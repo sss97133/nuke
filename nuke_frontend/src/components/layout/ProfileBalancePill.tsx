@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../contexts/ThemeContext';
 import type { CashBalance } from './hooks/useCashBalance';
 
 interface Props {
@@ -25,6 +26,7 @@ export const ProfileBalancePill: React.FC<Props> = ({
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
 
   // Close menu on outside click
   useEffect(() => {
@@ -182,8 +184,18 @@ export const ProfileBalancePill: React.FC<Props> = ({
                 </span>
               )}
             </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleTheme();
+              }}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}
+            >
+              <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+              <span style={{ fontSize: '14px', lineHeight: 1 }}>{theme === 'dark' ? '\u2600' : '\u263E'}</span>
+            </button>
             {[
-              { label: 'Capsule', action: '/capsule' },
+              { label: 'Appearance', action: '/capsule' },
               { label: 'Profile', action: `/profile/${session?.user?.id || ''}` },
               { label: 'Inbox', action: '/inbox' },
               { label: 'Vehicles', action: '/vehicle/list' },

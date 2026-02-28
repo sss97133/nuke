@@ -678,28 +678,42 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
       // Fall back to the existing multi-query client search if invoke fails.
       let edgeFunctionWorked = false;
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        const { data: edgeData, error: edgeError } = await supabase.functions.invoke('search', {
+        const { data: edgeData, error: edgeError } = await supabase.functions.invoke('universal-search', {
           body: {
             query: searchQuery.trim(),
             limit: 24,
-            user_id: user?.id ?? undefined,
-            user_location: userLocation ?? undefined
           }
         });
 
         if (!edgeError && edgeData && Array.isArray((edgeData as any).results)) {
-          const edgeResults = (edgeData as any).results as SearchResult[];
-          const edgeSummary = String((edgeData as any).search_summary || '') || `Found ${edgeResults.length} results for "${searchQuery.trim()}".`;
+          // Map universal-search result shape to frontend SearchResult type
+          const rawResults: any[] = (edgeData as any).results;
+          const typeMap: Record<string, string> = {
+            vin_match: 'vehicle',
+            tag: 'reference',
+            external_identity: 'user',
+          };
+          const edgeResults: SearchResult[] = rawResults.map((r: any) => ({
+            id: r.id,
+            type: (typeMap[r.type] ?? r.type) as SearchResult['type'],
+            title: r.title || '',
+            description: r.description || r.subtitle || '',
+            image_url: r.image_url,
+            relevance_score: r.relevance_score ?? 0,
+            metadata: r.metadata ?? {},
+            created_at: r.metadata?.created_at || '',
+          }));
+          const total = (edgeData as any).total_count ?? edgeResults.length;
+          const edgeSummary = `Found ${total} result${total !== 1 ? 's' : ''} for "${searchQuery.trim()}".`;
           onSearchResults(edgeResults, edgeSummary);
           edgeFunctionWorked = true;
           return;
         } else if (edgeError) {
-          console.warn('Search Edge Function error (falling back to client search):', edgeError);
+          console.warn('universal-search error (falling back to client search):', edgeError);
         }
       } catch (edgeErr: any) {
         // Edge function might not be deployed or network error - that's ok, use fallback
-        console.warn('Search Edge Function unavailable (using client search):', edgeErr?.message || 'Unknown error');
+        console.warn('universal-search unavailable (using client search):', edgeErr?.message || 'Unknown error');
       }
 
       const analysis = parseSearchQuery(searchQuery);
@@ -1884,7 +1898,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
             style={{
               fontSize: '13px',
               padding: queryIsUrl ? '10px 68px 10px 28px' : '10px 68px 10px 14px',
-              background: '#fff',
+              background: 'var(--surface)',
               border: '2px solid #000',
               borderRadius: '0px',
               fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -1971,7 +1985,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
           {/* Autocomplete Results */}
           {autocompleteResults.length > 0 && (
             <div style={{ padding: '8px 0' }}>
-              <div style={{ padding: '4px 16px', fontSize: '11px', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>
+              <div style={{ padding: '4px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase' }}>
                 Quick Results
               </div>
               {autocompleteResults.map((result, index) => (
@@ -1995,7 +2009,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
                     cursor: 'pointer',
                     fontSize: '12px',
                     borderBottom: '1px solid #e5e7eb',
-                    background: selectedSuggestionIndex === index ? '#f0f0f0' : 'white',
+                    background: selectedSuggestionIndex === index ? 'var(--bg)' : 'var(--surface)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px'
@@ -2006,7 +2020,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
                   <span style={{
                     fontSize: '11px',
                     fontWeight: 700,
-                    color: '#000',
+                    color: 'var(--text)',
                     minWidth: '20px'
                   }}>
                     {result.type === 'vehicle' ? 'V' : result.type === 'organization' ? 'O' : 'U'}
@@ -2014,7 +2028,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <span>{result.title}</span>
                     {result.type === 'user' && result.metadata?.subtitle && (
-                      <span style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>
+                      <span style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                         {result.metadata.subtitle}
                       </span>
                     )}
@@ -2027,7 +2041,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
           {/* Suggestions */}
           {suggestions.length > 0 && (
             <div style={{ padding: '8px 0', borderTop: autocompleteResults.length > 0 ? '1px solid #e5e7eb' : 'none' }}>
-              <div style={{ padding: '4px 16px', fontSize: '11px', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>
+              <div style={{ padding: '4px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase' }}>
                 Suggestions
               </div>
               {suggestions.map((suggestion, index) => (
@@ -2040,8 +2054,8 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
                     fontSize: '12px',
                     borderBottom: '1px solid #e5e7eb'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'var(--surface)'}
                 >
                   {suggestion}
                 </div>
@@ -2052,7 +2066,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
           {/* Recent Searches */}
           {searchHistory.length > 0 && (
             <div style={{ padding: '8px 0', borderTop: (autocompleteResults.length > 0 || suggestions.length > 0) ? '1px solid #e5e7eb' : 'none' }}>
-              <div style={{ padding: '4px 16px', fontSize: '11px', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>
+              <div style={{ padding: '4px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase' }}>
                 Recent Searches
               </div>
               {searchHistory.slice(0, 5).map((historyQuery, index) => (
@@ -2063,10 +2077,10 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
                     padding: '8px 16px',
                     cursor: 'pointer',
                     fontSize: '12px',
-                    color: '#666'
+                    color: 'var(--text-secondary)'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'var(--surface)'}
                 >
                   {historyQuery}
                 </div>

@@ -207,46 +207,36 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
 
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: '64px 24px',
-        flexDirection: 'column',
-        gap: '20px',
-      }}>
-        {/* Skeleton cards */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: '16px',
-          width: '100%',
-          marginBottom: '8px',
-        }}>
-          {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} style={{
-              height: '220px',
-              background: 'linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)',
-              backgroundSize: '200% 100%',
-              animation: 'skeleton-shimmer 1.5s infinite',
-              borderRadius: '8px',
-            }} />
-          ))}
-        </div>
+      <div style={{ padding: '0' }}>
         <style>{`
           @keyframes skeleton-shimmer {
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
           }
+          .sk { background: linear-gradient(90deg, var(--bg) 25%, var(--border) 50%, var(--bg) 75%); background-size: 200% 100%; animation: skeleton-shimmer 1.5s infinite; }
         `}</style>
-        <p style={{
-          fontSize: '12px',
-          color: '#9ca3af',
-          margin: 0,
-          fontWeight: 500,
+        {/* Fake summary bar */}
+        <div style={{ background: 'var(--bg)', border: '2px solid var(--border)', padding: '10px 14px', marginBottom: '12px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div className="sk" style={{ height: '14px', width: '80px', borderRadius: '3px' }} />
+          <div className="sk" style={{ height: '12px', width: '160px', borderRadius: '3px' }} />
+        </div>
+        {/* Skeleton vehicle cards grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+          gap: '12px',
         }}>
-          Searching...
-        </p>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} style={{ border: '1px solid var(--border)', borderRadius: '4px', overflow: 'hidden', background: 'var(--surface)' }}>
+              <div className="sk" style={{ height: '160px', width: '100%' }} />
+              <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="sk" style={{ height: '13px', width: '70%', borderRadius: '2px' }} />
+                <div className="sk" style={{ height: '11px', width: '45%', borderRadius: '2px' }} />
+                <div className="sk" style={{ height: '11px', width: '55%', borderRadius: '2px' }} />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -266,21 +256,21 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
             {/* Left: result count + summary */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
               {results.length > 0 && (
-                <span style={{ fontSize: '13px', fontWeight: 800, color: '#000' }}>
+                <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text)' }}>
                   {filteredAndSortedResults.length}
                 </span>
               )}
               {results.length > 0 && filterBy !== 'all' && (
-                <span style={{ fontSize: '11px', color: '#666' }}>of {results.length}</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>of {results.length}</span>
               )}
               {results.length > 0 && (
-                <span style={{ fontSize: '11px', color: '#444', fontWeight: 600 }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                   {filterBy === 'all' ? 'results' : (typeLabels[filterBy] || filterBy).toLowerCase()}
                   {searchQuery ? ` for "${searchQuery}"` : ''}
                 </span>
               )}
               {results.length === 0 && searchSummary && (
-                <span style={{ fontSize: '11px', color: '#666' }}>{searchSummary}</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{searchSummary}</span>
               )}
             </div>
 
@@ -320,7 +310,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                         borderRadius: '0px',
                         fontSize: '7.5pt',
                         fontWeight: 700,
-                        color: isActive ? '#fff' : '#374151',
+                        color: isActive ? '#fff' : 'var(--text)',
                         cursor: 'pointer',
                         transition: 'all 0.1s ease',
                       }}
@@ -328,7 +318,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       onMouseEnter={(e) => {
                         if (!isActive) {
                           e.currentTarget.style.borderColor = '#000';
-                          e.currentTarget.style.background = '#f9fafb';
+                          e.currentTarget.style.background = 'var(--bg)';
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -362,7 +352,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
               <div style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Workstation Lanes
               </div>
-              <div style={{ fontSize: '11px', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                 Jump into the slice you care about.
               </div>
             </div>
@@ -373,7 +363,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                 fontSize: '11px',
                 fontWeight: 700,
                 border: '2px solid #000',
-                background: '#fff',
+                background: 'var(--surface)',
                 cursor: 'pointer'
               }}
             >
@@ -383,11 +373,11 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
 
           <div style={{ display: 'grid', gap: '12px' }}>
             {bazaarGroups.map((group) => (
-              <div key={group.id} style={{ border: '1px solid var(--border)', padding: '10px', background: '#fff' }}>
+              <div key={group.id} style={{ border: '1px solid var(--border)', padding: '10px', background: 'var(--surface)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                   <div>
                     <div style={{ fontSize: '12px', fontWeight: 700 }}>{group.title}</div>
-                    <div style={{ fontSize: '11px', color: '#666' }}>{group.helper}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{group.helper}</div>
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {group.types.map((type) => {
@@ -406,7 +396,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                             fontSize: '9px',
                             fontWeight: 700,
                             border: `2px solid ${isActive ? '#3b82f6' : '#000'}`,
-                            background: isActive ? '#eff6ff' : '#fff',
+                            background: isActive ? '#eff6ff' : 'var(--surface)',
                             cursor: 'pointer'
                           }}
                         >
@@ -431,16 +421,16 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                           border: '1px solid var(--border)',
                           padding: '8px',
                           textDecoration: 'none',
-                          color: '#000',
+                          color: 'var(--text)',
                           background: 'var(--surface)'
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center' }}>
                           <div style={{ fontSize: '11px', fontWeight: 700 }}>{result.title}</div>
-                          <div style={{ fontSize: '9px', color: '#666', whiteSpace: 'nowrap' }}>{typeLabels[result.type] || result.type}</div>
+                          <div style={{ fontSize: '9px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{typeLabels[result.type] || result.type}</div>
                         </div>
                         {result.description && (
-                          <div style={{ fontSize: '9px', color: '#666', marginTop: '4px' }}>
+                          <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                             {String(result.description).slice(0, 120)}
                           </div>
                         )}
@@ -476,8 +466,8 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                   textTransform: 'uppercase',
                   border: '2px solid #000',
                   borderRadius: '0px',
-                  background: viewMode === mode ? '#000' : '#fff',
-                  color: viewMode === mode ? '#fff' : '#000',
+                  background: viewMode === mode ? 'var(--text)' : 'var(--surface)',
+                  color: viewMode === mode ? 'var(--surface)' : 'var(--text)',
                   cursor: 'pointer',
                   letterSpacing: '0.3px',
                 }}
@@ -489,7 +479,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <span style={{ fontSize: '7.5pt', fontWeight: 600, color: '#666' }}>Sort</span>
+              <span style={{ fontSize: '7.5pt', fontWeight: 600, color: 'var(--text-secondary)' }}>Sort</span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
@@ -499,7 +489,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                   border: '2px solid #000',
                   borderRadius: '0px',
                   background: 'var(--surface)',
-                  color: '#000',
+                  color: 'var(--text)',
                   fontWeight: 600,
                   cursor: 'pointer',
                 }}
@@ -525,14 +515,14 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           <div style={{
             fontSize: '15px',
             fontWeight: 700,
-            color: '#111',
+            color: 'var(--text)',
             marginBottom: '8px',
           }}>
             No results for &ldquo;{searchQuery}&rdquo;
           </div>
           <p style={{
             fontSize: '12px',
-            color: '#888',
+            color: 'var(--text-muted)',
             margin: '0 0 28px 0',
           }}>
             Try different keywords, check spelling, or search by make and model.
@@ -545,8 +535,8 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                 fontSize: '11px',
                 fontWeight: 700,
                 border: '2px solid #000',
-                background: '#fff',
-                color: '#000',
+                background: 'var(--surface)',
+                color: 'var(--text)',
                 cursor: 'pointer',
                 marginBottom: '20px',
               }}
@@ -564,14 +554,14 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                   fontSize: '11px',
                   fontWeight: 600,
                   border: '2px solid #e5e7eb',
-                  background: 'white',
-                  color: '#444',
+                  background: 'var(--surface)',
+                  color: 'var(--text-secondary)',
                   textDecoration: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.1s ease',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#000'; e.currentTarget.style.color = '#000'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.color = '#444'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#000'; e.currentTarget.style.color = 'var(--text)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
               >
                 {term}
               </a>
@@ -691,14 +681,14 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     transition: 'background 0.12s ease',
                     background: 'var(--surface)'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'var(--surface)'}
                 >
                   <div style={{
                     width: '60px',
                     height: '60px',
                     borderRadius: '0px',
-                    background: result.image_url ? `url(${result.image_url}) center/cover` : '#f0f0f0',
+                    background: result.image_url ? `url(${result.image_url}) center/cover` : 'var(--bg)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -718,7 +708,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                         margin: 0,
                         fontSize: '12px',
                         fontWeight: 700,
-                        color: '#000'
+                        color: 'var(--text)'
                       }}>
                         {result.title}
                       </h4>
@@ -740,22 +730,22 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     {result.type === 'vehicle' && (
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
                         {(result.metadata?.sale_price || result.metadata?.current_value || result.metadata?.asking_price) && (
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#000' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text)' }}>
                             ${((result.metadata?.sale_price || result.metadata?.current_value || result.metadata?.asking_price) || 0).toLocaleString()}
                           </span>
                         )}
                         {result.metadata?.vin && (
-                          <span style={{ fontSize: '9px', color: '#666', fontFamily: 'monospace' }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
                             {result.metadata.vin}
                           </span>
                         )}
                         {result.metadata?.mileage && (
-                          <span style={{ fontSize: '9px', color: '#666' }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
                             {result.metadata.mileage.toLocaleString()} mi
                           </span>
                         )}
                         {result.metadata?.transmission && (
-                          <span style={{ fontSize: '9px', color: '#666' }}>{result.metadata.transmission}</span>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>{result.metadata.transmission}</span>
                         )}
                       </div>
                     )}
@@ -764,7 +754,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       style={{
                         margin: '0 0 8px 0',
                         fontSize: '11px',
-                        color: '#666',
+                        color: 'var(--text-secondary)',
                         lineHeight: '1.4',
                         overflow: 'hidden',
                         display: '-webkit-box',
@@ -794,7 +784,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                           alignItems: 'center',
                           gap: '4px',
                           fontSize: '11px',
-                          color: '#666'
+                          color: 'var(--text-secondary)'
                         }}>
                           <span>📍</span>
                           <span>{result.location.address || 'Location available'}</span>
@@ -822,7 +812,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     flexDirection: 'column',
                     alignItems: 'flex-end',
                     fontSize: '11px',
-                    color: '#666',
+                    color: 'var(--text-secondary)',
                     marginLeft: '12px',
                     flexShrink: 0
                   }}>
@@ -835,7 +825,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     </div>
                     <div style={{
                       fontSize: '16px',
-                      color: '#000',
+                      color: 'var(--text)',
                       fontWeight: 700
                     }}>
                       {getTypeIcon(result.type)}
