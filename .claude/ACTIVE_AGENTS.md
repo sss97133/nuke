@@ -3,6 +3,23 @@
 
 ---
 
+## 🚨 VERCEL BUILD DEBRIEF — 2026-02-27 (READ BEFORE ANY FRONTEND WORK)
+
+**What happened:** 18 consecutive failed Vercel deployments (~14:05–14:33 UTC)
+**Root cause:** `QuotePartsList.tsx` imported `./PartLineItem` but `PartLineItem.tsx` was not committed.
+**Fix:** Commit `f10954394` added the missing file. Builds green since 14:35 UTC.
+
+**Rule for all frontend agents:**
+> When you create a new component file that another file imports, they MUST be in the same commit.
+> Never commit an import without also committing the file being imported.
+
+**Current git state:**
+- `origin/main` HEAD: `f10954394` (fix exchange)
+- Local HEAD (NOT YET PUSHED): `6282a7ce6` (fix homepage feed query, search loading state)
+- Action needed: push `6282a7ce6` to origin when safe
+
+---
+
 ## INTER-VP BRIEFS (read before starting work)
 
 ### 📋 VP Deal Flow → VP Extraction — 2026-02-26 (RESOLVED 2026-02-27)
@@ -17,7 +34,98 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 
 ---
 
+## 🚨 CRON CLEANUP — 2026-02-27 16:30 UTC + 17:30 UTC (READ BEFORE CREATING CRONS)
+
+**What happened:** 165 active cron jobs were choking the database. 44 ran every minute. 20 had completely broken auth (NULL headers). DB couldn't even run `SELECT count(*)` without timing out.
+
+**Pass 1 (16:30 UTC): 165 → 116 active**
+- Removed 50 cron jobs
+- Per-minute crons: 44 → 13 (kept 2 per major platform, 1 per minor)
+- Fixed 3 vault-based crons (data-quality-workforce, compute-data-quality-snapshot, check-vendor-balances) — rewrote to use `get_service_role_key_for_cron()`
+- Removed 20 crons with broken `current_setting()` auth (all analytics, premium-extraction, polling, scraper-health, etc.)
+- Removed 7 excess BaT extraction workers (10 → 3), 2 excess YONO workers (4 → 2), 3 excess continuous-queue-processors (5 → 2)
+- Purged 880,423 stale entries from `cron.job_run_details`
+- Added `cleanup-cron-log` cron (job 326): purges entries >6h old, runs every 6h
+
+**Pass 2 (17:30 UTC): 116 → 103 active**
+Removed 13 more low-value/redundant/broken jobs:
+- `auto-extract` (24): was `SELECT 1` — pure no-op
+- `concierge-villa-discovery` (90): broken auth — `app_config` key lookup, not `get_service_role_key_for_cron()`
+- `mecum-extraction-cron` (71): only inserted a run record, no actual extraction; mecum-queue-workers handle it
+- `cron-startup-timeout-alert` (328): low-priority monitoring noise every 5 min
+- `agent-monitor-scan` (235): redundant with extraction-watchdog
+- `extraction-health-check` (110): redundant with extraction-watchdog, every 15 min
+- `observation-migration` (82): broken COALESCE with `current_setting()` fallback, migration is background
+- `enrich-bulk-continuous` (170): `strategy:all, source:bat` — redundant with specific enrich-bulk-mine-bat + enrich-bulk-derive-bat + enrich-bulk-vin-bat
+- `aggressive-backlog-clear` (65): every 10 min, redundant with bat-extraction-worker-1/2/3 and continuous-queue-processors
+- `live-auction-sync` (87): broken vault auth (`trigger_live_auction_cron` uses `vault.decrypted_secrets`); `sync-live-auctions` (109) covers it every 15 min
+- `source-health-monitor` (21): low-value health check via old `trigger_agent_execution` dispatch, every hour
+- `auto-sort-telegram-photos` (128): low priority, every 2 hours
+- `analyze-unprocessed-org-images` (60): low priority, every 2 hours
+
+**Rules for all agents:**
+> 1. **NEVER create per-minute cron jobs.** Use `*/2` minimum, `*/5` preferred.
+> 2. **ALWAYS use `get_service_role_key_for_cron()`** — NOT `current_setting()`, NOT `vault.decrypted_secrets`.
+> 3. **Max 2 workers per platform queue.** Don't scale by adding more crons — fix throughput per worker.
+> 4. **Check `SELECT count(*) FROM cron.job WHERE active = true;` before adding crons.** If over 120, you need to justify it.
+
+**Removed workers (DO NOT RE-CREATE):**
+- mecum-queue-worker 3-10, mecum-live-queue-worker 3-5
+- cnb-queue-worker 3-6, bj-queue-worker 3-6, bat-queue-worker 3-5
+- pcar-queue-worker 2-3, bonhams-queue-worker 2-3, gooding-queue-worker-2
+- quality-backfill-worker 2-4, bat-extraction-worker 4-10, yono-vision-worker 3-4
+- continuous-queue-processor 3-5
+- auto-extract, concierge-villa-discovery, mecum-extraction-cron, cron-startup-timeout-alert
+- agent-monitor-scan, extraction-health-check, observation-migration, enrich-bulk-continuous
+- aggressive-backlog-clear, live-auction-sync, source-health-monitor, auto-sort-telegram-photos, analyze-unprocessed-org-images
+
+---
+
 ## CURRENTLY ACTIVE
+
+### 🚨 P0 ALERT: vehicles table UPDATE blocking PostgREST — 2026-02-27 ~18:30 UTC
+- PID 78414: `UPDATE vehicles SET auction_source = 'barrett-jackson'` running **30+ minutes**
+- While running, DDL retries (DROP/CREATE INDEX) cause AccessExclusive lock cascade → PGRST002 outage
+- **DO NOT** run any DDL on `vehicles` until this UPDATE completes
+- **DO NOT** re-enable valuation cron jobs 321-325 until UPDATE is done
+- Valuation crons 321-325 PAUSED by CWFTO to reduce contention
+
+
+### CWFTO — Morning Brief + Page Failure Triage — 2026-02-27 ~16:35 UTC — COMPLETED
+- Ran full startup ritual: inbox (3 msgs), active agents, DONE.md, task list, queue depths, background PIDs
+- Platform pulse: 1.165M active vehicles, import queue 40K pending / 235 processing / draining
+- Closed: duplicate YONO sidecar task (5a28a4a6), stale curator dedup task (3f77edb7)
+- Filed: P92 page load audit (21c3d69c), P88 auth guard map (e6aa28b8) — both vp-platform
+- COO inbox msg (YONO watchdog): british tier-2 training PID 37505 confirmed active at epoch 1/25
+- REMOVED: session complete
+
+### DB Migration — Normalize auction_source slugs — 2026-02-27
+- Task: Fix duplicate auction_source slugs (Barrett-Jackson, Bonhams, PCarMarket, etc.), tag ConceptCarz/orphan records, zero-mileage cleanup
+- Files: supabase/migrations/20260227210000_normalize_auction_sources.sql (new)
+- DO NOT TOUCH: vehicles.auction_source column (migrating it)
+
+### DB Worker — primary_image_url Backfill + Trigger — 2026-02-27
+- Task: Backfill vehicles.primary_image_url from vehicle_images (image_url column), add trigger
+- Files: supabase/migrations/20260227200000_sync_primary_image_url_trigger.sql (new)
+- DO NOT TOUCH: vehicle_images table schema, vehicles.primary_image_url column (backfilling it)
+
+### VP Vehicle Intel — Valuation Backfill Sprint (feb786e7) — 2026-02-27 ~17:00 UTC
+- Task: Lift valuation coverage from 44% → 70%+ (489K viable vehicles queued)
+- Building: sharded backfill cron (5 workers, quality-sorted), immediate batch fire, accuracy validation
+- DB changes: new migration for run_valuation_batch_by_quality() + 5 cron workers
+- DO NOT TOUCH: compute-vehicle-valuation edge function (calling it, not modifying)
+
+### VP Platform — Vehicle Profile P0 Fix — COMPLETED 2026-02-27
+- Fixed indefinite loading for anon users: anon role 3s timeout, RPC was slow
+- DB migration: stripped price_signal/price_history/documents subqueries, capped images at 200
+- Frontend: RPC timeout 8s→2.5s, explicit column fallback. Commit 5ee11e181, pushed to main.
+- REMOVED: session complete
+
+### CWFTO — Situational Brief — 2026-02-27 ~16:10 UTC — COMPLETED
+- Full startup ritual ran. Reset 7 stale in_progress→pending. Completed 4 done tasks. Closed 2 dupes.
+- Filed: P92 deactivate quality backfill crons (100% done), P90 YONO sidecar redeploy, P88 verify vehicle profile P0
+- Next CWFTO loop filed (P92 pending)
+- REMOVED: session complete
 
 ### Key Guardian Setup — COMPLETED 2026-02-27
 - gitleaks installed (v8.30.0), .gitleaks.toml config created
@@ -31,10 +139,10 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 - Committed cf0b94722, pushed to main
 - REMOVED: session complete
 
-### Frontend Worker — TeamInbox Gmail-style 3-pane Redesign — 2026-02-27
-- Task: Full visual redesign of TeamInbox.tsx (3-pane layout, design system tokens)
-- Files: nuke_frontend/src/pages/TeamInbox.tsx ONLY
-- Preserving all logic, replacing JSX/styles only
+### Frontend Worker — TeamInbox Gmail-style 3-pane Redesign — COMPLETED 2026-02-27
+- Rebuilt TeamInbox.tsx visual layer: 220px sidebar + 360px middle + flex-1 detail pane
+- All design system tokens, sender avatars, left accent bars, mobile tab bar
+- Commit 9c0553683, pushed to main. REMOVED: session complete
 
 ### Stripe Connect Agent — COMPLETED 2026-02-27
 - All done. See DONE.md for details. Commit 5528063ab, pushed to main.
@@ -328,3 +436,106 @@ Gap report: descriptions, VIN, mileage, engine/transmission gaps hurting scoring
 - 4 Critical + 4 High issues found and fixed. Commit 8ec743ad9 deployed.
 - Email report sent to founder via agent-email. See DONE.md for full details.
 - REMOVED: session complete
+
+### VP Extraction — VIN Backfill (User Submission) — 2026-02-27
+- Task: 05436e30 — Backfill VINs from listing_page_snapshots, NHTSA WMI lookup
+- Files: supabase/functions/backfill-vin-from-snapshots/ (new)
+- DO NOT TOUCH: continuous-queue-processor, import_queue processing
+
+
+### Frontend Audit Agent — Crash Fix Sprint — 2026-02-27 (ACTIVE)
+- Task: Full audit of all pages in nuke_frontend/src/pages/ for crashes/broken states
+- Touching: All pages (read), fixing null guards, loading states, broken imports
+- Priority pages: VehicleProfile.tsx, VehicleHeader.tsx, Search.tsx, CursorHomepage.tsx, MarketExchange.tsx, MarketFundDetail.tsx, Portfolio.tsx, TeamInbox.tsx, InvestorOffering.tsx, BrowseInvestments.tsx, OrganizationProfile.tsx, Dashboard.tsx, AdminMissionControl.tsx
+- DO NOT TOUCH: edge functions, DB schema
+
+### Backend Error Triage Agent — 2026-02-27 — COMPLETED
+- Found and filed 6 real backend issues (see agent_tasks filed 2026-02-27 16:35 UTC)
+- Key findings: api-v1-comps 401 for anon, search_vehicles_fuzzy 3s timeout, investor-portal-stats >15s timeout, api-v1-market-trends timeout, search_vehicles_fts intermittent 503
+- All pages return HTTP 200 from Vercel CDN. No missing route files.
+- REMOVED: session complete
+
+### VP Platform — Site Load Failure Triage (Playwright) — 2026-02-27
+- Task: Investigate blank content / "Loading module..." on nuke.ag
+- Using Playwright to capture console errors, network failures, screenshots
+- Pages: /, /search?q=porsche, /vehicles
+- READ ONLY — no file edits
+
+## Agent: search_vehicles_fuzzy index fix — 2026-02-27
+**Task**: Update search_vehicles_fuzzy function to use idx_vehicles_make_model_trgm index
+**Files**: supabase function (DB only, no file changes)
+**Status**: Running
+
+## Agent: Timeout Fixer — 2026-02-27 ~21:00 UTC
+- **Task**: Fix api-v1-market-trends 500 timeout + investor-portal-stats timeout
+- **Areas**: DB RPCs (get_market_trends, investor stats), edge functions (api-v1-market-trends, investor-portal-stats)
+- **Task IDs**: ffaeabaf, 322eb3ae
+
+### ~~Agent: Fix mobile nav + cron URL bugs — 2026-02-27 ~20:00 UTC~~ DONE
+- Both issues were already resolved before pickup. Tasks marked completed.
+
+### Agent: Fix Organization Pipeline (2026-02-27 ~21:00 UTC)
+- **Task**: Investigate and fix vehicle_images organization_status stuck at 'unorganized'
+- **Files**: supabase/functions/*organiz*, cron jobs, vehicle_images pipeline
+- **Task ID**: 28fc41c0-261f-43c1-8651-0e74b1309b82
+
+### FB Marketplace GraphQL Probe — 2026-02-27 17:00 UTC — COMPLETED
+**Agent**: FB Marketplace Extraction team
+**Result**: GraphQL probe complete. No tokens needed. v2 scraper deployed. 144 vintage listings from 5-city sweep.
+**Next**: Run `--all --max-pages 50` for full 55-metro sweep.
+
+### Agent: Infra/Ops — Valuation Crons + Org Pipeline — 2026-02-27 ~21:30 UTC
+- **Task 1**: Re-enable valuation cron jobs 321-325 (paused during lock cascade)
+- **Task 2**: Fix vehicle_images organization_status pipeline
+- **Areas**: cron.job, vehicles table locks, vehicle_images organization pipeline
+
+### ~~Agent Architecture Team — Agent Hierarchy Build — 2026-02-27 ~23:00 UTC~~ DONE
+- Built and deployed: haiku-extraction-worker, sonnet-supervisor, agent-tier-router, _shared/agentTiers.ts
+- Tested with real data. See DONE.md 2026-02-27 entry.
+- REMOVED: session complete
+
+### ~~YONO Sidecar Team — 2026-02-27 ~23:30 UTC~~ DONE
+- Tier-2 models exported to ONNX, uploaded to Modal, sidecar redeployed with all 6 families
+- `api-v1-vision` v1.1 rewritten: parallel classify+analyze, auth tokens, optional comps
+- All edge functions tested end-to-end. Consumer API delivering full vehicle intelligence at $0/image.
+
+### FB Marketplace National Sweep — RUNNING (PID 96491) — 2026-02-27 ~23:45 UTC
+- **Script**: `nohup dotenvx run -- node scripts/fb-marketplace-local-scraper.mjs --all --max-pages 50 > /tmp/fb-sweep.log 2>&1`
+- **PID**: 96491 (node process), parent wrapper PID 96482
+- **Status**: CONFIRMED RUNNING — Austin complete (89 vintage/942 total), Dallas in progress
+- **ETA**: ~4 hours for all 58 metros
+- **Monitor**: `tail -30 /tmp/fb-sweep.log`
+- **Expected yield**: ~2,000-4,000 vintage listings across 58 US metros
+- AGENT REMOVED — sweep is autonomous, no agent needed
+
+### ~~Automation Team — launchd Setup — 2026-02-28~~ DONE
+- Both plists created, loaded, verified. Old nohup killed. See DONE.md 2026-02-28.
+
+### ~~SDK Team — @nuke1/sdk v1.5.0 vision namespace — 2026-02-28~~ DONE
+- Vision types aligned with live api-v1-vision v1.1, health() method added, smart auth
+- All 4 methods verified end-to-end: classify, analyze, batch, health
+- REMOVED: session complete
+
+### Agent: VehicleProfile Refactor — 2026-02-27 ~18:00 UTC
+- **Task:** Splitting VehicleProfile.tsx into sub-components
+- **Files:** `nuke_frontend/src/pages/VehicleProfile.tsx`, new files in `nuke_frontend/src/pages/vehicle-profile/`
+- **NOT touching:** VehicleHeader.tsx (another agent owns that)
+
+### Agent: VehicleHeader Refactor — COMPLETED 2026-02-27
+**Phase 1 DONE**: Extracted utilities + hooks from VehicleHeader.tsx (5885 -> 4950 lines)
+- Created `vehicleHeaderUtils.ts` (313 lines) — pure utility functions
+- Created `hooks/useVehicleHeaderData.ts` (904 lines) — 16 custom data-fetching hooks
+- VehicleHeader.tsx compiles clean (`npx tsc --noEmit` passes)
+- Zero behavior change, all CSS/styling preserved
+
+### DOM Flattening — AppLayout.tsx — COMPLETED 2026-02-27
+- Merged `.content-container` into `main.main-content` in AppLayout (removed 1 wrapper div)
+- Files changed: AppLayout.tsx, design-system.css
+- index.css untouched (no changes needed)
+
+
+
+## UI Visual Audit Agent — 2026-02-27 ~18:00 UTC
+**Task**: Screenshot vehicle page at mobile/desktop widths, audit dark mode
+**Files**: Read-only (screenshots only)
+**Status**: Active

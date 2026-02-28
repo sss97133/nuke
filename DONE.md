@@ -1,5 +1,34 @@
 # DONE — Completed Work Log
 
+### [VP Extraction] P0: Fix Cars & Bids extraction pipeline — 2026-02-27 21:30 UTC
+**Task ID:** 200cba73-c5b7-4cc5-a5a2-4a77791ffe62 (RESOLVED)
+
+**Problem:** 488 C&B vehicles created in last 7 days had 0 comments, 0 bids, 0 listing URLs. Root cause: `extract-premium-auction` called `extract-cars-and-bids-core` (core data only) but never triggered secondary extractors (`extract-cars-and-bids-comments` and `extract-cab-bids`).
+
+**Solution:**
+1. **Modified `extract-premium-auction`**: Added non-blocking triggers for comment and bid extraction after successful core extraction (both index page and individual listing modes)
+2. **Updated `continuous-queue-processor`**: Added C&B comment/bid extraction triggers (same pattern as BaT)
+3. **Created `backfill-cb-extraction`**: New edge function to re-trigger full extraction for existing 489 C&B vehicles
+4. **Backfill execution**: Successfully triggered 489 extraction jobs (verified via function response)
+
+**Files changed:**
+- `supabase/functions/extract-premium-auction/index.ts`: Added C&B comment/bid fetch triggers (lines 118-153 for index, 184-219 for individual)
+- `supabase/functions/continuous-queue-processor/index.ts`: Added C&B secondary extraction block (lines 433-464)
+- `supabase/functions/backfill-cb-extraction/index.ts`: New backfill function (88.62kB)
+
+**Deployment:**
+- `extract-premium-auction` deployed ✓
+- `continuous-queue-processor` deployed ✓
+- `backfill-cb-extraction` deployed ✓
+- Backfill executed: 489/489 vehicles processed
+
+**Impact:** C&B vehicles now receive complete extraction pipeline:
+- Core data (VIN, specs, images, descriptions) via `extract-cars-and-bids-core`
+- All auction comments via `extract-cars-and-bids-comments`
+- Full bid history via `extract-cab-bids`
+
+**Commit:** 33eedb043
+
 ### [frontend] Competitors page reframed to partner ecosystem — 2026-02-27
 - Rewrote MarketCompetitors.tsx — changed framing from adversarial competitor comparison to partnership ecosystem
 - Removed: NUKE_ADVANTAGES attack section, "vs. X" summary cards, Nuke as a peer card in competitor grid, red ✗ scoring
