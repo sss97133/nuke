@@ -376,7 +376,7 @@ export default function UnifiedMap() {
         .select('id, latitude, longitude, image_url, thumbnail_url, vehicle_id, location_name, taken_at, source, exif_data')
         .not('latitude', 'is', null).not('longitude', 'is', null)
         .order('taken_at', { ascending: false })
-        .limit(5000);
+        .limit(15000);
       if (!data) return;
 
       // Get vehicle titles for linked photos
