@@ -1549,7 +1549,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           {vehicle.current_value && vehicle.purchase_price && 
            vehicle.purchase_price > 0 && 
            vehicle.purchase_price < vehicle.current_value * 5 ? (
-            <span style={{ color: vehicle.current_value > vehicle.purchase_price ? '#10b981' : '#ef4444' }}>
+            <span style={{ color: vehicle.current_value > vehicle.purchase_price ? 'var(--success)' : 'var(--error)' }}>
               {vehicle.current_value > vehicle.purchase_price ? '+' : ''}
               {formatPrice(vehicle.current_value - vehicle.purchase_price)}
             </span>
@@ -1569,22 +1569,22 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         state={{ vehicleTitle }}
         style={{
           display: 'block',
-          background: 'rgba(0, 0, 0, 0.9)',
+          background: 'var(--surface)',
           borderRadius: '8px',
           overflow: 'hidden',
           textDecoration: 'none',
           color: 'inherit',
           transition: 'transform 0.15s ease, box-shadow 0.15s ease',
           marginBottom: '0px',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+          boxShadow: '0 1px 4px var(--shadow-color, rgba(0,0,0,0.08))',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = 'translateY(-3px)';
-          e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.18)';
+          e.currentTarget.style.boxShadow = '0 8px 24px var(--shadow-color, rgba(0,0,0,0.18))';
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
+          e.currentTarget.style.boxShadow = '0 1px 4px var(--shadow-color, rgba(0,0,0,0.08))';
         }}
       >
         {/* Image preview with overlays */}
@@ -1592,7 +1592,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           style={{
             width: '100%',
             height: '200px',
-            backgroundColor: '#1a1a1a',
+            backgroundColor: 'var(--grey-200)',
             position: 'relative',
           }}
         >
@@ -2209,15 +2209,47 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               width: '100%',
               height: '100%',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'var(--text-muted)',
-              fontSize: '12px',
-              background: 'var(--grey-100)',
-              border: '1px dashed var(--border)'
+              gap: '6px',
+              background: '#222',
+              padding: '12px',
             }}
           >
-            No Image
+            <div style={{
+              fontSize: '13px',
+              fontWeight: 700,
+              color: '#fff',
+              textAlign: 'center',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              lineHeight: 1.3,
+            }}>
+              {`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'VEHICLE'}
+            </div>
+            <div style={{
+              fontSize: '9px',
+              color: '#666',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}>
+              NO PHOTO YET
+            </div>
+            {(() => {
+              const imgCount = vehicle.all_images?.length || vehicle.image_count || 0;
+              const eventCount = vehicle.event_count || 0;
+              const dataPoints = (imgCount > 0 ? 1 : 0) + (eventCount > 0 ? 1 : 0) + (vehicle.vin ? 1 : 0) + (vehicle.sale_price || vehicle.asking_price ? 1 : 0);
+              const sources: string[] = [];
+              if (vehicle.discovery_source) sources.push(vehicle.discovery_source);
+              if (vehicle.profile_origin) sources.push(vehicle.profile_origin.replace(/_/g, ' '));
+              return (
+                <div style={{ fontSize: '9px', color: '#888', textAlign: 'center', lineHeight: 1.5 }}>
+                  {dataPoints > 0 && <div>{dataPoints} data point{dataPoints !== 1 ? 's' : ''}</div>}
+                  {sources.length > 0 && <div>{sources.join(', ')}</div>}
+                </div>
+              );
+            })()}
           </div>
         )}
         {(showTopLeftStack || showTopRightBadges) && (
