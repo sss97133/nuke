@@ -158,8 +158,10 @@ interface PhotoPin {
   lng: number;
   img: string;
   thumb: string | null;
+  hasRealImage: boolean;       // false for placeholder.nuke.app URLs
   vehicleId: string | null;
   vehicleTitle: string;
+  vehicleThumb: string | null; // primary image of the linked vehicle
   locationName: string | null;
   takenAt: string | null;
   takenLabel: string;
@@ -379,31 +381,45 @@ export default function UnifiedMap() {
         .limit(15000);
       if (!data) return;
 
-      // Get vehicle titles for linked photos
+      // Get vehicle titles + primary images for linked photos
       const vehicleIds = [...new Set(data.map(d => d.vehicle_id).filter(Boolean))];
-      const vehicleTitles: Record<string, string> = {};
+      const vehicleInfo: Record<string, { title: string; thumb: string | null }> = {};
       if (vehicleIds.length > 0) {
-        const { data: vehs } = await supabase.from('vehicles')
-          .select('id, year, make, model')
-          .in('id', vehicleIds.slice(0, 200));
-        for (const v of vehs || []) {
-          vehicleTitles[v.id] = [v.year, v.make, v.model].filter(Boolean).join(' ');
+        // Fetch in batches of 200 (Supabase .in() limit)
+        for (let i = 0; i < vehicleIds.length; i += 200) {
+          const batch = vehicleIds.slice(i, i + 200);
+          const { data: vehs } = await supabase.from('vehicles')
+            .select('id, year, make, model, primary_image_url')
+            .in('id', batch);
+          for (const v of vehs || []) {
+            const thumb = v.primary_image_url?.includes('/storage/v1/object/public/')
+              ? v.primary_image_url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=200&height=140&quality=70&resize=cover'
+              : v.primary_image_url || null;
+            vehicleInfo[v.id] = {
+              title: [v.year, v.make, v.model].filter(Boolean).join(' '),
+              thumb,
+            };
+          }
         }
       }
 
       setPhotos(data.map(d => {
         const dt = d.taken_at ? new Date(d.taken_at) : null;
         const exif = d.exif_data as any;
+        const isPlaceholder = d.image_url?.includes('placeholder.nuke.app');
+        const vInfo = d.vehicle_id ? vehicleInfo[d.vehicle_id] : null;
         return {
           id: d.id,
           lat: Number(d.latitude),
           lng: Number(d.longitude),
           img: d.image_url,
-          thumb: d.thumbnail_url || (d.image_url?.includes('/storage/v1/object/public/')
+          thumb: isPlaceholder ? null : (d.thumbnail_url || (d.image_url?.includes('/storage/v1/object/public/')
             ? d.image_url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=200&height=140&quality=70&resize=cover'
-            : null),
+            : null)),
+          hasRealImage: !isPlaceholder,
           vehicleId: d.vehicle_id,
-          vehicleTitle: d.vehicle_id ? (vehicleTitles[d.vehicle_id] || 'Vehicle') : '',
+          vehicleTitle: vInfo?.title || '',
+          vehicleThumb: vInfo?.thumb || null,
           locationName: d.location_name,
           takenAt: d.taken_at,
           takenLabel: dt ? `${dt.toLocaleString('en', { month: 'short', day: 'numeric', year: 'numeric' })}` : '',
@@ -810,8 +826,10 @@ export default function UnifiedMap() {
         id: 'photo-points',
         data: photos,
         getPosition: (d: PhotoPin) => [d.lng, d.lat],
-        getRadius: 60,
-        getFillColor: [217, 70, 239, 230] as [number, number, number, number],
+        getRadius: (d: PhotoPin) => d.hasRealImage ? 60 : 40,
+        getFillColor: (d: PhotoPin) => d.hasRealImage
+          ? [217, 70, 239, 230] as [number, number, number, number]
+          : [217, 70, 239, 120] as [number, number, number, number],
         radiusMinPixels: Math.max(3, ptMin * 1.2),
         radiusMaxPixels: Math.max(6, ptMax * 1.2),
         pickable: true,
@@ -1172,40 +1190,48 @@ export default function UnifiedMap() {
 
             {type === 'photo' && (() => {
               const p = pin as PhotoPin;
-              const imgSrc = p.thumb || p.img;
+              // Show real photo thumbnail, or fall back to the vehicle's primary image
+              const imgSrc = p.hasRealImage ? (p.thumb || p.img) : p.vehicleThumb;
               return (
                 <div>
-                  {imgSrc && <img src={imgSrc} alt="Photo" style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block', background: '#000' }}
+                  {imgSrc && <img src={imgSrc} alt={p.vehicleTitle || 'Photo'} style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block', background: '#111' }}
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
-                  <div style={{ padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#D946EF', flexShrink: 0 }} />
-                      <span style={{ fontWeight: 700, fontSize: '14px', color: '#D946EF' }}>Photo</span>
-                      <span style={{ fontSize: '10px', color: '#666', marginLeft: 'auto', textTransform: 'uppercase' }}>{p.source}</span>
+                  {!imgSrc && p.vehicleTitle && (
+                    <div style={{ width: '100%', height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111', color: '#555', fontSize: 13 }}>
+                      No image available
                     </div>
-                    {p.vehicleTitle && (
+                  )}
+                  <div style={{ padding: '14px 16px' }}>
+                    {/* Vehicle title — the primary thing you care about */}
+                    {p.vehicleTitle ? (
                       <a href={p.vehicleId ? `/vehicle/${p.vehicleId}` : '#'} style={{
-                        color: '#3B82F6', textDecoration: 'none', fontWeight: 600, fontSize: '14px', display: 'block', marginBottom: 8,
+                        color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: '15px', display: 'block', marginBottom: 6,
+                        lineHeight: 1.3,
                       }}>{p.vehicleTitle}</a>
+                    ) : (
+                      <div style={{ color: '#888', fontSize: '13px', marginBottom: 6 }}>Unlinked photo</div>
                     )}
-                    {p.locationName && (
-                      <div style={{ color: '#e0e0e0', fontSize: '12px', marginBottom: 6, lineHeight: 1.5 }}>
-                        {p.locationName}
+
+                    {/* Location + date on one line */}
+                    <div style={{ color: '#aaa', fontSize: '12px', marginBottom: 10, lineHeight: 1.5 }}>
+                      {p.locationName && <div>{p.locationName}</div>}
+                      {p.takenLabel && <div style={{ color: '#888' }}>{p.takenLabel}{p.cameraModel ? ` \u00b7 ${p.cameraModel}` : ''}</div>}
+                    </div>
+
+                    {/* Source badge */}
+                    {!p.hasRealImage && (
+                      <div style={{ fontSize: '10px', color: '#D946EF', marginBottom: 10, opacity: 0.7 }}>
+                        GPS location from Apple Photos
                       </div>
                     )}
-                    <div style={{ color: '#999', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-                      {p.takenLabel && <div>Taken: <span style={{ color: '#e0e0e0' }}>{p.takenLabel}</span></div>}
-                      {p.cameraModel && <div>Camera: <span style={{ color: '#e0e0e0' }}>{p.cameraModel}</span></div>}
-                      <div>GPS: <span style={{ color: '#e0e0e0', fontFamily: 'monospace', fontSize: '10px' }}>
-                        {p.lat.toFixed(5)}, {p.lng.toFixed(5)}
-                      </span></div>
-                    </div>
+
+                    {/* Action button */}
                     {p.vehicleId && (
                       <a href={`/vehicle/${p.vehicleId}`} style={{
                         display: 'block', textAlign: 'center', padding: '10px', borderRadius: 6,
                         background: 'rgba(217,70,239,0.15)', color: '#D946EF', textDecoration: 'none',
-                        fontWeight: 600, fontSize: '12px', border: '1px solid rgba(217,70,239,0.3)',
-                      }}>View Vehicle</a>
+                        fontWeight: 600, fontSize: '13px', border: '1px solid rgba(217,70,239,0.3)',
+                      }}>View {p.vehicleTitle.split(' ').slice(1, 3).join(' ') || 'Vehicle'}</a>
                     )}
                   </div>
                 </div>
