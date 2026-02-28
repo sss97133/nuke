@@ -366,7 +366,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
     return (
       <div style={{
         background: 'var(--bg)',
-        border: '1px solid #bdbdbd',
+        border: '1px solid var(--border)',
         padding: '16px',
         margin: '16px',
         fontSize: '11px',
@@ -381,7 +381,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
     return (
       <div style={{
         background: 'var(--bg)',
-        border: '1px solid #bdbdbd',
+        border: '1px solid var(--border)',
         padding: '16px',
         margin: '16px',
         fontSize: '11px',
@@ -395,7 +395,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
   return (
     <div style={{
       background: 'var(--bg)',
-      border: '1px solid #bdbdbd',
+      border: '1px solid var(--border)',
       padding: '0px',
       margin: '16px',
       fontFamily: 'Arial, sans-serif'
@@ -461,7 +461,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
               <span>{stream.streamer_name}</span>
               <span>VIEWERS: {stream.viewer_count}</span>
             </div>
-            <div style={{ fontSize: '9px', color: '#ccc' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
               {stream.tags.map(tag => `#${tag}`).join(' ')}
             </div>
           </div>
@@ -472,16 +472,16 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
           <div style={{
             flex: '1',
             background: 'var(--surface)',
-            border: '1px solid #bdbdbd',
+            border: '1px solid var(--border)',
             display: 'flex',
             flexDirection: 'column',
             minWidth: '300px'
           }}>
             {/* Chat Header */}
             <div style={{
-              background: '#e0e0e0',
+              background: 'var(--border)',
               padding: '8px',
-              borderBottom: '1px solid #bdbdbd',
+              borderBottom: '1px solid var(--border)',
               fontSize: '11px',
               fontWeight: 'bold'
             }}>
@@ -504,10 +504,10 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                   style={{
                     marginBottom: '8px',
                     padding: '4px',
-                    borderBottom: '1px solid #f0f0f0',
+                    borderBottom: '1px solid var(--border)',
                     background:
                       msg.message_type === 'super_chat' || (msg.donation_cents || 0) > 0
-                        ? 'rgba(245, 158, 11, 0.16)'
+                        ? 'var(--warning-dim)'
                         : 'transparent'
                   }}
                 >
@@ -523,15 +523,15 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                         }}
                       />
                     )}
-                    <span style={{ fontWeight: 'bold', color: '#424242' }}>
+                    <span style={{ fontWeight: 'bold', color: 'var(--text)' }}>
                       {msg.user_name}
                     </span>
                     {(msg.donation_cents || 0) > 0 && (
-                      <span style={{ fontSize: '9px', color: '#92400e', fontWeight: 'bold' }}>
+                      <span style={{ fontSize: '9px', color: 'var(--warning)', fontWeight: 'bold' }}>
                         TIP ${((msg.donation_cents || 0) / 100).toFixed(2)}
                       </span>
                     )}
-                    <span style={{ fontSize: '9px', color: '#9e9e9e' }}>
+                    <span style={{ fontSize: '9px', color: 'var(--text-disabled)' }}>
                       {formatTimestamp(msg.created_at)}
                     </span>
                   </div>
@@ -541,10 +541,10 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
             </div>
 
             {/* Tip Panel */}
-            <div style={{ borderTop: '1px solid #bdbdbd', padding: '8px', fontSize: '11px' }}>
+            <div style={{ borderTop: '1px solid var(--border)', padding: '8px', fontSize: '11px' }}>
               <div style={{ fontWeight: 'bold', marginBottom: 6 }}>TIP STREAMER</div>
               {!user && (
-                <div style={{ color: '#757575' }}>Login to tip.</div>
+                <div style={{ color: 'var(--text-disabled)' }}>Login to tip.</div>
               )}
               {user && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -561,9 +561,9 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                         style={{
                           padding: '4px 8px',
                           fontSize: '11px',
-                          border: '1px solid #bdbdbd',
-                          background: '#111827',
-                          color: 'white',
+                          border: '1px solid var(--border)',
+                          background: 'var(--text)',
+                          color: 'var(--bg)',
                           borderRadius: '0px',
                           cursor: 'pointer',
                           opacity: tipping ? 0.7 : 1,
@@ -584,7 +584,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                       style={{
                         width: 110,
                         padding: '4px',
-                        border: '1px solid #bdbdbd',
+                        border: '1px solid var(--border)',
                         borderRadius: '0px',
                         fontSize: '11px',
                       }}
@@ -597,7 +597,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                       style={{
                         flex: 1,
                         padding: '4px',
-                        border: '1px solid #bdbdbd',
+                        border: '1px solid var(--border)',
                         borderRadius: '0px',
                         fontSize: '11px',
                       }}
@@ -612,9 +612,9 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                       style={{
                         padding: '4px 8px',
                         fontSize: '11px',
-                        border: '1px solid #bdbdbd',
-                        background: '#111827',
-                        color: 'white',
+                        border: '1px solid var(--border)',
+                        background: 'var(--text)',
+                        color: 'var(--bg)',
                         borderRadius: '0px',
                         cursor: 'pointer',
                         opacity: tipping || !parseTipAmountCents() ? 0.6 : 1,
@@ -628,13 +628,13 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
             </div>
 
             {/* Invest Panel */}
-            <div style={{ borderTop: '1px solid #bdbdbd', padding: '8px', fontSize: '11px' }}>
+            <div style={{ borderTop: '1px solid var(--border)', padding: '8px', fontSize: '11px' }}>
               <div style={{ fontWeight: 'bold', marginBottom: 6 }}>INVEST</div>
-              {loadingDeals && <div style={{ color: '#757575' }}>Loading deals...</div>}
-              {dealError && <div style={{ color: '#b91c1c' }}>{dealError}</div>}
+              {loadingDeals && <div style={{ color: 'var(--text-disabled)' }}>Loading deals...</div>}
+              {dealError && <div style={{ color: 'var(--error)' }}>{dealError}</div>}
 
               {!loadingDeals && !dealError && investmentDeals.length === 0 && (
-                <div style={{ color: '#757575' }}>No public deals.</div>
+                <div style={{ color: 'var(--text-disabled)' }}>No public deals.</div>
               )}
 
               {investmentDeals.map((d) => {
@@ -648,7 +648,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                   <div
                     key={d.id}
                     style={{
-                      border: '1px solid #bdbdbd',
+                      border: '1px solid var(--border)',
                       padding: '6px',
                       marginBottom: '6px',
                       background: 'transparent'
@@ -656,9 +656,9 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                       <div style={{ fontWeight: 'bold' }}>{d.title}</div>
-                      <div style={{ fontSize: '9px', color: '#6b7280', fontWeight: 'bold' }}>{typeLabel}</div>
+                      <div style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>{typeLabel}</div>
                     </div>
-                    <div style={{ fontSize: '9px', color: '#6b7280', marginTop: 2 }}>
+                    <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: 2 }}>
                       Rate: {ratePct.toFixed(2)}%
                       {capMult ? ` • Cap: ${capMult}x` : ''}
                       {d.term_end_at ? ` • Ends: ${new Date(d.term_end_at).toLocaleDateString()}` : ''}
@@ -677,7 +677,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                         style={{
                           width: 110,
                           padding: '4px',
-                          border: '1px solid #bdbdbd',
+                          border: '1px solid var(--border)',
                           borderRadius: '0px',
                           fontSize: '11px',
                         }}
@@ -688,9 +688,9 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                         style={{
                           padding: '4px 8px',
                           fontSize: '11px',
-                          border: '1px solid #bdbdbd',
-                          background: '#111827',
-                          color: 'white',
+                          border: '1px solid var(--border)',
+                          background: 'var(--text)',
+                          color: 'var(--bg)',
                           borderRadius: '0px',
                           cursor: 'pointer',
                           opacity: !user || investing ? 0.7 : 1,
@@ -704,7 +704,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
               })}
 
               {user && stream && user.id === stream.streamer_id && (
-                <div style={{ marginTop: 8, borderTop: '1px solid #e0e0e0', paddingTop: 8 }}>
+                <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                   <div style={{ fontWeight: 'bold', marginBottom: 6 }}>CREATE DEAL</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <button
@@ -713,9 +713,9 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                       style={{
                         padding: '4px 8px',
                         fontSize: '11px',
-                        border: '1px solid #bdbdbd',
-                        background: '#111827',
-                        color: 'white',
+                        border: '1px solid var(--border)',
+                        background: 'var(--text)',
+                        color: 'var(--bg)',
                         borderRadius: '0px',
                         cursor: 'pointer',
                         opacity: creatingDeal ? 0.7 : 1,
@@ -729,9 +729,9 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                       style={{
                         padding: '4px 8px',
                         fontSize: '11px',
-                        border: '1px solid #bdbdbd',
-                        background: '#111827',
-                        color: 'white',
+                        border: '1px solid var(--border)',
+                        background: 'var(--text)',
+                        color: 'var(--bg)',
                         borderRadius: '0px',
                         cursor: 'pointer',
                         opacity: creatingDeal ? 0.7 : 1,
@@ -740,7 +740,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                       {creatingDeal ? 'CREATING...' : 'CREATE REV SHARE'}
                     </button>
                   </div>
-                  <div style={{ color: '#757575', fontSize: '9px', marginTop: 6 }}>
+                  <div style={{ color: 'var(--text-disabled)', fontSize: '9px', marginTop: 6 }}>
                     Tips create cashflow events and auto-sweep payouts when deals are active.
                   </div>
                 </div>
@@ -751,7 +751,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
             {user && (
               <div style={{
                 padding: '8px',
-                borderTop: '1px solid #bdbdbd',
+                borderTop: '1px solid var(--border)',
                 display: 'flex',
                 gap: '4px'
               }}>
@@ -764,7 +764,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                   style={{
                     flex: '1',
                     padding: '4px',
-                    border: '1px solid #bdbdbd',
+                    border: '1px solid var(--border)',
                     borderRadius: '0px',
                     fontSize: '11px'
                   }}
@@ -775,9 +775,9 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                   style={{
                     padding: '4px 8px',
                     fontSize: '11px',
-                    border: '1px solid #bdbdbd',
-                    background: newMessage.trim() ? '#424242' : '#e0e0e0',
-                    color: newMessage.trim() ? 'white' : '#9e9e9e',
+                    border: '1px solid var(--border)',
+                    background: newMessage.trim() ? 'var(--text)' : 'var(--border)',
+                    color: newMessage.trim() ? 'var(--bg)' : 'var(--text-disabled)',
                     borderRadius: '0px',
                     cursor: newMessage.trim() ? 'pointer' : 'not-allowed'
                   }}
@@ -790,10 +790,10 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
             {!user && (
               <div style={{
                 padding: '8px',
-                borderTop: '1px solid #bdbdbd',
+                borderTop: '1px solid var(--border)',
                 fontSize: '11px',
                 textAlign: 'center',
-                color: '#757575'
+                color: 'var(--text-disabled)'
               }}>
                 Login to participate in chat
               </div>
@@ -808,7 +808,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
       {/* Stream Details */}
       <div style={{
         background: 'var(--surface)',
-        border: '1px solid #bdbdbd',
+        border: '1px solid var(--border)',
         padding: '12px',
         fontSize: '11px'
       }}>
@@ -822,9 +822,9 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
               style={{
                 padding: '4px 8px',
                 fontSize: '11px',
-                border: '1px solid #bdbdbd',
-                background: isFollowing ? '#e0e0e0' : '#424242',
-                color: isFollowing ? '#424242' : 'white',
+                border: '1px solid var(--border)',
+                background: isFollowing ? 'var(--border)' : 'var(--text)',
+                color: isFollowing ? 'var(--text)' : 'var(--bg)',
                 borderRadius: '0px',
                 cursor: 'pointer'
               }}
@@ -835,12 +835,12 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
         </div>
 
         {stream.description && (
-          <div style={{ marginBottom: '8px', color: '#6b7280' }}>
+          <div style={{ marginBottom: '8px', color: 'var(--text-secondary)' }}>
             {stream.description}
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '16px', fontSize: '9px', color: '#6b7280' }}>
+        <div style={{ display: 'flex', gap: '16px', fontSize: '9px', color: 'var(--text-secondary)' }}>
           <div>Type: {stream.stream_type.replace('_', ' ')}</div>
           <div>Status: {stream.status}</div>
           {stream.started_at && (

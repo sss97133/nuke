@@ -97,7 +97,7 @@
   border-radius: 2px;
   font-size: var(--fs-8);
   font-weight: 700;
-  color: white;
+  color: var(--bg);
   text-transform: uppercase;
 }
 
@@ -106,7 +106,7 @@
   border-radius: 2px;
   font-size: var(--fs-8);
   font-weight: 700;
-  color: white;
+  color: var(--bg);
 }
 
 .proposal-meta {

@@ -220,26 +220,26 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
   }
 
   return (
-    <div className="card" style={{ marginBottom: '16px', border: '2px solid #f59e0b' }}>
+    <div className="card" style={{ marginBottom: '16px', border: '2px solid var(--warning)' }}>
       <div className="card-header" style={{
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
-        background: '#fffbeb',
-        borderBottom: '1px solid #f59e0b'
+        background: 'var(--warning-dim)',
+        borderBottom: '1px solid var(--warning)'
       }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--warning)' }} strokeWidth="2">
           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
           <line x1="12" y1="9" x2="12" y2="13"/>
           <line x1="12" y1="17" x2="12.01" y2="17"/>
         </svg>
-        <span style={{ fontSize: '13px', fontWeight: 700, color: '#92400e' }}>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--warning-text, #92400e)' }}>
           Duplicate Profiles Detected ({proposals.length})
         </span>
       </div>
 
-      <div className="card-body" style={{ padding: '16px', background: '#fffbeb' }}>
-        <div style={{ fontSize: '11px', color: '#78350f', marginBottom: '16px' }}>
+      <div className="card-body" style={{ padding: '16px', background: 'var(--warning-dim)' }}>
+        <div style={{ fontSize: '11px', color: 'var(--warning-text, #78350f)', marginBottom: '16px' }}>
           AI detected potential duplicate vehicle profiles. Review and merge to consolidate your data.
         </div>
 
@@ -253,7 +253,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
             <div
               key={proposal.id}
               style={{
-                border: '1px solid #d97706',
+                border: '1px solid var(--warning)',
                 borderRadius: '4px',
                 padding: '12px',
                 marginBottom: '12px',
@@ -263,8 +263,8 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
               {/* Confidence badge */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                 <div style={{
-                  background: proposal.confidence_score >= 90 ? '#10b981' : '#f59e0b',
-                  color: 'white',
+                  background: proposal.confidence_score >= 90 ? 'var(--success)' : 'var(--warning)',
+                  color: 'var(--bg)',
                   padding: '3px 8px',
                   borderRadius: '2px',
                   fontSize: '9px',
@@ -287,14 +287,14 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                 {/* PRIMARY (Keep) */}
                 <div style={{
                   padding: '10px',
-                  border: '2px solid #10b981',
+                  border: '2px solid var(--success)',
                   borderRadius: '3px',
-                  background: '#ecfdf5'
+                  background: 'var(--success-dim)'
                 }}>
                   <div style={{
                     fontSize: '9px',
                     fontWeight: 700,
-                    color: '#059669',
+                    color: 'var(--success)',
                     marginBottom: '4px'
                   }}>
                     PRIMARY (KEEP)
@@ -309,9 +309,9 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                   )}
                   <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px' }}>
                     VIN: {primary.vin || 'None'}
-                    {isPrimaryFake && <span style={{ color: '#dc2626' }}> (auto-generated)</span>}
+                    {isPrimaryFake && <span style={{ color: 'var(--error)' }}> (auto-generated)</span>}
                   </div>
-                  <div style={{ fontSize: '9px', fontWeight: 600, color: '#059669' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 600, color: 'var(--success)' }}>
                     {primary.image_count} photos • {primary.event_count} events
                   </div>
                   {primary.discovery_source && (
@@ -323,7 +323,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
 
                 {/* Arrow */}
                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--text-disabled)' }} strokeWidth="2">
                     <line x1="5" y1="12" x2="19" y2="12"/>
                     <polyline points="12 5 19 12 12 19"/>
                   </svg>
@@ -332,14 +332,14 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                 {/* DUPLICATE (Merge) */}
                 <div style={{
                   padding: '10px',
-                  border: '2px solid #dc2626',
+                  border: '2px solid var(--error)',
                   borderRadius: '3px',
-                  background: '#fef2f2'
+                  background: 'var(--error-dim)'
                 }}>
                   <div style={{
                     fontSize: '9px',
                     fontWeight: 700,
-                    color: '#dc2626',
+                    color: 'var(--error)',
                     marginBottom: '4px'
                   }}>
                     DUPLICATE (MERGE)
@@ -354,9 +354,9 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                   )}
                   <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px' }}>
                     VIN: {duplicate.vin || 'None'}
-                    {isDupFake && <span style={{ color: '#dc2626' }}> (auto-generated)</span>}
+                    {isDupFake && <span style={{ color: 'var(--error)' }}> (auto-generated)</span>}
                   </div>
-                  <div style={{ fontSize: '9px', fontWeight: 600, color: '#dc2626' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 600, color: 'var(--error)' }}>
                     {duplicate.image_count} photos • {duplicate.event_count} events
                   </div>
                   {duplicate.discovery_source && (
@@ -372,7 +372,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                 <div style={{
                   padding: '8px',
                   background: 'var(--bg)',
-                  border: '1px solid #d1d5db',
+                  border: '1px solid var(--border)',
                   borderRadius: '3px',
                   fontSize: '11px',
                   color: 'var(--text-secondary)',
@@ -402,7 +402,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                   className="button button-primary button-small"
                   style={{
                     fontSize: '11px',
-                    background: merging === proposal.id ? '#6b7280' : undefined
+                    background: merging === proposal.id ? 'var(--text-secondary)' : undefined
                   }}
                 >
                   {merging === proposal.id ? 'Merging...' : 'Merge Profiles'}
@@ -417,7 +417,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
           marginTop: '16px',
           padding: '12px',
           background: 'var(--surface)',
-          border: '1px solid #d1d5db',
+          border: '1px solid var(--border)',
           borderRadius: '3px',
           fontSize: '11px',
           color: 'var(--text-muted)'

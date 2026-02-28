@@ -251,7 +251,7 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
                 const volMedian = sortedVol.length > 0 ? sortedVol[Math.floor(sortedVol.length / 2)] : 0;
                 const goodDay = todayCnt >= cntMedian && todayVol >= volMedian && (sortedCnt.length > 0 || sortedVol.length > 0);
                 const tempLabel = volPercentile >= 80 ? 'Hot' : volPercentile >= 50 ? 'Warm' : volPercentile >= 20 ? 'Cool' : 'Cold';
-                const tempColor = volPercentile >= 80 ? '#dc2626' : volPercentile >= 50 ? '#f59e0b' : volPercentile >= 20 ? '#3b82f6' : '#6b7280';
+                const tempColor = volPercentile >= 80 ? 'var(--error)' : volPercentile >= 50 ? 'var(--warning)' : volPercentile >= 20 ? 'var(--accent)' : 'var(--text-secondary)';
                 return (
                   <div style={{ marginBottom: '16px' }}>
                     <div style={{ fontSize: '11px', fontWeight: 900, marginBottom: '8px' }}>Today&apos;s market</div>
@@ -264,7 +264,7 @@ const StatsPanelOverlay: React.FC<StatsPanelOverlayProps> = ({
                       </div>
                       <div style={{ border: '2px solid var(--border)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
                         <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>GOOD DAY?</div>
-                        <div style={{ fontSize: '15px', fontWeight: 900, color: goodDay ? '#059669' : 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '15px', fontWeight: 900, color: goodDay ? 'var(--success)' : 'var(--text-muted)' }}>
                           {goodDay ? 'Yes' : 'No'}
                         </div>
                         <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>

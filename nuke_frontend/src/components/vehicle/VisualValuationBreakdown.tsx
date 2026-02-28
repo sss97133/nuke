@@ -315,7 +315,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
       <div className="card">
         <div className="card-header">Valuation Breakdown</div>
         <div className="card-body">
-          <div style={{ textAlign: 'center', padding: '20px', color: '#ef4444' }}>
+          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--error)' }}>
             Error loading valuation: {error}
           </div>
         </div>
@@ -601,8 +601,8 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                       style={{
                         padding: '12px',
                         borderRadius: '8px',
-                        border: '1px solid #facc15',
-                        background: '#fef9c3',
+                        border: '1px solid var(--warning)',
+                        background: 'var(--warning-dim)',
                         fontSize: '11px'
                       }}
                     >
@@ -873,7 +873,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
             {valuation.documentedInvestments > 0 && (
               <>
                 <div style={{ color: 'var(--text-muted)' }}>+ Documented Investments:</div>
-                <div style={{ textAlign: 'right', color: '#10b981', fontWeight: 'bold' }}>
+                <div style={{ textAlign: 'right', color: 'var(--success)', fontWeight: 'bold' }}>
                   {formatCurrency(valuation.documentedInvestments)}
                 </div>
               </>
@@ -916,8 +916,8 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                 <span>Position:</span>
                 <span style={{ 
                   fontWeight: 'bold',
-                  color: valuation.marketPosition === 'above' ? '#10b981' : 
-                         valuation.marketPosition === 'below' ? '#ef4444' : 
+                  color: valuation.marketPosition === 'above' ? 'var(--success)' :
+                         valuation.marketPosition === 'below' ? 'var(--error)' :
                          'var(--text)'
                 }}>
                   {valuation.marketPosition === 'above' ? '↑ Above Market' : 
@@ -933,8 +933,8 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
         {valuation.warnings.length > 0 && (
           <div style={{ 
             padding: '12px', 
-            background: '#fef3c7', 
-            border: '1px solid #fbbf24',
+            background: 'var(--warning-dim)',
+            border: '1px solid var(--warning)',
             marginBottom: '16px',
             fontSize: '11px'
           }}>
@@ -998,13 +998,13 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                 <div style={{ 
                   fontSize: '9px',
                   padding: '2px 6px',
-                  background: item.evidence.photoCount > 3 ? '#dcfce7' : 
-                              item.evidence.photoCount > 0 ? '#fef3c7' : 
-                              '#fee2e2',
+                  background: item.evidence.photoCount > 3 ? 'var(--success-dim)' :
+                              item.evidence.photoCount > 0 ? 'var(--warning-dim)' :
+                              'var(--error-dim)',
                   border: '1px solid ' + (
-                    item.evidence.photoCount > 3 ? '#86efac' : 
-                    item.evidence.photoCount > 0 ? '#fbbf24' : 
-                    '#fca5a5'
+                    item.evidence.photoCount > 3 ? 'var(--success)' :
+                    item.evidence.photoCount > 0 ? 'var(--warning)' :
+                    'var(--error)'
                   ),
                   borderRadius: '2px'
                 }}>
@@ -1070,9 +1070,9 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
               <div style={{ 
                 width: `${valuation.documentationScore}%`, 
                 height: '100%',
-                background: valuation.documentationScore > 70 ? '#10b981' : 
-                           valuation.documentationScore > 40 ? '#fbbf24' : 
-                           '#ef4444',
+                background: valuation.documentationScore > 70 ? 'var(--success)' :
+                           valuation.documentationScore > 40 ? 'var(--warning)' :
+                           'var(--error)',
                 transition: 'width 0.3s ease'
               }} />
             </div>

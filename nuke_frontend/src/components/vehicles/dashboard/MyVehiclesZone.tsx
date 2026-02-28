@@ -91,7 +91,7 @@ export const MyVehiclesZone: React.FC<MyVehiclesZoneProps> = ({
               fontSize: '9px',
               fontWeight: 600,
               background: 'var(--primary)',
-              color: 'white',
+              color: 'var(--bg)',
               border: 'none',
               borderRadius: '2px',
               cursor: 'pointer'

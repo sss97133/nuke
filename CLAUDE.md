@@ -158,6 +158,42 @@ const { html } = await readArchivedPage(url);
 
 ---
 
+## BATCHED MIGRATION PRINCIPLE (CRITICAL)
+
+**Never run unbounded UPDATE/DELETE on large tables (vehicles, vehicle_images, import_queue).**
+
+On 2026-02-27, a single `UPDATE vehicles SET auction_source = ...` ran for 30+ minutes, blocked PostgREST schema cache reload, and caused a full API outage (PGRST002) across all REST endpoints.
+
+### Rules for large-table migrations:
+1. **Batch all writes**: `UPDATE ... WHERE id IN (SELECT id FROM ... LIMIT 1000)` in a loop
+2. **Add pg_sleep(0.1)** between batches to let autovacuum and other queries breathe
+3. **Never hold a transaction open** across the entire table — use individual `UPDATE` statements per batch
+4. **No DDL (CREATE INDEX, ALTER TABLE) while a long UPDATE is running** — it causes AccessExclusive lock cascades
+5. **Test on a small batch first**: run with `LIMIT 10` and check execution time before scaling up
+6. **Time limit**: if a single migration statement takes >60s, it must be batched
+
+```
+-- WRONG: locks entire table for 30+ minutes
+UPDATE vehicles SET auction_source = 'barrett-jackson' WHERE auction_source = 'Barrett-Jackson';
+
+-- RIGHT: batch in chunks
+DO $$
+DECLARE batch_size INT := 1000; affected INT;
+BEGIN
+  LOOP
+    UPDATE vehicles SET auction_source = 'barrett-jackson'
+    WHERE id IN (
+      SELECT id FROM vehicles WHERE auction_source = 'Barrett-Jackson' LIMIT batch_size
+    );
+    GET DIAGNOSTICS affected = ROW_COUNT;
+    EXIT WHEN affected = 0;
+    PERFORM pg_sleep(0.1);
+  END LOOP;
+END $$;
+```
+
+---
+
 ## Available Tools
 
 ### MCP Servers (USE THESE - you have direct access)

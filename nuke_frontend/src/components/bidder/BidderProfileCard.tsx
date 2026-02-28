@@ -143,7 +143,7 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
       onClick={onClose}
     >
       {/* Backdrop */}
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--overlay, rgba(0,0,0,0.4))' }} />
 
       {/* Card */}
       <div
@@ -178,7 +178,7 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
                 <span style={{ fontSize: '19px', fontWeight: 700 }}>{username}</span>
                 {mvProfile && (
                   <span style={{
-                    fontSize: '9px', background: 'var(--primary, #3b82f6)', color: '#fff',
+                    fontSize: '9px', background: 'var(--primary, #3b82f6)', color: 'var(--bg)',
                     borderRadius: 10, padding: '1px 8px', fontWeight: 600,
                   }}>
                     {mvProfile.total_bids} bids
@@ -271,7 +271,7 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
                       <span style={{ fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 6 }}>
                         {formatUsd(a.highest_bid)}
                         {a.won && (
-                          <span style={{ color: '#22c55e', fontSize: '9px', fontWeight: 700 }}>WON</span>
+                          <span style={{ color: 'var(--success)', fontSize: '9px', fontWeight: 700 }}>WON</span>
                         )}
                       </span>
                     </div>

@@ -357,7 +357,7 @@ const DealerBulkEditor: React.FC = () => {
               fontSize: '11px',
               border: '1px solid var(--accent)',
               background: 'var(--accent)',
-              color: 'white',
+              color: 'var(--bg)',
               cursor: 'pointer',
               fontWeight: 600
             }}
@@ -372,7 +372,7 @@ const DealerBulkEditor: React.FC = () => {
               fontSize: '11px',
               border: '1px solid var(--success)',
               background: 'var(--success)',
-              color: 'white',
+              color: 'var(--bg)',
               cursor: saving ? 'wait' : 'pointer',
               fontWeight: 600,
               opacity: saving ? 0.6 : 1
@@ -411,7 +411,7 @@ const DealerBulkEditor: React.FC = () => {
                 fontSize: '11px',
                 border: '1px solid var(--accent)',
                 background: 'var(--accent)',
-                color: 'white',
+                color: 'var(--bg)',
                 cursor: aiParsing ? 'wait' : 'pointer',
                 fontWeight: 600
               }}
@@ -474,7 +474,7 @@ const DealerBulkEditor: React.FC = () => {
               <tr 
                 key={vehicle.id || index}
                 style={{
-                  background: vehicle._isDirty ? 'rgba(255, 220, 100, 0.1)' : 'white',
+                  background: vehicle._isDirty ? 'rgba(255, 220, 100, 0.1)' : 'var(--surface)',
                   borderLeft: vehicle._errors && vehicle._errors.length > 0 ? '3px solid var(--danger)' : 'none'
                 }}
               >

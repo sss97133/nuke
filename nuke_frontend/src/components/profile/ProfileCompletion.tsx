@@ -84,7 +84,7 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ completion, onAct
             <div style={{
               width: `${percentage}%`,
               height: '100%',
-              backgroundColor: percentage === 100 ? '#22c55e' : '#3b82f6',
+              backgroundColor: percentage === 100 ? 'var(--success)' : 'var(--accent)',
               transition: 'width 0.3s ease'
             }} />
           </div>
@@ -103,9 +103,9 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ completion, onAct
                 alignItems: 'center', 
                 justifyContent: 'space-between',
                 padding: '8px',
-                backgroundColor: item.completed ? '#f0fdf4' : '#fafafa',
+                backgroundColor: item.completed ? 'var(--success-dim)' : 'var(--bg-secondary)',
                 borderRadius: '4px',
-                border: item.completed ? '1px solid #22c55e' : '1px solid #e5e5e5'
+                border: item.completed ? '1px solid var(--success)' : '1px solid var(--border)'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -113,13 +113,13 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ completion, onAct
                   width: '16px',
                   height: '16px',
                   borderRadius: '50%',
-                  backgroundColor: item.completed ? '#22c55e' : '#e5e5e5',
+                  backgroundColor: item.completed ? 'var(--success)' : 'var(--border)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
                   {item.completed && (
-                    <span style={{ color: 'white', fontSize: '11px' }}>✓</span>
+                    <span style={{ color: 'var(--bg)', fontSize: '11px' }}>✓</span>
                   )}
                 </div>
                 <div>
@@ -145,14 +145,14 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ completion, onAct
           <div style={{ 
             marginTop: '16px', 
             padding: '12px', 
-            backgroundColor: '#f0fdf4', 
+            backgroundColor: 'var(--success-dim, #f0fdf4)',
             borderRadius: '4px',
-            border: '1px solid #22c55e'
+            border: '1px solid var(--success)'
           }}>
-            <div className="text-small font-bold" style={{ color: '#16a34a', fontSize: '11px' }}>
+            <div className="text-small font-bold" style={{ color: 'var(--success)', fontSize: '11px' }}>
               Profile Complete
             </div>
-            <div className="text-small" style={{ color: '#16a34a', fontSize: '11px' }}>
+            <div className="text-small" style={{ color: 'var(--success)', fontSize: '11px' }}>
               Your profile is fully set up and ready to showcase your vehicles.
             </div>
           </div>

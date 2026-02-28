@@ -289,7 +289,7 @@ const EventMap: React.FC<EventMapProps> = ({ vehicleId, showLifeOnly = false }) 
       <div className="card-body">
         {loading && <div className="text-sm text-gray-600">Loading events…</div>}
         {error && <div className="text-sm text-red-600">{error}</div>}
-        <div ref={mapRef} style={{ width: '100%', height: 360, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+        <div ref={mapRef} style={{ width: '100%', height: 360, borderRadius: 8, border: '1px solid var(--border)' }} />
       </div>
     </div>
   );

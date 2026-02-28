@@ -19,7 +19,7 @@ cd /Users/skylar/nuke && dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/res
 
 | ID | Name | Focus | Persona File |
 |----|------|-------|-------------|
-| `cwfto` | CWFTO | Workforce transformation | `.claude/agents/cwfto/CLAUDE.md` |
+| `cwtfo` | CWTFO | Situational awareness, triage, briefs | `.claude/agents/cwtfo/CLAUDE.md` |
 | `coo` | COO | Operations, coordination | `.claude/agents/coo/CLAUDE.md` |
 | `cto` | CTO | Architecture, infrastructure | `.claude/agents/cto/CLAUDE.md` |
 | `cfo` | CFO | Finance, cost analysis | `.claude/agents/cfo/CLAUDE.md` |

@@ -116,7 +116,7 @@ export function ServiceReportModal({
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0,0,0,0.8)',
+        background: 'var(--overlay)',
         zIndex: 9999,
         display: 'flex',
         alignItems: 'center',
@@ -289,7 +289,7 @@ export function ServiceReportModal({
                 onClick={() => window.open(`/vehicle/${vehicleId}`, '_blank')}
                 style={{
                   background: 'var(--accent)',
-                  color: 'white',
+                  color: 'var(--bg)',
                   border: 'none',
                   padding: '8px 16px',
                   fontSize: '11px',
@@ -314,7 +314,7 @@ export function ServiceReportModal({
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0,0,0,0.95)',
+            background: 'var(--overlay)',
             zIndex: 10000,
             display: 'flex',
             alignItems: 'center',

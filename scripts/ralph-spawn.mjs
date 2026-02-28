@@ -12,6 +12,9 @@
  *   dotenvx run -- node scripts/ralph-spawn.mjs --agent vp-extraction
  *   dotenvx run -- node scripts/ralph-spawn.mjs --dry-run
  *   dotenvx run -- node scripts/ralph-spawn.mjs --list
+ *   dotenvx run -- node scripts/ralph-spawn.mjs --max-tokens-per-agent 30000
+ *   dotenvx run -- node scripts/ralph-spawn.mjs --session-budget 200000
+ *   dotenvx run -- node scripts/ralph-spawn.mjs --model sonnet  (overrides all agents)
  */
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
@@ -35,7 +38,69 @@ const AGENT_FILTER = arg('--agent') || arg('-a');
 const DRY_RUN = flag('--dry-run');
 const LIST_ONLY = flag('--list');
 const MAX_TASKS = parseInt(arg('--max-tasks') || '30');
-const MODEL = arg('--model') || 'sonnet';
+
+// --model overrides ALL agents when specified (backward-compatible)
+const MODEL_OVERRIDE = arg('--model') || null;
+
+// Per-agent token budget. If specified, overrides tier defaults for all agents.
+const MAX_TOKENS_PER_AGENT_FLAG = arg('--max-tokens-per-agent');
+const MAX_TOKENS_PER_AGENT = MAX_TOKENS_PER_AGENT_FLAG ? parseInt(MAX_TOKENS_PER_AGENT_FLAG) : null;
+
+// Session-level total token cap across all agents. 0 = unlimited.
+const SESSION_BUDGET = parseInt(arg('--session-budget') || '0') || 0;
+
+// ─── Model routing ─────────────────────────────────────────────────────────
+
+const MODEL_MAP = {
+  // Extraction workers — Haiku (~$0.056/task)
+  worker: 'haiku',
+  'vp-extraction': 'haiku',
+  'vp-orgs': 'haiku',
+  'vp-docs': 'haiku',
+  'vp-photos': 'haiku',
+  // VP/domain leads — Sonnet (~$0.525/task)
+  'vp-ai': 'sonnet',
+  'vp-platform': 'sonnet',
+  'vp-vehicle-intel': 'sonnet',
+  'vp-deal-flow': 'sonnet',
+  // Executive/strategy — Opus (~$2.25/task)
+  cto: 'opus',
+  coo: 'opus',
+  cfo: 'opus',
+  cpo: 'opus',
+  cdo: 'opus',
+  cwtfo: 'opus',
+};
+
+// Default token budgets by tier
+const TOKEN_DEFAULTS = {
+  haiku: 30000,
+  sonnet: 60000,
+  opus: 100000,
+};
+
+// Hard cap: never run more than 3 Opus agents simultaneously
+const OPUS_CONCURRENCY_CAP = 3;
+
+function getAgentModel(agentType) {
+  if (MODEL_OVERRIDE) return MODEL_OVERRIDE;
+  return MODEL_MAP[agentType] || 'sonnet';
+}
+
+function getTokenBudget(model) {
+  if (MAX_TOKENS_PER_AGENT !== null) return MAX_TOKENS_PER_AGENT;
+  return TOKEN_DEFAULTS[model] || TOKEN_DEFAULTS.sonnet;
+}
+
+// For display in header (when using per-agent routing)
+const MODEL = MODEL_OVERRIDE || 'per-agent';
+
+// ─── Session-level shared state ────────────────────────────────────────────
+
+const sessionState = {
+  totalTokensUsed: 0,
+  activeOpusCount: 0,
+};
 
 // ─── Supabase ──────────────────────────────────────────────────────────────
 
@@ -116,13 +181,17 @@ async function markInProgress(taskId) {
     .eq('id', taskId);
 }
 
-async function markComplete(taskId, summary, success = true) {
+async function markComplete(taskId, summary, success = true, tokenUsage = null) {
+  const result = {
+    ...(summary ? { summary: summary.slice(0, 4000) } : {}),
+    ...(tokenUsage || {}),
+  };
   await supabase
     .from('agent_tasks')
     .update({
       status: success ? 'completed' : 'failed',
       completed_at: new Date().toISOString(),
-      result: summary ? { summary: summary.slice(0, 4000) } : null,
+      result: Object.keys(result).length > 0 ? result : null,
       error: success ? null : summary,
     })
     .eq('id', taskId);
@@ -133,19 +202,33 @@ async function markComplete(taskId, summary, success = true) {
 async function runAgent(task) {
   const { id, agent_type, priority, title, description } = task;
   const sessionId = `ralph-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const agentModel = getAgentModel(agent_type);
+  const tokenBudget = getTokenBudget(agentModel);
+  const isOpus = agentModel === 'opus';
+
+  // ── Opus concurrency cap: wait for a slot ──
+  if (isOpus) {
+    while (sessionState.activeOpusCount >= OPUS_CONCURRENCY_CAP) {
+      log(agent_type, `Opus cap reached (${sessionState.activeOpusCount}/${OPUS_CONCURRENCY_CAP}) — waiting 5s for slot...`, 'warn');
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+    sessionState.activeOpusCount++;
+  }
 
   // Atomic claim
   const claimed = await claimTask(id, sessionId);
   if (!claimed) {
+    if (isOpus) sessionState.activeOpusCount--;
     log(agent_type, `skipped (already claimed): ${title}`, 'warn');
     return;
   }
 
-  log(agent_type, `${C.bold}▶ P${priority}: ${title}${C.reset}`);
+  log(agent_type, `${C.bold}▶ P${priority} [${agentModel}/${tokenBudget}tok]: ${title}${C.reset}`);
 
   if (DRY_RUN) {
     log(agent_type, `[dry-run] would execute task ${id}`, 'success');
     await supabase.from('agent_tasks').update({ status: 'pending', claimed_by: null, claimed_at: null }).eq('id', id);
+    if (isOpus) sessionState.activeOpusCount--;
     return;
   }
 
@@ -166,6 +249,9 @@ async function runAgent(task) {
 
   let lastText = '';
   let turns = 0;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let budgetExceeded = false;
   const startMs = Date.now();
 
   try {
@@ -182,13 +268,30 @@ async function runAgent(task) {
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
         settingSources: ['project', 'user'],
-        model: MODEL,
+        model: agentModel,
         maxTurns: 100,
+        maxTokens: tokenBudget,
         env: { ...process.env, CLAUDECODE: undefined },
       },
     })) {
       if (message.type === 'assistant') {
         turns++;
+
+        // Accumulate token usage from each assistant message
+        const usage = message.message?.usage;
+        if (usage) {
+          totalInputTokens += usage.input_tokens || 0;
+          totalOutputTokens += usage.output_tokens || 0;
+        }
+
+        // Per-agent token budget check
+        const totalSoFar = totalInputTokens + totalOutputTokens;
+        if (totalSoFar >= tokenBudget) {
+          log(agent_type, `${C.yellow}Token budget exceeded (${totalSoFar}/${tokenBudget}) — stopping agent${C.reset}`, 'warn');
+          budgetExceeded = true;
+          break;
+        }
+
         const blocks = message.message?.content || [];
         for (const block of blocks) {
           if (block.type === 'text' && block.text?.trim()) {
@@ -202,14 +305,39 @@ async function runAgent(task) {
       }
     }
 
+    const tokensUsed = totalInputTokens + totalOutputTokens;
+    sessionState.totalTokensUsed += tokensUsed;
+
     const elapsed = ((Date.now() - startMs) / 1000).toFixed(0);
-    log(agent_type, `${C.bold}✓ done in ${elapsed}s (${turns} turns)${C.reset}`, 'success');
-    await markComplete(id, lastText, true);
+
+    if (budgetExceeded) {
+      log(agent_type, `${C.bold}⚠ token budget hit in ${elapsed}s (${turns} turns, ${tokensUsed}/${tokenBudget} tokens)${C.reset}`, 'warn');
+      await markComplete(id, 'Token budget exceeded', false, {
+        tokens_used: tokensUsed,
+        input_tokens: totalInputTokens,
+        output_tokens: totalOutputTokens,
+      });
+    } else {
+      log(agent_type, `${C.bold}✓ done in ${elapsed}s (${turns} turns, ${tokensUsed} tokens)${C.reset}`, 'success');
+      await markComplete(id, lastText, true, {
+        tokens_used: tokensUsed,
+        input_tokens: totalInputTokens,
+        output_tokens: totalOutputTokens,
+      });
+    }
 
   } catch (err) {
+    const tokensUsed = totalInputTokens + totalOutputTokens;
+    sessionState.totalTokensUsed += tokensUsed;
     const elapsed = ((Date.now() - startMs) / 1000).toFixed(0);
     log(agent_type, `✗ failed after ${elapsed}s: ${err.message}`, 'error');
-    await markComplete(id, err.message, false);
+    await markComplete(id, err.message, false, {
+      tokens_used: tokensUsed,
+      input_tokens: totalInputTokens,
+      output_tokens: totalOutputTokens,
+    });
+  } finally {
+    if (isOpus) sessionState.activeOpusCount--;
   }
 }
 
@@ -219,6 +347,16 @@ async function runPool(tasks, concurrency) {
   const queue = [...tasks];
   const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, async () => {
     while (queue.length > 0) {
+      // Session budget check: stop pulling tasks if total spend exceeded
+      if (SESSION_BUDGET > 0 && sessionState.totalTokensUsed >= SESSION_BUDGET) {
+        const remaining = queue.length;
+        if (remaining > 0) {
+          log('ralph-spawn', `Session budget reached (${sessionState.totalTokensUsed}/${SESSION_BUDGET} tokens used). ${remaining} task(s) remain pending in DB.`, 'warn');
+          queue.length = 0; // drain local queue; DB tasks stay pending
+        }
+        break;
+      }
+
       const task = queue.shift();
       if (task) await runAgent(task);
     }
@@ -237,6 +375,9 @@ async function main() {
   console.log(`\n${C.bold}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C.reset}`);
   console.log(`${C.bold}  ralph-spawn${C.reset}  ${C.dim}multi-agent executor${C.reset}`);
   console.log(`  concurrency: ${C.cyan}${CONCURRENCY}${C.reset}  model: ${C.cyan}${MODEL}${C.reset}  dry-run: ${DRY_RUN ? C.yellow + 'yes' : C.dim + 'no'}${C.reset}`);
+  if (MAX_TOKENS_PER_AGENT !== null) console.log(`  max-tokens-per-agent: ${C.cyan}${MAX_TOKENS_PER_AGENT}${C.reset} ${C.dim}(overrides tier defaults)${C.reset}`);
+  if (SESSION_BUDGET > 0) console.log(`  session-budget: ${C.cyan}${SESSION_BUDGET}${C.reset} tokens total`);
+  if (!MODEL_OVERRIDE) console.log(`  routing: ${C.dim}haiku→workers, sonnet→VPs, opus→C-suite (cap: ${OPUS_CONCURRENCY_CAP} opus concurrent)${C.reset}`);
   if (AGENT_FILTER) console.log(`  agent filter: ${C.yellow}${AGENT_FILTER}${C.reset}`);
   console.log(`${C.bold}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C.reset}\n`);
 
@@ -252,7 +393,9 @@ async function main() {
     const color = agentColor(t.agent_type);
     const hasPersona = existsSync(join(AGENTS_DIR, t.agent_type, 'CLAUDE.md'));
     const hint = hasPersona ? '' : ` ${C.yellow}(no persona — using worker)${C.reset}`;
-    console.log(`  ${color}[${t.agent_type}]${C.reset} P${t.priority}  ${t.title}${hint}`);
+    const model = getAgentModel(t.agent_type);
+    const budget = getTokenBudget(model);
+    console.log(`  ${color}[${t.agent_type}]${C.reset} P${t.priority}  ${C.dim}[${model}/${budget}tok]${C.reset}  ${t.title}${hint}`);
   }
   console.log();
 
@@ -260,7 +403,8 @@ async function main() {
 
   await runPool(tasks, CONCURRENCY);
 
-  console.log(`\n${C.bold}${C.green}━━━ all done ━━━${C.reset}\n`);
+  const totalUsed = sessionState.totalTokensUsed;
+  console.log(`\n${C.bold}${C.green}━━━ all done ━━━${C.reset}  ${C.dim}total tokens used: ${totalUsed}${SESSION_BUDGET > 0 ? ` / ${SESSION_BUDGET}` : ''}${C.reset}\n`);
 }
 
 main().catch((err) => {

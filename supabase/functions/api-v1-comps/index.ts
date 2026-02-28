@@ -68,10 +68,10 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // --- Auth ---
-    const { userId, error: authError } = await authenticateRequest(req, supabase);
-    if (authError || !userId) {
-      return jsonResponse({ error: authError || "Authentication required" }, 401);
-    }
+    // Comps data is public auction results — no auth required for reads.
+    // We still run authenticateRequest to identify the caller if present (for future rate limiting),
+    // but we allow anonymous access through regardless.
+    await authenticateRequest(req, supabase);
 
     // --- Parse params ---
     const url = new URL(req.url);
@@ -277,11 +277,21 @@ async function hashApiKey(key: string): Promise<string> {
 async function authenticateRequest(req: Request, supabase: any): Promise<{ userId: string | null; isServiceRole?: boolean; error?: string }> {
   const authHeader = req.headers.get("Authorization");
   const apiKey = req.headers.get("X-API-Key");
+  // Supabase clients send the anon key as the `apikey` header for unauthenticated requests
+  const apikeyHeader = req.headers.get("apikey");
+
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const altServiceRoleKey = Deno.env.get("SERVICE_ROLE_KEY");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+
+  // Allow anon key passthrough — comps data is public auction results, no auth needed
+  if (anonKey) {
+    if (apikeyHeader === anonKey) return { userId: "anon" };
+    if (authHeader === `Bearer ${anonKey}`) return { userId: "anon" };
+  }
 
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.replace("Bearer ", "");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const altServiceRoleKey = Deno.env.get("SERVICE_ROLE_KEY");
     if ((serviceRoleKey && token === serviceRoleKey) || (altServiceRoleKey && token === altServiceRoleKey)) {
       return { userId: "service-role", isServiceRole: true };
     }

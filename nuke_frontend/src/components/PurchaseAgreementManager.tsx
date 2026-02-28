@@ -131,7 +131,7 @@ export default function PurchaseAgreementManager({
       )}
 
       {agreements.length === 0 ? (
-        <div className="text-center" style={{ padding: '32px 0', color: '#666' }}>
+        <div className="text-center" style={{ padding: '32px 0', color: 'var(--text-secondary)' }}>
           <p>No purchase agreements found for this vehicle.</p>
           {canCreateAgreement && (
             <button onClick={() => setShowCreator(true)} className="button button-primary" style={{ marginTop: '16px' }}>

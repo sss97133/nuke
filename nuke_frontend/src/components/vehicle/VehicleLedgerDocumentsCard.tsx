@@ -212,7 +212,7 @@ export function VehicleLedgerDocumentsCard(props: {
         {loading ? (
           <div className="text-small text-muted">Loading…</div>
         ) : error ? (
-          <div className="text-small" style={{ color: '#b91c1c' }}>{error}</div>
+          <div className="text-small" style={{ color: 'var(--error)' }}>{error}</div>
         ) : (
           <>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: '11px' }}>

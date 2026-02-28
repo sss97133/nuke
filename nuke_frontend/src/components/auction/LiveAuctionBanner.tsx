@@ -256,7 +256,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
         <div
           style={{
             background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            color: 'white',
+            color: 'var(--bg)',
             padding: '8px 12px',
             marginBottom: '8px',
             borderRadius: '4px',
@@ -319,7 +319,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
               style={{
                 padding: '4px 12px',
                 background: 'var(--primary)',
-                color: 'white',
+                color: 'var(--bg)',
                 border: 'none',
                 borderRadius: '3px',
                 fontSize: '11px',

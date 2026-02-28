@@ -163,7 +163,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                       fontSize: '11px',
                       fontWeight: 600,
                       background: saving ? 'var(--border)' : 'var(--primary, #3b82f6)',
-                      color: '#fff',
+                      color: 'var(--bg)',
                       border: 'none',
                       borderRadius: '4px',
                       cursor: saving ? 'wait' : 'pointer',
@@ -174,7 +174,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                   </button>
                 </div>
                 {saveError && (
-                  <div style={{ fontSize: '9px', color: '#ef4444', marginTop: '2px' }}>{saveError}</div>
+                  <div style={{ fontSize: '9px', color: 'var(--error)', marginTop: '2px' }}>{saveError}</div>
                 )}
                 <button
                   onClick={() => { setShowMsrpForm(false); setMsrpInput(''); setSaveError(null); }}
@@ -272,7 +272,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                         style={{
                           padding: '4px 8px', fontSize: '11px', fontWeight: 600,
                           background: saving ? 'var(--border)' : 'var(--primary, #3b82f6)',
-                          color: '#fff', border: 'none', borderRadius: '4px',
+                          color: 'var(--bg)', border: 'none', borderRadius: '4px',
                           cursor: saving ? 'wait' : 'pointer',
                           opacity: !msrpInput.trim() ? 0.5 : 1,
                         }}
@@ -281,7 +281,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                       </button>
                     </div>
                     {saveError && (
-                      <div style={{ fontSize: '9px', color: '#ef4444', marginTop: '2px' }}>{saveError}</div>
+                      <div style={{ fontSize: '9px', color: 'var(--error)', marginTop: '2px' }}>{saveError}</div>
                     )}
                   </div>
                 ) : (
@@ -335,7 +335,7 @@ function DealScore({ score, price, estimate }: { score: number; price: number; e
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
       <span style={{
         width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
-        background: isGoodDeal ? '#22c55e' : isFair ? '#84cc16' : score > -20 ? '#f59e0b' : '#ef4444',
+        background: isGoodDeal ? 'var(--success)' : isFair ? 'var(--success)' : score > -20 ? 'var(--warning)' : 'var(--error)',
       }} />
       <span>
         {isGoodDeal ? `Good deal — ${Math.abs(pctDiff)}% below estimate` :

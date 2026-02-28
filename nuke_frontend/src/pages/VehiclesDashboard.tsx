@@ -75,7 +75,7 @@ const EmptyDashboard: React.FC = () => (
         fontSize: '12px',
         fontWeight: 600,
         background: 'var(--primary)',
-        color: 'white',
+        color: 'var(--bg)',
         textDecoration: 'none',
         borderRadius: '4px'
       }}
@@ -158,7 +158,7 @@ const VehiclesDashboard: React.FC = () => {
             fontSize: '12px',
             fontWeight: 600,
             background: 'var(--primary)',
-            color: 'white',
+            color: 'var(--bg)',
             textDecoration: 'none',
             borderRadius: '4px'
           }}
@@ -181,14 +181,14 @@ const VehiclesDashboard: React.FC = () => {
         </h1>
         <div style={{
           padding: '24px',
-          background: '#fef2f2',
-          border: '2px solid #fca5a5',
+          background: 'var(--error-dim)',
+          border: '2px solid var(--error)',
           textAlign: 'center'
         }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: '#dc2626', marginBottom: '8px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--error)', marginBottom: '8px' }}>
             Failed to load dashboard
           </div>
-          <div style={{ fontSize: '11px', color: '#991b1b', marginBottom: '16px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--error)', marginBottom: '16px' }}>
             {error.message}
           </div>
           <button
@@ -198,9 +198,9 @@ const VehiclesDashboard: React.FC = () => {
               padding: '8px 16px',
               fontSize: '11px',
               fontWeight: 600,
-              background: 'white',
-              border: '1px solid #dc2626',
-              color: '#dc2626',
+              background: 'var(--surface)',
+              border: '1px solid var(--error)',
+              color: 'var(--error)',
               borderRadius: '2px',
               cursor: 'pointer'
             }}

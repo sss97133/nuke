@@ -323,7 +323,7 @@ export default function ImportDataPage() {
               onClick={() => fileInputRef.current?.click()}
               style={{
                 border: `2px dashed ${isDragging ? 'var(--accent)' : 'var(--border)'}`,
-                background: isDragging ? 'rgba(0, 255, 0, 0.05)' : 'var(--bg-secondary)',
+                background: isDragging ? 'color-mix(in srgb, var(--success) 5%, transparent)' : 'var(--bg-secondary)',
                 padding: '48px',
                 textAlign: 'center',
                 cursor: 'pointer',
@@ -440,10 +440,10 @@ export default function ImportDataPage() {
                           <span style={{ color: 'var(--accent)' }}>Processing...</span>
                         )}
                         {upload.status === 'complete' && (
-                          <span style={{ color: 'var(--success, #4caf50)' }}>Complete</span>
+                          <span style={{ color: 'var(--success)' }}>Complete</span>
                         )}
                         {upload.status === 'error' && (
-                          <span style={{ color: 'var(--error, #f44336)' }}>
+                          <span style={{ color: 'var(--error)' }}>
                             Error: {upload.error}
                           </span>
                         )}

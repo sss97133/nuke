@@ -14,14 +14,16 @@
 ## Active Sprint Focus (Feb 2026)
 
 ### 1. YONO — Local Vehicle Vision Model [PRIMARY]
-**Status**: Phase 5 complete. Next step is FastAPI sidecar.
+**Status**: Sidecar live on Modal, consumer API deployed, tier-2 hierarchical models active.
 - Phase 5 EfficientNet trained ✓
-- ONNX model exported ✓
+- ONNX model exported ✓ (flat + tier-1 + 6 tier-2 families)
 - YONOClassifier working ✓
-- Photos library scan: running in background (PID in `yono/library_scan/scan.pid`)
-- **NEXT**: FastAPI sidecar service → integrate with edge functions → hierarchical retraining → SDK v1.3.0
-- Reference: MEMORY.md `## Core Strategic Focus: YONO`
-- Edge functions: `yono-classify`, `yono-batch-process`
+- FastAPI sidecar on Modal ✓ (2 warm containers, `yono-serve`)
+- Florence-2 vision analysis (condition/zone/damage) ✓
+- Zone classifier (41 zones, 72.8% val_acc) ✓
+- Consumer API `api-v1-vision` v1.1 ✓ — classify + analyze at $0/image
+- Edge functions: `yono-classify`, `yono-analyze`, `yono-batch-process`, `yono-vision-worker`, `yono-keepalive`, `api-v1-vision`
+- **NEXT**: SDK v1.3.0 (`nuke.vision.*` namespace), contextual model (image + sale history → price estimate)
 
 ### 2. Facebook Marketplace Extraction [ACTIVE RESEARCH]
 **Status**: Local residential-IP scraper deployed. Testing logged-out GraphQL path.
@@ -32,10 +34,15 @@
 - **NEXT**: Test logged-out GraphQL (`MarketplaceSearchResultsPageContainerNewQuery` + `doc_id` system)
 - Reference: MEMORY.md `## Active Focus: Facebook Marketplace Vehicle Extraction`
 
-### 3. Agent Hierarchy [PLANNED — see .claude/NEXT_SESSION.md]
-**Status**: Architecture designed, not built.
-- Plan: Haiku workers (extraction) + Sonnet supervisor + Opus strategy
-- See `.claude/NEXT_SESSION.md` for exact commands and structure
+### 3. Agent Hierarchy [DEPLOYED]
+**Status**: Built and deployed. Tested with real data.
+- `haiku-extraction-worker` — Routine extraction at $1/$5 MTok (3x cheaper than Sonnet)
+- `sonnet-supervisor` — Quality review, edge case handling, dispatch loop
+- `agent-tier-router` — Top-level router with Opus strategy layer
+- `_shared/agentTiers.ts` — Shared tier configs and Anthropic API wrapper
+- import_queue statuses: `pending` -> `pending_review` -> `pending_strategy` -> `complete`
+- See TOOLS.md "Agent Hierarchy" section for full usage
+- **NEXT**: Wire into cron for continuous processing, integrate with existing `continuous-queue-processor`
 
 ---
 
@@ -84,7 +91,7 @@ See `DONE.md` for full log. Quick summary:
 
 ## High-Value Next Work (in priority order)
 
-1. **YONO FastAPI sidecar** — unblocks SDK v1.3.0, the main revenue deliverable
+1. ~~**YONO FastAPI sidecar**~~ DONE — sidecar live, consumer API deployed, tier-2 models active
 2. **FB Marketplace GraphQL probe** — logged-out path, test `doc_id` + `fb_dtsg` approach
 3. **Agent hierarchy build** — Haiku workers for extraction (10x token efficiency)
 4. **SDK v1.3.0 prep** — depends on YONO sidecar being functional

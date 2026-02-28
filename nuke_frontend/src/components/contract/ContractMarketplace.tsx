@@ -180,7 +180,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                 className="card"
                 style={{ cursor: 'pointer', transition: 'transform 0.12s ease, box-shadow 0.12s ease', overflow: 'hidden' }}
                 onClick={() => onSelectContract(contract.id)}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px color-mix(in srgb, var(--text) 12%, transparent)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}
                 data-contract-id={contract.id}
                 data-contract-symbol={contract.contract_symbol}
@@ -280,7 +280,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                             {contract.curator_credentials?.length > 0 && (
                               <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                 {contract.curator_credentials.map((c: string, i: number) => (
-                                  <span key={i} style={{ padding: '1px 6px', background: 'var(--primary)', color: '#fff', borderRadius: '3px', fontSize: '9px', fontWeight: 700 }}>{c}</span>
+                                  <span key={i} style={{ padding: '1px 6px', background: 'var(--primary)', color: 'var(--bg)', borderRadius: '3px', fontSize: '9px', fontWeight: 700 }}>{c}</span>
                                 ))}
                               </div>
                             )}
@@ -379,7 +379,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                         {contract.risk_level && (
                           <HoverStat label="Risk Level" value={contract.risk_level.toUpperCase()} color={
                             contract.risk_level === 'conservative' ? 'var(--success, #10b981)' :
-                            contract.risk_level === 'moderate' ? '#f59e0b' :
+                            contract.risk_level === 'moderate' ? 'var(--warning)' :
                             'var(--danger, #ef4444)'
                           } />
                         )}
@@ -395,7 +395,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                         </div>
                         {contract.risk_level && (
                           <div style={{ fontSize: '9px', marginTop: '2px', fontWeight: 700, textTransform: 'uppercase',
-                            color: contract.risk_level === 'conservative' ? 'var(--success, #10b981)' : contract.risk_level === 'moderate' ? '#f59e0b' : 'var(--danger, #ef4444)' }}>
+                            color: contract.risk_level === 'conservative' ? 'var(--success, #10b981)' : contract.risk_level === 'moderate' ? 'var(--warning)' : 'var(--danger, #ef4444)' }}>
                             {contract.risk_level}
                           </div>
                         )}

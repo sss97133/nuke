@@ -173,7 +173,7 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
             style={{
               padding: '8px 16px',
               background: 'var(--primary)',
-              color: 'white',
+              color: 'var(--bg)',
               border: 'none',
               borderRadius: '6px',
               fontSize: '13px',
@@ -348,7 +348,7 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
                       right: '8px',
                       padding: '4px 8px',
                       background: badge.color,
-                      color: 'white',
+                      color: 'var(--bg)',
                       borderRadius: '4px',
                       fontSize: '10px',
                       fontWeight: 600
@@ -395,7 +395,7 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
                       right: '8px',
                       padding: '4px 8px',
                       background: badge.color,
-                      color: 'white',
+                      color: 'var(--bg)',
                       borderRadius: '4px',
                       fontSize: '10px',
                       fontWeight: 600

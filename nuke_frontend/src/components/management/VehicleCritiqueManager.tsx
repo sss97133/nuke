@@ -141,20 +141,20 @@ export default function VehicleCritiqueManager({
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent': return '#dc3545';
-      case 'high': return '#fd7e14';
-      case 'medium': return '#ffc107';
-      case 'low': return '#6c757d';
-      default: return '#6c757d';
+      case 'urgent': return 'var(--error)';
+      case 'high': return 'var(--warning)';
+      case 'medium': return 'var(--warning)';
+      case 'low': return 'var(--text-secondary)';
+      default: return 'var(--text-secondary)';
     }
   };
 
   const getStatusBadge = (status: string) => {
     const styles = {
-      pending: { background: '#fff3cd', color: '#856404', border: '1px solid #ffeaa7' },
-      reviewed: { background: '#cce5ff', color: '#004085', border: '1px solid #80bdff' },
-      implemented: { background: '#d4edda', color: '#155724', border: '1px solid #7dd87f' },
-      rejected: { background: '#f8d7da', color: '#721c24', border: '1px solid #f5c6cb' }
+      pending: { background: 'var(--warning-dim)', color: 'var(--warning)', border: '1px solid var(--warning)' },
+      reviewed: { background: 'var(--bg)', color: 'var(--accent)', border: '1px solid var(--accent)' },
+      implemented: { background: 'var(--success-dim)', color: 'var(--success)', border: '1px solid var(--success)' },
+      rejected: { background: 'var(--error-dim)', color: 'var(--error)', border: '1px solid var(--error)' }
     };
 
     return (
@@ -210,7 +210,7 @@ export default function VehicleCritiqueManager({
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '12px' }}>Vehicle Critiques & Business Feedback</h3>
-          <p style={{ margin: 0, fontSize: '11px', color: '#666' }}>
+          <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-secondary)' }}>
             {critiques.length} critique{critiques.length !== 1 ? 's' : ''} found
           </p>
         </div>
@@ -255,7 +255,7 @@ export default function VehicleCritiqueManager({
 
       <div className="card-body">
         {critiques.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
             No critiques found matching your filters.
           </div>
         ) : (
@@ -279,13 +279,13 @@ export default function VehicleCritiqueManager({
                   <tr key={critique.id}>
                     <td>
                       {critique.year} {critique.make} {critique.model}
-                      <div style={{ fontSize: '9px', color: '#666' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
                         {critique.vehicle_status}
                       </div>
                     </td>
                     <td style={{ textTransform: 'capitalize' }}>
                       {critique.category.replace('_', ' ')}
-                      <div style={{ fontSize: '9px', color: '#666' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
                         {critique.subcategory.replace('_', ' ')}
                       </div>
                     </td>
@@ -310,7 +310,7 @@ export default function VehicleCritiqueManager({
                     </td>
                     <td>
                       {critique.critique_author}
-                      <div style={{ fontSize: '9px', color: '#666' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
                         {critique.author_role}
                       </div>
                     </td>
@@ -328,7 +328,7 @@ export default function VehicleCritiqueManager({
                         </button>
                       )}
                       {critique.resolved_at && (
-                        <div style={{ fontSize: '9px', color: '#666' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
                           Resolved {new Date(critique.resolved_at).toLocaleDateString()}
                         </div>
                       )}
@@ -346,7 +346,7 @@ export default function VehicleCritiqueManager({
         <div style={{
           position: 'fixed',
           inset: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
+          backgroundColor: 'var(--overlay)',
           zIndex: 10000,
           display: 'flex',
           alignItems: 'center',
@@ -364,7 +364,7 @@ export default function VehicleCritiqueManager({
           }}>
             <div style={{
               padding: '16px',
-              borderBottom: '1px solid #e5e5e5',
+              borderBottom: '1px solid var(--border)',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center'
@@ -403,9 +403,9 @@ export default function VehicleCritiqueManager({
               <div style={{ marginBottom: '12px' }}>
                 <strong>Description:</strong>
                 <div style={{
-                  background: '#f8f9fa',
+                  background: 'var(--bg)',
                   padding: '8px',
-                  border: '1px solid #e9ecef',
+                  border: '1px solid var(--border)',
                   fontSize: '12px',
                   marginTop: '4px'
                 }}>
@@ -435,7 +435,7 @@ export default function VehicleCritiqueManager({
                     width: '100%',
                     fontSize: '12px',
                     padding: '8px',
-                    border: '1px solid #e9ecef',
+                    border: '1px solid var(--border)',
                     borderRadius: '4px'
                   }}
                 />

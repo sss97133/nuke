@@ -151,15 +151,15 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
   };
 
   const getValidationColor = (score: number) => {
-    if (score >= 80) return '#10B981'; // Green
-    if (score >= 60) return '#F59E0B'; // Yellow
-    return '#EF4444'; // Red
+    if (score >= 80) return 'var(--success)'; // Green
+    if (score >= 60) return 'var(--warning)'; // Yellow
+    return 'var(--error)'; // Red
   };
 
   if (loading) {
     return (
       <div className="card" style={{ padding: '20px' }}>
-        <div style={{ textAlign: 'center', color: '#6b7280' }}>
+        <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
           Loading comparables...
         </div>
       </div>
@@ -179,7 +179,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
           <h3 style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 4px 0' }}>
             User-Submitted Comparables
           </h3>
-          <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
             Community-sourced comparable vehicles with bullshit detection
           </p>
         </div>
@@ -198,7 +198,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
       {/* Submit Form */}
       {showSubmitForm && (
         <div style={{ 
-          border: '1px solid #e5e7eb',
+          border: '1px solid var(--border)',
           borderRadius: '8px',
           padding: '16px',
           marginBottom: '20px',
@@ -209,16 +209,16 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
           </h4>
           
           <div style={{ 
-            backgroundColor: '#fef3c7',
-            border: '1px solid #f59e0b',
+            backgroundColor: 'var(--warning-dim)',
+            border: '1px solid var(--warning)',
             borderRadius: '6px',
             padding: '12px',
             marginBottom: '16px'
           }}>
-            <div style={{ fontSize: '14px', fontWeight: '600', color: '#92400e', marginBottom: '4px' }}>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--warning)', marginBottom: '4px' }}>
               ⚠️ Bullshit Detection Active
             </div>
-            <div style={{ fontSize: '13px', color: '#92400e' }}>
+            <div style={{ fontSize: '13px', color: 'var(--warning)' }}>
               Icon builds, custom shop builds, and obvious outliers will be automatically flagged.
               Submit realistic comparables for {vehicleYear} {vehicleMake} {vehicleModel} or similar body styles.
             </div>
@@ -243,7 +243,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
                 style={{ width: '100%' }}
                 required
               />
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                 Supported: BAT, Hemmings, Classic.com, Cars.com, AutoTrader, Craigslist
               </div>
             </div>
@@ -296,9 +296,9 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
           padding: '12px',
           borderRadius: '6px',
           marginBottom: '16px',
-          backgroundColor: message.includes('success') ? '#d1fae5' : '#fee2e2',
-          border: `1px solid ${message.includes('success') ? '#10b981' : '#ef4444'}`,
-          color: message.includes('success') ? '#065f46' : '#991b1b',
+          backgroundColor: message.includes('success') ? 'var(--success-dim)' : 'var(--error-dim)',
+          border: `1px solid ${message.includes('success') ? 'var(--success)' : 'var(--error)'}`,
+          color: message.includes('success') ? 'var(--success)' : 'var(--error)',
           fontSize: '14px'
         }}>
           {message}
@@ -309,7 +309,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
       {comparables.length === 0 ? (
         <div style={{ 
           textAlign: 'center', 
-          color: '#6b7280',
+          color: 'var(--text-secondary)',
           padding: '40px 0'
         }}>
           <div style={{ fontSize: '48px', marginBottom: '12px' }}>🔍</div>
@@ -326,7 +326,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
             <div
               key={comparable.id}
               style={{
-                border: '1px solid #e5e7eb',
+                border: '1px solid var(--border)',
                 borderRadius: '8px',
                 padding: '16px'
               }}
@@ -349,7 +349,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
                   
                   <div style={{ 
                     fontSize: '14px', 
-                    color: '#6b7280',
+                    color: 'var(--text-secondary)',
                     marginBottom: '4px'
                   }}>
                     {comparable.source} • {formatPrice(comparable.price)}
@@ -361,7 +361,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
                     rel="noopener noreferrer"
                     style={{
                       fontSize: '12px',
-                      color: '#3b82f6',
+                      color: 'var(--accent)',
                       textDecoration: 'none'
                     }}
                   >
@@ -381,7 +381,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
                   }}>
                     {comparable.validation_score}%
                   </div>
-                  <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                     Validation
                   </div>
                 </div>
@@ -391,7 +391,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
               {comparable.notes && (
                 <div style={{
                   fontSize: '14px',
-                  color: '#374151',
+                  color: 'var(--text)',
                   marginBottom: '12px',
                   padding: '8px',
                   backgroundColor: 'var(--bg)',
@@ -449,8 +449,8 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
                       display: 'flex',
                       alignItems: 'center',
                       gap: '4px',
-                      backgroundColor: '#fee2e2',
-                      color: '#991b1b'
+                      backgroundColor: 'var(--error-dim)',
+                      color: 'var(--error)'
                     }}
                     disabled={!user}
                   >
@@ -458,7 +458,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
                   </button>
                 </div>
 
-                <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                   {new Date(comparable.submitted_at).toLocaleDateString()}
                 </div>
               </div>
@@ -476,8 +476,8 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
           borderRadius: '8px',
           marginTop: '16px'
         }}>
-          <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
-            <a href="/login" style={{ color: '#3b82f6', textDecoration: 'none' }}>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
+            <a href="/login" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
               Log in
             </a> to submit comparables and vote on submissions
           </p>

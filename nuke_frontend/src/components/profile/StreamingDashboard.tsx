@@ -206,7 +206,7 @@ const StreamingDashboard: React.FC<StreamingDashboardProps> = ({ userId, isOwnPr
                                 marginLeft: '8px',
                                 padding: '2px 6px',
                                 background: 'var(--error)',
-                                color: 'white',
+                                color: 'var(--bg)',
                                 fontSize: '9px',
                                 borderRadius: '2px'
                               }}>

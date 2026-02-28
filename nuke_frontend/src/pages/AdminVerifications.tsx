@@ -716,20 +716,20 @@ const AdminVerifications: React.FC = () => {
 
             {/* Messages */}
             {error && (
-              <div className="card" style={{ marginBottom: 16, background: '#fee2e2', borderColor: '#dc2626' }}>
+              <div className="card" style={{ marginBottom: 16, background: 'var(--error-dim)', borderColor: 'var(--error)' }}>
                 <div className="card-body">
-                  <div className="text-small" style={{ color: '#b91c1c' }}>{error}</div>
+                  <div className="text-small" style={{ color: 'var(--error)' }}>{error}</div>
                 </div>
               </div>
             )}
             {message && (
               <div className="card" style={{ 
                 marginBottom: 16, 
-                background: message.startsWith('Failed') ? '#fee2e2' : '#dcfce7',
-                borderColor: message.startsWith('Failed') ? '#dc2626' : '#16a34a'
+                background: message.startsWith('Failed') ? 'var(--error-dim)' : 'var(--success-dim)',
+                borderColor: message.startsWith('Failed') ? 'var(--error)' : 'var(--success)'
               }}>
                 <div className="card-body">
-                  <div className="text-small" style={{ color: message.startsWith('Failed') ? '#b91c1c' : '#16a34a' }}>
+                  <div className="text-small" style={{ color: message.startsWith('Failed') ? 'var(--error)' : 'var(--success)' }}>
                     {message}
                   </div>
                 </div>
@@ -965,7 +965,7 @@ const AdminVerifications: React.FC = () => {
                         const isProcessing = processing.has(d.id);
                         return (
                           <div key={d.id} className="card" style={{ 
-                            borderColor: checked ? '#3b82f6' : undefined,
+                            borderColor: checked ? 'var(--accent)' : undefined,
                             opacity: isProcessing ? 0.6 : 1,
                             position: 'relative'
                           }}>

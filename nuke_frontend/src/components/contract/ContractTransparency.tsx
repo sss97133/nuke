@@ -16,12 +16,12 @@ interface ContractTransparencyProps {
 
 // Asset type colors
 const ASSET_TYPE_COLORS: Record<string, string> = {
-  vehicle: '#3b82f6',
-  bond: '#10b981',
-  stake: '#f59e0b',
-  organization: '#8b5cf6',
-  real_estate: '#ef4444',
-  event: '#ec4899',
+  vehicle: 'var(--accent)',
+  bond: 'var(--success)',
+  stake: 'var(--warning)',
+  organization: 'var(--agent, #8b5cf6)',
+  real_estate: 'var(--error)',
+  event: 'var(--pink, #ec4899)',
 };
 
 const ASSET_TYPE_LABELS: Record<string, string> = {
@@ -313,7 +313,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
   if (error || !contract) {
     return (
       <div className="card">
-        <div className="card-body" style={{ color: 'var(--danger, #ef4444)', fontSize: '12px' }}>
+        <div className="card-body" style={{ color: 'var(--error)', fontSize: '12px' }}>
           {error || 'Contract not found'}
           <div style={{ marginTop: '12px' }}>
             <button className="button button-secondary" onClick={onBack}>
@@ -359,7 +359,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                 </h1>
                 <span style={{
                   padding: '4px 8px',
-                  background: contract.status === 'active' ? 'var(--success, #10b981)' : 'var(--text-muted)',
+                  background: contract.status === 'active' ? 'var(--success)' : 'var(--text-muted)',
                   color: 'var(--white)',
                   borderRadius: '4px',
                   fontSize: '11px',
@@ -447,7 +447,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
         <div className="card">
           <div className="card-header"><h3 className="heading-3">Performance</h3></div>
           <div className="card-body">
-            <div style={{ fontSize: '24px', fontWeight: 900, color: contract.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)' }}>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: contract.total_return_pct >= 0 ? 'var(--success)' : 'var(--error)' }}>
               {formatPct(contract.total_return_pct)}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Total return</div>
@@ -487,17 +487,17 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                 <AreaChart data={performanceData}>
                   <defs>
                     <linearGradient id="navGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <XAxis
                     dataKey="recorded_at"
-                    tick={{ fill: '#71717a', fontSize: 9 }}
+                    tick={{ fill: 'var(--text-secondary)', fontSize: 9 }}
                     tickFormatter={(d: string) => d ? d.slice(5, 10) : ''}
                   />
                   <YAxis
-                    tick={{ fill: '#71717a', fontSize: 9 }}
+                    tick={{ fill: 'var(--text-secondary)', fontSize: 9 }}
                     tickFormatter={(v: number) => formatCurrencyFromCents(v, { maximumFractionDigits: 0 })}
                   />
                   <Tooltip
@@ -505,7 +505,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                     formatter={(value: number) => [formatCurrencyFromCents(value), 'NAV']}
                     labelFormatter={(label: string) => label ? new Date(label).toLocaleDateString() : ''}
                   />
-                  <Area type="monotone" dataKey="nav_cents" stroke="#3b82f6" fill="url(#navGrad)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="nav_cents" stroke="var(--accent)" fill="url(#navGrad)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             </>
@@ -590,11 +590,11 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                     key={type}
                     style={{
                       width: `${pct}%`,
-                      background: ASSET_TYPE_COLORS[type] || '#6b7280',
+                      background: ASSET_TYPE_COLORS[type] || 'var(--text-secondary)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: '#fff',
+                      color: 'var(--bg)',
                       fontSize: '11px',
                       fontWeight: 700,
                       minWidth: pct > 8 ? undefined : '0',
@@ -612,7 +612,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                 const pct = (valueCents / totalValue) * 100;
                 return (
                   <div key={type} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: ASSET_TYPE_COLORS[type] || '#6b7280' }} />
+                    <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: ASSET_TYPE_COLORS[type] || 'var(--text-secondary)' }} />
                     <span style={{ color: 'var(--text-muted)' }}>
                       {ASSET_TYPE_LABELS[type] || type} — {pct.toFixed(1)}% ({formatCurrencyFromCents(valueCents)})
                     </span>
@@ -703,9 +703,9 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                           ) : (
                             <div style={{
                               width: '27px', height: '27px', borderRadius: '3px', flexShrink: 0,
-                              background: ASSET_TYPE_COLORS[asset.asset_type] || '#6b7280',
+                              background: ASSET_TYPE_COLORS[asset.asset_type] || 'var(--text-secondary)',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              color: '#fff', fontSize: '12px', fontWeight: 900,
+                              color: 'var(--bg)', fontSize: '12px', fontWeight: 900,
                             }}>
                               {asset.asset_type === 'bond' ? 'B' : asset.asset_type === 'stake' ? 'S' :
                                asset.asset_type === 'organization' ? (asset.details?.business_name || 'O').charAt(0).toUpperCase() :
@@ -720,7 +720,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                                 width: '8px',
                                 height: '8px',
                                 borderRadius: '2px',
-                                background: ASSET_TYPE_COLORS[asset.asset_type] || '#6b7280',
+                                background: ASSET_TYPE_COLORS[asset.asset_type] || 'var(--text-secondary)',
                               }} />
                               {asset.asset_type.toUpperCase()} • {asset.curator_notes || 'No notes'}
                             </div>
@@ -736,7 +736,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                         {asset.allocation_pct ? `${asset.allocation_pct.toFixed(1)}%` : `${allocationPct.toFixed(1)}%`}
                       </div>
 
-                      <div style={{ color: (asset.unrealized_gain_loss_pct || 0) >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)' }}>
+                      <div style={{ color: (asset.unrealized_gain_loss_pct || 0) >= 0 ? 'var(--success)' : 'var(--error)' }}>
                         {formatPct(asset.unrealized_gain_loss_pct || 0)}
                       </div>
 
@@ -832,7 +832,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                       color: 'var(--text-muted)',
                     }}>
                       <span style={{
-                        color: tx.transaction_type === 'subscription' ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)',
+                        color: tx.transaction_type === 'subscription' ? 'var(--success)' : 'var(--error)',
                         fontWeight: 700,
                         textTransform: 'uppercase',
                       }}>
@@ -867,7 +867,7 @@ function MetricPill({ label, value, positive }: { label: string; value: string; 
       <div style={{
         fontSize: '15px',
         fontWeight: 900,
-        color: positive === undefined ? 'var(--text)' : positive ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)',
+        color: positive === undefined ? 'var(--text)' : positive ? 'var(--success)' : 'var(--error)',
       }}>
         {value}
       </div>
@@ -948,7 +948,7 @@ function VehicleDetail({ asset, d, navigate }: { asset: any; d: any; navigate: a
           <DetailRow
             label="Gain/Loss"
             value={`${formatCurrencyFromCents(gainLoss)} (${gainLossPct !== null ? (gainLossPct >= 0 ? '+' : '') + gainLossPct.toFixed(1) + '%' : ''})`}
-            valueColor={gainLoss >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)'}
+            valueColor={gainLoss >= 0 ? 'var(--success)' : 'var(--error)'}
           />
         )}
       </div>
@@ -985,7 +985,7 @@ function BondDetail({ asset, d }: { asset: any; d: any }) {
         <div style={{ fontWeight: 700, marginBottom: '8px' }}>Issuer</div>
         <DetailRow label="Name" value={d.issuer_name || '—'} />
         <DetailRow label="Type" value={d.issuer_type || '—'} />
-        <DetailRow label="Status" value={d.status?.toUpperCase() || '—'} valueColor={isHealthy ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)'} />
+        <DetailRow label="Status" value={d.status?.toUpperCase() || '—'} valueColor={isHealthy ? 'var(--success)' : 'var(--error)'} />
       </div>
       <div>
         <div style={{ fontWeight: 700, marginBottom: '8px' }}>Terms</div>
@@ -999,7 +999,7 @@ function BondDetail({ asset, d }: { asset: any; d: any }) {
         {d.payments_on_time != null && <DetailRow label="On-Time Payments" value={d.payments_on_time} />}
         {d.collateral_description && <DetailRow label="Collateral" value={d.collateral_description} />}
         {!isHealthy && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', color: 'var(--danger, #ef4444)', fontSize: '11px', fontWeight: 700 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', color: 'var(--error)', fontSize: '11px', fontWeight: 700 }}>
             <AlertTriangle size={12} /> Risk indicator: bond not in active status
           </div>
         )}
@@ -1030,7 +1030,7 @@ function StakeDetail({ asset, d }: { asset: any; d: any }) {
         <DetailRow label="Progress" value={`${fundingPct.toFixed(0)}%`} />
         {/* Mini progress bar */}
         <div style={{ marginTop: '8px', height: '6px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
-          <div style={{ width: `${Math.min(fundingPct, 100)}%`, height: '100%', background: isFundraising ? '#f59e0b' : 'var(--success, #10b981)', borderRadius: '3px' }} />
+          <div style={{ width: `${Math.min(fundingPct, 100)}%`, height: '100%', background: isFundraising ? 'var(--warning)' : 'var(--success)', borderRadius: '3px' }} />
         </div>
       </div>
       <div>
@@ -1041,7 +1041,7 @@ function StakeDetail({ asset, d }: { asset: any; d: any }) {
           <DetailRow label="Investor's Share" value={formatCurrencyFromCents(Math.round(d.expected_profit_cents * d.profit_share_pct / 100))} />
         )}
         {isFundraising && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', color: '#f59e0b', fontSize: '11px', fontWeight: 700 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', color: 'var(--warning)', fontSize: '11px', fontWeight: 700 }}>
             <AlertTriangle size={12} /> Still fundraising — not yet active
           </div>
         )}
@@ -1069,7 +1069,7 @@ function OrgDetail({ asset, d }: { asset: any; d: any }) {
               <div style={{
                 width: `${d.reputation_score}%`,
                 height: '100%',
-                background: d.reputation_score >= 70 ? 'var(--success, #10b981)' : d.reputation_score >= 40 ? '#f59e0b' : 'var(--danger, #ef4444)',
+                background: d.reputation_score >= 70 ? 'var(--success)' : d.reputation_score >= 40 ? 'var(--warning)' : 'var(--error)',
                 borderRadius: '3px'
               }} />
             </div>
@@ -1104,7 +1104,7 @@ function RealEstateDetail({ asset, d }: { asset: any; d: any }) {
         {specs.square_feet && <DetailRow label="Square Feet" value={specs.square_feet.toLocaleString()} />}
         {specs.vehicle_capacity && <DetailRow label="Vehicle Capacity" value={`${specs.vehicle_capacity} cars`} />}
         {specs.lift_count && <DetailRow label="Lifts" value={specs.lift_count} />}
-        {specs.climate_controlled && <DetailRow label="Climate Control" value="Yes" valueColor="var(--success, #10b981)" />}
+        {specs.climate_controlled && <DetailRow label="Climate Control" value="Yes" valueColor="var(--success)" />}
         {specs.security && <DetailRow label="Security" value={specs.security.replace('_', ' ').toUpperCase()} />}
         {specs.amenities && (
           <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -1126,7 +1126,7 @@ function RealEstateDetail({ asset, d }: { asset: any; d: any }) {
           <>
             <DetailRow label="Occupancy" value={`${occupancy}%`} />
             <div style={{ marginTop: '4px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
-              <div style={{ width: `${occupancy}%`, height: '100%', background: occupancy >= 80 ? 'var(--success, #10b981)' : '#f59e0b', borderRadius: '2px' }} />
+              <div style={{ width: `${occupancy}%`, height: '100%', background: occupancy >= 80 ? 'var(--success)' : 'var(--warning)', borderRadius: '2px' }} />
             </div>
           </>
         )}
@@ -1161,7 +1161,7 @@ function EventDetail({ asset, d }: { asset: any; d: any }) {
         {fillPct > 0 && (
           <>
             <div style={{ marginTop: '4px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
-              <div style={{ width: `${Math.min(fillPct, 100)}%`, height: '100%', background: fillPct >= 90 ? 'var(--danger, #ef4444)' : fillPct >= 60 ? '#f59e0b' : 'var(--success, #10b981)', borderRadius: '2px' }} />
+              <div style={{ width: `${Math.min(fillPct, 100)}%`, height: '100%', background: fillPct >= 90 ? 'var(--error)' : fillPct >= 60 ? 'var(--warning)' : 'var(--success)', borderRadius: '2px' }} />
             </div>
             <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'right' }}>{fillPct}% filled</div>
           </>
@@ -1172,7 +1172,7 @@ function EventDetail({ asset, d }: { asset: any; d: any }) {
         {d.ticket_price_cents > 0 && <DetailRow label="Ticket" value={formatCurrencyFromCents(d.ticket_price_cents)} />}
         {d.vip_price_cents && <DetailRow label="VIP" value={formatCurrencyFromCents(d.vip_price_cents)} />}
         <DetailRow label="Total Revenue" value={revenueFormatted} />
-        <DetailRow label="Net Profit" value={profitFormatted} valueColor={d.net_profit_cents > 0 ? 'var(--success, #10b981)' : undefined} />
+        <DetailRow label="Net Profit" value={profitFormatted} valueColor={d.net_profit_cents > 0 ? 'var(--success)' : undefined} />
       </div>
     </div>
   );
@@ -1200,8 +1200,8 @@ function CuratorPanel({
           <h3 className="heading-3" style={{ margin: 0 }}>Management</h3>
           <span style={{
             padding: '2px 6px',
-            background: isAgent ? '#8b5cf6' : '#3b82f6',
-            color: '#fff',
+            background: isAgent ? 'var(--agent, #8b5cf6)' : 'var(--accent)',
+            color: 'var(--bg)',
             borderRadius: '4px',
             fontSize: '9px',
             fontWeight: 700,
@@ -1225,9 +1225,9 @@ function CuratorPanel({
               ) : (
                 <div style={{
                   width: '48px', height: '48px', borderRadius: '50%',
-                  background: isAgent ? '#8b5cf6' : 'var(--primary)',
+                  background: isAgent ? 'var(--agent, #8b5cf6)' : 'var(--primary)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#fff', fontSize: '21px', fontWeight: 900,
+                  color: 'var(--bg)', fontSize: '21px', fontWeight: 900,
                   border: '2px solid var(--border)',
                 }}>
                   {isAgent ? <Bot size={20} /> : (contract.curator_name || '?').charAt(0).toUpperCase()}
@@ -1240,7 +1240,7 @@ function CuratorPanel({
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                   {curatorProfile?.username && <span>@{curatorProfile.username}</span>}
                   {curatorProfile?.is_verified && (
-                    <span style={{ color: 'var(--success, #10b981)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    <span style={{ color: 'var(--success)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
                       <Shield size={10} /> VERIFIED
                     </span>
                   )}
@@ -1287,7 +1287,7 @@ function CuratorPanel({
                     </div>
                   } width={200}>
                     <span style={{
-                      padding: '2px 8px', background: 'var(--primary)', color: '#fff',
+                      padding: '2px 8px', background: 'var(--primary)', color: 'var(--bg)',
                       borderRadius: '3px', fontSize: '9px', fontWeight: 700, cursor: 'default',
                     }}>
                       {cred}
@@ -1330,7 +1330,7 @@ function CuratorPanel({
                         <div style={{ fontWeight: 700, marginBottom: '4px' }}>Average Return</div>
                         {withReturns.map((c: any, i: number) => (
                           <HoverStat key={i} label={c.contract_symbol || c.contract_name} value={`${c.total_return_pct >= 0 ? '+' : ''}${c.total_return_pct.toFixed(2)}%`}
-                            color={c.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)'} />
+                            color={c.total_return_pct >= 0 ? 'var(--success)' : 'var(--error)'} />
                         ))}
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                           Unweighted average across {withReturns.length} contract{withReturns.length !== 1 ? 's' : ''}.
@@ -1338,7 +1338,7 @@ function CuratorPanel({
                       </div>
                     } width={240}>
                       <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
-                        <div style={{ fontSize: '16px', fontWeight: 900, color: avgReturn >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)' }}>
+                        <div style={{ fontSize: '16px', fontWeight: 900, color: avgReturn >= 0 ? 'var(--success)' : 'var(--error)' }}>
                           {avgReturn >= 0 ? '+' : ''}{avgReturn.toFixed(2)}%
                         </div>
                         <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Avg Return</div>
@@ -1386,7 +1386,7 @@ function CuratorPanel({
                       </div>
                     } width={220}>
                       <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
-                        <div style={{ fontSize: '16px', fontWeight: 900, color: curatorStats.reputation_score >= 70 ? 'var(--success, #10b981)' : curatorStats.reputation_score >= 40 ? '#f59e0b' : 'var(--danger, #ef4444)' }}>
+                        <div style={{ fontSize: '16px', fontWeight: 900, color: curatorStats.reputation_score >= 70 ? 'var(--success)' : curatorStats.reputation_score >= 40 ? 'var(--warning)' : 'var(--error)' }}>
                           {curatorStats.reputation_score}
                         </div>
                         <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Reputation</div>
@@ -1407,17 +1407,17 @@ function CuratorPanel({
 
             {/* Agent Info — "Read Their Code" */}
             {isAgent && agentInfo && (
-              <div style={{ marginTop: '12px', padding: '10px', background: '#8b5cf620', border: '1px solid #8b5cf640', borderRadius: '4px' }}>
+              <div style={{ marginTop: '12px', padding: '10px', background: 'color-mix(in srgb, var(--agent, #8b5cf6) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--agent, #8b5cf6) 25%, transparent)', borderRadius: '4px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Bot size={14} color="#8b5cf6" />
-                    <span style={{ fontWeight: 900, fontSize: '12px', color: '#8b5cf6' }}>AGENT: {agentInfo.name}</span>
+                    <Bot size={14} color="var(--agent, #8b5cf6)" />
+                    <span style={{ fontWeight: 900, fontSize: '12px', color: 'var(--agent, #8b5cf6)' }}>AGENT: {agentInfo.name}</span>
                   </div>
                   <button
                     onClick={() => setShowCode(!showCode)}
                     style={{
-                      padding: '2px 8px', border: '1px solid #8b5cf6', borderRadius: '3px',
-                      background: showCode ? '#8b5cf6' : 'transparent', color: showCode ? '#fff' : '#8b5cf6',
+                      padding: '2px 8px', border: '1px solid var(--agent, #8b5cf6)', borderRadius: '3px',
+                      background: showCode ? 'var(--agent, #8b5cf6)' : 'transparent', color: showCode ? 'var(--bg)' : 'var(--agent, #8b5cf6)',
                       fontSize: '9px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
                     }}
                   >
@@ -1439,8 +1439,8 @@ function CuratorPanel({
                         </div>
                       } width={200}>
                         <span style={{
-                          padding: '1px 6px', background: '#8b5cf620', border: '1px solid #8b5cf640',
-                          borderRadius: '3px', fontSize: '9px', color: '#8b5cf6', fontWeight: 600, cursor: 'default',
+                          padding: '1px 6px', background: 'color-mix(in srgb, var(--agent, #8b5cf6) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--agent, #8b5cf6) 25%, transparent)',
+                          borderRadius: '3px', fontSize: '9px', color: 'var(--agent, #8b5cf6)', fontWeight: 600, cursor: 'default',
                         }}>
                           {cap}
                         </span>
@@ -1450,7 +1450,7 @@ function CuratorPanel({
                 )}
                 {showCode && agentInfo.prompt_template && (
                   <div style={{
-                    marginTop: '8px', padding: '10px', background: '#0d1117', color: '#c9d1d9',
+                    marginTop: '8px', padding: '10px', background: 'var(--code-bg, #0d1117)', color: 'var(--code-text, #c9d1d9)',
                     borderRadius: '4px', fontSize: '11px', fontFamily: 'monospace', lineHeight: '14px',
                     maxHeight: '300px', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                   }}>
@@ -1458,7 +1458,7 @@ function CuratorPanel({
                   </div>
                 )}
                 {showCode && !agentInfo.prompt_template && (
-                  <div style={{ marginTop: '8px', padding: '10px', background: '#0d1117', color: '#8b949e', borderRadius: '4px', fontSize: '11px', fontFamily: 'monospace' }}>
+                  <div style={{ marginTop: '8px', padding: '10px', background: 'var(--code-bg, #0d1117)', color: 'var(--code-muted, #8b949e)', borderRadius: '4px', fontSize: '11px', fontFamily: 'monospace' }}>
                     // Agent prompt template not published.{'\n'}
                     // Agent ID: {agentInfo.id}{'\n'}
                     // Capabilities: [{agentInfo.capabilities?.join(', ')}]{'\n'}
@@ -1487,7 +1487,7 @@ function CuratorPanel({
                       <HoverStat label="AUM" value={c.total_assets_under_management_cents ? formatCurrencyFromCents(c.total_assets_under_management_cents) : '—'} />
                       {c.total_return_pct != null && (
                         <HoverStat label="Return" value={`${c.total_return_pct >= 0 ? '+' : ''}${c.total_return_pct.toFixed(2)}%`}
-                          color={c.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)'} />
+                          color={c.total_return_pct >= 0 ? 'var(--success)' : 'var(--error)'} />
                       )}
                       <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '6px', fontStyle: 'italic' }}>
                         Click to view this contract
@@ -1512,7 +1512,7 @@ function CuratorPanel({
                             <span>{c.contract_type?.replace('_', ' ')}</span>
                             <span>•</span>
                             <span style={{
-                              color: c.status === 'active' ? 'var(--success, #10b981)' : 'var(--text-muted)',
+                              color: c.status === 'active' ? 'var(--success)' : 'var(--text-muted)',
                               fontWeight: 700,
                             }}>
                               {c.status?.toUpperCase()}
@@ -1528,7 +1528,7 @@ function CuratorPanel({
                           {c.total_return_pct != null && (
                             <div style={{
                               fontSize: '11px', fontWeight: 700,
-                              color: c.total_return_pct >= 0 ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)',
+                              color: c.total_return_pct >= 0 ? 'var(--success)' : 'var(--error)',
                             }}>
                               {c.total_return_pct >= 0 ? '+' : ''}{c.total_return_pct.toFixed(2)}%
                             </div>
@@ -1636,7 +1636,7 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
           {asset.asset_type === 'bond' && (
             <div style={{ padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.bond, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '16px', fontWeight: 900 }}>B</div>
+                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.bond, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '16px', fontWeight: 900 }}>B</div>
                 <div>
                   <div style={{ fontWeight: 900, fontSize: '15px' }}>{d.issuer_name || 'Bond'}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{d.issuer_type || 'Fixed Income'}</div>
@@ -1645,7 +1645,7 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
               <HoverRow label="Principal" value={formatCurrencyFromCents(d.principal_amount_cents)} />
               <HoverRow label="Rate" value={d.coupon_rate_pct != null ? `${d.coupon_rate_pct}%` : d.interest_rate_pct != null ? `${d.interest_rate_pct}%` : '—'} />
               <HoverRow label="Term" value={d.term_months ? `${d.term_months}mo` : '—'} />
-              <HoverRow label="Status" value={d.status?.toUpperCase() || '—'} valueColor={d.status === 'active' || d.status === 'current' ? 'var(--success, #10b981)' : 'var(--danger, #ef4444)'} />
+              <HoverRow label="Status" value={d.status?.toUpperCase() || '—'} valueColor={d.status === 'active' || d.status === 'current' ? 'var(--success)' : 'var(--error)'} />
               {d.maturity_date && <HoverRow label="Maturity" value={new Date(d.maturity_date).toLocaleDateString()} />}
             </div>
           )}
@@ -1658,7 +1658,7 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
             return (
               <div style={{ padding: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.stake, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '16px', fontWeight: 900 }}>S</div>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.stake, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '16px', fontWeight: 900 }}>S</div>
                   <div>
                     <div style={{ fontWeight: 900, fontSize: '15px' }}>Equity Stake</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{d.status?.toUpperCase() || 'ACTIVE'}</div>
@@ -1680,7 +1680,7 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
           {asset.asset_type === 'organization' && (
             <div style={{ padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.organization, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '16px', fontWeight: 900 }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.organization, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '16px', fontWeight: 900 }}>
                   {(d.business_name || 'O').charAt(0).toUpperCase()}
                 </div>
                 <div>
@@ -1692,9 +1692,9 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
               {d.employee_count != null && <HoverRow label="Employees" value={d.employee_count} />}
               {d.reputation_score != null && (
                 <>
-                  <HoverRow label="Reputation" value={`${d.reputation_score}/100`} valueColor={d.reputation_score >= 70 ? 'var(--success, #10b981)' : d.reputation_score >= 40 ? '#f59e0b' : 'var(--danger, #ef4444)'} />
+                  <HoverRow label="Reputation" value={`${d.reputation_score}/100`} valueColor={d.reputation_score >= 70 ? 'var(--success)' : d.reputation_score >= 40 ? 'var(--warning)' : 'var(--error)'} />
                   <div style={{ marginTop: '4px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
-                    <div style={{ width: `${d.reputation_score}%`, height: '100%', background: d.reputation_score >= 70 ? 'var(--success, #10b981)' : d.reputation_score >= 40 ? '#f59e0b' : 'var(--danger, #ef4444)', borderRadius: '2px' }} />
+                    <div style={{ width: `${d.reputation_score}%`, height: '100%', background: d.reputation_score >= 70 ? 'var(--success)' : d.reputation_score >= 40 ? 'var(--warning)' : 'var(--error)', borderRadius: '2px' }} />
                   </div>
                 </>
               )}
@@ -1705,7 +1705,7 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
           {asset.asset_type === 'real_estate' && (
             <div style={{ padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.real_estate, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '19px', fontWeight: 900 }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.real_estate, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '19px', fontWeight: 900 }}>
                   {'\u2302'}
                 </div>
                 <div>
@@ -1726,7 +1726,7 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
           {asset.asset_type === 'event' && (
             <div style={{ padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.event, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '16px', fontWeight: 900 }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.event, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '16px', fontWeight: 900 }}>
                   {'\u2605'}
                 </div>
                 <div>
@@ -1738,8 +1738,8 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
               <HoverRow label="Date" value={d.start_date ? new Date(d.start_date).toLocaleDateString() : '—'} />
               {d.max_capacity && <HoverRow label="Capacity" value={d.max_capacity.toLocaleString()} />}
               {d.vehicle_spots && <HoverRow label="Car Spots" value={d.vehicle_spots} />}
-              {d.total_revenue_cents > 0 && <HoverRow label="Revenue" value={formatCurrencyFromCents(d.total_revenue_cents)} valueColor="var(--success, #10b981)" />}
-              {d.net_profit_cents > 0 && <HoverRow label="Profit" value={formatCurrencyFromCents(d.net_profit_cents)} valueColor="var(--success, #10b981)" />}
+              {d.total_revenue_cents > 0 && <HoverRow label="Revenue" value={formatCurrencyFromCents(d.total_revenue_cents)} valueColor="var(--success)" />}
+              {d.net_profit_cents > 0 && <HoverRow label="Profit" value={formatCurrencyFromCents(d.net_profit_cents)} valueColor="var(--success)" />}
             </div>
           )}
         </div>

@@ -286,7 +286,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
                         fontSize: '9px',
                         border: 'none',
                         background: 'var(--accent)',
-                        color: 'white',
+                        color: 'var(--bg)',
                         cursor: 'pointer',
                         borderRadius: '3px',
                         fontWeight: 600

@@ -28,8 +28,8 @@
   padding: 0 8px;
   display: grid;
   align-items: center;
-  /* 8% Nuke | 2% spacer | (remaining, ~80%) agent | 2% spacer | >=8% capsule (can grow) */
-  grid-template-columns: 8% 2% minmax(0, 1fr) 2% minmax(8%, max-content);
+  /* max-content Nuke+nav | 2% spacer | (remaining) search | 2% spacer | max-content capsule */
+  grid-template-columns: max-content 2% minmax(0, 1fr) 2% minmax(8%, max-content);
   height: 40px;
   box-sizing: border-box;
 }
@@ -88,6 +88,27 @@
   font-size: 9pt;
   font-weight: bold;
   white-space: nowrap;
+}
+
+/* ============================================================================
+   NUKE WORDMARK — always-visible brand link
+   ============================================================================ */
+
+.nuke-wordmark {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  color: var(--text);
+  padding: 4px 6px;
+  flex-shrink: 0;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.nuke-wordmark:hover {
+  color: var(--text);
+  opacity: 0.75;
 }
 
 .main-nav {
@@ -207,6 +228,11 @@
   /* Ensure nav dropdown doesn't overflow the viewport on mobile */
   [data-marque-menu] > div {
     max-width: calc(100vw - 16px);
+  }
+
+  /* Hide Search/Market links on mobile — accessible via NukeMenu dropdown */
+  .header-main-nav {
+    display: none;
   }
 }
 

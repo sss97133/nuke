@@ -1,3 +1,8 @@
+// DEPRECATED: This function writes legacy angle strings (exterior_three_quarter,
+// exterior_front, etc.) to vehicle_images.angle. The platform has migrated to
+// the 41-zone vehicle_zone system. New image analysis should use the YONO pipeline
+// (yono-vision-worker) which writes vehicle_zone + zone_confidence.
+// See: nuke_frontend/src/constants/vehicleZones.ts for the canonical zone taxonomy.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
@@ -741,17 +741,17 @@ export default function AuctionMarketplace() {
     return `${minutes}m`;
   };
 
-  const getTimeRemainingColor = (endTime: string | null) => {
-    if (!endTime) return 'text-gray-600';
+  const getTimeRemainingStyle = (endTime: string | null): React.CSSProperties => {
+    if (!endTime) return { color: 'var(--text-secondary)' };
     const now = new Date();
     const end = new Date(endTime);
     const diff = end.getTime() - now.getTime();
     const hours = diff / (60 * 60 * 1000);
 
-    if (!Number.isFinite(diff) || diff <= 0 || diff > maxReasonableEndMs) return 'text-gray-600';
-    if (hours < 1) return 'text-red-600 font-bold';
-    if (hours < 24) return 'text-orange-600 font-semibold';
-    return 'text-gray-700';
+    if (!Number.isFinite(diff) || diff <= 0 || diff > maxReasonableEndMs) return { color: 'var(--text-secondary)' };
+    if (hours < 1) return { color: 'var(--error)', fontWeight: 700 };
+    if (hours < 24) return { color: 'var(--warning)', fontWeight: 600 };
+    return { color: 'var(--text)' };
   };
 
   const filteredListings = listings.filter(listing => {
@@ -915,7 +915,7 @@ export default function AuctionMarketplace() {
                         padding: '4px 10px',
                         fontSize: '11px',
                         border: filter === option.id ? '2px solid var(--accent)' : '1px solid var(--border)',
-                        background: filter === option.id ? 'var(--accent-dim)' : 'var(--white)',
+                        background: filter === option.id ? 'var(--accent-dim)' : 'var(--surface)',
                         color: filter === option.id ? 'var(--accent)' : 'var(--text)',
                         cursor: 'pointer',
                         borderRadius: '2px',
@@ -962,7 +962,7 @@ export default function AuctionMarketplace() {
                     Ending in the next 15 minutes ({liveNowListings.length})
                   </span>
                   {flashListings.length > 0 && (
-                    <span style={{ fontSize: '9px', fontWeight: 800, color: '#dc2626' }}>
+                    <span style={{ fontSize: '9px', fontWeight: 800, color: 'var(--error)' }}>
                       FLASH {flashListings.length}
                     </span>
                   )}
@@ -994,7 +994,7 @@ export default function AuctionMarketplace() {
                       listing={listing}
                       formatCurrency={formatCurrency}
                       formatTimeRemaining={formatTimeRemaining}
-                      getTimeRemainingColor={getTimeRemainingColor}
+                      getTimeRemainingStyle={getTimeRemainingStyle}
                       onBidClick={handleBidClick}
                     />
                   ))}
@@ -1049,7 +1049,7 @@ export default function AuctionMarketplace() {
                       listing={listing}
                       formatCurrency={formatCurrency}
                       formatTimeRemaining={formatTimeRemaining}
-                      getTimeRemainingColor={getTimeRemainingColor}
+                      getTimeRemainingStyle={getTimeRemainingStyle}
                       onBidClick={handleBidClick}
                     />
                   ))}
@@ -1091,37 +1091,37 @@ interface AuctionCardProps {
   listing: AuctionListing;
   formatCurrency: (cents: number | null, currency?: string | null) => string;
   formatTimeRemaining: (endTime: string | null) => string;
-  getTimeRemainingColor: (endTime: string | null) => string;
+  getTimeRemainingStyle: (endTime: string | null) => React.CSSProperties;
   onBidClick?: (listing: AuctionListing) => void;
 }
 
 // Platform configuration for badges and colors
 const PLATFORM_CONFIG: Record<string, { name: string; short: string; color: string; textColor: string }> = {
-  bat: { name: 'Bring a Trailer', short: 'BaT', color: '#1e40af', textColor: '#fff' },
-  cars_and_bids: { name: 'Cars & Bids', short: 'C&B', color: '#dc2626', textColor: '#fff' },
-  pcarmarket: { name: 'PCarMarket', short: 'PCM', color: '#0d9488', textColor: '#fff' },
-  collecting_cars: { name: 'Collecting Cars', short: 'CC', color: '#7c3aed', textColor: '#fff' },
-  broad_arrow: { name: 'Broad Arrow', short: 'BA', color: '#0369a1', textColor: '#fff' },
-  rmsothebys: { name: 'RM Sothebys', short: 'RM', color: '#b91c1c', textColor: '#fff' },
-  gooding: { name: 'Gooding & Co', short: 'G&C', color: '#166534', textColor: '#fff' },
-  sbx: { name: 'SBX Cars', short: 'SBX', color: '#ea580c', textColor: '#fff' },
-  ebay_motors: { name: 'eBay Motors', short: 'eBay', color: '#0064d2', textColor: '#fff' },
-  facebook_marketplace: { name: 'Facebook', short: 'FB', color: '#1877f2', textColor: '#fff' },
-  autotrader: { name: 'Autotrader', short: 'AT', color: '#ff6600', textColor: '#fff' },
-  hemmings: { name: 'Hemmings', short: 'HEM', color: '#8b4513', textColor: '#fff' },
-  classic_com: { name: 'Classic.com', short: 'CLC', color: '#4b5563', textColor: '#fff' },
-  craigslist: { name: 'Craigslist', short: 'CL', color: '#5c2d91', textColor: '#fff' },
-  copart: { name: 'Copart', short: 'COP', color: '#00529b', textColor: '#fff' },
-  iaai: { name: 'IAA', short: 'IAA', color: '#003366', textColor: '#fff' },
+  bat: { name: 'Bring a Trailer', short: 'BaT', color: '#1e40af', textColor: 'var(--bg)' },
+  cars_and_bids: { name: 'Cars & Bids', short: 'C&B', color: '#dc2626', textColor: 'var(--bg)' },
+  pcarmarket: { name: 'PCarMarket', short: 'PCM', color: '#0d9488', textColor: 'var(--bg)' },
+  collecting_cars: { name: 'Collecting Cars', short: 'CC', color: '#7c3aed', textColor: 'var(--bg)' },
+  broad_arrow: { name: 'Broad Arrow', short: 'BA', color: '#0369a1', textColor: 'var(--bg)' },
+  rmsothebys: { name: 'RM Sothebys', short: 'RM', color: '#b91c1c', textColor: 'var(--bg)' },
+  gooding: { name: 'Gooding & Co', short: 'G&C', color: '#166534', textColor: 'var(--bg)' },
+  sbx: { name: 'SBX Cars', short: 'SBX', color: '#ea580c', textColor: 'var(--bg)' },
+  ebay_motors: { name: 'eBay Motors', short: 'eBay', color: '#0064d2', textColor: 'var(--bg)' },
+  facebook_marketplace: { name: 'Facebook', short: 'FB', color: '#1877f2', textColor: 'var(--bg)' },
+  autotrader: { name: 'Autotrader', short: 'AT', color: '#ff6600', textColor: 'var(--bg)' },
+  hemmings: { name: 'Hemmings', short: 'HEM', color: '#8b4513', textColor: 'var(--bg)' },
+  classic_com: { name: 'Classic.com', short: 'CLC', color: '#4b5563', textColor: 'var(--bg)' },
+  craigslist: { name: 'Craigslist', short: 'CL', color: '#5c2d91', textColor: 'var(--bg)' },
+  copart: { name: 'Copart', short: 'COP', color: '#00529b', textColor: 'var(--bg)' },
+  iaai: { name: 'IAA', short: 'IAA', color: '#003366', textColor: 'var(--bg)' },
 };
 
-function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRemainingColor, onBidClick }: AuctionCardProps) {
+function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRemainingStyle, onBidClick }: AuctionCardProps) {
   const vehicle = listing.vehicle;
   const hasReserve = listing.reserve_price_cents !== null;
   const platformConfig = listing.platform ? PLATFORM_CONFIG[listing.platform] : null;
   const platformName = platformConfig?.name || (listing.platform ? listing.platform.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : null);
   const platformShort = platformConfig?.short || platformName;
-  const platformColor = platformConfig?.color || '#64748b';
+  const platformColor = platformConfig?.color || 'var(--text-secondary)';
   const isStale = Boolean(listing.telemetry_stale);
   const endMs = listing.auction_end_time ? new Date(listing.auction_end_time).getTime() : null;
   const statusLower = String(listing.status || '').toLowerCase();
@@ -1222,8 +1222,8 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             {!hasReserve && (
               <div
                 style={{
-                  background: '#ea580c',
-                  color: '#fff',
+                  background: 'var(--warning)',
+                  color: 'var(--bg)',
                   padding: '3px 8px',
                   borderRadius: '3px',
                   fontSize: '9px',
@@ -1236,8 +1236,8 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             {listing.is_flash && (
               <div
                 style={{
-                  background: '#dc2626',
-                  color: '#fff',
+                  background: 'var(--error)',
+                  color: 'var(--bg)',
                   padding: '3px 8px',
                   borderRadius: '3px',
                   fontSize: '9px',
@@ -1251,8 +1251,8 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             {isStale && (
               <div
                 style={{
-                  background: '#475569',
-                  color: '#fff',
+                  background: 'var(--text-secondary)',
+                  color: 'var(--bg)',
                   padding: '3px 8px',
                   borderRadius: '3px',
                   fontSize: '9px',
@@ -1272,8 +1272,8 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
               position: 'absolute',
               top: '6px',
               right: '6px',
-              background: '#dc2626',
-              color: '#fff',
+              background: 'var(--error)',
+              color: 'var(--bg)',
               padding: '3px 8px',
               borderRadius: '3px',
               fontSize: '9px',
@@ -1293,7 +1293,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
               top: isLive ? '28px' : '6px',
               right: '6px',
               background: platformColor,
-              color: '#fff',
+              color: 'var(--bg)',
               padding: isBat && batIconOk ? '2px 8px' : '3px 8px',
               borderRadius: '3px',
               fontSize: '9px',
@@ -1355,7 +1355,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
               {formatCurrency(listing.current_high_bid_cents, listing.currency_code)}
             </div>
             {isStale && (
-              <div style={{ fontSize: '9px', color: '#b45309', fontWeight: 700, marginTop: '2px' }}>
+              <div style={{ fontSize: '9px', color: 'var(--warning)', fontWeight: 700, marginTop: '2px' }}>
                 Telemetry stale
               </div>
             )}
@@ -1374,8 +1374,8 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
               style={{
                 fontSize: '11px',
                 fontWeight: 600,
+                ...(isStale ? { color: 'var(--text-secondary)' } : getTimeRemainingStyle(listing.auction_end_time)),
               }}
-              className={isStale ? 'text-gray-600' : getTimeRemainingColor(listing.auction_end_time)}
             >
               {isStale ? '—' : formatTimeRemaining(listing.auction_end_time)}
             </div>
@@ -1396,7 +1396,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <span
               title={bidCountSuspicious ? 'Bid count looks suspect (external telemetry). Refresh pending.' : undefined}
-              style={bidCountSuspicious ? { color: '#b45309', fontWeight: 700 } : undefined}
+              style={bidCountSuspicious ? { color: 'var(--warning)', fontWeight: 700 } : undefined}
             >
               {bidCountDisplay} {bidCountLabel}
             </span>

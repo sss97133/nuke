@@ -90,7 +90,7 @@ export default function SourcePortal({
             {vehiclePrice && data.platform_avg_price && data.platform_avg_price > 0 && (
               <div style={{
                 marginTop: '6px', padding: '4px 6px',
-                background: 'var(--bg-secondary, #f3f4f6)', borderRadius: '4px',
+                background: 'var(--bg-secondary)', borderRadius: '4px',
                 fontSize: '9px', color: 'var(--text-muted)',
               }}>
                 {vehiclePrice > data.platform_avg_price
@@ -108,7 +108,7 @@ export default function SourcePortal({
 
 function MetricBox({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ textAlign: 'center', padding: '4px', background: 'var(--bg-secondary, #f3f4f6)', borderRadius: '4px' }}>
+    <div style={{ textAlign: 'center', padding: '4px', background: 'var(--bg-secondary)', borderRadius: '4px' }}>
       <div style={{ fontSize: '15px', fontWeight: 700 }}>{value}</div>
       <div style={{ fontSize: '8px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{label}</div>
     </div>

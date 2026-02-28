@@ -54,7 +54,42 @@
   --warning-dim: rgba(176, 90, 0, 0.1);
   --error: #d13438;
   --error-dim: rgba(209, 52, 56, 0.1);
-  
+
+  /* Chart Palette — semantic colors for data visualization */
+  --chart-purple: #7d6b91;
+  --chart-green: #6b9d7d;
+  --chart-gold: #9d8b6b;
+  --chart-teal: #6b8b9d;
+  --chart-mauve: #8b6b7d;
+  --chart-lime: #7d9d6b;
+  --chart-rose: #9d6b6b;
+  --chart-slate: #6b7d9d;
+  --chart-amber: #9d7d6b;
+  --chart-sage: #6b9d8b;
+  --chart-olive: #8b9d6b;
+
+  /* Extended tokens (defaults) */
+  --bg-secondary: #fafafa;
+  --surface-secondary: var(--bg);
+  --surface-elevated: #ffffff;
+  --border-hover: var(--border-focus);
+  --info: #0ea5e9;
+  --info-dim: rgba(14, 165, 233, 0.1);
+  --link: var(--accent);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --header-height: 48px;
+  --danger: var(--error);
+  --danger-bg: var(--error-dim);
+  --primary: var(--accent);
+  --card-bg: var(--surface);
+  --input-bg: var(--bg);
+  --background: var(--bg);
+  --text-primary: var(--text);
+  --error-text: var(--error);
+  --success-light: var(--success-dim);
+  --success-bg: var(--success-dim);
+  --warning-light: var(--warning-dim);
+
   /* Spacing System (4px base) */
   --space-1: 4px;
   --space-2: 8px;
@@ -105,6 +140,109 @@
   --heat-5: #047857;
   --heat-6: #065f46;
   --heat-border: rgba(0, 0, 0, 0.12);
+
+  /* ── Extended tokens (referenced by components) ──────────────────── */
+  --bg-secondary: #fafafa;
+  --surface-secondary: var(--bg);
+  --surface-elevated: #ffffff;
+  --border-hover: var(--border-focus);
+  --info: #0ea5e9;
+  --info-dim: rgba(14, 165, 233, 0.1);
+  --info-bg: rgba(14, 165, 233, 0.08);
+  --link: var(--accent);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --overlay: rgba(0, 0, 0, 0.5);
+  --header-height: 48px;
+  --warning-bg: var(--warning-dim);
+  --success-bg: var(--success-dim);
+
+  /* ── Semantic aliases (map alternate names → canonical tokens) ──── */
+  --danger: var(--error);
+  --danger-bg: var(--error-dim);
+  --danger-light: var(--error-dim);
+  --primary: var(--accent);
+  --primary-light: var(--accent-dim);
+  --primary-dim: var(--accent-dim);
+  --primary-bg: var(--accent-dim);
+  --secondary: var(--text-secondary);
+  --background: var(--bg);
+  --background-secondary: var(--bg-secondary);
+  --text-primary: var(--text);
+  --text-color: var(--text);
+  --text-success: var(--success);
+  --error-text: var(--error);
+  --error-light: var(--error-dim);
+  --error-background: var(--error-dim);
+  --error-dark: #b91c1c;
+  --success-light: var(--success-dim);
+  --success-bg: var(--success-dim);
+  --warning-light: var(--warning-dim);
+  --warning-dark: #92400e;
+  --card-bg: var(--surface);
+  --input-bg: var(--bg);
+  --link-color: var(--accent);
+  --bg-color: var(--bg);
+  --bg-hover: var(--surface-hover);
+  --bg-primary: var(--accent-dim);
+  --bg-tertiary: var(--surface);
+  --border-dim: var(--border);
+  --border-success: var(--success);
+  --color-primary: var(--accent);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-secondary);
+  --color-border: var(--border);
+  --color-danger: var(--error);
+  --color-danger-light: var(--error-dim);
+  --color-success: var(--success);
+  --color-success-light: var(--success-dim);
+  --surface-raised: var(--surface);
+  --accent-light: var(--accent-dim);
+  --black: #000000;
+
+  /* ── gray-* aliases (American spelling → British grey-*) ───────── */
+  --gray-50: #fafafa;
+  --gray-100: #f5f5f5;
+  --gray-400: #bdbdbd;
+  --gray-500: #9e9e9e;
+  --gray-600: #757575;
+  --gray-700: #616161;
+  --gray-900: #212121;
+
+  /* ── Additional token aliases (resolve undefined refs) ─────────── */
+  --accent-rgb: 42, 42, 42;
+  --blue-50: #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-200: #bfdbfe;
+  --blue-300: #93c5fd;
+  --blue-500: #3b82f6;
+  --blue-600: #2563eb;
+  --border-color: var(--border);
+  --button-bg: var(--surface);
+  --button-disabled: var(--text-disabled);
+  --button-face: var(--surface);
+  --button-highlight: var(--accent);
+  --button-text: var(--text);
+  --color-background: var(--bg);
+  --color-background-muted: var(--bg-secondary);
+  --cyan: #06b6d4;
+  --error-bg: var(--error-dim);
+  --error-border: var(--error);
+  --foreground: var(--text);
+  --fs-7: calc(7px * var(--font-scale));
+  --fs-13: calc(13px * var(--font-scale));
+  --green-500: #22c55e;
+  --grey-950: #0a0a0a;
+  --indigo: #6366f1;
+  --muted: var(--text-secondary);
+  --orange: #f97316;
+  --orange-600: #ea580c;
+  --purple: #8b5cf6;
+  --radius-2: 8px;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --vehicle-tabbar-height: 48px;
+  --warning-border: var(--warning);
+  --yellow-50: #fefce8;
+  --yellow-200: #fef08a;
 
   /* ── Legacy token aliases — DO NOT USE IN NEW CODE ────────────────────
      These exist so the 92 components still importing design-system.css
@@ -162,6 +300,122 @@
   --heat-5: rgba(22, 130, 93, 0.78);
   --heat-6: rgba(22, 130, 93, 0.92);
   --heat-border: rgba(255, 255, 255, 0.10);
+
+  /* Chart Palette — lighter for dark backgrounds */
+  --chart-purple: #9d8bb1;
+  --chart-green: #8bbda0;
+  --chart-gold: #bdab8b;
+  --chart-teal: #8babbd;
+  --chart-mauve: #ab8b9d;
+  --chart-lime: #9dbd8b;
+  --chart-rose: #bd8b8b;
+  --chart-slate: #8b9dbd;
+  --chart-amber: #bd9d8b;
+  --chart-sage: #8bbdab;
+  --chart-olive: #abbd8b;
+
+  /* ── Extended tokens (dark mode) ─────────────────────────────────── */
+  --bg-secondary: #1a1a1a;
+  --surface-secondary: var(--bg);
+  --surface-elevated: #2d2d30;
+  --border-hover: var(--border-focus);
+  --info: #38bdf8;
+  --info-dim: rgba(56, 189, 248, 0.12);
+  --info-bg: rgba(56, 189, 248, 0.08);
+  --link: var(--accent);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --overlay: rgba(0, 0, 0, 0.6);
+  --header-height: 48px;
+  --warning-bg: var(--warning-dim);
+  --success-bg: var(--success-dim);
+
+  /* ── Semantic aliases (dark mode) ──────────────────────────────── */
+  --danger: var(--error);
+  --danger-bg: var(--error-dim);
+  --danger-light: var(--error-dim);
+  --primary: var(--accent);
+  --primary-light: var(--accent-dim);
+  --primary-dim: var(--accent-dim);
+  --primary-bg: var(--accent-dim);
+  --secondary: var(--text-secondary);
+  --background: var(--bg);
+  --background-secondary: var(--bg-secondary);
+  --text-primary: var(--text);
+  --text-color: var(--text);
+  --text-success: var(--success);
+  --error-text: var(--error);
+  --error-light: var(--error-dim);
+  --error-background: var(--error-dim);
+  --error-dark: #fca5a5;
+  --success-light: var(--success-dim);
+  --success-bg: var(--success-dim);
+  --warning-light: var(--warning-dim);
+  --warning-dark: #fbbf24;
+  --card-bg: var(--surface);
+  --input-bg: var(--bg);
+  --link-color: var(--accent);
+  --bg-color: var(--bg);
+  --bg-hover: var(--surface-hover);
+  --bg-primary: var(--accent-dim);
+  --bg-tertiary: var(--surface);
+  --border-dim: var(--border);
+  --border-success: var(--success);
+  --color-primary: var(--accent);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-secondary);
+  --color-border: var(--border);
+  --color-danger: var(--error);
+  --color-danger-light: var(--error-dim);
+  --color-success: var(--success);
+  --color-success-light: var(--success-dim);
+  --surface-raised: var(--surface);
+  --accent-light: var(--accent-dim);
+  --black: #000000;
+
+  /* ── gray-* aliases (American spelling → dark mode remaps) ─────── */
+  --gray-50: var(--bg);
+  --gray-100: var(--bg);
+  --gray-400: var(--border);
+  --gray-500: var(--text-disabled);
+  --gray-600: var(--text-secondary);
+  --gray-700: var(--text-secondary);
+  --gray-900: var(--text);
+
+  /* ── Additional token aliases (dark mode remaps) ────────────────── */
+  --accent-rgb: 204, 204, 204;
+  --blue-50: rgba(59, 130, 246, 0.08);
+  --blue-100: rgba(59, 130, 246, 0.12);
+  --blue-200: rgba(59, 130, 246, 0.18);
+  --blue-300: #93c5fd;
+  --blue-500: #60a5fa;
+  --blue-600: #3b82f6;
+  --border-color: var(--border);
+  --button-bg: var(--surface);
+  --button-disabled: var(--text-disabled);
+  --button-face: var(--surface);
+  --button-highlight: var(--accent);
+  --button-text: var(--text);
+  --color-background: var(--bg);
+  --color-background-muted: var(--bg-secondary);
+  --cyan: #22d3ee;
+  --error-bg: var(--error-dim);
+  --error-border: var(--error);
+  --foreground: var(--text);
+  --fs-7: calc(7px * var(--font-scale));
+  --fs-13: calc(13px * var(--font-scale));
+  --green-500: #4ade80;
+  --grey-950: #fafafa;
+  --indigo: #818cf8;
+  --muted: var(--text-secondary);
+  --orange: #fb923c;
+  --orange-600: #f97316;
+  --purple: #a78bfa;
+  --radius-2: 8px;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --vehicle-tabbar-height: 48px;
+  --warning-border: var(--warning);
+  --yellow-50: rgba(234, 179, 8, 0.08);
+  --yellow-200: rgba(234, 179, 8, 0.18);
 
   /* ── Legacy token aliases (dark mode remaps) — DO NOT USE IN NEW CODE ── */
   --text-muted: var(--text-secondary);

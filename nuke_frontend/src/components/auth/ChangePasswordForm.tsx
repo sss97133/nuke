@@ -125,11 +125,11 @@ const ChangePasswordForm: React.FC<ChangePasswordFormProps> = ({ onSuccess, onEr
         {successMessage && (
           <div style={{
             padding: '12px',
-            backgroundColor: '#d1fae5',
-            border: '1px solid #10b981',
+            backgroundColor: 'var(--success-dim)',
+            border: '1px solid var(--success)',
             borderRadius: '4px',
             marginBottom: '16px',
-            color: '#065f46'
+            color: 'var(--success)'
           }}>
             {successMessage}
           </div>
@@ -138,11 +138,11 @@ const ChangePasswordForm: React.FC<ChangePasswordFormProps> = ({ onSuccess, onEr
         {errors.general && (
           <div style={{
             padding: '12px',
-            backgroundColor: '#fee2e2',
-            border: '1px solid #ef4444',
+            backgroundColor: 'var(--error-dim)',
+            border: '1px solid var(--error)',
             borderRadius: '4px',
             marginBottom: '16px',
-            color: '#991b1b'
+            color: 'var(--error)'
           }}>
             {errors.general}
           </div>
@@ -233,7 +233,7 @@ const ChangePasswordForm: React.FC<ChangePasswordFormProps> = ({ onSuccess, onEr
           </div>
         </form>
 
-        <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '4px' }}>
+        <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'var(--bg-secondary, var(--surface))', borderRadius: '4px' }}>
           <h4 className="text-small font-bold" style={{ marginBottom: '8px' }}>Password Requirements:</h4>
           <ul className="text-small text-muted" style={{ margin: 0, paddingLeft: '16px' }}>
             <li>At least 6 characters long</li>

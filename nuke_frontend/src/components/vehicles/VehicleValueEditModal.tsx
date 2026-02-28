@@ -119,7 +119,7 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.6)',
+        background: 'var(--overlay)',
         zIndex: 10000,
         display: 'flex',
         alignItems: 'center',
@@ -145,7 +145,7 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
           style={{
             padding: '16px',
             background: 'var(--accent)',
-            color: 'white',
+            color: 'var(--bg)',
             fontSize: '13px',
             fontWeight: 700
           }}
@@ -222,16 +222,16 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
             <div
               style={{
                 padding: '12px',
-                background: roi >= 0 ? '#dcfce7' : '#fee2e2',
-                border: `2px solid ${roi >= 0 ? '#15803d' : '#dc2626'}`,
+                background: roi >= 0 ? 'var(--success-dim)' : 'var(--error-dim)',
+                border: `2px solid ${roi >= 0 ? 'var(--success)' : 'var(--error)'}`,
                 borderRadius: '4px',
                 marginBottom: '16px'
               }}
             >
-              <div style={{ fontSize: '9px', fontWeight: 600, marginBottom: '4px', color: roi >= 0 ? '#15803d' : '#dc2626' }}>
+              <div style={{ fontSize: '9px', fontWeight: 600, marginBottom: '4px', color: roi >= 0 ? 'var(--success)' : 'var(--error)' }}>
                 ROI Preview
               </div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: roi >= 0 ? '#15803d' : '#dc2626' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: roi >= 0 ? 'var(--success)' : 'var(--error)' }}>
                 {roi >= 0 ? '+' : ''}{formatCurrency(roi)}
               </div>
             </div>
@@ -242,10 +242,10 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
             <div
               style={{
                 padding: '10px',
-                background: '#fee2e2',
-                border: '1px solid #dc2626',
+                background: 'var(--error-dim)',
+                border: '1px solid var(--error)',
                 borderRadius: '4px',
-                color: '#991b1b',
+                color: 'var(--error)',
                 fontSize: '11px',
                 marginBottom: '16px'
               }}

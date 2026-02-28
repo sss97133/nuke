@@ -52,14 +52,14 @@ export const BroadArrowMetricsDisplay: React.FC<BroadArrowMetricsDisplayProps> =
             <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--text)' }}>{formatted.volume.total}</div>
           </div>
 
-          <div style={{ padding: '12px', background: '#dcfce7', borderRadius: '4px' }}>
-            <div style={{ fontSize: '11px', color: '#166534', marginBottom: '4px' }}>Vehicles Sold</div>
-            <div style={{ fontSize: '21px', fontWeight: 700, color: '#166534' }}>{formatted.volume.sold}</div>
+          <div style={{ padding: '12px', background: 'var(--success-dim)', borderRadius: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--success)', marginBottom: '4px' }}>Vehicles Sold</div>
+            <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--success)' }}>{formatted.volume.sold}</div>
           </div>
 
-          <div style={{ padding: '12px', background: '#fee2e2', borderRadius: '4px' }}>
-            <div style={{ fontSize: '11px', color: '#991b1b', marginBottom: '4px' }}>Vehicles Unsold</div>
-            <div style={{ fontSize: '21px', fontWeight: 700, color: '#991b1b' }}>{formatted.volume.unsold}</div>
+          <div style={{ padding: '12px', background: 'var(--error-dim)', borderRadius: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--error)', marginBottom: '4px' }}>Vehicles Unsold</div>
+            <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--error)' }}>{formatted.volume.unsold}</div>
           </div>
 
           <div style={{ padding: '12px', background: 'var(--grey-50)', borderRadius: '4px' }}>
@@ -68,15 +68,15 @@ export const BroadArrowMetricsDisplay: React.FC<BroadArrowMetricsDisplayProps> =
           </div>
 
           {/* Revenue Metrics */}
-          <div style={{ padding: '12px', background: '#dbeafe', borderRadius: '4px' }}>
-            <div style={{ fontSize: '11px', color: '#1e40af', marginBottom: '4px' }}>Total Revenue</div>
-            <div style={{ fontSize: '21px', fontWeight: 700, color: '#1e40af' }}>{formatted.revenue.total}</div>
-            <div style={{ fontSize: '9px', color: '#1e40af', marginTop: '2px' }}>(Buyer's Premium)</div>
+          <div style={{ padding: '12px', background: 'var(--accent-dim)', borderRadius: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '4px' }}>Total Revenue</div>
+            <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--accent)' }}>{formatted.revenue.total}</div>
+            <div style={{ fontSize: '9px', color: 'var(--accent)', marginTop: '2px' }}>(Buyer's Premium)</div>
           </div>
 
-          <div style={{ padding: '12px', background: '#dbeafe', borderRadius: '4px' }}>
-            <div style={{ fontSize: '11px', color: '#1e40af', marginBottom: '4px' }}>Avg Premium/Sale</div>
-            <div style={{ fontSize: '21px', fontWeight: 700, color: '#1e40af' }}>{formatted.revenue.averagePerSale}</div>
+          <div style={{ padding: '12px', background: 'var(--accent-dim)', borderRadius: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '4px' }}>Avg Premium/Sale</div>
+            <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--accent)' }}>{formatted.revenue.averagePerSale}</div>
           </div>
 
           {/* Sales Metrics */}

@@ -20,26 +20,26 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'vehicle': return '#3b82f6';
-      case 'timeline_event': return '#10b981';
-      case 'image': return '#f59e0b';
-      case 'shop': return '#8b5cf6';
-      case 'organization': return '#8b5cf6';
-      case 'auction': return '#ef4444';
-      case 'user': return '#6b7280';
-      case 'source': return '#6b7280';
-      case 'user_activity': return '#6b7280';
-      default: return '#6b7280';
+      case 'vehicle': return 'var(--accent)';
+      case 'timeline_event': return 'var(--success)';
+      case 'image': return 'var(--warning)';
+      case 'shop': return 'var(--purple, #8b5cf6)';
+      case 'organization': return 'var(--purple, #8b5cf6)';
+      case 'auction': return 'var(--error)';
+      case 'user': return 'var(--text-secondary)';
+      case 'source': return 'var(--text-secondary)';
+      case 'user_activity': return 'var(--text-secondary)';
+      default: return 'var(--text-secondary)';
     }
   };
 
   const smallChipStyle: React.CSSProperties = {
     background: 'var(--bg)',
-    border: '1px solid #c0c0c0',
+    border: '1px solid var(--border)',
     padding: '1px 4px',
     borderRadius: '2px',
     fontSize: '11px',
-    color: '#374151'
+    color: 'var(--text)'
   };
 
   // Images array for swipe (vehicles may provide multiple images)
@@ -208,7 +208,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
       className="content-card"
       style={{
         background: 'var(--surface)',
-        border: '1px solid #c0c0c0',
+        border: '1px solid var(--border)',
         borderRadius: '2px',
         overflow: 'hidden',
         cursor: 'pointer'
@@ -251,8 +251,8 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
         </div>
       )}
       {item.type === 'vehicle' && typeof (readiness as any).score === 'number' && (
-        <div style={{ width: '100%', height: 4, background: '#e5e7eb' }}>
-          <div style={{ width: `${Math.round((readiness as any).score)}%`, height: '100%', background: '#1e40af' }} />
+        <div style={{ width: '100%', height: 4, background: 'var(--border)' }}>
+          <div style={{ width: `${Math.round((readiness as any).score)}%`, height: '100%', background: 'var(--accent)' }} />
         </div>
       )}
 
@@ -266,7 +266,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
             </div>
           </div>
           {showUserPopover && (
-            <div style={{ position: 'absolute', top: '18px', left: 0, zIndex: 20, background: 'var(--surface)', border: '1px solid #c0c0c0', padding: '6px', width: '220px' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ position: 'absolute', top: '18px', left: 0, zIndex: 20, background: 'var(--surface)', border: '1px solid var(--border)', padding: '6px', width: '220px' }} onClick={(e) => e.stopPropagation()}>
               <div className="text text-bold" style={{ fontSize: '11px', marginBottom: '4px' }}>{item.user_name || 'User'}</div>
               <div className="text text-muted" style={{ fontSize: '9px' }}>User profile</div>
             </div>
@@ -292,7 +292,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
             margin: '0 0 8px 0',
             fontSize: '11px',
             lineHeight: 1.3,
-            color: '#555',
+            color: 'var(--text-secondary)',
             overflow: 'hidden',
             display: '-webkit-box',
             WebkitLineClamp: 2,
@@ -335,31 +335,31 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
                         {pi.label && typeof pi.amount === 'number' && (
                           <>
-                            <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600 }}>{pi.label}</span>
-                            <span style={{ fontSize: '16px', fontWeight: 700, color: '#111827' }}>{formatCurrency(pi.amount)}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>{pi.label}</span>
+                            <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>{formatCurrency(pi.amount)}</span>
                           </>
                         )}
                         {delta && (
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: delta.isPositive ? '#065f46' : '#7f1d1d' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: delta.isPositive ? 'var(--success)' : 'var(--error)' }}>
                             {delta.isPositive ? '↑' : '↓'} {Math.abs(delta.percent).toFixed(1)}%
                           </span>
                         )}
                         {typeof sig?.confidence === 'number' && sig.confidence > 0 && (
-                          <span style={{ fontSize: '11px', color: '#6b7280' }}>conf {sig.confidence}</span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>conf {sig.confidence}</span>
                         )}
                         {(item as any).type === 'auction' || (item.metadata?.auction_status === 'active') ? (
-                          <a href={`/vehicle/${item.id}?action=bid`} onClick={(e) => e.stopPropagation()} style={{ marginLeft: 'auto', background: '#fee2e2', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: '#991b1b', textDecoration: 'none' }}>
+                          <a href={`/vehicle/${item.id}?action=bid`} onClick={(e) => e.stopPropagation()} style={{ marginLeft: 'auto', background: 'var(--error-dim)', border: '1px solid var(--border)', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: 'var(--error)', textDecoration: 'none' }}>
                             Bid
                           </a>
                         ) : null}
                         {item.metadata?.is_for_sale ? (
-                          <a href={`/vehicle/${item.id}?action=buy`} onClick={(e) => e.stopPropagation()} style={{ background: '#dcfce7', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: '#166534', textDecoration: 'none' }}>
+                          <a href={`/vehicle/${item.id}?action=buy`} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--success-dim)', border: '1px solid var(--border)', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: 'var(--success)', textDecoration: 'none' }}>
                             Buy
                           </a>
                         ) : null}
                       </div>
                       {marketBand && (
-                        <div style={{ fontSize: '9px', color: '#6b7280' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
                           Band: {formatCurrency(marketBand.low)}–{formatCurrency(marketBand.mid)}–{formatCurrency(marketBand.high)}
                         </div>
                       )}
@@ -390,12 +390,12 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
                       {pc != null && (<span className="badge" style={smallChipStyle}>Parts: {formatCurrency(pc)}</span>)}
                       {partsCount != null && (<span className="badge" style={smallChipStyle}>Parts: {partsCount}</span>)}
                       {(m.book_url || m.shop_id) && (
-                        <a href={m.book_url || `/book?vehicle_id=${(item as any).metadata?.vehicle_id || ''}&event=${item.id}`} onClick={(e) => e.stopPropagation()} style={{ background: '#e0f2fe', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: '#075985', textDecoration: 'none' }}>
+                        <a href={m.book_url || `/book?vehicle_id=${(item as any).metadata?.vehicle_id || ''}&event=${item.id}`} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--accent-dim, #e0f2fe)', border: '1px solid var(--border)', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: 'var(--accent)', textDecoration: 'none' }}>
                           Book
                         </a>
                       )}
                       {(m.order_url || m.parts_list) && (
-                        <a href={m.order_url || `/order-parts?vehicle_id=${(item as any).metadata?.vehicle_id || ''}&event=${item.id}`} onClick={(e) => e.stopPropagation()} style={{ background: '#fef3c7', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: '#92400e', textDecoration: 'none' }}>
+                        <a href={m.order_url || `/order-parts?vehicle_id=${(item as any).metadata?.vehicle_id || ''}&event=${item.id}`} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--warning-dim)', border: '1px solid var(--border)', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: 'var(--warning)', textDecoration: 'none' }}>
                           Order
                         </a>
                       )}

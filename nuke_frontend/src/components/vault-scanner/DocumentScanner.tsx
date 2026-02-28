@@ -332,21 +332,21 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#000',
-      color: '#fff',
+      background: 'var(--bg)',
+      color: 'var(--bg)',
       display: 'flex',
       flexDirection: 'column',
     }}>
       {/* Header */}
       <div style={{
         padding: '16px',
-        borderBottom: '1px solid #333',
+        borderBottom: '1px solid var(--border)',
         textAlign: 'center',
       }}>
         <h1 style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>
           Document Scanner
         </h1>
-        <p style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+        <p style={{ fontSize: '12px', color: 'var(--text-disabled)', marginTop: '4px' }}>
           Your image stays on your device
         </p>
       </div>
@@ -417,7 +417,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({
                       width: '72px',
                       height: '72px',
                       borderRadius: '50%',
-                      background: '#fff',
+                      background: 'var(--bg)',
                       border: '4px solid rgba(255,255,255,0.3)',
                       cursor: 'pointer',
                     }}
@@ -435,13 +435,13 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({
               padding: '20px',
               textAlign: 'center',
             }}>
-              <p style={{ color: '#f87171', marginBottom: '20px' }}>{cameraError}</p>
+              <p style={{ color: 'var(--error)', marginBottom: '20px' }}>{cameraError}</p>
               <button
                 onClick={() => fileInputRef.current?.click()}
                 style={{
                   padding: '16px 32px',
-                  background: '#3b82f6',
-                  color: '#fff',
+                  background: 'var(--accent)',
+                  color: 'var(--bg)',
                   border: 'none',
                   borderRadius: '8px',
                   fontSize: '16px',
@@ -492,20 +492,20 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({
           }}>
             <div style={{
               height: '8px',
-              background: '#333',
+              background: 'var(--surface)',
               borderRadius: '4px',
               overflow: 'hidden',
             }}>
               <div style={{
                 height: '100%',
                 width: `${ocrProgress}%`,
-                background: '#3b82f6',
+                background: 'var(--accent)',
                 transition: 'width 0.3s',
               }} />
             </div>
           </div>
 
-          <p style={{ fontSize: '14px', color: '#888' }}>
+          <p style={{ fontSize: '14px', color: 'var(--text-disabled)' }}>
             Processing on your device... {ocrProgress}%
           </p>
         </div>
@@ -535,7 +535,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({
 
           {/* Extracted Data */}
           <div style={{
-            background: '#111',
+            background: 'var(--surface)',
             borderRadius: '8px',
             padding: '16px',
             marginBottom: '24px',
@@ -545,7 +545,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({
             </h2>
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '12px', color: '#888', marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-disabled)', marginBottom: '4px' }}>
                 VIN (Vehicle Identification Number) *
               </label>
               <input
@@ -556,38 +556,38 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({
                 style={{
                   width: '100%',
                   padding: '12px',
-                  background: '#222',
-                  border: isValidVin(editedVin) ? '1px solid #22c55e' : '1px solid #666',
+                  background: 'var(--surface)',
+                  border: isValidVin(editedVin) ? '1px solid var(--success)' : '1px solid var(--border)',
                   borderRadius: '4px',
-                  color: '#fff',
+                  color: 'var(--bg)',
                   fontSize: '16px',
                   fontFamily: 'monospace',
                 }}
               />
               {editedVin && !isValidVin(editedVin) && (
-                <p style={{ fontSize: '11px', color: '#f87171', marginTop: '4px' }}>
+                <p style={{ fontSize: '11px', color: 'var(--error)', marginTop: '4px' }}>
                   VIN must be exactly 17 characters
                 </p>
               )}
             </div>
 
             <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '12px', color: '#888' }}>Owner</label>
-              <p style={{ color: extractedData.owner_name ? '#fff' : '#666' }}>
+              <label style={{ fontSize: '12px', color: 'var(--text-disabled)' }}>Owner</label>
+              <p style={{ color: extractedData.owner_name ? 'var(--bg)' : 'var(--text-secondary)' }}>
                 {extractedData.owner_name || 'Not detected'}
               </p>
             </div>
 
             <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '12px', color: '#888' }}>Title Number</label>
-              <p style={{ color: extractedData.title_number ? '#fff' : '#666' }}>
+              <label style={{ fontSize: '12px', color: 'var(--text-disabled)' }}>Title Number</label>
+              <p style={{ color: extractedData.title_number ? 'var(--bg)' : 'var(--text-secondary)' }}>
                 {extractedData.title_number || 'Not detected'}
               </p>
             </div>
 
             <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '12px', color: '#888' }}>State</label>
-              <p style={{ color: extractedData.state ? '#fff' : '#666' }}>
+              <label style={{ fontSize: '12px', color: 'var(--text-disabled)' }}>State</label>
+              <p style={{ color: extractedData.state ? 'var(--bg)' : 'var(--text-secondary)' }}>
                 {extractedData.state || 'Not detected'}
               </p>
             </div>
@@ -595,10 +595,10 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({
             <div style={{
               marginTop: '16px',
               padding: '12px',
-              background: '#1a2e1a',
+              background: 'var(--surface)',
               borderRadius: '4px',
               fontSize: '12px',
-              color: '#22c55e',
+              color: 'var(--success)',
             }}>
               Your image never leaves this device. Only the text above will be sent.
             </div>
@@ -616,9 +616,9 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({
                 flex: 1,
                 padding: '16px',
                 background: 'transparent',
-                border: '1px solid #666',
+                border: '1px solid var(--border)',
                 borderRadius: '8px',
-                color: '#fff',
+                color: 'var(--bg)',
                 fontSize: '16px',
                 cursor: 'pointer',
               }}
@@ -631,10 +631,10 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({
               style={{
                 flex: 2,
                 padding: '16px',
-                background: isValidVin(editedVin) ? '#3b82f6' : '#333',
+                background: isValidVin(editedVin) ? 'var(--accent)' : 'var(--surface)',
                 border: 'none',
                 borderRadius: '8px',
-                color: '#fff',
+                color: 'var(--bg)',
                 fontSize: '16px',
                 cursor: isValidVin(editedVin) ? 'pointer' : 'not-allowed',
               }}
@@ -658,12 +658,12 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({
           <div style={{
             width: '48px',
             height: '48px',
-            border: '3px solid #333',
-            borderTopColor: '#3b82f6',
+            border: '3px solid var(--border)',
+            borderTopColor: 'var(--accent)',
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
           }} />
-          <p style={{ marginTop: '16px', color: '#888' }}>Submitting...</p>
+          <p style={{ marginTop: '16px', color: 'var(--text-disabled)' }}>Submitting...</p>
           <style>{`
             @keyframes spin {
               to { transform: rotate(360deg); }
@@ -689,9 +689,9 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({
             style={{
               padding: '8px 16px',
               background: 'rgba(0,0,0,0.5)',
-              border: '1px solid #666',
+              border: '1px solid var(--border)',
               borderRadius: '16px',
-              color: '#fff',
+              color: 'var(--bg)',
               fontSize: '12px',
               cursor: 'pointer',
             }}

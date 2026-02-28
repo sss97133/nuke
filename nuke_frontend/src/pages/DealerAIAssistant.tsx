@@ -273,10 +273,10 @@ What do you want to do first?`,
               style={{
                 padding: '12px',
                 borderRadius: '8px',
-                background: message.role === 'user' 
-                  ? 'var(--accent)' 
-                  : 'white',
-                color: message.role === 'user' ? 'white' : 'black',
+                background: message.role === 'user'
+                  ? 'var(--accent)'
+                  : 'var(--surface)',
+                color: message.role === 'user' ? 'var(--bg)' : 'var(--text)',
                 border: message.role === 'assistant' ? '1px solid var(--border)' : 'none',
                 fontSize: '12px',
                 whiteSpace: 'pre-wrap',
@@ -336,7 +336,7 @@ What do you want to do first?`,
                         borderRadius: '3px',
                         background: action.status === 'completed' ? 'var(--success)' : 
                                    action.status === 'failed' ? 'var(--danger)' : 'var(--warning)',
-                        color: 'white'
+                        color: 'var(--bg)'
                       }}>
                         {action.status}
                       </span>
@@ -481,7 +481,7 @@ What do you want to do first?`,
             style={{
               padding: '10px 20px',
               background: 'var(--accent)',
-              color: 'white',
+              color: 'var(--bg)',
               border: 'none',
               borderRadius: '4px',
               cursor: processing ? 'wait' : 'pointer',

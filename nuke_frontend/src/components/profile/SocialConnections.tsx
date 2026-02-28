@@ -379,7 +379,7 @@ export default function SocialConnections({ userId }: Props) {
       id: platformId,
       name: platformId,
       shortLabel: platformId.slice(0, 2).toUpperCase(),
-      color: '#6b7280',
+      color: 'var(--text-secondary)',
       oauthEndpoint: null,
       description: '',
       domain: undefined
@@ -404,10 +404,10 @@ export default function SocialConnections({ userId }: Props) {
           <div style={{
             padding: '8px 12px',
             marginBottom: '12px',
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
+            background: 'var(--error-dim)',
+            border: '1px solid var(--error)',
             borderRadius: '4px',
-            color: '#dc2626',
+            color: 'var(--error)',
             fontSize: '11px'
           }}>
             {error}
@@ -436,7 +436,7 @@ export default function SocialConnections({ userId }: Props) {
                     padding: '10px 12px',
                     background: 'var(--surface-hover)',
                     borderRadius: '4px',
-                    border: isExpired ? '2px solid #f59e0b' : '1px solid var(--border)'
+                    border: isExpired ? '2px solid var(--warning)' : '1px solid var(--border)'
                   }}
                 >
                   <PlatformFavicon
@@ -457,8 +457,8 @@ export default function SocialConnections({ userId }: Props) {
                         borderRadius: '10px',
                         fontSize: '9px',
                         fontWeight: 600,
-                        background: isExpired ? '#fef3c7' : '#dcfce7',
-                        color: isExpired ? '#d97706' : '#16a34a'
+                        background: isExpired ? 'var(--warning-dim)' : 'var(--success-dim)',
+                        color: isExpired ? 'var(--warning)' : 'var(--success)'
                       }}>
                         {isExpired ? 'Reconnect Needed' : 'Connected'}
                       </span>
@@ -491,7 +491,7 @@ export default function SocialConnections({ userId }: Props) {
                         className="button button-small"
                         onClick={() => initiateOAuth(platform)}
                         disabled={connecting === platform.id}
-                        style={{ fontSize: '9px', background: '#fef3c7', borderColor: '#f59e0b', color: '#92400e' }}
+                        style={{ fontSize: '9px', background: 'var(--warning-dim)', borderColor: 'var(--warning)', color: 'var(--warning-text, #92400e)' }}
                       >
                         {connecting === platform.id ? '...' : 'Reconnect'}
                       </button>

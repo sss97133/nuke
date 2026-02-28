@@ -277,7 +277,7 @@ const RoleManagementInterface: React.FC<RoleManagementInterfaceProps> = ({
             left: '12px',
             top: '50%',
             transform: 'translateY(-50%)',
-            color: '#6B7280'
+            color: 'var(--text-secondary)'
           }} />
           <input
             type="text"
@@ -323,7 +323,7 @@ const RoleManagementInterface: React.FC<RoleManagementInterfaceProps> = ({
                   justifyContent: 'center',
                   fontSize: '20px',
                   fontWeight: 'bold',
-                  color: '#6B7280'
+                  color: 'var(--text-secondary)'
                 }}>
                   {contributor.user_profile?.avatar_url ? (
                     <img
@@ -363,7 +363,7 @@ const RoleManagementInterface: React.FC<RoleManagementInterfaceProps> = ({
                     {contributor.user_profile?.email}
                   </div>
 
-                  <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#6B7280' }}>
+                  <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--text-secondary)' }}>
                     <span>Joined: {new Date(contributor.granted_at).toLocaleDateString()}</span>
                     <span>Trust: {contributor.trust_score}/100</span>
                     <span>Activity: {contributor.recent_activity?.length || 0} recent actions</span>
@@ -444,7 +444,7 @@ const RoleManagementInterface: React.FC<RoleManagementInterfaceProps> = ({
                   justifyContent: 'center',
                   fontSize: '20px',
                   fontWeight: 'bold',
-                  color: '#6B7280'
+                  color: 'var(--text-secondary)'
                 }}>
                   {request.user_profile?.avatar_url ? (
                     <img
@@ -483,12 +483,12 @@ const RoleManagementInterface: React.FC<RoleManagementInterfaceProps> = ({
                   </div>
 
                   {request.evidence && Object.keys(request.evidence).length > 0 && (
-                    <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                       <strong>Evidence:</strong> {Object.keys(request.evidence).join(', ')}
                     </div>
                   )}
 
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '8px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
                     Requested: {new Date(request.created_at).toLocaleDateString()}
                   </div>
                 </div>

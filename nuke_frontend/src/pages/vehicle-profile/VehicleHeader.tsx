@@ -1123,10 +1123,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       return { badge: null, link: null, outcome: null };
     }
     const badges: Record<string, any> = {
-      sold: { text: 'SOLD', color: '#22c55e', bg: '#dcfce7' },
-      reserve_not_met: { text: 'RNM', color: '#f59e0b', bg: '#fef3c7' },
-      no_sale: { text: 'NO SALE', color: '#6b7280', bg: '#f3f4f6' },
-      pending: { text: 'LIVE', color: '#3b82f6', bg: '#dbeafe' }
+      sold: { text: 'SOLD', color: 'var(--success)', bg: 'var(--success-bg)' },
+      reserve_not_met: { text: 'RNM', color: 'var(--warning)', bg: 'var(--warning-bg)' },
+      no_sale: { text: 'NO SALE', color: 'var(--text-secondary)', bg: 'var(--surface)' },
+      pending: { text: 'LIVE', color: 'var(--text-secondary)', bg: 'var(--info-bg)' }
     };
     
     const rawOutcome = String((vehicle as any)?.auction_outcome || '').toLowerCase();
@@ -1548,7 +1548,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const trendIndicator = useMemo(() => {
     if (trendPct === null) return null;
     const positive = trendPct >= 0;
-    const color = positive ? '#22c55e' : '#ef4444';
+    const color = positive ? 'var(--success)' : 'var(--error)';
     const triangleStyle = positive
       ? {
           borderLeft: '5px solid transparent',
@@ -1914,7 +1914,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       <span style={{ color: 'var(--text-muted)' }}>Price trend</span>
                       <span style={{
                         fontWeight: 700,
-                        color: popoverData.trend_direction === 'up' ? '#166534' : popoverData.trend_direction === 'down' ? '#dc2626' : 'var(--text)',
+                        color: popoverData.trend_direction === 'up' ? 'var(--success)' : popoverData.trend_direction === 'down' ? 'var(--error)' : 'var(--text)',
                       }}>
                         {popoverData.trend_direction === 'up' ? '↑ Rising' : popoverData.trend_direction === 'down' ? '↓ Falling' : '→ Stable'}
                       </span>
@@ -1967,12 +1967,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 4,
-                  background: transferStatus.status === 'completed' ? '#dcfce7' :
-                              transferStatus.status === 'stalled' ? '#fef3c7' : '#eff6ff',
-                  color: transferStatus.status === 'completed' ? '#166534' :
-                         transferStatus.status === 'stalled' ? '#92400e' : '#1e40af',
-                  border: `1px solid ${transferStatus.status === 'completed' ? '#86efac' :
-                                        transferStatus.status === 'stalled' ? '#fcd34d' : '#93c5fd'}`,
+                  background: transferStatus.status === 'completed' ? 'var(--success-bg)' :
+                              transferStatus.status === 'stalled' ? 'var(--warning-bg)' : 'var(--info-bg)',
+                  color: transferStatus.status === 'completed' ? 'var(--success)' :
+                         transferStatus.status === 'stalled' ? 'var(--warning)' : 'var(--text-secondary)',
+                  border: `1px solid ${transferStatus.status === 'completed' ? 'var(--success)' :
+                                        transferStatus.status === 'stalled' ? 'var(--warning)' : 'var(--border)'}`,
                   borderRadius: '3px',
                   padding: '2px 5px',
                 }}
@@ -1991,7 +1991,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   <span style={{ opacity: 0.6, fontSize: '8px' }}>{transferStatus.progress.pct}%</span>
                 )}
                 {transferStatus.days_since_activity !== null && transferStatus.days_since_activity >= 7 && (
-                  <span style={{ color: transferStatus.status === 'stalled' ? '#b45309' : '#64748b', fontSize: '8px' }}>
+                  <span style={{ color: transferStatus.status === 'stalled' ? 'var(--warning)' : 'var(--text-secondary)', fontSize: '8px' }}>
                     · {transferStatus.days_since_activity}d
                   </span>
                 )}
@@ -2042,7 +2042,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     background: 'transparent',
                     border: 'none',
                     padding: '2px 4px',
-                    color: label === 'OWNER' ? '#15803d' : '#1d4ed8',
+                    color: label === 'OWNER' ? 'var(--success)' : 'var(--text-secondary)',
                     textTransform: 'uppercase'
                   }}
                   title="Why does this vehicle profile look different?"
@@ -2062,7 +2062,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       border: '2px solid var(--border)',
                       padding: '10px 12px',
                       width: '280px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+                      boxShadow: '0 4px 12px var(--shadow)',
                       marginTop: '4px',
                     }}
                     onClick={(e) => e.stopPropagation()}
@@ -2175,7 +2175,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                               {popoverData.identity.claimed_by && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                   <span style={{ color: 'var(--text-muted)' }}>Claimed</span>
-                                  <span style={{ fontWeight: 700, color: '#166534' }}>Yes</span>
+                                  <span style={{ fontWeight: 700, color: 'var(--success)' }}>Yes</span>
                                 </div>
                               )}
                             </div>
@@ -2410,8 +2410,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                                 <span style={{ color: 'var(--text-muted)' }}>Status</span>
                                 <span style={{
                                   fontWeight: 700,
-                                  color: popoverData.listingStatus === 'sold' ? '#166534' :
-                                    popoverData.listingStatus === 'reserve_not_met' ? '#dc2626' : baseTextColor,
+                                  color: popoverData.listingStatus === 'sold' ? 'var(--success)' :
+                                    popoverData.listingStatus === 'reserve_not_met' ? 'var(--error)' : baseTextColor,
                                 }}>
                                   {popoverData.listingStatus === 'sold' ? 'SOLD' :
                                     popoverData.listingStatus === 'reserve_not_met' ? 'Reserve Not Met' :
@@ -2462,17 +2462,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           borderRadius: 4,
                           background:
                             headerBuyer.tone === 'success'
-                              ? '#dcfce7'
+                              ? 'var(--success-bg)'
                               : headerBuyer.tone === 'muted'
                                 ? 'var(--grey-100)'
                                 : 'var(--surface)',
                           border:
                             headerBuyer.tone === 'success'
-                              ? '1px solid #166534'
+                              ? '1px solid var(--success)'
                               : '1px solid var(--border)',
                           color:
                             headerBuyer.tone === 'success'
-                              ? '#166534'
+                              ? 'var(--success)'
                               : headerBuyer.tone === 'muted'
                                 ? mutedTextColor
                                 : baseTextColor,
@@ -2496,17 +2496,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         borderRadius: 4,
                         background:
                           headerBuyer.tone === 'success'
-                            ? '#dcfce7'
+                            ? 'var(--success-bg)'
                             : headerBuyer.tone === 'muted'
                               ? 'var(--grey-100)'
                               : 'var(--surface)',
                         border:
                           headerBuyer.tone === 'success'
-                            ? '1px solid #166534'
+                            ? '1px solid var(--success)'
                             : '1px solid var(--border)',
                         color:
                           headerBuyer.tone === 'success'
-                            ? '#166534'
+                            ? 'var(--success)'
                             : headerBuyer.tone === 'muted'
                               ? mutedTextColor
                               : baseTextColor,
@@ -2543,7 +2543,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         width: 6,
                         height: 6,
                         borderRadius: 999,
-                        background: headerCountdown.isLive ? '#dc2626' : '#94a3b8',
+                        background: headerCountdown.isLive ? 'var(--error)' : 'var(--text-disabled)',
                         display: 'inline-block',
                         flexShrink: 0,
                       }}
@@ -2596,7 +2596,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     border: '2px solid var(--primary)',
                     padding: '12px',
                     width: '260px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    boxShadow: '0 4px 12px var(--shadow)',
                     marginTop: '4px',
                   }}
                   onClick={(e) => e.stopPropagation()}
@@ -2736,7 +2736,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     border: '2px solid var(--primary)',
                     padding: '12px',
                     width: '320px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    boxShadow: '0 4px 12px var(--shadow)',
                     marginTop: '4px',
                   }}
                   onClick={(e) => e.stopPropagation()}
@@ -2784,7 +2784,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     {ownerPopoverLoading ? (
                       <div style={{ marginTop: 10, color: 'var(--text-muted)' }}>Loading partner signals...</div>
                     ) : ownerPopoverError ? (
-                      <div style={{ marginTop: 10, color: 'var(--error-text, #dc2626)' }}>{ownerPopoverError}</div>
+                      <div style={{ marginTop: 10, color: 'var(--error)' }}>{ownerPopoverError}</div>
                     ) : ownerPopoverData ? (
                       <>
                         <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
@@ -2941,7 +2941,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     border: '2px solid var(--primary)',
                     padding: '12px',
                     width: '280px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    boxShadow: '0 4px 12px var(--shadow)',
                     marginTop: '4px',
                   }}
                   onClick={(e) => e.stopPropagation()}
@@ -3304,7 +3304,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       const t = new Date(auctionPulse.updated_at as any).getTime();
                       if (!Number.isFinite(t)) return undefined;
                       const diffMin = (Date.now() - t) / (1000 * 60);
-                      return diffMin > 3 ? '#b45309' : undefined;
+                      return diffMin > 3 ? 'var(--warning)' : undefined;
                     })(),
                   }}
                   title="Telemetry freshness"
@@ -3325,7 +3325,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       width: 6,
                       height: 6,
                       borderRadius: 999,
-                      background: isAuctionLive ? '#dc2626' : '#94a3b8',
+                      background: isAuctionLive ? 'var(--error)' : 'var(--text-disabled)',
                       display: 'inline-block',
                       flexShrink: 0
                     }}
@@ -3353,9 +3353,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       style={{ 
                         fontSize: '10px', 
                         fontWeight: 700,
-                        color: reserveMet ? '#22c55e' : '#f59e0b',
-                        border: `1px solid ${reserveMet ? '#22c55e' : '#f59e0b'}`,
-                        backgroundColor: reserveMet ? '#dcfce7' : '#fef3c7'
+                        color: reserveMet ? 'var(--success)' : 'var(--warning)',
+                        border: `1px solid ${reserveMet ? 'var(--success)' : 'var(--warning)'}`,
+                        backgroundColor: reserveMet ? 'var(--success-bg)' : 'var(--warning-bg)'
                       }} 
                       title={reserveMet ? 'Reserve met - will sell' : `Reserve: ${formatCurrency(reservePrice)}`}
                     >
@@ -3383,9 +3383,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         style={{ 
                           fontSize: '10px', 
                           fontWeight: 700,
-                          color: isOutperforming ? '#22c55e' : '#f59e0b',
-                          border: `1px solid ${isOutperforming ? '#22c55e' : '#f59e0b'}`,
-                          backgroundColor: isOutperforming ? '#dcfce7' : '#fef3c7'
+                          color: isOutperforming ? 'var(--success)' : 'var(--warning)',
+                          border: `1px solid ${isOutperforming ? 'var(--success)' : 'var(--warning)'}`,
+                          backgroundColor: isOutperforming ? 'var(--success-bg)' : 'var(--warning-bg)'
                         }} 
                         title={`${isOutperforming ? 'Outperforming' : 'Underperforming'} typical sale by ${Math.abs(diffPct).toFixed(0)}%`}
                       >
@@ -3412,9 +3412,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   }
                 }}
                 style={{
-                  border: '1px solid #22c55e',
-                  background: '#f0fdf4',
-                  color: '#15803d',
+                  border: '1px solid var(--success)',
+                  background: 'var(--success-bg)',
+                  color: 'var(--success)',
                   fontWeight: 600,
                   padding: '1px 8px',
                   borderRadius: '4px',
@@ -3434,9 +3434,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     setShowPendingDetails(!showPendingDetails);
                   }}
                   style={{
-                    border: '1px solid #f59e0b',
-                    background: '#fef3c7',
-                    color: '#92400e',
+                    border: '1px solid var(--warning)',
+                    background: 'var(--warning-bg)',
+                    color: 'var(--warning)',
                     fontWeight: 600,
                     padding: '1px 8px',
                     borderRadius: '4px',
@@ -3455,7 +3455,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       background: 'var(--surface)',
                       border: '1px solid var(--border)',
                       borderRadius: 6,
-                      boxShadow: '0 8px 20px rgba(15, 23, 42, 0.18)',
+                      boxShadow: '0 8px 20px var(--shadow)',
                       padding: 12,
                       width: 320,
                       zIndex: 950,
@@ -3464,13 +3464,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     }}
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#92400e', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--warning)', marginBottom: '8px' }}>
                       {pendingReasonText}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#78350f', marginBottom: '12px', lineHeight: '1.5' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--warning)', marginBottom: '12px', lineHeight: '1.5' }}>
                       To activate this vehicle:
                     </div>
-                    <ul style={{ fontSize: '11px', color: '#78350f', margin: '0 0 12px 0', paddingLeft: '20px', lineHeight: '1.6' }}>
+                    <ul style={{ fontSize: '11px', color: 'var(--warning)', margin: '0 0 12px 0', paddingLeft: '20px', lineHeight: '1.6' }}>
                       {needsVIN && (
                         <li style={{ marginBottom: '6px' }}>
                           <strong>Add a VIN:</strong> Go to{' '}
@@ -3479,7 +3479,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                             style={{
                               background: 'transparent',
                               border: 'none',
-                              color: '#92400e',
+                              color: 'var(--warning)',
                               textDecoration: 'underline',
                               cursor: 'pointer',
                               padding: 0,
@@ -3505,7 +3505,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
                     {similarVehicles.length > 0 && (
                       <div>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#92400e', marginBottom: '8px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--warning)', marginBottom: '8px' }}>
                           Similar Vehicles ({similarVehicles.length}):
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -3513,8 +3513,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                             <div
                               key={similar.id}
                               style={{
-                                background: '#fef3c7',
-                                border: '1px solid #fbbf24',
+                                background: 'var(--warning-bg)',
+                                border: '1px solid var(--warning)',
                                 borderRadius: '4px',
                                 padding: '8px',
                                 display: 'flex',
@@ -3523,10 +3523,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                               }}
                             >
                               <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: '12px', fontWeight: 600, color: '#1f2937' }}>
+                                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>
                                   {similar.year} {similar.make} {similar.model}
                                 </div>
-                                <div style={{ fontSize: '9px', color: '#6b7280', marginTop: '2px' }}>
+                                <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                                   {similar.vin ? `VIN: ${similar.vin.substring(0, 8)}...` : 'No VIN'} • {similar.image_count} images • {similar.confidence}% match
                                 </div>
                               </div>
@@ -3564,9 +3564,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                                       }
                                     }}
                                     style={{
-                                      background: '#f59e0b',
-                                      border: '1px solid #d97706',
-                                      color: '#ffffff',
+                                      background: 'var(--warning)',
+                                      border: '1px solid var(--warning)',
+                                      color: 'var(--bg)',
                                       padding: '4px 8px',
                                       borderRadius: '4px',
                                       fontSize: '9px',
@@ -3584,7 +3584,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       </div>
                     )}
                     {loadingSimilar && (
-                      <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '8px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '8px' }}>
                         Loading similar vehicles...
                       </div>
                     )}
@@ -3911,7 +3911,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   borderRadius: 6,
-                  boxShadow: '0 8px 20px rgba(15, 23, 42, 0.18)',
+                  boxShadow: '0 8px 20px var(--shadow)',
                   padding: 12,
                   width: 260,
                   zIndex: 950
@@ -4222,7 +4222,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   cursor: 'pointer',
                   textDecoration: 'underline',
                   textDecorationStyle: 'dotted',
-                  textDecorationColor: 'rgba(0,0,0,0.3)',
+                  textDecorationColor: 'var(--text-disabled)',
                   // Blur effect for RNM auctions (reserve not met)
                   filter: isRNM && highBid && String(priceDisplay).toUpperCase() !== 'SOLD' ? 'blur(4px)' : 'none',
                   transition: 'filter 0.2s ease',
@@ -4260,7 +4260,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     const isRNM = reservePrice && currentBid && currentBid < reservePrice;
                     
                     return (
-                      <span style={{ color: isRNM ? '#dc2626' : undefined }}>
+                      <span style={{ color: isRNM ? 'var(--error)' : undefined }}>
                         {priceDisplay}
                       </span>
                     );
@@ -4307,8 +4307,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   style={{
                     fontSize: '8px',
                     fontWeight: 700,
-                    color: '#22c55e',
-                    background: '#dcfce7',
+                    color: 'var(--success)',
+                    background: 'var(--success-bg)',
                     padding: '2px 6px',
                     borderRadius: '3px',
                     letterSpacing: '0.5px',
@@ -4335,8 +4335,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   style={{
                     fontSize: '8px',
                     fontWeight: 700,
-                    color: '#155e75',
-                    background: '#cffafe',
+                    color: 'var(--text-secondary)',
+                    background: 'var(--info-bg)',
                     padding: '2px 6px',
                     borderRadius: '3px',
                     letterSpacing: '0.5px',
@@ -4361,7 +4361,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 background: 'var(--surface)',
                 border: '1px solid var(--border)',
                 borderRadius: 6,
-                boxShadow: '0 12px 24px rgba(15, 23, 42, 0.15)',
+                boxShadow: '0 12px 24px var(--shadow)',
                 padding: 12,
                 fontSize: '11px',
                 color: baseTextColor,
@@ -4421,7 +4421,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     : isOverpriced
                       ? `OVERPRICED by ${Math.abs(gapPct).toFixed(0)}%`
                       : 'FAIR MARKET';
-                  const verdictColor = isUnderpriced ? '#166534' : isOverpriced ? '#dc2626' : 'var(--text)';
+                  const verdictColor = isUnderpriced ? 'var(--success)' : isOverpriced ? 'var(--error)' : 'var(--text)';
 
                   return (
                     <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -4430,7 +4430,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: 'var(--text-muted)' }}>Nuke Estimate vs Price</span>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: gap > 0 ? '#166534' : gap < 0 ? '#dc2626' : 'var(--text)' }}>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: gap > 0 ? 'var(--success)' : gap < 0 ? 'var(--error)' : 'var(--text)' }}>
                           {gap > 0 ? '+' : ''}{formatCurrency(gap)} ({gapPct > 0 ? '+' : ''}{gapPct.toFixed(0)}%)
                         </span>
                       </div>
@@ -4451,7 +4451,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               })()}
 
               {isOwnerLike && (
-                <div style={{ marginTop: 12, borderTop: '1px solid #e5e7eb', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -4638,7 +4638,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         width: 6,
                         height: 6,
                         borderRadius: 999,
-                        background: isAuctionLive ? '#dc2626' : '#94a3b8',
+                        background: isAuctionLive ? 'var(--error)' : 'var(--text-disabled)',
                         display: 'inline-block',
                         flexShrink: 0,
                       }}
@@ -4664,7 +4664,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         width: 6,
                         height: 6,
                         borderRadius: 999,
-                        background: '#dc2626',
+                        background: 'var(--error)',
                         display: 'inline-block',
                         flexShrink: 0,
                       }}
@@ -4735,7 +4735,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       width: 6,
                       height: 6,
                       borderRadius: 999,
-                      background: '#dc2626',
+                      background: 'var(--error)',
                       display: 'inline-block',
                       flexShrink: 0,
                     }}
@@ -4756,7 +4756,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
+            background: 'var(--overlay)',
             zIndex: 1000,
             display: 'flex',
             alignItems: 'center',

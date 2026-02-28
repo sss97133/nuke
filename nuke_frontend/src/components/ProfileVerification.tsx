@@ -500,7 +500,7 @@ export const ProfileVerification: React.FC = () => {
                     className="input"
                   />
                   {!isE164(phoneNumber) && phoneNumber && (
-                    <div className="text-small" style={{ color: '#b91c1c' }}>
+                    <div className="text-small" style={{ color: 'var(--error)' }}>
                       Include country code. Example: +17025551234
                     </div>
                   )}

@@ -193,7 +193,7 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
 
   if (loading) {
     return (
-      <div style={{ fontSize: '9px', color: '#9ca3af', padding: '4px 0' }}>
+      <div style={{ fontSize: '9px', color: 'var(--text-disabled)', padding: '4px 0' }}>
         Loading metrics...
       </div>
     );
@@ -210,24 +210,24 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
         style={{
           marginTop: '8px',
           padding: '8px',
-          background: '#f0f9ff',
-          border: '1px solid #bfdbfe',
+          background: 'var(--accent-dim, #f0f9ff)',
+          border: '1px solid var(--accent-border, #bfdbfe)',
           borderRadius: '4px',
           fontSize: '9px'
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: '6px', color: '#1e40af' }}>
+        <div style={{ fontWeight: 700, marginBottom: '6px', color: 'var(--accent)' }}>
           SERVICE METRICS
         </div>
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '6px' }}>
           <div>
-            <span style={{ color: '#6b7280' }}>Days on lot:</span>
+            <span style={{ color: 'var(--text-secondary)' }}>Days on lot:</span>
             <span style={{ fontWeight: 600, marginLeft: '4px' }}>{metrics.daysOnLot}</span>
           </div>
           {metrics.parkingCostPerDay > 0 && (
             <div>
-              <span style={{ color: '#6b7280' }}>Parking:</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Parking:</span>
               <span style={{ fontWeight: 600, marginLeft: '4px' }}>
                 {formatCurrency(metrics.totalParkingCost)}
               </span>
@@ -237,18 +237,18 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '6px' }}>
           <div>
-            <span style={{ color: '#6b7280' }}>Materials:</span>
+            <span style={{ color: 'var(--text-secondary)' }}>Materials:</span>
             <span style={{ fontWeight: 600, marginLeft: '4px' }}>
               {formatCurrency(metrics.materialCost)}
             </span>
           </div>
           <div>
-            <span style={{ color: '#6b7280' }}>Labor:</span>
+            <span style={{ color: 'var(--text-secondary)' }}>Labor:</span>
             <span style={{ fontWeight: 600, marginLeft: '4px' }}>
               {formatCurrency(metrics.laborCost)}
             </span>
             {metrics.laborHours > 0 && (
-              <span style={{ color: '#9ca3af', marginLeft: '4px' }}>
+              <span style={{ color: 'var(--text-disabled)', marginLeft: '4px' }}>
                 ({metrics.laborHours.toFixed(1)}h)
               </span>
             )}
@@ -257,7 +257,7 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
 
         {metrics.contractorCost > 0 && (
           <div style={{ marginBottom: '6px' }}>
-            <span style={{ color: '#6b7280' }}>Contractors:</span>
+            <span style={{ color: 'var(--text-secondary)' }}>Contractors:</span>
             <span style={{ fontWeight: 600, marginLeft: '4px' }}>
               {formatCurrency(metrics.contractorCost)}
             </span>
@@ -268,14 +268,14 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
           <div style={{ 
             marginTop: '6px', 
             padding: '4px 6px', 
-            background: '#fef3c7', 
-            border: '1px solid #f59e0b',
+            background: 'var(--warning-dim)',
+            border: '1px solid var(--warning)',
             borderRadius: '2px'
           }}>
-            <div style={{ fontSize: '8px', color: '#92400e', marginBottom: '2px' }}>
+            <div style={{ fontSize: '8px', color: 'var(--warning)', marginBottom: '2px' }}>
               OWNER OPERATOR VALUE
             </div>
-            <div style={{ fontWeight: 700, color: '#92400e' }}>
+            <div style={{ fontWeight: 700, color: 'var(--warning)' }}>
               {metrics.ownerOperatorHours.toFixed(1)}h × ${metrics.ownerOperatorRate}/hr = {formatCurrency(metrics.ownerOperatorValue)}
             </div>
           </div>
@@ -284,13 +284,13 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
         <div style={{ 
           marginTop: '6px', 
           paddingTop: '6px', 
-          borderTop: '1px solid #bfdbfe',
+          borderTop: '1px solid var(--accent-border, #bfdbfe)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <span style={{ color: '#6b7280' }}>Total Cost:</span>
-          <span style={{ fontWeight: 700, fontSize: '11px', color: '#1e40af' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>Total Cost:</span>
+          <span style={{ fontWeight: 700, fontSize: '11px', color: 'var(--accent)' }}>
             {formatCurrency(metrics.totalCost)}
           </span>
         </div>

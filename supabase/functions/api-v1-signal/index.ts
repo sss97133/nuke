@@ -6,6 +6,7 @@
  * single 0-100 deal score with confidence-weighted signal breakdown.
  *
  * Supports lookup by vehicle_id or VIN.
+ * When no estimate exists, triggers on-demand valuation (adds ~1-3s, but returns data).
  *
  * Authentication: Bearer token (Supabase JWT) or API key (nk_live_...)
  *
@@ -96,6 +97,48 @@ function extractCompCount(raw: Record<string, any> | null): number | null {
   return raw.comps.sourceCount;
 }
 
+// ── On-demand valuation trigger ────────────────────────────────────────────
+// When no estimate exists, calls compute-vehicle-valuation inline.
+// Returns the freshly computed estimate row, or null if computation fails.
+
+async function triggerOnDemandValuation(
+  vehicleId: string,
+  supabaseUrl: string,
+  serviceRoleKey: string
+): Promise<any | null> {
+  try {
+    const resp = await fetch(
+      `${supabaseUrl}/functions/v1/compute-vehicle-valuation`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({ vehicle_id: vehicleId }),
+      }
+    );
+
+    if (!resp.ok) return null;
+
+    const result = await resp.json();
+    // compute-vehicle-valuation returns { results: [...] } or error details
+    if (result.error) return null;
+
+    // Now fetch the freshly written estimate from nuke_estimates
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const { data: estimate } = await supabase
+      .from("nuke_estimates")
+      .select("*")
+      .eq("vehicle_id", vehicleId)
+      .maybeSingle();
+
+    return estimate ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -155,7 +198,7 @@ serve(async (req) => {
     const vehiclePrice = vehicle.asking_price ?? vehicle.sale_price ?? null;
 
     // Fetch nuke_estimates
-    const { data: estimate, error: estError } = await supabase
+    let { data: estimate, error: estError } = await supabase
       .from("nuke_estimates")
       .select("*")
       .eq("vehicle_id", resolvedVehicleId!)
@@ -165,11 +208,21 @@ serve(async (req) => {
       throw estError;
     }
 
+    // On-demand valuation: if no estimate exists, compute it now
+    let computedOnDemand = false;
     if (!estimate) {
+      estimate = await triggerOnDemandValuation(resolvedVehicleId!, supabaseUrl, supabaseKey);
+      if (estimate) {
+        computedOnDemand = true;
+      }
+    }
+
+    if (!estimate) {
+      // Vehicle has no price data to work from — cannot compute
       return jsonResponse({
-        error: "No signal score available for this vehicle. Run a valuation first.",
+        error: "No signal score available for this vehicle. Insufficient price data.",
         vehicle_id: resolvedVehicleId,
-        hint: "Use nuke.valuations.get() to trigger a valuation, then retry.",
+        hint: "Vehicle needs sale_price, asking_price, or comparable sales data before a signal can be computed.",
       }, 404);
     }
 
@@ -205,6 +258,7 @@ serve(async (req) => {
         model_version: estimate.model_version ?? null,
         calculated_at: estimate.calculated_at ?? null,
         is_stale: estimate.is_stale ?? null,
+        computed_on_demand: computedOnDemand,
       },
     });
   } catch (err) {

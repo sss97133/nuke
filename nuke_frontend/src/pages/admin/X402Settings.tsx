@@ -173,22 +173,22 @@ Or use Supabase CLI:
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
       <div style={{ marginBottom: '30px' }}>
         <h1 style={{ fontSize: '24px', marginBottom: '8px' }}>x402 Payment Settings</h1>
-        <p style={{ fontSize: '12px', color: '#666' }}>
+        <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
           Configure blockchain payments via HTTP 402 protocol
         </p>
       </div>
 
       {/* Status Card */}
       <div style={{ 
-        border: '2px solid #000',
+        border: '2px solid var(--text)',
         borderRadius: '0px',
         background: 'var(--surface)',
         marginBottom: '20px'
       }}>
         <div style={{ 
           padding: '16px', 
-          borderBottom: '2px solid #000',
-          background: 'var(--surface-light, #f5f5f5)',
+          borderBottom: '2px solid var(--text)',
+          background: 'var(--surface-light)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
@@ -197,15 +197,15 @@ Or use Supabase CLI:
             <div style={{ fontSize: '16px', fontWeight: 700 }}>
               x402 Payment Status
             </div>
-            <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
               {config.enabled ? 'Configured and ready' : 'Not configured'}
             </div>
           </div>
           <div style={{
             padding: '6px 12px',
             borderRadius: '0px',
-            background: config.enabled ? '#10b981' : '#ef4444',
-            color: '#fff',
+            background: config.enabled ? 'var(--success)' : 'var(--error)',
+            color: 'var(--bg)',
             fontSize: '11px',
             fontWeight: 700
           }}>
@@ -217,15 +217,15 @@ Or use Supabase CLI:
           {config.enabled ? (
             <div style={{ 
               padding: '16px', 
-              background: '#f0fdf4',
-              border: '2px solid #10b981',
+              background: 'var(--success-dim)',
+              border: '2px solid var(--success)',
               borderRadius: '0px',
               marginBottom: '20px'
             }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: '#10b981' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: 'var(--success)' }}>
                 ✅ x402 Configured
               </div>
-              <div style={{ fontSize: '12px', color: '#666' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                 <div>Network: <strong>{config.network}</strong></div>
                 {config.wallet_address && (
                   <div style={{ marginTop: '4px' }}>
@@ -239,15 +239,15 @@ Or use Supabase CLI:
           ) : (
             <div style={{ 
               padding: '16px', 
-              background: '#fef2f2',
-              border: '2px solid #ef4444',
+              background: 'var(--error-dim)',
+              border: '2px solid var(--error)',
               borderRadius: '0px',
               marginBottom: '20px'
             }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: '#ef4444' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: 'var(--error)' }}>
                 ⚠️ x402 Not Configured
               </div>
-              <div style={{ fontSize: '12px', color: '#666' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                 Set environment variables in Supabase Dashboard to enable x402 payments.
               </div>
             </div>
@@ -257,8 +257,8 @@ Or use Supabase CLI:
             onClick={handleTestConnection}
             style={{
               padding: '8px 16px',
-              background: '#3b82f6',
-              color: '#fff',
+              background: 'var(--accent)',
+              color: 'var(--bg)',
               border: 'none',
               borderRadius: '0px',
               fontSize: '12px',
@@ -274,20 +274,20 @@ Or use Supabase CLI:
 
       {/* Configuration Form */}
       <div style={{ 
-        border: '2px solid #000',
+        border: '2px solid var(--text)',
         borderRadius: '0px',
         background: 'var(--surface)',
         marginBottom: '20px'
       }}>
         <div style={{ 
           padding: '16px', 
-          borderBottom: '2px solid #000',
-          background: 'var(--surface-light, #f5f5f5)'
+          borderBottom: '2px solid var(--text)',
+          background: 'var(--surface-light)'
         }}>
           <div style={{ fontSize: '16px', fontWeight: 700 }}>
             Configuration
           </div>
-          <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
             Enter values below, then set them in Supabase Dashboard
           </div>
         </div>
@@ -310,13 +310,13 @@ Or use Supabase CLI:
               style={{
                 width: '100%',
                 padding: '8px 12px',
-                border: '2px solid #000',
+                border: '2px solid var(--text)',
                 borderRadius: '0px',
                 fontSize: '12px',
                 fontFamily: 'monospace'
               }}
             />
-            <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
               Your wallet address where payments will be received. Get from MetaMask, Coinbase Wallet, etc.
             </div>
           </div>
@@ -336,7 +336,7 @@ Or use Supabase CLI:
               style={{
                 width: '100%',
                 padding: '8px 12px',
-                border: '2px solid #000',
+                border: '2px solid var(--text)',
                 borderRadius: '0px',
                 fontSize: '12px'
               }}
@@ -346,7 +346,7 @@ Or use Supabase CLI:
               <option value="solana-devnet">solana-devnet (Test)</option>
               <option value="ethereum">ethereum (Production)</option>
             </select>
-            <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
               Blockchain network for payments. Use base-sepolia for testing.
             </div>
           </div>
@@ -368,12 +368,12 @@ Or use Supabase CLI:
               style={{
                 width: '100%',
                 padding: '8px 12px',
-                border: '2px solid #000',
+                border: '2px solid var(--text)',
                 borderRadius: '0px',
                 fontSize: '12px'
               }}
             />
-            <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
               x402 payment facilitator service URL. Default is usually fine.
             </div>
           </div>
@@ -383,8 +383,8 @@ Or use Supabase CLI:
             disabled={saving || !formData.wallet_address}
             style={{
               padding: '10px 20px',
-              background: saving ? '#9ca3af' : '#10b981',
-              color: '#fff',
+              background: saving ? '#9ca3af' : 'var(--success)',
+              color: 'var(--bg)',
               border: 'none',
               borderRadius: '0px',
               fontSize: '13px',
@@ -400,15 +400,15 @@ Or use Supabase CLI:
 
       {/* Instructions Card */}
       <div style={{ 
-        border: '2px solid #000',
+        border: '2px solid var(--text)',
         borderRadius: '0px',
         background: 'var(--surface)',
         marginBottom: '20px'
       }}>
         <div style={{ 
           padding: '16px', 
-          borderBottom: '2px solid #000',
-          background: 'var(--surface-light, #f5f5f5)'
+          borderBottom: '2px solid var(--text)',
+          background: 'var(--surface-light)'
         }}>
           <div style={{ fontSize: '16px', fontWeight: 700 }}>
             Setup Instructions
@@ -416,7 +416,7 @@ Or use Supabase CLI:
         </div>
 
         <div style={{ padding: '20px', fontSize: '12px', lineHeight: 1.8 }}>
-          <ol style={{ marginLeft: '20px', color: '#666' }}>
+          <ol style={{ marginLeft: '20px', color: 'var(--text-secondary)' }}>
             <li>Fill in the configuration form above</li>
             <li>Click "Copy Setup Instructions" to copy the commands</li>
             <li>Go to <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer">Supabase Dashboard</a></li>
@@ -439,8 +439,8 @@ Or use Supabase CLI:
           <div style={{ 
             marginTop: '20px',
             padding: '12px',
-            background: '#fffbeb',
-            border: '1px solid #f59e0b',
+            background: 'var(--warning-dim)',
+            border: '1px solid var(--warning)',
             borderRadius: '0px',
             fontSize: '11px'
           }}>

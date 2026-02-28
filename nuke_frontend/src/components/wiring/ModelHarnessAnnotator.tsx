@@ -458,13 +458,13 @@ export function ModelHarnessAnnotator({
       </div>
 
       {modelError && (
-        <div style={{ marginBottom: '10px', padding: '8px', background: '#ffebee', border: '1px solid #f44336', borderRadius: '2px', fontSize: '11px', color: '#c62828' }}>
+        <div style={{ marginBottom: '10px', padding: '8px', background: 'var(--error-dim)', border: '1px solid var(--error)', borderRadius: '2px', fontSize: '11px', color: 'var(--error)' }}>
           {modelError}
         </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '12px' }}>
-        <div style={{ border: '2px solid var(--border)', borderRadius: '2px', overflow: 'hidden', background: '#0f1115' }}>
+        <div style={{ border: '2px solid var(--border)', borderRadius: '2px', overflow: 'hidden', background: 'var(--bg-deep, #0f1115)' }}>
           <div style={{ height: '420px' }}>
             <Canvas camera={{ position: [1.2, 0.8, 1.2], fov: 55 }} onPointerDown={canInteract ? handleCanvasClick : undefined}>
               <ambientLight intensity={0.7} />
@@ -478,7 +478,7 @@ export function ModelHarnessAnnotator({
               <OrbitControls makeDefault />
             </Canvas>
           </div>
-          <div style={{ padding: '6px 8px', fontSize: '9px', color: '#cbd5e1', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ padding: '6px 8px', fontSize: '9px', color: 'var(--text-muted)', borderTop: '1px solid color-mix(in srgb, var(--border) 30%, transparent)' }}>
             {modelPath ? `Model: ${modelPath}` : 'No model loaded. Upload a GLB to start.'}
           </div>
         </div>

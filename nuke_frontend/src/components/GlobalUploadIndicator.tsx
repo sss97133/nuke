@@ -42,9 +42,9 @@ const GlobalUploadIndicator: React.FC = () => {
         alignItems: 'center',
         gap: '6px',
         padding: '2px 6px',
-        backgroundColor: '#C0C0C0',
+        backgroundColor: 'var(--border)',
         border: '2px solid',
-        borderColor: '#FFFFFF #808080 #808080 #FFFFFF',
+        borderColor: 'var(--bg) var(--text-disabled) var(--text-disabled) var(--bg)',
         cursor: 'pointer',
         fontSize: '11px',
         fontFamily: 'monospace',
@@ -55,8 +55,8 @@ const GlobalUploadIndicator: React.FC = () => {
       <div style={{
         width: '10px',
         height: '10px',
-        backgroundColor: activeUploads.length > 0 ? '#00FF00' : '#808080',
-        border: '1px solid #000',
+        backgroundColor: activeUploads.length > 0 ? 'var(--success)' : 'var(--text-disabled)',
+        border: '1px solid var(--text)',
         animation: activeUploads.length > 0 ? 'blink 1s infinite' : 'none'
       }} />
       
@@ -64,10 +64,10 @@ const GlobalUploadIndicator: React.FC = () => {
       <div style={{
         display: 'flex',
         gap: '1px',
-        backgroundColor: '#000',
+        backgroundColor: 'var(--text)',
         padding: '1px',
         border: '1px solid',
-        borderColor: '#808080 #FFFFFF #FFFFFF #808080'
+        borderColor: 'var(--text-disabled) var(--bg) var(--bg) var(--text-disabled)'
       }}>
         {[...Array(10)].map((_, i) => (
           <div
@@ -75,14 +75,14 @@ const GlobalUploadIndicator: React.FC = () => {
             style={{
               width: '8px',
               height: '10px',
-              backgroundColor: i < filledSegments ? '#0000AA' : '#FFFFFF'
+              backgroundColor: i < filledSegments ? 'var(--accent)' : 'var(--bg)'
             }}
           />
         ))}
       </div>
       
       {/* Count display */}
-      <span style={{ color: '#000' }}>
+      <span style={{ color: 'var(--text)' }}>
         {activeUploads.length > 0 ? `${activeUploads.length}↑` : '✓'}
       </span>
 
@@ -95,18 +95,18 @@ const GlobalUploadIndicator: React.FC = () => {
           right: 0,
           marginTop: '4px',
           width: '300px',
-          backgroundColor: '#C0C0C0',
+          backgroundColor: 'var(--border)',
           border: '2px solid',
-          borderColor: '#FFFFFF #000000 #000000 #FFFFFF',
+          borderColor: 'var(--bg) var(--text) var(--text) var(--bg)',
           padding: '4px',
           fontSize: '10px',
           fontFamily: 'monospace',
           zIndex: 10001,
-          boxShadow: '2px 2px 0px rgba(0,0,0,0.5)'
+          boxShadow: '2px 2px 0px var(--overlay)'
         }}>
           <div style={{ 
-            backgroundColor: '#000080',
-            color: '#FFFFFF',
+            backgroundColor: 'var(--accent)',
+            color: 'var(--bg)',
             padding: '2px 4px',
             marginBottom: '2px',
             fontWeight: 'bold'
@@ -114,14 +114,14 @@ const GlobalUploadIndicator: React.FC = () => {
             Upload Queue
           </div>
           <div style={{ 
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #808080',
+            backgroundColor: 'var(--bg)',
+            border: '1px solid var(--text-disabled)',
             padding: '4px',
             maxHeight: '200px',
             overflowY: 'auto'
           }}>
             {queue.map(item => (
-              <div key={item.id} style={{ padding: '2px 0', borderBottom: '1px solid #C0C0C0' }}>
+              <div key={item.id} style={{ padding: '2px 0', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>{item.file.name.substring(0, 25)}...</span>
                   <span>{item.status === 'completed' ? '✓' : 
@@ -145,9 +145,9 @@ const GlobalUploadIndicator: React.FC = () => {
                 uploadQueue.clearCompleted();
               }}
               style={{
-                backgroundColor: '#C0C0C0',
+                backgroundColor: 'var(--border)',
                 border: '1px solid',
-                borderColor: '#FFFFFF #000000 #000000 #FFFFFF',
+                borderColor: 'var(--bg) var(--text) var(--text) var(--bg)',
                 padding: '1px 4px',
                 fontSize: '9px',
                 cursor: 'pointer'

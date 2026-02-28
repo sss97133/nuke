@@ -72,11 +72,11 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return '#10b981';
-      case 'stagnant': return '#ef4444';
-      case 'moderate': return '#f59e0b';
+      case 'active': return 'var(--success)';
+      case 'stagnant': return 'var(--error)';
+      case 'moderate': return 'var(--warning)';
       case 'for_sale': return '#8b5cf6';
-      default: return '#6b7280';
+      default: return 'var(--text-secondary)';
     }
   };
 
@@ -247,7 +247,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
       {(results.length > 0 || searchSummary) && (
         <div style={{
           background: 'var(--surface)',
-          border: '2px solid #000',
+          border: '2px solid var(--text)',
           borderRadius: '0px',
           padding: '10px 14px',
           marginBottom: '12px'
@@ -283,9 +283,9 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       padding: '3px 8px',
                       fontSize: '7.5pt',
                       fontWeight: 700,
-                      border: '2px solid #000',
-                      background: '#000',
-                      color: '#fff',
+                      border: '2px solid var(--text)',
+                      background: 'var(--text)',
+                      color: 'var(--bg)',
                       cursor: 'pointer',
                     }}
                     onClick={() => setFilterBy('all')}
@@ -304,26 +304,26 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
-                        background: isActive ? '#000' : 'var(--surface)',
-                        border: `2px solid ${isActive ? '#000' : '#d1d5db'}`,
+                        background: isActive ? 'var(--text)' : 'var(--surface)',
+                        border: `2px solid ${isActive ? 'var(--text)' : 'var(--border)'}`,
                         padding: '3px 8px',
                         borderRadius: '0px',
                         fontSize: '7.5pt',
                         fontWeight: 700,
-                        color: isActive ? '#fff' : 'var(--text)',
+                        color: isActive ? 'var(--bg)' : 'var(--text)',
                         cursor: 'pointer',
                         transition: 'all 0.1s ease',
                       }}
                       onClick={() => { setFilterBy(type); setViewMode('cards'); }}
                       onMouseEnter={(e) => {
                         if (!isActive) {
-                          e.currentTarget.style.borderColor = '#000';
+                          e.currentTarget.style.borderColor = 'var(--text)';
                           e.currentTarget.style.background = 'var(--bg)';
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (!isActive) {
-                          e.currentTarget.style.borderColor = '#d1d5db';
+                          e.currentTarget.style.borderColor = 'var(--border)';
                           e.currentTarget.style.background = 'var(--surface)';
                         }
                       }}
@@ -344,7 +344,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           marginBottom: '20px',
           padding: '12px 16px',
           background: 'var(--surface)',
-          border: '2px solid #000',
+          border: '2px solid var(--text)',
           borderRadius: '0px'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
@@ -362,7 +362,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                 padding: '4px 8px',
                 fontSize: '11px',
                 fontWeight: 700,
-                border: '2px solid #000',
+                border: '2px solid var(--text)',
                 background: 'var(--surface)',
                 cursor: 'pointer'
               }}
@@ -395,8 +395,8 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                             padding: '3px 6px',
                             fontSize: '9px',
                             fontWeight: 700,
-                            border: `2px solid ${isActive ? '#3b82f6' : '#000'}`,
-                            background: isActive ? '#eff6ff' : 'var(--surface)',
+                            border: `2px solid ${isActive ? 'var(--accent)' : 'var(--text)'}`,
+                            background: isActive ? 'var(--bg)' : 'var(--surface)',
                             cursor: 'pointer'
                           }}
                         >
@@ -464,7 +464,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                   fontSize: '7.5pt',
                   fontWeight: 700,
                   textTransform: 'uppercase',
-                  border: '2px solid #000',
+                  border: '2px solid var(--text)',
                   borderRadius: '0px',
                   background: viewMode === mode ? 'var(--text)' : 'var(--surface)',
                   color: viewMode === mode ? 'var(--surface)' : 'var(--text)',
@@ -486,7 +486,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                 style={{
                   fontSize: '7.5pt',
                   padding: '3px 6px',
-                  border: '2px solid #000',
+                  border: '2px solid var(--text)',
                   borderRadius: '0px',
                   background: 'var(--surface)',
                   color: 'var(--text)',
@@ -534,7 +534,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                 padding: '6px 14px',
                 fontSize: '11px',
                 fontWeight: 700,
-                border: '2px solid #000',
+                border: '2px solid var(--text)',
                 background: 'var(--surface)',
                 color: 'var(--text)',
                 cursor: 'pointer',
@@ -553,15 +553,15 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                   padding: '5px 12px',
                   fontSize: '11px',
                   fontWeight: 600,
-                  border: '2px solid #e5e7eb',
+                  border: '2px solid var(--border)',
                   background: 'var(--surface)',
                   color: 'var(--text-secondary)',
                   textDecoration: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.1s ease',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#000'; e.currentTarget.style.color = 'var(--text)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; e.currentTarget.style.color = 'var(--text)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
               >
                 {term}
               </a>
@@ -635,7 +635,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       top: '12px',
                       right: '12px',
                       background: 'rgba(59, 130, 246, 0.95)',
-                      color: 'white',
+                      color: 'var(--bg)',
                       padding: '4px 10px',
                       borderRadius: '12px',
                       fontSize: '9px',
@@ -656,7 +656,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           {viewMode === 'list' && (
             <div style={{
               background: 'var(--surface)',
-              border: '2px solid #000',
+              border: '2px solid var(--text)',
               borderRadius: '0px',
               overflow: 'hidden'
             }}>
@@ -676,7 +676,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     display: 'flex',
                     alignItems: 'center',
                     padding: '12px',
-                    borderBottom: index < filteredAndSortedResults.length - 1 ? '1px solid #000' : 'none',
+                    borderBottom: index < filteredAndSortedResults.length - 1 ? '1px solid var(--text)' : 'none',
                     cursor: 'pointer',
                     transition: 'background 0.12s ease',
                     background: 'var(--surface)'
@@ -694,11 +694,11 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     justifyContent: 'center',
                     fontSize: '16px',
                     marginRight: '12px',
-                    border: '2px solid #000',
+                    border: '2px solid var(--text)',
                     flexShrink: 0
                   }}>
                     {!result.image_url && (
-                      <span style={{ color: '#9ca3af' }}>{getTypeIcon(result.type)}</span>
+                      <span style={{ color: 'var(--text-disabled)' }}>{getTypeIcon(result.type)}</span>
                     )}
                   </div>
 
@@ -713,8 +713,8 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                         {result.title}
                       </h4>
                       <div style={{
-                        background: '#000',
-                        color: '#fff',
+                        background: 'var(--text)',
+                        color: 'var(--bg)',
                         padding: '2px 6px',
                         borderRadius: '0px',
                         fontSize: '9px',
@@ -768,8 +768,8 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                       <div style={{
-                        background: '#000',
-                        color: '#fff',
+                        background: 'var(--text)',
+                        color: 'var(--bg)',
                         padding: '2px 6px',
                         borderRadius: '0px',
                         fontSize: '9px',
@@ -794,7 +794,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       {result.metadata?.build_status && (
                         <div style={{
                           background: getStatusColor(result.metadata.build_status),
-                          color: '#fff',
+                          color: 'var(--bg)',
                           padding: '2px 6px',
                           borderRadius: '0px',
                           fontSize: '9px',

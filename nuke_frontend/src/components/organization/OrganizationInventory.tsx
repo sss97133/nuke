@@ -183,7 +183,7 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
                       top: '8px',
                       left: '8px',
                       background: 'rgba(0,0,0,0.7)',
-                      color: '#fff',
+                      color: 'var(--bg)',
                       padding: '4px 8px',
                       borderRadius: '2px',
                       fontSize: '9px',
@@ -970,7 +970,7 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
               onClick={handleDelete}
               disabled={deleting}
               className="button button-small"
-              style={{ fontSize: '11px', background: 'var(--danger)', color: 'white', border: 'none' }}
+              style={{ fontSize: '11px', background: 'var(--danger)', color: 'var(--bg)', border: 'none' }}
             >
               {deleting ? 'Deleting...' : 'Delete'}
             </button>

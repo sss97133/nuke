@@ -222,10 +222,10 @@ export default function PlatformCredentialForm({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return '#22c55e';
-      case 'expired': return '#f59e0b';
-      case '2fa_required': return '#f59e0b';
-      case 'invalid': return '#ef4444';
+      case 'active': return 'var(--success)';
+      case 'expired': return 'var(--warning)';
+      case '2fa_required': return 'var(--warning)';
+      case 'invalid': return 'var(--error)';
       default: return 'var(--text-muted)';
     }
   };
@@ -237,7 +237,7 @@ export default function PlatformCredentialForm({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.5)',
+        background: 'var(--overlay)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -291,9 +291,9 @@ export default function PlatformCredentialForm({
         <div style={{ padding: '20px' }}>
           {error && (
             <div style={{
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
-              color: '#991b1b',
+              background: 'var(--error-dim)',
+              border: '1px solid var(--error)',
+              color: 'var(--error)',
               padding: '10px 12px',
               borderRadius: '4px',
               marginBottom: '16px',
@@ -507,9 +507,9 @@ export default function PlatformCredentialForm({
                     disabled={loading}
                     style={{
                       padding: '10px 16px',
-                      border: '1px solid #ef4444',
+                      border: '1px solid var(--error)',
                       background: 'transparent',
-                      color: '#ef4444',
+                      color: 'var(--error)',
                       borderRadius: '4px',
                       fontSize: '12px',
                       cursor: 'pointer'
@@ -567,7 +567,7 @@ export default function PlatformCredentialForm({
               <div style={{
                 width: '64px',
                 height: '64px',
-                background: '#fef3c7',
+                background: 'var(--warning-dim)',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
@@ -575,7 +575,7 @@ export default function PlatformCredentialForm({
                 margin: '0 auto 16px',
                 fontSize: '15px',
                 fontWeight: 700,
-                color: '#92400e',
+                color: 'var(--warning)',
                 letterSpacing: '0.5px'
               }}>
                 2FA
@@ -606,7 +606,7 @@ export default function PlatformCredentialForm({
               <div style={{
                 width: '64px',
                 height: '64px',
-                background: '#dcfce7',
+                background: 'var(--success-dim)',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',

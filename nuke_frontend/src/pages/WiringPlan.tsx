@@ -166,7 +166,7 @@ export default function WiringPlan() {
       )}
 
       {error && (
-        <div style={{ marginTop: '12px', padding: '8px', background: '#ffebee', border: '1px solid #f44336', borderRadius: '2px', fontSize: '11px', color: '#c62828' }}>
+        <div style={{ marginTop: '12px', padding: '8px', background: 'var(--error-dim)', border: '1px solid var(--error)', borderRadius: '2px', fontSize: '11px', color: 'var(--error)' }}>
           {error}
         </div>
       )}
@@ -200,7 +200,7 @@ export default function WiringPlan() {
                         <span style={{ fontWeight: 600 }}>{label}</span>
                         {part && name && <span style={{ color: 'var(--text-muted)' }}>({part})</span>}
                         {required !== null && (
-                          <span style={{ fontSize: '9px', color: required ? '#0b7a0b' : 'var(--text-muted)' }}>
+                          <span style={{ fontSize: '9px', color: required ? 'var(--success)' : 'var(--text-muted)' }}>
                             {required ? 'Required' : 'Optional'}
                           </span>
                         )}

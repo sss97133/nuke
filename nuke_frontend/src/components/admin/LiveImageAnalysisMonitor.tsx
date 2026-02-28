@@ -119,13 +119,13 @@ export default function LiveImageAnalysisMonitor() {
 
       {/* Main Progress Card */}
       <div style={{ 
-        border: '2px solid #000', 
+        border: '2px solid var(--text)',
         background: 'var(--surface)',
         marginBottom: '24px'
       }}>
         <div style={{
-          background: '#000',
-          color: '#fff',
+          background: 'var(--text)',
+          color: 'var(--bg)',
           padding: '12px 16px',
           fontSize: '11px',
           fontWeight: 700,
@@ -153,26 +153,26 @@ export default function LiveImageAnalysisMonitor() {
             gap: '20px',
             marginBottom: '20px'
           }}>
-            <div style={{ border: '2px solid #000', padding: '16px', background: '#f8f8f8' }}>
-              <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px', fontWeight: 600 }}>
+            <div style={{ border: '2px solid var(--text)', padding: '16px', background: 'var(--bg)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>
                 ANALYZED
               </div>
               <div style={{ fontSize: '27px', fontWeight: 700, marginBottom: '4px' }}>
                 {stats.analyzed.toLocaleString()}
               </div>
-              <div style={{ fontSize: '11px', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                 of {stats.total.toLocaleString()} total
               </div>
             </div>
 
-            <div style={{ border: '2px solid #000', padding: '16px', background: '#fff3cd' }}>
-              <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px', fontWeight: 600 }}>
+            <div style={{ border: '2px solid var(--text)', padding: '16px', background: 'var(--warning-dim)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>
                 REMAINING
               </div>
-              <div style={{ fontSize: '27px', fontWeight: 700, marginBottom: '4px', color: '#856404' }}>
+              <div style={{ fontSize: '27px', fontWeight: 700, marginBottom: '4px', color: 'var(--warning)' }}>
                 {stats.pending.toLocaleString()}
               </div>
-              <div style={{ fontSize: '11px', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                 images pending analysis
               </div>
             </div>
@@ -185,38 +185,38 @@ export default function LiveImageAnalysisMonitor() {
             gap: '16px',
             marginTop: '20px'
           }}>
-            <div style={{ border: '2px solid #e5e5e5', padding: '12px', background: 'var(--surface)' }}>
-              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', fontWeight: 600 }}>
+            <div style={{ border: '2px solid var(--border)', padding: '12px', background: 'var(--surface)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 600 }}>
                 PROCESSING RATE
               </div>
               <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {stats.rate.toFixed(1)}
               </div>
-              <div style={{ fontSize: '11px', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                 images/minute
               </div>
             </div>
 
-            <div style={{ border: '2px solid #e5e5e5', padding: '12px', background: 'var(--surface)' }}>
-              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', fontWeight: 600 }}>
+            <div style={{ border: '2px solid var(--border)', padding: '12px', background: 'var(--surface)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 600 }}>
                 ELAPSED TIME
               </div>
               <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {stats.elapsed.toFixed(1)}
               </div>
-              <div style={{ fontSize: '11px', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                 minutes
               </div>
             </div>
 
-            <div style={{ border: '2px solid #e5e5e5', padding: '12px', background: 'var(--surface)' }}>
-              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', fontWeight: 600 }}>
+            <div style={{ border: '2px solid var(--border)', padding: '12px', background: 'var(--surface)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 600 }}>
                 ESTIMATED TIME REMAINING
               </div>
-              <div style={{ fontSize: '19px', fontWeight: 700, color: stats.eta < 60 ? '#10b981' : '#f59e0b' }}>
+              <div style={{ fontSize: '19px', fontWeight: 700, color: stats.eta < 60 ? 'var(--success)' : 'var(--warning)' }}>
                 {stats.eta < 60 ? `${stats.eta.toFixed(1)}m` : `${(stats.eta / 60).toFixed(1)}h`}
               </div>
-              <div style={{ fontSize: '11px', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                 {stats.eta > 0 ? 'at current rate' : 'calculating...'}
               </div>
             </div>
@@ -227,11 +227,11 @@ export default function LiveImageAnalysisMonitor() {
             <div style={{
               marginTop: '20px',
               padding: '12px',
-              background: '#10b98110',
-              border: '2px solid #10b981',
+              background: 'var(--success-dim)',
+              border: '2px solid var(--success)',
               fontSize: '11px',
               fontWeight: 600,
-              color: '#10b981'
+              color: 'var(--success)'
             }}>
               ⚡ Last update: +{stats.lastUpdate} images processed
             </div>
@@ -242,12 +242,12 @@ export default function LiveImageAnalysisMonitor() {
             <div style={{
               marginTop: '20px',
               padding: '16px',
-              background: '#10b981',
-              color: '#fff',
+              background: 'var(--success)',
+              color: 'var(--bg)',
               fontSize: '13px',
               fontWeight: 700,
               textAlign: 'center',
-              border: '2px solid #000'
+              border: '2px solid var(--text)'
             }}>
               ✅ ALL IMAGES COMPLETE!
             </div>
@@ -258,10 +258,10 @@ export default function LiveImageAnalysisMonitor() {
       {/* Info Footer */}
       <div style={{ 
         padding: '12px', 
-        background: '#f8f8f8', 
-        border: '2px solid #e5e5e5',
+        background: 'var(--bg)',
+        border: '2px solid var(--border)',
         fontSize: '11px',
-        color: '#666',
+        color: 'var(--text-secondary)',
         textAlign: 'center'
       }}>
         Updates every 5 seconds • Press refresh to update manually

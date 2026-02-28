@@ -109,7 +109,7 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
       <div style={{
         ...getSizeStyles(),
         background: getVerificationColor(userRating.verification_level),
-        color: 'white',
+        color: 'var(--bg)',
         borderRadius: '12px',
         display: 'flex',
         alignItems: 'center',
@@ -124,7 +124,7 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
       <div style={{
         ...getSizeStyles(),
         background: getTrustLevelColor(userRating.trust_level),
-        color: 'white',
+        color: 'var(--bg)',
         borderRadius: '12px',
         display: 'flex',
         alignItems: 'center',
@@ -140,7 +140,7 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
         <div style={{
           ...getSizeStyles(),
           background: '#8b5cf6',
-          color: 'white',
+          color: 'var(--bg)',
           borderRadius: '12px',
           display: 'flex',
           alignItems: 'center',
@@ -157,7 +157,7 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
         <div style={{
           ...getSizeStyles(),
           background: '#f59e0b',
-          color: 'white',
+          color: 'var(--bg)',
           borderRadius: '12px',
           display: 'flex',
           alignItems: 'center',
@@ -174,7 +174,7 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
         <div style={{
           ...getSizeStyles(),
           background: '#ef4444',
-          color: 'white',
+          color: 'var(--bg)',
           borderRadius: '12px',
           display: 'flex',
           alignItems: 'center',

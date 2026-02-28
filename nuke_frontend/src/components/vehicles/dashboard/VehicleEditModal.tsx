@@ -458,13 +458,13 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
         <label style={{
           display: 'block',
           fontSize: '9px',
-          color: isEmpty ? '#9ca3af' : 'var(--text-muted)',
+          color: isEmpty ? 'var(--text-disabled)' : 'var(--text-muted)',
           marginBottom: '2px',
           textTransform: 'uppercase'
         }}>
           {label}
-          {isModified && <span style={{ color: '#f59e0b', marginLeft: '4px' }}>*</span>}
-          {isReadOnly && <span style={{ color: '#6b7280', marginLeft: '4px', fontSize: '8px' }}>(read-only)</span>}
+          {isModified && <span style={{ color: 'var(--warning)', marginLeft: '4px' }}>*</span>}
+          {isReadOnly && <span style={{ color: 'var(--text-secondary)', marginLeft: '4px', fontSize: '8px' }}>(read-only)</span>}
         </label>
         {inputType === 'textarea' ? (
           <textarea
@@ -476,8 +476,8 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
               width: '100%',
               padding: '4px 6px',
               fontSize: '11px',
-              border: `1px solid ${isModified ? '#f59e0b' : isEmpty ? '#e5e7eb' : 'var(--border)'}`,
-              background: isReadOnly ? 'var(--grey-100)' : isEmpty ? '#fafafa' : 'var(--surface)',
+              border: `1px solid ${isModified ? 'var(--warning)' : isEmpty ? 'var(--border)' : 'var(--border)'}`,
+              background: isReadOnly ? 'var(--grey-100)' : isEmpty ? 'var(--bg)' : 'var(--surface)',
               borderRadius: '2px',
               minHeight: '50px',
               resize: 'vertical',
@@ -510,8 +510,8 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
             style={{
               width: '100%',
               padding: '3px 6px',
-              border: `1px solid ${isModified ? '#f59e0b' : isEmpty ? '#e5e7eb' : 'var(--border)'}`,
-              background: isReadOnly ? 'var(--grey-100)' : isEmpty ? '#fafafa' : 'var(--surface)',
+              border: `1px solid ${isModified ? 'var(--warning)' : isEmpty ? 'var(--border)' : 'var(--border)'}`,
+              background: isReadOnly ? 'var(--grey-100)' : isEmpty ? 'var(--bg)' : 'var(--surface)',
               borderRadius: '2px',
               opacity: isReadOnly ? 0.7 : 1,
               fontFamily: (field.includes('_id') || field === 'vin' || field.includes('_url')) ? 'monospace' : 'inherit',
@@ -592,7 +592,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
             {vehicle && (
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                 {[vehicle.year, vehicle.make, vehicle.model, vehicle.trim].filter(Boolean).join(' ')}
-                {vehicle.vin && <span style={{ marginLeft: '8px', fontFamily: 'monospace', color: '#6b7280' }}>VIN: {vehicle.vin}</span>}
+                {vehicle.vin && <span style={{ marginLeft: '8px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>VIN: {vehicle.vin}</span>}
               </div>
             )}
           </div>
@@ -679,22 +679,22 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
               Loading...
             </div>
           ) : error ? (
-            <div style={{ textAlign: 'center', padding: '24px', color: '#dc2626' }}>
+            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--error)' }}>
               {error}
             </div>
           ) : vehicle ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {/* My Relationship / Ownership - Critical for misattribution */}
               <div style={{
-                background: '#fef2f2',
-                border: '1px solid #fca5a5',
+                background: 'var(--error-dim)',
+                border: '1px solid var(--error)',
                 borderRadius: '4px',
                 padding: '10px'
               }}>
                 <div style={{
                   fontSize: '11px',
                   fontWeight: 700,
-                  color: '#991b1b',
+                  color: 'var(--error)',
                   marginBottom: '8px',
                   display: 'flex',
                   alignItems: 'center',
@@ -702,7 +702,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                 }}>
                   <span style={{ fontSize: '12px' }}>👤</span>
                   MY RELATIONSHIP TO THIS VEHICLE
-                  <span style={{ fontWeight: 400, fontSize: '9px', color: '#f87171' }}>Check for misattribution</span>
+                  <span style={{ fontWeight: 400, fontSize: '9px', color: 'var(--error)' }}>Check for misattribution</span>
                 </div>
 
                 {/* Show current status */}
@@ -710,13 +710,13 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                   {ownershipVerification ? (
                     <div style={{
                       padding: '6px 8px',
-                      background: ownershipVerification.status === 'approved' ? '#dcfce7' : '#fef3c7',
-                      border: `1px solid ${ownershipVerification.status === 'approved' ? '#86efac' : '#fcd34d'}`,
+                      background: ownershipVerification.status === 'approved' ? 'var(--success-dim)' : 'var(--warning-dim)',
+                      border: `1px solid ${ownershipVerification.status === 'approved' ? 'var(--success)' : 'var(--warning)'}`,
                       borderRadius: '3px',
                       marginBottom: '6px'
                     }}>
                       <strong>Ownership Verification:</strong> {ownershipVerification.status}
-                      <div style={{ fontSize: '9px', color: '#6b7280', marginTop: '2px' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                         Submitted: {new Date(ownershipVerification.submitted_at).toLocaleDateString()}
                       </div>
                     </div>
@@ -725,8 +725,8 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                   {myRelationship ? (
                     <div style={{
                       padding: '6px 8px',
-                      background: '#e0e7ff',
-                      border: '1px solid #a5b4fc',
+                      background: 'var(--bg)',
+                      border: '1px solid var(--accent)',
                       borderRadius: '3px'
                     }}>
                       <strong>Current Role:</strong>{' '}
@@ -734,12 +734,12 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                         {myRelationship.role.replace('_', ' ')}
                       </span>
                       {myRelationship.context && (
-                        <span style={{ color: '#6b7280', marginLeft: '6px' }}>
+                        <span style={{ color: 'var(--text-secondary)', marginLeft: '6px' }}>
                           ({myRelationship.context})
                         </span>
                       )}
                       {myRelationship.granted_at && (
-                        <div style={{ fontSize: '9px', color: '#6b7280', marginTop: '2px' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                           Since: {new Date(myRelationship.granted_at).toLocaleDateString()}
                         </div>
                       )}
@@ -747,10 +747,10 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                   ) : (
                     <div style={{
                       padding: '6px 8px',
-                      background: '#f3f4f6',
-                      border: '1px solid #d1d5db',
+                      background: 'var(--bg)',
+                      border: '1px solid var(--border)',
                       borderRadius: '3px',
-                      color: '#6b7280'
+                      color: 'var(--text-secondary)'
                     }}>
                       No explicit relationship set. May appear in your list due to import attribution.
                     </div>
@@ -759,7 +759,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
 
                 {/* Change relationship */}
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <label style={{ fontSize: '9px', color: '#6b7280', fontWeight: 600 }}>
+                  <label style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                     CHANGE TO:
                   </label>
                   <select
@@ -769,9 +769,9 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                     style={{
                       padding: '4px 8px',
                       fontSize: '11px',
-                      border: '1px solid #d1d5db',
+                      border: '1px solid var(--border)',
                       borderRadius: '3px',
-                      background: 'white',
+                      background: 'var(--surface)',
                       cursor: updatingRole ? 'wait' : 'pointer',
                       opacity: updatingRole ? 0.6 : 1
                     }}
@@ -793,9 +793,9 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                         padding: '4px 10px',
                         fontSize: '9px',
                         fontWeight: 600,
-                        background: '#fee2e2',
-                        color: '#991b1b',
-                        border: '1px solid #fca5a5',
+                        background: 'var(--error-dim)',
+                        color: 'var(--error)',
+                        border: '1px solid var(--error)',
                         borderRadius: '3px',
                         cursor: updatingRole ? 'wait' : 'pointer',
                         opacity: updatingRole ? 0.6 : 1
@@ -809,7 +809,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                 <div style={{
                   marginTop: '8px',
                   fontSize: '9px',
-                  color: '#9ca3af',
+                  color: 'var(--text-disabled)',
                   lineHeight: 1.4
                 }}>
                   <strong>Why is this here?</strong> Vehicles appear in your list based on: ownership verifications,
@@ -820,15 +820,15 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
 
               {/* Documents On Hand */}
               <div style={{
-                background: '#f0fdf4',
-                border: '1px solid #86efac',
+                background: 'var(--success-dim)',
+                border: '1px solid var(--success)',
                 borderRadius: '4px',
                 padding: '10px'
               }}>
                 <div style={{
                   fontSize: '11px',
                   fontWeight: 700,
-                  color: '#166534',
+                  color: 'var(--success)',
                   marginBottom: '8px',
                   display: 'flex',
                   alignItems: 'center',
@@ -836,7 +836,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                 }}>
                   <span style={{ fontSize: '12px' }}>📋</span>
                   DOCUMENTS ON HAND
-                  <span style={{ fontWeight: 400, fontSize: '9px', color: '#4ade80' }}>Check what you physically have</span>
+                  <span style={{ fontWeight: 400, fontSize: '9px', color: 'var(--success)' }}>Check what you physically have</span>
                 </div>
                 <div style={{
                   display: 'grid',
@@ -851,8 +851,8 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                         alignItems: 'center',
                         gap: '5px',
                         padding: '4px 6px',
-                        background: documentsOnHand[doc.key] ? '#dcfce7' : 'white',
-                        border: `1px solid ${documentsOnHand[doc.key] ? '#86efac' : '#e5e7eb'}`,
+                        background: documentsOnHand[doc.key] ? 'var(--success-dim)' : 'var(--surface)',
+                        border: `1px solid ${documentsOnHand[doc.key] ? 'var(--success)' : 'var(--border)'}`,
                         borderRadius: '2px',
                         cursor: 'pointer',
                         fontSize: '9px'
@@ -865,7 +865,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                         style={{ margin: 0, width: '12px', height: '12px' }}
                       />
                       <span style={{
-                        color: documentsOnHand[doc.key] ? '#166534' : '#6b7280',
+                        color: documentsOnHand[doc.key] ? 'var(--success)' : 'var(--text-secondary)',
                         fontWeight: documentsOnHand[doc.key] ? 600 : 400
                       }}>
                         {doc.label}
@@ -924,7 +924,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                           </span>
                           <span style={{
                             fontSize: '9px',
-                            color: '#9ca3af',
+                            color: 'var(--text-disabled)',
                             marginLeft: '8px'
                           }}>
                             {section.subtitle}
@@ -934,14 +934,14 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{
                           fontSize: '9px',
-                          color: filledCount === fieldsInSection.length ? '#16a34a' : '#9ca3af',
-                          background: filledCount === fieldsInSection.length ? '#dcfce7' : '#f3f4f6',
+                          color: filledCount === fieldsInSection.length ? 'var(--success)' : 'var(--text-disabled)',
+                          background: filledCount === fieldsInSection.length ? 'var(--success-dim)' : 'var(--bg)',
                           padding: '2px 6px',
                           borderRadius: '10px'
                         }}>
                           {filledCount}/{fieldsInSection.length}
                         </span>
-                        <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>
                           {isCollapsed ? '▶' : '▼'}
                         </span>
                       </div>
@@ -966,7 +966,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
               {/* Other Fields */}
               {getOtherFields().length > 0 && (
                 <div style={{
-                  border: '1px solid #e5e7eb',
+                  border: '1px solid var(--border)',
                   borderRadius: '4px',
                   overflow: 'hidden'
                 }}>
@@ -976,8 +976,8 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                     style={{
                       width: '100%',
                       padding: '8px 10px',
-                      background: '#f9fafb',
-                      borderBottom: collapsedSections.has('other') ? 'none' : '1px solid #e5e7eb',
+                      background: 'var(--bg)',
+                      borderBottom: collapsedSections.has('other') ? 'none' : '1px solid var(--border)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
@@ -986,13 +986,13 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                       textAlign: 'left'
                     }}
                   >
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)' }}>
                       OTHER FIELDS
-                      <span style={{ fontWeight: 400, marginLeft: '8px', color: '#9ca3af' }}>
+                      <span style={{ fontWeight: 400, marginLeft: '8px', color: 'var(--text-disabled)' }}>
                         {getOtherFields().length} additional fields
                       </span>
                     </span>
-                    <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>
                       {collapsedSections.has('other') ? '▶' : '▼'}
                     </span>
                   </button>
@@ -1023,7 +1023,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
         }}>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             {Object.keys(editedFields).length > 0 && (
-              <span style={{ color: '#f59e0b', fontWeight: 600 }}>
+              <span style={{ color: 'var(--warning)', fontWeight: 600 }}>
                 {Object.keys(editedFields).length} field(s) modified
               </span>
             )}
@@ -1050,7 +1050,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                 fontSize: '12px',
                 fontWeight: 600,
                 background: Object.keys(editedFields).length > 0 ? 'var(--primary)' : 'var(--grey-300)',
-                color: Object.keys(editedFields).length > 0 ? 'white' : 'var(--text-muted)',
+                color: Object.keys(editedFields).length > 0 ? 'var(--bg)' : 'var(--text-muted)',
                 border: 'none',
                 borderRadius: '2px',
                 cursor: Object.keys(editedFields).length > 0 ? 'pointer' : 'default'
@@ -1087,7 +1087,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
               right: '16px',
               background: 'rgba(255,255,255,0.2)',
               border: 'none',
-              color: 'white',
+              color: 'var(--bg)',
               fontSize: '24px',
               width: '44px',
               height: '44px',
@@ -1114,7 +1114,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                 transform: 'translateY(-50%)',
                 background: 'rgba(255,255,255,0.2)',
                 border: 'none',
-                color: 'white',
+                color: 'var(--bg)',
                 fontSize: '24px',
                 width: '44px',
                 height: '44px',
@@ -1154,7 +1154,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                 transform: 'translateY(-50%)',
                 background: 'rgba(255,255,255,0.2)',
                 border: 'none',
-                color: 'white',
+                color: 'var(--bg)',
                 fontSize: '24px',
                 width: '44px',
                 height: '44px',
@@ -1176,7 +1176,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
               left: '50%',
               transform: 'translateX(-50%)',
               background: 'rgba(0,0,0,0.6)',
-              color: 'white',
+              color: 'var(--bg)',
               padding: '6px 12px',
               borderRadius: '4px',
               fontSize: '12px'

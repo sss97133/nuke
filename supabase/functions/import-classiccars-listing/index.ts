@@ -1,3 +1,7 @@
+// NOTE: This function uses legacy angle strings (exterior_three_quarter, etc.)
+// in its AI image classification prompt. The platform has migrated to the
+// 41-zone vehicle_zone system. DEPRECATED: migrate to vehicle_zone.
+// See: nuke_frontend/src/constants/vehicleZones.ts for the canonical zone taxonomy.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 

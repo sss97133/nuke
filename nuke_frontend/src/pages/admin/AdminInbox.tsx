@@ -165,14 +165,14 @@ export default function AdminInbox() {
       {/* Header */}
       <div style={{
         padding: '12px 16px',
-        borderBottom: '1px solid #222',
+        borderBottom: '1px solid var(--border)',
         display: 'flex',
         alignItems: 'center',
         gap: 12,
-        background: '#0a0a0a',
+        background: 'var(--bg)',
       }}>
-        <span style={{ fontSize: '15px', fontWeight: 600, color: '#fff' }}>
-          Inbox {totalUnread > 0 && <span style={{ color: '#e74c3c', fontSize: '12px' }}>({totalUnread})</span>}
+        <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)' }}>
+          Inbox {totalUnread > 0 && <span style={{ color: 'var(--error)', fontSize: '12px' }}>({totalUnread})</span>}
         </span>
 
         {/* Status filter */}
@@ -184,9 +184,9 @@ export default function AdminInbox() {
               style={{
                 padding: '3px 8px',
                 fontSize: '11px',
-                background: filter === f ? '#333' : 'transparent',
-                color: filter === f ? '#fff' : '#666',
-                border: '1px solid #333',
+                background: filter === f ? 'var(--surface)' : 'transparent',
+                color: filter === f ? 'var(--text)' : 'var(--text-secondary)',
+                border: '1px solid var(--surface)',
                 borderRadius: 3,
                 cursor: 'pointer',
                 textTransform: 'uppercase',
@@ -204,9 +204,9 @@ export default function AdminInbox() {
             style={{
               padding: '3px 8px',
               fontSize: '11px',
-              background: mailboxFilter === 'all' ? '#333' : 'transparent',
-              color: mailboxFilter === 'all' ? '#fff' : '#666',
-              border: '1px solid #333',
+              background: mailboxFilter === 'all' ? 'var(--surface)' : 'transparent',
+              color: mailboxFilter === 'all' ? 'var(--text)' : 'var(--text-secondary)',
+              border: '1px solid var(--surface)',
               borderRadius: 3,
               cursor: 'pointer',
             }}
@@ -220,9 +220,9 @@ export default function AdminInbox() {
               style={{
                 padding: '3px 8px',
                 fontSize: '11px',
-                background: mailboxFilter === addr ? (MAILBOX_COLORS[addr] || '#333') : 'transparent',
-                color: mailboxFilter === addr ? '#fff' : (MAILBOX_COLORS[addr] || '#666'),
-                border: `1px solid ${MAILBOX_COLORS[addr] || '#333'}`,
+                background: mailboxFilter === addr ? (MAILBOX_COLORS[addr] || 'var(--surface)') : 'transparent',
+                color: mailboxFilter === addr ? 'var(--text)' : (MAILBOX_COLORS[addr] || 'var(--text-secondary)'),
+                border: `1px solid ${MAILBOX_COLORS[addr] || 'var(--surface)'}`,
                 borderRadius: 3,
                 cursor: 'pointer',
               }}
@@ -238,14 +238,14 @@ export default function AdminInbox() {
         {/* Email list */}
         <div style={{
           width: selected ? '35%' : '100%',
-          borderRight: selected ? '1px solid #222' : 'none',
+          borderRight: selected ? '1px solid var(--border)' : 'none',
           overflowY: 'auto',
           transition: 'width 0.15s ease',
         }}>
           {loading ? (
-            <div style={{ padding: 20, color: '#666', fontSize: '12px' }}>loading...</div>
+            <div style={{ padding: 20, color: 'var(--text-secondary)', fontSize: '12px' }}>loading...</div>
           ) : emails.length === 0 ? (
-            <div style={{ padding: 20, color: '#666', fontSize: '12px' }}>
+            <div style={{ padding: 20, color: 'var(--text-secondary)', fontSize: '12px' }}>
               {filter === 'all' ? 'No emails yet' : `No ${filter} emails`}
             </div>
           ) : (
@@ -255,20 +255,20 @@ export default function AdminInbox() {
                 onClick={() => openEmail(email)}
                 style={{
                   padding: '10px 14px',
-                  borderBottom: '1px solid #1a1a1a',
+                  borderBottom: '1px solid var(--border)',
                   cursor: 'pointer',
-                  background: selected?.id === email.id ? '#1a1a2a' : 'transparent',
+                  background: selected?.id === email.id ? 'var(--surface)' : 'transparent',
                   opacity: email.status === 'archived' ? 0.5 : 1,
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {email.status === 'unread' && (
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3498db', flexShrink: 0 }} />
+                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
                     )}
                     <span style={{
                       fontSize: '12px',
-                      color: email.status === 'unread' ? '#fff' : '#999',
+                      color: email.status === 'unread' ? 'var(--text)' : 'var(--text-disabled)',
                       fontWeight: email.status === 'unread' ? 600 : 400,
                     }}>
                       {email.from_name || email.from_address}
@@ -279,17 +279,17 @@ export default function AdminInbox() {
                       fontSize: '9px',
                       padding: '1px 5px',
                       borderRadius: 2,
-                      background: MAILBOX_COLORS[email.to_address] || '#333',
-                      color: '#fff',
+                      background: MAILBOX_COLORS[email.to_address] || 'var(--surface)',
+                      color: 'var(--text)',
                     }}>
                       {email.to_address.split('@')[0]}
                     </span>
-                    <span style={{ fontSize: '11px', color: '#555' }}>{timeAgo(email.received_at)}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{timeAgo(email.received_at)}</span>
                   </div>
                 </div>
                 <div style={{
                   fontSize: '12px',
-                  color: email.status === 'unread' ? '#ccc' : '#777',
+                  color: email.status === 'unread' ? 'var(--text)' : 'var(--text-disabled)',
                   marginTop: 3,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
@@ -300,7 +300,7 @@ export default function AdminInbox() {
                 {!selected && email.body_text && (
                   <div style={{
                     fontSize: '11px',
-                    color: '#555',
+                    color: 'var(--text-secondary)',
                     marginTop: 2,
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -319,39 +319,39 @@ export default function AdminInbox() {
         {selected && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* Detail header */}
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #222' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <div style={{ fontSize: '15px', color: '#fff', fontWeight: 600 }}>{selected.subject}</div>
-                  <div style={{ fontSize: '12px', color: '#888', marginTop: 4 }}>
-                    From: <span style={{ color: '#ccc' }}>{selected.from_name ? `${selected.from_name} <${selected.from_address}>` : selected.from_address}</span>
+                  <div style={{ fontSize: '15px', color: 'var(--text)', fontWeight: 600 }}>{selected.subject}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-disabled)', marginTop: 4 }}>
+                    From: <span style={{ color: 'var(--text)' }}>{selected.from_name ? `${selected.from_name} <${selected.from_address}>` : selected.from_address}</span>
                   </div>
-                  <div style={{ fontSize: '12px', color: '#888' }}>
-                    To: <span style={{ color: MAILBOX_COLORS[selected.to_address] || '#ccc' }}>{selected.to_address}</span>
+                  <div style={{ fontSize: '12px', color: 'var(--text-disabled)' }}>
+                    To: <span style={{ color: MAILBOX_COLORS[selected.to_address] || 'var(--text)' }}>{selected.to_address}</span>
                   </div>
-                  <div style={{ fontSize: '11px', color: '#555', marginTop: 2 }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: 2 }}>
                     {new Date(selected.received_at).toLocaleString()}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {selected.status === 'replied' && (
-                    <span style={{ fontSize: '11px', padding: '2px 6px', background: '#2ecc71', color: '#000', borderRadius: 3 }}>replied</span>
+                    <span style={{ fontSize: '11px', padding: '2px 6px', background: 'var(--success)', color: 'var(--bg)', borderRadius: 3 }}>replied</span>
                   )}
                   <button
                     onClick={() => archiveEmail(selected.id)}
-                    style={{ fontSize: '11px', padding: '3px 8px', background: '#333', color: '#999', border: 'none', borderRadius: 3, cursor: 'pointer' }}
+                    style={{ fontSize: '11px', padding: '3px 8px', background: 'var(--surface)', color: 'var(--text-disabled)', border: 'none', borderRadius: 3, cursor: 'pointer' }}
                   >
                     archive
                   </button>
                   <button
                     onClick={() => markSpam(selected.id)}
-                    style={{ fontSize: '11px', padding: '3px 8px', background: '#333', color: '#e74c3c', border: 'none', borderRadius: 3, cursor: 'pointer' }}
+                    style={{ fontSize: '11px', padding: '3px 8px', background: 'var(--surface)', color: 'var(--error)', border: 'none', borderRadius: 3, cursor: 'pointer' }}
                   >
                     spam
                   </button>
                   <button
                     onClick={() => setSelected(null)}
-                    style={{ fontSize: '11px', padding: '3px 8px', background: '#333', color: '#999', border: 'none', borderRadius: 3, cursor: 'pointer' }}
+                    style={{ fontSize: '11px', padding: '3px 8px', background: 'var(--surface)', color: 'var(--text-disabled)', border: 'none', borderRadius: 3, cursor: 'pointer' }}
                   >
                     close
                   </button>
@@ -366,7 +366,7 @@ export default function AdminInbox() {
                   dangerouslySetInnerHTML={{ __html: selected.body_html }}
                   style={{
                     fontSize: '13px',
-                    color: '#ddd',
+                    color: 'var(--text)',
                     lineHeight: 1.6,
                     maxWidth: 700,
                   }}
@@ -374,7 +374,7 @@ export default function AdminInbox() {
               ) : selected.body_text ? (
                 <pre style={{
                   fontSize: '12px',
-                  color: '#ddd',
+                  color: 'var(--text)',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
                   lineHeight: 1.5,
@@ -384,14 +384,14 @@ export default function AdminInbox() {
                   {selected.body_text}
                 </pre>
               ) : (
-                <div style={{ color: '#555', fontSize: '12px' }}>(no body content)</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>(no body content)</div>
               )}
 
               {selected.attachments && selected.attachments.length > 0 && (
-                <div style={{ marginTop: 16, padding: '8px 12px', background: '#111', borderRadius: 4 }}>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: 4 }}>ATTACHMENTS ({selected.attachments.length})</div>
+                <div style={{ marginTop: 16, padding: '8px 12px', background: 'var(--surface)', borderRadius: 4 }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-disabled)', marginBottom: 4 }}>ATTACHMENTS ({selected.attachments.length})</div>
                   {selected.attachments.map((att: any, i: number) => (
-                    <div key={i} style={{ fontSize: '12px', color: '#ccc' }}>
+                    <div key={i} style={{ fontSize: '12px', color: 'var(--text)' }}>
                       {att.filename} ({att.content_type})
                     </div>
                   ))}
@@ -400,7 +400,7 @@ export default function AdminInbox() {
             </div>
 
             {/* Reply box */}
-            <div style={{ borderTop: '1px solid #222', padding: '12px 16px' }}>
+            <div style={{ borderTop: '1px solid var(--border)', padding: '12px 16px' }}>
               <textarea
                 value={replyText}
                 onChange={e => setReplyText(e.target.value)}
@@ -408,9 +408,9 @@ export default function AdminInbox() {
                 style={{
                   width: '100%',
                   minHeight: 80,
-                  background: '#111',
-                  color: '#ddd',
-                  border: '1px solid #333',
+                  background: 'var(--surface)',
+                  color: 'var(--text)',
+                  border: '1px solid var(--border)',
                   borderRadius: 4,
                   padding: 10,
                   fontSize: '12px',
@@ -420,7 +420,7 @@ export default function AdminInbox() {
                 }}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-                <span style={{ fontSize: '11px', color: '#555' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                   Replying from {selected.to_address}
                 </span>
                 <button
@@ -429,8 +429,8 @@ export default function AdminInbox() {
                   style={{
                     padding: '5px 16px',
                     fontSize: '12px',
-                    background: replyText.trim() ? '#3498db' : '#222',
-                    color: replyText.trim() ? '#fff' : '#555',
+                    background: replyText.trim() ? 'var(--accent)' : 'var(--surface)',
+                    color: replyText.trim() ? 'var(--bg)' : 'var(--text-secondary)',
                     border: 'none',
                     borderRadius: 3,
                     cursor: replyText.trim() ? 'pointer' : 'default',

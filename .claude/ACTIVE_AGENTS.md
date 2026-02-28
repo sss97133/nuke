@@ -539,3 +539,37 @@ Removed 13 more low-value/redundant/broken jobs:
 **Task**: Screenshot vehicle page at mobile/desktop widths, audit dark mode
 **Files**: Read-only (screenshots only)
 **Status**: Active
+
+### ~~🎨 Theme System Audit & Fix — 2026-02-27 ~23:00 UTC~~ DONE
+- Completed: Full audit, 800+ fixes across 80+ files, 90 new CSS variables, report written
+- See THEME_AUDIT_REPORT.md for full results
+- REMOVED: session complete
+
+### [labor-estimation] COMPLETED — 2026-02-28 03:15 UTC
+Automated Labor Estimation Pipeline — all 7 phases built, deployed, and committed (ae30b897c).
+
+### [first-touch-overhaul] First-Time User Engagement Overhaul — 2026-02-27 ~23:20 UTC
+- **Task**: Overhauling all first-touch surfaces (homepage, feed, search, about, signup, onboarding)
+- **Files**: nuke_frontend/src/pages/*, nuke_frontend/src/components/onboarding/*
+- **Areas**: Homepage hero, vehicle cards, feed page, about page, signup page
+
+### Agent: UnifiedMap Migration (Leaflet → deck.gl + MapLibre)
+- **Started**: 2026-02-28
+- **Files**: `nuke_frontend/src/components/map/UnifiedMap.tsx`, `nuke_frontend/package.json`
+- **Task**: Replace react-leaflet with deck.gl ScatterplotLayer + maplibre-gl base map
+
+### Agent: vehicle_zone deprecation (2026-02-28 ~UTC) -- COMPLETED
+- Rewrote imageDisplayPriority.ts + imageCoverageTracker.ts, created constants/vehicleZones.ts
+- Added deprecation comments to all legacy angle references
+- REMOVED: session complete
+
+## Agent: Demote AI Button + Harden Pre-Analysis Pipeline
+- **Task**: Demote AI button in ImageLightbox, surface analysis data better in sidebar
+- **Files**: nuke_frontend/src/components/image/ImageLightbox.tsx, nuke_frontend/src/components/image/ImageInfoPanel.tsx
+- **Started**: 2026-02-28 17:54 UTC
+
+
+### Agent: Walk-Around Carousel — 2026-02-28 ~15:00 UTC
+- **Task**: Build WalkAroundCarousel component, wire into VehicleProfile
+- **Files**: `nuke_frontend/src/components/images/WalkAroundCarousel.tsx` (new), `nuke_frontend/src/pages/VehicleProfile.tsx`, `nuke_frontend/src/pages/vehicle-profile/VehicleHeroImage.tsx`
+- **Status**: Starting

@@ -181,7 +181,7 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
             <span style={{
               padding: '4px 8px',
               background: 'var(--warning)',
-              color: 'white',
+              color: 'var(--bg)',
               borderRadius: '4px',
               fontSize: '11px'
             }}>

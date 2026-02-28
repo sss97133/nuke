@@ -97,6 +97,7 @@ const COUNTRY_FLAGS: Record<string, string> = {
 };
 
 // ── Color scale ──────────────────────────────────────────────────────────────
+// TODO: Choropleth colors are hardcoded RGB for Leaflet — migrate to CSS variables when Leaflet supports it
 
 const COLOR_STOPS = [
   [0, 15, 23, 42],
@@ -127,7 +128,7 @@ function choroplethGradientCSS(): string {
 
 const MARKER_ICON = L.divIcon({
   className: '',
-  html: `<div style="background:#38bdf8;width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 8px rgba(56,189,248,0.6),0 2px 4px rgba(0,0,0,.4);animation:pulse 2s infinite"></div>`,
+  html: `<div style="background:var(--accent);width:16px;height:16px;border-radius:50%;border:2px solid var(--bg);box-shadow:0 0 8px rgba(56,189,248,0.6),0 2px 4px rgba(0,0,0,.4);animation:pulse 2s infinite"></div>`,
   iconSize: [16, 16], iconAnchor: [8, 8], popupAnchor: [0, -8],
 });
 
@@ -376,15 +377,17 @@ function MapLayers({
       const name = feature.properties?.name || id;
       const d = agg.get(id) || { count: 0, inventory: 0 };
       (layer as L.Path).bindTooltip(
-        `<div style="min-width:140px"><strong style="font-size:13px;letter-spacing:0.01em">${name}</strong><div style="margin-top:4px;display:flex;gap:14px"><span style="font-weight:600;color:#38bdf8">${d.count}</span><span style="opacity:.5">collections</span></div><div style="display:flex;gap:14px"><span style="font-weight:600;color:#34d399">${d.inventory.toLocaleString()}</span><span style="opacity:.5">vehicles</span></div>${d.count > 0 ? '<div style="margin-top:6px;font-size:10px;opacity:.5;border-top:1px solid rgba(255,255,255,.1);padding-top:4px">Click to explore</div>' : ''}</div>`,
+        `<div style="min-width:140px"><strong style="font-size:13px;letter-spacing:0.01em">${name}</strong><div style="margin-top:4px;display:flex;gap:14px"><span style="font-weight:600;color:var(--accent)">${d.count}</span><span style="opacity:.5">collections</span></div><div style="display:flex;gap:14px"><span style="font-weight:600;color:var(--success)">${d.inventory.toLocaleString()}</span><span style="opacity:.5">vehicles</span></div>${d.count > 0 ? '<div style="margin-top:6px;font-size:10px;opacity:.5;border-top:1px solid rgba(255,255,255,.1);padding-top:4px">Click to explore</div>' : ''}</div>`,
         { sticky: true, direction: 'top', className: 'map-tooltip' }
       );
       (layer as L.Path).on({
         mouseover: (e) => {
+          // TODO: Leaflet requires string hex — migrate to CSS variable when Leaflet supports it
           e.target.setStyle({ weight: 2, fillOpacity: 0.85, color: '#38bdf8' });
           e.target.bringToFront();
         },
         mouseout: (e) => {
+          // TODO: Leaflet requires string hex — migrate to CSS variable when Leaflet supports it
           e.target.setStyle({ weight: 0.5, fillOpacity: 0.55, color: '#334155' });
         },
         click: () => onClick(id, name),
@@ -413,6 +416,7 @@ function MapLayers({
       {routeLines.map(line => (
         <Polyline key={`route-${line.from.id}-${line.to.id}`}
           positions={[[line.from.lat, line.from.lng], [line.to.lat, line.to.lng]]}
+          // TODO: Leaflet pathOptions requires string hex — migrate to CSS variable when Leaflet supports it
           pathOptions={{ color: '#38bdf8', weight: 1, opacity: 0.2, dashArray: '4 6' }} />
       ))}
       {colls.map(c => {
@@ -420,18 +424,18 @@ function MapLayers({
         const size = isHighlighted ? 36 : 28;
         const halfSize = size / 2;
         const isFav = favorites.has(c.id);
-        const starBadge = isFav ? `<div style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;background:#f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;line-height:1;border:1.5px solid #0f172a;z-index:2">★</div>` : '';
+        const starBadge = isFav ? `<div style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;background:var(--warning);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;line-height:1;border:1.5px solid var(--text);z-index:2">★</div>` : '';
         const glowClass = isHighlighted ? ' glow-ring' : '';
         const icon = c.logo_url
           ? L.divIcon({
               className: '',
-              html: `<div class="${glowClass}" style="position:relative;width:${size}px;height:${size}px;border-radius:50%;border:${isHighlighted ? '3px solid #38bdf8' : isFav ? '2px solid #f59e0b' : '2px solid #fff'};box-shadow:${isHighlighted ? '0 0 20px rgba(56,189,248,0.8),0 0 40px rgba(56,189,248,0.3)' : '0 0 8px rgba(56,189,248,0.5),0 2px 6px rgba(0,0,0,.5)'};overflow:visible;background:#1e293b;transition:all 200ms ease">${starBadge}<div style="width:100%;height:100%;border-radius:50%;overflow:hidden"><img src="${c.logo_url}" style="width:100%;height:100%;object-fit:cover" /></div></div>`,
+              html: `<div class="${glowClass}" style="position:relative;width:${size}px;height:${size}px;border-radius:50%;border:${isHighlighted ? '3px solid var(--accent)' : isFav ? '2px solid var(--warning)' : '2px solid var(--bg)'};box-shadow:${isHighlighted ? '0 0 20px rgba(56,189,248,0.8),0 0 40px rgba(56,189,248,0.3)' : '0 0 8px rgba(56,189,248,0.5),0 2px 6px rgba(0,0,0,.5)'};overflow:visible;background:var(--surface);transition:all 200ms ease">${starBadge}<div style="width:100%;height:100%;border-radius:50%;overflow:hidden"><img src="${c.logo_url}" style="width:100%;height:100%;object-fit:cover" /></div></div>`,
               iconSize: [size, size], iconAnchor: [halfSize, halfSize], popupAnchor: [0, -halfSize],
             })
           : isHighlighted
             ? L.divIcon({
                 className: '',
-                html: `<div style="background:#38bdf8;width:24px;height:24px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 20px rgba(56,189,248,0.9),0 0 40px rgba(56,189,248,0.4),0 2px 8px rgba(0,0,0,.4);animation:pulse 1s infinite"></div>`,
+                html: `<div style="background:var(--accent);width:24px;height:24px;border-radius:50%;border:3px solid var(--bg);box-shadow:0 0 20px rgba(56,189,248,0.9),0 0 40px rgba(56,189,248,0.4),0 2px 8px rgba(0,0,0,.4);animation:pulse 1s infinite"></div>`,
                 iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -12],
               })
             : MARKER_ICON;
@@ -439,7 +443,7 @@ function MapLayers({
           <Marker key={c.id} position={[c.lat, c.lng]} icon={icon} zIndexOffset={isHighlighted ? 1000 : 0}>
             {/* Name label below marker */}
             <Tooltip permanent direction="bottom" offset={[0, 8]} className="marker-name-label">
-              <span style={{ fontSize: 9, fontWeight: 600, color: '#e2e8f0', textShadow: '0 1px 3px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.6)' }}>{c.name.length > 20 ? c.name.slice(0, 18) + '…' : c.name}</span>
+              <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text)', textShadow: '0 1px 3px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.6)' }}>{c.name.length > 20 ? c.name.slice(0, 18) + '…' : c.name}</span>
             </Tooltip>
             <Popup maxWidth={300}>
               <div className="min-w-[260px] p-3">
@@ -546,6 +550,7 @@ function MapLayers({
       const inventoryScale = Math.min(c.total_inventory / 50, 1); // 0-1 based on inventory
       const baseRadius = drill.level === 'world' ? 6 : 12;
       return (
+        // TODO: Leaflet pathOptions requires string hex — migrate to CSS variable when Leaflet supports it
         <CircleMarker key={`h-${c.id}`} center={[c.lat, c.lng]}
           radius={baseRadius + inventoryScale * 8}
           pathOptions={{ color: 'transparent', fillColor: inventoryScale > 0.5 ? '#34d399' : '#38bdf8', fillOpacity: drill.level === 'world' ? 0.08 : 0.12, weight: 0 }}
@@ -617,15 +622,15 @@ function MapLayers({
             <div style={{ minWidth: 100 }}>
               <strong>{g.city}</strong>
               <div style={{ marginTop: 3, fontSize: 11 }}>
-                <span style={{ color: '#38bdf8', fontWeight: 600 }}>{g.count}</span> collections
+                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{g.count}</span> collections
                 <span style={{ margin: '0 6px', opacity: 0.3 }}>|</span>
-                <span style={{ color: '#34d399', fontWeight: 600 }}>{g.inventory}</span> vehicles
+                <span style={{ color: 'var(--success)', fontWeight: 600 }}>{g.inventory}</span> vehicles
               </div>
             </div>
           </Tooltip>
           {g.count >= 2 && (
             <Tooltip permanent direction="center" className="city-count-label">
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.8)' }}>{g.count}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--bg)', textShadow: '0 1px 3px rgba(0,0,0,.8)' }}>{g.count}</span>
             </Tooltip>
           )}
         </CircleMarker>
@@ -682,11 +687,11 @@ function MapInstance({ onMap, onMoveEnd, onZoom }: { onMap: (map: L.Map) => void
 // ── CSS ──────────────────────────────────────────────────────────────────────
 
 const MAP_STYLES = `
-  .map-tooltip { background: rgba(15,23,42,.95) !important; color: #e2e8f0 !important; border: 1px solid rgba(56,189,248,.2) !important; border-radius: 10px !important; padding: 10px 14px !important; font-size: 12px !important; box-shadow: 0 8px 32px rgba(0,0,0,.6) !important; backdrop-filter: blur(12px); }
+  .map-tooltip { background: rgba(15,23,42,.95) !important; color: var(--text) !important; border: 1px solid rgba(56,189,248,.2) !important; border-radius: 10px !important; padding: 10px 14px !important; font-size: 12px !important; box-shadow: 0 8px 32px rgba(0,0,0,.6) !important; backdrop-filter: blur(12px); }
   .map-tooltip::before { border-top-color: rgba(56,189,248,.2) !important; }
   .city-count-label { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
   .city-count-label::before { display: none !important; }
-  .region-count { background: rgba(15,23,42,.75); color: #e2e8f0; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 6px; text-align: center; white-space: nowrap; pointer-events: none; border: 1px solid rgba(56,189,248,.15); text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+  .region-count { background: rgba(15,23,42,.75); color: var(--text); font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 6px; text-align: center; white-space: nowrap; pointer-events: none; border: 1px solid rgba(56,189,248,.15); text-shadow: 0 1px 2px rgba(0,0,0,.5); }
   .leaflet-popup-content-wrapper { border-radius: 12px !important; }
   .leaflet-popup-content { margin: 0 !important; }
   @keyframes pulse { 0%,100% { box-shadow: 0 0 8px rgba(56,189,248,0.6),0 2px 4px rgba(0,0,0,.4); } 50% { box-shadow: 0 0 16px rgba(56,189,248,0.9),0 2px 8px rgba(0,0,0,.4); } }
@@ -710,9 +715,9 @@ const MAP_STYLES = `
   .marker-name-label { background: rgba(15,23,42,.7) !important; border: 1px solid rgba(56,189,248,.1) !important; border-radius: 4px !important; padding: 1px 4px !important; box-shadow: 0 2px 8px rgba(0,0,0,.4) !important; }
   .marker-name-label::before { border-bottom-color: rgba(56,189,248,.1) !important; }
   /* Light mode adaptations */
-  .map-light .region-count { background: rgba(255,255,255,.85); color: #1e293b; border-color: rgba(37,99,235,.2); text-shadow: none; }
-  .map-light .marker-name-label { background: rgba(255,255,255,.85) !important; color: #1e293b !important; border-color: rgba(37,99,235,.15) !important; }
-  .map-light .marker-name-label span { color: #1e293b !important; text-shadow: none !important; }
+  .map-light .region-count { background: rgba(255,255,255,.85); color: var(--text); border-color: rgba(37,99,235,.2); text-shadow: none; }
+  .map-light .marker-name-label { background: rgba(255,255,255,.85) !important; color: var(--text) !important; border-color: rgba(37,99,235,.15) !important; }
+  .map-light .marker-name-label span { color: var(--text) !important; text-shadow: none !important; }
   /* Improved scrollbar for sidebar/panel */
   .custom-scroll::-webkit-scrollbar { width: 4px; }
   .custom-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -721,7 +726,7 @@ const MAP_STYLES = `
   /* Minimap */
   .minimap-container { border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,.5); }
   .minimap-container .leaflet-control-container { display: none; }
-  .minimap-viewport { border: 1.5px solid #38bdf8; background: rgba(56,189,248,.08); pointer-events: none; }
+  .minimap-viewport { border: 1.5px solid var(--accent); background: rgba(56,189,248,.08); pointer-events: none; }
   /* Favorite star */
   @keyframes starPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
   .star-pop { animation: starPop 300ms ease; }
@@ -738,8 +743,8 @@ const MAP_STYLES = `
   @keyframes glowRing { 0% { box-shadow: 0 0 0 0 rgba(56,189,248,0.6); } 100% { box-shadow: 0 0 0 12px rgba(56,189,248,0); } }
   .glow-ring { animation: glowRing 1.5s ease-out infinite; }
   /* Range slider styling */
-  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #38bdf8; cursor: pointer; border: 2px solid #0f172a; }
-  input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #38bdf8; cursor: pointer; border: 2px solid #0f172a; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--text); }
+  input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--text); }
 `;
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -1208,8 +1213,8 @@ export default function CollectionsMap() {
           {drill.level !== 'world' && collections.length > 0 && (
             <div className="relative w-7 h-7 flex-shrink-0" title={`${Math.round((scopedCollections.length / collections.length) * 100)}% of all collections`}>
               <svg className="w-7 h-7 -rotate-90" viewBox="0 0 28 28">
-                <circle cx="14" cy="14" r="11" fill="none" stroke="#1e293b" strokeWidth="3" />
-                <circle cx="14" cy="14" r="11" fill="none" stroke="#38bdf8" strokeWidth="3"
+                <circle cx="14" cy="14" r="11" fill="none" stroke="var(--surface)" strokeWidth="3" />
+                <circle cx="14" cy="14" r="11" fill="none" stroke="var(--accent)" strokeWidth="3"
                   strokeDasharray={`${Math.round((scopedCollections.length / collections.length) * 69.12)} 69.12`}
                   strokeLinecap="round" className="transition-all duration-700" />
               </svg>
@@ -1252,7 +1257,7 @@ export default function CollectionsMap() {
                 <span className="truncate">{d.label}</span>
               </div>
               <div className="flex-1 h-2 bg-gray-800/80 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${d.pct}%`, background: `linear-gradient(90deg, #1e40af, #38bdf8)` }} />
+                <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${d.pct}%`, background: `linear-gradient(90deg, var(--accent), var(--accent))` }} />
               </div>
               <div className="w-10 text-right text-[10px] text-gray-500 font-medium tabular-nums">{d.pct}%</div>
             </div>
@@ -1677,7 +1682,7 @@ export default function CollectionsMap() {
                   <div className="absolute top-1.5 right-1.5 z-10 text-amber-400 text-[10px]">★</div>
                 )}
                 {/* Gradient header strip */}
-                <div className="h-1 w-full" style={{ background: c.total_inventory > 0 ? 'linear-gradient(90deg, #2563eb, #38bdf8, #34d399)' : 'linear-gradient(90deg, #1e293b, #334155)' }} />
+                <div className="h-1 w-full" style={{ background: c.total_inventory > 0 ? 'linear-gradient(90deg, var(--accent), var(--accent), var(--success))' : 'linear-gradient(90deg, var(--surface), var(--text))' }} />
                 <Link to={`/org/${c.slug}`} className="block p-2.5">
                   <div className="flex items-center gap-2 mb-1.5">
                     {c.logo_url ? (
@@ -1742,7 +1747,7 @@ export default function CollectionsMap() {
         {/* Drill depth gradient bar */}
         {drill.level !== 'world' && (
           <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{
-            background: `linear-gradient(90deg, #1e40af 0%, #38bdf8 ${DRILL_ORDER.indexOf(drill.level) * 25}%, transparent ${DRILL_ORDER.indexOf(drill.level) * 25 + 10}%)`
+            background: `linear-gradient(90deg, var(--accent) 0%, var(--accent) ${DRILL_ORDER.indexOf(drill.level) * 25}%, transparent ${DRILL_ORDER.indexOf(drill.level) * 25 + 10}%)`
           }} />
         )}
         <div className="flex items-center justify-between gap-2">
@@ -1888,7 +1893,7 @@ export default function CollectionsMap() {
             </div>
           ) : (
             <MapContainer center={[20, 0]} zoom={2} className={`absolute inset-0 ${mapStyle === 'light' ? 'map-light' : ''}`}
-              style={{ background: mapStyle === 'light' ? '#f0f0f0' : '#0a0f1a' }}
+              style={{ background: mapStyle === 'light' ? 'var(--bg)' : 'var(--map-bg, #0a0f1a)' }}
               zoomControl={false} attributionControl={false}>
               <MapInstance onMap={handleMap} onMoveEnd={handleMoveEnd} onZoom={handleZoom} />
               <TileLayer key={mapStyle} url={MAP_TILES[mapStyle].url} />
@@ -1896,6 +1901,7 @@ export default function CollectionsMap() {
                 worldGeo={worldGeo} statesGeo={statesGeo} countiesGeo={countiesGeo} stateAssign={stateAssign} countyAssign={countyAssign} highlightedId={highlightedId}
                 favorites={favorites} toggleFavorite={toggleFavorite} showHeatmap={showHeatmap} hoveredRegion={hoveredRegion} />
               {/* User location marker */}
+              {/* TODO: Leaflet pathOptions requires string hex — migrate to CSS variable when Leaflet supports it */}
               {userLocation && (
                 <CircleMarker center={userLocation} radius={8}
                   pathOptions={{ color: '#10b981', fillColor: '#10b981', fillOpacity: 0.3, weight: 2 }}>
@@ -2036,7 +2042,7 @@ export default function CollectionsMap() {
               style={{ width: 140, height: 90 }}>
               <MapContainer center={[20, 0]} zoom={1} zoomControl={false} attributionControl={false}
                 dragging={false} scrollWheelZoom={false} doubleClickZoom={false} touchZoom={false}
-                style={{ width: 140, height: 90, background: '#0a0f1a' }}>
+                style={{ width: 140, height: 90, background: 'var(--map-bg, #0a0f1a)' }}>
                 <TileLayer url={MAP_TILES.dark.url} />
                 {/* Viewport indicator */}
                 {(() => {

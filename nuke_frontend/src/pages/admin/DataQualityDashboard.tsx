@@ -98,15 +98,15 @@ const WORKFORCE_STRATEGIES: WorkforceStrategy[] = [
 ];
 
 function getBarColor(pct: number): string {
-  if (pct >= 80) return '#22c55e';
-  if (pct >= 30) return '#f59e0b';
-  if (pct >= 10) return '#f97316';
-  return '#ef4444';
+  if (pct >= 80) return 'var(--success)';
+  if (pct >= 30) return 'var(--warning)';
+  if (pct >= 10) return 'var(--warning-text, #f97316)';
+  return 'var(--error)';
 }
 
 function TrendArrow({ delta }: { delta: number }) {
-  if (delta > 0.05) return <span style={{ color: '#22c55e', marginLeft: '6px', fontWeight: 700 }}>▲{delta.toFixed(1)}%</span>;
-  if (delta < -0.05) return <span style={{ color: '#ef4444', marginLeft: '6px', fontWeight: 700 }}>▼{Math.abs(delta).toFixed(1)}%</span>;
+  if (delta > 0.05) return <span style={{ color: 'var(--success)', marginLeft: '6px', fontWeight: 700 }}>▲{delta.toFixed(1)}%</span>;
+  if (delta < -0.05) return <span style={{ color: 'var(--error)', marginLeft: '6px', fontWeight: 700 }}>▼{Math.abs(delta).toFixed(1)}%</span>;
   return <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>→</span>;
 }
 
@@ -294,7 +294,7 @@ export default function DataQualityDashboard() {
           padding: '10px 14px',
           fontSize: '11px',
           marginBottom: '16px',
-          color: '#166534',
+          color: 'var(--success)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -344,8 +344,8 @@ export default function DataQualityDashboard() {
             style={{
               fontSize: '10px',
               padding: '4px 10px',
-              background: '#1d4ed8',
-              color: '#fff',
+              background: 'var(--accent)',
+              color: 'var(--bg)',
               border: 'none',
               borderRadius: '0px',
               cursor: 'pointer',
@@ -374,13 +374,13 @@ export default function DataQualityDashboard() {
                   height: '20px',
                   borderRadius: '50%',
                   background: isLlm ? 'rgba(245, 158, 11, 0.15)' : 'rgba(34, 197, 94, 0.15)',
-                  border: `2px solid ${isLlm ? '#f59e0b' : '#22c55e'}`,
+                  border: `2px solid ${isLlm ? 'var(--warning)' : 'var(--success)'}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '9px',
                   fontWeight: 700,
-                  color: isLlm ? '#f59e0b' : '#22c55e',
+                  color: isLlm ? 'var(--warning)' : 'var(--success)',
                   flexShrink: 0,
                 }}>
                   {strategy.priority}
@@ -400,8 +400,8 @@ export default function DataQualityDashboard() {
                   padding: '2px 6px',
                   borderRadius: '2px',
                   background: isLlm ? 'rgba(245, 158, 11, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-                  color: isLlm ? '#92400e' : '#166534',
-                  border: `1px solid ${isLlm ? '#fcd34d' : '#86efac'}`,
+                  color: isLlm ? 'var(--warning)' : 'var(--success)',
+                  border: `1px solid ${isLlm ? 'var(--warning)' : 'var(--success)'}`,
                 }}>
                   {isLlm ? '$$$' : 'FREE'}
                 </span>
@@ -548,10 +548,10 @@ export default function DataQualityDashboard() {
         <span>Snapshot via TABLESAMPLE SYSTEM(3)</span>
         <span>Trend arrows = delta vs previous snapshot</span>
         <span>
-          Bar colors: <span style={{ color: '#22c55e' }}>■</span> &ge;80%
-          <span style={{ color: '#f59e0b' }}> ■</span> 30–79%
-          <span style={{ color: '#f97316' }}> ■</span> 10–29%
-          <span style={{ color: '#ef4444' }}> ■</span> &lt;10%
+          Bar colors: <span style={{ color: 'var(--success)' }}>■</span> &ge;80%
+          <span style={{ color: 'var(--warning)' }}> ■</span> 30–79%
+          <span style={{ color: 'var(--warning-text, #f97316)' }}> ■</span> 10–29%
+          <span style={{ color: 'var(--error)' }}> ■</span> &lt;10%
         </span>
       </div>
     </div>

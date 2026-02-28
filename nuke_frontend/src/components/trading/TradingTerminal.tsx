@@ -196,7 +196,7 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({
   return (
     <div
       style={{
-        background: '#1a1a2e',
+        background: 'var(--bg)',
         minHeight: '100vh',
         padding: '12px',
         fontFamily: 'Arial, sans-serif',
@@ -210,14 +210,14 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({
           alignItems: 'center',
           padding: '8px 12px',
           marginBottom: '12px',
-          background: '#16213e',
+          background: 'var(--surface)',
           borderRadius: '4px',
-          border: '1px solid #0f3460',
+          border: '1px solid var(--border)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           {/* Title */}
-          <h1 style={{ margin: 0, fontSize: '19px', fontWeight: 'bold', color: '#e5e7eb' }}>
+          <h1 style={{ margin: 0, fontSize: '19px', fontWeight: 'bold', color: 'var(--text)' }}>
             {vehicleName}
           </h1>
 
@@ -228,14 +228,14 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({
                 style={{
                   fontSize: '24px',
                   fontWeight: 'bold',
-                  color: '#10b981',
+                  color: 'var(--success)',
                   fontFamily: 'var(--font-mono, monospace)',
                 }}
               >
                 ${nbbo.lastTradePrice.toFixed(2)}
               </span>
               {nbbo.spread !== null && (
-                <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                   Spread: ${nbbo.spread.toFixed(2)}
                 </span>
               )}
@@ -251,10 +251,10 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({
                 width: '8px',
                 height: '8px',
                 borderRadius: '50%',
-                background: isConnected ? '#10b981' : '#ef4444',
+                background: isConnected ? 'var(--success)' : 'var(--error)',
               }}
             />
-            <span style={{ fontSize: '12px', color: '#6b7280' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
               {isConnected ? 'LIVE' : 'OFFLINE'}
             </span>
           </div>
@@ -271,10 +271,10 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({
                 style={{
                   padding: '4px 8px',
                   fontSize: '12px',
-                  border: '1px solid #0f3460',
+                  border: '1px solid var(--border)',
                   borderRadius: '2px',
-                  background: layout.layout === l ? '#0f3460' : 'transparent',
-                  color: layout.layout === l ? '#e5e7eb' : '#6b7280',
+                  background: layout.layout === l ? 'var(--surface-raised)' : 'transparent',
+                  color: layout.layout === l ? 'var(--text)' : 'var(--text-secondary)',
                   cursor: 'pointer',
                 }}
               >
@@ -292,8 +292,8 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({
               fontWeight: 600,
               border: 'none',
               borderRadius: '4px',
-              background: '#10b981',
-              color: 'white',
+              background: 'var(--success)',
+              color: 'var(--bg)',
               cursor: 'pointer',
             }}
           >
@@ -307,8 +307,8 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({
               fontWeight: 600,
               border: 'none',
               borderRadius: '4px',
-              background: '#ef4444',
-              color: 'white',
+              background: 'var(--error)',
+              color: 'var(--bg)',
               cursor: 'pointer',
             }}
           >
@@ -322,10 +322,10 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({
               style={{
                 padding: '6px 12px',
                 fontSize: '13px',
-                border: '1px solid #6b7280',
+                border: '1px solid var(--text-secondary)',
                 borderRadius: '4px',
                 background: 'transparent',
-                color: '#6b7280',
+                color: 'var(--text-secondary)',
                 cursor: 'pointer',
               }}
             >
@@ -343,7 +343,7 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({
           padding: '4px 12px',
           marginBottom: '8px',
           fontSize: '11px',
-          color: '#6b7280',
+          color: 'var(--text-secondary)',
         }}
       >
         <span><kbd style={kbdStyle}>B</kbd> Buy</span>
@@ -411,7 +411,7 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({
             bottom: '8px',
             right: '12px',
             fontSize: '11px',
-            color: '#6b7280',
+            color: 'var(--text-secondary)',
           }}
         >
           Last update: {lastUpdate.toLocaleTimeString()}
@@ -425,8 +425,8 @@ const kbdStyle: React.CSSProperties = {
   display: 'inline-block',
   padding: '1px 4px',
   borderRadius: '3px',
-  border: '1px solid #4b5563',
-  background: '#374151',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-raised)',
   fontFamily: 'monospace',
   fontSize: '11px',
   marginRight: '4px',

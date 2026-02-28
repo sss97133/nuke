@@ -205,7 +205,7 @@ function StatBar({ label, value, max, unit, precision, invert }: {
           style={{
             height: '100%',
             width: `${pct}%`,
-            background: pct > 80 ? '#000' : pct > 50 ? '#333' : '#666',
+            background: pct > 80 ? 'var(--text)' : pct > 50 ? 'var(--text)' : 'var(--text-secondary)',
             transition: 'width 0.6s ease',
           }}
         />
@@ -223,14 +223,14 @@ function ScoreBadge({ score, label, size = 'md', onClick }: { score: number | nu
   const bg = score == null
     ? 'var(--bg)'
     : score >= 80
-      ? '#000'
+      ? 'var(--text)'
       : score >= 60
-        ? '#333'
+        ? 'var(--text)'
         : score >= 40
-          ? '#666'
-          : '#999';
+          ? 'var(--text-secondary)'
+          : 'var(--text-muted)';
 
-  const color = score == null ? 'var(--text-muted)' : '#fff';
+  const color = score == null ? 'var(--text-muted)' : 'var(--bg)';
 
   return (
     <div style={{ textAlign: 'center', cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
@@ -247,7 +247,7 @@ function ScoreBadge({ score, label, size = 'md', onClick }: { score: number | nu
           fontSize,
           fontWeight: 800,
           margin: '0 auto 4px',
-          border: '2px solid #000',
+          border: '2px solid var(--text)',
           transition: 'transform 0.15s ease',
         }}
         onMouseEnter={(e) => onClick && ((e.target as HTMLElement).style.transform = 'scale(1.1)')}
@@ -272,7 +272,7 @@ function SocialBar({ label, value }: { label: string; value: number }) {
           style={{
             height: '100%',
             width: `${value}%`,
-            background: value > 70 ? '#000' : value > 50 ? '#444' : '#888',
+            background: value > 70 ? 'var(--text)' : value > 50 ? 'var(--text)' : 'var(--text-muted)',
             transition: 'width 0.6s ease',
           }}
         />
@@ -350,7 +350,7 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
 
   if (loading) {
     return (
-      <div style={{ padding: '16px', border: '2px solid #000', background: 'var(--surface)' }}>
+      <div style={{ padding: '16px', border: '2px solid var(--border)', background: 'var(--surface)' }}>
         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Loading performance data...</div>
       </div>
     );
@@ -368,11 +368,11 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
   const social = data.social_positioning_breakdown;
 
   return (
-    <div style={{ border: '2px solid #000', background: 'var(--surface)' }}>
+    <div style={{ border: '2px solid var(--border)', background: 'var(--surface)' }}>
       {/* Header */}
       <div style={{
         padding: '10px 14px',
-        borderBottom: '2px solid #000',
+        borderBottom: '2px solid var(--border)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -507,7 +507,7 @@ export default function VehiclePerformanceCard({ vehicleId, compact = false }: P
 
         {/* Running gear (collapsible) */}
         {(data.suspension_front || data.brake_type_front || data.tire_spec_front) && (
-          <div style={{ border: '1px solid #e5e5e5' }}>
+          <div style={{ border: '1px solid var(--border)' }}>
             <button
               onClick={() => setShowRunningGear(!showRunningGear)}
               style={{

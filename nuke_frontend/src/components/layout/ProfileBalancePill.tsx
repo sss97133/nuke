@@ -179,7 +179,7 @@ export const ProfileBalancePill: React.FC<Props> = ({
             >
               <span>Notifications</span>
               {unreadCount > 0 && (
-                <span style={{ background: '#dc2626', color: '#ffffff', borderRadius: '12px', padding: '2px 8px', fontSize: '10px', minWidth: '24px', textAlign: 'center' }}>
+                <span style={{ background: 'var(--error)', color: 'var(--bg)', borderRadius: '12px', padding: '2px 8px', fontSize: '10px', minWidth: '24px', textAlign: 'center' }}>
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}

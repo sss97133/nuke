@@ -118,7 +118,7 @@ const FacebookConnectionSettings: React.FC<FacebookConnectionSettingsProps> = ({
             style={{
               padding: '8px 16px',
               background: '#1877F2',
-              color: 'white',
+              color: 'var(--bg)',
               border: 'none',
               borderRadius: '6px',
               fontSize: '12px',
@@ -162,7 +162,7 @@ const FacebookConnectionSettings: React.FC<FacebookConnectionSettingsProps> = ({
             <span style={{
               padding: '2px 8px',
               background: '#1877F2',
-              color: 'white',
+              color: 'var(--bg)',
               borderRadius: '4px',
               fontSize: '10px',
               fontWeight: 500
@@ -185,7 +185,7 @@ const FacebookConnectionSettings: React.FC<FacebookConnectionSettingsProps> = ({
           style={{
             padding: '8px 16px',
             background: disconnecting ? 'var(--text-muted)' : 'var(--danger)',
-            color: 'white',
+            color: 'var(--bg)',
             border: 'none',
             borderRadius: '6px',
             fontSize: '12px',

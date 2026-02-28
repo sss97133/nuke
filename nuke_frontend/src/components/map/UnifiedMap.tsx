@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import DeckGL from '@deck.gl/react';
-import { ScatterplotLayer } from '@deck.gl/layers';
-import { HeatmapLayer } from '@deck.gl/aggregation-layers';
+import { ScatterplotLayer, TextLayer, GeoJsonLayer } from '@deck.gl/layers';
 import { Map } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../contexts/ThemeContext';
 import '../../styles/unified-design-system.css';
 import ZIP_DB from './us-zips.json';
+import * as topojson from 'topojson-client';
+import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
+import { point as turfPoint } from '@turf/helpers';
 
 const MAP_FONT = 'Arial, Helvetica, sans-serif';
 const CARTO_DARK = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
@@ -201,13 +203,7 @@ const colColor = (country: string): [number, number, number] => COUNTRY_COLORS[c
 const BASE_FIELDS = 'id,year,make,model,trim,listing_location,bat_location,location,gps_latitude,gps_longitude,primary_image_url';
 const RICH_FIELDS = `${BASE_FIELDS},sale_price,asking_price,current_value,nuke_estimate,mileage,color,interior_color,engine_type,engine_size,horsepower,transmission,drivetrain,body_style,condition_rating,deal_score,heat_score,created_at,bat_sale_date,auction_end_date`;
 
-function buildOr(q: string): string {
-  const escaped = q.replace(/'/g, "''");
-  return ['make', 'model', 'trim', 'color', 'interior_color', 'engine_type', 'engine_code',
-    'transmission', 'drivetrain', 'body_style', 'tire_spec_front', 'tire_spec_rear',
-    'modifications', 'description', 'title', 'vin',
-  ].map(c => `${c}.ilike.%${escaped}%`).join(',');
-}
+// Search uses search_vector GIN index — fast even on 130k+ rows
 
 // --- Pin types ---
 interface VPin {
@@ -380,10 +376,6 @@ function VehicleCard({ v, accent }: { v: VPin; accent: string }) {
 
 const INITIAL_VIEW = { longitude: -98, latitude: 39, zoom: 4.5, pitch: 0, bearing: 0 };
 
-// Thermal heatmap color ramp: indigo → purple → red → orange → yellow → white
-const THERMAL_RAMP: [number, number, number][] = [
-  [20, 10, 80], [80, 0, 120], [180, 30, 30], [230, 120, 20], [255, 230, 50], [255, 255, 240],
-];
 
 export default function UnifiedMap() {
   const { theme } = useTheme();
@@ -427,6 +419,10 @@ export default function UnifiedMap() {
   // Timeline — filter vehicles by date
   const [timelineEnabled, setTimelineEnabled] = useState(false);
   const [timeCutoff, setTimeCutoff] = useState(100); // 0-100 percentage of date range
+
+  // County choropleth for thermal mode
+  const [countyGeoJson, setCountyGeoJson] = useState<any>(null);
+  const [countyLoading, setCountyLoading] = useState(false);
 
   // Live events
   const liveEventsRef = useRef<LiveEvent[]>([]);
@@ -488,7 +484,7 @@ export default function UnifiedMap() {
         .select('id, latitude, longitude, image_url, thumbnail_url, vehicle_id, location_name, taken_at, source, exif_data')
         .not('latitude', 'is', null).not('longitude', 'is', null)
         .order('taken_at', { ascending: false })
-        .limit(15000);
+        .limit(20000);
       if (!data) return;
 
       // Get vehicle titles + primary images for linked photos
@@ -677,6 +673,34 @@ export default function UnifiedMap() {
     return () => { cancelled = true; };
   }, []);
 
+  // ---- Load county boundaries for thermal choropleth ----
+  useEffect(() => {
+    if (mode !== 'thermal' || countyGeoJson) return;
+    setCountyLoading(true);
+    fetch('/data/us-counties-10m.json')
+      .then(r => r.json())
+      .then(topo => {
+        const geo = topojson.feature(topo, topo.objects.counties);
+        // Pre-compute bounding boxes for fast spatial lookup
+        for (const f of (geo as any).features) {
+          const coords = f.geometry.type === 'Polygon' ? f.geometry.coordinates : f.geometry.coordinates.flat();
+          let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+          for (const ring of coords) {
+            for (const [lng, lat] of ring) {
+              if (lat < minLat) minLat = lat;
+              if (lat > maxLat) maxLat = lat;
+              if (lng < minLng) minLng = lng;
+              if (lng > maxLng) maxLng = lng;
+            }
+          }
+          f.properties._bbox = [minLng, minLat, maxLng, maxLat];
+        }
+        setCountyGeoJson(geo);
+        setCountyLoading(false);
+      })
+      .catch(err => { console.error('County load error:', err); setCountyLoading(false); });
+  }, [mode, countyGeoJson]);
+
   // ---- Query engine ----
   const handleSearch = useCallback(async () => {
     const q = searchText.trim();
@@ -691,12 +715,13 @@ export default function UnifiedMap() {
       if (yearMatch) {
         query = query.eq('year', parseInt(yearMatch[1]));
         const rest = q.slice(4).trim();
-        if (rest) query = query.or(buildOr(rest));
+        if (rest) query = query.textSearch('search_vector', rest, { type: 'websearch' });
       } else {
-        query = query.or(buildOr(q));
+        query = query.textSearch('search_vector', q, { type: 'websearch' });
       }
 
-      const { data, count } = await query.limit(3000);
+      const { data, count, error: searchError } = await query.limit(3000);
+      if (searchError) { console.error('Search error:', searchError); }
       setQueryTotal(count || 0);
 
       const pins: VPin[] = [];
@@ -765,6 +790,68 @@ export default function UnifiedMap() {
     return vehicles.filter(v => v.dateTs <= cutoffTs);
   }, [vehicles, timelineEnabled, timeCutoff, timelineRange]);
 
+  // ---- Compute county vehicle counts for choropleth (async to avoid blocking UI) ----
+  const [countyFeatures, setCountyFeatures] = useState<any>(null);
+  const [thermalComputing, setThermalComputing] = useState(false);
+  useEffect(() => {
+    if (!countyGeoJson || mode !== 'thermal') { setCountyFeatures(null); return; }
+    const data = hasQuery ? queryResults : filteredVehicles;
+    if (data.length === 0) { setCountyFeatures(countyGeoJson); return; }
+
+    setThermalComputing(true);
+    // Defer heavy computation so React can render loading state first
+    const timer = setTimeout(() => {
+      try {
+        // Build spatial grid (0.5° cells) for fast county lookup
+        const grid: Record<string, any[]> = {};
+        for (const f of countyGeoJson.features) {
+          const [minLng, minLat, maxLng, maxLat] = f.properties._bbox;
+          const gMinX = Math.floor(minLng * 2), gMaxX = Math.floor(maxLng * 2);
+          const gMinY = Math.floor(minLat * 2), gMaxY = Math.floor(maxLat * 2);
+          for (let gx = gMinX; gx <= gMaxX; gx++) {
+            for (let gy = gMinY; gy <= gMaxY; gy++) {
+              const key = `${gx},${gy}`;
+              if (!grid[key]) grid[key] = [];
+              grid[key].push(f);
+            }
+          }
+        }
+
+        // Count vehicles per county using grid-accelerated PIP
+        const countMap = new Map<string, number>();
+        for (const v of data) {
+          const gx = Math.floor(v.lng * 2), gy = Math.floor(v.lat * 2);
+          const candidates = grid[`${gx},${gy}`];
+          if (!candidates) continue;
+          const pt = turfPoint([v.lng, v.lat]);
+          for (const f of candidates) {
+            const [minLng, minLat, maxLng, maxLat] = f.properties._bbox;
+            if (v.lng < minLng || v.lng > maxLng || v.lat < minLat || v.lat > maxLat) continue;
+            if (booleanPointInPolygon(pt, f)) {
+              countMap.set(f.id, (countMap.get(f.id) || 0) + 1);
+              break;
+            }
+          }
+        }
+
+        const vals = [...countMap.values()];
+        const maxCount = vals.length > 0 ? Math.max(...vals) : 1;
+        setCountyFeatures({
+          ...countyGeoJson,
+          features: countyGeoJson.features.map((f: any) => ({
+            ...f,
+            properties: { ...f.properties, _count: countMap.get(f.id) || 0, _maxCount: maxCount },
+          })),
+        });
+      } catch (err) {
+        console.error('Thermal computation error:', err);
+        setCountyFeatures(null);
+      }
+      setThermalComputing(false);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [countyGeoJson, mode, hasQuery, queryResults, filteredVehicles]);
+
   const cutoffLabel = useMemo(() => {
     if (!timelineEnabled || timeCutoff >= 100) return timelineRange.maxLabel;
     const range = timelineRange.max - timelineRange.min;
@@ -802,21 +889,47 @@ export default function UnifiedMap() {
     const vehColor: [number, number, number] = hasQuery ? colors.query : colors.vehicle;
     const glowAlpha = Math.max(0, Math.min(255, glowIntensity));
 
+    // Zoom-based point scale — visible at z4.5 (nationwide), grows slightly with zoom
+    const zoomScale = Math.max(0.6, Math.min(1.5, 0.4 + zoom / 12));
+    const ptBase = pointSize * zoomScale;
+
     // Glow fades as you zoom in past z12, but never fully disappears
     const showGlow = mode === 'density';
     const glowFade = showGlow ? Math.max(0.15, Math.min(1, (14 - zoom) / 8)) : 0;
 
-    // --- Thermal Heatmap (replaces all vehicle layers when active) ---
-    if (showVehicles && mode === 'thermal') {
-      result.push(new HeatmapLayer({
-        id: 'vehicle-thermal',
-        data: hasQuery ? queryResults : filteredVehicles,
-        getPosition: (d: VPin) => [d.lng, d.lat],
-        getWeight: (d: VPin) => d.weight || 1,
-        radiusPixels: glowRadius,
-        intensity: glowIntensity / 50,
-        threshold: 0.03,
-        colorRange: THERMAL_RAMP,
+    // --- Thermal Choropleth (county boundaries colored by vehicle density) ---
+    if (showVehicles && mode === 'thermal' && countyFeatures) {
+      result.push(new GeoJsonLayer({
+        id: 'county-choropleth',
+        data: countyFeatures,
+        filled: true,
+        stroked: true,
+        getFillColor: (f: any) => {
+          const count = f.properties._count || 0;
+          if (count === 0) return [0, 0, 0, 0];
+          const maxC = f.properties._maxCount || 1;
+          // Log scale for better distribution
+          const t = Math.log1p(count) / Math.log1p(maxC);
+          // Infrared ramp: dark indigo → purple → red → orange → yellow → white
+          if (t < 0.15) return [20 + t * 400, 10, 80 + t * 267, Math.round(60 + t * 600)];
+          if (t < 0.3)  return [80, 0, 120, Math.round(100 + t * 400)];
+          if (t < 0.5)  return [180, 30, 30, Math.round(140 + t * 200)];
+          if (t < 0.7)  return [230, 120, 20, Math.round(160 + t * 120)];
+          if (t < 0.9)  return [255, 230, 50, Math.round(180 + t * 80)];
+          return [255, 255, 240, 230];
+        },
+        getLineColor: [255, 255, 255, 30],
+        lineWidthMinPixels: 0.5,
+        pickable: true,
+        onHover: ({ object, x, y }: any) => {
+          if (object) {
+            const count = object.properties._count || 0;
+            setHoverInfo({ x, y, text: `${object.properties.name}: ${count.toLocaleString()} vehicles` });
+          } else {
+            setHoverInfo(null);
+          }
+        },
+        updateTriggers: { getFillColor: [countyFeatures] },
       }));
     }
 
@@ -826,14 +939,25 @@ export default function UnifiedMap() {
         id: 'vehicle-glow',
         data: filteredVehicles,
         getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: (d: VPin) => d.weight * 500,
-        radiusUnits: 'meters' as const,
+        getRadius: (d: VPin) => d.weight * glowRadius * zoomScale * 0.3,
         getFillColor: [...vehColor, glowAlpha] as [number, number, number, number],
         radiusMinPixels: 0,
-        radiusMaxPixels: 30,
+        radiusMaxPixels: glowRadius,
         opacity: glowFade,
-        pickable: false,
-        updateTriggers: { getFillColor: [glowAlpha, colorPreset] },
+        pickable: true,
+        onClick: ({ object }: any) => {
+          if (object) setSelectedPin({ pin: object, type: 'vehicle' });
+        },
+        onHover: ({ object, x, y }: any) => {
+          if (object) {
+            const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
+            const price = object.price ? ' · ' + fmtPrice(object.price) : '';
+            setHoverInfo({ x, y, text: (t || 'Vehicle') + price });
+          } else {
+            setHoverInfo(null);
+          }
+        },
+        updateTriggers: { getFillColor: [glowAlpha, colorPreset], getRadius: [glowRadius, zoom] },
       }));
     }
 
@@ -843,11 +967,10 @@ export default function UnifiedMap() {
         id: 'vehicle-points',
         data: filteredVehicles,
         getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: 3,
-        radiusUnits: 'meters' as const,
+        getRadius: ptBase,
+        getFillColor: [...vehColor, 200] as [number, number, number, number],
         radiusMinPixels: 1.5,
         radiusMaxPixels: 8,
-        getFillColor: [...vehColor, 200] as [number, number, number, number],
         pickable: true,
         onClick: ({ object }: any) => {
           if (object) setSelectedPin({ pin: object, type: 'vehicle' });
@@ -861,7 +984,7 @@ export default function UnifiedMap() {
             setHoverInfo(null);
           }
         },
-        updateTriggers: { getFillColor: [colorPreset] },
+        updateTriggers: { getFillColor: [colorPreset], getRadius: [pointSize, zoom] },
       }));
     }
 
@@ -871,27 +994,11 @@ export default function UnifiedMap() {
         id: 'query-glow',
         data: queryResults,
         getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: (d: VPin) => d.weight * 500,
-        radiusUnits: 'meters' as const,
+        getRadius: (d: VPin) => d.weight * glowRadius * zoomScale * 0.3,
         getFillColor: [...colors.query, glowAlpha] as [number, number, number, number],
         radiusMinPixels: 0,
-        radiusMaxPixels: 30,
+        radiusMaxPixels: glowRadius,
         opacity: glowFade,
-        pickable: false,
-      }));
-    }
-
-    // --- Query Points ---
-    if (hasQuery && queryResults.length > 0 && mode !== 'thermal') {
-      result.push(new ScatterplotLayer({
-        id: 'query-points',
-        data: queryResults,
-        getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: 4,
-        radiusUnits: 'meters' as const,
-        radiusMinPixels: 2,
-        radiusMaxPixels: 10,
-        getFillColor: [...colors.query, 220] as [number, number, number, number],
         pickable: true,
         onClick: ({ object }: any) => {
           if (object) setSelectedPin({ pin: object, type: 'vehicle' });
@@ -905,6 +1012,34 @@ export default function UnifiedMap() {
             setHoverInfo(null);
           }
         },
+        updateTriggers: { getRadius: [glowRadius, zoom] },
+      }));
+    }
+
+    // --- Query Points ---
+    if (hasQuery && queryResults.length > 0 && mode !== 'thermal') {
+      result.push(new ScatterplotLayer({
+        id: 'query-points',
+        data: queryResults,
+        getPosition: (d: VPin) => [d.lng, d.lat],
+        getRadius: ptBase * 1.2,
+        getFillColor: [...colors.query, 220] as [number, number, number, number],
+        radiusMinPixels: 1.5,
+        radiusMaxPixels: 8,
+        pickable: true,
+        onClick: ({ object }: any) => {
+          if (object) setSelectedPin({ pin: object, type: 'vehicle' });
+        },
+        onHover: ({ object, x, y }: any) => {
+          if (object) {
+            const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
+            const price = object.price ? ' · ' + fmtPrice(object.price) : '';
+            setHoverInfo({ x, y, text: (t || 'Vehicle') + price });
+          } else {
+            setHoverInfo(null);
+          }
+        },
+        updateTriggers: { getRadius: [pointSize, zoom] },
       }));
     }
 
@@ -914,13 +1049,24 @@ export default function UnifiedMap() {
         id: 'collection-glow',
         data: collections,
         getPosition: (d: ColPin) => [d.lng, d.lat],
-        getRadius: 600,
-        radiusUnits: 'meters' as const,
+        getRadius: (d: ColPin) => (d.totalInventory > 20 ? glowRadius * 0.5 : glowRadius * 0.3) * zoomScale,
         getFillColor: (d: ColPin) => [...colColor(d.country), Math.round(glowAlpha * 0.8)] as [number, number, number, number],
         radiusMinPixels: 0,
-        radiusMaxPixels: 25,
+        radiusMaxPixels: glowRadius * 0.6,
         opacity: glowFade * 0.8,
-        pickable: false,
+        pickable: true,
+        onClick: ({ object }: any) => {
+          if (object) setSelectedPin({ pin: object, type: 'collection' });
+        },
+        onHover: ({ object, x, y }: any) => {
+          if (object) {
+            const inv = object.totalInventory ? ` (${object.totalInventory})` : '';
+            setHoverInfo({ x, y, text: object.name + inv });
+          } else {
+            setHoverInfo(null);
+          }
+        },
+        updateTriggers: { getRadius: [glowRadius, zoom] },
       }));
     }
 
@@ -930,11 +1076,10 @@ export default function UnifiedMap() {
         id: 'collection-points',
         data: collections,
         getPosition: (d: ColPin) => [d.lng, d.lat],
-        getRadius: 10,
-        radiusUnits: 'meters' as const,
-        radiusMinPixels: 2,
-        radiusMaxPixels: 12,
+        getRadius: ptBase * 1.5,
         getFillColor: (d: ColPin) => [...colColor(d.country), 220] as [number, number, number, number],
+        radiusMinPixels: 2,
+        radiusMaxPixels: 8,
         pickable: true,
         onClick: ({ object }: any) => {
           if (object) setSelectedPin({ pin: object, type: 'collection' });
@@ -946,7 +1091,28 @@ export default function UnifiedMap() {
           }
           else setHoverInfo(null);
         },
+        updateTriggers: { getRadius: [pointSize, zoom] },
       }));
+
+      // --- Collection Labels — visible at z10+ ---
+      if (zoom >= 10) {
+        result.push(new TextLayer({
+          id: 'collection-labels',
+          data: collections,
+          getPosition: (d: ColPin) => [d.lng, d.lat],
+          getText: (d: ColPin) => d.name,
+          getSize: Math.min(14, 9 + (zoom - 10) * 1.5),
+          getColor: [255, 255, 255, zoom >= 13 ? 230 : 160],
+          getPixelOffset: [0, -12],
+          fontFamily: MAP_FONT,
+          fontWeight: 'bold',
+          outlineWidth: 2,
+          outlineColor: [0, 0, 0, 180],
+          billboard: false,
+          sizeUnits: 'pixels',
+          pickable: false,
+        }));
+      }
     }
 
     // --- Business Glow ---
@@ -955,13 +1121,24 @@ export default function UnifiedMap() {
         id: 'business-glow',
         data: businesses,
         getPosition: (d: BizPin) => [d.lng, d.lat],
-        getRadius: 500,
-        radiusUnits: 'meters' as const,
+        getRadius: glowRadius * 0.25 * zoomScale,
         getFillColor: [...colors.business, Math.round(glowAlpha * 0.6)] as [number, number, number, number],
         radiusMinPixels: 0,
-        radiusMaxPixels: 20,
+        radiusMaxPixels: glowRadius * 0.5,
         opacity: glowFade * 0.6,
-        pickable: false,
+        pickable: true,
+        onClick: ({ object }: any) => {
+          if (object) setSelectedPin({ pin: object, type: 'business' });
+        },
+        onHover: ({ object, x, y }: any) => {
+          if (object) {
+            const t = object.type ? ` · ${object.type}` : '';
+            setHoverInfo({ x, y, text: object.name + t });
+          } else {
+            setHoverInfo(null);
+          }
+        },
+        updateTriggers: { getRadius: [glowRadius, zoom] },
       }));
     }
 
@@ -971,11 +1148,10 @@ export default function UnifiedMap() {
         id: 'business-points',
         data: businesses,
         getPosition: (d: BizPin) => [d.lng, d.lat],
-        getRadius: 8,
-        radiusUnits: 'meters' as const,
-        radiusMinPixels: 1,
-        radiusMaxPixels: 10,
+        getRadius: ptBase * 1.2,
         getFillColor: [...colors.business, 200] as [number, number, number, number],
+        radiusMinPixels: 1,
+        radiusMaxPixels: 7,
         pickable: true,
         onClick: ({ object }: any) => {
           if (object) setSelectedPin({ pin: object, type: 'business' });
@@ -987,7 +1163,27 @@ export default function UnifiedMap() {
           }
           else setHoverInfo(null);
         },
+        updateTriggers: { getRadius: [pointSize, zoom] },
       }));
+
+      // --- Business Labels — visible at z12+ ---
+      if (zoom >= 12) {
+        result.push(new TextLayer({
+          id: 'business-labels',
+          data: businesses,
+          getPosition: (d: BizPin) => [d.lng, d.lat],
+          getText: (d: BizPin) => d.name,
+          getSize: Math.min(12, 8 + (zoom - 12) * 1.5),
+          getColor: [200, 230, 220, zoom >= 14 ? 220 : 140],
+          getPixelOffset: [0, -10],
+          fontFamily: MAP_FONT,
+          outlineWidth: 2,
+          outlineColor: [0, 0, 0, 160],
+          billboard: false,
+          sizeUnits: 'pixels',
+          pickable: false,
+        }));
+      }
     }
 
     // --- Photo Glow ---
@@ -996,13 +1192,23 @@ export default function UnifiedMap() {
         id: 'photo-glow',
         data: photos,
         getPosition: (d: PhotoPin) => [d.lng, d.lat],
-        getRadius: 400,
-        radiusUnits: 'meters' as const,
+        getRadius: glowRadius * 0.2 * zoomScale,
         getFillColor: [...colors.photo, Math.round(glowAlpha * 0.7)] as [number, number, number, number],
         radiusMinPixels: 0,
-        radiusMaxPixels: 20,
+        radiusMaxPixels: glowRadius * 0.4,
         opacity: glowFade * 0.7,
-        pickable: false,
+        pickable: true,
+        onClick: ({ object }: any) => {
+          if (object) setSelectedPin({ pin: object, type: 'photo' });
+        },
+        onHover: ({ object, x, y }: any) => {
+          if (object) {
+            setHoverInfo({ x, y, text: object.vehicleTitle || object.locationName || 'Photo' });
+          } else {
+            setHoverInfo(null);
+          }
+        },
+        updateTriggers: { getRadius: [glowRadius, zoom] },
       }));
     }
 
@@ -1012,10 +1218,9 @@ export default function UnifiedMap() {
         id: 'photo-points',
         data: photos,
         getPosition: (d: PhotoPin) => [d.lng, d.lat],
-        getRadius: (d: PhotoPin) => d.hasRealImage ? 5 : 3,
-        radiusUnits: 'meters' as const,
+        getRadius: ptBase * 0.8,
         radiusMinPixels: 1,
-        radiusMaxPixels: 8,
+        radiusMaxPixels: 6,
         getFillColor: (d: PhotoPin) => d.hasRealImage
           ? [...colors.photo, 230] as [number, number, number, number]
           : [...colors.photo, 120] as [number, number, number, number],
@@ -1058,10 +1263,9 @@ export default function UnifiedMap() {
         id: 'marketplace-points',
         data: marketplace,
         getPosition: (d: MarketplacePin) => [d.lng, d.lat],
-        getRadius: 4,
-        radiusUnits: 'meters' as const,
-        radiusMinPixels: 1.5,
-        radiusMaxPixels: 8,
+        getRadius: ptBase,
+        radiusMinPixels: 1,
+        radiusMaxPixels: 6,
         getFillColor: [74, 222, 128, 220] as [number, number, number, number],
         pickable: true,
         onClick: ({ object }: any) => {
@@ -1112,7 +1316,7 @@ export default function UnifiedMap() {
 
     return result;
   }, [filteredVehicles, collections, businesses, photos, marketplace, queryResults, showVehicles, showCollections, showBusinesses,
-      showPhotos, showMarketplace, hasQuery, zoom, mode, glowRadius, glowIntensity, colorPreset, tick]);
+      showPhotos, showMarketplace, hasQuery, zoom, mode, glowRadius, glowIntensity, pointSize, colorPreset, tick, countyFeatures]);
 
   const panelW = 320; // side panel width
   const hasSidePanel = selectedPin !== null;
@@ -1137,9 +1341,9 @@ export default function UnifiedMap() {
         </div>
 
         {/* Loading progress bar — 1px at top */}
-        {vehLoading && (
+        {(vehLoading || countyLoading || thermalComputing) && (
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1100, height: 1, background: 'var(--border)' }}>
-            <div style={{ height: '100%', background: 'var(--text)', width: `${Math.min(100, (vehicles.length / 15000) * 100)}%`, transition: 'width 0.3s ease' }} />
+            <div style={{ height: '100%', background: 'var(--text)', width: (countyLoading || thermalComputing) ? '50%' : `${Math.min(100, (vehicles.length / 15000) * 100)}%`, transition: 'width 0.3s ease' }} />
           </div>
         )}
 
@@ -1258,9 +1462,10 @@ export default function UnifiedMap() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {mode !== 'points' && <>
-                  <SliderControl label="Radius" value={glowRadius} min={10} max={100} onChange={setGlowRadius} />
-                  <SliderControl label="Intensity" value={glowIntensity} min={5} max={50} onChange={setGlowIntensity} />
+                <SliderControl label="Point Size" value={pointSize} min={1} max={12} onChange={setPointSize} />
+                {mode === 'density' && <>
+                  <SliderControl label="Glow Radius" value={glowRadius} min={5} max={200} onChange={setGlowRadius} />
+                  <SliderControl label="Glow Intensity" value={glowIntensity} min={1} max={100} onChange={setGlowIntensity} />
                 </>}
               </div>
             </div>

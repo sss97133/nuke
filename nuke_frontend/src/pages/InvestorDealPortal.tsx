@@ -216,7 +216,7 @@ export default function InvestorDealPortal() {
   if (loading) {
     return (
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px', textAlign: 'center' }}>
-        <div style={{ fontSize: '12px', color: '#666' }}>Loading vehicle profile...</div>
+        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Loading vehicle profile...</div>
       </div>
     );
   }
@@ -225,7 +225,7 @@ export default function InvestorDealPortal() {
     return (
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px', textAlign: 'center' }}>
         <div style={{ fontSize: '13px', fontWeight: 700 }}>Vehicle not found</div>
-        <button onClick={() => navigate('/')} style={{ marginTop: '12px', padding: '8px 16px', border: '2px solid #000', background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '11px' }}>
+        <button onClick={() => navigate('/')} style={{ marginTop: '12px', padding: '8px 16px', border: '2px solid var(--text)', background: 'var(--surface)', cursor: 'pointer', fontWeight: 700, fontSize: '11px' }}>
           Go Home
         </button>
       </div>
@@ -240,21 +240,21 @@ export default function InvestorDealPortal() {
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '16px 0',
-        borderBottom: '2px solid #000',
+        borderBottom: '2px solid var(--text)',
         marginBottom: '20px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '2px', color: '#666' }}>
+          <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '2px', color: 'var(--text-secondary)' }}>
             NUKE
           </div>
-          <div style={{ width: '1px', height: '16px', background: '#ccc' }} />
+          <div style={{ width: '1px', height: '16px', background: 'var(--border)' }} />
           <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
             Investment Prospectus
           </div>
         </div>
         <button
           onClick={() => navigate(`/vehicle/${vehicleId}`)}
-          style={{ fontSize: '9px', fontWeight: 700, border: '1px solid #ccc', padding: '4px 10px', background: '#fff', cursor: 'pointer' }}
+          style={{ fontSize: '9px', fontWeight: 700, border: '1px solid var(--border)', padding: '4px 10px', background: 'var(--surface)', cursor: 'pointer' }}
         >
           Full Profile
         </button>
@@ -273,7 +273,7 @@ export default function InvestorDealPortal() {
                 height: '480px',
                 objectFit: 'cover',
                 display: 'block',
-                border: '2px solid #000',
+                border: '2px solid var(--text)',
               }}
             />
             {/* Navigation arrows */}
@@ -283,7 +283,7 @@ export default function InvestorDealPortal() {
                   onClick={() => setHeroIndex((i) => (i > 0 ? i - 1 : images.length - 1))}
                   style={{
                     position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
-                    width: '36px', height: '36px', border: '2px solid #000', background: 'rgba(255,255,255,0.9)',
+                    width: '36px', height: '36px', border: '2px solid var(--text)', background: 'rgba(255,255,255,0.9)',
                     cursor: 'pointer', fontSize: '19px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
                 >
@@ -293,7 +293,7 @@ export default function InvestorDealPortal() {
                   onClick={() => setHeroIndex((i) => (i < images.length - 1 ? i + 1 : 0))}
                   style={{
                     position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
-                    width: '36px', height: '36px', border: '2px solid #000', background: 'rgba(255,255,255,0.9)',
+                    width: '36px', height: '36px', border: '2px solid var(--text)', background: 'rgba(255,255,255,0.9)',
                     cursor: 'pointer', fontSize: '19px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
                 >
@@ -304,7 +304,7 @@ export default function InvestorDealPortal() {
             {/* Image count */}
             <div style={{
               position: 'absolute', bottom: '12px', right: '12px',
-              background: 'rgba(0,0,0,0.8)', color: '#fff',
+              background: 'rgba(0,0,0,0.8)', color: 'var(--bg)',
               padding: '4px 10px', fontSize: '9px', fontWeight: 700,
             }}>
               {heroIndex + 1} / {images.length}
@@ -322,7 +322,7 @@ export default function InvestorDealPortal() {
                 onClick={() => setHeroIndex(idx)}
                 style={{
                   width: '72px', height: '54px', objectFit: 'cover', cursor: 'pointer',
-                  border: idx === heroIndex ? '2px solid #000' : '1px solid #ddd',
+                  border: idx === heroIndex ? '2px solid var(--text)' : '1px solid var(--border)',
                   opacity: idx === heroIndex ? 1 : 0.7,
                   flexShrink: 0,
                 }}
@@ -345,7 +345,7 @@ export default function InvestorDealPortal() {
           <h1 style={{ fontSize: '29px', fontWeight: 800, margin: '0 0 4px', letterSpacing: '-0.5px' }}>
             {title}
           </h1>
-          <div style={{ fontSize: '12px', color: '#666', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             {vehicle.vin && <span>VIN: {vehicle.vin}</span>}
             {vehicle.mileage != null && <span>{vehicle.mileage.toLocaleString()} mi</span>}
             {vehicle.color && <span>{vehicle.color}</span>}
@@ -358,7 +358,7 @@ export default function InvestorDealPortal() {
             <div style={{ fontSize: '29px', fontWeight: 800 }}>{formatPrice(askingPrice)}</div>
           )}
           {vehicle.nuke_estimate && vehicle.nuke_estimate !== askingPrice && (
-            <div style={{ fontSize: '11px', color: '#666' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Nuke Estimate: {formatPrice(vehicle.nuke_estimate)}
               {vehicle.nuke_estimate_confidence && (
                 <span style={{ marginLeft: '4px' }}>({vehicle.nuke_estimate_confidence}% conf.)</span>
@@ -369,7 +369,7 @@ export default function InvestorDealPortal() {
             <div style={{
               display: 'inline-block',
               padding: '3px 10px',
-              border: '2px solid #000',
+              border: '2px solid var(--text)',
               fontSize: '11px',
               fontWeight: 800,
               textTransform: 'uppercase',
@@ -392,10 +392,10 @@ export default function InvestorDealPortal() {
         <div>
           {/* Investment Thesis */}
           {(vehicle.highlights || vehicle.description) && (
-            <div style={{ border: '2px solid #000', marginBottom: '20px' }}>
+            <div style={{ border: '2px solid var(--text)', marginBottom: '20px' }}>
               <div style={{
                 padding: '10px 14px',
-                borderBottom: '1px solid #e5e5e5',
+                borderBottom: '1px solid var(--border)',
                 fontSize: '12px',
                 fontWeight: 800,
                 textTransform: 'uppercase',
@@ -439,7 +439,7 @@ export default function InvestorDealPortal() {
                     <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase' }}>
                       Known Issues
                     </div>
-                    <div style={{ fontSize: '12px', lineHeight: '1.5', whiteSpace: 'pre-wrap', color: '#666' }}>
+                    <div style={{ fontSize: '12px', lineHeight: '1.5', whiteSpace: 'pre-wrap', color: 'var(--text-secondary)' }}>
                       {vehicle.known_flaws}
                     </div>
                   </div>
@@ -459,10 +459,10 @@ export default function InvestorDealPortal() {
           )}
 
           {/* Key specs grid */}
-          <div style={{ border: '2px solid #000', marginBottom: '20px' }}>
+          <div style={{ border: '2px solid var(--text)', marginBottom: '20px' }}>
             <div style={{
               padding: '10px 14px',
-              borderBottom: '1px solid #e5e5e5',
+              borderBottom: '1px solid var(--border)',
               fontSize: '12px',
               fontWeight: 800,
               textTransform: 'uppercase',
@@ -489,8 +489,8 @@ export default function InvestorDealPortal() {
               ]
                 .filter(([, val]) => val != null && String(val).trim() !== '')
                 .map(([label, val]) => (
-                  <div key={String(label)} style={{ borderBottom: '1px solid #f0f0f0', paddingBottom: '6px' }}>
-                    <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: '#999', marginBottom: '2px' }}>
+                  <div key={String(label)} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '6px' }}>
+                    <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-disabled)', marginBottom: '2px' }}>
                       {label}
                     </div>
                     <div style={{ fontSize: '12px', fontWeight: 600 }}>{val}</div>
@@ -501,10 +501,10 @@ export default function InvestorDealPortal() {
 
           {/* Provenance timeline */}
           {timeline.length > 0 && (
-            <div style={{ border: '2px solid #000', marginBottom: '20px' }}>
+            <div style={{ border: '2px solid var(--text)', marginBottom: '20px' }}>
               <div style={{
                 padding: '10px 14px',
-                borderBottom: '1px solid #e5e5e5',
+                borderBottom: '1px solid var(--border)',
                 fontSize: '12px',
                 fontWeight: 800,
                 textTransform: 'uppercase',
@@ -519,23 +519,23 @@ export default function InvestorDealPortal() {
                     gap: '12px',
                     paddingBottom: idx < timeline.length - 1 ? '12px' : '0',
                     marginBottom: idx < timeline.length - 1 ? '12px' : '0',
-                    borderBottom: idx < timeline.length - 1 ? '1px solid #f0f0f0' : 'none',
+                    borderBottom: idx < timeline.length - 1 ? '1px solid var(--border)' : 'none',
                   }}>
                     <div style={{
                       width: '8px', height: '8px', borderRadius: '50%',
-                      background: '#000', flexShrink: 0, marginTop: '4px',
+                      background: 'var(--text)', flexShrink: 0, marginTop: '4px',
                     }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '11px', fontWeight: 700 }}>
                         {event.title || event.event_type.replace(/_/g, ' ')}
                       </div>
                       {event.event_date && (
-                        <div style={{ fontSize: '9px', color: '#999', marginTop: '1px' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-disabled)', marginTop: '1px' }}>
                           {new Date(event.event_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                         </div>
                       )}
                       {event.description && (
-                        <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                           {event.description}
                         </div>
                       )}
@@ -547,10 +547,10 @@ export default function InvestorDealPortal() {
           )}
 
           {/* Market scores */}
-          <div style={{ border: '2px solid #000' }}>
+          <div style={{ border: '2px solid var(--text)' }}>
             <div style={{
               padding: '10px 14px',
-              borderBottom: '1px solid #e5e5e5',
+              borderBottom: '1px solid var(--border)',
               fontSize: '12px',
               fontWeight: 800,
               textTransform: 'uppercase',
@@ -562,19 +562,19 @@ export default function InvestorDealPortal() {
               {vehicle.deal_score != null && (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '27px', fontWeight: 800 }}>{Math.round(vehicle.deal_score)}</div>
-                  <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: '#666' }}>Deal Score</div>
+                  <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Deal Score</div>
                 </div>
               )}
               {vehicle.heat_score != null && (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '27px', fontWeight: 800 }}>{Math.round(vehicle.heat_score)}</div>
-                  <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: '#666' }}>Heat Score</div>
+                  <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Heat Score</div>
                 </div>
               )}
               {vehicle.provenance_score != null && (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '27px', fontWeight: 800 }}>{vehicle.provenance_score}</div>
-                  <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: '#666' }}>Provenance</div>
+                  <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Provenance</div>
                 </div>
               )}
             </div>
@@ -590,15 +590,15 @@ export default function InvestorDealPortal() {
 
           {/* Deal CTA */}
           <div style={{
-            border: '2px solid #000',
-            background: '#000',
-            color: '#fff',
+            border: '2px solid var(--text)',
+            background: 'var(--text)',
+            color: 'var(--bg)',
           }}>
             <div style={{ padding: '16px' }}>
               <div style={{ fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>
                 Acquire This Vehicle
               </div>
-              <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '16px', lineHeight: '1.4' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-disabled)', marginBottom: '16px', lineHeight: '1.4' }}>
                 Submit an inquiry or make a deposit to begin the acquisition process. Wire instructions will be provided upon request.
               </div>
               {askingPrice && (
@@ -611,8 +611,8 @@ export default function InvestorDealPortal() {
                 style={{
                   width: '100%',
                   padding: '12px',
-                  background: '#fff',
-                  color: '#000',
+                  background: 'var(--bg)',
+                  color: 'var(--text)',
                   border: 'none',
                   fontSize: '12px',
                   fontWeight: 800,
@@ -630,9 +630,9 @@ export default function InvestorDealPortal() {
           <div style={{
             marginTop: '12px',
             padding: '12px',
-            border: '1px solid #e5e5e5',
+            border: '1px solid var(--border)',
             fontSize: '9px',
-            color: '#666',
+            color: 'var(--text-secondary)',
           }}>
             <div style={{ fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Buyer Protection
@@ -652,29 +652,29 @@ export default function InvestorDealPortal() {
       {showDealModal && (
         <div
           style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            position: 'fixed', inset: 0, background: 'var(--overlay)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 9999,
           }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowDealModal(false); }}
         >
           <div style={{
-            background: '#fff', width: '100%', maxWidth: '520px',
+            background: 'var(--surface)', width: '100%', maxWidth: '520px',
             maxHeight: '90vh', overflow: 'auto',
-            border: '2px solid #000',
+            border: '2px solid var(--text)',
           }}>
             {dealSuccess ? (
               <div style={{ padding: '40px', textAlign: 'center' }}>
                 <div style={{ fontSize: '32px', marginBottom: '16px' }}>{'\u2713'}</div>
                 <div style={{ fontSize: '16px', fontWeight: 800, marginBottom: '8px' }}>Inquiry Submitted</div>
-                <div style={{ fontSize: '12px', color: '#666', marginBottom: '20px', lineHeight: '1.5' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: '1.5' }}>
                   Your inquiry for the {title} has been received. Wire instructions and next steps will be sent to {dealForm.buyer_email} shortly.
                 </div>
                 <button
                   onClick={() => { setShowDealModal(false); setDealSuccess(false); }}
                   style={{
-                    padding: '10px 24px', border: '2px solid #000', background: '#000',
-                    color: '#fff', fontWeight: 700, fontSize: '12px', cursor: 'pointer',
+                    padding: '10px 24px', border: '2px solid var(--text)', background: 'var(--text)',
+                    color: 'var(--bg)', fontWeight: 700, fontSize: '12px', cursor: 'pointer',
                   }}
                 >
                   Close
@@ -684,14 +684,14 @@ export default function InvestorDealPortal() {
               <>
                 <div style={{
                   padding: '16px 20px',
-                  borderBottom: '2px solid #000',
+                  borderBottom: '2px solid var(--text)',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 }}>
                   <div>
                     <div style={{ fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
                       Acquisition Inquiry
                     </div>
-                    <div style={{ fontSize: '11px', color: '#666' }}>{title}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{title}</div>
                   </div>
                   <button
                     onClick={() => setShowDealModal(false)}
@@ -717,7 +717,7 @@ export default function InvestorDealPortal() {
                         value={(dealForm as any)[key]}
                         onChange={(e) => setDealForm((f) => ({ ...f, [key]: e.target.value }))}
                         style={{
-                          width: '100%', padding: '8px 10px', border: '2px solid #000',
+                          width: '100%', padding: '8px 10px', border: '2px solid var(--text)',
                           fontSize: '12px', fontWeight: 600, boxSizing: 'border-box',
                         }}
                       />
@@ -735,7 +735,7 @@ export default function InvestorDealPortal() {
                       onChange={(e) => setDealForm((f) => ({ ...f, offer_amount: e.target.value }))}
                       placeholder={askingPrice ? String(askingPrice) : ''}
                       style={{
-                        width: '100%', padding: '8px 10px', border: '2px solid #000',
+                        width: '100%', padding: '8px 10px', border: '2px solid var(--text)',
                         fontSize: '12px', fontWeight: 600, boxSizing: 'border-box',
                       }}
                     />
@@ -753,9 +753,9 @@ export default function InvestorDealPortal() {
                           onClick={() => setDealForm((f) => ({ ...f, payment_method: method }))}
                           style={{
                             padding: '6px 12px',
-                            border: `2px solid ${dealForm.payment_method === method ? '#000' : '#ddd'}`,
-                            background: dealForm.payment_method === method ? '#000' : '#fff',
-                            color: dealForm.payment_method === method ? '#fff' : '#000',
+                            border: `2px solid ${dealForm.payment_method === method ? 'var(--text)' : 'var(--border)'}`,
+                            background: dealForm.payment_method === method ? 'var(--text)' : 'var(--surface)',
+                            color: dealForm.payment_method === method ? 'var(--bg)' : 'var(--text)',
                             fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
                             cursor: 'pointer',
                           }}
@@ -777,7 +777,7 @@ export default function InvestorDealPortal() {
                       rows={3}
                       placeholder="Questions, inspection requests, financing details..."
                       style={{
-                        width: '100%', padding: '8px 10px', border: '2px solid #000',
+                        width: '100%', padding: '8px 10px', border: '2px solid var(--text)',
                         fontSize: '12px', fontWeight: 500, boxSizing: 'border-box', resize: 'vertical',
                       }}
                     />
@@ -789,8 +789,8 @@ export default function InvestorDealPortal() {
                     disabled={dealSubmitting || !dealForm.buyer_name || !dealForm.buyer_email}
                     style={{
                       width: '100%', padding: '12px', border: 'none',
-                      background: dealSubmitting ? '#666' : '#000',
-                      color: '#fff', fontSize: '12px', fontWeight: 800,
+                      background: dealSubmitting ? 'var(--text-secondary)' : 'var(--text)',
+                      color: 'var(--bg)', fontSize: '12px', fontWeight: 800,
                       textTransform: 'uppercase', letterSpacing: '1px',
                       cursor: dealSubmitting ? 'not-allowed' : 'pointer',
                     }}
@@ -798,7 +798,7 @@ export default function InvestorDealPortal() {
                     {dealSubmitting ? 'Submitting...' : 'Submit Inquiry'}
                   </button>
 
-                  <div style={{ fontSize: '9px', color: '#999', textAlign: 'center', marginTop: '12px', lineHeight: '1.4' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-disabled)', textAlign: 'center', marginTop: '12px', lineHeight: '1.4' }}>
                     By submitting, you agree to receive wire instructions and deal documentation via email.
                     Deposits are held in escrow until both parties confirm.
                   </div>

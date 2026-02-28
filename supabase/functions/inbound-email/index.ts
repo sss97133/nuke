@@ -5,6 +5,7 @@
  * fetches full email content via Resend API, and stores in contact_inbox.
  *
  * Routing:
+ *   - skylar@nuke.ag → forwards to shkylar@gmail.com via Resend
  *   - alerts@nuke.ag → process-alert-email (extracts listing URLs → import_queue)
  *   - coo@nuke.ag, cto@nuke.ag, etc. → agent_messages table
  *   - all others → contact_inbox only
@@ -24,6 +25,8 @@ const VALID_ADDRESSES = [
   "investors@nuke.ag",
   "support@nuke.ag",
   "hello@nuke.ag",
+  // Founder — forwards to Gmail
+  "skylar@nuke.ag",
   // Vehicle listing alert forwarding — routes to process-alert-email → import_queue
   "alerts@nuke.ag",
   // Agent addresses — routed to agent_messages
@@ -32,7 +35,7 @@ const VALID_ADDRESSES = [
   "cfo@nuke.ag",
   "cpo@nuke.ag",
   "cdo@nuke.ag",
-  "cwfto@nuke.ag",
+  "cwtfo@nuke.ag",
   "vp-ai@nuke.ag",
   "vp-extraction@nuke.ag",
   "vp-platform@nuke.ag",
@@ -51,7 +54,7 @@ const EMAIL_TO_ROLE: Record<string, string> = {
   "cfo@nuke.ag": "cfo",
   "cpo@nuke.ag": "cpo",
   "cdo@nuke.ag": "cdo",
-  "cwfto@nuke.ag": "cwfto",
+  "cwtfo@nuke.ag": "cwtfo",
   "vp-ai@nuke.ag": "vp-ai",
   "vp-extraction@nuke.ag": "vp-extraction",
   "vp-platform@nuke.ag": "vp-platform",
@@ -215,6 +218,34 @@ Deno.serve(async (req) => {
         metadata: { contact_inbox_id: inserted.id, sender_name: senderName },
       });
       console.log(`[inbound-email] Routed to agent_messages for role: ${agentRole}`);
+    }
+
+    // Forward skylar@nuke.ag → shkylar@gmail.com
+    if (nukeAddress === "skylar@nuke.ag") {
+      try {
+        const fwdRes = await fetch(`${RESEND_API_URL}/emails`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${resendApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: `${fromName || fromAddress} via Nuke <skylar@nuke.ag>`,
+            to: ["shkylar@gmail.com"],
+            subject: data.subject || "(no subject)",
+            html: bodyHtml || `<pre>${bodyText || "(no body)"}</pre>`,
+            reply_to: fromAddress,
+          }),
+        });
+        const fwdData = await fwdRes.json();
+        if (fwdRes.ok) {
+          console.log(`[inbound-email] Forwarded skylar@nuke.ag → shkylar@gmail.com: ${fwdData.id}`);
+        } else {
+          console.warn(`[inbound-email] Forward failed: ${fwdData.message}`);
+        }
+      } catch (fwdErr) {
+        console.warn("[inbound-email] Failed to forward to Gmail:", fwdErr);
+      }
     }
 
     // Route alerts@nuke.ag to process-alert-email → import_queue

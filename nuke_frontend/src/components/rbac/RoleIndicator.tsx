@@ -27,89 +27,89 @@ const ROLE_CONFIG: Record<UserRole, {
   viewer: {
     label: 'Viewer',
     icon: Eye,
-    color: '#6B7280',
-    bgColor: '#F9FAFB',
-    borderColor: '#E5E7EB',
+    color: 'var(--text-disabled)',
+    bgColor: 'var(--bg)',
+    borderColor: 'var(--border)',
     description: 'Basic viewing access'
   },
   contributor: {
     label: 'Contributor',
     icon: Users,
-    color: '#3B82F6',
-    bgColor: '#EFF6FF',
-    borderColor: '#DBEAFE',
+    color: 'var(--accent)',
+    bgColor: 'var(--accent-dim, #EFF6FF)',
+    borderColor: 'var(--accent)',
     description: 'Can add photos and notes'
   },
   photographer: {
     label: 'Photographer',
     icon: Camera,
-    color: '#8B5CF6',
-    bgColor: '#F3E8FF',
-    borderColor: '#E9D5FF',
+    color: 'var(--accent)',
+    bgColor: 'var(--accent-dim, #F3E8FF)',
+    borderColor: 'var(--accent)',
     description: 'Visual documentation specialist'
   },
   previous_owner: {
     label: 'Previous Owner',
     icon: Key,
-    color: '#F59E0B',
-    bgColor: '#FFFBEB',
-    borderColor: '#FED7AA',
+    color: 'var(--warning)',
+    bgColor: 'var(--warning-dim)',
+    borderColor: 'var(--warning)',
     description: 'Former owner with historical knowledge'
   },
   mechanic: {
     label: 'Mechanic',
     icon: Wrench,
-    color: '#10B981',
-    bgColor: '#ECFDF5',
-    borderColor: '#D1FAE5',
+    color: 'var(--success)',
+    bgColor: 'var(--success-dim)',
+    borderColor: 'var(--success)',
     description: 'Professional technical expertise'
   },
   restorer: {
     label: 'Restorer',
     icon: Star,
-    color: '#F97316',
-    bgColor: '#FFF7ED',
-    borderColor: '#FEDEC7',
+    color: 'var(--warning)',
+    bgColor: 'var(--warning-dim)',
+    borderColor: 'var(--warning)',
     description: 'Vehicle restoration specialist'
   },
   appraiser: {
     label: 'Appraiser',
     icon: TrendingUp,
-    color: '#06B6D4',
-    bgColor: '#ECFEFF',
-    borderColor: '#CFFAFE',
+    color: 'var(--accent)',
+    bgColor: 'var(--accent-dim, #ECFEFF)',
+    borderColor: 'var(--accent)',
     description: 'Professional valuation expert'
   },
   dealer: {
     label: 'Dealer',
     icon: Building,
-    color: '#8B5CF6',
-    bgColor: '#F3E8FF',
-    borderColor: '#E9D5FF',
+    color: 'var(--accent)',
+    bgColor: 'var(--accent-dim, #F3E8FF)',
+    borderColor: 'var(--accent)',
     description: 'Licensed automotive dealer'
   },
   moderator: {
     label: 'Moderator',
     icon: Gavel,
-    color: '#DC2626',
-    bgColor: '#FEF2F2',
-    borderColor: '#FECACA',
+    color: 'var(--error)',
+    bgColor: 'var(--error-dim)',
+    borderColor: 'var(--error)',
     description: 'Platform content moderator'
   },
   owner: {
     label: 'Owner',
     icon: Crown,
-    color: '#DC2626',
-    bgColor: '#FEF2F2',
-    borderColor: '#FECACA',
+    color: 'var(--error)',
+    bgColor: 'var(--error-dim)',
+    borderColor: 'var(--error)',
     description: 'Legal vehicle owner'
   },
   admin: {
     label: 'Administrator',
     icon: Shield,
-    color: '#1F2937',
-    bgColor: '#F9FAFB',
-    borderColor: '#E5E7EB',
+    color: 'var(--text)',
+    bgColor: 'var(--bg)',
+    borderColor: 'var(--border)',
     description: 'Platform administrator'
   }
 };
@@ -121,28 +121,28 @@ const TRUST_LEVEL_CONFIG: Record<TrustLevel, {
 }> = {
   low: {
     label: 'New User',
-    color: '#6B7280',
-    bgColor: '#F9FAFB'
+    color: 'var(--text-disabled)',
+    bgColor: 'var(--bg)'
   },
   medium: {
     label: 'Established',
-    color: '#3B82F6',
-    bgColor: '#EFF6FF'
+    color: 'var(--accent)',
+    bgColor: 'var(--accent-dim, #EFF6FF)'
   },
   high: {
     label: 'Trusted',
-    color: '#10B981',
-    bgColor: '#ECFDF5'
+    color: 'var(--success)',
+    bgColor: 'var(--success-dim)'
   },
   trusted: {
     label: 'Highly Trusted',
-    color: '#059669',
-    bgColor: '#D1FAE5'
+    color: 'var(--success)',
+    bgColor: 'var(--success-dim)'
   },
   verified: {
     label: 'Verified Expert',
-    color: '#DC2626',
-    bgColor: '#FEF2F2'
+    color: 'var(--error)',
+    bgColor: 'var(--error-dim)'
   }
 };
 
@@ -226,7 +226,7 @@ const RoleIndicator: React.FC<RoleIndicatorProps> = ({
             padding: '4px 8px',
             fontSize: '12px',
             backgroundColor: 'var(--color-primary)',
-            color: 'white',
+            color: 'var(--bg)',
             border: 'none',
             borderRadius: '4px',
             cursor: 'pointer'
@@ -241,7 +241,7 @@ const RoleIndicator: React.FC<RoleIndicatorProps> = ({
           style={{
             marginTop: '4px',
             fontSize: '12px',
-            color: '#6B7280'
+            color: 'var(--text-disabled)'
           }}
         >
           {config.description}

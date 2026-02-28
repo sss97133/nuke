@@ -256,24 +256,24 @@ export default function TechCapture() {
 
   const statusColor = (status: ProcessingEvent['status']) => {
     switch (status) {
-      case 'uploading': return '#6b7280';
-      case 'processing': return '#f59e0b';
-      case 'completed': return '#10b981';
-      case 'failed': return '#ef4444';
+      case 'uploading': return 'var(--text-secondary)';
+      case 'processing': return 'var(--warning)';
+      case 'completed': return 'var(--success)';
+      case 'failed': return 'var(--error)';
     }
   };
 
   if (!user) {
     return (
-      <div style={{ minHeight: '100dvh', backgroundColor: '#111', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace' }}>
-        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#e5e7eb', marginBottom: '0.5rem' }}>Nuke</div>
-        <div style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '2rem' }}>Techs take photos, we do the rest.</div>
+      <div style={{ minHeight: '100dvh', backgroundColor: 'var(--text)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace' }}>
+        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--border)', marginBottom: '0.5rem' }}>Nuke</div>
+        <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '2rem' }}>Techs take photos, we do the rest.</div>
         <a
           href="/login"
           style={{
             padding: '0.75rem 2rem',
-            backgroundColor: '#e5e7eb',
-            color: '#111',
+            backgroundColor: 'var(--border)',
+            color: 'var(--text)',
             fontFamily: 'monospace',
             fontWeight: 700,
             fontSize: '0.9rem',
@@ -290,8 +290,8 @@ export default function TechCapture() {
   return (
     <div style={{
       minHeight: '100dvh',
-      backgroundColor: '#111',
-      color: '#e5e7eb',
+      backgroundColor: 'var(--text)',
+      color: 'var(--border)',
       fontFamily: 'monospace',
       display: 'flex',
       flexDirection: 'column',
@@ -304,14 +304,14 @@ export default function TechCapture() {
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '1rem',
-        borderBottom: '1px solid #333',
+        borderBottom: '1px solid var(--surface)',
       }}>
         <div style={{ fontSize: '1.25rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
           Nuke
         </div>
-        <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
           {events.filter(e => e.status === 'processing').length > 0 && (
-            <span style={{ color: '#f59e0b' }}>
+            <span style={{ color: 'var(--warning)' }}>
               {events.filter(e => e.status === 'processing').length} processing
             </span>
           )}
@@ -319,8 +319,8 @@ export default function TechCapture() {
       </div>
 
       {/* Vehicle Selector */}
-      <div style={{ padding: '1rem', borderBottom: '1px solid #222' }}>
-        <label style={{ display: 'block', fontSize: '0.7rem', color: '#6b7280', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      <div style={{ padding: '1rem', borderBottom: '1px solid var(--surface)' }}>
+        <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Vehicle
         </label>
         <select
@@ -329,10 +329,10 @@ export default function TechCapture() {
           style={{
             width: '100%',
             padding: '0.75rem',
-            backgroundColor: '#1a1a1a',
-            border: '1px solid #333',
+            backgroundColor: 'var(--text)',
+            border: '1px solid var(--surface)',
             borderRadius: '0.5rem',
-            color: '#e5e7eb',
+            color: 'var(--border)',
             fontSize: '0.95rem',
             fontFamily: 'monospace',
             appearance: 'auto',
@@ -344,7 +344,7 @@ export default function TechCapture() {
           ))}
         </select>
         {selectedVehicle && (
-          <div style={{ marginTop: '0.25rem', fontSize: '0.7rem', color: '#6b7280' }}>
+          <div style={{ marginTop: '0.25rem', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
             {selectedVehicle.vin ? `VIN: ${selectedVehicle.vin}` : 'No VIN on file'}
           </div>
         )}
@@ -374,9 +374,9 @@ export default function TechCapture() {
             width: '180px',
             height: '180px',
             borderRadius: '50%',
-            border: isUploading ? '3px solid #f59e0b' : '3px solid #e5e7eb',
-            backgroundColor: isUploading ? '#1a1a1a' : 'transparent',
-            color: isUploading ? '#f59e0b' : '#e5e7eb',
+            border: isUploading ? '3px solid var(--warning)' : '3px solid var(--border)',
+            backgroundColor: isUploading ? 'var(--text)' : 'transparent',
+            color: isUploading ? 'var(--warning)' : 'var(--border)',
             fontSize: '1rem',
             fontFamily: 'monospace',
             fontWeight: 700,
@@ -406,14 +406,14 @@ export default function TechCapture() {
       {/* Status Feed */}
       {events.length > 0 && (
         <div style={{
-          borderTop: '1px solid #333',
+          borderTop: '1px solid var(--surface)',
           maxHeight: '40dvh',
           overflowY: 'auto',
         }}>
           <div style={{
             padding: '0.75rem 1rem 0.25rem',
             fontSize: '0.7rem',
-            color: '#6b7280',
+            color: 'var(--text-secondary)',
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
           }}>
@@ -427,7 +427,7 @@ export default function TechCapture() {
                 alignItems: 'center',
                 gap: '0.75rem',
                 padding: '0.5rem 1rem',
-                borderBottom: '1px solid #1a1a1a',
+                borderBottom: '1px solid var(--text)',
               }}
             >
               {/* Thumbnail */}
@@ -448,7 +448,7 @@ export default function TechCapture() {
                   width: '40px',
                   height: '40px',
                   borderRadius: '0.25rem',
-                  backgroundColor: '#1a1a1a',
+                  backgroundColor: 'var(--text)',
                 }} />
               )}
 
@@ -463,7 +463,7 @@ export default function TechCapture() {
                 }}>
                   {statusIcon(event.status)} {event.message}
                 </div>
-                <div style={{ fontSize: '0.65rem', color: '#4b5563' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
                   {event.timestamp.toLocaleTimeString()}
                 </div>
               </div>

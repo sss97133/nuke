@@ -17,8 +17,8 @@ interface CsvRow {
 const NUMERIC_KEYS: (keyof CsvRow)[] = ['msrp','current_value','purchase_price','asking_price','sale_price'];
 
 const to8 = { fontSize: '11px' } as const;
-const inputStyle: React.CSSProperties = { ...to8, padding: '2px 4px', border: '1px solid #c0c0c0', borderRadius: 0 };
-const chip: React.CSSProperties = { ...to8, background: 'var(--bg)', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: 2 };
+const inputStyle: React.CSSProperties = { ...to8, padding: '2px 4px', border: '1px solid var(--border)', borderRadius: 0 };
+const chip: React.CSSProperties = { ...to8, background: 'var(--bg)', border: '1px solid var(--border)', padding: '1px 4px', borderRadius: 2 };
 
 const PriceCsvImport: React.FC = () => {
   const navigate = useNavigate();
@@ -151,8 +151,8 @@ const PriceCsvImport: React.FC = () => {
 
   return (
     <div className="container compact">
-      <div className="card" style={{ border: '1px solid #c0c0c0' }}>
-        <div className="card-header" style={{ ...to8, padding: 6, borderBottom: '1px solid #c0c0c0', background: 'var(--bg)' }}>
+      <div className="card" style={{ border: '1px solid var(--border)' }}>
+        <div className="card-header" style={{ ...to8, padding: 6, borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
           <div className="text text-bold" style={to8}>CSV Price Import</div>
         </div>
         <div className="card-body" style={{ padding: 8 }}>
@@ -179,7 +179,7 @@ const PriceCsvImport: React.FC = () => {
               placeholder="id,msrp,current_value,purchase_price,asking_price,sale_price,is_for_sale\n..."
               style={{ width: '100%', height: 140, ...inputStyle }}
             />
-            {parsingError && <div className="text" style={{ ...to8, color: '#800000' }}>{parsingError}</div>}
+            {parsingError && <div className="text" style={{ ...to8, color: 'var(--error)' }}>{parsingError}</div>}
           </div>
 
           <div style={{ marginTop: 8 }}>
@@ -189,20 +189,20 @@ const PriceCsvImport: React.FC = () => {
                 <thead>
                   <tr>
                     {['id','msrp','purchase_price','current_value','asking_price','sale_price','is_for_sale'].map(h => (
-                      <th key={h} style={{ borderBottom: '1px solid #c0c0c0', textAlign: 'left', padding: '2px 4px', ...to8 }}>{h}</th>
+                      <th key={h} style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', padding: '2px 4px', ...to8 }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {rows.slice(0, 50).map(r => (
                     <tr key={r.id}>
-                      <td style={{ borderBottom: '1px solid #e5e7eb', padding: '2px 4px', ...to8 }}>{r.id}</td>
-                      <td style={{ borderBottom: '1px solid #e5e7eb', padding: '2px 4px', ...to8 }}>{r.msrp ?? ''}</td>
-                      <td style={{ borderBottom: '1px solid #e5e7eb', padding: '2px 4px', ...to8 }}>{r.purchase_price ?? ''}</td>
-                      <td style={{ borderBottom: '1px solid #e5e7eb', padding: '2px 4px', ...to8 }}>{r.current_value ?? ''}</td>
-                      <td style={{ borderBottom: '1px solid #e5e7eb', padding: '2px 4px', ...to8 }}>{r.asking_price ?? ''}</td>
-                      <td style={{ borderBottom: '1px solid #e5e7eb', padding: '2px 4px', ...to8 }}>{r.sale_price ?? ''}</td>
-                      <td style={{ borderBottom: '1px solid #e5e7eb', padding: '2px 4px', ...to8 }}>{r.is_for_sale === null || r.is_for_sale === undefined ? '' : (r.is_for_sale ? 'true' : 'false')}</td>
+                      <td style={{ borderBottom: '1px solid var(--border)', padding: '2px 4px', ...to8 }}>{r.id}</td>
+                      <td style={{ borderBottom: '1px solid var(--border)', padding: '2px 4px', ...to8 }}>{r.msrp ?? ''}</td>
+                      <td style={{ borderBottom: '1px solid var(--border)', padding: '2px 4px', ...to8 }}>{r.purchase_price ?? ''}</td>
+                      <td style={{ borderBottom: '1px solid var(--border)', padding: '2px 4px', ...to8 }}>{r.current_value ?? ''}</td>
+                      <td style={{ borderBottom: '1px solid var(--border)', padding: '2px 4px', ...to8 }}>{r.asking_price ?? ''}</td>
+                      <td style={{ borderBottom: '1px solid var(--border)', padding: '2px 4px', ...to8 }}>{r.sale_price ?? ''}</td>
+                      <td style={{ borderBottom: '1px solid var(--border)', padding: '2px 4px', ...to8 }}>{r.is_for_sale === null || r.is_for_sale === undefined ? '' : (r.is_for_sale ? 'true' : 'false')}</td>
                     </tr>
                   ))}
                 </tbody>

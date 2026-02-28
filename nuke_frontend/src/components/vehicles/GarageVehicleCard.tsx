@@ -197,13 +197,13 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
     if (!relationship) return null;
     
     const badges: Record<string, { text: string; color: string; bg: string }> = {
-      owned: { text: relationship.role || 'Verified Owner', color: '#166534', bg: '#dcfce7' },
-      contributing: { text: 'Contributor', color: '#1e40af', bg: '#dbeafe' },
-      interested: { text: 'Watching', color: '#92400e', bg: '#fef3c7' },
+      owned: { text: relationship.role || 'Verified Owner', color: 'var(--success)', bg: 'var(--success-dim)' },
+      contributing: { text: 'Contributor', color: 'var(--accent)', bg: 'var(--info-dim)' },
+      interested: { text: 'Watching', color: 'var(--warning)', bg: 'var(--warning-dim)' },
       discovered: { text: 'Discovered', color: '#6b21a8', bg: '#f3e8ff' },
       curated: { text: 'Curated', color: '#b45309', bg: '#fed7aa' },
       consigned: { text: 'Consigned', color: '#0e7490', bg: '#cffafe' },
-      previously_owned: { text: 'Previous Owner', color: '#4b5563', bg: '#e5e7eb' }
+      previously_owned: { text: 'Previous Owner', color: 'var(--text-secondary)', bg: 'var(--border)' }
     };
 
     const badge = badges[relationship.relationshipType];
@@ -355,7 +355,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
       style={{
         display: 'block',
         background: 'var(--surface)',
-        border: '2px solid #c0c0c0',
+        border: '2px solid var(--border)',
         borderRadius: '2px',
         overflow: 'hidden',
         textDecoration: 'none',
@@ -364,12 +364,12 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
         cursor: 'pointer'
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = '#000';
+        e.currentTarget.style.borderColor = 'var(--text)';
         e.currentTarget.style.transform = 'translateY(-2px)';
         e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = '#c0c0c0';
+        e.currentTarget.style.borderColor = 'var(--border)';
         e.currentTarget.style.transform = 'translateY(0)';
         e.currentTarget.style.boxShadow = 'none';
       }}
@@ -380,7 +380,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
         width: '100%', 
         aspectRatio: '16 / 9',
         overflow: 'hidden', 
-        background: '#f3f4f6'
+        background: 'var(--bg)'
       }}>
         {(() => {
           // Try to get image URL from multiple sources
@@ -445,9 +445,9 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
             position: 'absolute',
             top: '8px',
             right: '8px',
-            background: healthScore >= 75 ? '#dcfce7' : healthScore >= 50 ? '#fef3c7' : '#fee2e2',
-            border: `2px solid ${healthScore >= 75 ? '#15803d' : healthScore >= 50 ? '#d97706' : '#dc2626'}`,
-            color: healthScore >= 75 ? '#15803d' : healthScore >= 50 ? '#b45309' : '#991b1b',
+            background: healthScore >= 75 ? 'var(--success-dim)' : healthScore >= 50 ? 'var(--warning-dim)' : 'var(--error-dim)',
+            border: `2px solid ${healthScore >= 75 ? 'var(--success)' : healthScore >= 50 ? 'var(--warning)' : 'var(--error)'}`,
+            color: healthScore >= 75 ? 'var(--success)' : healthScore >= 50 ? 'var(--warning)' : 'var(--error)',
             padding: '4px 8px',
             borderRadius: '3px',
             fontSize: '9px',
@@ -467,8 +467,8 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
               position: 'absolute',
               bottom: '8px',
               left: '8px',
-              background: 'rgba(0,0,0,0.75)',
-              color: '#fff',
+              background: 'var(--overlay)',
+              color: 'var(--bg)',
               padding: '4px 8px',
               borderRadius: '3px',
               fontSize: '9px',
@@ -490,7 +490,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
             fontWeight: 700,
             margin: '0 0 8px 0',
             lineHeight: 1.3,
-            color: '#111827'
+            color: 'var(--text)'
           }}
         >
           {vehicle.year} {vehicle.make} {vehicle.model}
@@ -521,9 +521,9 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
                   fontWeight: 600,
                   padding: '3px 6px',
                   borderRadius: '2px',
-                  background: '#fef3c7',
-                  color: '#92400e',
-                  border: '1px solid #fcd34d',
+                  background: 'var(--warning-dim)',
+                  color: 'var(--warning)',
+                  border: '1px solid var(--warning)',
                   cursor: onQuickEdit ? 'pointer' : 'default',
                   textTransform: 'uppercase',
                   letterSpacing: '0.3px'
@@ -542,14 +542,14 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
             {/* Value/ROI */}
             {vehicle.current_value && vehicle.purchase_price ? (
               <div style={{ fontSize: '11px', marginBottom: '4px' }}>
-                <span style={{ color: '#4b5563', fontWeight: 500 }}>Value: </span>
-                <span style={{ fontWeight: 700, color: '#111827' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Value: </span>
+                <span style={{ fontWeight: 700, color: 'var(--text)' }}>
                   {formatCurrency(vehicle.current_value)}
                 </span>
                 <span
                   style={{
                     marginLeft: '6px',
-                    color: vehicle.current_value >= vehicle.purchase_price ? '#15803d' : '#dc2626',
+                    color: vehicle.current_value >= vehicle.purchase_price ? 'var(--success)' : 'var(--error)',
                     fontWeight: 700
                   }}
                 >
@@ -559,24 +559,24 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
               </div>
             ) : vehicle.current_value ? (
               <div style={{ fontSize: '11px', marginBottom: '4px' }}>
-                <span style={{ color: '#4b5563', fontWeight: 500 }}>Value: </span>
-                <span style={{ fontWeight: 700, color: '#111827' }}>{formatCurrency(vehicle.current_value)}</span>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Value: </span>
+                <span style={{ fontWeight: 700, color: 'var(--text)' }}>{formatCurrency(vehicle.current_value)}</span>
               </div>
             ) : null}
 
             {/* Latest activity */}
             {liveData.latestEvent ? (
               <div style={{ fontSize: '11px', marginBottom: '4px' }}>
-                <span style={{ color: '#4b5563', fontWeight: 500 }}>Last: </span>
-                <span style={{ color: '#111827', fontWeight: 500 }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Last: </span>
+                <span style={{ color: 'var(--text)', fontWeight: 500 }}>
                   {liveData.latestEvent.title || liveData.latestEvent.event_type}
                 </span>
-                <span style={{ color: '#6b7280', marginLeft: '4px' }}>
+                <span style={{ color: 'var(--text-secondary)', marginLeft: '4px' }}>
                   {getTimeAgo(liveData.latestEvent.event_date)}
                 </span>
               </div>
             ) : (
-              <div style={{ fontSize: '11px', marginBottom: '4px', color: '#6b7280' }}>
+              <div style={{ fontSize: '11px', marginBottom: '4px', color: 'var(--text-secondary)' }}>
                 No activity yet
               </div>
             )}
@@ -587,8 +587,8 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
                 display: 'flex',
                 gap: '8px',
                 fontSize: '9px',
-                color: '#4b5563',
-                borderTop: '1px solid #e5e7eb',
+                color: 'var(--text-secondary)',
+                borderTop: '1px solid var(--border)',
                 paddingTop: '8px',
                 marginTop: '6px'
               }}
@@ -613,8 +613,8 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
               position: 'relative',
               marginTop: '8px',
               padding: '8px 10px',
-              background: primaryAction.type === 'critical' ? '#fff5f5' : primaryAction.type === 'high' ? '#fffbeb' : '#f9fafb',
-              border: `2px solid ${primaryAction.type === 'critical' ? '#dc2626' : primaryAction.type === 'high' ? '#d97706' : '#6b7280'}`,
+              background: primaryAction.type === 'critical' ? 'var(--error-dim)' : primaryAction.type === 'high' ? 'var(--warning-dim)' : 'var(--bg)',
+              border: `2px solid ${primaryAction.type === 'critical' ? 'var(--error)' : primaryAction.type === 'high' ? 'var(--warning)' : 'var(--text-secondary)'}`,
               borderRadius: '2px'
             }}
             onMouseEnter={(e) => {
@@ -638,7 +638,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
               style={{
                 fontSize: '11px',
                 fontWeight: 700,
-                color: primaryAction.type === 'critical' ? '#991b1b' : primaryAction.type === 'high' ? '#92400e' : '#1f2937',
+                color: primaryAction.type === 'critical' ? 'var(--error)' : primaryAction.type === 'high' ? 'var(--warning)' : 'var(--text)',
                 marginBottom: '4px',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px'
@@ -648,7 +648,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
             </div>
             <div style={{ 
               fontSize: '9px', 
-              color: primaryAction.type === 'critical' ? '#7f1d1d' : primaryAction.type === 'high' ? '#78350f' : '#374151',
+              color: primaryAction.type === 'critical' ? 'var(--error)' : primaryAction.type === 'high' ? 'var(--warning)' : 'var(--text-secondary)',
               lineHeight: 1.4
             }}>
               {primaryAction.reason}
@@ -664,19 +664,19 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
                   transform: 'translateX(-50%)',
                   marginBottom: '8px',
                   padding: '10px 12px',
-                  background: '#1f2937',
-                  color: '#fff',
+                  background: 'var(--text)',
+                  color: 'var(--bg)',
                   borderRadius: '4px',
                   fontSize: '9px',
                   lineHeight: 1.5,
                   whiteSpace: 'nowrap',
                   zIndex: 1000,
                   boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  border: '1px solid #374151'
+                  border: '1px solid var(--text-secondary)'
                 }}
               >
                 <div style={{ fontWeight: 700, marginBottom: '4px' }}>Track Your Investment</div>
-                <div style={{ color: '#d1d5db' }}>
+                <div style={{ color: 'var(--border)' }}>
                   Set purchase price and current value to see your vehicle's ROI over time
                 </div>
                 <div
@@ -689,7 +689,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
                     height: 0,
                     borderLeft: '4px solid transparent',
                     borderRight: '4px solid transparent',
-                    borderTop: '4px solid #1f2937'
+                    borderTop: '4px solid var(--text)'
                   }}
                 />
               </div>
@@ -703,7 +703,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
             style={{
               marginTop: '6px',
               fontSize: '9px',
-              color: '#2563eb',
+              color: 'var(--accent)',
               textDecoration: 'underline',
               cursor: 'pointer'
             }}
@@ -747,11 +747,11 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({
             style={{
               marginTop: '8px',
               padding: '6px 8px',
-              background: '#f9fafb',
-              border: '1px solid #e5e7eb',
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
               borderRadius: '2px',
               fontSize: '9px',
-              color: '#6b7280',
+              color: 'var(--text-secondary)',
               textAlign: 'center'
             }}
             title="Service metrics appear when this vehicle is linked to an organization (service provider, work location, or owner). Link this vehicle to an organization on the vehicle profile page to see cost tracking, days on lot, and other metrics."

@@ -128,33 +128,41 @@ def fetch_images_from_supabase(limit: int = 5000) -> list[dict]:
     """
     Fetch vehicle_images that have zone classification but need stage labeling.
     Returns list of {id, image_url, vehicle_zone, vehicle_id}.
+    Paginates in chunks of 500 to avoid PostgREST timeouts on large tables.
     """
     import urllib.request
 
     url, key = get_supabase_config()
+    PAGE_SIZE = 500
+    all_data = []
 
-    # Query: has vehicle_zone, has image_url, is not a junk URL
-    # Use PostgREST query
-    query_url = (
-        f"{url}/rest/v1/vehicle_images"
-        f"?select=id,image_url,vehicle_zone,vehicle_id"
-        f"&vehicle_zone=not.is.null"
-        f"&image_url=not.is.null"
-        f"&ai_processing_status=eq.completed"
-        f"&order=created_at.desc"
-        f"&limit={limit}"
-    )
+    while len(all_data) < limit:
+        remaining = min(PAGE_SIZE, limit - len(all_data))
+        query_url = (
+            f"{url}/rest/v1/vehicle_images"
+            f"?select=id,image_url,vehicle_zone,vehicle_id"
+            f"&vehicle_zone=not.is.null"
+            f"&image_url=not.is.null"
+            f"&order=id"
+            f"&limit={remaining}"
+            f"&offset={len(all_data)}"
+        )
 
-    req = urllib.request.Request(query_url)
-    req.add_header("apikey", key)
-    req.add_header("Authorization", f"Bearer {key}")
-    req.add_header("Content-Type", "application/json")
+        req = urllib.request.Request(query_url)
+        req.add_header("apikey", key)
+        req.add_header("Authorization", f"Bearer {key}")
+        req.add_header("Content-Type", "application/json")
 
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = json.loads(resp.read().decode())
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read().decode())
 
-    print(f"Fetched {len(data)} images from Supabase with zone classification")
-    return data
+        if not data:
+            break
+        all_data.extend(data)
+        print(f"  Fetched page: {len(data)} rows (total: {len(all_data)})")
+
+    print(f"Fetched {len(all_data)} images from Supabase with zone classification")
+    return all_data
 
 
 def sample_from_cache(n: int = 5000) -> list[dict]:

@@ -179,7 +179,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0, 0, 0, 0.75)',
+        background: 'var(--overlay)',
         zIndex: 10000,
         display: 'flex',
         alignItems: 'center',
@@ -247,14 +247,14 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
                 {(() => {
                   if (recentTransfers.length > 0) {
                     return (
-                      <div style={{ padding: '8px', background: '#fef3c7', borderRadius: '4px', fontSize: '11px' }}>
+                      <div style={{ padding: '8px', background: 'var(--warning-dim)', borderRadius: '4px', fontSize: '11px' }}>
                         <strong>Recent Ownership Change:</strong> {recentTransfers.length} transfer{recentTransfers.length > 1 ? 's' : ''} in last 90 days
                       </div>
                     );
                   }
                   if (ownerships.length >= 3) {
                     return (
-                      <div style={{ padding: '8px', background: '#e0e7ff', borderRadius: '4px', fontSize: '11px' }}>
+                      <div style={{ padding: '8px', background: 'var(--info-bg)', borderRadius: '4px', fontSize: '11px' }}>
                         <strong>Multiple Owners:</strong> {ownerships.length} total owners
                       </div>
                     );
@@ -263,7 +263,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
                     const daysOwned = (Date.now() - new Date(currentOwners[0].start_date).getTime()) / (1000 * 60 * 60 * 24);
                     if (daysOwned > 365) {
                       return (
-                        <div style={{ padding: '8px', background: '#dcfce7', borderRadius: '4px', fontSize: '11px' }}>
+                        <div style={{ padding: '8px', background: 'var(--success-dim)', borderRadius: '4px', fontSize: '11px' }}>
                           <strong>Stable Ownership:</strong> {Math.floor(daysOwned / 365)} year{Math.floor(daysOwned / 365) > 1 ? 's' : ''} owned
                         </div>
                       );

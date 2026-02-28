@@ -210,7 +210,7 @@ const AdminDashboard: React.FC = () => {
               <span style={{
                 marginLeft: '8px',
                 backgroundColor: 'var(--error)',
-                color: 'white',
+                color: 'var(--bg)',
                 borderRadius: '2px',
                 padding: '1px 4px',
                 fontSize: '11px',

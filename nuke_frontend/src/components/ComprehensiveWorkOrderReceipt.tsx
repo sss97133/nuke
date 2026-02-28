@@ -657,7 +657,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         justifyContent: 'center',
         zIndex: 9999
       }}>
-        <div style={{ color: '#fff', fontSize: '19px' }}>Loading receipt...</div>
+        <div style={{ color: 'var(--bg)', fontSize: '19px' }}>Loading receipt...</div>
       </div>,
       document.body
     );
@@ -835,7 +835,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '12px',
-          borderBottom: '2px solid #000',
+          borderBottom: '2px solid var(--text)',
           backgroundColor: 'var(--bg)'
         }}>
           <button
@@ -852,11 +852,11 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               padding: '4px 12px',
               fontSize: '9px',
               fontWeight: 'bold',
-              border: '2px solid #000',
-              background: adjacentEvents.prev ? '#fff' : '#f0f0f0',
+              border: '2px solid var(--text)',
+              background: adjacentEvents.prev ? 'var(--surface)' : 'var(--bg)',
               cursor: adjacentEvents.prev ? 'pointer' : 'not-allowed',
               textTransform: 'uppercase',
-              color: adjacentEvents.prev ? '#000' : '#999'
+              color: adjacentEvents.prev ? 'var(--text)' : 'var(--text-disabled)'
             }}
           >
             ← PREV DAY
@@ -884,11 +884,11 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               padding: '4px 12px',
               fontSize: '9px',
               fontWeight: 'bold',
-              border: '2px solid #000',
-              background: adjacentEvents.next ? '#fff' : '#f0f0f0',
+              border: '2px solid var(--text)',
+              background: adjacentEvents.next ? 'var(--surface)' : 'var(--bg)',
               cursor: adjacentEvents.next ? 'pointer' : 'not-allowed',
               textTransform: 'uppercase',
-              color: adjacentEvents.next ? '#000' : '#999'
+              color: adjacentEvents.next ? 'var(--text)' : 'var(--text-disabled)'
             }}
           >
             NEXT DAY →
@@ -898,7 +898,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         {/* WORK ORDER HEADER - Wireframe */}
         <div style={{
           padding: '8px 12px',
-          borderBottom: '3px double #000',
+          borderBottom: '3px double var(--text)',
           background: 'var(--bg)',
           display: 'flex',
           justifyContent: 'space-between',
@@ -909,14 +909,14 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>
               WORK ORDER #{workOrder.id?.slice(0, 8).toUpperCase() || 'N/A'}
             </div>
-            <div style={{ fontSize: '9px', color: '#666', marginBottom: '6px' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
               {workOrder.event_date ? new Date(workOrder.event_date).toLocaleDateString('en-US', {
                 month: 'long',
                 day: 'numeric',
                 year: 'numeric'
               }) : 'Date unknown'}
             </div>
-            <div style={{ fontSize: '9px', color: '#666' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
               {workOrder.service_provider_name || 'Owner/DIY'}
             </div>
           </div>
@@ -938,15 +938,15 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     width: '48px',
                     height: '48px',
                     objectFit: 'cover',
-                    border: '1px solid #ccc',
+                    border: '1px solid var(--border)',
                     cursor: 'pointer',
                     borderRadius: '2px'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.border = '2px solid #000';
+                    e.currentTarget.style.border = '2px solid var(--text)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.border = '1px solid #ccc';
+                    e.currentTarget.style.border = '1px solid var(--border)';
                   }}
                 />
               ))}
@@ -963,7 +963,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     alignItems: 'center',
                     justifyContent: 'center',
                     background: 'var(--surface)',
-                    border: '1px solid #ccc',
+                    border: '1px solid var(--border)',
                     borderRadius: '2px',
                     fontSize: '9px',
                     fontWeight: 'bold',
@@ -983,7 +983,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             data-images-section
             style={{ 
               padding: '12px', 
-              borderBottom: '2px solid #000',
+              borderBottom: '2px solid var(--text)',
               backgroundColor: 'var(--bg)' 
             }}
           >
@@ -1003,7 +1003,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               </div>
               <div style={{ 
                 fontSize: '9px', 
-                color: '#666',
+                color: 'var(--text-secondary)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px'
@@ -1015,13 +1015,15 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                   const processing = status === 'processing' || runningContextual;
                   const failed = status === 'failed';
                   const statusLabel = done ? 'Analyzed' : failed ? 'AI failed' : processing ? 'Analyzing' : 'AI pending';
+                  // TODO: Status badge colors use semantic hex for light tints. Replace when
+                  // a JS theme bridge is available (e.g. success-dim, error-dim tokens).
                   const statusBg = done ? '#d1fae5' : failed ? '#fee2e2' : processing ? '#fef3c7' : '#f3f4f6';
 
                   return (
                     <>
                       <span style={{
                         padding: '2px 6px',
-                        border: '1px solid #000',
+                        border: '1px solid var(--text)',
                         background: statusBg,
                         fontWeight: 700,
                         textTransform: 'uppercase'
@@ -1038,11 +1040,11 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                             padding: '2px 6px',
                             fontSize: '9px',
                             fontWeight: 'bold',
-                            border: '1px solid #000',
-                            background: processing ? '#f0f0f0' : '#fff',
+                            border: '1px solid var(--text)',
+                            background: processing ? 'var(--grey-100)' : 'var(--surface)',
                             cursor: processing ? 'not-allowed' : 'pointer',
                             textTransform: 'uppercase',
-                            color: '#000'
+                            color: 'var(--text)'
                           }}
                           title="Run AI analysis on this evidence set"
                         >
@@ -1054,7 +1056,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 })()}
               </div>
             </div>
-            <div style={{ fontSize: '9px', color: '#666', marginBottom: '8px', lineHeight: 1.5 }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginBottom: '8px', lineHeight: 1.5 }}>
               Add originator context to help AI interpret screenshots, listings, and discovery moments.
               After analysis, you will get tailored follow-up questions to capture the story.
             </div>
@@ -1062,8 +1064,8 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               <div style={{
                 marginTop: '6px',
                 padding: '10px',
-                border: '1px solid #111',
-                background: '#fff',
+                border: '1px solid var(--border)',
+                background: 'var(--surface)',
                 borderRadius: '4px'
               }}>
                 <div style={{
@@ -1074,10 +1076,10 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 }}>
                   Originator context
                 </div>
-                <div style={{ fontSize: '9px', color: '#666', marginTop: '4px', lineHeight: 1.4 }}>
+                <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.4 }}>
                   Help the analysis by adding what you know about this evidence set.
                 </div>
-                <div style={{ fontSize: '9px', color: '#666', marginTop: '6px' }}>
+                <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '6px' }}>
                   <div style={{ fontWeight: 700 }}>Suggested prompts</div>
                   <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
                     {originatorPrompts.map((prompt) => (
@@ -1101,19 +1103,19 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     marginTop: '8px',
                     padding: '6px',
                     fontSize: '11px',
-                    border: '1px solid #ccc',
+                    border: '1px solid var(--border)',
                     borderRadius: '3px',
                     resize: 'vertical'
                   }}
                 />
-                <div style={{ fontSize: '9px', color: '#666', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
                   <span>This note will be included in AI analysis.</span>
                   <span>{originatorContext.length}/1200</span>
                 </div>
               </div>
             )}
             {contextualError && (
-              <div style={{ marginTop: '8px', fontSize: '9px', color: '#a00' }}>
+              <div style={{ marginTop: '8px', fontSize: '9px', color: 'var(--error)' }}>
                 {contextualError}
               </div>
             )}
@@ -1128,17 +1130,17 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                   onClick={() => window.open(img.image_url, '_blank')}
                   style={{
                     aspectRatio: '1',
-                    border: '1px solid #ccc',
+                    border: '1px solid var(--border)',
                     overflow: 'hidden',
                     cursor: 'pointer',
                     borderRadius: '2px',
                     transition: 'border 0.12s'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.border = '2px solid #000';
+                    e.currentTarget.style.border = '2px solid var(--text)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.border = '1px solid #ccc';
+                    e.currentTarget.style.border = '1px solid var(--border)';
                   }}
                 >
                   <img 
@@ -1157,7 +1159,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         )}
 
         {/* WORK PERFORMED - Wireframe */}
-        <div style={{ padding: '12px', borderBottom: '2px solid #000' }}>
+        <div style={{ padding: '12px', borderBottom: '2px solid var(--text)' }}>
           <div style={{ 
             fontSize: '11px', 
             fontWeight: 'bold', 
@@ -1171,7 +1173,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             {workOrder.title || workOrder.description || `${evidence.length} photos from ${workOrder.event_date ? new Date(workOrder.event_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'date unknown'}`}
           </div>
           {workOrder.description && workOrder.title && (
-            <div style={{ fontSize: '11px', marginTop: '4px', color: '#666', lineHeight: '1.5' }}>
+            <div style={{ fontSize: '11px', marginTop: '4px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
               {workOrder.description}
             </div>
           )}
@@ -1190,7 +1192,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             null;
 
           return (
-            <div style={{ padding: '12px', borderBottom: '2px solid #000', background: 'var(--bg)' }}>
+            <div style={{ padding: '12px', borderBottom: '2px solid var(--text)', background: 'var(--bg)' }}>
               <div style={{
                 fontSize: '11px',
                 fontWeight: 'bold',
@@ -1226,17 +1228,17 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               </div>
 
               {ca?.narrative_summary && (
-                <div style={{ marginTop: '8px', fontSize: '11px', color: '#666', lineHeight: 1.5 }}>
+                <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                   {String(ca.narrative_summary)}
                 </div>
               )}
               {ca?.originator_context && (
-                <div style={{ marginTop: '8px', fontSize: '11px', color: '#444', lineHeight: 1.5 }}>
+                <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text)', lineHeight: 1.5 }}>
                   <strong>ORIGINATOR NOTES:</strong> {String(ca.originator_context)}
                 </div>
               )}
               {Array.isArray(ca?.originator_questions) && ca.originator_questions.length > 0 && (
-                <div style={{ marginTop: '8px', fontSize: '11px', color: '#444', lineHeight: 1.5 }}>
+                <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text)', lineHeight: 1.5 }}>
                   <div style={{ fontWeight: 700, marginBottom: '4px' }}>FOLLOW-UP QUESTIONS</div>
                   <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
                     {ca.originator_questions.slice(0, 6).map((question: string) => (
@@ -1253,7 +1255,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
 
         {/* AUCTION RECEIPT FORMAT - Special format for auction_sold events */}
         {((workOrder.event_type === 'auction_sold' || workOrder.event_type === 'sale') && auctionData?.sale_price) ? (
-          <div style={{ padding: '12px', borderBottom: '2px solid #000' }}>
+          <div style={{ padding: '12px', borderBottom: '2px solid var(--text)' }}>
             <div style={{ 
               fontSize: '11px', 
               fontWeight: 'bold', 
@@ -1265,14 +1267,14 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             </div>
 
             {/* Parties Section */}
-            <div style={{ marginBottom: '16px', padding: '8px', background: 'var(--bg)', border: '1px solid #ddd' }}>
-              <div style={{ fontSize: '9px', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase', color: '#666' }}>
+            <div style={{ marginBottom: '16px', padding: '8px', background: 'var(--bg)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '9px', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
                 Parties
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '11px' }}>
                 <div>
                   <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>Seller</div>
-                  <div style={{ color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     {auctionData.seller_profile_url ? (
                       <a 
                         href={auctionData.seller_profile_url} 
@@ -1290,7 +1292,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 </div>
                 <div>
                   <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>Buyer</div>
-                  <div style={{ color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     {auctionData.buyer_profile_url ? (
                       <a 
                         href={auctionData.buyer_profile_url} 
@@ -1307,7 +1309,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                   </div>
                 </div>
               </div>
-              <div style={{ marginTop: '8px', fontSize: '9px', color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ marginTop: '8px', fontSize: '9px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 Platform: 
                 <FaviconIcon url="https://bringatrailer.com" size={12} preserveAspectRatio={true} />
                 <strong>Bring a Trailer</strong>
@@ -1332,7 +1334,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               gridTemplateColumns: '2fr 120px',
               gap: '8px',
               paddingBottom: '4px',
-              borderBottom: '1px solid #000',
+              borderBottom: '1px solid var(--text)',
               fontSize: '9px',
               fontWeight: 'bold',
               marginBottom: '4px'
@@ -1348,7 +1350,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               gap: '8px',
               padding: '6px 0',
               fontSize: '11px',
-              borderBottom: '1px dotted #ddd'
+              borderBottom: '1px dotted var(--border)'
             }}>
               <div style={{ fontWeight: 'bold' }}>Sale Price</div>
               <div style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(auctionData.sale_price)}</div>
@@ -1364,11 +1366,11 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                   gap: '8px',
                   padding: '6px 0',
                   fontSize: '11px',
-                  borderBottom: '1px dotted #ddd'
+                  borderBottom: '1px dotted var(--border)'
                 }}>
                   <div>
                     Buyer's Fee (5% * est.)
-                    <span style={{ fontSize: '8px', color: '#666', marginLeft: '4px' }}>*estimated</span>
+                    <span style={{ fontSize: '8px', color: 'var(--text-secondary)', marginLeft: '4px' }}>*estimated</span>
                   </div>
                   <div style={{ textAlign: 'right' }}>{formatCurrency(buyerFee)}</div>
                 </div>
@@ -1386,7 +1388,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                   gap: '8px',
                   padding: '8px 0',
                   marginTop: '4px',
-                  borderTop: '1px solid #000',
+                  borderTop: '1px solid var(--text)',
                   fontSize: '12px',
                   fontWeight: 'bold'
                 }}>
@@ -1409,11 +1411,11 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     padding: '6px 0',
                     marginTop: '12px',
                     fontSize: '11px',
-                    borderBottom: '1px dotted #ddd'
+                    borderBottom: '1px dotted var(--border)'
                   }}>
                     <div>
                       Seller's Fee (BaT: 5% of first $5,000)
-                      <span style={{ fontSize: '8px', color: '#666', marginLeft: '4px' }}>*estimated</span>
+                      <span style={{ fontSize: '8px', color: 'var(--text-secondary)', marginLeft: '4px' }}>*estimated</span>
                     </div>
                     <div style={{ textAlign: 'right' }}>{formatCurrency(sellerFee)}</div>
                   </div>
@@ -1425,7 +1427,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     gap: '8px',
                     padding: '8px 0',
                     marginTop: '4px',
-                    borderTop: '2px solid #000',
+                    borderTop: '2px solid var(--text)',
                     fontSize: '12px',
                     fontWeight: 'bold'
                   }}>
@@ -1439,7 +1441,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         ) : (
           /* STANDARD COST BREAKDOWN - For non-auction events */
           (costBreakdown?.parts?.items?.length > 0 || costBreakdown?.labor?.tasks?.length > 0 || workOrder.cost_amount) && (
-            <div style={{ padding: '12px', borderBottom: '2px solid #000' }}>
+            <div style={{ padding: '12px', borderBottom: '2px solid var(--text)' }}>
               <div style={{ 
                 fontSize: '11px', 
                 fontWeight: 'bold', 
@@ -1456,7 +1458,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               gridTemplateColumns: '2fr 60px 80px 100px',
               gap: '8px',
               paddingBottom: '4px',
-              borderBottom: '1px solid #000',
+              borderBottom: '1px solid var(--text)',
               fontSize: '9px',
               fontWeight: 'bold',
               marginBottom: '4px'
@@ -1477,13 +1479,13 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                   gap: '8px',
                   padding: '4px 0',
                   fontSize: '11px',
-                  borderBottom: '1px dotted #ddd'
+                  borderBottom: '1px dotted var(--border)'
                 }}
               >
                 <div>
                   <div style={{ fontWeight: 'bold' }}>{part.name}</div>
                   {part.brand && (
-                    <div style={{ fontSize: '8px', color: '#666' }}>
+                    <div style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
                       {part.brand}{part.part_number && ` #${part.part_number}`}
                     </div>
                   )}
@@ -1510,7 +1512,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     gap: '8px',
                     padding: '4px 0',
                     fontSize: '11px',
-                    borderBottom: '1px dotted #ddd'
+                    borderBottom: '1px dotted var(--border)'
                   }}
                 >
                   <div>
@@ -1518,12 +1520,12 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                       {task.task} ({task.hours.toFixed(1)} hrs @ {formatCurrency(task.rate)}/hr)
                     </div>
                     {hasBothRates && (
-                      <div style={{ fontSize: '8px', color: '#666', marginTop: '2px' }}>
+                      <div style={{ fontSize: '8px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                         Reported: {formatCurrency(task.reported_rate)}/hr • Calculated: {formatCurrency(task.calculated_rate)}/hr ({rateSourceLabel})
                       </div>
                     )}
                     {!hasBothRates && task.rate_source && (
-                      <div style={{ fontSize: '8px', color: '#666', marginTop: '2px' }}>
+                      <div style={{ fontSize: '8px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                         {rateSourceLabel}
                       </div>
                     )}
@@ -1543,7 +1545,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 gap: '8px',
                 padding: '4px 0',
                 fontSize: '11px',
-                borderBottom: '1px dotted #ddd'
+                borderBottom: '1px dotted var(--border)'
               }}>
                 <div>Work performed</div>
                 <div style={{ textAlign: 'right' }}>-</div>
@@ -1559,7 +1561,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               gap: '8px',
               paddingTop: '8px',
               marginTop: '8px',
-              borderTop: '2px solid #000',
+              borderTop: '2px solid var(--text)',
               fontSize: '12px',
               fontWeight: 'bold'
             }}>
@@ -1581,12 +1583,12 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
 
         {/* MATERIALS */}
         {costBreakdown?.materials?.items && costBreakdown.materials.items.length > 0 && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #ddd' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
             <div style={{ 
               fontSize: '12px', 
               fontWeight: 'bold', 
               marginBottom: '8px',
-              borderBottom: '1px solid #000',
+              borderBottom: '1px solid var(--text)',
               paddingBottom: '4px'
             }}>
               MATERIALS & CONSUMABLES
@@ -1601,7 +1603,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 <div>
                   {mat.name}
                   {mat.quantity && mat.unit && (
-                    <span style={{ color: '#666', fontSize: '9px' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '9px' }}>
                       {' '}({mat.quantity} {mat.unit})
                     </span>
                   )}
@@ -1614,7 +1616,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               justifyContent: 'space-between',
               fontWeight: 'bold',
               paddingTop: '8px',
-              borderTop: '1px solid #000',
+              borderTop: '1px solid var(--text)',
               fontSize: '12px'
             }}>
               <div>SUBTOTAL (Materials):</div>
@@ -1625,12 +1627,12 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
 
         {/* TOOLS */}
         {costBreakdown?.tools?.items && costBreakdown.tools.items.length > 0 && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #ddd' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
             <div style={{ 
               fontSize: '12px', 
               fontWeight: 'bold', 
               marginBottom: '8px',
-              borderBottom: '1px solid #000',
+              borderBottom: '1px solid var(--text)',
               paddingBottom: '4px'
             }}>
               TOOLS USED (Depreciation)
@@ -1645,7 +1647,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 <div>
                   Tool {tool.tool_id?.substring(0, 8) || 'Unknown'}
                   {tool.duration_minutes && (
-                    <span style={{ color: '#666', fontSize: '9px' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '9px' }}>
                       {' '}({Math.floor(tool.duration_minutes / 60)}h {tool.duration_minutes % 60}m)
                     </span>
                   )}
@@ -1658,7 +1660,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               justifyContent: 'space-between',
               fontWeight: 'bold',
               paddingTop: '8px',
-              borderTop: '1px solid #000',
+              borderTop: '1px solid var(--text)',
               fontSize: '12px'
             }}>
               <div>SUBTOTAL (Tools):</div>
@@ -1669,12 +1671,12 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
 
         {/* OVERHEAD */}
         {costBreakdown?.overhead && costBreakdown.overhead.total_overhead && costBreakdown.overhead.total_overhead > 0 && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #ddd' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
             <div style={{ 
               fontSize: '12px', 
               fontWeight: 'bold', 
               marginBottom: '8px',
-              borderBottom: '1px solid #000',
+              borderBottom: '1px solid var(--text)',
               paddingBottom: '4px'
             }}>
               OVERHEAD & FACILITY
@@ -1689,7 +1691,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 <div>
                   Facility Usage
                   {costBreakdown.overhead.facility_hours && costBreakdown.overhead.facility_rate && (
-                    <span style={{ color: '#666', fontSize: '9px' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '9px' }}>
                       {' '}({costBreakdown.overhead.facility_hours.toFixed(1)} hrs @ {formatCurrency(costBreakdown.overhead.facility_rate)}/hr)
                     </span>
                   )}
@@ -1713,7 +1715,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               justifyContent: 'space-between',
               fontWeight: 'bold',
               paddingTop: '8px',
-              borderTop: '1px solid #000',
+              borderTop: '1px solid var(--text)',
               fontSize: '12px'
             }}>
               <div>SUBTOTAL (Overhead):</div>
@@ -1723,12 +1725,12 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         )}
 
         {/* GENERATED INVOICE (drafts) */}
-        <div style={{ padding: '16px', borderBottom: '1px solid #ddd', background: 'var(--bg)' }}>
+        <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
           <div style={{
             fontSize: '12px',
             fontWeight: 'bold',
             marginBottom: '8px',
-            borderBottom: '1px solid #000',
+            borderBottom: '1px solid var(--text)',
             paddingBottom: '4px'
           }}>
             INVOICE (Draft)
@@ -1739,7 +1741,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', fontSize: '11px' }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 800 }}>{invoiceDraft.invoice_number}</div>
-                  <div style={{ fontSize: '9px', color: '#666', marginTop: 2 }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: 2 }}>
                     {invoiceDraft.invoice_date ? `Date ${String(invoiceDraft.invoice_date).slice(0, 10)}` : 'Date unknown'}
                     {invoiceDraft.status ? ` • ${invoiceDraft.status}` : ''}
                     {invoiceDraft.payment_status ? ` • ${invoiceDraft.payment_status}` : ''}
@@ -1760,8 +1762,8 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     padding: '4px 10px',
                     fontSize: '11px',
                     fontWeight: 'bold',
-                    border: '1px solid #000',
-                    background: '#fff',
+                    border: '1px solid var(--text)',
+                    background: 'var(--surface)',
                     cursor: 'pointer'
                   }}
                 >
@@ -1774,8 +1776,8 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     padding: '4px 10px',
                     fontSize: '11px',
                     fontWeight: 'bold',
-                    border: '1px solid #000',
-                    background: '#fff',
+                    border: '1px solid var(--text)',
+                    background: 'var(--surface)',
                     cursor: 'pointer'
                   }}
                 >
@@ -1784,18 +1786,18 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               </div>
 
               {showInvoiceHtml && (
-                <div style={{ marginTop: 12, border: '1px solid #ddd', background: '#fff', padding: 12 }}>
+                <div style={{ marginTop: 12, border: '1px solid var(--border)', background: 'var(--surface)', padding: 12 }}>
                   {invoiceDraft.html_content ? (
                     <div dangerouslySetInnerHTML={{ __html: invoiceDraft.html_content }} />
                   ) : (
-                    <div style={{ fontSize: '11px', color: '#666' }}>No HTML content generated yet.</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>No HTML content generated yet.</div>
                   )}
                 </div>
               )}
             </>
           ) : (
             <>
-              <div style={{ fontSize: '11px', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                 No invoice draft exists for this event yet.
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
@@ -1807,8 +1809,8 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     padding: '4px 10px',
                     fontSize: '11px',
                     fontWeight: 'bold',
-                    border: '1px solid #000',
-                    background: generatingInvoice ? '#f0f0f0' : '#fff',
+                    border: '1px solid var(--text)',
+                    background: generatingInvoice ? 'var(--grey-100)' : 'var(--surface)',
                     cursor: generatingInvoice ? 'not-allowed' : 'pointer'
                   }}
                 >
@@ -1816,7 +1818,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 </button>
               </div>
               {invoiceError && (
-                <div style={{ marginTop: 8, fontSize: '9px', color: '#a00' }}>
+                <div style={{ marginTop: 8, fontSize: '9px', color: 'var(--error)' }}>
                   {invoiceError}
                 </div>
               )}
@@ -1826,12 +1828,12 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
 
         {/* RECEIPT / INVOICE LINE ITEMS (uploaded documents) */}
         {receiptHeaders.length > 0 && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #ddd' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
             <div style={{
               fontSize: '12px',
               fontWeight: 'bold',
               marginBottom: '8px',
-              borderBottom: '1px solid #000',
+              borderBottom: '1px solid var(--text)',
               paddingBottom: '4px'
             }}>
               UPLOADED RECEIPTS / INVOICES
@@ -1853,7 +1855,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     <div style={{ textAlign: 'right' }}>{formatCurrency(headerTotal)}</div>
                   </div>
 
-                  <div style={{ fontSize: '9px', color: '#666', marginTop: '2px', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px', lineHeight: 1.4 }}>
                     {[r.receipt_date ? `Date ${r.receipt_date}` : null, r.invoice_number ? `Invoice #${r.invoice_number}` : null].filter(Boolean).join(' • ')}
                     {doc?.file_url ? (
                       <>
@@ -1872,7 +1874,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                         gridTemplateColumns: '2fr 60px 80px 100px',
                         gap: '8px',
                         paddingBottom: '4px',
-                        borderBottom: '1px solid #000',
+                        borderBottom: '1px solid var(--text)',
                         fontSize: '9px',
                         fontWeight: 'bold',
                         marginBottom: '4px'
@@ -1892,13 +1894,13 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                             gap: '8px',
                             padding: '4px 0',
                             fontSize: '11px',
-                            borderBottom: '1px dotted #ddd'
+                            borderBottom: '1px dotted var(--border)'
                           }}
                         >
                           <div>
                             <div style={{ fontWeight: 'bold' }}>{it.description || 'Line item'}</div>
                             {(it.category || it.part_number || it.sku) && (
-                              <div style={{ fontSize: '8px', color: '#666' }}>
+                              <div style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
                                 {[it.category, it.part_number ? `#${it.part_number}` : null, it.sku ? `SKU ${it.sku}` : null].filter(Boolean).join(' ')}
                               </div>
                             )}
@@ -1915,7 +1917,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                         gap: '8px',
                         paddingTop: '8px',
                         marginTop: '8px',
-                        borderTop: '2px solid #000',
+                        borderTop: '2px solid var(--text)',
                         fontSize: '12px',
                         fontWeight: 'bold'
                       }}>
@@ -1933,7 +1935,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         )}
 
         {/* TOTAL */}
-        <div style={{ padding: '16px', borderBottom: '2px solid #000', backgroundColor: 'var(--bg)' }}>
+        <div style={{ padding: '16px', borderBottom: '2px solid var(--text)', backgroundColor: 'var(--bg)' }}>
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between',
@@ -1975,7 +1977,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             const delta = hasBoth ? (actualTotal - estimateTotal) : 0;
 
             return (
-              <div style={{ marginTop: '6px', fontSize: '9px', color: '#666', textAlign: 'right', lineHeight: 1.5 }}>
+              <div style={{ marginTop: '6px', fontSize: '9px', color: 'var(--text-secondary)', textAlign: 'right', lineHeight: 1.5 }}>
                 {estimateTotal > 0 && <div>Estimate: {formatCurrency(estimateTotal)}</div>}
                 {actualTotal > 0 && <div>Actual: {formatCurrency(actualTotal)}</div>}
                 {hasBoth && delta !== 0 && <div>Delta: {formatCurrency(delta)}</div>}
@@ -1983,7 +1985,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             );
           })()}
           {workOrder.ai_confidence_score && (
-            <div style={{ fontSize: '9px', color: '#666', marginTop: '4px', textAlign: 'right' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px', textAlign: 'right' }}>
               Confidence: {(workOrder.ai_confidence_score * 100).toFixed(0)}%
             </div>
           )}
@@ -1991,12 +1993,12 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
 
         {/* QUALITY & VALUE */}
         {(workOrder.quality_rating || workOrder.value_impact) && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #ddd' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
             <div style={{ 
               fontSize: '12px', 
               fontWeight: 'bold', 
               marginBottom: '8px',
-              borderBottom: '1px solid #000',
+              borderBottom: '1px solid var(--text)',
               paddingBottom: '4px'
             }}>
               QUALITY ASSESSMENT
@@ -2007,7 +2009,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               </div>
             )}
             {workOrder.quality_justification && (
-              <div style={{ fontSize: '11px', marginBottom: '8px', color: '#666' }}>
+              <div style={{ fontSize: '11px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                 {workOrder.quality_justification}
               </div>
             )}
@@ -2021,19 +2023,19 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
 
         {/* CONCERNS */}
         {workOrder.concerns && workOrder.concerns.length > 0 && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #ddd', backgroundColor: '#fff3cd' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--warning-dim)' }}>
             <div style={{ 
               fontSize: '12px', 
               fontWeight: 'bold', 
               marginBottom: '8px',
-              borderBottom: '1px solid #000',
+              borderBottom: '1px solid var(--text)',
               paddingBottom: '4px',
-              color: '#856404'
+              color: 'var(--warning)'
             }}>
               CONCERNS FLAGGED
             </div>
             {workOrder.concerns.map((concern, idx) => (
-              <div key={idx} style={{ fontSize: '11px', marginBottom: '4px', color: '#856404' }}>
+              <div key={idx} style={{ fontSize: '11px', marginBottom: '4px', color: 'var(--warning)' }}>
                 • {concern}
               </div>
             ))}
@@ -2045,10 +2047,10 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         <div style={{ 
           padding: '12px', 
           textAlign: 'center',
-          borderTop: '2px solid #000',
+          borderTop: '2px solid var(--text)',
           backgroundColor: 'var(--bg)',
           fontSize: '9px',
-          color: '#666'
+          color: 'var(--text-secondary)'
         }}>
           [ESC TO CLOSE]
         </div>

@@ -117,33 +117,33 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ endDate, size = 'small'
   // Normal -> Coral -> Orange -> Red -> Pulsing Red
   const urgencyStyles: Record<string, { color: string; bg: string; border?: string; glow?: string }> = {
     lastMinute: {
-      color: '#dc2626',      // Bright red
-      bg: '#fef2f2',
-      border: '2px solid #dc2626',
-      glow: '0 0 8px rgba(220, 38, 38, 0.6)'
+      color: 'var(--error)',
+      bg: 'var(--error-dim)',
+      border: '2px solid var(--error)',
+      glow: '0 0 8px color-mix(in srgb, var(--error) 60%, transparent)'
     },
     critical: {
-      color: '#dc2626',      // Red
-      bg: '#fee2e2',
-      border: '1px solid #fca5a5'
+      color: 'var(--error)',
+      bg: 'var(--error-dim)',
+      border: '1px solid var(--error)'
     },
     urgent: {
-      color: '#ea580c',      // Orange (not yellow!)
-      bg: '#fff7ed',
-      border: '1px solid #fdba74'
+      color: 'var(--warning)',
+      bg: 'var(--warning-dim)',
+      border: '1px solid var(--warning)'
     },
     gettingClose: {
-      color: '#e07960',      // Coral/salmon - warmer than neutral but not orange
-      bg: '#fef7f5',
-      border: '1px solid #f5cdc4'
+      color: 'var(--warning)',
+      bg: 'var(--warning-dim)',
+      border: '1px solid var(--warning)'
     },
     normal: {
       color: 'var(--text)',
       bg: 'var(--surface-hover)'
     },
     ended: {
-      color: '#6b7280',
-      bg: '#f3f4f6'
+      color: 'var(--text-disabled)',
+      bg: 'var(--bg)'
     },
   };
 
@@ -201,12 +201,12 @@ const TierBadge: React.FC<TierBadgeProps> = ({ bid, bidCount }) => {
     const b = bid || 0;
     const c = bidCount || 0;
 
-    if (c === 0) return { tier: 'F', color: '#6b7280', bg: '#f3f4f6' };
-    if (b >= 500000 && c >= 50) return { tier: 'S', color: '#7c3aed', bg: '#ede9fe' };
-    if ((b >= 100000 && c >= 30) || (b >= 250000 && c >= 20)) return { tier: 'A', color: '#059669', bg: '#d1fae5' };
-    if ((b >= 50000 && c >= 20) || (b >= 100000 && c >= 10)) return { tier: 'B', color: '#3b82f6', bg: '#dbeafe' };
-    if ((b >= 25000 && c >= 10) || (b >= 50000 && c >= 5)) return { tier: 'C', color: '#f59e0b', bg: '#fef3c7' };
-    return { tier: 'D', color: '#6b7280', bg: '#f3f4f6' };
+    if (c === 0) return { tier: 'F', color: 'var(--text-disabled)', bg: 'var(--bg)' };
+    if (b >= 500000 && c >= 50) return { tier: 'S', color: 'var(--accent)', bg: 'var(--accent-dim, #ede9fe)' };
+    if ((b >= 100000 && c >= 30) || (b >= 250000 && c >= 20)) return { tier: 'A', color: 'var(--success)', bg: 'var(--success-dim)' };
+    if ((b >= 50000 && c >= 20) || (b >= 100000 && c >= 10)) return { tier: 'B', color: 'var(--accent)', bg: 'var(--accent-dim, #dbeafe)' };
+    if ((b >= 25000 && c >= 10) || (b >= 50000 && c >= 5)) return { tier: 'C', color: 'var(--warning)', bg: 'var(--warning-dim)' };
+    return { tier: 'D', color: 'var(--text-disabled)', bg: 'var(--bg)' };
   };
 
   const { tier, color, bg } = getTier();
@@ -248,7 +248,7 @@ const BidTrend: React.FC<BidTrendProps> = ({ current }) => {
   if (!current) return null;
 
   return (
-    <span style={{ color: '#10b981', fontSize: '10px', marginLeft: '2px' }} title="Bid increasing">
+    <span style={{ color: 'var(--success)', fontSize: '10px', marginLeft: '2px' }} title="Bid increasing">
       ^
     </span>
   );
@@ -266,16 +266,16 @@ const PlatformBreakdownChart: React.FC<PlatformBreakdownChartProps> = ({ stats }
   const maxCount = Math.max(...stats.map((s) => s.count), 1);
 
   const platformColors: Record<string, string> = {
-    bat: '#e67e22',
-    cars_and_bids: '#3498db',
-    pcarmarket: '#9b59b6',
-    ebay_motors: '#e74c3c',
-    mecum: '#2ecc71',
-    bonhams: '#1abc9c',
-    rmsothebys: '#34495e',
-    collecting_cars: '#f39c12',
-    hagerty: '#e91e63',
-    default: '#95a5a6',
+    bat: 'var(--warning)',
+    cars_and_bids: 'var(--accent)',
+    pcarmarket: 'var(--accent)',
+    ebay_motors: 'var(--error)',
+    mecum: 'var(--success)',
+    bonhams: 'var(--success)',
+    rmsothebys: 'var(--text)',
+    collecting_cars: 'var(--warning)',
+    hagerty: 'var(--error)',
+    default: 'var(--text-disabled)',
   };
 
   return (
@@ -334,24 +334,24 @@ const MarketHeatIndicator: React.FC<MarketHeatIndicatorProps> = ({ totalBids, to
 
   if (bidsPerAuction >= 40) {
     heat = 'fire';
-    heatColor = '#ef4444';
-    heatBg = '#fef2f2';
+    heatColor = 'var(--error)';
+    heatBg = 'var(--error-dim)';
   } else if (bidsPerAuction >= 25) {
     heat = 'hot';
-    heatColor = '#f97316';
-    heatBg = '#fff7ed';
+    heatColor = 'var(--warning)';
+    heatBg = 'var(--warning-dim)';
   } else if (bidsPerAuction >= 15) {
     heat = 'warm';
-    heatColor = '#f59e0b';
-    heatBg = '#fef3c7';
+    heatColor = 'var(--warning)';
+    heatBg = 'var(--warning-dim)';
   } else if (bidsPerAuction >= 8) {
     heat = 'soft';
-    heatColor = '#3b82f6';
-    heatBg = '#eff6ff';
+    heatColor = 'var(--accent)';
+    heatBg = 'var(--accent-dim, #eff6ff)';
   } else {
     heat = 'cold';
-    heatColor = '#6b7280';
-    heatBg = '#f3f4f6';
+    heatColor = 'var(--text-disabled)';
+    heatBg = 'var(--bg)';
   }
 
   return (
@@ -531,14 +531,14 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ listing, onNavigate }) => {
             justifyContent: 'space-between',
             marginBottom: 4,
             padding: '6px 8px',
-            background: 'linear-gradient(135deg, rgba(5, 150, 105, 0.06) 0%, rgba(5, 150, 105, 0.02) 100%)',
+            background: 'var(--success-dim)',
             borderRadius: 6,
-            border: '1px solid rgba(5, 150, 105, 0.15)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5)',
+            border: '1px solid var(--success)',
+            boxShadow: 'none',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-            <span style={{ fontSize: '12px', fontWeight: 900, color: '#059669' }}>
+            <span style={{ fontSize: '12px', fontWeight: 900, color: 'var(--success)' }}>
               {formatCurrency(listing.current_bid)}
             </span>
             <BidTrend current={listing.current_bid} />
@@ -547,11 +547,11 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ listing, onNavigate }) => {
             style={{
               fontSize: '9px',
               fontWeight: 600,
-              color: '#059669',
-              background: 'rgba(5, 150, 105, 0.12)',
+              color: 'var(--success)',
+              background: 'var(--success-dim)',
               padding: '2px 7px',
               borderRadius: 10,
-              border: '1px solid rgba(5, 150, 105, 0.2)',
+              border: '1px solid var(--success)',
             }}
             title="Total bids"
           >

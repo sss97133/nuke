@@ -65,12 +65,12 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'critical': return '#dc2626';
-      case 'high': return '#ea580c';
-      case 'medium': return '#ca8a04';
-      case 'low': return '#65a30d';
-      case 'cosmetic': return '#0891b2';
-      default: return '#666';
+      case 'critical': return 'var(--error)';
+      case 'high': return 'var(--warning)';
+      case 'medium': return 'var(--warning)';
+      case 'low': return 'var(--success)';
+      case 'cosmetic': return 'var(--accent)';
+      default: return 'var(--text-secondary)';
     }
   };
 
@@ -128,14 +128,14 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
   const total = calculateTotal();
 
   return (
-    <div style={{ padding: '16px', background: 'var(--surface)', border: '2px solid #000' }}>
+    <div style={{ padding: '16px', background: 'var(--surface)', border: '2px solid var(--text)' }}>
       
       {/* Header */}
-      <div style={{ marginBottom: '16px', borderBottom: '2px solid #000', paddingBottom: '12px' }}>
+      <div style={{ marginBottom: '16px', borderBottom: '2px solid var(--text)', paddingBottom: '12px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>
           AI PARTS QUOTE GENERATOR
         </h2>
-        <div style={{ fontSize: '11px', color: '#666' }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
           {vehicleInfo.year} {vehicleInfo.make} {vehicleInfo.model}
         </div>
       </div>
@@ -150,9 +150,9 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
             padding: '16px',
             fontSize: '13px',
             fontWeight: 700,
-            border: '2px solid #000',
-            background: loading ? '#ccc' : '#000',
-            color: '#fff',
+            border: '2px solid var(--text)',
+            background: loading ? 'var(--border)' : 'var(--text)',
+            color: 'var(--bg)',
             cursor: loading ? 'wait' : 'pointer',
             marginBottom: '16px'
           }}
@@ -175,8 +175,8 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
                 style={{
                   marginBottom: '8px',
                   padding: '12px',
-                  background: selectedParts.has(idx) ? '#f0f8ff' : '#f8f8f8',
-                  border: `2px solid ${selectedParts.has(idx) ? '#0066cc' : '#ddd'}`,
+                  background: selectedParts.has(idx) ? 'var(--accent-dim, var(--bg))' : 'var(--bg)',
+                  border: `2px solid ${selectedParts.has(idx) ? 'var(--accent)' : 'var(--border)'}`,
                   cursor: 'pointer'
                 }}
                 onClick={() => {
@@ -200,20 +200,20 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
                       />
                       {rec.part_name}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                       {rec.issue}
                     </div>
                     <div style={{ fontSize: '9px' }}>
                       <span style={{ 
                         padding: '2px 6px', 
                         background: getPriorityColor(rec.priority),
-                        color: '#fff',
+                        color: 'var(--bg)',
                         borderRadius: '2px',
                         marginRight: '8px'
                       }}>
                         {rec.priority.toUpperCase()}
                       </span>
-                      <span style={{ color: '#666' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>
                         {rec.confidence}% confidence
                       </span>
                     </div>
@@ -223,7 +223,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
                       ${rec.estimated_cost?.toFixed(2) || 'N/A'}
                     </div>
                     {rec.catalog_matches.length > 0 && (
-                      <div style={{ fontSize: '9px', color: '#666' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
                         {rec.catalog_matches[0].part_number}
                       </div>
                     )}
@@ -234,7 +234,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
           </div>
 
           {/* Labor */}
-          <div style={{ marginBottom: '16px', padding: '12px', background: '#f8f8f8', border: '2px solid #000' }}>
+          <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--bg)', border: '2px solid var(--text)' }}>
             <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px' }}>
               LABOR ESTIMATE
             </div>
@@ -252,7 +252,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
                     width: '100%',
                     padding: '6px',
                     fontSize: '11px',
-                    border: '2px solid #000'
+                    border: '2px solid var(--text)'
                   }}
                 />
               </div>
@@ -268,7 +268,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
                     width: '100%',
                     padding: '6px',
                     fontSize: '11px',
-                    border: '2px solid #000'
+                    border: '2px solid var(--text)'
                   }}
                 />
               </div>
@@ -276,7 +276,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
           </div>
 
           {/* Quote Summary */}
-          <div style={{ padding: '12px', background: '#000', color: '#fff', border: '2px solid #000', marginBottom: '16px' }}>
+          <div style={{ padding: '12px', background: 'var(--text)', color: 'var(--bg)', border: '2px solid var(--text)', marginBottom: '16px' }}>
             <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px' }}>
               QUOTE SUMMARY
             </div>
@@ -292,7 +292,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
               <span>Subtotal:</span>
               <span>${total.subtotal.toFixed(2)}</span>
             </div>
-            <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #666' }}>
+            <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid var(--text-secondary)' }}>
               <span>Tax (est.):</span>
               <span>${total.tax.toFixed(2)}</span>
             </div>
@@ -311,9 +311,9 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
                 padding: '12px',
                 fontSize: '11px',
                 fontWeight: 700,
-                border: '2px solid #000',
-                background: '#000',
-                color: '#fff',
+                border: '2px solid var(--text)',
+                background: 'var(--text)',
+                color: 'var(--bg)',
                 cursor: 'pointer'
               }}
             >
@@ -325,7 +325,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
                 padding: '12px 16px',
                 fontSize: '11px',
                 fontWeight: 700,
-                border: '2px solid #000',
+                border: '2px solid var(--text)',
                 background: 'var(--surface)',
                 cursor: 'pointer'
               }}

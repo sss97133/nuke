@@ -198,21 +198,17 @@ export const DomainRoutes = () => {
           <Route path="/predictions/:id" element={<MarketDetail />} />
           <Route path="/predictions/live" element={<LiveAuctionView />} />
 
-          {/* Settings */}
-          <Route path="/settings/api-keys" element={<ApiKeysPage />} />
-          <Route path="/settings/webhooks" element={<WebhooksPage />} />
-          <Route path="/settings/usage" element={<UsageDashboardPage />} />
-
-          {/* Developer dashboard (authenticated SDK users) */}
-          <Route path="/developers/dashboard" element={<DeveloperDashboard />} />
-
-          {/* Business management */}
-          <Route path="/business/settings" element={<BusinessSettings />} />
-          <Route path="/api/quickbooks/callback" element={<QuickBooksCallback />} />
-
-          {/* Stripe Connect */}
-          <Route path="/stripe-connect" element={<StripeConnect />} />
-          <Route path="/stripe-connect/store/:accountId" element={<StripeConnectStore />} />
+          {/* Settings (protected) */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/settings/api-keys" element={<ApiKeysPage />} />
+            <Route path="/settings/webhooks" element={<WebhooksPage />} />
+            <Route path="/settings/usage" element={<UsageDashboardPage />} />
+            <Route path="/developers/dashboard" element={<DeveloperDashboard />} />
+            <Route path="/business/settings" element={<BusinessSettings />} />
+            <Route path="/api/quickbooks/callback" element={<QuickBooksCallback />} />
+            <Route path="/stripe-connect" element={<StripeConnect />} />
+            <Route path="/stripe-connect/store/:accountId" element={<StripeConnectStore />} />
+          </Route>
         </Route>
 
         {/* ── Fallback ─────────────────────────────────────────────────── */}

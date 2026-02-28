@@ -1033,7 +1033,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
 
       {/* Compact header only if there are comments */}
       {comments.length > 0 && (
-        <div style={{ marginBottom: '12px', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+        <div style={{ marginBottom: '12px', fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>
           Comments ({comments.length})
         </div>
       )}
@@ -1052,7 +1052,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
           />
           <div className="form-actions" style={{ position: 'absolute', right: '8px', bottom: '8px', display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
             {scrapingStatus && (
-              <div style={{ fontSize: '11px', color: '#6b7280', padding: '2px 8px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '2px 8px' }}>
                 {scrapingStatus}
               </div>
             )}
@@ -1088,11 +1088,11 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
                           </div>
                         )}
                       </div>
-                      <div className="comment-author" style={{ fontSize: 12, color: '#374151' }}>
+                      <div className="comment-author" style={{ fontSize: 12, color: 'var(--text)' }}>
                         {comment.user_name || comment.user_email?.split('@')[0] || 'User'}
                       </div>
                       <UserReputationBadge userId={comment.user_id} inline={true} />
-                      <span className="comment-date" style={{ fontSize: 11, color: '#6b7280' }}>{formatDate(comment.created_at)}</span>
+                      <span className="comment-date" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{formatDate(comment.created_at)}</span>
                     </div>
                     {canDeleteComment(comment) && (
                       <button
@@ -1105,7 +1105,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
                         style={{
                           background: 'transparent',
                           border: 'none',
-                          color: '#ef4444',
+                          color: 'var(--error)',
                           fontSize: '11px',
                           cursor: deletingCommentId === comment.id ? 'not-allowed' : 'pointer',
                           padding: '2px 6px',
@@ -1129,7 +1129,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
                               target="_blank"
                               rel="noopener noreferrer"
                               style={{
-                                color: isBAT ? '#2563eb' : '#059669',
+                                color: isBAT ? 'var(--accent)' : 'var(--success)',
                                 textDecoration: 'underline',
                                 fontWeight: isBAT ? 600 : 400
                               }}

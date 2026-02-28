@@ -1,4 +1,43 @@
 {
+  "hier_american": {
+    "AMC": 0,
+    "Buick": 1,
+    "Cadillac": 2,
+    "Chevrolet": 3,
+    "Chrysler": 4,
+    "DeLorean": 5,
+    "Dodge": 6,
+    "Ford": 7,
+    "GMC": 8,
+    "International": 9,
+    "Jeep": 10,
+    "Lincoln": 11,
+    "Mercury": 12,
+    "Oldsmobile": 13,
+    "Packard": 14,
+    "Plymouth": 15,
+    "Pontiac": 16,
+    "Shelby": 17,
+    "Studebaker": 18,
+    "Willys": 19
+  },
+  "hier_british": {
+    "Aston Martin": 0,
+    "Austin": 1,
+    "Austin-Healey": 2,
+    "Bentley": 3,
+    "Jaguar": 4,
+    "Jensen": 5,
+    "Land Rover": 6,
+    "Lotus": 7,
+    "MG": 8,
+    "Morgan": 9,
+    "Morris": 10,
+    "Rolls-Royce": 11,
+    "Rover": 12,
+    "Sunbeam": 13,
+    "Triumph": 14
+  },
   "hier_family": {
     "american": 0,
     "british": 1,
@@ -8,5 +47,38 @@
     "japanese": 5,
     "other": 6,
     "swedish": 7
+  },
+  "hier_french": {
+    "Citroen": 0,
+    "Renault": 1
+  },
+  "hier_german": {
+    "Audi": 0,
+    "BMW": 1,
+    "Mercedes-Benz": 2,
+    "Porsche": 3,
+    "Volkswagen": 4
+  },
+  "hier_italian": {
+    "Alfa Romeo": 0,
+    "Ferrari": 1,
+    "Fiat": 2,
+    "Lamborghini": 3,
+    "Lancia": 4,
+    "Maserati": 5
+  },
+  "hier_japanese": {
+    "Honda": 0,
+    "Isuzu": 1,
+    "Mazda": 2,
+    "Mitsubishi": 3,
+    "Nissan": 4,
+    "Subaru": 5,
+    "Suzuki": 6,
+    "Toyota": 7
+  },
+  "hier_swedish": {
+    "Saab": 0,
+    "Volvo": 1
   }
 }

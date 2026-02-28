@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const SHARE_URL  = 'https://nuke.ag/market/competitors';
-const SHARE_TEXT = 'Nuke vs. Rally, TheCarCrowd, Fraction Motors — every fractional vehicle ownership platform compared. Real transaction data on 1.25M vehicles.';
+const SHARE_URL  = 'https://nuke.ag/market/partners';
+const SHARE_TEXT = 'Nuke partners with Rally, TheCarCrowd, MCQ Markets, and Fraction Motors — bringing real transaction data and data-informed buyers to fractional vehicle platforms.';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
-type Tier = 'strong' | 'partial' | 'none' | 'na';
-
-interface Competitor {
+interface Partner {
   id: string;
   name: string;
   url: string;
@@ -20,33 +18,18 @@ interface Competitor {
   vehiclesOffered: string;
   aum: string;
   regulatory: string;
-  notes: string;
-  isNuke?: boolean;
+  what_they_have: string;
+  partnership_opportunity: string;
 }
 
-interface FeatureRow {
+interface CapabilityRow {
   category: string;
-  feature: string;
+  capability: string;
   description: string;
-  scores: Record<string, Tier>;
+  platforms: Record<string, boolean>;
 }
 
-const COMPETITORS: Competitor[] = [
-  {
-    id: 'nuke',
-    name: 'Nuke',
-    url: '#',
-    tagline: 'Data-grounded fractional ownership with 1.25M vehicle price history',
-    founded: '2024',
-    hq: 'US',
-    model: 'Segment ETFs + individual vehicle shares',
-    minInvestment: '$1',
-    vehiclesOffered: '1.25M tracked',
-    aum: '—',
-    regulatory: 'MVP',
-    notes: 'Only platform with proprietary transaction data across 15+ auction sources. NAV computed from real auction closes, not appraiser estimates. Covers every price tier from $5K barn finds to $500K Ferraris.',
-    isNuke: true,
-  },
+const PARTNERS: Partner[] = [
   {
     id: 'rally',
     name: 'Rally',
@@ -55,11 +38,12 @@ const COMPETITORS: Competitor[] = [
     founded: '2017',
     hq: 'New York, NY',
     model: 'SEC Reg A+, individual asset IPOs + secondary market',
-    minInvestment: '$14.25–$212.50/share (cars)',
+    minInvestment: '$14.25\u2013$212.50/share (cars)',
     vehiclesOffered: '9 active cars ($2.07M market cap)',
     aum: '~$40M (all assets)',
-    regulatory: 'SEC Reg A+ · $350K SEC fine 2023',
-    notes: 'Raised $112M total ($175M valuation in 2021), now last round was $0.5M in June 2025 — growth stalled. ~200–250K users (flat since 2021). SEC fined $350K in July 2023 for operating an unregistered securities exchange (2018–2021, $5.8M in secondary trades, 20K investors). 9 car listings: BMW 850CSi ($14.25/share), Porsche 356 ($212.50/share), Saleen S7 already exited. Multi-asset: cars now compete with cards, wine, comics for catalog space.',
+    regulatory: 'SEC Reg A+',
+    what_they_have: 'Proven SEC Reg A+ infrastructure, established secondary market, 200K+ user base, 8-year track record in fractional collectibles. 9 active car listings across sports cars, classics, and exotics.',
+    partnership_opportunity: "Rally's car listings are priced via Hagerty appraisals \u2014 subjective estimates. Nuke's real transaction data (1.25M vehicles, 15+ auction sources) can power real-market NAV for their listings. Our data API can replace appraisal-based pricing with auction-close-based pricing, and our investor base of data-driven buyers would bring fresh demand to their secondary market.",
   },
   {
     id: 'carcrowd',
@@ -68,12 +52,13 @@ const COMPETITORS: Competitor[] = [
     tagline: 'Fractional classic car syndicates',
     founded: '2019',
     hq: 'Newark, UK',
-    model: 'Private syndicates per car — NOT FCA-regulated',
-    minInvestment: '£2,000–£5,000/slot',
+    model: 'Private syndicates per car',
+    minInvestment: '\u00a32,000\u2013\u00a35,000/slot',
     vehiclesOffered: '40+ cars (UK syndicate model)',
-    aum: '~£2–8M (est.)',
-    regulatory: '⚠ Explicitly NOT FCA-regulated',
-    notes: 'Their own FAQs state: "not regulated by the UK Financial Conduct Authority." No FSCS protection. Raised ~$2.4M total equity. 7,000+ members. Fees: 12.5% curation upfront + ~3.91%/year + up to 10% of gains on exit — PistonHeads community calculates car must appreciate ~30% before investors break even. Returns (12.6% 2023, 12.7% 2024) are directors\' paper estimates — only 2 confirmed exits. UK-only, no US access.',
+    aum: '~\u00a32\u20138M (est.)',
+    regulatory: 'Private syndicate model',
+    what_they_have: 'Largest classic car fractional platform by vehicle count (40+ cars), 7,000+ member community, established UK market presence, curation expertise for classic British and European vehicles, and hands-on vehicle management experience.',
+    partnership_opportunity: "TheCarCrowd has more cars under management than any other platform, but their pricing is based on directors' estimates. Nuke's comps engine provides real comparable sales data for each vehicle. A data partnership would give their 7,000 members transparent market-rate pricing \u2014 and introduce their inventory to US investors via Nuke's platform.",
   },
   {
     id: 'mcqmarkets',
@@ -87,7 +72,8 @@ const COMPETITORS: Competitor[] = [
     vehiclesOffered: 'Lamborghini Countach 5000QV, Lexus LFA, Ferrari 512 BBi',
     aum: 'Early stage',
     regulatory: 'SEC Reg A+',
-    notes: 'Direct US competitor. $20/share minimum — lowest of any SEC-regulated platform. Currently listing: 1986 Lamborghini Countach 5000QV, 2012 Lexus LFA, 1984 Ferrari 512 BBi. Raised $750K Reg CF round. Also launched McQueen Garage (Dogecoin blockchain) in June 2025. Motorsports/entertainment connections via co-founder Lachlan DeFrancesco.',
+    what_they_have: 'SEC Reg A+ infrastructure, $20/share minimum (most accessible price point in the market), focus on blue-chip exotics (Lamborghini, Lexus LFA, Ferrari), motorsports community connections via co-founder Lachlan DeFrancesco.',
+    partnership_opportunity: "Most aligned US partner. MCQ picks cars by feel and motorsports relationships \u2014 compelling curation, but no data layer. Nuke's comps engine and vision AI can validate MCQ's pricing before IPO, give buyers confidence in NAV, and surface MCQ listings to Nuke's data-driven investor audience. Natural fit for API integration.",
   },
   {
     id: 'fractionmotors',
@@ -96,178 +82,130 @@ const COMPETITORS: Competitor[] = [
     tagline: 'Blockchain-tokenized collector cars',
     founded: '2022',
     hq: 'Birmingham, AL',
-    model: 'Blockchain tokenization — 100,000 tokens per vehicle (USDC)',
+    model: 'Blockchain tokenization \u2014 100,000 tokens per vehicle (USDC)',
     minInvestment: 'Sub-$1',
     vehiclesOffered: '5 cars ($284.4K total appraised)',
-    aum: 'Undisclosed / minimal',
-    regulatory: '⚠ No SEC registration found',
-    notes: '5 cars: 1965 Mustang K-Code ($95.7K), 1969 Chevelle SS ($66.5K), 2012 GT500 ($58.4K), 1958 Beetle ($39.1K), 1988 Fiero ($24.7K). App launched June 2024 — 2 App Store ratings total. No SEC/FINRA filing found despite selling investment interests to retail. No disclosed funding. No press coverage. Blockchain model may bypass SEC registration but creates significant legal exposure.',
+    aum: 'Early stage',
+    regulatory: 'Blockchain model',
+    what_they_have: 'Sub-$1 minimum investment (lowest entry point in the market), blockchain-native architecture enabling micro-fractional ownership, diverse vehicle selection from muscle cars to classic VWs, and early-adopter community.',
+    partnership_opportunity: "Fraction Motors has the most accessible entry point in the market \u2014 sub-$1 fractions could unlock a completely new class of collectors. Their blockchain model needs a credible pricing layer. Nuke's transaction data and comps engine can provide real market valuations for their tokenized vehicles. A data partnership brings credibility and price transparency to their platform.",
   },
 ];
 
-const FEATURES: FeatureRow[] = [
-  // Data
+// What each platform specializes in \u2014 complementary capabilities map
+const CAPABILITIES: CapabilityRow[] = [
   {
-    category: 'Data',
-    feature: 'Proprietary price history',
-    description: 'Real transaction data from multiple auction platforms',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'none' },
+    category: 'Inventory',
+    capability: 'Blue-chip exotics',
+    description: 'Ferraris, Lamborghinis, Porsches \u2014 trophy asset focus',
+    platforms: { rally: true, carcrowd: false, mcqmarkets: true, fractionmotors: false },
   },
   {
-    category: 'Data',
-    feature: 'NAV from real transactions',
-    description: 'Net Asset Value from actual auction closes — not appraisals or director estimates',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'none' },
+    category: 'Inventory',
+    capability: 'Classic / vintage',
+    description: 'Pre-1980 collector vehicles, British and European classics',
+    platforms: { rally: true, carcrowd: true, mcqmarkets: false, fractionmotors: true },
   },
   {
-    category: 'Data',
-    feature: 'Vehicle coverage',
-    description: 'Nuke: 1.25M · Rally: 9 cars · TheCarCrowd: 40+ · MCQ: 3 · Fraction: 5',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'partial', mcqmarkets: 'none', fractionmotors: 'none' },
+    category: 'Inventory',
+    capability: 'Working-class collectibles',
+    description: 'Muscle cars, trucks, barn finds \u2014 broader market access',
+    platforms: { rally: false, carcrowd: false, mcqmarkets: false, fractionmotors: true },
   },
   {
-    category: 'Data',
-    feature: 'Vision AI (condition/damage)',
-    description: 'Automated photo analysis for condition, damage, modifications',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'none' },
+    category: 'Market Access',
+    capability: 'SEC Reg A+ (US retail)',
+    description: 'Full SEC registration for US retail investor access',
+    platforms: { rally: true, carcrowd: false, mcqmarkets: true, fractionmotors: false },
   },
   {
-    category: 'Data',
-    feature: 'Data API for developers',
-    description: 'Programmatic access to vehicle data and market pricing',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'none' },
-  },
-  // Market structure
-  {
-    category: 'Market',
-    feature: 'Continuous secondary market',
-    description: 'Trade shares anytime (not periodic windows or illiquid bulletin boards)',
-    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'none', mcqmarkets: 'strong', fractionmotors: 'partial' },
+    category: 'Market Access',
+    capability: 'Continuous secondary market',
+    description: 'Trade shares anytime after IPO',
+    platforms: { rally: true, carcrowd: false, mcqmarkets: true, fractionmotors: true },
   },
   {
-    category: 'Market',
-    feature: 'Segment ETFs',
-    description: 'Diversified exposure to vehicle categories (Porsche, Trucks, etc.)',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'none' },
+    category: 'Market Access',
+    capability: 'Sub-$25 minimum entry',
+    description: 'Accessible to first-time fractional investors',
+    platforms: { rally: true, carcrowd: false, mcqmarkets: true, fractionmotors: true },
   },
   {
-    category: 'Market',
-    feature: 'Individual vehicle fractions',
-    description: 'Invest in a specific VIN',
-    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'strong', mcqmarkets: 'strong', fractionmotors: 'strong' },
-  },
-  {
-    category: 'Market',
-    feature: 'Price-time priority order book',
-    description: 'True exchange-style matching — not periodic windows',
-    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'none', mcqmarkets: 'strong', fractionmotors: 'none' },
-  },
-  {
-    category: 'Market',
-    feature: 'Min investment < $25',
-    description: 'Nuke: $1 · MCQ: $20 · Rally: $14.25 · TheCarCrowd: £2,000 · Fraction: <$1',
-    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'none', mcqmarkets: 'strong', fractionmotors: 'strong' },
-  },
-  // Vehicle focus
-  {
-    category: 'Vehicles',
-    feature: 'Vehicle-exclusive focus',
-    description: 'Platform dedicated to cars (not diluted by art/cards/sneakers)',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'strong', mcqmarkets: 'strong', fractionmotors: 'strong' },
-  },
-  {
-    category: 'Vehicles',
-    feature: 'Working-class + blue chip',
-    description: 'Covers trucks, project cars, barn finds — not just $500K Ferraris',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'strong' },
-  },
-  {
-    category: 'Vehicles',
-    feature: 'Comps engine',
-    description: 'Automated comparable sales analysis per vehicle',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'none' },
-  },
-  // Platform
-  {
-    category: 'Platform',
-    feature: 'Regulatory compliance',
-    description: 'SEC Reg A+ or equivalent — verified, not just claimed',
-    scores: { nuke: 'partial', rally: 'partial', carcrowd: 'none', mcqmarkets: 'strong', fractionmotors: 'none' },
+    category: 'Market Access',
+    capability: 'UK / European market',
+    description: 'Established presence outside the US',
+    platforms: { rally: false, carcrowd: true, mcqmarkets: false, fractionmotors: false },
   },
   {
     category: 'Platform',
-    feature: 'Mobile app',
-    description: 'Native iOS/Android app',
-    scores: { nuke: 'none', rally: 'strong', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'strong' },
+    capability: 'Established user base (100K+)',
+    description: 'Proven community of fractional investors',
+    platforms: { rally: true, carcrowd: true, mcqmarkets: false, fractionmotors: false },
   },
   {
     category: 'Platform',
-    feature: 'US market access',
-    description: 'Available to US-based retail investors',
-    scores: { nuke: 'strong', rally: 'strong', carcrowd: 'none', mcqmarkets: 'strong', fractionmotors: 'strong' },
+    capability: 'Mobile app',
+    description: 'Native iOS/Android trading experience',
+    platforms: { rally: true, carcrowd: false, mcqmarkets: false, fractionmotors: true },
   },
   {
     category: 'Platform',
-    feature: 'Provenance tracking',
-    description: 'Service records, ownership history, title chain',
-    scores: { nuke: 'strong', rally: 'none', carcrowd: 'none', mcqmarkets: 'none', fractionmotors: 'none' },
+    capability: 'Blockchain / tokenization',
+    description: 'On-chain ownership and micro-fractionalization',
+    platforms: { rally: false, carcrowd: false, mcqmarkets: false, fractionmotors: true },
+  },
+  {
+    category: 'Platform',
+    capability: 'Motorsports / collector community',
+    description: 'Deep connections to car enthusiast networks',
+    platforms: { rally: true, carcrowd: true, mcqmarkets: true, fractionmotors: false },
   },
 ];
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const TIER_CONFIG: Record<Tier, { label: string; bg: string; color: string }> = {
-  strong:  { label: '✓',  bg: 'rgba(16,185,129,0.15)', color: '#059669' },
-  partial: { label: '~',  bg: 'rgba(245,158,11,0.15)',  color: '#b45309' },
-  none:    { label: '✗',  bg: 'rgba(220,38,38,0.10)',   color: '#b91c1c' },
-  na:      { label: '—',  bg: 'rgba(0,0,0,0.04)',       color: 'var(--text-muted)' },
-};
-
-const NUKE_ADVANTAGES = [
+const NUKE_VALUE_PROPS = [
   {
-    title: 'Rally raised $112M and has $40M in assets. Growth stalled in 2021.',
-    body: 'Rally raised $112M total ($175M valuation in Oct 2021). Their last round was $0.5M in June 2025 — a signal the company is in maintenance mode, not growth. ~200–250K users, flat since 2021. ~$40M AUM across all assets after $112M invested. And in July 2023, the SEC fined them $350K for operating an unregistered securities exchange from 2018–2021. Their 9 car listings are priced via Hagerty appraisals. Nuke prices from real auction closes.',
+    title: 'Real transaction data \u2014 not appraisals',
+    body: '1.25M vehicles across 15+ auction sources. Most fractional platforms price via Hagerty appraisals or directors\u2019 estimates. Nuke prices from real auction closes. Integrating our data layer means NAV grounded in what the market actually pays.',
   },
   {
-    title: 'TheCarCrowd\'s own website: "not regulated by the FCA."',
-    body: 'Press articles describe TheCarCrowd as FCA-regulated. Their own FAQ page says: "TheCarCrowd Limited offer private syndicates... which are not regulated by the UK Financial Conduct Authority. Your capital is at risk and any funds deposited are not protected by the Financial Services Compensation Scheme." The FCA connection (via Kession Capital) applies only to their equity crowdfunding raises, not the car investments.',
+    title: 'Comps engine \u2014 per-vehicle pricing intelligence',
+    body: 'For any VIN or YMM, Nuke surfaces comparable sales with dates, condition adjustments, and platform breakdown. Partner platforms can embed this at IPO time to validate offering price and give investors confidence they\u2019re buying at market.',
   },
   {
-    title: 'TheCarCrowd fees: 12.5% upfront + 3.91%/year + 10% of gains.',
-    body: 'PistonHeads forum community calculated that a TheCarCrowd syndicate car must appreciate approximately 30% before investors see any positive return after the 12.5% curation fee, ~4% annual operations fee over a 3–5 year hold, and 10% of any gains on exit. Their 12.6% average return (2023) is based on directors\' paper estimates — only 2 confirmed exits in 4+ years. The entire market is sub-$100M AUM.',
+    title: 'Vision AI \u2014 automated condition assessment',
+    body: 'YONO (our vision model) classifies vehicle condition, zones of damage or modification, and originality from photos. Partner platforms submit photos; we return condition scores. Replaces subjective curation with consistent, data-backed grading.',
   },
   {
-    title: 'Fraction Motors: 2 App Store reviews. No SEC registration.',
-    body: 'Fraction Motors launched in June 2024 and has 2 App Store ratings. No SEC or FINRA filing found despite selling investment interests in tokenized vehicles to retail buyers. No disclosed funding. Zero press coverage. 5 cars listed totaling $284K appraised. Their blockchain model may bypass traditional securities law — or it may not, and they haven\'t tested it yet.',
+    title: 'Data API \u2014 build on our intelligence layer',
+    body: 'api.nuke.ag exposes comps, valuations, market trends, and vehicle history as a developer API. Partner platforms integrate once and gain access to 1.25M vehicles of pricing history. TypeScript SDK available at npmjs.com/@nuke1/sdk.',
   },
   {
-    title: 'The entire market is under $100M AUM. It\'s wide open.',
-    body: 'The global fractional classic car investment market is estimated at $1.38B in 2024 (DataIntelo), growing to $4.13B by 2033. The total classic car market is $37–43B annually. All fractional platforms combined — Rally, TheCarCrowd, MCQ Markets, Fraction Motors — hold an estimated under $100M in AUM. Less than 0.3% of the market has been fractionalized. Nuke has 1.25M vehicles tracked with real data. The timing is early.',
+    title: 'Investor distribution \u2014 data-driven buyers',
+    body: "Nuke\u2019s investor base comes for the data. They trust market-rate valuations, not appraisals. When a partner platform lists a vehicle with Nuke data behind the pricing, it unlocks a new buyer segment that currently can\u2019t find a fractional platform they trust.",
   },
 ];
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 Component \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 export default function MarketCompetitors() {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [copied, setCopied] = useState(false);
 
-  // Update document title + meta tags for Slack/WhatsApp/iMessage previews
   useEffect(() => {
     const prev = document.title;
-    document.title = 'Nuke vs. Rally — Fractional Vehicle Ownership Comparison';
+    document.title = 'Nuke Partner Ecosystem \u2014 Fractional Vehicle Platforms';
 
     const setMeta = (sel: string, attr: string, val: string) => {
       const el = document.querySelector(sel);
       if (el) el.setAttribute(attr, val);
     };
-    setMeta('meta[name="description"]',           'content', SHARE_TEXT);
-    setMeta('meta[property="og:title"]',          'content', 'Nuke vs. Rally — Fractional Vehicle Ownership Comparison');
-    setMeta('meta[property="og:description"]',    'content', SHARE_TEXT);
-    setMeta('meta[property="og:url"]',            'content', SHARE_URL);
-    setMeta('meta[name="twitter:title"]',         'content', 'Nuke vs. Rally — Fractional Vehicle Ownership Comparison');
-    setMeta('meta[name="twitter:description"]',   'content', SHARE_TEXT);
+    setMeta('meta[name="description"]',         'content', SHARE_TEXT);
+    setMeta('meta[property="og:title"]',        'content', 'Nuke Partner Ecosystem \u2014 Fractional Vehicle Platforms');
+    setMeta('meta[property="og:description"]',  'content', SHARE_TEXT);
+    setMeta('meta[property="og:url"]',          'content', SHARE_URL);
+    setMeta('meta[name="twitter:title"]',       'content', 'Nuke Partner Ecosystem \u2014 Fractional Vehicle Platforms');
+    setMeta('meta[name="twitter:description"]', 'content', SHARE_TEXT);
 
     return () => { document.title = prev; };
   }, []);
@@ -282,10 +220,10 @@ export default function MarketCompetitors() {
     }
   };
 
-  const categories = ['All', ...Array.from(new Set(FEATURES.map(f => f.category)))];
-  const visibleFeatures = activeCategory === 'All'
-    ? FEATURES
-    : FEATURES.filter(f => f.category === activeCategory);
+  const categories = ['All', ...Array.from(new Set(CAPABILITIES.map(f => f.category)))];
+  const visibleCapabilities = activeCategory === 'All'
+    ? CAPABILITIES
+    : CAPABILITIES.filter(f => f.category === activeCategory);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
@@ -295,10 +233,10 @@ export default function MarketCompetitors() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <h1 style={{ margin: 0, fontSize: '17px', fontWeight: 800 }}>
-              Fractional Vehicle Ownership — Market Landscape
+              Partner Ecosystem \u2014 Fractional Vehicle Platforms
             </h1>
             <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
-              Rally: $112M raised, 9 cars, SEC fined 2023 · TheCarCrowd: NOT FCA-regulated per own site, 12.5% fee · MCQ: $20/share, SEC Reg A+ · Fraction: 2 app reviews, no SEC filing · Total market AUM: &lt;$100M
+              These platforms have fractions to sell. Nuke has the data and the clients. Together we can move a market that&apos;s under $100M AUM against a $37B opportunity.
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -318,42 +256,75 @@ export default function MarketCompetitors() {
           </div>
         </div>
 
-        {/* Competitor cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-          {COMPETITORS.map(c => (
-            <div key={c.id} className="card" style={{
-              borderColor: c.isNuke ? 'var(--accent, #2563eb)' : 'var(--border)',
-              borderWidth: c.isNuke ? '2px' : '1px',
-            }}>
-              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <h3 className="heading-3" style={{ color: c.isNuke ? 'var(--accent, #2563eb)' : undefined }}>
-                  {c.name}
-                  {c.isNuke && <span style={{ marginLeft: '6px', fontSize: '9px', fontWeight: 700, color: 'var(--accent, #2563eb)', background: 'rgba(37,99,235,0.1)', padding: '1px 5px', borderRadius: '3px' }}>THIS</span>}
-                </h3>
-                {c.url !== '#' && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.url}</span>}
-              </div>
-              <div className="card-body" style={{ display: 'grid', gap: '6px', fontSize: '11px' }}>
-                <div style={{ color: 'var(--text-muted)' }}>{c.tagline}</div>
-                <div style={{ display: 'grid', gap: '4px', marginTop: '4px' }}>
-                  <Row label="Founded"    value={c.founded} />
-                  <Row label="Model"      value={c.model} />
-                  <Row label="Min invest" value={c.minInvestment} />
-                  <Row label="Coverage"  value={c.vehiclesOffered} />
-                  <Row label="AUM"        value={c.aum} />
-                  <Row label="Regulatory" value={c.regulatory} />
-                </div>
-                <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: '6px' }}>
-                  {c.notes}
-                </div>
-              </div>
+        {/* Partnership model callout */}
+        <div style={{
+          padding: '18px 24px',
+          border: '2px solid var(--accent, #2563eb)',
+          borderRadius: '6px',
+          background: 'color-mix(in srgb, var(--accent) 4%, transparent)',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '16px',
+          alignItems: 'center',
+        }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '13px', marginBottom: '4px' }}>The model</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+              Fractional platforms have curated vehicles and legal infrastructure. Nuke has real transaction data, a comps engine, and data-driven investors. Partnerships create a better product for buyers \u2014 and more demand for sellers.
             </div>
-          ))}
+          </div>
+          <div style={{ display: 'grid', gap: '8px' }}>
+            <ModelPill label="Partners bring" value="Inventory, regulation, curation" color="var(--accent, #2563eb)" />
+            <ModelPill label="Nuke brings" value="Data, pricing, investor distribution" color="var(--success, #059669)" />
+            <ModelPill label="Buyers get" value="Market-rate NAV, real comps, confidence" color="var(--warning-text, #b45309)" />
+          </div>
         </div>
 
-        {/* Feature matrix */}
+        {/* Partner cards */}
+        <div>
+          <h2 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            Platform Profiles
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
+            {PARTNERS.map(p => (
+              <div key={p.id} className="card">
+                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <h3 className="heading-3">{p.name}</h3>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{p.url}</span>
+                </div>
+                <div className="card-body" style={{ display: 'grid', gap: '10px', fontSize: '11px' }}>
+                  <div style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>{p.tagline}</div>
+                  <div style={{ display: 'grid', gap: '4px' }}>
+                    <Row label="Founded"    value={p.founded} />
+                    <Row label="HQ"         value={p.hq} />
+                    <Row label="Model"      value={p.model} />
+                    <Row label="Min invest" value={p.minInvestment} />
+                    <Row label="Coverage"   value={p.vehiclesOffered} />
+                    <Row label="Regulatory" value={p.regulatory} />
+                  </div>
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: '8px', display: 'grid', gap: '8px' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>What they have</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text)', lineHeight: 1.5 }}>{p.what_they_have}</div>
+                    </div>
+                    <div style={{ background: 'color-mix(in srgb, var(--accent) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', borderRadius: '4px', padding: '8px 10px' }}>
+                      <div style={{ fontWeight: 700, fontSize: '10px', color: 'var(--accent, #2563eb)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>Partnership opportunity</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text)', lineHeight: 1.5 }}>{p.partnership_opportunity}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Capability map */}
         <div className="card">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-            <h3 className="heading-3">Feature Matrix</h3>
+            <div>
+              <h3 className="heading-3">Platform Capability Map</h3>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>What each partner brings to the ecosystem \u2014 complementary, not competing</div>
+            </div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {categories.map(cat => (
                 <button
@@ -368,7 +339,7 @@ export default function MarketCompetitors() {
                     borderRadius: '3px',
                     cursor: 'pointer',
                     background: activeCategory === cat ? 'var(--accent, #2563eb)' : 'var(--surface)',
-                    color: activeCategory === cat ? '#fff' : 'var(--text)',
+                    color: activeCategory === cat ? 'var(--text-on-accent, #fff)' : 'var(--text)',
                   }}
                 >
                   {cat}
@@ -381,33 +352,31 @@ export default function MarketCompetitors() {
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--bg)' }}>
                   <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap', minWidth: '200px' }}>
-                    Feature
+                    Capability
                   </th>
-                  {COMPETITORS.map(c => (
-                    <th key={c.id} style={{
+                  {PARTNERS.map(p => (
+                    <th key={p.id} style={{
                       padding: '10px 16px',
                       textAlign: 'center',
                       fontWeight: 800,
                       whiteSpace: 'nowrap',
-                      color: c.isNuke ? 'var(--accent, #2563eb)' : undefined,
-                      minWidth: '80px',
+                      minWidth: '90px',
                     }}>
-                      {c.name}
+                      {p.name}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {visibleFeatures.map((row, i) => {
-                  // Insert category divider when category changes
-                  const prevCategory = i > 0 ? visibleFeatures[i - 1].category : null;
+                {visibleCapabilities.map((row, i) => {
+                  const prevCategory = i > 0 ? visibleCapabilities[i - 1].category : null;
                   const showDivider = row.category !== prevCategory;
 
                   return (
-                    <React.Fragment key={row.feature}>
+                    <React.Fragment key={row.capability}>
                       {showDivider && (
                         <tr>
-                          <td colSpan={COMPETITORS.length + 1} style={{
+                          <td colSpan={PARTNERS.length + 1} style={{
                             padding: '8px 16px 4px',
                             fontSize: '7.5pt',
                             fontWeight: 800,
@@ -426,25 +395,24 @@ export default function MarketCompetitors() {
                         background: i % 2 === 0 ? 'var(--surface)' : 'var(--bg)',
                       }}>
                         <td style={{ padding: '9px 16px' }}>
-                          <div style={{ fontWeight: 600 }}>{row.feature}</div>
+                          <div style={{ fontWeight: 600 }}>{row.capability}</div>
                           <div style={{ fontSize: '7.5pt', color: 'var(--text-muted)', marginTop: '2px' }}>{row.description}</div>
                         </td>
-                        {COMPETITORS.map(c => {
-                          const tier = row.scores[c.id] ?? 'na';
-                          const cfg = TIER_CONFIG[tier];
+                        {PARTNERS.map(p => {
+                          const has = row.platforms[p.id] ?? false;
                           return (
-                            <td key={c.id} style={{ padding: '9px 16px', textAlign: 'center' }}>
+                            <td key={p.id} style={{ padding: '9px 16px', textAlign: 'center' }}>
                               <span style={{
                                 display: 'inline-block',
                                 padding: '2px 8px',
                                 borderRadius: '3px',
-                                background: cfg.bg,
-                                color: cfg.color,
+                                background: has ? 'color-mix(in srgb, var(--success) 15%, transparent)' : 'color-mix(in srgb, var(--text) 4%, transparent)',
+                                color: has ? 'var(--success)' : 'var(--text-muted)',
                                 fontWeight: 800,
                                 fontSize: '13px',
                                 minWidth: '28px',
                               }}>
-                                {cfg.label}
+                                {has ? '\u2713' : '\u2014'}
                               </span>
                             </td>
                           );
@@ -456,23 +424,19 @@ export default function MarketCompetitors() {
               </tbody>
             </table>
           </div>
-          <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: '16px', fontSize: '11px', color: 'var(--text-muted)' }}>
-            {Object.entries(TIER_CONFIG).map(([tier, cfg]) => (
-              <span key={tier} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <span style={{ background: cfg.bg, color: cfg.color, fontWeight: 800, padding: '1px 6px', borderRadius: '3px' }}>{cfg.label}</span>
-                {{ strong: 'Yes / Full', partial: 'Partial', none: 'No', na: 'N/A' }[tier]}
-              </span>
-            ))}
+          <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', fontSize: '11px', color: 'var(--text-muted)' }}>
+            \u2713 = platform has this capability \u00b7 \u2014 = not a focus area \u00b7 Green cells highlight what each partner brings to the ecosystem
           </div>
         </div>
 
-        {/* Nuke advantages deep-dive */}
+        {/* What Nuke brings */}
         <div className="card">
           <div className="card-header">
-            <h3 className="heading-3">Why Nuke Wins on Data</h3>
+            <h3 className="heading-3">What Nuke Brings to Partners</h3>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>The intelligence layer that makes fractional vehicle investing data-credible</div>
           </div>
           <div className="card-body" style={{ display: 'grid', gap: '14px' }}>
-            {NUKE_ADVANTAGES.map((adv, i) => (
+            {NUKE_VALUE_PROPS.map((prop, i) => (
               <div key={i} style={{
                 display: 'grid',
                 gridTemplateColumns: '4px 1fr',
@@ -480,95 +444,92 @@ export default function MarketCompetitors() {
               }}>
                 <div style={{ background: 'var(--accent, #2563eb)', borderRadius: '2px' }} />
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '9.5pt', marginBottom: '4px' }}>{adv.title}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.6 }}>{adv.body}</div>
+                  <div style={{ fontWeight: 700, fontSize: '9.5pt', marginBottom: '4px' }}>{prop.title}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.6 }}>{prop.body}</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Competitive positioning summary */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
-          <SummaryCard
-            title="vs. Rally"
-            verdict="$112M raised. $40M assets. SEC fine."
-            color="rgba(37,99,235,0.12)"
-            accentColor="#1d4ed8"
-            body="9 cars, $2.07M fractional market cap, priced via Hagerty. $112M raised but last round was $0.5M in June 2025 — stalled growth. SEC fined $350K in 2023 for running an unregistered exchange. Only documented car exit returned 17% net (not annualized) on a Mustang Cobra R. Users flat at 200–250K since 2021."
-          />
-          <SummaryCard
-            title="vs. TheCarCrowd"
-            verdict="Claims FCA. Own site says otherwise."
-            color="rgba(16,185,129,0.12)"
-            accentColor="#059669"
-            body={'Their FAQ: "not regulated by the UK Financial Conduct Authority. Your capital is at risk and not protected by FSCS." 12.5% upfront fee + 3.91%/year + 10% of gains means ~30% appreciation needed to break even. Returns (12.6%) are directors\' paper estimates \u2014 2 confirmed exits in 4 years. \u00a32,000 minimum. UK-only.'}
-          />
-          <SummaryCard
-            title="vs. MCQ Markets"
-            verdict="Closest US comp — $20 min, SEC Reg A+"
-            color="rgba(16,185,129,0.12)"
-            accentColor="#059669"
-            body="MCQ is the most direct US competitor: SEC Reg A+, $20/share, exotic cars (Lamborghini Countach 5000QV, Lexus LFA, Ferrari 512 BBi). $750K Reg CF raise. Early stage, small catalog. No transaction data, no comps engine, no segment ETFs. Nuke's data layer is the differentiator — MCQ picks cars the same way Rally does: by feel."
-          />
-          <SummaryCard
-            title="vs. Fraction Motors"
-            verdict="2 App Store reviews. No SEC filing."
-            color="rgba(245,158,11,0.12)"
-            accentColor="#b45309"
-            body="5 cars ($284K total), launched June 2024, 2 App Store ratings. No SEC or FINRA registration found despite selling investment interests to retail. No disclosed funding. No press coverage. Blockchain model may bypass securities compliance — or may create significant legal exposure. Not a serious platform yet."
-          />
+        {/* Integration paths */}
+        <div>
+          <h2 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            Integration Paths
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+            <IntegrationCard
+              title="Data API"
+              subtitle="Any platform"
+              color="color-mix(in srgb, var(--accent) 8%, transparent)"
+              accentColor="var(--accent, #1d4ed8)"
+              body="Partners call api.nuke.ag with a VIN or YMM. We return real comparable sales, auction history, condition flags, and a market-based valuation. Embed in IPO prospectus, listing page, or investor dashboard. TypeScript SDK available."
+            />
+            <IntegrationCard
+              title="Vision AI"
+              subtitle="Condition grading"
+              color="color-mix(in srgb, var(--success) 8%, transparent)"
+              accentColor="var(--success, #059669)"
+              body="Submit vehicle photo sets to our YONO vision API. We return zone-level condition scores (exterior, interior, engine bay), modification flags, and an originality rating. Replaces subjective curation with consistent machine-graded assessment."
+            />
+            <IntegrationCard
+              title="Listing Distribution"
+              subtitle="Demand generation"
+              color="color-mix(in srgb, var(--success) 8%, transparent)"
+              accentColor="var(--success, #059669)"
+              body="Partner fractions surfaced to Nuke's investor base \u2014 data-driven buyers who've already vetted market pricing via our platform. Distribution to users who trust auction-close NAV, not appraisals. Natural demand for well-priced inventory."
+            />
+            <IntegrationCard
+              title="Co-branded Pricing Badge"
+              subtitle="Investor trust layer"
+              color="color-mix(in srgb, var(--warning) 8%, transparent)"
+              accentColor="var(--warning-text, #b45309)"
+              body="Partner listings show 'Priced with Nuke data' \u2014 linking to our comps report for the vehicle. Transparent pricing builds buyer confidence, reduces negotiation friction, and positions the platform as data-forward in a market that runs on appraisals."
+            />
+          </div>
         </div>
 
-        {/* Share strip */}
+        {/* Market opportunity stats */}
         <div style={{
-          padding: '14px 20px',
+          padding: '16px 20px',
           border: '1px solid var(--border)',
           borderRadius: '6px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px',
           background: 'var(--surface)',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+          gap: '16px',
+          textAlign: 'center',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Share this page:</span>
-            <code style={{
-              fontSize: '11px',
-              padding: '3px 8px',
-              background: 'var(--bg)',
-              border: '1px solid var(--border)',
-              borderRadius: '3px',
-              color: 'var(--text)',
-              userSelect: 'all',
-            }}>
-              {SHARE_URL}
-            </code>
-          </div>
-          <button className="button button-primary" onClick={handleShare}>
-            {copied ? 'Copied!' : 'Copy link'}
-          </button>
+          <StatBlock value="$37\u201343B" label="Annual classic car market" />
+          <StatBlock value="<$100M" label="Total fractional AUM today" />
+          <StatBlock value="<0.3%" label="Market fractionalized so far" />
+          <StatBlock value="1.25M" label="Vehicles in Nuke's database" />
+          <StatBlock value="15+" label="Auction sources tracked" />
+          <StatBlock value="$1.38B\u2192$4.13B" label="Fractional market forecast (2024\u21922033)" />
         </div>
 
-        {/* CTA — two tracks: invest/trade + investor inquiry */}
+        {/* CTA */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
           <div style={{
             padding: '20px',
             border: '2px solid var(--accent, #2563eb)',
             borderRadius: '6px',
-            background: 'rgba(37,99,235,0.04)',
+            background: 'color-mix(in srgb, var(--accent) 4%, transparent)',
           }}>
-            <div style={{ fontWeight: 800, fontSize: '13px', marginBottom: '6px' }}>Ready to trade?</div>
+            <div style={{ fontWeight: 800, fontSize: '13px', marginBottom: '6px' }}>Platform partnership inquiry</div>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.5 }}>
-              Invest in segment ETFs (PORS, TRUK, SQBD, Y79) or browse individual vehicle offerings.
+              Running a fractional vehicle platform? Talk to us about data API integration, co-branded pricing, or listing distribution to Nuke investors.
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button className="button button-primary" onClick={() => navigate('/market/exchange')}>
-                Go to Exchange
-              </button>
-              <button className="button button-secondary" onClick={() => navigate('/market/portfolio')}>
-                Portfolio
+              <a
+                href="mailto:info@nuke.ag?subject=Platform%20Partnership%20Inquiry"
+                className="button button-primary"
+                style={{ textDecoration: 'none' }}
+              >
+                Contact us
+              </a>
+              <button className="button button-secondary" onClick={() => navigate('/offering')}>
+                Data Room
               </button>
             </div>
           </div>
@@ -579,21 +540,17 @@ export default function MarketCompetitors() {
             borderRadius: '6px',
             background: 'var(--surface)',
           }}>
-            <div style={{ fontWeight: 800, fontSize: '13px', marginBottom: '6px' }}>Investor inquiry?</div>
+            <div style={{ fontWeight: 800, fontSize: '13px', marginBottom: '6px' }}>Invest via Nuke</div>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.5 }}>
-              Access the full data room: business plan, revenue model, technical exhibits, and information memorandum.
+              Invest in segment ETFs (PORS, TRUK, SQBD, Y79) or browse individual vehicle offerings \u2014 priced with real auction data, not appraisals.
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button className="button button-primary" onClick={() => navigate('/offering')}>
-                Investor Data Room
+              <button className="button button-primary" onClick={() => navigate('/market/exchange')}>
+                Go to Exchange
               </button>
-              <a
-                href="mailto:info@nuke.ag?subject=Investment%20Inquiry"
-                className="button button-secondary"
-                style={{ textDecoration: 'none' }}
-              >
-                Email us
-              </a>
+              <button className="button button-secondary" onClick={() => navigate('/market/portfolio')}>
+                Portfolio
+              </button>
             </div>
           </div>
         </div>
@@ -603,7 +560,7 @@ export default function MarketCompetitors() {
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 Sub-components \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -614,9 +571,18 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SummaryCard({ title, verdict, color, accentColor, body }: {
+function ModelPill({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
+      <span style={{ color: 'var(--text-muted)', minWidth: '90px' }}>{label}</span>
+      <span style={{ fontWeight: 700, color }}>{value}</span>
+    </div>
+  );
+}
+
+function IntegrationCard({ title, subtitle, color, accentColor, body }: {
   title: string;
-  verdict: string;
+  subtitle: string;
   color: string;
   accentColor: string;
   body: string;
@@ -624,15 +590,24 @@ function SummaryCard({ title, verdict, color, accentColor, body }: {
   return (
     <div style={{
       padding: '16px',
-      border: '2px solid var(--border)',
+      border: '1px solid var(--border)',
       borderRadius: '6px',
       background: color,
       display: 'grid',
-      gap: '8px',
+      gap: '6px',
     }}>
-      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>{title}</div>
-      <div style={{ fontWeight: 800, fontSize: '13px', color: accentColor }}>{verdict}</div>
+      <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{subtitle}</div>
+      <div style={{ fontWeight: 800, fontSize: '13px', color: accentColor }}>{title}</div>
       <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.6 }}>{body}</div>
+    </div>
+  );
+}
+
+function StatBlock({ value, label }: { value: string; label: string }) {
+  return (
+    <div>
+      <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--accent, #2563eb)' }}>{value}</div>
+      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>{label}</div>
     </div>
   );
 }

@@ -177,7 +177,7 @@ export default function SystemStatus() {
 
   if (!stats) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: '#888' }}>
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-disabled)' }}>
         Loading system status...
       </div>
     );
@@ -189,11 +189,11 @@ export default function SystemStatus() {
     <div style={{ padding: '16px', maxWidth: '1400px', margin: '0 auto', background: 'var(--surface)', minHeight: '100vh' }}>
       
       {/* Header */}
-      <div style={{ marginBottom: '16px', borderBottom: '2px solid #000', paddingBottom: '8px' }}>
+      <div style={{ marginBottom: '16px', borderBottom: '2px solid var(--text)', paddingBottom: '8px' }}>
         <h1 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           ADMIN SYSTEM STATUS
         </h1>
-        <p style={{ fontSize: '11px', color: '#666' }}>
+        <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
           Updates every 2s • Last: {stats.lastUpdate}
         </p>
       </div>
@@ -205,8 +205,8 @@ export default function SystemStatus() {
         <div 
           onClick={() => handlePanelClick('tier1')}
           style={{ 
-            background: expandedSection === 'tier1' ? '#e0e0e0' : '#f8f8f8', 
-            border: '2px solid #000', 
+            background: expandedSection === 'tier1' ? 'var(--surface-hover)' : 'var(--bg)',
+            border: '2px solid var(--text)',
             padding: '12px',
             cursor: 'pointer'
           }}
@@ -217,25 +217,25 @@ export default function SystemStatus() {
           <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: 'monospace' }}>
             {stats.images.analyzed.toLocaleString()}
           </div>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
             of {stats.images.total.toLocaleString()} images
           </div>
-          <div style={{ height: '8px', background: '#e0e0e0', border: '1px solid #000', overflow: 'hidden', marginBottom: '8px' }}>
+          <div style={{ height: '8px', background: 'var(--border)', border: '1px solid var(--text)', overflow: 'hidden', marginBottom: '8px' }}>
             <div style={{
               width: `${imagePercent}%`,
               height: '100%',
-              background: '#000',
+              background: 'var(--text)',
               transition: 'width 0.5s ease'
             }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
             <span style={{ fontWeight: 700 }}>{imagePercent.toFixed(1)}%</span>
-            <span style={{ color: '#666' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>
               {stats.images.pending.toLocaleString()} pending
             </span>
           </div>
           {stats.images.failed > 0 && (
-            <div style={{ marginTop: '4px', fontSize: '11px', color: '#ef4444' }}>
+            <div style={{ marginTop: '4px', fontSize: '11px', color: 'var(--error)' }}>
               {stats.images.failed} failed
             </div>
           )}
@@ -245,8 +245,8 @@ export default function SystemStatus() {
         <div 
           onClick={() => handlePanelClick('catalog')}
           style={{ 
-            background: expandedSection === 'catalog' ? '#e0e0e0' : '#f8f8f8', 
-            border: '2px solid #000', 
+            background: expandedSection === 'catalog' ? 'var(--surface-hover)' : 'var(--bg)',
+            border: '2px solid var(--text)',
             padding: '12px',
             cursor: 'pointer'
           }}
@@ -257,16 +257,16 @@ export default function SystemStatus() {
           <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: 'monospace' }}>
             {stats.catalog.total_parts.toLocaleString()}
           </div>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
             parts indexed
           </div>
           <div style={{ fontSize: '11px', marginBottom: '4px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ color: '#666' }}>Chunks done:</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Chunks done:</span>
               <span style={{ fontWeight: 700 }}>{stats.catalog.chunks_done}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#666' }}>Chunks pending:</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Chunks pending:</span>
               <span style={{ fontWeight: 700 }}>{stats.catalog.chunks_pending}</span>
             </div>
           </div>
@@ -276,8 +276,8 @@ export default function SystemStatus() {
         <div 
           onClick={() => handlePanelClick('vehicles')}
           style={{ 
-            background: expandedSection === 'vehicles' ? '#e0e0e0' : '#f8f8f8', 
-            border: '2px solid #000', 
+            background: expandedSection === 'vehicles' ? 'var(--surface-hover)' : 'var(--bg)',
+            border: '2px solid var(--text)',
             padding: '12px',
             cursor: 'pointer'
           }}
@@ -288,16 +288,16 @@ export default function SystemStatus() {
           <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: 'monospace' }}>
             {stats.vehicles.active.toLocaleString()}
           </div>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
             active vehicles
           </div>
           <div style={{ fontSize: '11px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ color: '#666' }}>Total:</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Total:</span>
               <span style={{ fontWeight: 700 }}>{stats.vehicles.total.toLocaleString()}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#666' }}>Pending:</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Pending:</span>
               <span style={{ fontWeight: 700 }}>{stats.vehicles.pending.toLocaleString()}</span>
             </div>
           </div>
@@ -307,8 +307,8 @@ export default function SystemStatus() {
         <div 
           onClick={() => handlePanelClick('auctions')}
           style={{ 
-            background: expandedSection === 'auctions' ? '#e0e0e0' : '#f8f8f8', 
-            border: '2px solid #000', 
+            background: expandedSection === 'auctions' ? 'var(--surface-hover)' : 'var(--bg)',
+            border: '2px solid var(--text)',
             padding: '12px',
             cursor: 'pointer'
           }}
@@ -319,12 +319,12 @@ export default function SystemStatus() {
           <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: 'monospace' }}>
             {stats.auctions.comments.toLocaleString()}
           </div>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
             comments analyzed
           </div>
           <div style={{ fontSize: '11px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#666' }}>Auctions:</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Auctions:</span>
               <span style={{ fontWeight: 700 }}>{stats.auctions.total.toLocaleString()}</span>
             </div>
           </div>
@@ -333,7 +333,7 @@ export default function SystemStatus() {
 
       {/* Expanded List View */}
       {expandedSection && (
-        <div style={{ marginBottom: '16px', background: 'var(--surface)', border: '2px solid #000', padding: '12px' }}>
+        <div style={{ marginBottom: '16px', background: 'var(--surface)', border: '2px solid var(--text)', padding: '12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <h3 style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' }}>
               {expandedSection === 'tier1' && 'ALL IMAGES'}
@@ -343,21 +343,21 @@ export default function SystemStatus() {
             </h3>
             <button 
               onClick={() => setExpandedSection(null)}
-              style={{ fontSize: '11px', fontWeight: 700, border: '1px solid #000', background: 'var(--surface)', padding: '4px 8px', cursor: 'pointer' }}
+              style={{ fontSize: '11px', fontWeight: 700, border: '1px solid var(--text)', background: 'var(--surface)', padding: '4px 8px', cursor: 'pointer' }}
             >
               CLOSE
             </button>
           </div>
-          <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #ccc' }}>
+          <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--border)' }}>
             {listData.length === 0 ? (
-              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: '#999' }}>Loading...</div>
+              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-disabled)' }}>Loading...</div>
             ) : (
               <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
                 <tbody>
                   {listData.map((item, idx) => (
                     <tr 
                       key={item.id || idx} 
-                      style={{ borderBottom: '1px solid #eee', cursor: 'pointer' }}
+                      style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
                       onClick={() => {
                         if (expandedSection === 'tier1') setSelectedImage(item);
                         if (expandedSection === 'vehicles') navigate(`/vehicle/${item.id}`);
@@ -366,7 +366,7 @@ export default function SystemStatus() {
                     >
                       {expandedSection === 'tier1' && (
                         <>
-                          <td style={{ padding: '6px', fontFamily: 'monospace', color: '#666' }}>{item.id.substring(0, 8)}</td>
+                          <td style={{ padding: '6px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{item.id.substring(0, 8)}</td>
                           <td style={{ padding: '6px' }}>{item.ai_processing_status || 'pending'}</td>
                           <td style={{ padding: '6px' }}>{item.ai_scan_metadata?.tier_1_analysis?.category || 'unknown'}</td>
                           <td style={{ padding: '6px' }}>{item.ai_scan_metadata?.tier_1_analysis?.angle || 'unknown'}</td>
@@ -376,8 +376,8 @@ export default function SystemStatus() {
                         <>
                           <td style={{ padding: '6px', fontFamily: 'monospace' }}>{item.part_number}</td>
                           <td style={{ padding: '6px' }}>{item.name || 'No name'}</td>
-                          <td style={{ padding: '6px', fontSize: '9px', color: '#666' }}>{item.category || 'Uncategorized'}</td>
-                          <td style={{ padding: '6px', fontSize: '9px', color: '#666' }}>
+                          <td style={{ padding: '6px', fontSize: '9px', color: 'var(--text-secondary)' }}>{item.category || 'Uncategorized'}</td>
+                          <td style={{ padding: '6px', fontSize: '9px', color: 'var(--text-secondary)' }}>
                             {item.year_start && item.year_end ? `${item.year_start}-${item.year_end}` : 'N/A'}
                           </td>
                           <td style={{ padding: '6px', fontWeight: 700 }}>${item.price_current?.toFixed(2) || '0.00'}</td>
@@ -390,7 +390,7 @@ export default function SystemStatus() {
                         <>
                           <td style={{ padding: '6px' }}>{item.year} {item.make} {item.model}</td>
                           <td style={{ padding: '6px' }}>{item.status}</td>
-                          <td style={{ padding: '6px', color: '#999' }}>{new Date(item.created_at).toLocaleDateString()}</td>
+                          <td style={{ padding: '6px', color: 'var(--text-disabled)' }}>{new Date(item.created_at).toLocaleDateString()}</td>
                         </>
                       )}
                       {expandedSection === 'auctions' && (
@@ -398,7 +398,7 @@ export default function SystemStatus() {
                           <td style={{ padding: '6px', fontFamily: 'monospace', fontSize: '11px' }}>{item.id.substring(0, 8)}</td>
                           <td style={{ padding: '6px' }}>{item.outcome || 'unknown'}</td>
                           <td style={{ padding: '6px' }}>${item.high_bid?.toLocaleString() || 'N/A'}</td>
-                          <td style={{ padding: '6px', color: '#999' }}>{new Date(item.created_at).toLocaleDateString()}</td>
+                          <td style={{ padding: '6px', color: 'var(--text-disabled)' }}>{new Date(item.created_at).toLocaleDateString()}</td>
                         </>
                       )}
                     </tr>
@@ -414,7 +414,7 @@ export default function SystemStatus() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
         
         {/* Recent Tier 1 Analysis */}
-        <div style={{ background: '#f8f8f8', border: '2px solid #000', padding: '12px' }}>
+        <div style={{ background: 'var(--bg)', border: '2px solid var(--text)', padding: '12px' }}>
           <h2 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Recent Tier 1 Analysis
           </h2>
@@ -437,26 +437,26 @@ export default function SystemStatus() {
                     alignItems: 'center',
                     padding: '6px',
                     background: 'var(--surface)',
-                    border: '1px solid #ccc',
+                    border: '1px solid var(--border)',
                     cursor: 'pointer'
                   }}
                 >
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <div style={{ 
-                      fontSize: '11px', 
-                      fontFamily: 'monospace', 
-                      color: '#666'
+                    <div style={{
+                      fontSize: '11px',
+                      fontFamily: 'monospace',
+                      color: 'var(--text-secondary)'
                     }}>
                       {img.id.substring(0, 8)}
                     </div>
                     <div style={{ fontSize: '11px', fontWeight: 600 }}>
                       {category}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#666' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                       {angle}
                     </div>
                   </div>
-                  <div style={{ fontSize: '11px', color: '#999' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>
                     {timeAgo}
                   </div>
                 </div>
@@ -466,7 +466,7 @@ export default function SystemStatus() {
         </div>
 
         {/* Recent Catalog Parts */}
-        <div style={{ background: '#f8f8f8', border: '2px solid #000', padding: '12px' }}>
+        <div style={{ background: 'var(--bg)', border: '2px solid var(--text)', padding: '12px' }}>
           <h2 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Recent Catalog Parts
           </h2>
@@ -486,7 +486,7 @@ export default function SystemStatus() {
                     alignItems: 'center',
                     padding: '6px',
                     background: 'var(--surface)',
-                    border: '1px solid #ccc'
+                    border: '1px solid var(--border)'
                   }}
                 >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -497,7 +497,7 @@ export default function SystemStatus() {
                     }}>
                       {part.part_number}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#666' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                       {part.name?.substring(0, 30) || 'No name'}
                     </div>
                   </div>
@@ -505,7 +505,7 @@ export default function SystemStatus() {
                     <div style={{ fontSize: '11px', fontWeight: 700 }}>
                       ${part.price_current?.toFixed(2) || 'N/A'}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#999' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>
                       {timeAgo}
                     </div>
                   </div>
@@ -517,58 +517,58 @@ export default function SystemStatus() {
       </div>
 
       {/* Quick Actions */}
-      <div style={{ display: 'flex', gap: '8px', borderTop: '2px solid #000', paddingTop: '12px' }}>
-        <button 
+      <div style={{ display: 'flex', gap: '8px', borderTop: '2px solid var(--text)', paddingTop: '12px' }}>
+        <button
           onClick={() => navigate('/')}
-          style={{ 
-            padding: '8px 16px', 
-            background: '#000', 
-            color: '#fff', 
+          style={{
+            padding: '8px 16px',
+            background: 'var(--text)',
+            color: 'var(--bg)',
             fontWeight: 700,
             fontSize: '11px',
-            border: '2px solid #000',
+            border: '2px solid var(--text)',
             cursor: 'pointer'
           }}
         >
           VEHICLES
         </button>
-        <button 
+        <button
           onClick={() => navigate('/admin/scripts')}
-          style={{ 
-            padding: '8px 16px', 
-            background: 'var(--surface)', 
-            color: '#000', 
+          style={{
+            padding: '8px 16px',
+            background: 'var(--surface)',
+            color: 'var(--text)',
             fontWeight: 700,
             fontSize: '11px',
-            border: '2px solid #000',
+            border: '2px solid var(--text)',
             cursor: 'pointer'
           }}
         >
           SCRIPTS
         </button>
-        <button 
+        <button
           onClick={() => navigate('/admin/image-processing')}
-          style={{ 
-            padding: '8px 16px', 
-            background: 'var(--surface)', 
-            color: '#000', 
+          style={{
+            padding: '8px 16px',
+            background: 'var(--surface)',
+            color: 'var(--text)',
             fontWeight: 700,
             fontSize: '11px',
-            border: '2px solid #000',
+            border: '2px solid var(--text)',
             cursor: 'pointer'
           }}
         >
           IMAGES
         </button>
-        <button 
+        <button
           onClick={() => navigate('/admin/verifications')}
-          style={{ 
-            padding: '8px 16px', 
-            background: 'var(--surface)', 
-            color: '#000', 
+          style={{
+            padding: '8px 16px',
+            background: 'var(--surface)',
+            color: 'var(--text)',
             fontWeight: 700,
             fontSize: '11px',
-            border: '2px solid #000',
+            border: '2px solid var(--text)',
             cursor: 'pointer'
           }}
         >
@@ -596,8 +596,8 @@ export default function SystemStatus() {
           <div 
             onClick={(e) => e.stopPropagation()}
             style={{ 
-              background: 'var(--surface)', 
-              border: '2px solid #000', 
+              background: 'var(--surface)',
+              border: '2px solid var(--text)',
               padding: '16px', 
               maxWidth: '800px',
               maxHeight: '90vh',
@@ -608,7 +608,7 @@ export default function SystemStatus() {
               <h3 style={{ fontSize: '11px', fontWeight: 700 }}>IMAGE ANALYSIS</h3>
               <button 
                 onClick={() => setSelectedImage(null)}
-                style={{ fontSize: '11px', border: '1px solid #000', background: 'var(--surface)', padding: '4px 8px', cursor: 'pointer' }}
+                style={{ fontSize: '11px', border: '1px solid var(--text)', background: 'var(--surface)', padding: '4px 8px', cursor: 'pointer' }}
               >
                 CLOSE
               </button>
@@ -618,13 +618,13 @@ export default function SystemStatus() {
               <img 
                 src={selectedImage.image_url} 
                 alt="Vehicle" 
-                style={{ width: '100%', maxHeight: '400px', objectFit: 'contain', marginBottom: '12px', border: '1px solid #ccc' }}
+                style={{ width: '100%', maxHeight: '400px', objectFit: 'contain', marginBottom: '12px', border: '1px solid var(--border)' }}
               />
             )}
 
             <div style={{ fontSize: '11px', marginBottom: '8px' }}>
               <div style={{ fontWeight: 700, marginBottom: '4px' }}>ID:</div>
-              <div style={{ fontFamily: 'monospace', color: '#666' }}>{selectedImage.id}</div>
+              <div style={{ fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{selectedImage.id}</div>
             </div>
 
             <div style={{ fontSize: '11px', marginBottom: '8px' }}>
@@ -654,7 +654,7 @@ export default function SystemStatus() {
             )}
 
             {!selectedImage.ai_scan_metadata?.tier_1_analysis && (
-              <div style={{ fontSize: '11px', color: '#999', fontStyle: 'italic' }}>No analysis data yet</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-disabled)', fontStyle: 'italic' }}>No analysis data yet</div>
             )}
           </div>
         </div>

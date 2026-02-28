@@ -1317,16 +1317,16 @@ const AdminMissionControl: React.FC = () => {
           <div
             key={idx}
             style={{
-                border: '2px solid #000',
-                background: stat.alert ? '#fef2f2' : '#fff',
+                border: '2px solid var(--text)',
+                background: stat.alert ? 'var(--error-dim)' : 'var(--surface)',
                 padding: '12px',
                 textAlign: 'center'
               }}
             >
-              <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', color: stat.alert ? '#ef4444' : '#000' }}>
+              <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', color: stat.alert ? 'var(--error)' : 'var(--text)' }}>
                 {stat.value}
               </div>
-              <div style={{ fontSize: '11px', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                 {stat.label}
               </div>
             </div>
@@ -1339,8 +1339,8 @@ const AdminMissionControl: React.FC = () => {
         <h2 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           IMAGE FINGERPRINT RADAR (DUPES + CONTAMINATION)
         </h2>
-        <div style={{ border: '2px solid #000', background: '#fff', padding: '12px' }}>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: 10 }}>
+        <div style={{ border: '2px solid var(--text)', background: 'var(--surface)', padding: '12px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: 10 }}>
             Finds image keys that appear many times across vehicles. This is the fastest way to detect BaT "chrome" images and cross-post reuse.
           </div>
 
@@ -1403,13 +1403,13 @@ const AdminMissionControl: React.FC = () => {
               {imageRadarLoading ? 'Loading…' : 'Refresh'}
             </button>
 
-            <div style={{ fontSize: '11px', color: '#666' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               {imageRadarLastUpdatedAt ? `Updated: ${imageRadarLastUpdatedAt.toLocaleString()}` : ''}
             </div>
           </div>
 
           {imageRadarError && (
-            <div style={{ marginTop: 10, padding: 10, border: '2px solid #ef4444', background: '#fef2f2', fontSize: '11px' }}>
+            <div style={{ marginTop: 10, padding: 10, border: '2px solid var(--error)', background: 'var(--error-dim)', fontSize: '11px' }}>
               {imageRadarError}
             </div>
           )}
@@ -1436,7 +1436,7 @@ const AdminMissionControl: React.FC = () => {
                           <img src={r.sample_url} style={{ width: 72, height: 54, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'pointer' }} />
                         </ImageHoverPreview>
                       ) : (
-                        <span style={{ color: '#999' }}>—</span>
+                        <span style={{ color: 'var(--text-disabled)' }}>—</span>
                       )}
                     </td>
                     <td style={{ padding: 8, borderBottom: '1px solid var(--border)', fontFamily: 'monospace', maxWidth: 520, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.key}>
@@ -1466,7 +1466,7 @@ const AdminMissionControl: React.FC = () => {
                 ))}
                 {(!imageRadarRows || imageRadarRows.length === 0) && (
                   <tr>
-                    <td colSpan={5} style={{ padding: 10, color: '#666' }}>
+                    <td colSpan={5} style={{ padding: 10, color: 'var(--text-secondary)' }}>
                       {imageRadarLoading ? 'Loading…' : 'No rows (try lowering Min count, or remove Source filter).'}
                     </td>
                   </tr>
@@ -1482,32 +1482,32 @@ const AdminMissionControl: React.FC = () => {
         <h2 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           INVENTORY DATA COMPLETENESS (TRUTH-GATED)
         </h2>
-        <div style={{ border: '2px solid #000', background: '#fff', padding: '12px' }}>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: 10 }}>
+        <div style={{ border: '2px solid var(--text)', background: 'var(--surface)', padding: '12px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: 10 }}>
             Counts only fields with confidence at or above threshold. Default: 70.
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-            <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
+            <div style={{ border: '2px solid var(--border)', padding: 10 }}>
               <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {inventoryCompleteness?.counts?.at_or_above_min ?? '—'} / {inventoryCompleteness?.counts?.total ?? '—'}
               </div>
-              <div style={{ fontSize: '11px', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                 VEHICLES AT OR ABOVE 90% FIELDS
               </div>
             </div>
-            <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
+            <div style={{ border: '2px solid var(--border)', padding: 10 }}>
               <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {inventoryCompleteness?.counts?.avg_fill_pct ?? '—'}%
               </div>
-              <div style={{ fontSize: '11px', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                 AVERAGE FIELD COMPLETENESS
               </div>
             </div>
-            <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
+            <div style={{ border: '2px solid var(--border)', padding: 10 }}>
               <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {inventoryCompleteness?.counts?.p50_fill_pct ?? '—'}%
               </div>
-              <div style={{ fontSize: '11px', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                 MEDIAN FIELD COMPLETENESS
               </div>
             </div>
@@ -1520,32 +1520,32 @@ const AdminMissionControl: React.FC = () => {
         <h2 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           IMAGE ANGLE COVERAGE
         </h2>
-        <div style={{ border: '2px solid #000', background: '#fff', padding: '12px' }}>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: 10 }}>
+        <div style={{ border: '2px solid var(--text)', background: 'var(--surface)', padding: '12px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: 10 }}>
             Coverage is computed from image angle tags (AI-detected) with confidence at or above 0.60.
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-            <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
+            <div style={{ border: '2px solid var(--border)', padding: 10 }}>
               <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {angleCoverage?.counts?.full_coverage ?? '—'} / {angleCoverage?.counts?.vehicles ?? '—'}
               </div>
-              <div style={{ fontSize: '11px', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                 FULL COVERAGE (ALL REQUIRED ANGLES)
               </div>
             </div>
-            <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
+            <div style={{ border: '2px solid var(--border)', padding: 10 }}>
               <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {angleCoverage?.counts?.at_or_above_90 ?? '—'} / {angleCoverage?.counts?.vehicles ?? '—'}
               </div>
-              <div style={{ fontSize: '11px', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                 AT OR ABOVE 90% ANGLES
               </div>
             </div>
-            <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
+            <div style={{ border: '2px solid var(--border)', padding: 10 }}>
               <div style={{ fontSize: '19px', fontWeight: 700 }}>
                 {angleCoverage?.counts?.avg_angle_coverage_pct ?? '—'}%
               </div>
-              <div style={{ fontSize: '11px', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                 AVERAGE ANGLE COVERAGE
               </div>
             </div>
@@ -1581,22 +1581,22 @@ const AdminMissionControl: React.FC = () => {
                 padding: '16px',
                 fontSize: '11px',
                 textAlign: 'left',
-                border: action.primary ? '2px solid #000' : '2px solid #ccc',
-                background: action.primary ? '#000' : '#fff',
-                color: action.primary ? '#fff' : '#000',
+                border: action.primary ? '2px solid var(--text)' : '2px solid var(--border)',
+                background: action.primary ? 'var(--text)' : 'var(--surface)',
+                color: action.primary ? 'var(--bg)' : 'var(--text)',
                 cursor: 'pointer',
                 transition: 'all 0.12s ease',
                 fontWeight: 600
               }}
               onMouseEnter={(e) => {
                 if (!action.primary) {
-                  e.currentTarget.style.borderColor = '#000';
+                  e.currentTarget.style.borderColor = 'var(--text)';
                   e.currentTarget.style.transform = 'translateY(-2px)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!action.primary) {
-                  e.currentTarget.style.borderColor = '#ccc';
+                  e.currentTarget.style.borderColor = 'var(--border)';
                   e.currentTarget.style.transform = 'translateY(0)';
                 }
               }}
@@ -1610,10 +1610,10 @@ const AdminMissionControl: React.FC = () => {
 
       {/* Analysis Queue */}
       {analysisQueue.length > 0 && (
-        <div style={{ marginBottom: '24px', border: '2px solid #f59e0b', background: '#fffbeb' }}>
+        <div style={{ marginBottom: '24px', border: '2px solid var(--warning)', background: 'var(--warning-dim)' }}>
           <div style={{
-            background: '#f59e0b',
-            color: '#000',
+            background: 'var(--warning)',
+            color: 'var(--text)',
             padding: '12px 16px',
             fontSize: '11px',
             fontWeight: 700,
@@ -1632,14 +1632,14 @@ const AdminMissionControl: React.FC = () => {
                     alignItems: 'center',
                     padding: '12px',
                     background: 'var(--surface)',
-                    border: '2px solid #e5e5e5'
+                    border: '2px solid var(--border)'
                   }}
                 >
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', fontFamily: 'monospace' }}>
                       ORG: {queue.organization_id.slice(0, 8)}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#666' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                       {queue.pending_count} images | Oldest: {new Date(queue.oldest_image).toLocaleDateString()}
                     </div>
                   </div>
@@ -1649,7 +1649,7 @@ const AdminMissionControl: React.FC = () => {
                       style={{ 
                         fontSize: '11px', 
                         padding: '8px 12px',
-                        border: '2px solid #000',
+                        border: '2px solid var(--text)',
                         background: 'var(--surface)',
                         cursor: 'pointer',
                         fontWeight: 600
@@ -1659,12 +1659,12 @@ const AdminMissionControl: React.FC = () => {
                     </button>
                     <button
                       onClick={() => runAnalysis(queue.organization_id)}
-                      style={{ 
-                        fontSize: '11px', 
+                      style={{
+                        fontSize: '11px',
                         padding: '8px 12px',
-                        border: '2px solid #000',
-                        background: '#000',
-                        color: '#fff',
+                        border: '2px solid var(--text)',
+                        background: 'var(--text)',
+                        color: 'var(--bg)',
                         cursor: 'pointer',
                         fontWeight: 600
                       }}
@@ -1681,10 +1681,10 @@ const AdminMissionControl: React.FC = () => {
       )}
 
       {/* Recent Activity */}
-      <div style={{ border: '2px solid #000' }}>
+      <div style={{ border: '2px solid var(--text)' }}>
         <div style={{
-          background: '#000',
-          color: '#fff',
+          background: 'var(--text)',
+          color: 'var(--bg)',
           padding: '12px 16px',
           fontSize: '11px',
           fontWeight: 700,
@@ -1694,7 +1694,7 @@ const AdminMissionControl: React.FC = () => {
         </div>
         <div style={{ padding: '16px', background: 'var(--surface)' }}>
           {recentActivity.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#999', fontSize: '11px' }}>
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-disabled)', fontSize: '11px' }}>
               NO RECENT ACTIVITY
             </div>
           ) : (
@@ -1704,8 +1704,8 @@ const AdminMissionControl: React.FC = () => {
                   key={event.id || idx}
                   style={{
                     padding: '12px',
-                    background: '#f8f8f8',
-                    border: '1px solid #e5e5e5',
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border)',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
@@ -1716,11 +1716,11 @@ const AdminMissionControl: React.FC = () => {
                     <div style={{ fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase' }}>
                       {event.event_type?.replace(/_/g, ' ')}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#666' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                       {event.description || 'No description'}
                     </div>
                   </div>
-                  <div style={{ fontSize: '11px', color: '#999', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-disabled)', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
                     {new Date(event.created_at).toLocaleString()}
                   </div>
                 </div>

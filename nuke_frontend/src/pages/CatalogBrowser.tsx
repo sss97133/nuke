@@ -135,23 +135,23 @@ export default function CatalogBrowser() {
     <div style={{ padding: '16px', maxWidth: '1600px', margin: '0 auto', background: 'var(--surface)', minHeight: '100vh' }}>
       
       {/* Header */}
-      <div style={{ marginBottom: '16px', borderBottom: '2px solid #000', paddingBottom: '12px' }}>
+      <div style={{ marginBottom: '16px', borderBottom: '2px solid var(--text)', paddingBottom: '12px' }}>
         <h1 style={{ fontSize: '19px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>
           LMC PARTS CATALOG
         </h1>
-        <div style={{ display: 'flex', gap: '16px', fontSize: '11px', color: '#666' }}>
+        <div style={{ display: 'flex', gap: '16px', fontSize: '11px', color: 'var(--text-secondary)' }}>
           <span>Total Parts: {stats.total.toLocaleString()}</span>
           <span>With Images: {stats.with_images.toLocaleString()}</span>
           <span>In Stock: {stats.in_stock.toLocaleString()}</span>
         </div>
-        <div style={{ marginTop: '6px', fontSize: '11px', color: '#666' }}>
+        <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-secondary)' }}>
           Provider:{' '}
-          <span style={{ fontWeight: 700, color: '#111' }}>
+          <span style={{ fontWeight: 700, color: 'var(--text)' }}>
             {providerName}
           </span>
           {providerHref && (
             <span style={{ marginLeft: '8px' }}>
-              <a href={providerHref} target="_blank" rel="noreferrer" style={{ color: '#0066cc', textDecoration: 'none' }}>
+              <a href={providerHref} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
                 Open provider site
               </a>
             </span>
@@ -166,8 +166,8 @@ export default function CatalogBrowser() {
         gap: '12px',
         marginBottom: '16px',
         padding: '12px',
-        background: '#f8f8f8',
-        border: '2px solid #000'
+        background: 'var(--bg)',
+        border: '2px solid var(--text)'
       }}>
         
         {/* Search */}
@@ -184,7 +184,7 @@ export default function CatalogBrowser() {
               width: '100%',
               padding: '6px',
               fontSize: '11px',
-              border: '1px solid #000',
+              border: '1px solid var(--text)',
               fontFamily: 'inherit'
             }}
           />
@@ -202,7 +202,7 @@ export default function CatalogBrowser() {
               width: '100%',
               padding: '6px',
               fontSize: '11px',
-              border: '1px solid #000',
+              border: '1px solid var(--text)',
               fontFamily: 'inherit'
             }}
           >
@@ -236,7 +236,7 @@ export default function CatalogBrowser() {
               padding: '6px 12px',
               fontSize: '11px',
               fontWeight: 700,
-              border: '2px solid #000',
+              border: '2px solid var(--text)',
               background: 'var(--surface)',
               cursor: 'pointer'
             }}
@@ -248,11 +248,11 @@ export default function CatalogBrowser() {
 
       {/* Parts Grid */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', fontSize: '11px', color: '#999' }}>
+        <div style={{ textAlign: 'center', padding: '40px', fontSize: '11px', color: 'var(--text-disabled)' }}>
           Loading catalog...
         </div>
       ) : parts.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', fontSize: '11px', color: '#999' }}>
+        <div style={{ textAlign: 'center', padding: '40px', fontSize: '11px', color: 'var(--text-disabled)' }}>
           No parts found matching filters
         </div>
       ) : (
@@ -265,7 +265,7 @@ export default function CatalogBrowser() {
             <div 
               key={part.id}
               style={{
-                border: '2px solid #000',
+                border: '2px solid var(--text)',
                 background: 'var(--surface)',
                 overflow: 'hidden',
                 transition: 'transform 0.12s',
@@ -278,12 +278,12 @@ export default function CatalogBrowser() {
               
               {/* Product Image */}
               <div style={{ 
-                height: '200px', 
-                background: '#f8f8f8',
+                height: '200px',
+                background: 'var(--bg)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                borderBottom: '2px solid #000'
+                borderBottom: '2px solid var(--text)'
               }}>
                 {part.product_image_url ? (
                   <img 
@@ -292,7 +292,7 @@ export default function CatalogBrowser() {
                     style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                   />
                 ) : (
-                  <div style={{ fontSize: '11px', color: '#999' }}>No image</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>No image</div>
                 )}
               </div>
 
@@ -322,7 +322,7 @@ export default function CatalogBrowser() {
                 {part.category && (
                   <div style={{ 
                     fontSize: '9px',
-                    color: '#666',
+                    color: 'var(--text-secondary)',
                     marginBottom: '4px'
                   }}>
                     {part.category}
@@ -334,7 +334,7 @@ export default function CatalogBrowser() {
                 {(part.year_start || part.fits_models?.length > 0) && (
                   <div style={{ 
                     fontSize: '9px',
-                    color: '#666',
+                    color: 'var(--text-secondary)',
                     marginBottom: '8px'
                   }}>
                     Fits: {part.year_start && part.year_end 
@@ -356,7 +356,7 @@ export default function CatalogBrowser() {
                 <div style={{ 
                   fontSize: '9px',
                   fontWeight: 700,
-                  color: part.in_stock ? '#16a34a' : '#dc2626',
+                  color: part.in_stock ? 'var(--success)' : 'var(--error)',
                   marginBottom: '8px'
                 }}>
                   {part.in_stock ? '● IN STOCK' : '○ OUT OF STOCK'}
@@ -372,9 +372,9 @@ export default function CatalogBrowser() {
                         padding: '6px 8px',
                         fontSize: '9px',
                         fontWeight: 700,
-                        border: '2px solid #000',
-                        background: '#000',
-                        color: '#fff',
+                        border: '2px solid var(--text)',
+                        background: 'var(--text)',
+                        color: 'var(--bg)',
                         cursor: 'pointer'
                       }}
                     >
@@ -387,7 +387,7 @@ export default function CatalogBrowser() {
                         padding: '6px 8px',
                         fontSize: '9px',
                         fontWeight: 700,
-                        border: '2px solid #000',
+                        border: '2px solid var(--text)',
                         background: 'var(--surface)',
                         cursor: 'pointer'
                       }}
@@ -406,9 +406,9 @@ export default function CatalogBrowser() {
       <div style={{ 
         marginTop: '24px',
         padding: '12px',
-        borderTop: '2px solid #000',
+        borderTop: '2px solid var(--text)',
         fontSize: '11px',
-        color: '#666',
+        color: 'var(--text-secondary)',
         textAlign: 'center'
       }}>
         Showing {parts.length} parts • Total catalog: {stats.total.toLocaleString()} parts

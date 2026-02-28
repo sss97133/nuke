@@ -91,7 +91,7 @@ export default function AdminRalphBrief() {
       </div>
 
       {error && (
-        <div style={{ marginTop: 'var(--space-4)', fontSize: '11px', color: '#b91c1c' }}>
+        <div style={{ marginTop: 'var(--space-4)', fontSize: '11px', color: 'var(--error)' }}>
           {error}
         </div>
       )}

@@ -132,7 +132,7 @@ const VehicleRelationshipManager: React.FC<VehicleRelationshipManagerProps> = ({
     <div style={{ 
       padding: '8px', 
       backgroundColor: 'var(--surface)', 
-      border: '1px solid #bdbdbd',
+      border: '1px solid var(--border)',
       fontSize: '11px'
     }}>
       <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>
@@ -152,8 +152,8 @@ const VehicleRelationshipManager: React.FC<VehicleRelationshipManagerProps> = ({
               display: 'flex', 
               alignItems: 'center',
               padding: '4px',
-              backgroundColor: currentRelationship === option.value ? '#f5f5f5' : 'transparent',
-              border: currentRelationship === option.value ? '1px solid #757575' : '1px solid transparent',
+              backgroundColor: currentRelationship === option.value ? 'var(--bg-secondary)' : 'transparent',
+              border: currentRelationship === option.value ? '1px solid var(--text-muted)' : '1px solid transparent',
               cursor: 'pointer',
               userSelect: 'none'
             }}
@@ -172,14 +172,14 @@ const VehicleRelationshipManager: React.FC<VehicleRelationshipManagerProps> = ({
             />
             <div>
               <div style={{ fontWeight: 'bold' }}>{option.label}</div>
-              <div style={{ fontSize: '9px', color: '#757575' }}>{option.description}</div>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{option.description}</div>
             </div>
           </label>
         ))}
       </div>
       
       {updating && (
-        <div style={{ marginTop: '6px', fontSize: '9px', color: '#757575' }}>
+        <div style={{ marginTop: '6px', fontSize: '9px', color: 'var(--text-muted)' }}>
           Updating...
         </div>
       )}
@@ -189,9 +189,9 @@ const VehicleRelationshipManager: React.FC<VehicleRelationshipManagerProps> = ({
           marginTop: '6px', 
           padding: '6px',
           fontSize: '9px', 
-          color: '#dc2626',
-          background: '#fee2e2',
-          border: '1px solid #dc2626',
+          color: 'var(--error)',
+          background: 'var(--error-dim)',
+          border: '1px solid var(--error)',
           borderRadius: '3px'
         }}>
           {error}
@@ -203,9 +203,9 @@ const VehicleRelationshipManager: React.FC<VehicleRelationshipManagerProps> = ({
           marginTop: '6px', 
           padding: '6px',
           fontSize: '9px', 
-          color: '#15803d',
-          background: '#dcfce7',
-          border: '1px solid #15803d',
+          color: 'var(--success)',
+          background: 'var(--success-dim)',
+          border: '1px solid var(--success)',
           borderRadius: '3px'
         }}>
           ✓ Relationship updated successfully

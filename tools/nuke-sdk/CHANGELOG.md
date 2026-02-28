@@ -7,6 +7,55 @@ Versioning: [Semantic Versioning](https://semver.org/)
 
 ---
 
+## [1.5.0] — 2026-02-28
+
+**SDK v1.5.0 — Vision types aligned with live API, health endpoint, smart auth.**
+
+The `nuke.vision.*` namespace now matches the deployed `api-v1-vision` v1.1 endpoint exactly. Types are aligned with real YONO sidecar output, not pre-deployment specs.
+
+### Added
+
+- **`nuke.vision.health()`** — Check YONO sidecar status, loaded models, and API version.
+  ```typescript
+  const health = await nuke.vision.health();
+  console.log(health.sidecar_status.status);       // 'ok'
+  console.log(health.sidecar_status.tier2_families); // 6
+  console.log(health.sidecar_status.vision_available); // true
+  ```
+
+- **`VisionHealthResult` type** — exported from `@nuke1/sdk`
+- **`VisionBatchItemResult` type** — individual batch result (was previously inlined)
+
+### Changed
+
+- **`VisionAnalyzeResult` rewritten** to match actual API response. Old spec fields (`category`, `subject`, `description`, `condition_notes`, `visible_damage`, `camera_position`, `yono` sub-object) replaced with real YONO output fields:
+  - `vehicle_zone` (41-zone classification), `zone_confidence`, `zone_source`
+  - `condition_score` (1-10 scale)
+  - `damage_flags`, `modification_flags` (string arrays)
+  - `interior_quality`, `photo_quality`, `photo_type`
+  - `comps` (optional comparable sales, enabled via `include_comps: true`)
+  - `classify_model`, `analyze_model`, `classify_ms`, `analyze_ms`
+
+- **`VisionAnalyzeParams`** now includes `include_comps` option for comparable sales
+
+- **`VisionClassifyResult`** now includes `yono_source` field (e.g. 'hierarchical', 'flat', 'tier2_german')
+
+- **Auth header logic** — SDK now auto-detects key format:
+  - `nk_live_*` / `nk_test_*` keys sent as `X-API-Key` header
+  - All other tokens (service role keys, JWTs) sent as `Authorization: Bearer` header
+
+- **Vision timeouts** — `analyze()` defaults to 90s, `batch()` defaults to 120s (accounts for Modal cold start + Florence-2 inference)
+
+### Verified
+
+- All 4 vision methods tested end-to-end against live `api-v1-vision` v1.1
+- `classify`: Porsche, german family, 0.632 confidence, 370ms
+- `analyze`: zone=ext_driver_side, condition=4, photo_quality=5, 4.8s total
+- `batch`: concurrent classification, $0 cost
+- `health`: sidecar ok, 6 tier-2 families, Florence-2 available
+
+---
+
 ## [1.4.0] — 2026-02-27
 
 **SDK v1.4.0 — Signal Score: "Is this a good deal?"**

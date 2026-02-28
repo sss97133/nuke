@@ -333,7 +333,7 @@ export default function ReceiptManager({ vehicleId, canEdit }: ReceiptManagerPro
 
         {/* Receipt List */}
         {receipts.length === 0 ? (
-          <div className="text-center" style={{ padding: '32px 0', color: '#666' }}>
+          <div className="text-center" style={{ padding: '32px 0', color: 'var(--text-secondary)' }}>
             <p>No receipts added yet.</p>
             {canEdit && (
               <p className="text-small text-muted" style={{ marginTop: '8px' }}>

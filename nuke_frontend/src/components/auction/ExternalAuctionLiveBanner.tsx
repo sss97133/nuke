@@ -37,10 +37,10 @@ const platformNames: Record<string, string> = {
 };
 
 const platformColors: Record<string, { bg: string; text: string; accent: string }> = {
-  bat: { bg: '#1a1a1a', text: '#ffffff', accent: '#f59e0b' },
-  cars_and_bids: { bg: '#dc2626', text: '#ffffff', accent: '#fbbf24' },
-  ebay_motors: { bg: '#0064d2', text: '#ffffff', accent: '#f5af02' },
-  hemmings: { bg: '#8b0000', text: '#ffffff', accent: '#ffd700' },
+  bat: { bg: '#1a1a1a', text: 'var(--bg)', accent: 'var(--warning)' },
+  cars_and_bids: { bg: 'var(--error)', text: 'var(--bg)', accent: '#fbbf24' },
+  ebay_motors: { bg: '#0064d2', text: 'var(--bg)', accent: '#f5af02' },
+  hemmings: { bg: '#8b0000', text: 'var(--bg)', accent: '#ffd700' },
 };
 
 type UrgencyLevel = 'ended' | 'lastMinute' | 'critical' | 'urgent' | 'gettingClose' | 'normal';
@@ -81,12 +81,12 @@ function formatTimeRemaining(endDate: string | null): { text: string; urgency: U
 
 // Color mapping for urgency levels - NO YELLOW
 const urgencyColors: Record<UrgencyLevel, { color: string; glow?: string }> = {
-  lastMinute: { color: '#dc2626', glow: '0 0 12px rgba(220, 38, 38, 0.7)' },
-  critical: { color: '#dc2626', glow: '0 0 8px rgba(220, 38, 38, 0.5)' },
+  lastMinute: { color: 'var(--error)', glow: '0 0 12px rgba(220, 38, 38, 0.7)' },
+  critical: { color: 'var(--error)', glow: '0 0 8px rgba(220, 38, 38, 0.5)' },
   urgent: { color: '#ea580c', glow: '0 0 6px rgba(234, 88, 12, 0.4)' },
   gettingClose: { color: '#e07960' },
   normal: { color: 'inherit' },
-  ended: { color: '#9ca3af' },
+  ended: { color: 'var(--text-disabled)' },
 };
 
 function formatCurrency(amount: number | null, currencyCode?: string | null): string {
@@ -234,9 +234,9 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
                   width: '8px',
                   height: '8px',
                   borderRadius: '50%',
-                  background: ['lastMinute', 'critical', 'urgent'].includes(timeState.urgency) ? '#ef4444' : '#22c55e',
+                  background: ['lastMinute', 'critical', 'urgent'].includes(timeState.urgency) ? 'var(--error)' : 'var(--success)',
                   animation: 'pulse 1.5s ease-in-out infinite',
-                  boxShadow: `0 0 8px ${['lastMinute', 'critical', 'urgent'].includes(timeState.urgency) ? '#ef4444' : '#22c55e'}`,
+                  boxShadow: `0 0 8px ${['lastMinute', 'critical', 'urgent'].includes(timeState.urgency) ? 'var(--error)' : 'var(--success)'}`,
                 }}
               />
               <span style={{ fontWeight: 700, fontSize: '9px', letterSpacing: '0.5px' }}>LIVE</span>
@@ -377,7 +377,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               style={{
                 background: colors.accent,
                 border: 'none',
-                color: '#000',
+                color: 'var(--text)',
                 padding: '6px 12px',
                 borderRadius: '4px',
                 fontSize: '9px',
@@ -405,7 +405,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
             <span
               style={{
                 background: 'rgba(34, 197, 94, 0.2)',
-                color: '#22c55e',
+                color: 'var(--success)',
                 padding: '4px 8px',
                 borderRadius: '4px',
                 fontSize: '8px',

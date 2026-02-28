@@ -16,7 +16,7 @@ const RESEND_API_URL = "https://api.resend.com/emails";
 
 const ROLE_TO_EMAIL: Record<string, string> = {
   coo: "coo@nuke.ag", cto: "cto@nuke.ag", cfo: "cfo@nuke.ag",
-  cpo: "cpo@nuke.ag", cdo: "cdo@nuke.ag", cwfto: "cwfto@nuke.ag",
+  cpo: "cpo@nuke.ag", cdo: "cdo@nuke.ag", cwtfo: "cwtfo@nuke.ag",
   "vp-ai": "vp-ai@nuke.ag", "vp-extraction": "vp-extraction@nuke.ag",
   "vp-platform": "vp-platform@nuke.ag", "vp-vehicle-intel": "vp-vehicle-intel@nuke.ag",
   "vp-deal-flow": "vp-deal-flow@nuke.ag", "vp-orgs": "vp-orgs@nuke.ag",
@@ -25,7 +25,7 @@ const ROLE_TO_EMAIL: Record<string, string> = {
 };
 
 const ROLE_DISPLAY: Record<string, string> = {
-  coo: "COO", cto: "CTO", cfo: "CFO", cpo: "CPO", cdo: "CDO", cwfto: "CWFTO",
+  coo: "COO", cto: "CTO", cfo: "CFO", cpo: "CPO", cdo: "CDO", cwtfo: "CWTFO",
   "vp-ai": "VP AI", "vp-extraction": "VP Extraction", "vp-platform": "VP Platform",
   "vp-vehicle-intel": "VP Vehicle Intel", "vp-deal-flow": "VP Deal Flow",
   "vp-orgs": "VP Orgs", "vp-photos": "VP Photos", "vp-docs": "VP Docs",

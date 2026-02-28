@@ -412,7 +412,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                 fontSize: '9px',
                 padding: '2px 6px',
                 background: '#dc2626',
-                color: 'white',
+                color: 'var(--bg)',
                 borderRadius: '10px'
               }}
             >
@@ -541,7 +541,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                               padding: '6px 16px',
                               border: '1px solid var(--success)',
                               background: 'var(--success)',
-                              color: 'white',
+                              color: 'var(--bg)',
                               cursor: 'pointer',
                               fontSize: '11px',
                               fontWeight: '600'

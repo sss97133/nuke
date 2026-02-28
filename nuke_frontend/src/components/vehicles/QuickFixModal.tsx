@@ -230,7 +230,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
       <div style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.6)',
+        background: 'var(--overlay)',
         zIndex: 10003,
         display: 'flex',
         alignItems: 'center',
@@ -239,13 +239,13 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
       }} onClick={handleClose}>
         <div
           style={{
-            background: '#fff',
+            background: 'var(--surface)',
             border: '2px solid var(--border)',
             maxWidth: '500px',
             width: '100%',
             maxHeight: '80vh',
             overflow: 'auto',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.2)'
+            boxShadow: '0 8px 32px var(--overlay)'
           }}
           onClick={e => e.stopPropagation()}
         >
@@ -288,7 +288,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: 'rgba(0,0,0,0.6)',
+      background: 'var(--overlay)',
       zIndex: 10003,
       display: 'flex',
       alignItems: 'center',
@@ -297,7 +297,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
     }} onClick={handleClose}>
       <div
         style={{
-          background: '#fff',
+          background: 'var(--surface)',
           border: '2px solid var(--border)',
           maxWidth: '600px',
           width: '100%',
@@ -305,7 +305,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.2)'
+          boxShadow: '0 8px 32px var(--overlay)'
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -339,11 +339,11 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
         </div>
 
         {/* Progress bar */}
-        <div style={{ height: '4px', background: '#e5e7eb' }}>
+        <div style={{ height: '4px', background: 'var(--border)' }}>
           <div style={{
             height: '100%',
             width: `${(fixedCount / vehicles.length) * 100}%`,
-            background: '#22c55e',
+            background: 'var(--success)',
             transition: 'width 0.3s ease'
           }} />
         </div>
@@ -352,8 +352,8 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
         {error && (
           <div style={{
             padding: '10px 16px',
-            background: '#fee2e2',
-            color: '#991b1b',
+            background: 'var(--error-dim)',
+            color: 'var(--error)',
             fontSize: '11px'
           }}>
             {error}
@@ -373,8 +373,8 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
                   key={vehicle.id}
                   style={{
                     padding: '12px',
-                    background: vehicle.fixed ? '#f0fdf4' : '#f9fafb',
-                    border: `1px solid ${vehicle.fixed ? '#86efac' : '#e5e7eb'}`,
+                    background: vehicle.fixed ? 'var(--success-dim)' : 'var(--bg)',
+                    border: `1px solid ${vehicle.fixed ? 'var(--success)' : 'var(--border)'}`,
                     borderRadius: '4px',
                     opacity: vehicle.fixed ? 0.7 : 1
                   }}
@@ -390,7 +390,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
                         {vehicle.year} {vehicle.make} {vehicle.model}
                       </div>
                       {vehicle.fixed ? (
-                        <div style={{ fontSize: '11px', color: '#15803d', fontWeight: 500 }}>
+                        <div style={{ fontSize: '11px', color: 'var(--success)', fontWeight: 500 }}>
                           ✓ Fixed: {vehicle.currentValue}
                         </div>
                       ) : (
@@ -404,9 +404,9 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
                             width: '100%',
                             padding: '8px 10px',
                             fontSize: '12px',
-                            border: '1px solid #d1d5db',
+                            border: '1px solid var(--border)',
                             borderRadius: '3px',
-                            background: '#fff'
+                            background: 'var(--surface)'
                           }}
                           onKeyDown={e => {
                             if (e.key === 'Enter') {
@@ -425,8 +425,8 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
                           padding: '8px 14px',
                           fontSize: '11px',
                           fontWeight: 600,
-                          background: values[vehicle.id]?.trim() ? '#1e40af' : '#9ca3af',
-                          color: '#fff',
+                          background: values[vehicle.id]?.trim() ? 'var(--accent)' : 'var(--text-disabled)',
+                          color: 'var(--bg)',
                           border: 'none',
                           borderRadius: '3px',
                           cursor: values[vehicle.id]?.trim() ? 'pointer' : 'not-allowed'
@@ -449,7 +449,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: '#f9fafb'
+          background: 'var(--bg)'
         }}>
           <button
             type="button"
@@ -458,8 +458,8 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
               padding: '8px 16px',
               fontSize: '11px',
               fontWeight: 600,
-              background: '#fff',
-              border: '1px solid #d1d5db',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
               borderRadius: '3px',
               cursor: 'pointer'
             }}
@@ -474,8 +474,8 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
               padding: '8px 16px',
               fontSize: '11px',
               fontWeight: 600,
-              background: hasValues && remainingCount > 0 ? '#15803d' : '#9ca3af',
-              color: '#fff',
+              background: hasValues && remainingCount > 0 ? 'var(--success)' : 'var(--text-disabled)',
+              color: 'var(--bg)',
               border: 'none',
               borderRadius: '3px',
               cursor: hasValues && remainingCount > 0 ? 'pointer' : 'not-allowed'

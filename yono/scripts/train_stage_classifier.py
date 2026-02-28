@@ -89,15 +89,17 @@ class StageDataset(Dataset):
 
         try:
             if img_source.startswith("http"):
-                # Download from URL to temp file
+                # Download from URL, cache locally for reuse across epochs
+                import hashlib
                 import urllib.request
-                import tempfile
+                cache_dir = YONO_DIR / ".image_cache"
+                cache_dir.mkdir(exist_ok=True)
+                url_hash = hashlib.md5(img_source.encode()).hexdigest()
                 ext = Path(img_source.split("?")[0]).suffix or ".jpg"
-                tmp = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
-                tmp.close()
-                urllib.request.urlretrieve(img_source, tmp.name)
-                image = Image.open(tmp.name).convert("RGB")
-                os.unlink(tmp.name)
+                cached_path = cache_dir / f"{url_hash}{ext}"
+                if not cached_path.exists():
+                    urllib.request.urlretrieve(img_source, str(cached_path))
+                image = Image.open(cached_path).convert("RGB")
             else:
                 image = Image.open(img_source).convert("RGB")
         except Exception:

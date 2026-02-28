@@ -21,7 +21,7 @@ const BidMarketDashboard = React.lazy(() => import('../../../pages/BidMarketDash
 const MarketCompetitors = React.lazy(() => import('../../../pages/MarketCompetitors'));
 
 const LazyFallback = () => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#888', fontSize: '12px' }}>
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'var(--text-disabled)', fontSize: '12px' }}>
     loading...
   </div>
 );

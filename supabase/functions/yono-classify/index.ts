@@ -34,7 +34,8 @@ const corsHeaders = {
 
 const SIDECAR_URL =
   Deno.env.get("YONO_SIDECAR_URL") || "http://127.0.0.1:8472";
-const SIDECAR_TIMEOUT_MS = 10_000;
+const SIDECAR_TIMEOUT_MS = 60_000; // 60s — Modal network from Supabase can take 30-40s
+const HEALTH_TIMEOUT_MS = 45_000;  // 45s — matches yono-vision-worker
 const SIDECAR_TOKEN = Deno.env.get("MODAL_SIDECAR_TOKEN") || "";
 
 function sidecarHeaders(extra: Record<string, string> = {}): Record<string, string> {
@@ -70,7 +71,7 @@ serve(async (req) => {
     let sidecarAvailable = false;
     try {
       const healthResp = await fetch(`${SIDECAR_URL}/health`, {
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
       });
       sidecarAvailable = healthResp.ok;
     } catch {
@@ -127,7 +128,7 @@ serve(async (req) => {
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    const isTimeout = msg.includes("timeout") || msg.includes("Timeout");
+    const isTimeout = msg.includes("timeout") || msg.includes("Timeout") || msg.includes("timed out");
     return new Response(
       JSON.stringify({
         available: false,

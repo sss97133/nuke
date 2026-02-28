@@ -46,7 +46,7 @@ export default function DataGrowthChart() {
     { label: 'Comments', value: stats.comments, color: '#ffd93d' },
     { label: 'Observations', value: stats.observations, color: '#6bcb77' },
     { label: 'Identity Seeds', value: stats.bat_identities, color: '#c77dff' },
-    { label: 'Active Users', value: stats.active_users, color: '#ffffff' },
+    { label: 'Active Users', value: stats.active_users, color: 'var(--text-secondary)' },
   ] : [];
 
   // Calculate bar widths relative to max
@@ -77,7 +77,7 @@ export default function DataGrowthChart() {
       </div>
 
       {error && (
-        <div style={{ marginTop: 'var(--space-3)', fontSize: '11px', color: '#b91c1c' }}>
+        <div style={{ marginTop: 'var(--space-3)', fontSize: '11px', color: 'var(--error)' }}>
           {error}
         </div>
       )}

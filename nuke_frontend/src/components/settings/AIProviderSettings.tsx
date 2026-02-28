@@ -172,7 +172,7 @@ const AIProviderSettings: React.FC = () => {
       </div>
       <div className="card-body">
         {showAddForm && (
-          <div style={{ marginBottom: '12px', padding: '12px', background: 'var(--bg)', border: '1px solid #e0e0e0' }}>
+          <div style={{ marginBottom: '12px', padding: '12px', background: 'var(--bg)', border: '1px solid var(--border)' }}>
             <div className="text font-bold" style={{ marginBottom: '8px', fontSize: '12px' }}>Add API Key</div>
             <ProviderForm
               provider={{
@@ -193,7 +193,7 @@ const AIProviderSettings: React.FC = () => {
         )}
 
         {providers.length === 0 && !showAddForm && (
-          <div style={{ textAlign: 'center', padding: '24px', background: 'var(--bg)', border: '1px dashed #ccc' }}>
+          <div style={{ textAlign: 'center', padding: '24px', background: 'var(--bg)', border: '1px dashed var(--border)' }}>
             <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔑</div>
             <div className="text font-bold" style={{ marginBottom: '4px', fontSize: '12px' }}>No API Keys</div>
             <div className="text text-small text-muted" style={{ fontSize: '11px' }}>
@@ -204,7 +204,7 @@ const AIProviderSettings: React.FC = () => {
         )}
 
         {providers.map(provider => (
-          <div key={provider.id} style={{ marginBottom: '8px', padding: '12px', background: 'var(--surface)', border: '1px solid #e0e0e0' }}>
+          <div key={provider.id} style={{ marginBottom: '8px', padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
             {editingProvider?.id === provider.id ? (
               <ProviderForm
                 provider={provider}
@@ -227,7 +227,7 @@ const AIProviderSettings: React.FC = () => {
                     {provider.provider.toUpperCase()}
                     {provider.is_default && ' (PRIMARY)'}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#666', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
                     {(() => {
                       if (!provider.api_key_encrypted) return '••••••••';
                       try {

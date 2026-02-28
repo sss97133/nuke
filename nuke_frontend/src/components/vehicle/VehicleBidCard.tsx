@@ -95,12 +95,12 @@ function BidTooltip({ active, payload }: any) {
   if (!d) return null;
   return (
     <div style={{
-      background: 'var(--grey-800, #1f2937)', color: '#fff', padding: '4px 8px',
+      background: 'var(--grey-800, #1f2937)', color: 'var(--bg)', padding: '4px 8px',
       borderRadius: 0, fontSize: '11px', fontFamily: 'monospace', boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
     }}>
       <div style={{ fontWeight: 700 }}>{formatUsd(d.amount)}</div>
       <div style={{ opacity: 0.7 }}>{d.username} &middot; {formatTime(d.timestamp)}</div>
-      {d.jump > 0 && <div style={{ color: '#22c55e' }}>+{formatUsd(d.jump)}</div>}
+      {d.jump > 0 && <div style={{ color: 'var(--success)' }}>+{formatUsd(d.jump)}</div>}
     </div>
   );
 }
@@ -190,14 +190,14 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
           <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             {data?.platform && data.platform !== 'bat' && (
               <span style={{
-                fontSize: '9px', background: data.platform === 'cars_and_bids' ? '#e8590c' : '#6b7280',
-                color: '#fff', borderRadius: 10, padding: '1px 6px', fontWeight: 600,
+                fontSize: '9px', background: data.platform === 'cars_and_bids' ? '#e8590c' : 'var(--text-secondary)',
+                color: 'var(--bg)', borderRadius: 10, padding: '1px 6px', fontWeight: 600,
               }}>
                 {data.platform === 'cars_and_bids' ? 'C&B' : data.platform}
               </span>
             )}
             <span style={{
-              fontSize: '11px', background: 'var(--primary, #3b82f6)', color: '#fff',
+              fontSize: '11px', background: 'var(--primary, #3b82f6)', color: 'var(--bg)',
               borderRadius: 10, padding: '1px 8px', fontWeight: 600,
             }}>
               {summary.bid_count} bids
@@ -353,7 +353,7 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
                         </span>
                         {b.is_winning && (
                           <span style={{
-                            marginLeft: 4, fontSize: '9px', background: '#22c55e', color: '#fff',
+                            marginLeft: 4, fontSize: '9px', background: 'var(--success)', color: 'var(--bg)',
                             borderRadius: 4, padding: '1px 4px',
                           }}>
                             winner
@@ -365,7 +365,7 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
                       </td>
                       <td style={{
                         padding: '4px 6px', textAlign: 'right', fontFamily: 'monospace',
-                        color: b.jump > 0 ? '#22c55e' : 'var(--text-muted)',
+                        color: b.jump > 0 ? 'var(--success)' : 'var(--text-muted)',
                       }}>
                         {b.jump > 0 ? `+${formatUsd(b.jump)}` : '—'}
                       </td>

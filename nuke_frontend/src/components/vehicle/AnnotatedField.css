@@ -9,32 +9,32 @@
 
 .annotated-field.has-annotation {
   cursor: pointer;
-  border-bottom: 1px dotted #6b7280;
+  border-bottom: 1px dotted var(--text-secondary);
 }
 
 .annotated-field.has-annotation:hover {
-  background-color: #f3f4f6;
-  border-bottom-color: #374151;
+  background-color: var(--surface-hover);
+  border-bottom-color: var(--text);
 }
 
 /* Verification level indicators */
 .annotated-field.verified-multi {
-  border-bottom-color: #22c55e;
-  background-color: #f0fdf4;
+  border-bottom-color: var(--success);
+  background-color: var(--success-dim);
 }
 
 .annotated-field.verified-professional {
-  border-bottom-color: #3b82f6;
-  background-color: #eff6ff;
+  border-bottom-color: var(--info);
+  background-color: var(--info-dim);
 }
 
 .annotated-field.verified-basic {
-  border-bottom-color: #eab308;
-  background-color: #fefce8;
+  border-bottom-color: var(--warning);
+  background-color: var(--warning-dim);
 }
 
 .annotated-field.unverified {
-  border-bottom-color: #9ca3af;
+  border-bottom-color: var(--text-disabled);
 }
 
 .annotated-field.has-conflicts {
@@ -45,14 +45,14 @@
 .verification-indicator {
   margin-left: 4px;
   font-size: 0.75em;
-  color: #22c55e;
+  color: var(--success);
   font-weight: bold;
 }
 
 .conflict-indicator {
   margin-left: 4px;
   font-size: 0.75em;
-  color: #f59e0b;
+  color: var(--warning);
   font-weight: bold;
 }
 
@@ -69,10 +69,10 @@
 
 .data-source-popover {
   position: absolute;
-  background: white;
-  border: 1px solid #d1d5db;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-lg);
   min-width: 320px;
   max-width: 480px;
   max-height: 400px;
@@ -86,22 +86,22 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid #e5e7eb;
-  background-color: #f9fafb;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--bg);
 }
 
 .popover-header h3 {
   margin: 0;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text);
 }
 
 .close-button {
   background: none;
   border: none;
   font-size: 18px;
-  color: #6b7280;
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 0;
   width: 24px;
@@ -112,7 +112,7 @@
 }
 
 .close-button:hover {
-  color: #374151;
+  color: var(--text);
 }
 
 .popover-content {
@@ -131,7 +131,7 @@
   margin: 0 0 8px 0;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -144,14 +144,14 @@
 
 .source-item {
   padding: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background-color: #fafafa;
+  background-color: var(--bg);
 }
 
 .source-item.primary-source {
-  border-color: #3b82f6;
-  background-color: #eff6ff;
+  border-color: var(--info);
+  background-color: var(--info-dim);
 }
 
 .source-header {
@@ -164,15 +164,15 @@
 .source-type {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text);
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .primary-badge {
-  background-color: #3b82f6;
-  color: white;
+  background-color: var(--info);
+  color: var(--bg);
   padding: 1px 6px;
   border-radius: 10px;
   font-size: 0.625rem;
@@ -186,7 +186,7 @@
 
 .source-entity {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-bottom: 4px;
 }
 
@@ -196,7 +196,7 @@
 
 .source-url a {
   font-size: 0.75rem;
-  color: #3b82f6;
+  color: var(--accent);
   text-decoration: none;
 }
 
@@ -209,7 +209,7 @@
   justify-content: space-between;
   align-items: center;
   font-size: 0.625rem;
-  color: #9ca3af;
+  color: var(--text-disabled);
 }
 
 .verification-status {
@@ -218,15 +218,15 @@
 
 .verification-summary {
   padding-top: 12px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
   font-size: 0.75rem;
 }
 
 .verification-level {
   margin-bottom: 4px;
-  color: #374151;
+  color: var(--text);
 }
 
 .last-updated {
-  color: #6b7280;
+  color: var(--text-secondary);
 }

@@ -87,8 +87,8 @@ export default function MileagePortal({ vehicleId, mileage, year, activePortal, 
                     borderRadius: '3px',
                     fontSize: '9px',
                     fontWeight: 600,
-                    background: mileageLevel === 'Low' ? '#22c55e20' : mileageLevel === 'Average' ? '#f59e0b20' : '#ef444420',
-                    color: mileageLevel === 'Low' ? '#22c55e' : mileageLevel === 'Average' ? '#f59e0b' : '#ef4444',
+                    background: mileageLevel === 'Low' ? 'color-mix(in srgb, var(--success) 12%, transparent)' : mileageLevel === 'Average' ? 'color-mix(in srgb, var(--warning) 12%, transparent)' : 'color-mix(in srgb, var(--error) 12%, transparent)',
+                    color: mileageLevel === 'Low' ? 'var(--success)' : mileageLevel === 'Average' ? 'var(--warning)' : 'var(--error)',
                   }}>
                     {mileageLevel}
                   </span>
@@ -131,8 +131,8 @@ export default function MileagePortal({ vehicleId, mileage, year, activePortal, 
                     borderRadius: '3px',
                     fontSize: '9px',
                     fontWeight: 600,
-                    background: mileageLevel === 'Low' ? '#22c55e20' : mileageLevel === 'Average' ? '#f59e0b20' : '#ef444420',
-                    color: mileageLevel === 'Low' ? '#22c55e' : mileageLevel === 'Average' ? '#f59e0b' : '#ef4444',
+                    background: mileageLevel === 'Low' ? 'color-mix(in srgb, var(--success) 12%, transparent)' : mileageLevel === 'Average' ? 'color-mix(in srgb, var(--warning) 12%, transparent)' : 'color-mix(in srgb, var(--error) 12%, transparent)',
+                    color: mileageLevel === 'Low' ? 'var(--success)' : mileageLevel === 'Average' ? 'var(--warning)' : 'var(--error)',
                   }}>
                     {mileageLevel}
                   </span>

@@ -337,7 +337,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                   fontSize: '11px',
                   border: '1px solid var(--accent)',
                   background: 'var(--accent)',
-                  color: 'white',
+                  color: 'var(--bg)',
                   cursor: action === 'collection' ? 'wait' : 'pointer',
                   borderRadius: '4px',
                   opacity: action === 'collection' ? 0.5 : 1
@@ -501,7 +501,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                   fontWeight: 600,
                   border: '1px solid #15803d',
                   background: '#15803d',
-                  color: 'white',
+                  color: 'var(--bg)',
                   cursor: 'pointer',
                   borderRadius: '4px'
                 }}
@@ -567,7 +567,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                       fontSize: '11px',
                       border: '1px solid var(--accent)',
                       background: 'var(--accent)',
-                      color: 'white',
+                      color: 'var(--bg)',
                       cursor: action === 'assign_org' || !selectedOrgId ? 'wait' : 'pointer',
                       borderRadius: '4px',
                       opacity: action === 'assign_org' || !selectedOrgId ? 0.5 : 1
@@ -604,7 +604,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                 fontWeight: 600,
                 border: '1px solid #1e40af',
                 background: '#1e40af',
-                color: 'white',
+                color: 'var(--bg)',
                 cursor: 'pointer',
                 borderRadius: '4px'
               }}

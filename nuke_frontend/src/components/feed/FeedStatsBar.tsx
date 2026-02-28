@@ -175,7 +175,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                   ? '1px solid rgba(16,185,129,0.55)'
                   : '1px solid rgba(16,185,129,0.25)',
                 background: filters.addedTodayOnly ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.08)',
-                color: '#059669',
+                color: 'var(--success)',
                 fontSize: '11px',
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -215,7 +215,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
             {formatCurrency(displayStats.totalValue)}
           </span>
           {displayStats.marketInterestValue > 0 && (
-            <span style={{ color: '#d97706', fontSize: '9px', fontWeight: 500, cursor: 'help' }}>
+            <span style={{ color: 'var(--warning)', fontSize: '9px', fontWeight: 500, cursor: 'help' }}>
               +{formatCurrency(displayStats.marketInterestValue)} interest
             </span>
           )}
@@ -243,7 +243,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                 cursor: 'pointer',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
                 fontSize: '11px',
-                color: filters.forSale ? '#059669' : 'var(--text-muted)',
+                color: filters.forSale ? 'var(--success)' : 'var(--text-muted)',
                 fontWeight: filters.forSale ? 700 : 400,
                 transition: 'color 0.15s ease',
               }}
@@ -272,7 +272,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                 cursor: 'pointer',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
                 fontSize: '7.5pt',
-                color: 'white',
+                color: 'var(--bg)',
                 borderRadius: '999px',
                 fontWeight: 700,
                 transition: 'opacity 0.15s ease',
@@ -301,7 +301,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
               cursor: 'pointer',
               fontFamily: 'system-ui, -apple-system, sans-serif',
               fontSize: '7.5pt',
-              color: 'white',
+              color: 'var(--bg)',
               borderRadius: '999px',
               fontWeight: 700,
               transition: 'opacity 0.15s ease',
@@ -336,7 +336,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
               cursor: 'pointer',
               fontFamily: 'system-ui, -apple-system, sans-serif',
               fontSize: '7.5pt',
-              color: sortBy === 'deal_score' ? 'white' : '#10b981',
+              color: sortBy === 'deal_score' ? 'var(--bg)' : 'var(--success)',
               borderRadius: '999px',
               fontWeight: 700,
               transition: 'all 0.15s ease',
@@ -371,7 +371,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
               cursor: 'pointer',
               fontFamily: 'system-ui, -apple-system, sans-serif',
               fontSize: '7.5pt',
-              color: sortBy === 'heat_score' ? 'white' : '#f97316',
+              color: sortBy === 'heat_score' ? 'var(--bg)' : 'var(--warning)',
               borderRadius: '999px',
               fontWeight: 700,
               transition: 'all 0.15s ease',
@@ -400,7 +400,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                 cursor: 'pointer',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
                 fontSize: '11px',
-                color: statsPanel === 'sold_today' ? '#7c3aed' : 'var(--text-muted)',
+                color: statsPanel === 'sold_today' ? 'var(--purple, #7c3aed)' : 'var(--text-muted)',
                 fontWeight: statsPanel === 'sold_today' ? 700 : 400,
                 transition: 'color 0.15s ease',
               }}

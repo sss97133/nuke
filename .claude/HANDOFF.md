@@ -1,18 +1,30 @@
-# Auto-Checkpoint — 2026-02-27 10:10:20
+# Auto-Checkpoint — 2026-02-28 19:16:01
 *(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
 
 ## Recent Commits (last 30 min)
-cf0b94722 security(key-guardian): secret scanning pre-commit hook, daily audit, gitleaks config
-8ec743ad9 security(stripe): auth guards, ownership checks, fee-bypass fix, CORS hardening, RLS fix
-ab4e0891b COO: Urgent work orders for all agents — 6 issues blocking CEO demos
-58481ad2b chore: update coordination files + STRIPE_WEBHOOK_SECRET stored
-5528063ab feat(stripe): full Connect integration — V2 accounts, onboarding, products, storefront, subscriptions
+none
 
 ## Uncommitted Changes
 .claude/ACTIVE_AGENTS.md
 .claude/HANDOFF.md
+.claude/agents/REGISTRY.md
+.claude/agents/cwfto/.claude/settings.local.json
+.claude/agents/cwfto/ACTION_PLAN.md
+.claude/agents/cwfto/CLAUDE.md
+.claude/agents/cwfto/CRITICAL_BUGS_FROM_USER_TESTING.md
+.claude/agents/cwfto/USER_PANEL.md
+.claude/settings.local.json
+CLAUDE.md
 DONE.md
+NUKE_COMPANY_BRIEF.md
+PROJECT_STATE.md
+TOOLS.md
+facebook-marketplace-extraction.md
 mcp-server
+nuke_frontend/package-lock.json
+nuke_frontend/package.json
+nuke_frontend/src/components/ComprehensiveWorkOrderReceipt.tsx
+nuke_frontend/src/components/ErrorBoundary.tsx
 
 ## Staged
 none

@@ -1077,7 +1077,7 @@ export default function AIDataIngestionSearch() {
           alignItems: 'center',
           gap: '4px',
           background: 'var(--white)',
-          border: isDragging ? '2px solid #0ea5e9' : '2px solid var(--border)',
+          border: isDragging ? '2px solid var(--accent)' : '2px solid var(--border)',
           padding: '4px 6px',
           height: '28px',
           transition: 'all 0.12s ease',
@@ -1180,7 +1180,7 @@ export default function AIDataIngestionSearch() {
             marginTop: '4px',
             background: 'var(--white)',
             border: '2px solid var(--border)',
-            boxShadow: '2px 2px 8px rgba(0,0,0,0.2)',
+            boxShadow: '2px 2px 8px var(--overlay)',
             zIndex: 1203,
             maxHeight: '420px',
             overflowY: 'auto',
@@ -1192,7 +1192,7 @@ export default function AIDataIngestionSearch() {
             <div style={{
               padding: '10px 12px',
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
+              color: 'var(--bg)',
               fontSize: '11px',
               borderBottom: '1px solid var(--border-light)'
             }}>
@@ -1204,12 +1204,12 @@ export default function AIDataIngestionSearch() {
           {/* Rich results with thumbnails */}
           {autocompleteResults.map((result, index) => {
             const typeColors: Record<string, string> = {
-              vehicle: '#1976d2',
-              organization: '#388e3c',
+              vehicle: 'var(--accent)',
+              organization: 'var(--success)',
               user: '#9c27b0',
-              tag: '#ff9800',
+              tag: 'var(--warning)',
               external_identity: '#00bcd4',
-              vin_match: '#e91e63'
+              vin_match: 'var(--error)'
             };
             const typeIcons: Record<string, string> = {
               vehicle: '🚗',
@@ -1228,7 +1228,7 @@ export default function AIDataIngestionSearch() {
                 style={{
                   padding: '8px 10px',
                   cursor: 'pointer',
-                  background: selectedAutocompleteIndex === index ? '#e3f2fd' : 'transparent',
+                  background: selectedAutocompleteIndex === index ? 'var(--accent-dim, #e3f2fd)' : 'transparent',
                   borderBottom: '1px solid var(--border-light)',
                   display: 'flex',
                   alignItems: 'center',
@@ -1241,7 +1241,7 @@ export default function AIDataIngestionSearch() {
                   width: '40px',
                   height: '40px',
                   borderRadius: '4px',
-                  background: result.image_url ? `url(${result.image_url}) center/cover` : '#e0e0e0',
+                  background: result.image_url ? `url(${result.image_url}) center/cover` : 'var(--border)',
                   flexShrink: 0,
                   display: 'flex',
                   alignItems: 'center',
@@ -1256,7 +1256,7 @@ export default function AIDataIngestionSearch() {
                 <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                   <div style={{
                     fontWeight: 600,
-                    color: typeColors[result.type] || '#333',
+                    color: typeColors[result.type] || 'var(--text)',
                     fontSize: '12px',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -1267,7 +1267,7 @@ export default function AIDataIngestionSearch() {
                   {result.subtitle && (
                     <div style={{
                       fontSize: '9px',
-                      color: '#666',
+                      color: 'var(--text-secondary)',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis'
@@ -1280,8 +1280,8 @@ export default function AIDataIngestionSearch() {
                 {/* Type badge */}
                 <div style={{
                   fontSize: '8px',
-                  color: 'white',
-                  background: typeColors[result.type] || '#999',
+                  color: 'var(--bg)',
+                  background: typeColors[result.type] || 'var(--text-disabled)',
                   padding: '2px 6px',
                   borderRadius: '3px',
                   textTransform: 'uppercase',
@@ -1298,8 +1298,8 @@ export default function AIDataIngestionSearch() {
           {autocompleteAISuggestion && autocompleteResults.length > 0 && autocompleteResults.length < 3 && (
             <div style={{
               padding: '8px 12px',
-              background: '#f5f5f5',
-              color: '#666',
+              background: 'var(--bg)',
+              color: 'var(--text-secondary)',
               fontSize: '9px',
               borderTop: '1px solid var(--border-light)'
             }}>
@@ -1320,7 +1320,7 @@ export default function AIDataIngestionSearch() {
                 width: '100%',
                 textAlign: 'left',
                 padding: '8px 12px',
-                background: '#f9fafb',
+                background: 'var(--bg)',
                 border: 'none',
                 borderTop: '1px solid var(--border-light)',
                 fontSize: '11px',
@@ -1344,7 +1344,7 @@ export default function AIDataIngestionSearch() {
             right: 0,
             background: 'var(--white)',
             border: '2px solid var(--border)',
-            boxShadow: '2px 2px 8px rgba(0,0,0,0.2)',
+            boxShadow: '2px 2px 8px var(--overlay)',
             padding: '6px',
             zIndex: 1200,
             display: 'flex',
@@ -1364,7 +1364,7 @@ export default function AIDataIngestionSearch() {
                 height: '20px',
                 minWidth: 'auto',
                 opacity: 1,
-                background: showCritique ? '#c0c0c0' : 'var(--white)',
+                background: showCritique ? 'var(--border)' : 'var(--white)',
                 whiteSpace: 'nowrap'
               }}
               title="Open critique mode to provide feedback on this vehicle"
@@ -1506,7 +1506,7 @@ export default function AIDataIngestionSearch() {
           zIndex: 1202,
           maxHeight: '400px',
           overflowY: 'auto',
-          boxShadow: '2px 2px 8px rgba(0,0,0,0.2)'
+          boxShadow: '2px 2px 8px var(--overlay)'
         }}>
           <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' }}>
             Extracted Data Preview
@@ -1540,8 +1540,8 @@ export default function AIDataIngestionSearch() {
             <div style={{ 
               marginBottom: '12px', 
               fontSize: '11px',
-              background: extractionPreview.matchResult.shouldMerge ? '#e8f5e9' : '#fff3cd',
-              border: `2px solid ${extractionPreview.matchResult.shouldMerge ? '#4caf50' : '#ffc107'}`,
+              background: extractionPreview.matchResult.shouldMerge ? 'var(--success-dim)' : 'var(--warning-dim)',
+              border: `2px solid ${extractionPreview.matchResult.shouldMerge ? 'var(--success)' : 'var(--warning)'}`,
               padding: '8px',
               borderRadius: '2px'
             }}>
@@ -1554,7 +1554,7 @@ export default function AIDataIngestionSearch() {
                   <div style={{ marginTop: '4px' }}>
                     <div style={{ fontWeight: 'bold' }}>Evidence:</div>
                     {extractionPreview.matchResult.evidence.slice(0, 3).map((evidence, idx) => (
-                      <div key={idx} style={{ paddingLeft: '8px', fontSize: '9px', color: '#666' }}>
+                      <div key={idx} style={{ paddingLeft: '8px', fontSize: '9px', color: 'var(--text-secondary)' }}>
                         • {evidence.matchType}: {evidence.details}
                       </div>
                     ))}
@@ -1575,12 +1575,12 @@ export default function AIDataIngestionSearch() {
                   {extractionPreview.result.rawData.organization.name}
                 </div>
                 {extractionPreview.result.rawData.organization.website && (
-                  <div style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                     {extractionPreview.result.rawData.organization.website}
                   </div>
                 )}
                 {extractionPreview.result.rawData.organization.description && (
-                  <div style={{ fontSize: '9px', color: '#666', marginTop: '4px', fontStyle: 'italic' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px', fontStyle: 'italic' }}>
                     {extractionPreview.result.rawData.organization.description}
                   </div>
                 )}
@@ -1619,7 +1619,7 @@ export default function AIDataIngestionSearch() {
           )}
 
           {extractionPreview.operationPlan && (
-            <div style={{ marginBottom: '12px', fontSize: '11px', color: '#666' }}>
+            <div style={{ marginBottom: '12px', fontSize: '11px', color: 'var(--text-secondary)' }}>
               {extractionPreview.operationPlan.vehicleOperation.isNew 
                 ? 'Will create new vehicle profile'
                 : 'Will update existing vehicle profile'}
@@ -1627,7 +1627,7 @@ export default function AIDataIngestionSearch() {
           )}
 
           {extractionPreview.result.provider && (
-            <div style={{ marginTop: '8px', fontSize: '9px', color: '#999', fontStyle: 'italic' }}>
+            <div style={{ marginTop: '8px', fontSize: '9px', color: 'var(--text-disabled)', fontStyle: 'italic' }}>
               Processed with {extractionPreview.result.provider}
               {extractionPreview.result.model && ` / ${extractionPreview.result.model}`}
             </div>
@@ -1682,7 +1682,7 @@ export default function AIDataIngestionSearch() {
           zIndex: 1202,
           maxHeight: '360px',
           overflowY: 'auto',
-          boxShadow: '2px 2px 8px rgba(0,0,0,0.2)',
+          boxShadow: '2px 2px 8px var(--overlay)',
           fontSize: '11px',
           whiteSpace: 'pre-wrap',
           lineHeight: 1.35
@@ -1762,11 +1762,11 @@ export default function AIDataIngestionSearch() {
           left: 0,
           right: 0,
           marginTop: '4px',
-          background: '#fee',
-          border: '2px solid #fcc',
+          background: 'var(--error-dim)',
+          border: '2px solid var(--error)',
           padding: '8px',
           fontSize: '11px',
-          color: '#c00',
+          color: 'var(--error)',
           zIndex: 1202
         }}>
           {error}

@@ -230,7 +230,7 @@ export default function VenueSpreadAnalyzer() {
                   <div className="flex items-center gap-2">
                     <div
                       className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: VENUE_COLORS[spread.venue_slug] || '#666' }}
+                      style={{ backgroundColor: VENUE_COLORS[spread.venue_slug] || 'var(--text-secondary)' }}
                     />
                     <span className="text-white font-medium">{spread.venue_name}</span>
                   </div>
@@ -293,7 +293,7 @@ export default function VenueSpreadAnalyzer() {
                     className="h-full rounded transition-all duration-500"
                     style={{
                       width: `${widthPct}%`,
-                      backgroundColor: VENUE_COLORS[spread.venue_slug] || '#666',
+                      backgroundColor: VENUE_COLORS[spread.venue_slug] || 'var(--text-secondary)',
                     }}
                   />
                 </div>

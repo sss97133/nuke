@@ -298,7 +298,7 @@ export default function Dashboard() {
           fontSize: '11px'
         }}
       >
-        <div style={{ marginBottom: '16px', color: '#424242' }}>
+        <div style={{ marginBottom: '16px', color: 'var(--text)' }}>
           Please log in to view your dashboard
         </div>
         <button
@@ -307,10 +307,10 @@ export default function Dashboard() {
             fontSize: '11px',
             fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
             padding: '8px 16px',
-            border: '1px solid #bdbdbd',
+            border: '1px solid var(--border)',
             background: 'var(--surface)',
             cursor: 'pointer',
-            color: '#000000'
+            color: 'var(--text)'
           }}
         >
           [Log In]
@@ -393,12 +393,12 @@ export default function Dashboard() {
         style={{
           marginBottom: '16px',
           paddingBottom: '8px',
-          borderBottom: '1px solid #bdbdbd'
+          borderBottom: '1px solid var(--border)'
         }}
       >
         <h1 style={{ fontSize: '13px', fontWeight: '600', margin: 0 }}>Dashboard</h1>
         {totalPending > 0 && (
-          <div style={{ fontSize: '9px', color: '#757575', marginTop: '4px' }}>
+          <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px' }}>
             {totalPending} item{totalPending !== 1 ? 's' : ''} need attention
           </div>
         )}
@@ -409,7 +409,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '8px' }}>
           <style>{`@keyframes dash-pulse { 0%,100%{opacity:.7} 50%{opacity:.3} }`}</style>
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} style={{ height: 56, background: 'var(--surface, #f5f5f5)', border: '1px solid #e0e0e0', borderRadius: 2, animation: 'dash-pulse 1.5s ease-in-out infinite' }} />
+            <div key={i} style={{ height: 56, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 2, animation: 'dash-pulse 1.5s ease-in-out infinite' }} />
           ))}
         </div>
       ) : allItems.length === 0 ? (
@@ -417,7 +417,7 @@ export default function Dashboard() {
           style={{
             padding: '32px',
             textAlign: 'center',
-            color: '#757575',
+            color: 'var(--text-secondary)',
             fontSize: '11px'
           }}
         >
@@ -456,7 +456,7 @@ export default function Dashboard() {
             style={{
               background: 'var(--surface)',
               padding: '20px',
-              border: '2px solid #bdbdbd',
+              border: '2px solid var(--border)',
               maxWidth: '500px',
               width: '90%',
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
@@ -467,10 +467,10 @@ export default function Dashboard() {
               <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
                 Rejection Reason
               </div>
-              <div style={{ fontSize: '11px', color: '#757575', marginBottom: '12px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
                 {rejectionModal.title}
               </div>
-              <div style={{ fontSize: '11px', color: '#757575', marginBottom: '8px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                 Why are you rejecting this? (Optional)
               </div>
               <textarea
@@ -480,7 +480,7 @@ export default function Dashboard() {
                   width: '100%',
                   minHeight: '80px',
                   padding: '8px',
-                  border: '1px solid #bdbdbd',
+                  border: '1px solid var(--border)',
                   fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
                   fontSize: '11px',
                   resize: 'vertical'
@@ -493,7 +493,7 @@ export default function Dashboard() {
                 onClick={() => setRejectionModal(null)}
                 style={{
                   padding: '6px 16px',
-                  border: '1px solid #bdbdbd',
+                  border: '1px solid var(--border)',
                   background: 'var(--surface)',
                   cursor: 'pointer',
                   fontSize: '11px'
@@ -514,9 +514,9 @@ export default function Dashboard() {
                 }}
                 style={{
                   padding: '6px 16px',
-                  border: '1px solid #dc2626',
-                  background: '#dc2626',
-                  color: 'white',
+                  border: '1px solid var(--upload-red)',
+                  background: 'var(--upload-red)',
+                  color: 'var(--bg)',
                   cursor: 'pointer',
                   fontSize: '11px',
                   fontWeight: '600'

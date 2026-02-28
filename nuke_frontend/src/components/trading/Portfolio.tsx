@@ -58,7 +58,7 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
   return (
     <div style={{
       background: 'var(--surface)',
-      border: '2px solid #bdbdbd',
+      border: '2px solid var(--border)',
       borderRadius: '4px',
       padding: '16px'
     }}>
@@ -66,19 +66,19 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
 
       {/* Summary */}
       <div style={{
-        background: isPositive ? '#f0fdf4' : '#fef2f2',
-        border: `2px solid ${isPositive ? '#10b981' : '#dc2626'}`,
+        background: isPositive ? 'var(--success-dim)' : 'var(--error-dim)',
+        border: `2px solid ${isPositive ? 'var(--success)' : 'var(--error)'}`,
         padding: '12px',
         borderRadius: '4px',
         marginBottom: '16px'
       }}>
-        <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
           Total Value
         </div>
         <div style={{
           fontSize: '24px',
           fontWeight: 'bold',
-          color: isPositive ? '#10b981' : '#dc2626',
+          color: isPositive ? 'var(--success)' : 'var(--error)',
           marginBottom: '8px'
         }}>
           ${totalValue.toFixed(2)}
@@ -86,7 +86,7 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
         <div style={{
           fontSize: '15px',
           fontWeight: 'bold',
-          color: isPositive ? '#10b981' : '#dc2626'
+          color: isPositive ? 'var(--success)' : 'var(--error)'
         }}>
           {isPositive ? '↑' : '↓'} ${Math.abs(totalGainLoss).toFixed(2)} ({gainLossPercent.toFixed(1)}%)
         </div>
@@ -97,7 +97,7 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
         <div style={{
           textAlign: 'center',
           padding: '24px',
-          color: '#6b7280'
+          color: 'var(--text-secondary)'
         }}>
           No holdings yet
         </div>
@@ -108,7 +108,7 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
               key={holding.offering_id}
               style={{
                 background: 'var(--bg)',
-                border: '1px solid #e5e7eb',
+                border: '1px solid var(--border)',
                 padding: '10px',
                 borderRadius: '2px',
                 display: 'grid',
@@ -122,11 +122,11 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
                   fontSize: '12px',
                   fontWeight: 'bold',
                   marginBottom: '4px',
-                  color: '#1f2937'
+                  color: 'var(--text)'
                 }}>
                   {holding.vehicle_title}
                 </div>
-                <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                   {holding.shares_owned} shares @ ${holding.current_mark.toFixed(2)}/share
                 </div>
               </div>
@@ -136,13 +136,13 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
                   fontSize: '13px',
                   fontWeight: 'bold',
                   marginBottom: '4px',
-                  color: holding.unrealized_gain_loss >= 0 ? '#10b981' : '#dc2626'
+                  color: holding.unrealized_gain_loss >= 0 ? 'var(--success)' : 'var(--error)'
                 }}>
                   ${(holding.shares_owned * holding.current_mark).toFixed(2)}
                 </div>
                 <div style={{
                   fontSize: '11px',
-                  color: holding.unrealized_gain_loss >= 0 ? '#10b981' : '#dc2626',
+                  color: holding.unrealized_gain_loss >= 0 ? 'var(--success)' : 'var(--error)',
                   fontWeight: 'bold'
                 }}>
                   {holding.unrealized_gain_loss >= 0 ? '↑' : '↓'} {Math.abs(holding.unrealized_gain_loss_pct).toFixed(1)}%
@@ -157,7 +157,7 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
         <div style={{
           textAlign: 'center',
           marginTop: '12px',
-          color: '#6b7280',
+          color: 'var(--text-secondary)',
           fontSize: '11px'
         }}>
           Loading...

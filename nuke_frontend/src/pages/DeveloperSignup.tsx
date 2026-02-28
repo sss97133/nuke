@@ -168,7 +168,7 @@ export default function DeveloperSignup() {
               type="submit" disabled={loading}
               style={{
                 width: '100%', padding: '10px',
-                background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer',
+                background: 'var(--accent)', color: 'var(--text-on-accent, #fff)', border: 'none', cursor: 'pointer',
                 fontFamily: 'Arial, sans-serif', fontSize: 'var(--fs-9, 9px)', fontWeight: 600,
                 textTransform: 'uppercase', letterSpacing: '0.05em',
               }}
@@ -204,7 +204,7 @@ export default function DeveloperSignup() {
             onClick={copyKey}
             style={{
               width: '100%', padding: '8px', marginBottom: 24,
-              background: copied ? 'var(--success, #22c55e)' : 'var(--accent)', color: '#fff',
+              background: copied ? 'var(--success, #22c55e)' : 'var(--accent)', color: 'var(--text-on-accent, #fff)',
               border: 'none', cursor: 'pointer',
               fontFamily: 'Arial, sans-serif', fontSize: 'var(--fs-9, 9px)', fontWeight: 600,
             }}
@@ -227,7 +227,7 @@ const comps = await nuke.comps.get({
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={() => navigate('/developers/dashboard')}
-              style={{ flex: 1, padding: '10px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'Arial, sans-serif', fontSize: 'var(--fs-9, 9px)' }}
+              style={{ flex: 1, padding: '10px', background: 'var(--accent)', color: 'var(--text-on-accent, #fff)', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'Arial, sans-serif', fontSize: 'var(--fs-9, 9px)' }}
             >
               Go to Dashboard
             </button>

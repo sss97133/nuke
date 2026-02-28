@@ -17,20 +17,20 @@ const VehicleErrorFallback: React.FC<{
   <div style={{
     padding: '16px',
     margin: '8px 0',
-    border: '1px solid #f59e0b',
-    backgroundColor: '#fef3c7',
+    border: '1px solid var(--warning)',
+    backgroundColor: 'var(--warning-dim)',
     borderRadius: '4px',
     fontFamily: 'Arial, sans-serif',
     fontSize: '11px'
   }}>
     <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
-      <AlertTriangle style={{ width: '16px', height: '16px', color: '#f59e0b', marginRight: '6px' }} />
-      <h4 style={{ margin: 0, color: '#92400e', fontSize: '12px', fontWeight: 'bold' }}>
+      <AlertTriangle style={{ width: '16px', height: '16px', color: 'var(--warning)', marginRight: '6px' }} />
+      <h4 style={{ margin: 0, color: 'var(--warning-text, #92400e)', fontSize: '12px', fontWeight: 'bold' }}>
         Vehicle Component Error
       </h4>
     </div>
 
-    <div style={{ marginBottom: '12px', color: '#92400e' }}>
+    <div style={{ marginBottom: '12px', color: 'var(--warning-text, #92400e)' }}>
       {componentName ? (
         <p style={{ margin: '0 0 4px 0' }}>
           Failed to load <strong>{componentName}</strong> component
@@ -56,8 +56,8 @@ const VehicleErrorFallback: React.FC<{
             display: 'flex',
             alignItems: 'center',
             padding: '4px 8px',
-            backgroundColor: '#f59e0b',
-            color: 'white',
+            backgroundColor: 'var(--warning)',
+            color: 'var(--bg)',
             border: 'none',
             borderRadius: '3px',
             fontSize: '10px',
@@ -74,7 +74,7 @@ const VehicleErrorFallback: React.FC<{
         display: 'flex',
         alignItems: 'center',
         gap: '4px',
-        color: '#92400e',
+        color: 'var(--warning-text, #92400e)',
         fontSize: '10px'
       }}>
         <Car style={{ width: '12px', height: '12px' }} />

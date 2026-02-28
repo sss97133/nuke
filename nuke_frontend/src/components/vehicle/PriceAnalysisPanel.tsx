@@ -25,11 +25,11 @@ interface RpcSignal {
 interface HistPoint { as_of: string; value: number; type: string }
 
 const to8 = { fontSize: '11px' } as const;
-const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
-const panel: React.CSSProperties = { width: 760, maxWidth: '95%', background: 'var(--surface)', border: '1px solid #c0c0c0', borderRadius: 2 };
-const header: React.CSSProperties = { ...to8, padding: 6, borderBottom: '1px solid #c0c0c0', background: 'var(--bg)', fontWeight: 700 };
+const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'var(--overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
+const panel: React.CSSProperties = { width: 760, maxWidth: '95%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 2 };
+const header: React.CSSProperties = { ...to8, padding: 6, borderBottom: '1px solid var(--border)', background: 'var(--bg)', fontWeight: 700 };
 const body: React.CSSProperties = { padding: 8 };
-const chip: React.CSSProperties = { ...to8, background: 'var(--bg)', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: 2 };
+const chip: React.CSSProperties = { ...to8, background: 'var(--bg)', border: '1px solid var(--border)', padding: '1px 4px', borderRadius: 2 };
 
 const PriceAnalysisPanel: React.FC<PriceAnalysisPanelProps> = ({ vehicleId, isOpen, onClose }) => {
   const [sig, setSig] = useState<RpcSignal | null>(null);
@@ -97,7 +97,7 @@ const PriceAnalysisPanel: React.FC<PriceAnalysisPanelProps> = ({ vehicleId, isOp
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
                 <span style={chip}>Primary: {sig?.primary_label || '—'} {fmt(sig?.primary_value)}</span>
                 <span style={chip}>Anchor: {sig?.anchor_label || '—'} {fmt(sig?.anchor_value)}</span>
-                <span style={{ ...chip, color: (sig?.delta_amount ?? 0) >= 0 ? '#006400' : '#800000' }}>Delta: {pct(sig?.delta_pct)} {fmt(Math.abs(sig?.delta_amount ?? 0))}</span>
+                <span style={{ ...chip, color: (sig?.delta_amount ?? 0) >= 0 ? 'var(--success)' : 'var(--error)' }}>Delta: {pct(sig?.delta_pct)} {fmt(Math.abs(sig?.delta_amount ?? 0))}</span>
                 {typeof sig?.confidence === 'number' && <span style={chip}>Conf {sig.confidence}</span>}
                 {(sig?.missing_fields || []).length > 0 && (
                   <span style={{ ...chip, borderStyle: 'dashed' }}>Missing: {(sig!.missing_fields || []).join(', ')}</span>
@@ -118,7 +118,7 @@ const PriceAnalysisPanel: React.FC<PriceAnalysisPanelProps> = ({ vehicleId, isOp
               <div style={{ marginTop: 4 }}>
                 <div className="text text-muted" style={to8}>30–90d trend</div>
                 {spark ? (
-                  <svg width={spark.w} height={spark.h} viewBox={`0 0 ${spark.w} ${spark.h}`} style={{ border: '1px solid #c0c0c0' }}>
+                  <svg width={spark.w} height={spark.h} viewBox={`0 0 ${spark.w} ${spark.h}`} style={{ border: '1px solid var(--border)' }}>
                     <polyline fill="none" stroke="#2563eb" strokeWidth="1" points={spark.pts} />
                   </svg>
                 ) : (

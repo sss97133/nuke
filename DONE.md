@@ -1,5 +1,28 @@
 # DONE — Completed Work Log
 
+## 2026-02-28 (Photo Spatial Mapping — 10K GPS Pins)
+- [scripts] iphoto-intake.mjs: Added `--map-only` mode — inserts GPS metadata from osxphotos without requiring local image files (works with iCloud-only photos)
+- [scripts] iphoto-intake.mjs: `queryAlbumMetadata()` extracts lat/lng/place/date/EXIF from osxphotos JSON, `extractPhotoMeta()` handles nested place objects
+- [scripts] iphoto-intake.mjs: `--backfill-gps` mode updates existing iphoto images with GPS from Apple Photos metadata
+- [scripts] Ran `--map-only` across all 72 vehicle albums: 10,181 GPS-tagged photos across 48 vehicles
+- [frontend] UnifiedMap.tsx: Photo map layer (magenta pins) with GPS-tagged images as ScatterplotLayer
+- [frontend] UnifiedMap.tsx: Photo side panel with thumbnail, vehicle link, location, date, camera, GPS coords
+- [frontend] UnifiedMap.tsx: Increased photo layer limit 5K→15K to display full dataset
+- [data] Before: 0% of iphoto images had GPS. After: 99.6% (10,181/10,219) have GPS coordinates
+
+## 2026-02-28 (Vehicle Zone Deprecation / Angle String Migration)
+- [frontend] NEW: `nuke_frontend/src/constants/vehicleZones.ts` -- canonical 41-zone taxonomy constants (ZONE_CATEGORIES, ZONE_LABELS, ZONE_DISPLAY_PRIORITY, ESSENTIAL_ZONES, ANGLE_TO_ZONE_MAP, ANGLE_FAMILY_TO_ZONE_MAP, helper functions)
+- [frontend] REWRITE: `imageDisplayPriority.ts` -- scoring now driven by `vehicle_zone` + `zone_confidence` + `photo_quality_score` from YONO; legacy angle fallback preserved but marked DEPRECATED
+- [frontend] REWRITE: `imageCoverageTracker.ts` -- coverage analysis now uses `vehicle_zone` column directly; essential zones from constants; legacy `getEssentialAngles()` kept as deprecated alias
+- [frontend] UPDATE: `imageFilterUtils.ts` `scoreMoneyShot()` -- prefers `vehicle_zone` for scoring, falls back to legacy `ai_detected_angle`/`angle` strings; function-level deprecation docstring
+- [frontend] DEPRECATION COMMENTS: `imageAngleService.ts` (module-level + per-function), `personalPhotoLibraryService.ts` (angle_breakdown type), `vehicleFieldScoring.ts` (engine_bay reference), `ImageGallery.tsx` (catPriority maps), `About.tsx` (schema diagram updated)
+- [backend] DEPRECATION COMMENTS: `process-all-images-cron/index.ts`, `analyze-image/index.ts`, `analyze-image/coordinate_output.ts`, `import-classiccars-listing/index.ts` -- all marked as using legacy angle strings, pointing to vehicle_zone system
+
+## 2026-02-28 (Image Gallery Zone View)
+- [frontend] ImageZoneSection.tsx: New collapsible zone-grouped gallery component (HIGHLIGHTS/EXTERIOR/ENGINE BAY/INTERIOR/UNDERCARRIAGE/WHEELS/DETAIL/DOCUMENTS/UNCATEGORIZED)
+- [frontend] ImageGallery.tsx: Added "Zones" as DEFAULT view mode (before Grid/Full/Info/Sessions), surfaces vehicle_zone, photo_quality_score, condition_score, damage_flags from YONO pipeline
+- [frontend] Zone sections sort by photo_quality_score DESC, show condition badge + damage dot + photo quality indicator on thumbnails
+
 ## 2026-02-28 (First-Touch User Engagement Overhaul)
 - [frontend] Homepage: Live vehicle showcase strip (8 real vehicles with images, auto-refresh 60s)
 - [frontend] Homepage: Inline search preview dropdown (debounced 300ms, 5 results)
@@ -17,7 +40,11 @@
 - [frontend] Phase 3: Fixed 3 CSS files (AnnotatedField, ProfessionalToolbox, MergeProposalsDashboard) — zero violations
 - [frontend] Phase 4: Updated index.css compat layer with audit stats and documentation
 - [frontend] Phase 6: Wrote THEME_AUDIT_REPORT.md — full stats, remaining debt, recommendations
-- [frontend] Result: 47% reduction in inline violations (1,709→902), 100% of undefined CSS vars resolved
+- [frontend] Phase 3 cont: Fixed 170+ more TSX files across 5 batch sweeps (~2,000+ additional fixes)
+- [frontend] Batches covered: top 20 offenders, next 16, 9 mid-tier, 20 more, then full 107-file sweep of all remaining
+- [frontend] Result: 89% reduction in inline violations (1,709→185), 99.2% of genuine bare colors eliminated (1,709→13)
+- [frontend] Remaining 185 refs: 101 intentional (dark overlays, maps), 53 correct var(--token, #fallback), ~13 genuine (brand colors, Three.js, Recharts)
+- [frontend] Updated THEME_AUDIT_REPORT.md with final statistics
 
 ## 2026-02-28 (Automated Labor Estimation Pipeline)
 - [labor] Phase 1: YONO fabrication stage head — 10-stage taxonomy (raw→complete), auto_label_stages.py, train_stage_classifier.py, StageClassifier in server.py
@@ -2219,3 +2246,44 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - Prevents the 1,671+ vehicles NULL state from recurring
 
 **Status:** COMPLETED ✓
+
+## 2026-02-28
+- [frontend] Demoted AI button in ImageLightbox — hidden by default, shows RETRY on failure, status text for processing/pending, Alt+click power-user reprocess preserved
+- [frontend] Added Vision Summary section to sidebar — vehicle_zone, condition stars, photo_quality, damage_flags as red tags, fabrication_stage
+- [frontend] Made raw ai_scan_metadata collapsible (details/summary) — collapsed by default for power users
+- [frontend] Updated ImageInfoPanel (mobile) with matching Vision Summary section
+- [frontend] Replaced ANALYZE NOW button with status-aware display in sidebar
+- [frontend] Walk-Around Carousel: horizontal scrollable strip below hero showing best image per zone category in canonical walk-around order (FRONT -> FRONT 3/4 -> DRIVER -> REAR 3/4 -> REAR -> PASSENGER -> INTERIOR -> ENGINE -> UNDER -> WHEELS -> DETAIL), with coverage indicator (X/11 angles), empty dashed placeholders for missing zones, photo counts per slot, click-to-scroll-to-zone interaction
+
+## 2026-02-28
+
+[dedup] Built auto-dedup-check edge function — fires automatically from photo-pipeline-orchestrator on every image INSERT
+  - Computes dHash (same algorithm as dedup-vehicle-images), compares against vehicle's existing hashed images
+  - If hamming distance <= 5, marks duplicate with provenance priority (user_upload > bat_import)
+  - If new image from stronger source, flips — marks OLD image as duplicate (provenance-aware)
+  - Non-blocking fire-and-forget from orchestrator Step 8
+  - Deployed to production
+
+[dedup] Added provenance display to ImageLightbox info sidebar
+  - Shows ORIGINAL badge (green) with photographer attribution when cross_source_provenance exists
+  - Shows "Also found on" with source list and dates
+  - Shows attribution insight: "uploaded by user before appearing on auction platforms"
+  - Shows DUPLICATE badge (red) for duplicate images with link to original
+
+[dedup] Added provenance display to mobile ImageInfoPanel
+  - Same provenance/duplicate indicators in mobile-friendly layout
+
+[dedup] Added "dupes removed" count to ImageGallery Story Summary Bar
+  - Parallel query counts is_duplicate=true images during load
+  - Shows "N dupes removed" in summary bar when duplicates exist
+  - Verified all 5 gallery view modes (grid, masonry, list, bundles, zones) correctly filter is_duplicate=true
+
+## 2026-02-28 (Profile Import Flow for /claim-identity)
+- [identity] Created `ingest-external-profile` edge function — validates profile URL, upserts external_identities, queues at priority 90
+- [identity] Created `process-profile-queue` edge function — claims highest-priority queue items, calls extract-bat-profile-vehicles, sends in-app notification + email on completion
+- [identity] Fixed `claim_user_profile_queue_batch` RPC — disambiguated column references (upq alias)
+- [identity] Deployed `extract-bat-profile-vehicles` (was local-only, not previously deployed)
+- [identity] Registered pg_cron job #335 — process-profile-queue every 5 minutes
+- [frontend] Updated ClaimExternalIdentity.tsx — "Not seeing your profile?" import wizard replaces bare "Claim anyway" button; URL paste → instant identity creation → async stats enrichment
+- [frontend] Updated Notifications.tsx — added action_url to query and renders as clickable "View →" link
+- [identity] Verified end-to-end: skylarwilliams ingested → priority 90 queue → processed → 15 listings found → identity updated

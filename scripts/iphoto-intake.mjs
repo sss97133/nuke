@@ -16,8 +16,31 @@ import { createClient } from '@supabase/supabase-js';
 import { readFileSync, readdirSync, statSync, mkdirSync, rmSync } from 'fs';
 import { join, basename } from 'path';
 import os from 'os';
+import dns from 'dns';
 
-const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+// ─── DNS fix: bypass broken macOS system resolver using Google DNS ──────────
+const resolver = new dns.Resolver();
+resolver.setServers(['8.8.8.8', '1.1.1.1']);
+const origLookup = dns.lookup.bind(dns);
+dns.lookup = function(hostname, options, callback) {
+  if (typeof options === 'function') { callback = options; options = {}; }
+  resolver.resolve4(hostname, (err, addresses) => {
+    if (err || !addresses || addresses.length === 0) {
+      return origLookup(hostname, options, callback);
+    }
+    if (options && options.all) {
+      callback(null, addresses.map(a => ({ address: a, family: 4 })));
+    } else {
+      callback(null, addresses[0], 4);
+    }
+  });
+};
+// Use node-fetch (respects dns.lookup) instead of built-in fetch (undici, doesn't)
+const nodeFetch = (await import('node-fetch')).default;
+
+const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+  global: { fetch: nodeFetch }
+});
 const BUCKET = 'vehicle-photos';
 const BATCH_SIZE = 10;
 const USER_ID = '0b9f107a-d124-49de-9ded-94698f63c1c4'; // skylar's user_id
@@ -58,7 +81,7 @@ function parseAlbumName(name) {
   const rest = yearMatch[2].trim();
 
   const MAKES = ['Chevrolet', 'GMC', 'Ford', 'Dodge', 'Pontiac', 'Jaguar', 'Porsche',
-    'Ferrari', 'Mercedes', 'Nissan', 'Lexus', 'Lincoln', 'Buick'];
+    'Ferrari', 'Mercedes', 'Nissan', 'Lexus', 'Lincoln', 'Buick', 'DMC', 'DeLorean'];
 
   let make = null;
   let modelParts = rest.split(' ');
@@ -78,10 +101,87 @@ function parseAlbumName(name) {
   return { year, make, model };
 }
 
-// ─── Vehicle matching ────────────────────────────────────────────────────────
+// ─── Retry helper ───────────────────────────────────────────────────────────
+
+async function withRetry(fn, label = '', retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (attempt === retries) throw e;
+      const delay = attempt * 2000;
+      console.log(`  Retry ${attempt}/${retries} (${label}): ${e.message} — waiting ${delay}ms`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+}
+
+// ─── Vehicle cache (pre-loaded at startup to avoid per-album DNS failures) ──
+
+let vehicleCache = null; // Array of {id, year, make, model, vin}
+
+async function loadVehicleCache(albums = null) {
+  if (vehicleCache) return;
+  console.log('Loading vehicle cache...');
+
+  // STRATEGY: Load vehicles that already have iphoto records (from --map-only run).
+  // These are the user's actual vehicles — much more accurate than searching 1.2M vehicles.
+  const iphotoVehicleIds = new Set();
+  let offset = 0;
+  while (true) {
+    const { data } = await withRetry(async () => {
+      const r = await supabase.from('vehicle_images')
+        .select('vehicle_id')
+        .eq('source', 'iphoto')
+        .range(offset, offset + 999);
+      if (r.error) throw new Error(r.error.message);
+      return r;
+    }, 'iphoto-vehicles');
+    if (!data || data.length === 0) break;
+    for (const d of data) iphotoVehicleIds.add(d.vehicle_id);
+    if (data.length < 1000) break;
+    offset += 1000;
+  }
+
+  // Fetch full details for those vehicles
+  vehicleCache = [];
+  const ids = [...iphotoVehicleIds];
+  for (let i = 0; i < ids.length; i += 50) {
+    const batch = ids.slice(i, i + 50);
+    const { data } = await withRetry(async () => {
+      const r = await supabase.from('vehicles')
+        .select('id, year, make, model, vin')
+        .in('id', batch);
+      if (r.error) throw new Error(r.error.message);
+      return r;
+    }, 'vehicle-details');
+    if (data) vehicleCache.push(...data);
+  }
+
+  console.log(`  Cached ${vehicleCache.length} vehicles (user's iphoto-linked vehicles)`);
+}
+
+function findVehicleCached(year, make, model) {
+  const modelFirst = model.split(' ')[0].toLowerCase();
+  const makeLower = make.toLowerCase();
+  const matches = vehicleCache.filter(v =>
+    v.year === year &&
+    v.make?.toLowerCase().includes(makeLower) &&
+    v.model?.toLowerCase().includes(modelFirst)
+  );
+  if (matches.length === 1) return matches[0];
+  if (matches.length > 1) {
+    console.log(`  Multiple matches for ${year} ${make} ${model}:`, matches.map(v => v.model).join(', '));
+    return matches[0];
+  }
+  return null;
+}
 
 async function findVehicle(year, make, model) {
-  // Try exact year+make+model first
+  // Use cache if loaded (preferred — avoids DNS issues during long runs)
+  if (vehicleCache) return findVehicleCached(year, make, model);
+
+  // Fallback to live query
   const { data: exact } = await supabase
     .from('vehicles')
     .select('id, year, make, model, vin')
@@ -198,7 +298,7 @@ function exportAlbum(albumName, destDir, downloadFromICloud = false) {
     // Pipe "y" to handle the interactive "Do you want to continue?" prompt
     const result = spawnSync('bash', ['-c',
       `echo "y" | osxphotos export "${destDir}" --album "${albumName}" --download-missing --overwrite`
-    ], { encoding: 'utf8', stdio: 'pipe', timeout: 600000 }); // 10 min timeout per album
+    ], { encoding: 'utf8', stdio: 'pipe', timeout: 1800000 }); // 30 min timeout per album
     if (result.status !== 0 && result.status !== null) {
       console.error('  Export error:', (result.stderr || '').slice(0, 200));
       return false;
@@ -535,12 +635,16 @@ async function syncAlbum(albumName, vehicleId = null) {
     // Get existing placeholder records for this vehicle (to replace them)
     // Placeholders may be keyed by UUID filename or original filename — build a
     // reverse lookup from the osxphotos metadata that maps original→UUID and vice versa.
-    const { data: placeholders } = await supabase
-      .from('vehicle_images')
-      .select('id, file_name')
-      .eq('vehicle_id', vehicleId)
-      .eq('source', 'iphoto')
-      .like('image_url', '%placeholder.nuke.app%');
+    const { data: placeholders } = await withRetry(async () => {
+      const r = await supabase
+        .from('vehicle_images')
+        .select('id, file_name')
+        .eq('vehicle_id', vehicleId)
+        .eq('source', 'iphoto')
+        .like('image_url', '%placeholder.nuke.app%');
+      if (r.error) throw new Error(r.error.message);
+      return r;
+    }, 'placeholders');
     const placeholderById = new Map();
     for (const p of (placeholders || [])) {
       placeholderById.set(baseName(p.file_name), p.id);
@@ -565,12 +669,16 @@ async function syncAlbum(albumName, vehicleId = null) {
     }
 
     // Get existing real images (skip these)
-    const { data: realExisting } = await supabase
-      .from('vehicle_images')
-      .select('file_name')
-      .eq('vehicle_id', vehicleId)
-      .eq('source', 'iphoto')
-      .like('image_url', '%supabase.co/storage%');
+    const { data: realExisting } = await withRetry(async () => {
+      const r = await supabase
+        .from('vehicle_images')
+        .select('file_name')
+        .eq('vehicle_id', vehicleId)
+        .eq('source', 'iphoto')
+        .like('image_url', '%supabase.co/storage%');
+      if (r.error) throw new Error(r.error.message);
+      return r;
+    }, 'real-images');
     const realNames = new Set((realExisting || []).map(r => r.file_name));
 
     const files = readdirSync(tmpJpeg).filter(f => /\.(jpg|jpeg|png)$/i.test(f));
@@ -588,11 +696,21 @@ async function syncAlbum(albumName, vehicleId = null) {
         const storagePath = `${vehicleId}/iphoto/${filename}`;
         const mimeType = /\.png$/i.test(filename) ? 'image/png' : 'image/jpeg';
 
-        // Upload to storage
-        const { error: uploadError } = await supabase.storage
-          .from(BUCKET)
-          .upload(storagePath, fileData, { contentType: mimeType, upsert: true });
-        if (uploadError) { errors++; return; }
+        // Upload to storage (with retry for intermittent network)
+        let uploadError;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          const r = await supabase.storage
+            .from(BUCKET)
+            .upload(storagePath, fileData, { contentType: mimeType, upsert: true });
+          uploadError = r.error;
+          if (!uploadError) break;
+          if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1000));
+        }
+        if (uploadError) {
+          if (errors < 5) console.error(`\n  Upload error (${filename}): ${uploadError.message}`);
+          errors++;
+          return;
+        }
 
         const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
         const meta = metaMap.get(baseName(filename)) || {};
@@ -667,10 +785,11 @@ if (flag('--backfill-gps')) {
 } else if (flag('--sync')) {
   const albumName = arg('--album');
   const vehicleId = arg('--vehicle-id');
+  const albums = albumName ? null : listAlbums();
+  await loadVehicleCache(albums || [{ name: albumName }]);
   if (albumName) {
     await syncAlbum(albumName, vehicleId);
   } else {
-    const albums = listAlbums();
     console.log(`Syncing ${albums.length} vehicle albums (download from iCloud → upload)...`);
     let totalUploaded = 0, totalReplaced = 0, albumsDone = 0;
     for (const a of albums) {

@@ -222,8 +222,8 @@ const VehicleStreamingCard: React.FC<VehicleStreamingCardProps> = ({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{
-                background: '#dc2626',
-                color: 'white',
+                background: 'var(--error)',
+                color: 'var(--bg)',
                 padding: '2px 6px',
                 borderRadius: 4,
                 fontSize: '10px',
@@ -319,7 +319,7 @@ const VehicleStreamingCard: React.FC<VehicleStreamingCardProps> = ({
                 {muxSettings && (
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {muxSettings.error ? (
-                      <div style={{ color: '#b91c1c' }}>{String(muxSettings.error)}</div>
+                      <div style={{ color: 'var(--error)' }}>{String(muxSettings.error)}</div>
                     ) : (
                       <>
                         {muxSettings.rtmpUrl && (

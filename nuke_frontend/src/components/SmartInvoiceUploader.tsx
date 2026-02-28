@@ -370,7 +370,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0,0,0,0.5)',
+        background: 'var(--overlay)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -555,14 +555,14 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
 
               {/* Error */}
               {status === 'error' && (
-                <div style={{ padding: 'var(--space-2)', background: '#fee', border: '1px solid #fcc', borderRadius: '2px', fontSize: '11px', color: '#c00' }}>
+                <div style={{ padding: 'var(--space-2)', background: 'var(--error-dim)', border: '1px solid color-mix(in srgb, var(--error) 30%, transparent)', borderRadius: '2px', fontSize: '11px', color: 'var(--error)' }}>
                   ❌ {message}
                 </div>
               )}
 
               {/* Success */}
               {status === 'success' && valueDelta && (
-                <div style={{ padding: 'var(--space-2)', background: '#efe', border: '1px solid #cfc', borderRadius: '2px', fontSize: '11px' }}>
+                <div style={{ padding: 'var(--space-2)', background: 'var(--success-dim)', border: '1px solid color-mix(in srgb, var(--success) 30%, transparent)', borderRadius: '2px', fontSize: '11px' }}>
                   ✅ Saved! Value updated: <strong>{valueDelta.delta >= 0 ? '+' : ''}${valueDelta.delta.toLocaleString()}</strong> → ${valueDelta.newValue.toLocaleString()} ({valueDelta.confidence}% confidence)
                 </div>
               )}

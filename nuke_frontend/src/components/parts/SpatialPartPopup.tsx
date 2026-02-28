@@ -42,7 +42,7 @@ const SpatialPartPopup: React.FC<SpatialPartPopupProps> = ({ part, onClose, onOr
 				onClick={(e) => e.stopPropagation()}
 				style={{
 					background: 'var(--surface)',
-					border: '1px solid #d1d5db',
+					border: '1px solid var(--border)',
 					padding: 16,
 					minWidth: 320,
 					maxWidth: 520
@@ -52,7 +52,7 @@ const SpatialPartPopup: React.FC<SpatialPartPopupProps> = ({ part, onClose, onOr
 					{part.name || 'Part'}
 				</div>
 				{part.oem_part_number && (
-					<div style={{ fontSize: '12px', color: '#374151', marginBottom: 8 }}>
+					<div style={{ fontSize: '12px', color: 'var(--text)', marginBottom: 8 }}>
 						Part #: {part.oem_part_number}
 					</div>
 				)}

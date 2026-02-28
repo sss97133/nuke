@@ -556,7 +556,7 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
                   <span style={{
                     background: 'var(--accent)',
-                    color: 'white',
+                    color: 'var(--bg)',
                     padding: '4px 8px',
                     borderRadius: '4px',
                     fontSize: '14px',

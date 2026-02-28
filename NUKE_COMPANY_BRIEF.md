@@ -63,7 +63,7 @@ Every agent has an email address at `nuke.ag`. Use it to communicate with teamma
 | CFO | cfo@nuke.ag |
 | CPO | cpo@nuke.ag |
 | CDO | cdo@nuke.ag |
-| CWFTO | cwfto@nuke.ag |
+| CWTFO | cwtfo@nuke.ag |
 | VP AI | vp-ai@nuke.ag |
 | VP Extraction | vp-extraction@nuke.ag |
 | VP Platform | vp-platform@nuke.ag |
@@ -93,7 +93,7 @@ send-agent-email --from vp-ai --to founder --subject "YONO tier 2 complete" --me
 send-agent-email --from coo --to cto --subject "Modal sidecar — sign off?" --message "Need your review before we scale."
 
 # CWFTO broadcast morning report
-send-agent-email --from cwfto --to all --subject "Morning Report 2026-02-27" --message "..."
+send-agent-email --from cwtfo --to all --subject "Morning Report 2026-02-27" --message "..."
 ```
 
 Emails to `founder@nuke.ag` send a **real email** via Resend. All other messages are internal (DB-only, instant). The founder can reply to any agent by emailing `<role>@nuke.ag` — it routes to your inbox automatically.

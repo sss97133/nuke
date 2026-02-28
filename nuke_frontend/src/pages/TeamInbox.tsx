@@ -60,12 +60,12 @@ const MAILBOX_COLORS: Record<string, string> = {
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  coo: '#3b82f6',
+  coo: 'var(--accent)',
   cto: '#8b5cf6',
-  cfo: '#10b981',
-  cpo: '#f59e0b',
+  cfo: 'var(--success)',
+  cpo: 'var(--warning)',
   cdo: '#ec4899',
-  cwfto: '#6366f1',
+  cwtfo: '#6366f1',
   'vp-ai': '#14b8a6',
   'vp-extraction': '#f97316',
   'vp-platform': '#64748b',
@@ -74,13 +74,13 @@ const ROLE_COLORS: Record<string, string> = {
   'vp-orgs': '#84cc16',
   'vp-photos': '#d946ef',
   'vp-docs': '#fb7185',
-  worker: '#94a3b8',
-  founder: '#f59e0b',
-  system: '#6b7280',
+  worker: 'var(--text-disabled)',
+  founder: 'var(--warning)',
+  system: 'var(--text-secondary)',
 };
 
 const ALL_ROLES = [
-  'founder', 'coo', 'cto', 'cfo', 'cpo', 'cdo', 'cwfto',
+  'founder', 'coo', 'cto', 'cfo', 'cpo', 'cdo', 'cwtfo',
   'vp-ai', 'vp-extraction', 'vp-platform', 'vp-vehicle-intel',
   'vp-deal-flow', 'vp-orgs', 'vp-photos', 'vp-docs', 'worker',
 ];
@@ -128,7 +128,7 @@ function extractVehicleUrls(text: string | null): string[] {
 }
 
 function roleColor(role: string) {
-  return ROLE_COLORS[role] || '#6b7280';
+  return ROLE_COLORS[role] || 'var(--text-secondary)';
 }
 
 function getAvatarColor(str: string): string {
@@ -160,7 +160,7 @@ function RolePill({ role }: { role: string }) {
       fontSize: '9px',
       fontFamily: 'var(--font-mono)',
       fontWeight: 600,
-      color: '#fff',
+      color: 'var(--bg)',
       backgroundColor: roleColor(role),
       borderRadius: 3,
       letterSpacing: '0.02em',
@@ -172,11 +172,11 @@ function RolePill({ role }: { role: string }) {
 
 function StatusBadge({ status }: { status: InboxEmail['status'] }) {
   const styles: Record<string, React.CSSProperties> = {
-    unread:   { background: 'var(--accent)', color: '#fff' },
+    unread:   { background: 'var(--accent)', color: 'var(--bg)' },
     read:     { background: 'var(--surface-hover)', color: 'var(--text-muted)' },
-    replied:  { background: 'var(--success)', color: '#fff' },
+    replied:  { background: 'var(--success)', color: 'var(--bg)' },
     archived: { background: 'var(--border)', color: 'var(--text-muted)' },
-    spam:     { background: 'var(--error)', color: '#fff' },
+    spam:     { background: 'var(--error)', color: 'var(--bg)' },
   };
   return (
     <span style={{
@@ -205,7 +205,7 @@ function UnreadBadge({ count }: { count: number }) {
       padding: '0 5px',
       borderRadius: 999,
       background: 'var(--error)',
-      color: '#fff',
+      color: 'var(--bg)',
       fontSize: '10px',
       fontWeight: 700,
       fontFamily: 'var(--font-mono)',
@@ -225,7 +225,7 @@ function SenderAvatar({ name, email, size = 36 }: { name: string | null; email: 
       height: size,
       borderRadius: '50%',
       background: getAvatarColor(email),
-      color: '#fff',
+      color: 'var(--bg)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -411,7 +411,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                   padding: '3px 8px',
                   fontSize: '11px',
                   background: statusFilter === f ? 'var(--accent)' : 'transparent',
-                  color: statusFilter === f ? '#fff' : 'var(--text-muted)',
+                  color: statusFilter === f ? 'var(--bg)' : 'var(--text-muted)',
                   border: '1px solid var(--border)',
                   borderRadius: 2,
                   cursor: 'pointer',
@@ -810,7 +810,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                       fontSize: '13px',
                       fontWeight: 600,
                       background: replyText.trim() && !sending ? 'var(--accent)' : 'var(--surface-hover)',
-                      color: replyText.trim() && !sending ? '#fff' : 'var(--text-muted)',
+                      color: replyText.trim() && !sending ? 'var(--bg)' : 'var(--text-muted)',
                       border: 'none',
                       borderRadius: 3,
                       cursor: replyText.trim() && !sending ? 'pointer' : 'default',
@@ -900,7 +900,7 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
       position: 'fixed',
       inset: 0,
       zIndex: 1000,
-      background: 'rgba(0,0,0,0.4)',
+      background: 'var(--overlay)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -912,7 +912,7 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
         padding: 24,
         width: '100%',
         maxWidth: 500,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+        boxShadow: '0 8px 32px var(--overlay)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>New Message to Agent</span>
@@ -991,7 +991,7 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
               fontSize: '13px',
               fontWeight: 600,
               background: toRole && subject.trim() && body.trim() && !sending ? 'var(--accent)' : 'var(--surface-hover)',
-              color: toRole && subject.trim() && body.trim() && !sending ? '#fff' : 'var(--text-muted)',
+              color: toRole && subject.trim() && body.trim() && !sending ? 'var(--bg)' : 'var(--text-muted)',
               border: 'none',
               borderRadius: 3,
               cursor: 'pointer',
@@ -1119,7 +1119,7 @@ function MessagesTab() {
               fontSize: '12px',
               fontWeight: 600,
               background: 'var(--accent)',
-              color: '#fff',
+              color: 'var(--bg)',
               border: 'none',
               borderRadius: 3,
               cursor: 'pointer',
@@ -1447,7 +1447,7 @@ export default function TeamInbox() {
         .inbox-mobile-tabbar { display: none; }
         .inbox-email-row:hover { background: var(--surface-hover) !important; }
         .email-body img { max-width: 100%; height: auto; border-radius: 4px; margin: 8px 0; display: block; }
-        .email-body a { color: var(--primary, #3b82f6); text-decoration: underline; }
+        .email-body a { color: var(--primary, var(--accent)); text-decoration: underline; }
         .email-body p { margin: 0 0 12px; }
         .email-body table { max-width: 100%; border-collapse: collapse; }
         .email-body td, .email-body th { padding: 6px 8px; border: 1px solid var(--border); }
@@ -1623,7 +1623,7 @@ export default function TeamInbox() {
                 height: 16,
                 borderRadius: 999,
                 background: 'var(--error)',
-                color: '#fff',
+                color: 'var(--bg)',
                 fontSize: '9px',
                 display: 'flex',
                 alignItems: 'center',
