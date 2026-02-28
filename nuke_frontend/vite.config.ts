@@ -33,7 +33,11 @@ export default defineConfig({
               id.includes('@react-three') ||
               id.includes('use-sync-external-store') ||
               id.includes('/zustand/') ||
-              id.includes('/tunnel-rat/')
+              id.includes('/tunnel-rat/') ||
+              // @deck.gl/react and react-map-gl import React — must stay in vendor
+              // to avoid createContext undefined errors. Only non-React GL libs go in 'maps'.
+              id.includes('@deck.gl/react') ||
+              id.includes('react-map-gl')
             ) return 'vendor';
             // recharts + d3 are only used on a few pages (VehicleProfile, BidMarketDashboard,
             // ContractStation, admin analytics) — keep them out of vendor so pages that
@@ -45,7 +49,7 @@ export default defineConfig({
             if (id.includes('three')) return 'three';
             if (id.includes('exceljs')) return 'exceljs';
             if (id.includes('tesseract')) return 'tesseract';
-            if (id.includes('leaflet') || id.includes('maplibre-gl') || id.includes('deck.gl') || id.includes('@deck.gl/') || id.includes('react-map-gl')) return 'maps';
+            if (id.includes('leaflet') || id.includes('maplibre-gl') || id.includes('deck.gl') || id.includes('@deck.gl/')) return 'maps';
           }
         },
       },
