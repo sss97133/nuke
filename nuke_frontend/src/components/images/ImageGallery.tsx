@@ -277,6 +277,7 @@ const ImageGallery = ({
   const [imageViewCounts, setImageViewCounts] = useState<Record<string, number>>({});
   const [uploaderOrgNames, setUploaderOrgNames] = useState<Record<string, string>>({});
   const [imageAttributions, setImageAttributions] = useState<Record<string, any>>({});
+  const [duplicateCount, setDuplicateCount] = useState<number>(0);
   const [showDropZone, setShowDropZone] = useState(false);
   const sentinelRef = React.useRef<HTMLDivElement>(null);
   const [usingFallback, setUsingFallback] = useState(false);
@@ -1552,19 +1553,32 @@ const ImageGallery = ({
           }
         }
 
-        const { data: rawImages, error } = await supabase
-          .from('vehicle_images')
-          .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags')
-          .eq('vehicle_id', vehicleId)
-          // Filter out documents (treat NULL as false for legacy rows)
-          .not('is_document', 'is', true)
-          // Hide duplicate rows by default (treat NULL as false for legacy rows)
-          .not('is_duplicate', 'is', true)
-          // Additional filtering: ensure we have valid image URLs
-          .not('image_url', 'is', null)
-          .order('is_primary', { ascending: false })
-          .order('position', { ascending: true, nullsFirst: false })
-          .order('created_at', { ascending: true });
+        // Fetch images and duplicate count in parallel
+        const [imageResult, dupCountResult] = await Promise.all([
+          supabase
+            .from('vehicle_images')
+            .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags')
+            .eq('vehicle_id', vehicleId)
+            // Filter out documents (treat NULL as false for legacy rows)
+            .not('is_document', 'is', true)
+            // Hide duplicate rows by default (treat NULL as false for legacy rows)
+            .not('is_duplicate', 'is', true)
+            // Additional filtering: ensure we have valid image URLs
+            .not('image_url', 'is', null)
+            .order('is_primary', { ascending: false })
+            .order('position', { ascending: true, nullsFirst: false })
+            .order('created_at', { ascending: true }),
+          // Count duplicates filtered out (for "dupes removed" display)
+          supabase
+            .from('vehicle_images')
+            .select('id', { count: 'exact', head: true })
+            .eq('vehicle_id', vehicleId)
+            .eq('is_duplicate', true)
+            .not('is_document', 'is', true),
+        ]);
+
+        const { data: rawImages, error } = imageResult;
+        setDuplicateCount(dupCountResult.count || 0);
 
         if (error) throw error;
         const deduped = dedupeFetchedImages(rawImages || []);
@@ -2515,6 +2529,13 @@ const ImageGallery = ({
 
         const parts: React.ReactNode[] = [];
         parts.push(<span key="count">{totalCount} photos</span>);
+        if (duplicateCount > 0) {
+          parts.push(
+            <span key="dupes" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>
+              {duplicateCount} dupe{duplicateCount !== 1 ? 's' : ''} removed
+            </span>
+          );
+        }
         parts.push(
           <span key="coverage" style={{ color: coverageColor }}>
             {anglesCovered}/{anglesTotal} angles covered

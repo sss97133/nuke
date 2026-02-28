@@ -2230,6 +2230,180 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     );
                   })()}
 
+                  {/* Provenance Section — cross-source duplicate tracking */}
+                  {(() => {
+                    const scanMeta = imageMetadata?.ai_scan_metadata;
+                    const provenance: string[] | undefined = scanMeta?.cross_source_provenance;
+                    const duplicateSources: Array<{ source: string; image_id: string; hamming_distance: number; detected_at: string }> | undefined = scanMeta?.duplicate_sources;
+                    const isDuplicate = imageMetadata?.is_duplicate === true;
+                    const duplicateOf = imageMetadata?.duplicate_of;
+
+                    // Source display name mapping
+                    const sourceLabels: Record<string, string> = {
+                      user_upload: 'User Upload',
+                      photo_auto_sync: 'Auto Sync',
+                      iphoto: 'Apple Photos',
+                      bat_import_mirrored: 'BaT (mirrored)',
+                      bat_import: 'BaT Import',
+                      bat_image_library: 'BaT Library',
+                      extractor: 'Extractor',
+                      bat_listing: 'BaT Listing',
+                    };
+                    const getLabel = (s: string) => sourceLabels[s] || s.replace(/_/g, ' ');
+
+                    // Source priority for determining "original photographer" status
+                    const sourcePriority: Record<string, number> = {
+                      user_upload: 1,
+                      photo_auto_sync: 2,
+                      iphoto: 3,
+                      bat_import_mirrored: 4,
+                      extractor: 5,
+                      bat_image_library: 6,
+                      bat_import: 7,
+                    };
+                    const isUserSource = (s: string) => (sourcePriority[s] ?? 50) <= 3;
+
+                    // Show provenance for originals with cross-source data
+                    if (provenance && provenance.length > 1) {
+                      const imgSource = imageMetadata?.source || 'unknown';
+                      const imgCreatedAt = imageMetadata?.created_at;
+                      const isOriginal = scanMeta?.is_original === true;
+
+                      return (
+                        <div className="mb-4">
+                          <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Provenance</h4>
+                          <div style={{
+                            background: 'rgba(0,0,0,0.3)',
+                            padding: '10px 12px',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+                            fontSize: '10px',
+                            lineHeight: '18px',
+                          }}>
+                            {/* Original source line */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                              {isOriginal && (
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '1px 5px',
+                                  fontSize: '8px',
+                                  fontWeight: 'bold',
+                                  backgroundColor: 'rgba(34,197,94,0.2)',
+                                  border: '1px solid rgba(34,197,94,0.4)',
+                                  color: 'rgba(74,222,128,1)',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                }}>
+                                  ORIGINAL
+                                </span>
+                              )}
+                              <span style={{ color: 'rgba(255,255,255,0.7)' }}>
+                                Original photographer: {getLabel(imgSource)}
+                              </span>
+                              {imgCreatedAt && (
+                                <span style={{ color: 'rgba(255,255,255,0.4)' }}>
+                                  ({new Date(imgCreatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Duplicate sources */}
+                            {duplicateSources && duplicateSources.length > 0 && (
+                              <div style={{ marginTop: '4px' }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Also found on: </span>
+                                {duplicateSources.map((ds, i) => (
+                                  <span key={i} style={{ color: 'rgba(255,255,255,0.6)' }}>
+                                    {i > 0 && ', '}
+                                    {getLabel(ds.source)}
+                                    {ds.detected_at && (
+                                      <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: '3px' }}>
+                                        ({new Date(ds.detected_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})
+                                      </span>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Cross-source provenance summary (fallback if no duplicate_sources detail) */}
+                            {(!duplicateSources || duplicateSources.length === 0) && (
+                              <div style={{ marginTop: '4px' }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Also found on: </span>
+                                <span style={{ color: 'rgba(255,255,255,0.6)' }}>
+                                  {provenance.filter(s => s !== imgSource).map(s => getLabel(s)).join(', ')}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Attribution insight */}
+                            {isUserSource(imgSource) && provenance.some(s => !isUserSource(s)) && (
+                              <div style={{
+                                marginTop: '6px',
+                                padding: '4px 8px',
+                                backgroundColor: 'rgba(34,197,94,0.08)',
+                                border: '1px solid rgba(34,197,94,0.15)',
+                                color: 'rgba(163,230,183,0.9)',
+                                fontSize: '9px',
+                              }}>
+                                This image was uploaded by the user before it appeared on auction platforms — proving photographer attribution.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // Show duplicate indicator for images marked as duplicate
+                    if (isDuplicate && duplicateOf) {
+                      const imgSource = imageMetadata?.source || 'unknown';
+
+                      return (
+                        <div className="mb-4">
+                          <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Provenance</h4>
+                          <div style={{
+                            background: 'rgba(0,0,0,0.3)',
+                            padding: '10px 12px',
+                            border: '1px solid rgba(239,68,68,0.2)',
+                            fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+                            fontSize: '10px',
+                            lineHeight: '18px',
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '1px 5px',
+                                fontSize: '8px',
+                                fontWeight: 'bold',
+                                backgroundColor: 'rgba(239,68,68,0.2)',
+                                border: '1px solid rgba(239,68,68,0.4)',
+                                color: 'rgba(252,165,165,1)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                DUPLICATE
+                              </span>
+                              <span style={{ color: 'rgba(255,255,255,0.5)' }}>
+                                Source: {getLabel(imgSource)}
+                              </span>
+                            </div>
+                            <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: '2px' }}>
+                              Original: <span style={{ color: 'rgba(147,197,253,0.9)', cursor: 'pointer', textDecoration: 'underline' }}>{duplicateOf.substring(0, 8)}...</span>
+                            </div>
+                            <div style={{
+                              marginTop: '6px',
+                              color: 'rgba(255,255,255,0.5)',
+                              fontSize: '9px',
+                            }}>
+                              This image was imported from {getLabel(imgSource)} but the original was uploaded by the user.
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return null;
+                  })()}
+
                   {/* AI Analysis Section - Data Inspector View */}
                   {(() => {
                     const tier1Analysis = imageMetadata?.ai_scan_metadata?.tier_1_analysis;
