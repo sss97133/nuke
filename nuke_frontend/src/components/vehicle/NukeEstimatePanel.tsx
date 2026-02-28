@@ -214,7 +214,7 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
                   padding: '4px 8px',
                   borderRadius: '4px',
                   background: DEAL_COLORS[estimate.deal_score_label] || '#6b7280',
-                  color: 'white',
+                  color: 'var(--bg)',
                   fontSize: '11px',
                   fontWeight: 700,
                 }}>
@@ -228,7 +228,7 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
                   padding: '4px 8px',
                   borderRadius: '4px',
                   background: HEAT_COLORS[estimate.heat_score_label] || '#6b7280',
-                  color: 'white',
+                  color: 'var(--bg)',
                   fontSize: '11px',
                   fontWeight: 700,
                 }}>

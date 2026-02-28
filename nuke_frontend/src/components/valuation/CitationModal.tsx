@@ -86,6 +86,8 @@ export default function CitationModal({
     });
   };
 
+  // TODO: Badge colors are used with hex-opacity suffix (e.g. `${color}22`), so they
+  // cannot be CSS variables directly. Replace when a JS theme bridge is available.
   const getEvidenceBadge = (evidenceType: string) => {
     const badges: Record<string, { label: string; color: string }> = {
       receipt: { label: '🧾 Receipt', color: '#10b981' },
@@ -101,6 +103,7 @@ export default function CitationModal({
     return badges[evidenceType] || { label: evidenceType, color: '#9ca3af' };
   };
 
+  // TODO: Role badge colors are used with hex-opacity suffix, cannot be CSS variables.
   const getRoleBadge = (role: string | null) => {
     if (!role) return null;
     const colors: Record<string, string> = {
@@ -190,7 +193,7 @@ export default function CitationModal({
                       border: '1px solid var(--border)',
                       borderRadius: '4px',
                       padding: '12px',
-                      background: idx === 0 ? 'var(--surface)' : 'white'
+                      background: idx === 0 ? 'var(--surface)' : 'var(--bg)'
                     }}
                   >
                     {/* Primary row: WHO, WHEN, VALUE */}
@@ -204,7 +207,7 @@ export default function CitationModal({
                                 marginLeft: '6px',
                                 fontSize: '9px',
                                 padding: '2px 6px',
-                                background: roleBadge?.color ? `${roleBadge.color}22` : '#f3f4f6',
+                                background: roleBadge?.color ? `${roleBadge.color}22` : 'var(--bg-secondary)',
                                 color: roleBadge?.color || '#6b7280',
                                 borderRadius: '2px',
                                 fontWeight: 'normal'
@@ -264,7 +267,7 @@ export default function CitationModal({
                             cit.verification_status === 'receipt_confirmed' ? '#10b98122' :
                             cit.verification_status === 'professional_verified' ? '#3b82f622' :
                             cit.verification_status === 'disputed' ? '#ef444422' :
-                            '#f3f4f6',
+                            'var(--bg-secondary)',
                           color:
                             cit.verification_status === 'receipt_confirmed' ? '#10b981' :
                             cit.verification_status === 'professional_verified' ? '#3b82f6' :
@@ -285,7 +288,7 @@ export default function CitationModal({
                           {cit.source_document_id && (
                             <a
                               href={`#document-${cit.source_document_id}`}
-                              style={{ color: '#3b82f6', textDecoration: 'underline', cursor: 'pointer' }}
+                              style={{ color: 'var(--accent)', textDecoration: 'underline', cursor: 'pointer' }}
                             >
                               View Receipt/Document
                             </a>
@@ -303,7 +306,7 @@ export default function CitationModal({
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: '#3b82f6',
+                                color: 'var(--accent)',
                                 textDecoration: 'underline',
                                 cursor: 'pointer',
                                 padding: 0,
@@ -316,7 +319,7 @@ export default function CitationModal({
                           {cit.source_image_tag_id && (
                             <a
                               href={`#tag-${cit.source_image_tag_id}`}
-                              style={{ color: '#8b5cf6', textDecoration: 'underline', cursor: 'pointer' }}
+                              style={{ color: '#8b5cf6' /* TODO: add --purple token */, textDecoration: 'underline', cursor: 'pointer' }}
                             >
                               View Tag
                             </a>
@@ -374,7 +377,7 @@ export default function CitationModal({
             <img
               src={selectedImage}
               alt="Evidence"
-              style={{ maxWidth: '100%', maxHeight: '100%', border: '2px solid white' }}
+              style={{ maxWidth: '100%', maxHeight: '100%', border: '2px solid var(--bg)' }}
               onClick={(e) => e.stopPropagation()}
             />
             <button

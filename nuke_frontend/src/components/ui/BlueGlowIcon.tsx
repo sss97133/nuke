@@ -22,9 +22,9 @@ const BlueGlowIcon: React.FC<BlueGlowIconProps> = ({
     >
       <defs>
         <radialGradient id="blueGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" style={{stopColor:'#3b82f6',stopOpacity:1}} />
-          <stop offset="70%" style={{stopColor:'#1d4ed8',stopOpacity:0.8}} />
-          <stop offset="100%" style={{stopColor:'#1e3a8a',stopOpacity:0.4}} />
+          <stop offset="0%" style={{stopColor:'var(--accent, #3b82f6)',stopOpacity:1}} />
+          <stop offset="70%" style={{stopColor:'var(--accent-hover, #1d4ed8)',stopOpacity:0.8}} />
+          <stop offset="100%" style={{stopColor:'var(--accent-dark, #1e3a8a)',stopOpacity:0.4}} />
         </radialGradient>
         <filter id="glow">
           <feGaussianBlur stdDeviation="2" result="coloredBlur"/>

@@ -116,7 +116,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
       <div style={{
         padding: '12px',
         background: 'var(--accent)',
-        color: 'white',
+        color: 'var(--bg)',
         fontSize: '12px',
         fontWeight: 700
       }}>
@@ -183,7 +183,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
                   fontWeight: 600,
                   border: '1px solid #059669',
                   background: '#059669',
-                  color: 'white',
+                  color: 'var(--bg)',
                   cursor: responding.has(question.question_id) ? 'wait' : 'pointer',
                   borderRadius: '4px',
                   opacity: responding.has(question.question_id) ? 0.5 : 1

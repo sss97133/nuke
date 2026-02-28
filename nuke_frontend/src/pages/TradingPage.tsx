@@ -33,7 +33,7 @@ export default function TradingPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <TradingTerminal
         offeringId={offeringId}
         onClose={() => navigate('/market')}

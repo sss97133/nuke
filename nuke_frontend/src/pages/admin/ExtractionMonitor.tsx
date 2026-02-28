@@ -239,9 +239,9 @@ const ExtractionMonitor: React.FC = () => {
       }}>
         {notifications.map((notification, index) => {
           const colors = {
-            error: { bg: '#fee2e2', border: '#ef4444', text: '#991b1b' },
-            warning: { bg: '#fef3c7', border: '#f59e0b', text: '#92400e' },
-            info: { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af' }
+            error: { bg: 'var(--error-dim)', border: 'var(--error)', text: 'var(--error)' },
+            warning: { bg: 'var(--warning-dim)', border: 'var(--warning)', text: 'var(--warning)' },
+            info: { bg: 'var(--accent-dim, #dbeafe)', border: 'var(--accent)', text: 'var(--accent)' }
           }[notification.type];
           
           return (
@@ -296,7 +296,7 @@ const ExtractionMonitor: React.FC = () => {
       {stats.failed > 20 && (
         <div style={{
           background: 'rgba(239, 68, 68, 0.15)',
-          border: '2px solid #ef4444',
+          border: '2px solid var(--error)',
           padding: '16px',
           borderRadius: '4px',
           marginBottom: '24px',
@@ -304,9 +304,9 @@ const ExtractionMonitor: React.FC = () => {
           alignItems: 'center',
           gap: '12px'
         }}>
-          <span style={{ fontSize: '20px', fontWeight: 700, color: '#ef4444' }}>⚠</span>
+          <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--error)' }}>⚠</span>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: '#ef4444', marginBottom: '4px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--error)', marginBottom: '4px' }}>
               High Failure Rate Detected
             </div>
             <div style={{ fontSize: '11px', opacity: 0.9 }}>
@@ -375,7 +375,7 @@ const ExtractionMonitor: React.FC = () => {
           <div style={{ fontSize: '12px', textTransform: 'uppercase', opacity: 0.7, marginBottom: '8px' }}>
             Extracted
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#22c55e' }}>
+          <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--success)' }}>
             {stats.extracted.toLocaleString()}
           </div>
           <div style={{ fontSize: '12px', marginTop: '4px', opacity: 0.7 }}>
@@ -407,7 +407,7 @@ const ExtractionMonitor: React.FC = () => {
             <div style={{ fontSize: '12px', textTransform: 'uppercase', opacity: 0.7, marginBottom: '8px' }}>
               Potential Failures
             </div>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#ef4444' }}>
+            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--error)' }}>
               {stats.failed.toLocaleString()}
             </div>
             <div style={{ fontSize: '10px', marginTop: '4px', opacity: 0.7 }}>
@@ -467,7 +467,7 @@ const ExtractionMonitor: React.FC = () => {
           <div style={{
             width: `${progressPercent}%`,
             height: '100%',
-            background: '#22c55e',
+            background: 'var(--success)',
             transition: 'width 0.3s ease'
           }} />
         </div>
@@ -506,10 +506,10 @@ const ExtractionMonitor: React.FC = () => {
                   justifyContent: 'space-between',
                   marginBottom: '8px'
                 }}>
-                  <span style={{ 
-                    textTransform: 'uppercase', 
+                  <span style={{
+                    textTransform: 'uppercase',
                     fontWeight: 'bold',
-                    color: '#22c55e'
+                    color: 'var(--success)'
                   }}>
                     {info.angle}
                   </span>
@@ -530,11 +530,11 @@ const ExtractionMonitor: React.FC = () => {
                   </IDHoverCard>
                 </div>
                 {info.models.length > 1 && (
-                  <div style={{ 
-                    fontSize: '9px', 
+                  <div style={{
+                    fontSize: '9px',
                     opacity: 0.7,
                     marginTop: '4px',
-                    color: '#3b82f6'
+                    color: 'var(--accent)'
                   }}>
                     {info.models.length} models: {info.models.join(', ')}
                   </div>
@@ -554,7 +554,7 @@ const ExtractionMonitor: React.FC = () => {
             textTransform: 'uppercase',
             marginBottom: '16px',
             letterSpacing: '1px',
-            color: '#ef4444'
+            color: 'var(--error)'
           }}>
             ⚠️ Potential Failures ({stats.recentFailures.length})
           </h2>
@@ -586,10 +586,10 @@ const ExtractionMonitor: React.FC = () => {
                     justifyContent: 'space-between',
                     marginBottom: '8px'
                   }}>
-                    <span style={{ 
-                      textTransform: 'uppercase', 
+                    <span style={{
+                      textTransform: 'uppercase',
                       fontWeight: 'bold',
-                      color: '#ef4444',
+                      color: 'var(--error)',
                       fontSize: '10px'
                     }}>
                       No Extraction
@@ -627,11 +627,11 @@ const ExtractionMonitor: React.FC = () => {
                       </IDHoverCard>
                     </div>
                   )}
-                  <div style={{ 
-                    fontSize: '9px', 
+                  <div style={{
+                    fontSize: '9px',
                     opacity: 0.7,
                     marginTop: '4px',
-                    color: '#f59e0b'
+                    color: 'var(--warning)'
                   }}>
                     {failure.reason}
                   </div>
@@ -658,7 +658,7 @@ const ExtractionMonitor: React.FC = () => {
         </div>
         {stats.failed > 0 && (
           <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '4px' }}>
-            <div style={{ fontWeight: 'bold', color: '#ef4444', marginBottom: '4px' }}>⚠️ Failures Detected</div>
+            <div style={{ fontWeight: 'bold', color: 'var(--error)', marginBottom: '4px' }}>⚠️ Failures Detected</div>
             <div>Some images may have failed extraction. Check the failures section above for details.</div>
             <div style={{ marginTop: '4px', fontSize: '10px' }}>
               Common causes: Rate limits (429), API errors, or images still processing.

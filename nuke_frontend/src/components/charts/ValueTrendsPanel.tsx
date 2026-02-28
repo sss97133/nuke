@@ -157,7 +157,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
       {
         id: 'realized',
         label: 'Realized',
-        color: '#22c55e', // green
+        color: 'var(--success)', // green
         showArea: true,
         data: data.trends.daily_values.map(d => ({
           date: d.date,
@@ -167,7 +167,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
       {
         id: 'ask',
         label: 'Ask',
-        color: '#3b82f6', // blue
+        color: 'var(--accent)', // blue
         data: data.trends.daily_values.map(d => ({
           date: d.date,
           value: d.cumulative_ask_value || 0,
@@ -176,7 +176,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
       {
         id: 'mark',
         label: 'Mark',
-        color: '#f59e0b', // amber
+        color: 'var(--warning)', // amber
         data: data.trends.daily_values.map(d => ({
           date: d.date,
           value: d.cumulative_mark_value || 0,
@@ -185,7 +185,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
       {
         id: 'cost',
         label: 'Cost',
-        color: '#6b7280', // gray
+        color: 'var(--text-secondary)', // gray
         data: data.trends.daily_values.map(d => ({
           date: d.date,
           value: d.cumulative_cost_value || 0,
@@ -201,7 +201,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
       {
         id: 'total',
         label: 'Total Value',
-        color: '#8b5cf6', // purple
+        color: 'var(--purple, #8b5cf6)', // purple
         showArea: true,
         data: data.trends.daily_values.map(d => ({
           date: d.date,
@@ -241,7 +241,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
       {
         id: 'sold_ratio',
         label: 'Sold %',
-        color: '#22c55e',
+        color: 'var(--success)',
         showArea: true,
         data: rollingData,
       },
@@ -255,7 +255,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
       {
         id: 'daily_value',
         label: 'Daily Import Value',
-        color: '#06b6d4', // cyan
+        color: 'var(--info, #06b6d4)', // cyan
         showArea: true,
         data: data.trends.daily_imports.map(d => ({
           date: d.date,
@@ -309,7 +309,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
 
   if (error) {
     return (
-      <div style={{ padding: '10px', color: '#b91c1c', fontSize: '11px', ...style }}>
+      <div style={{ padding: '10px', color: 'var(--error)', fontSize: '11px', ...style }}>
         {error}
       </div>
     );
@@ -368,7 +368,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
               <div style={{
                 fontSize: '11px',
                 fontWeight: 700,
-                color: trends.totalTrend > 0 ? '#22c55e' : trends.totalTrend < 0 ? '#ef4444' : 'var(--text-muted)',
+                color: trends.totalTrend > 0 ? 'var(--success)' : trends.totalTrend < 0 ? 'var(--error)' : 'var(--text-muted)',
               }}>
                 {trends.totalTrend > 0 ? '\u2191' : trends.totalTrend < 0 ? '\u2193' : ''}{Math.abs(trends.totalTrend).toFixed(1)}%
               </div>
@@ -396,7 +396,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
               <div style={{
                 fontSize: '11px',
                 fontWeight: 700,
-                color: trends.avgSoldRatio >= 0.7 ? '#22c55e' : trends.avgSoldRatio >= 0.5 ? '#f59e0b' : '#ef4444',
+                color: trends.avgSoldRatio >= 0.7 ? 'var(--success)' : trends.avgSoldRatio >= 0.5 ? 'var(--warning)' : 'var(--error)',
               }}>
                 avg {formatPercent(trends.avgSoldRatio)}
               </div>
@@ -422,7 +422,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
               <div style={{
                 fontSize: '11px',
                 fontWeight: 700,
-                color: trends.velocityTrend > 10 ? '#22c55e' : trends.velocityTrend < -10 ? '#ef4444' : 'var(--text-muted)',
+                color: trends.velocityTrend > 10 ? 'var(--success)' : trends.velocityTrend < -10 ? 'var(--error)' : 'var(--text-muted)',
               }}>
                 {trends.velocityTrend > 0 ? '\u2191' : trends.velocityTrend < 0 ? '\u2193' : ''}{Math.abs(trends.velocityTrend).toFixed(0)}% vs prev 7d
               </div>

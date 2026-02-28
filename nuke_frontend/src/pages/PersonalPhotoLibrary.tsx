@@ -727,13 +727,13 @@ export const PersonalPhotoLibrary: React.FC = () => {
                       width: '8px',
                       height: '8px',
                       borderRadius: '50%',
-                      background: isProcessing 
-                        ? '#10b981' 
-                        : hasIssues 
-                          ? '#ef4444' 
-                          : item.status === 'complete' 
-                            ? '#10b981' 
-                            : '#999',
+                      background: isProcessing
+                        ? 'var(--success)'
+                        : hasIssues
+                          ? 'var(--error)'
+                          : item.status === 'complete'
+                            ? 'var(--success)'
+                            : 'var(--text-disabled)',
                       display: 'inline-block',
                       boxShadow: isProcessing || hasIssues ? '0 0 4px currentColor' : 'none'
                     }}
@@ -1220,7 +1220,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                         right: '4px',
                         padding: '2px 4px',
                         background: 'rgba(0,0,0,0.75)',
-                        color: 'white',
+                        color: 'var(--bg)',
                         fontSize: '9px',
                         borderRadius: '0px',
                         border: '1px solid var(--border)'
@@ -1256,8 +1256,8 @@ export const PersonalPhotoLibrary: React.FC = () => {
                         top: '6px',
                         right: '6px',
                         padding: '2px 5px',
-                        background: photo.ai_processing_status === 'processing' ? '#ff9d00' : '#999',
-                        color: 'white',
+                        background: photo.ai_processing_status === 'processing' ? 'var(--warning)' : 'var(--text-disabled)',
+                        color: 'var(--bg)',
                         fontSize: '9px',
                         fontWeight: 'bold'
                       }}>

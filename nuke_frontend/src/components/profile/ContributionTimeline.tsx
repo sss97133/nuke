@@ -402,7 +402,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                               gridColumn: `${startWeek + 1} / span ${monthWidth}`,
                               textAlign: 'center',
                               fontSize: '11px',
-                              color: '#888888',
+                              color: 'var(--text-muted)',
                               lineHeight: '8px'
                             }}
                           >
@@ -467,7 +467,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                                       gridColumn: weekIdx + 1,
                                       width: '12px',
                                       height: '12px',
-                                      backgroundColor: inYear ? colorForHours(hours) : '#f5f5f5',
+                                      backgroundColor: inYear ? colorForHours(hours) : 'var(--bg-secondary)',
                                       borderRadius: '2px',
                                       border: clickable ? '1px solid rgba(0,0,0,0.1)' : 'none',
                                       opacity: inYear ? 1 : 0.3
@@ -678,15 +678,15 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                               <div style={{
                                 fontSize: '11px',
                                 padding: '6px',
-                                backgroundColor: '#e8f4f8',
-                                border: '1px solid #4a90e2',
+                                backgroundColor: 'var(--accent-dim, #e8f4f8)',
+                                border: '1px solid var(--accent, #4a90e2)',
                                 borderRadius: '3px',
                                 marginTop: '4px'
                               }}>
-                                <div style={{ fontWeight: 'bold', color: '#1a5490', marginBottom: '2px', fontSize: '11px' }}>
+                                <div style={{ fontWeight: 'bold', color: 'var(--text)', marginBottom: '2px', fontSize: '11px' }}>
                                   AI Analysis
                                 </div>
-                                <div style={{ color: '#475569', fontSize: '11px' }}>
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
                                   {metadata.ai_analysis.summary}
                                 </div>
                               </div>

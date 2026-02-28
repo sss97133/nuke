@@ -169,7 +169,7 @@ export const ImageAIChat: React.FC<ImageAIChatProps> = ({
               backgroundColor: msg.role === 'user' 
                 ? 'rgba(255,255,255,0.1)' 
                 : msg.role === 'system'
-                ? 'rgba(255,255,0,0.1)'
+                ? 'color-mix(in srgb, var(--warning) 10%, transparent)'
                 : 'rgba(0,0,0,0.2)',
               border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: '0px'
@@ -187,7 +187,7 @@ export const ImageAIChat: React.FC<ImageAIChatProps> = ({
               {msg.content}
             </div>
             {msg.actions && msg.actions.length > 0 && (
-              <div style={{ marginTop: '4px', fontSize: '8px', color: 'rgba(0,255,0,0.7)' }}>
+              <div style={{ marginTop: '4px', fontSize: '8px', color: 'color-mix(in srgb, var(--success) 70%, transparent)' }}>
                 {msg.actions.map((action, idx) => (
                   <div key={idx}>
                     {action.type === 'field_update' && `✓ Updated ${action.field}`}

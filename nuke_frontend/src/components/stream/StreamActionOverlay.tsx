@@ -139,7 +139,7 @@ export default function StreamActionOverlay({
               left: '12px',
               top: `${top}px`,
               background: 'rgba(0, 0, 0, 0.78)',
-              color: 'white',
+              color: 'var(--bg)',
               border: '1px solid rgba(255, 255, 255, 0.18)',
               padding: '8px 10px',
               maxWidth: '70%',

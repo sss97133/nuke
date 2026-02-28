@@ -103,21 +103,21 @@ const formatUSD = (v: number | null | undefined) => {
 
 const trustColor = (level: string) => {
   switch (level) {
-    case 'verified': return '#22c55e';
-    case 'partially_verified': return '#eab308';
-    case 'unverified': return '#f97316';
-    case 'suspicious': return '#ef4444';
-    default: return '#6b7280';
+    case 'verified': return 'var(--success)';
+    case 'partially_verified': return 'var(--warning)';
+    case 'unverified': return 'var(--warning-bright, #f97316)';
+    case 'suspicious': return 'var(--error)';
+    default: return 'var(--text-secondary)';
   }
 };
 
 const trustIcon = (level: string) => {
   switch (level) {
-    case 'verified': return <CheckCircle size={12} color="#22c55e" />;
-    case 'partially_verified': return <HelpCircle size={12} color="#eab308" />;
-    case 'unverified': return <AlertTriangle size={12} color="#f97316" />;
-    case 'suspicious': return <XCircle size={12} color="#ef4444" />;
-    default: return <HelpCircle size={12} color="#6b7280" />;
+    case 'verified': return <CheckCircle size={12} color="var(--success)" />;
+    case 'partially_verified': return <HelpCircle size={12} color="var(--warning)" />;
+    case 'unverified': return <AlertTriangle size={12} color="var(--warning-bright, #f97316)" />;
+    case 'suspicious': return <XCircle size={12} color="var(--error)" />;
+    default: return <HelpCircle size={12} color="var(--text-secondary)" />;
   }
 };
 
@@ -208,7 +208,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
 
       {/* Headline */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '13px' }}>
-        <FileWarning size={14} color="#ef4444" />
+        <FileWarning size={14} color="var(--error)" />
         <span style={{ fontWeight: 700 }}>
           {summary.red_flag_count} red flag{summary.red_flag_count !== 1 ? 's' : ''} detected
         </span>
@@ -233,11 +233,11 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
         </div>
         <div>
           <div style={{ color: 'var(--text-muted)', marginBottom: 2 }}>ESTIMATED TRUE PROFIT</div>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444' }}>{formatUSD(summary.true_profit_estimate)}</div>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--error)' }}>{formatUSD(summary.true_profit_estimate)}</div>
         </div>
         <div>
           <div style={{ color: 'var(--text-muted)', marginBottom: 2 }}>HIDDEN PROFIT</div>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: Number.isFinite(profitDelta) && profitDelta > 0 ? '#ef4444' : Number.isFinite(profitDelta) && profitDelta < 0 ? '#22c55e' : 'inherit' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: Number.isFinite(profitDelta) && profitDelta > 0 ? 'var(--error)' : Number.isFinite(profitDelta) && profitDelta < 0 ? 'var(--success)' : 'inherit' }}>
             {Number.isFinite(profitDelta) ? (profitDelta >= 0 ? '+' : '') + formatUSD(profitDelta) : formatUSD(profitDelta)}
           </div>
         </div>
@@ -252,8 +252,8 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
         </div>
         {Number(summary.sale_price) > 0 && (
           <div style={{ height: 6, background: 'var(--grey-200)', borderRadius: 3, overflow: 'hidden', display: 'flex' }}>
-            <div style={{ width: `${Math.min(100, (Number(summary.purchase_cost) / Number(summary.sale_price)) * 100)}%`, background: '#3b82f6' }} />
-            <div style={{ width: `${Math.min(100, (Number(summary.total_recon) / Number(summary.sale_price)) * 100)}%`, background: reconPct > 80 ? '#ef4444' : '#f97316' }} />
+            <div style={{ width: `${Math.min(100, (Number(summary.purchase_cost) / Number(summary.sale_price)) * 100)}%`, background: 'var(--accent)' }} />
+            <div style={{ width: `${Math.min(100, (Number(summary.total_recon) / Number(summary.sale_price)) * 100)}%`, background: reconPct > 80 ? 'var(--error)' : 'var(--warning-bright, #f97316)' }} />
           </div>
         )}
       </div>
@@ -263,7 +263,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
         <div>Stock: {summary.stock_number}</div>
         <div>Sold: {summary.sold_date}</div>
         <div>Buyer: {summary.buyer}</div>
-        {summary.lwi_deduction ? <div style={{ color: '#ef4444' }}>LWI deduction: {formatUSD(summary.lwi_deduction)}</div> : null}
+        {summary.lwi_deduction ? <div style={{ color: 'var(--error)' }}>LWI deduction: {formatUSD(summary.lwi_deduction)}</div> : null}
         {summary.trade_in ? (
           <div>Trade: {summary.trade_in.year} {summary.trade_in.make} {summary.trade_in.model}</div>
         ) : null}
@@ -277,9 +277,9 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
         borderBottom: '1px solid var(--border-light)'
       }}>
         <span>{summary.expense_count} expenses:</span>
-        <span style={{ color: '#22c55e' }}>{summary.verified_expenses} verified</span>
-        <span style={{ color: '#ef4444' }}>{summary.suspicious_expenses} suspicious</span>
-        <span style={{ color: '#ef4444' }}>{formatUSD(summary.suspicious_amount)} unvalidated</span>
+        <span style={{ color: 'var(--success)' }}>{summary.verified_expenses} verified</span>
+        <span style={{ color: 'var(--error)' }}>{summary.suspicious_expenses} suspicious</span>
+        <span style={{ color: 'var(--error)' }}>{formatUSD(summary.suspicious_amount)} unvalidated</span>
       </div>
 
       {/* Toggle Details */}
@@ -328,7 +328,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
         <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {fullExtraction.forensic_summary.red_flags.map((flag, i) => (
             <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'flex-start' }}>
-              <AlertTriangle size={10} color="#ef4444" style={{ flexShrink: 0, marginTop: 1 }} />
+              <AlertTriangle size={10} color="var(--error)" style={{ flexShrink: 0, marginTop: 1 }} />
               <span>{flag}</span>
             </div>
           ))}
@@ -369,7 +369,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
                 display: 'grid', gridTemplateColumns: '20px 1fr 80px 80px 80px',
                 gap: 4, padding: '2px 0',
                 borderBottom: '1px solid var(--border-light)',
-                background: item.trust.level === 'suspicious' ? 'rgba(239, 68, 68, 0.05)' : 'transparent'
+                background: item.trust.level === 'suspicious' ? 'color-mix(in srgb, var(--error) 5%, transparent)' : 'transparent'
               }}
             >
               <span style={{ color: 'var(--text-muted)' }}>{item.line_number}</span>
@@ -377,7 +377,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
                 {item.description}
               </span>
               <span style={{ textAlign: 'right', fontWeight: 600 }}>{formatUSD(item.amount)}</span>
-              <span style={{ color: item.vendor ? '#22c55e' : 'var(--text-disabled)' }}>
+              <span style={{ color: item.vendor ? 'var(--success)' : 'var(--text-disabled)' }}>
                 {item.vendor || 'none'}
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
@@ -394,7 +394,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
               style={{
                 display: 'grid', gridTemplateColumns: '20px 1fr 80px 80px 80px',
                 gap: 4, padding: '2px 0',
-                background: 'rgba(239, 68, 68, 0.08)',
+                background: 'color-mix(in srgb, var(--error) 8%, transparent)',
                 borderBottom: '1px solid var(--border-light)',
               }}
             >

@@ -168,7 +168,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       background: 'transparent',
                       padding: 0,
                       margin: 0,
-                      color: '#10b981',
+                      color: 'var(--success)',
                       fontWeight: 900,
                       cursor: 'pointer',
                       fontFamily: 'monospace',
@@ -196,7 +196,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
               >
                 <b>{formatCurrency(displayStats.totalValue)}</b>
                 {displayStats.marketInterestValue > 0 && (
-                  <span style={{ color: '#f59e0b', fontSize: '8px', fontWeight: 500 }}>
+                  <span style={{ color: 'var(--warning)', fontSize: '8px', fontWeight: 500 }}>
                     +{formatCurrency(displayStats.marketInterestValue)}
                   </span>
                 )}
@@ -223,7 +223,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       cursor: 'pointer',
                       fontFamily: 'monospace',
                       fontSize: '9px',
-                      color: filters.forSale ? '#059669' : 'var(--text)',
+                      color: filters.forSale ? 'var(--success)' : 'var(--text)',
                       fontWeight: filters.forSale ? 700 : 400,
                     }}
                   >
@@ -250,7 +250,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       cursor: 'pointer',
                       fontFamily: 'monospace',
                       fontSize: '9px',
-                      color: statsPanel === 'sold_today' ? '#7c3aed' : 'var(--text)',
+                      color: statsPanel === 'sold_today' ? 'var(--purple, #7c3aed)' : 'var(--text)',
                       fontWeight: statsPanel === 'sold_today' ? 700 : 400,
                     }}
                   >
@@ -277,7 +277,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       cursor: 'pointer',
                       fontFamily: 'monospace',
                       fontSize: '9px',
-                      color: 'white',
+                      color: 'var(--bg)',
                       borderRadius: '4px',
                       fontWeight: 700,
                       animation: 'pulse 2s infinite',

@@ -97,8 +97,8 @@ const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
   return (
     <div
       style={{
-        background: '#fef3c7',
-        border: '1px solid #f59e0b',
+        background: 'var(--warning-dim)',
+        border: '1px solid var(--warning)',
         borderRadius: '4px',
         padding: '8px 12px',
         margin: '8px var(--space-2)',
@@ -124,7 +124,7 @@ const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
                 onClick={handleCompleteProfile}
                 style={{
                   background: '#f59e0b',
-                  color: 'white',
+                  color: 'var(--bg)',
                   border: 'none',
                   padding: '4px 10px',
                   borderRadius: '4px',

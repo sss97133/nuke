@@ -2,6 +2,8 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 
 // Platform display names and colors
+// TODO: These chart colors are hardcoded hex values required by SVG stroke/fill rendering.
+// They cannot use CSS variables because SVG path attributes need resolved color strings.
 const PLATFORM_DISPLAY: Record<string, { name: string; color: string }> = {
   bat: { name: 'Bring a Trailer', color: '#ff6b6b' },
   pcarmarket: { name: 'PCarMarket', color: '#00d4ff' },
@@ -16,6 +18,8 @@ const PLATFORM_DISPLAY: Record<string, { name: string; color: string }> = {
 };
 
 // Sentiment colors
+// TODO: These are gauge/badge colors used in SVG rendering and dynamic backgrounds.
+// CSS variables don't resolve in inline SVG attributes. Keeping as hex for now.
 const SENTIMENT_COLORS: Record<string, { bg: string; text: string; label: string }> = {
   hot: { bg: '#dc2626', text: '#ffffff', label: 'HOT' },
   warm: { bg: '#f97316', text: '#ffffff', label: 'WARM' },
@@ -158,6 +162,7 @@ export default function AuctionTrendsDashboard() {
             right: 0,
             height: '90px',
             borderRadius: '90px 90px 0 0',
+            /* TODO: Gauge gradient uses hardcoded hex - CSS variables don't work in linear-gradient with inline styles */
             background: 'linear-gradient(90deg, #8b5cf6 0%, #3b82f6 25%, #6b7280 50%, #f97316 75%, #dc2626 100%)',
             opacity: 0.3,
           }} />
@@ -243,6 +248,7 @@ export default function AuctionTrendsDashboard() {
         return `${x},${y}`;
       });
 
+      // TODO: Fallback chart color kept as hex for SVG stroke compatibility
       const platformConfig = PLATFORM_DISPLAY[platform] || { name: platform, color: '#888' };
       paths.push({
         platform,
@@ -311,7 +317,7 @@ export default function AuctionTrendsDashboard() {
                 style={{
                   flex: 1,
                   height: `${Math.max(height, 2)}%`,
-                  background: isPeak ? '#ff6b6b' : 'var(--grey-300)',
+                  background: isPeak ? 'var(--error)' : 'var(--grey-300)',
                   borderRadius: '2px 2px 0 0',
                   transition: 'height 0.3s ease',
                 }}
@@ -353,6 +359,7 @@ export default function AuctionTrendsDashboard() {
     });
 
     const priceDirection = data.market_sentiment.components.price_direction;
+    // TODO: SVG stroke/fill requires resolved color - kept as hex for chart rendering
     const color = priceDirection >= 0 ? '#10ac84' : '#ee5a24';
 
     return (
@@ -411,7 +418,7 @@ export default function AuctionTrendsDashboard() {
       </div>
 
       {error && (
-        <div style={{ marginTop: 'var(--space-3)', fontSize: '11px', color: '#b91c1c' }}>
+        <div style={{ marginTop: 'var(--space-3)', fontSize: '11px', color: 'var(--error)' }}>
           {error}
         </div>
       )}
@@ -440,7 +447,7 @@ export default function AuctionTrendsDashboard() {
                   <span>Sell-through:</span>
                   <span style={{ fontWeight: 600 }}>{data.market_sentiment.components.sell_through_rate}%</span>
                   <span>Price Trend:</span>
-                  <span style={{ fontWeight: 600, color: data.market_sentiment.components.price_direction >= 0 ? '#10ac84' : '#ee5a24' }}>
+                  <span style={{ fontWeight: 600, color: data.market_sentiment.components.price_direction >= 0 ? 'var(--success)' : 'var(--error)' }}>
                     {data.market_sentiment.components.price_direction >= 0 ? '+' : ''}
                     {data.market_sentiment.components.price_direction}%
                   </span>
@@ -469,6 +476,7 @@ export default function AuctionTrendsDashboard() {
               Source Leaderboard - Live Auctions
             </div>
             {data.source_leaderboard.slice(0, 6).map((platform) => {
+              // TODO: Fallback chart color kept as hex for SVG/bar rendering compatibility
               const config = PLATFORM_DISPLAY[platform.platform] || { name: platform.platform, color: '#888' };
               return (
                 <div key={platform.platform} style={{ marginBottom: 'var(--space-2)' }}>
@@ -579,11 +587,11 @@ export default function AuctionTrendsDashboard() {
             </div>
             <div>
               <div style={{ color: 'var(--text-muted)' }}>Sold (30d)</div>
-              <div style={{ fontWeight: 600, color: '#10ac84' }}>{formatNumber(data.market_sentiment.current_metrics.sold_count)}</div>
+              <div style={{ fontWeight: 600, color: 'var(--success)' }}>{formatNumber(data.market_sentiment.current_metrics.sold_count)}</div>
             </div>
             <div>
               <div style={{ color: 'var(--text-muted)' }}>Unsold (30d)</div>
-              <div style={{ fontWeight: 600, color: '#ee5a24' }}>{formatNumber(data.market_sentiment.current_metrics.unsold_count)}</div>
+              <div style={{ fontWeight: 600, color: 'var(--error)' }}>{formatNumber(data.market_sentiment.current_metrics.unsold_count)}</div>
             </div>
           </div>
 

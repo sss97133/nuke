@@ -129,10 +129,10 @@ export const PartLineItem: React.FC<PartLineItemProps> = ({
   };
 
   const priorityBadge = {
-    critical: { bg: '#fee2e2', color: '#991b1b', label: 'CRITICAL' },
-    normal: { bg: '#f3f4f6', color: '#374151', label: 'NORMAL' },
-    later: { bg: '#dbeafe', color: '#1e40af', label: 'LATER' }
-  }[priority] || { bg: '#f3f4f6', color: '#374151', label: 'NORMAL' };
+    critical: { bg: 'var(--error-dim)', color: 'var(--error)', label: 'CRITICAL' },
+    normal: { bg: 'var(--bg)', color: 'var(--text)', label: 'NORMAL' },
+    later: { bg: 'var(--bg)', color: 'var(--accent)', label: 'LATER' }
+  }[priority] || { bg: 'var(--bg)', color: 'var(--text)', label: 'NORMAL' };
 
   const retailerIcon = (retailer: string) => {
     const icons: Record<string, string> = {
@@ -150,11 +150,11 @@ export const PartLineItem: React.FC<PartLineItemProps> = ({
 
   return (
     <div style={{
-      border: '1px solid #e5e7eb',
-      borderLeft: priority === 'critical' ? '4px solid #dc2626' :
-                  priority === 'later' ? '4px solid #3b82f6' : '4px solid #9ca3af',
+      border: '1px solid var(--border)',
+      borderLeft: priority === 'critical' ? '4px solid var(--error)' :
+                  priority === 'later' ? '4px solid var(--accent)' : '4px solid var(--text-disabled)',
       marginBottom: '8px',
-      background: '#fff'
+      background: 'var(--surface)'
     }}>
       {/* Main row - always visible */}
       <div
@@ -171,9 +171,9 @@ export const PartLineItem: React.FC<PartLineItemProps> = ({
         <div>
           <div style={{ fontSize: '12px', fontWeight: 600 }}>
             {partName}
-            {quantity > 1 && <span style={{ color: '#666', fontWeight: 400 }}> ×{quantity}</span>}
+            {quantity > 1 && <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}> ×{quantity}</span>}
           </div>
-          <div style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>
+          <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px' }}>
             {brand || 'Generic'} {partNumber && `#${partNumber}`} • {supplier || 'TBD'}
           </div>
         </div>
@@ -194,7 +194,7 @@ export const PartLineItem: React.FC<PartLineItemProps> = ({
           ${(currentPrice * quantity).toFixed(2)}
         </div>
 
-        <div style={{ textAlign: 'center', fontSize: '11px', color: '#666' }}>
+        <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-secondary)' }}>
           {alternatives.length > 0 || loading ? (expanded ? '▼' : '▶') : ''}
           {alternatives.length > 0 && !expanded && (
             <div style={{ fontSize: '8px' }}>{alternatives.length}</div>
@@ -205,21 +205,21 @@ export const PartLineItem: React.FC<PartLineItemProps> = ({
       {/* Expanded alternatives */}
       {expanded && (
         <div style={{
-          borderTop: '1px solid #e5e7eb',
-          background: '#f9fafb',
+          borderTop: '1px solid var(--border)',
+          background: 'var(--bg)',
           padding: '8px 12px'
         }}>
           {loading ? (
-            <div style={{ fontSize: '11px', color: '#666' }}>Loading...</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Loading...</div>
           ) : alternatives.length === 0 ? (
-            <div style={{ fontSize: '11px', color: '#666' }}>No alternatives found</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>No alternatives found</div>
           ) : (
             <>
               <div style={{
                 fontSize: '9px',
                 fontWeight: 700,
                 marginBottom: '6px',
-                color: '#666',
+                color: 'var(--text-secondary)',
                 textTransform: 'uppercase'
               }}>
                 Select Alternative:
@@ -235,8 +235,8 @@ export const PartLineItem: React.FC<PartLineItemProps> = ({
                     gap: '8px',
                     padding: '6px 8px',
                     marginBottom: '4px',
-                    background: alt.is_selected ? '#dcfce7' : '#fff',
-                    border: alt.is_selected ? '2px solid #22c55e' : '1px solid #e5e7eb',
+                    background: alt.is_selected ? 'var(--success-dim)' : 'var(--surface)',
+                    border: alt.is_selected ? '2px solid var(--success)' : '1px solid var(--border)',
                     cursor: 'pointer',
                     alignItems: 'center',
                     fontSize: '11px'
@@ -247,7 +247,7 @@ export const PartLineItem: React.FC<PartLineItemProps> = ({
                     <span style={{ fontWeight: 600 }}>{alt.brand}</span>
                     {alt.part_number && (
                       <span
-                        style={{ color: '#3b82f6', cursor: 'pointer', textDecoration: 'underline' }}
+                        style={{ color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline' }}
                         onClick={(e) => {
                           e.stopPropagation();
                           navigator.clipboard.writeText(alt.part_number!);
@@ -258,11 +258,11 @@ export const PartLineItem: React.FC<PartLineItemProps> = ({
                         {' '}#{alt.part_number}
                       </span>
                     )}
-                    {alt.notes && <span style={{ color: '#999', fontSize: '9px' }}> - {alt.notes}</span>}
+                    {alt.notes && <span style={{ color: 'var(--text-disabled)', fontSize: '9px' }}> - {alt.notes}</span>}
                   </div>
                   <div style={{
-                    color: alt.condition === 'new' ? '#166534' :
-                           alt.condition === 'reman' ? '#b45309' : '#6b7280',
+                    color: alt.condition === 'new' ? 'var(--success)' :
+                           alt.condition === 'reman' ? 'var(--warning)' : 'var(--text-secondary)',
                     fontWeight: 500,
                     textTransform: 'uppercase',
                     fontSize: '9px'
@@ -270,7 +270,7 @@ export const PartLineItem: React.FC<PartLineItemProps> = ({
                     {alt.condition}
                   </div>
                   <div
-                    style={{ fontSize: '9px', cursor: 'pointer', color: '#3b82f6', textDecoration: 'underline' }}
+                    style={{ fontSize: '9px', cursor: 'pointer', color: 'var(--accent)', textDecoration: 'underline' }}
                     onClick={(e) => {
                       e.stopPropagation();
                       const searchUrls: Record<string, string> = {
@@ -293,11 +293,11 @@ export const PartLineItem: React.FC<PartLineItemProps> = ({
                   <div style={{ textAlign: 'right' }}>
                     <span style={{ fontWeight: 700 }}>${alt.price.toFixed(2)}</span>
                     {alt.in_stock && (
-                      <div style={{ fontSize: '8px', color: '#22c55e' }}>✓ In Stock</div>
+                      <div style={{ fontSize: '8px', color: 'var(--success)' }}>✓ In Stock</div>
                     )}
                     {alt.store_location && (
                       <div
-                        style={{ fontSize: '8px', color: '#666', cursor: 'pointer' }}
+                        style={{ fontSize: '8px', color: 'var(--text-secondary)', cursor: 'pointer' }}
                         onClick={(e) => {
                           e.stopPropagation();
                           window.open(`https://maps.google.com/?q=${encodeURIComponent(alt.store_location!)}`, '_blank');
@@ -315,12 +315,12 @@ export const PartLineItem: React.FC<PartLineItemProps> = ({
               <div style={{
                 marginTop: '10px',
                 paddingTop: '8px',
-                borderTop: '1px solid #e5e7eb',
+                borderTop: '1px solid var(--border)',
                 display: 'flex',
                 gap: '8px',
                 alignItems: 'center'
               }}>
-                <span style={{ fontSize: '9px', color: '#666', fontWeight: 700 }}>PRIORITY:</span>
+                <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 700 }}>PRIORITY:</span>
                 {['critical', 'normal', 'later'].map(p => (
                   <button
                     key={p}
@@ -328,9 +328,9 @@ export const PartLineItem: React.FC<PartLineItemProps> = ({
                     style={{
                       fontSize: '9px',
                       padding: '3px 8px',
-                      border: priority === p ? '2px solid #000' : '1px solid #ccc',
-                      background: priority === p ? '#000' : '#fff',
-                      color: priority === p ? '#fff' : '#000',
+                      border: priority === p ? '2px solid var(--text)' : '1px solid var(--border)',
+                      background: priority === p ? 'var(--text)' : 'var(--surface)',
+                      color: priority === p ? 'var(--bg)' : 'var(--text)',
                       cursor: 'pointer',
                       fontWeight: 600,
                       textTransform: 'uppercase'

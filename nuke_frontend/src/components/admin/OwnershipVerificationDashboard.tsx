@@ -204,11 +204,11 @@ const OwnershipVerificationDashboard = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'approved': return '#166534';
-      case 'rejected': return '#dc2626';
-      case 'under_review': return '#d97706';
-      case 'pending': return '#6b7280';
-      default: return '#6b7280';
+      case 'approved': return 'var(--success)';
+      case 'rejected': return 'var(--error)';
+      case 'under_review': return 'var(--warning)';
+      case 'pending': return 'var(--text-secondary)';
+      default: return 'var(--text-secondary)';
     }
   };
 
@@ -226,7 +226,7 @@ const OwnershipVerificationDashboard = () => {
     return (
       <div style={{
         background: 'var(--bg)',
-        border: '1px solid #bdbdbd',
+        border: '1px solid var(--border)',
         padding: '16px',
         margin: '16px',
         fontFamily: 'Arial, sans-serif',
@@ -241,14 +241,14 @@ const OwnershipVerificationDashboard = () => {
   if (!isAdmin) {
     return (
       <div style={{
-        background: '#f8d7da',
-        border: '1px solid #f5c6cb',
+        background: 'var(--error-dim)',
+        border: '1px solid var(--error)',
         padding: '16px',
         margin: '16px',
         fontFamily: 'Arial, sans-serif',
         textAlign: 'center',
         fontSize: '11px',
-        color: '#721c24'
+        color: 'var(--error)'
       }}>
         Access denied. Admin privileges required.
       </div>
@@ -265,7 +265,7 @@ const OwnershipVerificationDashboard = () => {
       {/* Filter Tabs */}
       <div style={{
         background: 'var(--surface)',
-        border: '1px solid #bdbdbd',
+        border: '1px solid var(--border)',
         padding: '8px',
         marginBottom: '12px'
       }}>
@@ -277,9 +277,9 @@ const OwnershipVerificationDashboard = () => {
               style={{
                 padding: '4px 8px',
                 fontSize: '11px',
-                border: '1px solid #bdbdbd',
-                background: filter === status ? '#424242' : '#f5f5f5',
-                color: filter === status ? 'white' : '#424242',
+                border: '1px solid var(--border)',
+                background: filter === status ? 'var(--text)' : 'var(--bg)',
+                color: filter === status ? 'var(--bg)' : 'var(--text)',
                 borderRadius: '0px',
                 cursor: 'pointer'
               }}
@@ -294,8 +294,8 @@ const OwnershipVerificationDashboard = () => {
       {/* Loading State */}
       {loading && (
         <div style={{
-          background: '#e7f3ff',
-          border: '1px solid #b8daff',
+          background: 'var(--accent-dim, var(--bg))',
+          border: '1px solid var(--accent)',
           padding: '12px',
           textAlign: 'center',
           fontSize: '11px',
@@ -308,7 +308,7 @@ const OwnershipVerificationDashboard = () => {
       {/* Verifications List */}
       <div style={{
         background: 'var(--surface)',
-        border: '1px solid #bdbdbd',
+        border: '1px solid var(--border)',
         maxHeight: '600px',
         overflowY: 'auto'
       }}>
@@ -317,7 +317,7 @@ const OwnershipVerificationDashboard = () => {
             padding: '24px',
             textAlign: 'center',
             fontSize: '11px',
-            color: '#757575'
+            color: 'var(--text-secondary)'
           }}>
             No {filter === 'all' ? '' : filter + ' '}verifications found
           </div>
@@ -327,9 +327,9 @@ const OwnershipVerificationDashboard = () => {
               key={verification.id}
               style={{
                 padding: '12px',
-                borderBottom: '1px solid #e0e0e0',
+                borderBottom: '1px solid var(--border)',
                 cursor: 'pointer',
-                background: selectedVerification?.id === verification.id ? '#f8fafc' : 'white'
+                background: selectedVerification?.id === verification.id ? 'var(--bg)' : 'var(--surface)'
               }}
               onClick={() => setSelectedVerification(verification)}
             >
@@ -339,7 +339,7 @@ const OwnershipVerificationDashboard = () => {
                 </div>
                 <div style={{
                   background: getStatusColor(verification.status),
-                  color: 'white',
+                  color: 'var(--bg)',
                   padding: '2px 6px',
                   fontSize: '9px',
                   fontWeight: 'bold'
@@ -353,7 +353,7 @@ const OwnershipVerificationDashboard = () => {
                 {verification.vehicle?.vin && <span> (VIN: {verification.vehicle.vin})</span>}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#757575' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-secondary)' }}>
                 <div>Type: {verification.verification_type}</div>
                 <div>Submitted: {formatDate(verification.created_at)}</div>
               </div>
@@ -370,7 +370,7 @@ const OwnershipVerificationDashboard = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backgroundColor: 'var(--overlay)',
           zIndex: 1000,
           display: 'flex',
           alignItems: 'center',
@@ -378,7 +378,7 @@ const OwnershipVerificationDashboard = () => {
         }}>
           <div style={{
             background: 'var(--surface)',
-            border: '2px solid #bdbdbd',
+            border: '2px solid var(--border)',
             borderRadius: '0px',
             padding: '0px',
             maxWidth: '600px',
@@ -389,9 +389,9 @@ const OwnershipVerificationDashboard = () => {
           }}>
             {/* Modal Header */}
             <div style={{
-              background: '#e0e0e0',
+              background: 'var(--bg)',
               padding: '12px',
-              borderBottom: '1px solid #bdbdbd',
+              borderBottom: '1px solid var(--border)',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center'
@@ -461,9 +461,9 @@ const OwnershipVerificationDashboard = () => {
                     onClick={() => updateVerificationStatus(selectedVerification.id, 'under_review')}
                     disabled={processing === selectedVerification.id}
                     style={{
-                      background: '#d97706',
-                      color: 'white',
-                      border: '1px solid #bdbdbd',
+                      background: 'var(--warning)',
+                      color: 'var(--bg)',
+                      border: '1px solid var(--border)',
                       borderRadius: '0px',
                       padding: '6px 12px',
                       fontSize: '11px',
@@ -476,9 +476,9 @@ const OwnershipVerificationDashboard = () => {
                     onClick={() => updateVerificationStatus(selectedVerification.id, 'approved')}
                     disabled={processing === selectedVerification.id}
                     style={{
-                      background: '#166534',
-                      color: 'white',
-                      border: '1px solid #bdbdbd',
+                      background: 'var(--success)',
+                      color: 'var(--bg)',
+                      border: '1px solid var(--border)',
                       borderRadius: '0px',
                       padding: '6px 12px',
                       fontSize: '11px',
@@ -491,9 +491,9 @@ const OwnershipVerificationDashboard = () => {
                     onClick={() => updateVerificationStatus(selectedVerification.id, 'rejected', 'Additional documentation required')}
                     disabled={processing === selectedVerification.id}
                     style={{
-                      background: '#dc2626',
-                      color: 'white',
-                      border: '1px solid #bdbdbd',
+                      background: 'var(--error)',
+                      color: 'var(--bg)',
+                      border: '1px solid var(--border)',
                       borderRadius: '0px',
                       padding: '6px 12px',
                       fontSize: '11px',
@@ -511,9 +511,9 @@ const OwnershipVerificationDashboard = () => {
                     onClick={() => updateVerificationStatus(selectedVerification.id, 'approved')}
                     disabled={processing === selectedVerification.id}
                     style={{
-                      background: '#166534',
-                      color: 'white',
-                      border: '1px solid #bdbdbd',
+                      background: 'var(--success)',
+                      color: 'var(--bg)',
+                      border: '1px solid var(--border)',
                       borderRadius: '0px',
                       padding: '6px 12px',
                       fontSize: '11px',
@@ -526,9 +526,9 @@ const OwnershipVerificationDashboard = () => {
                     onClick={() => updateVerificationStatus(selectedVerification.id, 'rejected', 'Documentation insufficient')}
                     disabled={processing === selectedVerification.id}
                     style={{
-                      background: '#dc2626',
-                      color: 'white',
-                      border: '1px solid #bdbdbd',
+                      background: 'var(--error)',
+                      color: 'var(--bg)',
+                      border: '1px solid var(--border)',
                       borderRadius: '0px',
                       padding: '6px 12px',
                       fontSize: '11px',

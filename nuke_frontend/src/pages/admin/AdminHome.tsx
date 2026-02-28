@@ -332,7 +332,7 @@ export default function AdminHome() {
                   {opData.importQueuePending.toLocaleString()} pending
                 </span>
                 {' / '}
-                <span style={{ color: opData.importQueueFailed > 0 ? '#b91c1c' : 'var(--text-muted)' }}>
+                <span style={{ color: opData.importQueueFailed > 0 ? 'var(--error)' : 'var(--text-muted)' }}>
                   {opData.importQueueFailed.toLocaleString()} failed
                 </span>
               </>
@@ -343,7 +343,7 @@ export default function AdminHome() {
             {opData == null ? (
               <span style={{ color: 'var(--text-muted)' }}>…</span>
             ) : (
-              <span style={{ color: opData.agentTasksPending > 0 ? '#b45309' : 'var(--text-muted)' }}>
+              <span style={{ color: opData.agentTasksPending > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
                 {opData.agentTasksPending.toLocaleString()} pending
               </span>
             )}
@@ -353,7 +353,7 @@ export default function AdminHome() {
             {cardCounts == null ? (
               <span style={{ color: 'var(--text-muted)' }}>…</span>
             ) : (
-              <span style={{ color: cardCounts.agentInboxUnread > 0 ? '#b45309' : 'var(--text-muted)' }}>
+              <span style={{ color: cardCounts.agentInboxUnread > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
                 {cardCounts.agentInboxUnread.toLocaleString()} unread
               </span>
             )}
@@ -386,7 +386,7 @@ export default function AdminHome() {
               style={{
                 display: 'block',
                 borderRadius: '0px',
-                border: hasAlert ? '2px solid #b91c1c' : '2px solid var(--border-light)',
+                border: hasAlert ? '2px solid var(--error)' : '2px solid var(--border-light)',
                 backgroundColor: 'var(--white)',
                 padding: 'var(--space-4)',
                 transition: 'all 0.12s ease'
@@ -404,7 +404,7 @@ export default function AdminHome() {
                   <div style={{
                     fontSize: '11px',
                     fontWeight: 600,
-                    color: count > 0 ? '#b91c1c' : 'var(--text-muted)',
+                    color: count > 0 ? 'var(--error)' : 'var(--text-muted)',
                     fontFamily: 'monospace',
                     flexShrink: 0,
                   }}>

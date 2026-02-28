@@ -666,7 +666,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                 >
                   {/* Document image (blurred) */}
                   {source.image_url && (
-                    <div style={{ position: 'relative', height: '180px', overflow: 'hidden', background: '#000' }}>
+                    <div style={{ position: 'relative', height: '180px', overflow: 'hidden', background: 'var(--bg)' }}>
                       <img
                         src={source.image_url}
                         alt="Proof document"

@@ -161,7 +161,7 @@ const UserReputationBadge: React.FC<UserReputationBadgeProps> = ({
           
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: 'var(--gray-600)' }}>Verified:</span>
-            <span style={{ fontWeight: 600, color: '#10b981' }}>
+            <span style={{ fontWeight: 600, color: 'var(--success)' }}>
               {score.verified_contributions}
             </span>
           </div>
@@ -183,7 +183,7 @@ const UserReputationBadge: React.FC<UserReputationBadgeProps> = ({
           {score.disputed_contributions > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--gray-600)' }}>Disputed:</span>
-              <span style={{ fontWeight: 600, color: '#ef4444' }}>
+              <span style={{ fontWeight: 600, color: 'var(--error)' }}>
                 {score.disputed_contributions}
               </span>
             </div>

@@ -544,7 +544,7 @@ const EditVehicle: React.FC = () => {
                     </button>
                   </div>
                   {scrapingError && (
-                    <div style={{ marginTop: '8px', color: '#dc2626', fontSize: '12px' }}>
+                    <div style={{ marginTop: '8px', color: 'var(--error)', fontSize: '12px' }}>
                       {scrapingError}
                     </div>
                   )}
@@ -1118,16 +1118,16 @@ const EditVehicle: React.FC = () => {
                             marginTop: '12px', 
                             padding: '12px', 
                             background: 'var(--bg)', 
-                            border: '2px solid #e5e7eb',
+                            border: '2px solid var(--border)',
                             borderRadius: '4px'
                           }}>
-                            <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                               Trade details will be managed in the vehicle profile after saving.
                               You'll be able to link the vehicle(s) you traded and specify values.
                             </div>
                             <a 
                               href="#trade-details" 
-                              style={{ fontSize: '11px', color: '#2563eb', textDecoration: 'underline' }}
+                              style={{ fontSize: '11px', color: 'var(--accent)', textDecoration: 'underline' }}
                               onClick={(e) => {
                                 e.preventDefault();
                                 alert('Save this vehicle first, then use the "Manage Trade Details" button in the Financial Information section of the vehicle profile.');
@@ -1198,7 +1198,7 @@ const EditVehicle: React.FC = () => {
                     {/* Auction Information Section */}
                     {(detailLevel === 'professional' || detailLevel === 'expert') && (
                       <>
-                        <hr style={{ margin: '20px 0', borderColor: '#e5e7eb' }} />
+                        <hr style={{ margin: '20px 0', borderColor: 'var(--border)' }} />
                         <h4 style={{ marginBottom: 12, fontWeight: 600 }}>Auction Information (if applicable)</h4>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="form-group">

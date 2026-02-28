@@ -36,7 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             padding: '4px 8px',
             cursor: 'pointer',
             userSelect: 'none',
-            background: isSelected ? '#f5f5f5' : 'transparent',
+            background: isSelected ? 'var(--bg-secondary)' : 'transparent',
             paddingLeft: `${8 + level * 8}px`,
             display: 'flex',
             alignItems: 'center',
@@ -51,7 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }}
           onMouseEnter={(e) => {
             if (!isSelected) {
-              e.currentTarget.style.background = '#f8fafc';
+              e.currentTarget.style.background = 'var(--surface)';
             }
           }}
           onMouseLeave={(e) => {
@@ -61,16 +61,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }}
         >
           {hasChildren && (
-            <span style={{ color: '#757575', minWidth: '8px' }}>
+            <span style={{ color: 'var(--text-muted)', minWidth: '8px' }}>
               {isExpanded ? '▼' : '▶'}
             </span>
           )}
-          <span style={{ color: '#757575' }}>{category.icon}</span>
-          <span style={{ flex: 1, color: isSelected ? '#000000' : '#424242' }}>
+          <span style={{ color: 'var(--text-muted)' }}>{category.icon}</span>
+          <span style={{ flex: 1, color: isSelected ? 'var(--text)' : 'var(--text-secondary)' }}>
             {category.label}
           </span>
           {category.count > 0 && (
-            <span style={{ color: '#9e9e9e', fontSize: '9px' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>
               ({category.count})
             </span>
           )}
@@ -88,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div
       style={{
         width: '200px',
-        borderRight: '1px solid #bdbdbd',
+        borderRight: '1px solid var(--border)',
         background: 'var(--surface)',
         height: '100%',
         overflowY: 'auto',

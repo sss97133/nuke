@@ -242,7 +242,7 @@ export default function AdminPendingVehicles() {
                 </div>
               ))}
               {vehicle.needs.length === 0 && (
-                <span style={{ color: '#10b981', fontSize: '12px' }}>✅ Complete</span>
+                <span style={{ color: 'var(--success)', fontSize: '12px' }}>Complete</span>
               )}
             </div>
 
@@ -252,7 +252,7 @@ export default function AdminPendingVehicles() {
                 {analysis.sourcing_results
                   .find(r => r.vehicle_id === vehicle.vehicle_id)
                   ?.sourced_fields && (
-                  <div style={{ color: '#10b981' }}>
+                  <div style={{ color: 'var(--success)' }}>
                     ✅ Sourced: {analysis.sourcing_results
                       .find(r => r.vehicle_id === vehicle.vehicle_id)
                       ?.sourced_fields.join(', ')}
@@ -269,13 +269,13 @@ export default function AdminPendingVehicles() {
 
 function getNeedColor(need: string): string {
   const colors: { [key: string]: string } = {
-    vin: '#fef3c7',
-    images: '#dbeafe',
-    description: '#e0e7ff',
-    price: '#fce7f3',
-    mileage: '#f0fdf4',
-    color: '#fff7ed'
+    vin: 'var(--warning-dim)',
+    images: 'var(--info-bg)',
+    description: 'var(--info-bg)',
+    price: 'var(--error-dim)',
+    mileage: 'var(--success-dim)',
+    color: 'var(--warning-dim)'
   };
-  return colors[need] || '#f3f4f6';
+  return colors[need] || 'var(--bg-secondary)';
 }
 

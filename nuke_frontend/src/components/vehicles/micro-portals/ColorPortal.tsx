@@ -59,7 +59,7 @@ export default function ColorPortal({ make, color, year, activePortal, onOpen }:
                 width: '28px',
                 height: '28px',
                 borderRadius: '50%',
-                background: data.hex_color || '#d1d5db',
+                background: data.hex_color || 'var(--border)',
                 border: '2px solid var(--border)',
                 flexShrink: 0,
               }} />
@@ -86,7 +86,7 @@ export default function ColorPortal({ make, color, year, activePortal, onOpen }:
                 width: '32px',
                 height: '32px',
                 borderRadius: '50%',
-                background: data.hex_color || '#d1d5db',
+                background: data.hex_color || 'var(--border)',
                 border: '2px solid var(--border)',
                 flexShrink: 0,
               }} />

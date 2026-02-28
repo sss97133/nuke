@@ -175,7 +175,7 @@ export const AnnotoriousImageTagger: React.FC<AnnotoriousImageTaggerProps> = ({
   }, [vehicleId, onTagsUpdate]);
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center" style={{ backgroundColor: '#0a0a0a' }}>
+    <div className="relative w-full h-full flex items-center justify-center" style={{ backgroundColor: 'var(--bg)' }}>
       <Annotorious>
         <ImageAnnotator>
           <img 

@@ -191,13 +191,13 @@ export default function ConnectedPlatforms() {
 
   const getStatusBadge = (cred: PlatformCredential) => {
     const styles: Record<string, { bg: string; color: string; label: string }> = {
-      active: { bg: '#dcfce7', color: '#16a34a', label: 'Connected' },
-      pending: { bg: '#fef3c7', color: '#d97706', label: 'Pending' },
-      validating: { bg: '#dbeafe', color: '#2563eb', label: 'Validating...' },
-      expired: { bg: '#fef3c7', color: '#d97706', label: 'Expired' },
-      '2fa_required': { bg: '#fef3c7', color: '#d97706', label: '2FA Needed' },
-      invalid: { bg: '#fef2f2', color: '#dc2626', label: 'Invalid' },
-      suspended: { bg: '#fef2f2', color: '#dc2626', label: 'Suspended' },
+      active: { bg: 'var(--success-dim)', color: 'var(--success)', label: 'Connected' },
+      pending: { bg: 'var(--warning-dim)', color: 'var(--warning)', label: 'Pending' },
+      validating: { bg: 'var(--accent-dim, #dbeafe)', color: 'var(--accent)', label: 'Validating...' },
+      expired: { bg: 'var(--warning-dim)', color: 'var(--warning)', label: 'Expired' },
+      '2fa_required': { bg: 'var(--warning-dim)', color: 'var(--warning)', label: '2FA Needed' },
+      invalid: { bg: 'var(--error-dim)', color: 'var(--error)', label: 'Invalid' },
+      suspended: { bg: 'var(--error-dim)', color: 'var(--error)', label: 'Suspended' },
     };
 
     const style = styles[cred.status] || styles.pending;
@@ -222,7 +222,7 @@ export default function ConnectedPlatforms() {
       id: platformId,
       name: platformId,
       shortLabel: platformId.slice(0, 3).toUpperCase(),
-      color: '#6b7280'
+      color: 'var(--text-disabled)'
     };
   };
 
@@ -307,7 +307,7 @@ export default function ConnectedPlatforms() {
                     padding: '10px 12px',
                     background: 'var(--surface-hover)',
                     borderRadius: '4px',
-                    border: cred.status === '2fa_required' ? '2px solid #f59e0b' : '1px solid var(--border)'
+                    border: cred.status === '2fa_required' ? '2px solid var(--warning)' : '1px solid var(--border)'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 200px', minWidth: 0 }}>
@@ -330,12 +330,12 @@ export default function ConnectedPlatforms() {
                         </div>
                       )}
                       {cred.status === 'invalid' && cred.validation_error && (
-                        <div style={{ fontSize: '9px', color: '#dc2626' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--error)' }}>
                           {cred.validation_error}
                         </div>
                       )}
                       {cred.status === '2fa_required' && (
-                        <div style={{ fontSize: '9px', color: '#d97706' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--warning)' }}>
                           Two-factor authentication code required
                         </div>
                       )}
@@ -364,9 +364,9 @@ export default function ConnectedPlatforms() {
                         }}
                         style={{
                           fontSize: '9px',
-                          background: '#fef3c7',
-                          borderColor: '#f59e0b',
-                          color: '#92400e'
+                          background: 'var(--warning-dim)',
+                          borderColor: 'var(--warning)',
+                          color: 'var(--warning)'
                         }}
                       >
                         Enter Code

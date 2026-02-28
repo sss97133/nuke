@@ -22,7 +22,7 @@ const ScrollToTopButton: React.FC<ScrollToTopButtonProps> = ({ visible }) => {
         background: 'rgba(0, 0, 0, 0.7)',
         backdropFilter: 'blur(10px)',
         border: '2px solid rgba(255, 255, 255, 0.3)',
-        color: 'white',
+        color: 'var(--bg)',
         fontSize: '20px',
         fontWeight: 'bold',
         cursor: 'pointer',

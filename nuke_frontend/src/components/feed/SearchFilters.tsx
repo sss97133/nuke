@@ -132,7 +132,7 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
               style={{
                 padding: '4px 6px',
                 fontSize: '11px',
-                border: filters.contentTypes.includes(option.value) ? '2px solid #3b82f6' : '1px solid #c0c0c0',
+                border: filters.contentTypes.includes(option.value) ? '2px solid var(--accent)' : '1px solid var(--border)',
                 borderRadius: '2px'
               }}
             >
@@ -145,8 +145,8 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
       {/* Advanced Filters Panel */}
       {showAdvancedFilters && (
         <div className="advanced-filters" style={{
-          background: '#f8fafc',
-          border: '1px solid #c0c0c0',
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border)',
           borderRadius: '2px',
           padding: '8px',
           marginBottom: '8px'

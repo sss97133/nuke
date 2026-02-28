@@ -101,7 +101,7 @@ const inputStyle: React.CSSProperties = {
 const btnPrimary: React.CSSProperties = {
   padding: '8px 16px',
   background: 'var(--primary)',
-  color: '#fff',
+  color: 'var(--text-on-accent, #fff)',
   border: 'none',
   borderRadius: '4px',
   fontSize: '14px',
@@ -122,7 +122,7 @@ const btnSecondary: React.CSSProperties = {
 };
 
 const errStyle: React.CSSProperties = {
-  color: '#c0392b',
+  color: 'var(--error)',
   fontSize: '13px',
   marginTop: '8px',
 };
@@ -361,13 +361,13 @@ export default function StripeConnect() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
               <div>
                 <span style={labelStyle}>Ready to Process Payments</span>
-                <span style={{ fontSize: '14px', color: status.readyToProcessPayments ? '#27ae60' : '#e74c3c' }}>
+                <span style={{ fontSize: '14px', color: status.readyToProcessPayments ? 'var(--success)' : 'var(--error)' }}>
                   {status.readyToProcessPayments ? 'Yes' : 'No'}
                 </span>
               </div>
               <div>
                 <span style={labelStyle}>Onboarding Complete</span>
-                <span style={{ fontSize: '14px', color: status.onboardingComplete ? '#27ae60' : '#e74c3c' }}>
+                <span style={{ fontSize: '14px', color: status.onboardingComplete ? 'var(--success)' : 'var(--error)' }}>
                   {status.onboardingComplete ? 'Yes' : 'No'}
                 </span>
               </div>

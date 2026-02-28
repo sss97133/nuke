@@ -463,15 +463,15 @@ export default function MarketMap() {
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e', color: '#ccc', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontSize: '10px', padding: '12px' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--surface)', color: 'var(--text)', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontSize: '10px', padding: '12px' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', marginBottom: '8px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Market Map</div>
           {stats && (
-            <div style={{ display: 'flex', gap: '20px', fontSize: '10px', color: '#858585' }}>
-              <span><b style={{ color: '#ccc', fontFamily: 'monospace' }}>{fmtMoney(stats.totalValue)}</b> <small style={{ textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.4px' }}>Total</small></span>
-              <span><b style={{ color: '#ccc', fontFamily: 'monospace' }}>{fmtNum(stats.totalCount)}</b> <small style={{ textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.4px' }}>Vehicles</small></span>
+            <div style={{ display: 'flex', gap: '20px', fontSize: '10px', color: 'var(--text-secondary)' }}>
+              <span><b style={{ color: 'var(--text)', fontFamily: 'monospace' }}>{fmtMoney(stats.totalValue)}</b> <small style={{ textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.4px' }}>Total</small></span>
+              <span><b style={{ color: 'var(--text)', fontFamily: 'monospace' }}>{fmtNum(stats.totalCount)}</b> <small style={{ textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.4px' }}>Vehicles</small></span>
             </div>
           )}
         </div>
@@ -479,8 +479,8 @@ export default function MarketMap() {
           <div style={{ display: 'flex', gap: '3px' }}>
             {(['segment', 'source', 'brand'] as ViewMode[]).map(v => (
               <button key={v} onClick={() => switchView(v)} style={{
-                border: `1px solid ${view === v ? '#ccc' : '#3e3e42'}`, background: view === v ? '#ccc' : 'transparent',
-                color: view === v ? '#1e1e1e' : '#858585', padding: '4px 10px', fontSize: '9px', fontWeight: 600,
+                border: `1px solid ${view === v ? 'var(--text)' : 'var(--border)'}`, background: view === v ? 'var(--text)' : 'transparent',
+                color: view === v ? 'var(--surface)' : 'var(--text-secondary)', padding: '4px 10px', fontSize: '9px', fontWeight: 600,
                 cursor: 'pointer', borderRadius: '3px', fontFamily: 'inherit',
               }}>
                 {v.charAt(0).toUpperCase() + v.slice(1)}
@@ -490,8 +490,8 @@ export default function MarketMap() {
           <div style={{ display: 'flex', gap: '3px', marginLeft: '12px' }}>
             {(['value', 'count'] as Metric[]).map(m => (
               <button key={m} onClick={() => setMetric(m)} style={{
-                border: `1px solid ${metric === m ? '#ccc' : '#3e3e42'}`, background: metric === m ? '#ccc' : 'transparent',
-                color: metric === m ? '#1e1e1e' : '#858585', padding: '4px 10px', fontSize: '9px', fontWeight: 600,
+                border: `1px solid ${metric === m ? 'var(--text)' : 'var(--border)'}`, background: metric === m ? 'var(--text)' : 'transparent',
+                color: metric === m ? 'var(--surface)' : 'var(--text-secondary)', padding: '4px 10px', fontSize: '9px', fontWeight: 600,
                 cursor: 'pointer', borderRadius: '3px', fontFamily: 'inherit',
               }}>
                 {m === 'count' ? 'Volume' : 'Value'}
@@ -502,31 +502,31 @@ export default function MarketMap() {
       </div>
 
       {/* Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px', fontSize: '10px', color: '#858585', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px', fontSize: '10px', color: 'var(--text-secondary)', flexShrink: 0 }}>
         {history.length > 0 && (
           <span onClick={back} style={{ cursor: 'pointer', marginRight: '6px', fontSize: '11px' }}>&larr;</span>
         )}
         {breadcrumbs.map((bc, i) => (
           <span key={i}>
-            {i > 0 && <span style={{ color: '#656565', margin: '0 6px', fontSize: '9px' }}>&rsaquo;</span>}
+            {i > 0 && <span style={{ color: 'var(--text-disabled)', margin: '0 6px', fontSize: '9px' }}>&rsaquo;</span>}
             {bc.onClick ? (
-              <a onClick={bc.onClick} style={{ color: '#858585', cursor: 'pointer', textDecoration: 'none' }}
+              <a onClick={bc.onClick} style={{ color: 'var(--text-secondary)', cursor: 'pointer', textDecoration: 'none' }}
                 onMouseOver={e => (e.target as HTMLElement).style.textDecoration = 'underline'}
                 onMouseOut={e => (e.target as HTMLElement).style.textDecoration = 'none'}>
                 {bc.label}
               </a>
             ) : (
-              <span style={{ color: '#ccc', fontWeight: 600 }}>{bc.label}</span>
+              <span style={{ color: 'var(--text)', fontWeight: 600 }}>{bc.label}</span>
             )}
           </span>
         ))}
       </div>
 
       {/* Treemap container */}
-      <div style={{ position: 'relative', border: '1px solid #3e3e42', borderRadius: '3px', overflow: 'hidden', background: '#1e1e1e', flex: 1, minHeight: 0 }}>
+      <div style={{ position: 'relative', border: '1px solid var(--border)', borderRadius: '3px', overflow: 'hidden', background: 'var(--surface)', flex: 1, minHeight: 0 }}>
         <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%' }} />
         {loading && (
-          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: '#656565', fontSize: '11px' }}>Loading...</div>
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: 'var(--text-disabled)', fontSize: '11px' }}>Loading...</div>
         )}
       </div>
 
@@ -534,17 +534,17 @@ export default function MarketMap() {
       {tooltip.visible && (
         <div style={{
           position: 'fixed', left: tooltip.x, top: tooltip.y,
-          background: '#1a1a1a', border: '1px solid #333', borderRadius: '4px',
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px',
           padding: '10px 14px', pointerEvents: 'none', zIndex: 1000,
           minWidth: '180px', maxWidth: '280px', fontSize: '10px',
           boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
         }}>
-          <div style={{ fontWeight: 600, color: '#e0e0e0', marginBottom: '4px', fontSize: '11px' }}>{tooltip.name}</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'monospace', color: '#16825d', marginBottom: '8px' }}>{tooltip.value}</div>
-          <hr style={{ border: 'none', borderTop: '1px solid #333', margin: '6px 0' }} />
+          <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: '4px', fontSize: '11px' }}>{tooltip.name}</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'monospace', color: 'var(--success)', marginBottom: '8px' }}>{tooltip.value}</div>
+          <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '6px 0' }} />
           {tooltip.rows.map((r, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px', color: '#999' }}>
-              <span style={{ fontFamily: 'monospace', color: '#ccc', fontWeight: 600, fontSize: '10px' }}>{r.pct}</span>
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px', color: 'var(--text-disabled)' }}>
+              <span style={{ fontFamily: 'monospace', color: 'var(--text)', fontWeight: 600, fontSize: '10px' }}>{r.pct}</span>
               <span style={{ fontSize: '9px', textAlign: 'right', marginLeft: '12px' }}>{r.label}</span>
             </div>
           ))}

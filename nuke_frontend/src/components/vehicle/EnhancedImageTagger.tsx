@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import '../../design-system.css';
 import { InputDialog } from '../common/InputDialog';
 
 interface EnhancedImageTaggerProps {
@@ -613,8 +614,8 @@ export default function EnhancedImageTagger({
         }
 
         .tag-btn {
-          background: #c0c0c0;
-          border: 1px outset #c0c0c0;
+          background: var(--surface);
+          border: 1px outset var(--border);
           padding: 1px 6px;
           font-size: 8pt;
           font-family: "MS Sans Serif", sans-serif;
@@ -622,30 +623,30 @@ export default function EnhancedImageTagger({
         }
 
         .tag-btn:active {
-          border: 1px inset #c0c0c0;
+          border: 1px inset var(--border);
         }
 
         .tag-btn:disabled {
-          color: #808080;
+          color: var(--text-disabled);
         }
 
         .tag-field {
-          border: 1px inset #c0c0c0;
+          border: 1px inset var(--border);
           padding: 1px 3px;
           font-size: 8pt;
           font-family: "MS Sans Serif", sans-serif;
-          background: #ffffff;
+          background: var(--bg);
         }
 
         .tag-counts {
           font-size: 8pt;
-          color: #000000;
+          color: var(--text);
           margin-top: 2px;
         }
 
         .tag-count.pending {
-          background: #ffc10720;
-          color: #ffc107;
+          background: color-mix(in srgb, var(--warning) 12%, transparent);
+          color: var(--warning);
         }
       `}</style>
 

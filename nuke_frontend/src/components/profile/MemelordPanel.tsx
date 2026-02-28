@@ -49,13 +49,13 @@ export const MemelordPanel: React.FC<{ userId: string }> = ({ userId }) => {
     <div className="card">
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>Meme Library Activity</div>
-        <div style={{ fontSize: '11px', color: '#6b7280' }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
           Total: {stats.total} · Spent: ${((stats.spentCents || 0) / 100).toFixed(2)}
         </div>
       </div>
       <div className="card-body" style={{ fontSize: '12px' }}>
         {loading && <div className="text text-muted">Loading…</div>}
-        {error && <div style={{ color: '#b91c1c' }}>{error}</div>}
+        {error && <div style={{ color: 'var(--error)' }}>{error}</div>}
         {!loading && !error && events.length === 0 && (
           <div className="text text-muted">No activity yet.</div>
         )}
@@ -65,7 +65,7 @@ export const MemelordPanel: React.FC<{ userId: string }> = ({ userId }) => {
             <div>
               <div className="text text-bold" style={{ marginBottom: 8 }}>Top targets</div>
               {stats.topTargets.map(([key, count]) => (
-                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
+                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
                   <div className="text text-small">{formatTarget(key)}</div>
                   <div className="text text-small text-muted">{count}</div>
                 </div>
@@ -75,7 +75,7 @@ export const MemelordPanel: React.FC<{ userId: string }> = ({ userId }) => {
             <div>
               <div className="text text-bold" style={{ marginBottom: 8 }}>Recent drops</div>
               {events.slice(0, 8).map((e) => (
-                <div key={e.id} style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
+                <div key={e.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
                   <div className="text text-small text-bold">{e.title}</div>
                   <div className="text text-small text-muted" style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                     <span>{formatTarget(e.target_key)}</span>

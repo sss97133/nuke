@@ -143,14 +143,14 @@ export default function ProxyBidOperations() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return '#f59e0b';
-      case 'active': return '#3b82f6';
-      case 'winning': return '#10b981';
-      case 'outbid': return '#ef4444';
-      case 'won': return '#059669';
-      case 'lost': return '#6b7280';
-      case 'cancelled': return '#9ca3af';
-      default: return '#6b7280';
+      case 'pending': return 'var(--warning, #f59e0b)';
+      case 'active': return 'var(--accent, #3b82f6)';
+      case 'winning': return 'var(--success, #10b981)';
+      case 'outbid': return 'var(--error, #ef4444)';
+      case 'won': return 'var(--success, #059669)';
+      case 'lost': return 'var(--text-secondary, #6b7280)';
+      case 'cancelled': return 'var(--text-muted, #9ca3af)';
+      default: return 'var(--text-secondary, #6b7280)';
     }
   };
 
@@ -374,7 +374,7 @@ export default function ProxyBidOperations() {
                               <div
                                 style={{
                                   background: getStatusColor(bid.status),
-                                  color: '#fff',
+                                  color: 'var(--text-on-accent, #fff)',
                                   padding: '2px 8px',
                                   borderRadius: '3px',
                                   fontSize: '9px',
@@ -398,7 +398,7 @@ export default function ProxyBidOperations() {
                             </div>
                             <div>
                               <span style={{ color: 'var(--text-muted)' }}>Ends:</span>{' '}
-                              <strong style={{ color: bid.external_listing?.end_date && new Date(bid.external_listing.end_date).getTime() - Date.now() < 60 * 60 * 1000 ? '#ef4444' : 'inherit' }}>
+                              <strong style={{ color: bid.external_listing?.end_date && new Date(bid.external_listing.end_date).getTime() - Date.now() < 60 * 60 * 1000 ? 'var(--error)' : 'inherit' }}>
                                 {formatTimeUntil(bid.external_listing?.end_date || null)}
                               </strong>
                             </div>
@@ -512,7 +512,7 @@ export default function ProxyBidOperations() {
                                     className="button button-small"
                                     onClick={() => handleMarkStatus(bid, 'won')}
                                     disabled={actionLoading}
-                                    style={{ fontSize: '9px', background: '#059669', color: '#fff' }}
+                                    style={{ fontSize: '9px', background: 'var(--success)', color: 'var(--text-on-accent, #fff)' }}
                                   >
                                     Mark Won
                                   </button>
@@ -520,7 +520,7 @@ export default function ProxyBidOperations() {
                                     className="button button-small"
                                     onClick={() => handleMarkStatus(bid, 'lost')}
                                     disabled={actionLoading}
-                                    style={{ fontSize: '9px', background: '#6b7280', color: '#fff' }}
+                                    style={{ fontSize: '9px', background: 'var(--text-secondary)', color: 'var(--text-on-accent, #fff)' }}
                                   >
                                     Mark Lost
                                   </button>

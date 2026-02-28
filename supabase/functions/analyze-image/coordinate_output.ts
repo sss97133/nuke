@@ -1,6 +1,11 @@
 /**
  * CAMERA POSITION OUTPUT MODULE
- * 
+ *
+ * DEPRECATED: This module maps legacy angle strings (exterior_three_quarter,
+ * exterior_front, etc.) to 3D camera positions. The platform has migrated to
+ * the 41-zone vehicle_zone system. New camera position logic should derive
+ * from vehicle_zone values. See: nuke_frontend/src/constants/vehicleZones.ts
+ *
  * Converts AI-detected angles to proper 3D camera positions.
  * Uses spherical coordinates (azimuth, elevation, distance) which can
  * be converted to Cartesian (x, y, z) relative to vehicle center.

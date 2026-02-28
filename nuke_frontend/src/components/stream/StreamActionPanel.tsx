@@ -107,12 +107,12 @@ export default function StreamActionPanel({
   const canInteract = !!user?.id && !disabled;
 
   return (
-    <div style={{ borderTop: '1px solid #bdbdbd' }}>
+    <div style={{ borderTop: '1px solid var(--border)' }}>
       <div
         style={{
-          background: '#e0e0e0',
+          background: 'var(--bg-secondary)',
           padding: '8px',
-          borderBottom: '1px solid #bdbdbd',
+          borderBottom: '1px solid var(--border)',
           fontSize: '11px',
           fontWeight: 'bold',
         }}
@@ -122,15 +122,15 @@ export default function StreamActionPanel({
 
       <div style={{ padding: '8px', fontSize: '11px' }}>
         {!user?.id && (
-          <div style={{ color: '#757575' }}>
+          <div style={{ color: 'var(--text-muted)' }}>
             Login to purchase packs and trigger overlays.
           </div>
         )}
 
-        {loading && <div style={{ color: '#757575' }}>Loading actions...</div>}
+        {loading && <div style={{ color: 'var(--text-muted)' }}>Loading actions...</div>}
 
         {user?.id && !loading && !hasAnyOwned && (
-          <div style={{ marginBottom: '8px', color: '#424242' }}>
+          <div style={{ marginBottom: '8px', color: 'var(--text)' }}>
             Purchase a pack to unlock popups and sound effects.
           </div>
         )}
@@ -148,9 +148,9 @@ export default function StreamActionPanel({
                     style={{
                       padding: '6px 8px',
                       fontSize: '11px',
-                      border: '1px solid #bdbdbd',
-                      background: owned ? '#d1fae5' : '#f5f5f5',
-                      color: '#111827',
+                      border: '1px solid var(--border)',
+                      background: owned ? 'var(--success-dim)' : 'var(--surface)',
+                      color: 'var(--text)',
                       borderRadius: '0px',
                       cursor: owned ? 'default' : 'pointer',
                       opacity: !canInteract ? 0.6 : 1,
@@ -173,9 +173,9 @@ export default function StreamActionPanel({
                     style={{
                       padding: '6px 8px',
                       fontSize: '11px',
-                      border: '1px solid #bdbdbd',
-                      background: '#424242',
-                      color: 'white',
+                      border: '1px solid var(--border)',
+                      background: 'var(--text)',
+                      color: 'var(--bg)',
                       borderRadius: '0px',
                       cursor: 'pointer',
                       opacity: !canInteract ? 0.6 : 1,
@@ -187,7 +187,7 @@ export default function StreamActionPanel({
                 ))}
 
                 {ownedActions.length === 0 && (
-                  <div style={{ color: '#757575' }}>
+                  <div style={{ color: 'var(--text-muted)' }}>
                     No actions available.
                   </div>
                 )}

@@ -280,17 +280,17 @@ export default function TransferPartyPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: '#64748b', fontSize: '14px' }}>Loading transfer...</div>
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Loading transfer...</div>
       </div>
     );
   }
 
   if (error || !transfer) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
-        <div style={{ color: '#f87171', fontSize: '16px', fontWeight: 600 }}>Transfer not found</div>
-        <div style={{ color: '#64748b', fontSize: '13px' }}>{error ?? 'This transfer link may be expired or invalid.'}</div>
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ color: 'var(--error)', fontSize: '16px', fontWeight: 600 }}>Transfer not found</div>
+        <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{error ?? 'This transfer link may be expired or invalid.'}</div>
       </div>
     );
   }
@@ -310,24 +310,24 @@ export default function TransferPartyPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0f172a', color: '#e2e8f0', fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'system-ui, sans-serif' }}>
       {/* Top nav */}
-      <div style={{ background: '#0a0f1e', borderBottom: '1px solid #1e293b', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', letterSpacing: '-0.01em' }}>
-          nuke<span style={{ color: '#3b82f6' }}>.</span>ag
+      <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+          nuke<span style={{ color: 'var(--accent)' }}>.</span>ag
         </div>
         {role !== 'observer' && (
-          <div style={{ fontSize: '12px', color: '#64748b' }}>
-            Viewing as <span style={{ color: role === 'buyer' ? '#86efac' : '#93c5fd', fontWeight: 600 }}>{role}</span>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+            Viewing as <span style={{ color: role === 'buyer' ? 'var(--success)' : 'var(--accent)', fontWeight: 600 }}>{role}</span>
           </div>
         )}
       </div>
 
       <div style={{ maxWidth: '680px', margin: '0 auto', padding: '32px 24px' }}>
         {/* Vehicle card */}
-        <div style={{ background: '#1e293b', borderRadius: '12px', overflow: 'hidden', marginBottom: '24px' }}>
+        <div style={{ background: 'var(--surface)', borderRadius: '12px', overflow: 'hidden', marginBottom: '24px' }}>
           {vehicleImage && (
-            <div style={{ height: '200px', overflow: 'hidden', background: '#0f172a' }}>
+            <div style={{ height: '200px', overflow: 'hidden', background: 'var(--bg)' }}>
               <img
                 src={vehicleImage}
                 alt={vehicleName}
@@ -337,26 +337,26 @@ export default function TransferPartyPage() {
             </div>
           )}
           <div style={{ padding: '20px' }}>
-            <h1 style={{ margin: '0 0 8px', fontSize: '22px', fontWeight: 700, color: '#f8fafc' }}>{vehicleName}</h1>
+            <h1 style={{ margin: '0 0 8px', fontSize: '22px', fontWeight: 700, color: 'var(--text)' }}>{vehicleName}</h1>
             {vehicle?.vin && (
-              <div style={{ fontSize: '12px', color: '#475569', marginBottom: '8px', fontFamily: 'monospace' }}>VIN: {vehicle.vin}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-disabled)', marginBottom: '8px', fontFamily: 'monospace' }}>VIN: {vehicle.vin}</div>
             )}
             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
               {transfer.agreed_price && (
-                <div style={{ fontSize: '20px', fontWeight: 700, color: '#34d399' }}>
+                <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--success)' }}>
                   {fmtPrice(transfer.agreed_price, transfer.currency)}
                 </div>
               )}
               <div style={{
                 padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 600,
-                background: isComplete ? '#14532d' : '#1e3a5f',
-                color: isComplete ? '#86efac' : '#93c5fd',
+                background: isComplete ? 'var(--success-dim)' : 'var(--accent-dim)',
+                color: isComplete ? 'var(--success)' : 'var(--accent)',
               }}>
                 {isComplete ? 'Complete' : 'In Progress'}
               </div>
             </div>
             {transfer.seller && (
-              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '8px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
                 {transfer.seller.handle} → {transfer.buyer?.handle ?? 'buyer TBD'}
               </div>
             )}
@@ -364,19 +364,19 @@ export default function TransferPartyPage() {
         </div>
 
         {/* Progress bar */}
-        <div style={{ background: '#1e293b', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
+        <div style={{ background: 'var(--surface)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: '#f1f5f9' }}>Transfer Progress</div>
-            <div style={{ fontSize: '13px', color: '#64748b' }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>Transfer Progress</div>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
               {completedMilestones.length} of {requiredMilestones.length} steps done
             </div>
           </div>
-          <div style={{ background: '#0f172a', borderRadius: '6px', height: '10px', overflow: 'hidden', marginBottom: '16px' }}>
+          <div style={{ background: 'var(--bg)', borderRadius: '6px', height: '10px', overflow: 'hidden', marginBottom: '16px' }}>
             <div
               style={{
                 height: '100%',
                 width: `${progressPct}%`,
-                background: isComplete ? '#22c55e' : 'linear-gradient(90deg, #3b82f6, #818cf8)',
+                background: isComplete ? 'var(--success)' : 'linear-gradient(90deg, var(--accent), var(--accent))',
                 borderRadius: '6px',
                 transition: 'width 0.5s ease',
               }}
@@ -402,8 +402,8 @@ export default function TransferPartyPage() {
                     style={{
                       display: 'flex', alignItems: 'center', gap: '12px',
                       padding: '10px 12px', borderRadius: '8px',
-                      background: isCurrent ? '#1a2d4a' : 'transparent',
-                      border: isCurrent ? '1px solid #334155' : '1px solid transparent',
+                      background: isCurrent ? 'var(--accent-dim)' : 'transparent',
+                      border: isCurrent ? '1px solid var(--border)' : '1px solid transparent',
                       opacity: isSkipped ? 0.4 : 1,
                     }}
                   >
@@ -411,8 +411,8 @@ export default function TransferPartyPage() {
                     <div style={{
                       width: '24px', height: '24px', borderRadius: '50%', flexShrink: 0,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: isDone ? '#14532d' : isOverdue ? '#450a0a' : isCurrent ? '#1e3a5f' : '#1e293b',
-                      border: `2px solid ${isDone ? '#22c55e' : isOverdue ? '#ef4444' : isCurrent ? '#3b82f6' : '#334155'}`,
+                      background: isDone ? 'var(--success-dim)' : isOverdue ? 'var(--error-dim)' : isCurrent ? 'var(--accent-dim)' : 'var(--surface)',
+                      border: `2px solid ${isDone ? 'var(--success)' : isOverdue ? 'var(--error)' : isCurrent ? 'var(--accent)' : 'var(--border)'}`,
                       fontSize: '12px',
                     }}>
                       {isDone ? '✓' : isOverdue ? '!' : isCurrent ? '→' : '·'}
@@ -422,18 +422,18 @@ export default function TransferPartyPage() {
                       <div style={{
                         fontSize: '13px',
                         fontWeight: isCurrent ? 600 : 400,
-                        color: isDone ? '#64748b' : isCurrent ? '#f1f5f9' : '#94a3b8',
+                        color: isDone ? 'var(--text-secondary)' : isCurrent ? 'var(--text)' : 'var(--text-disabled)',
                         textDecoration: isSkipped ? 'line-through' : 'none',
                       }}>
                         {label}
                       </div>
                       {isDone && m.completed_at && (
-                        <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-disabled)', marginTop: '2px' }}>
                           Done {new Date(m.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </div>
                       )}
                       {isOverdue && m.deadline_at && (
-                        <div style={{ fontSize: '11px', color: '#f87171', marginTop: '2px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--error)', marginTop: '2px' }}>
                           Overdue since {new Date(m.deadline_at).toLocaleDateString()}
                         </div>
                       )}
@@ -444,7 +444,7 @@ export default function TransferPartyPage() {
                         onClick={() => confirmMilestone(m.milestone_type)}
                         disabled={confirming === m.milestone_type}
                         style={{
-                          background: '#14532d', color: '#86efac', border: '1px solid #166534',
+                          background: 'var(--success-dim)', color: 'var(--success)', border: '1px solid var(--success)',
                           borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: 600,
                           cursor: confirming === m.milestone_type ? 'wait' : 'pointer',
                           flexShrink: 0,
@@ -459,21 +459,21 @@ export default function TransferPartyPage() {
           </div>
 
           {confirmError && (
-            <div style={{ color: '#f87171', fontSize: '12px', marginTop: '8px' }}>{confirmError}</div>
+            <div style={{ color: 'var(--error)', fontSize: '12px', marginTop: '8px' }}>{confirmError}</div>
           )}
         </div>
 
         {/* Current action prompt */}
         {!isComplete && transfer.current_milestone && (
-          <div style={{ background: '#1a2d4a', border: '1px solid #1e3a5f', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
-            <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+          <div style={{ background: 'var(--accent-dim)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
               Waiting on
             </div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: '#f1f5f9', marginBottom: '4px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>
               {transfer.current_milestone.label}
             </div>
             {MILESTONE_CTA[transfer.current_milestone.type] && (
-              <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '8px' }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-disabled)', marginTop: '8px' }}>
                 {MILESTONE_CTA[transfer.current_milestone.type]}
               </div>
             )}
@@ -482,11 +482,11 @@ export default function TransferPartyPage() {
 
         {/* Free-form signal */}
         {!isComplete && (
-          <div style={{ background: '#1e293b', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: '#f1f5f9', marginBottom: '8px' }}>
+          <div style={{ background: 'var(--surface)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' }}>
               Send an update
             </div>
-            <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '12px' }}>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
               Describe what happened and we'll automatically advance the right step.
               Examples: "I just sent the wire transfer" · "Inspection is complete, car is great" · "Title is in the mail"
             </div>
@@ -496,23 +496,23 @@ export default function TransferPartyPage() {
               placeholder="What happened? (e.g. 'I wired the deposit this morning')"
               rows={3}
               style={{
-                width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '6px',
-                color: '#e2e8f0', padding: '10px 12px', fontSize: '13px', resize: 'vertical',
+                width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px',
+                color: 'var(--text)', padding: '10px 12px', fontSize: '13px', resize: 'vertical',
                 boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit',
               }}
             />
             {signalError && (
-              <div style={{ color: '#f87171', fontSize: '12px', marginTop: '6px' }}>{signalError}</div>
+              <div style={{ color: 'var(--error)', fontSize: '12px', marginTop: '6px' }}>{signalError}</div>
             )}
             {signalResult && (
-              <div style={{ color: '#86efac', fontSize: '12px', marginTop: '6px' }}>{signalResult}</div>
+              <div style={{ color: 'var(--success)', fontSize: '12px', marginTop: '6px' }}>{signalResult}</div>
             )}
             <button
               onClick={sendSignal}
               disabled={!signalText.trim() || signaling}
               style={{
                 marginTop: '10px',
-                background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px',
+                background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: '6px',
                 padding: '9px 20px', fontSize: '13px', fontWeight: 600,
                 cursor: !signalText.trim() || signaling ? 'not-allowed' : 'pointer',
                 opacity: !signalText.trim() ? 0.5 : 1,
@@ -524,10 +524,10 @@ export default function TransferPartyPage() {
         )}
 
         {isComplete && (
-          <div style={{ background: '#14532d', border: '1px solid #166534', borderRadius: '10px', padding: '20px', textAlign: 'center' }}>
+          <div style={{ background: 'var(--success-dim)', border: '1px solid var(--success)', borderRadius: '10px', padding: '20px', textAlign: 'center' }}>
             <div style={{ fontSize: '28px', marginBottom: '8px' }}>✓</div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: '#86efac' }}>Transfer Complete</div>
-            <div style={{ fontSize: '13px', color: '#4ade80', marginTop: '6px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--success)' }}>Transfer Complete</div>
+            <div style={{ fontSize: '13px', color: 'var(--success)', marginTop: '6px' }}>
               {vehicleName} has been successfully transferred.
             </div>
           </div>
@@ -535,9 +535,9 @@ export default function TransferPartyPage() {
 
         {/* Contact info */}
         {transfer.inbox_email && (
-          <div style={{ borderTop: '1px solid #1e293b', paddingTop: '20px', marginTop: '8px' }}>
-            <div style={{ fontSize: '12px', color: '#475569' }}>
-              Questions? Email <a href={`mailto:${transfer.inbox_email}`} style={{ color: '#3b82f6', textDecoration: 'none' }}>{transfer.inbox_email}</a> — replies automatically update your transfer.
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '20px', marginTop: '8px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-disabled)' }}>
+              Questions? Email <a href={`mailto:${transfer.inbox_email}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}>{transfer.inbox_email}</a> — replies automatically update your transfer.
             </div>
           </div>
         )}

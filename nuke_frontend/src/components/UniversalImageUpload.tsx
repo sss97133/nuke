@@ -534,7 +534,7 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
           left: 0;
           right: 0;
           bottom: 0;
-          background: #000;
+          background: var(--text);
           z-index: 9999;
           display: flex;
           flex-direction: column;
@@ -545,19 +545,19 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
           justify-content: space-between;
           align-items: center;
           padding: 16px;
-          border-bottom: 2px solid #00ff00;
+          border-bottom: 2px solid var(--accent);
         }
         
         .header h2 {
           margin: 0;
-          color: #00ff00;
+          color: var(--accent);
           font-size: 18px;
         }
         
         .close-btn {
           background: none;
-          border: 2px solid #00ff00;
-          color: #00ff00;
+          border: 2px solid var(--accent);
+          color: var(--accent);
           font-size: 24px;
           width: 40px;
           height: 40px;
@@ -581,13 +581,13 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
         }
         
         .empty-state p {
-          color: #888;
+          color: var(--text-disabled);
           text-align: center;
         }
         
         .select-button {
-          background: #00ff00;
-          color: #000;
+          background: var(--accent);
+          color: var(--bg);
           padding: 12px 24px;
           border: none;
           font-weight: bold;
@@ -607,8 +607,8 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
         .spinner {
           width: 40px;
           height: 40px;
-          border: 3px solid #333;
-          border-top: 3px solid #00ff00;
+          border: 3px solid var(--surface);
+          border-top: 3px solid var(--accent);
           border-radius: 50%;
           animation: spin 1s linear infinite;
         }
@@ -618,21 +618,21 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
         }
         
         .analyzing p {
-          color: #00ff00;
+          color: var(--accent);
           margin: 0;
         }
         
         .analyzing .small {
-          color: #888;
+          color: var(--text-disabled);
           font-size: 14px;
         }
-        
+
         .summary {
-          color: #00ff00;
+          color: var(--accent);
           margin-bottom: 24px;
           padding: 12px;
-          background: #111;
-          border: 2px solid #00ff00;
+          background: var(--surface);
+          border: 2px solid var(--accent);
         }
         
         .sessions {
@@ -642,9 +642,9 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
         }
         
         .session {
-          border: 2px solid #333;
+          border: 2px solid var(--surface);
           padding: 16px;
-          background: #111;
+          background: var(--surface);
         }
         
         .session-header {
@@ -659,17 +659,17 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
         }
         
         .time {
-          color: #00ff00;
+          color: var(--accent);
           font-weight: bold;
         }
         
         .count {
-          color: #888;
+          color: var(--text-disabled);
           font-size: 14px;
         }
-        
+
         .location {
-          color: #888;
+          color: var(--text-disabled);
           font-size: 14px;
         }
         
@@ -685,7 +685,7 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
           width: 100%;
           aspect-ratio: 1;
           object-fit: cover;
-          border: 1px solid #333;
+          border: 1px solid var(--surface);
         }
         
         .more-count {
@@ -693,10 +693,10 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
           bottom: 8px;
           right: 8px;
           background: rgba(0, 0, 0, 0.8);
-          color: #00ff00;
+          color: var(--accent);
           padding: 4px 8px;
           font-size: 12px;
-          border: 1px solid #00ff00;
+          border: 1px solid var(--accent);
         }
         
         .vehicle-selector {
@@ -706,26 +706,26 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
         }
         
         .vehicle-selector label {
-          color: #888;
+          color: var(--text-disabled);
           font-size: 14px;
         }
-        
+
         .vehicle-selector select {
           flex: 1;
-          background: #000;
-          color: #00ff00;
-          border: 2px solid #00ff00;
+          background: var(--text);
+          color: var(--accent);
+          border: 2px solid var(--accent);
           padding: 8px;
           font-size: 14px;
         }
         
         .vehicle-selector select.has-suggestion {
-          border-color: #00ff00;
-          background: #001100;
+          border-color: var(--accent);
+          background: var(--surface);
         }
         
         .confidence {
-          color: #00ff00;
+          color: var(--accent);
           font-size: 12px;
           white-space: nowrap;
         }
@@ -733,15 +733,15 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
         .actions {
           position: sticky;
           bottom: 0;
-          background: #000;
+          background: var(--text);
           padding: 16px 0;
           margin-top: 24px;
         }
         
         .upload-button {
           width: 100%;
-          background: #00ff00;
-          color: #000;
+          background: var(--accent);
+          color: var(--bg);
           border: none;
           padding: 16px;
           font-size: 18px;
@@ -750,8 +750,8 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
         }
         
         .upload-button:disabled {
-          background: #333;
-          color: #666;
+          background: var(--surface);
+          color: var(--text-secondary);
           cursor: not-allowed;
         }
       `}</style>

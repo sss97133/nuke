@@ -89,30 +89,30 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
     switch (role) {
       case 'owner':
       case 'co_founder':
-        return '#00ff00';
+        return 'var(--success)';
       case 'manager':
       case 'board_member':
-        return '#00aaff';
+        return 'var(--accent)';
       case 'employee':
       case 'technician':
-        return '#ffaa00';
+        return 'var(--warning)';
       case 'contractor':
         return '#ff00ff';
       default:
-        return '#666';
+        return 'var(--text-secondary)';
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return { text: 'ACTIVE', color: '#00ff00' };
+        return { text: 'ACTIVE', color: 'var(--success)' };
       case 'inactive':
-        return { text: 'PAST', color: '#666' };
+        return { text: 'PAST', color: 'var(--text-secondary)' };
       case 'pending':
-        return { text: 'PENDING', color: '#ffff00' };
+        return { text: 'PENDING', color: 'var(--warning)' };
       default:
-        return { text: status.toUpperCase(), color: '#666' };
+        return { text: status.toUpperCase(), color: 'var(--text-secondary)' };
     }
   };
 
@@ -161,7 +161,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
 
   if (loading) {
     return (
-      <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+      <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
         Loading affiliations...
       </div>
     );
@@ -169,7 +169,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
 
   if (affiliations.length === 0) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
         <div style={{ fontSize: '18px', marginBottom: '10px' }}>
           {isOwnProfile ? 'No Organization Affiliations' : 'Not affiliated with any organizations'}
         </div>
@@ -201,7 +201,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
     <div style={{ padding: '0' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
-          <tr style={{ borderBottom: '2px solid #000', backgroundColor: 'var(--bg)' }}>
+          <tr style={{ borderBottom: '2px solid var(--text)', backgroundColor: 'var(--bg)' }}>
             <th style={{ padding: '8px', textAlign: 'left', fontSize: '10px', fontWeight: 'bold' }}>ORGANIZATION</th>
             <th style={{ padding: '8px', textAlign: 'left', fontSize: '10px', fontWeight: 'bold' }}>ROLE</th>
             <th style={{ padding: '8px', textAlign: 'left', fontSize: '10px', fontWeight: 'bold' }}>STATUS</th>
@@ -218,7 +218,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
               <tr
                 key={affiliation.id}
                 style={{
-                  borderBottom: '1px solid #ddd',
+                  borderBottom: '1px solid var(--border)',
                   cursor: !isEditing ? 'pointer' : 'default'
                 }}
                 onClick={() => !isEditing && navigate(`/organizations/${affiliation.organization_id}`)}
@@ -227,7 +227,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
                   <div style={{ fontWeight: 600, fontSize: '14px' }}>
                     {affiliation.organization_name}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#666' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                     {affiliation.organization_type?.replace(/_/g, ' ')}
                   </div>
                 </td>
@@ -283,7 +283,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
                         fontWeight: 'bold',
                         padding: '3px 6px',
                         backgroundColor: statusBadge.color,
-                        color: statusBadge.color === '#ffff00' ? '#000' : '#fff',
+                        color: statusBadge.color === 'var(--warning)' ? 'var(--text)' : 'var(--bg)',
                         border: 'none',
                         borderRadius: '3px',
                         cursor: saving ? 'wait' : 'pointer'
@@ -299,14 +299,14 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
                       fontWeight: 'bold',
                       padding: '3px 6px',
                       backgroundColor: statusBadge.color,
-                      color: statusBadge.color === '#ffff00' ? '#000' : '#fff',
+                      color: statusBadge.color === 'var(--warning)' ? 'var(--text)' : 'var(--bg)',
                       borderRadius: '3px'
                     }}>
                       {statusBadge.text}
                     </span>
                   )}
                 </td>
-                <td style={{ padding: '12px 8px', fontSize: '12px', color: '#666' }}>
+                <td style={{ padding: '12px 8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
                   {new Date(affiliation.start_date).toLocaleDateString()}
                 </td>
                 {isOwnProfile && (
@@ -321,7 +321,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
                         style={{ 
                           padding: '4px 10px', 
                           fontSize: '10px',
-                          backgroundColor: '#0000ff'
+                          backgroundColor: 'var(--accent)'
                         }}
                       >
                         EDIT
@@ -337,7 +337,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
                           style={{ 
                             padding: '4px 8px', 
                             fontSize: '10px',
-                            backgroundColor: '#666'
+                            backgroundColor: 'var(--text-secondary)'
                           }}
                           disabled={saving}
                         >
@@ -352,7 +352,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
                           style={{ 
                             padding: '4px 8px', 
                             fontSize: '10px',
-                            backgroundColor: '#ff0000'
+                            backgroundColor: 'var(--error)'
                           }}
                           disabled={saving}
                         >

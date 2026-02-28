@@ -113,7 +113,7 @@ export const SensitiveImageOverlay: React.FC<SensitiveImageOverlayProps> = ({
             left: 0,
             right: 0,
             backgroundColor: 'rgba(220, 38, 38, 0.9)',
-            color: 'white',
+            color: 'var(--bg)',
             padding: 'var(--space-2)',
             fontSize: '11px',
             fontWeight: 700,

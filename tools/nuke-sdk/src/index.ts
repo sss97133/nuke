@@ -35,9 +35,11 @@ export type {
   VisionClassifyResult,
   VisionAnalyzeResult,
   VisionBatchResult,
+  VisionBatchItem,
+  VisionBatchItemResult,
   VisionClassifyParams,
   VisionAnalyzeParams,
-  VisionBatchItem,
+  VisionHealthResult,
 } from './resources/vision';
 export type { Signal } from './resources/signal';
 
@@ -60,7 +62,7 @@ import { NukeError, NukeAPIError, NukeAuthenticationError, NukeRateLimitError } 
 
 const DEFAULT_BASE_URL = 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1';
 const DEFAULT_TIMEOUT = 30000;
-const SDK_VERSION = '1.4.0';
+const SDK_VERSION = '1.5.0';
 
 export default class Nuke {
   private apiKey: string;
@@ -121,10 +123,15 @@ export default class Nuke {
   ): Promise<T> {
     const url = `${this.baseUrl}/${endpoint}`;
 
+    // API keys (nk_live_*, nk_test_*) use X-API-Key header.
+    // Service role keys and JWTs use Authorization: Bearer header.
+    const isApiKey = this.apiKey.startsWith('nk_live_') || this.apiKey.startsWith('nk_test_');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'X-API-Key': this.apiKey,
       'User-Agent': `nuke-sdk-typescript/${SDK_VERSION}`,
+      ...(isApiKey
+        ? { 'X-API-Key': this.apiKey }
+        : { 'Authorization': `Bearer ${this.apiKey}` }),
     };
 
     if (options?.idempotencyKey) {

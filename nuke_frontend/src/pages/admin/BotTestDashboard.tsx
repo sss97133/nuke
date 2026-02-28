@@ -50,11 +50,11 @@ interface DashboardStats {
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
-  critical: '#ff0000',
-  high: '#ff4444',
-  medium: '#ff8800',
-  low: '#ffaa00',
-  info: '#888888',
+  critical: 'var(--error)',
+  high: 'var(--error)',
+  medium: 'var(--warning)',
+  low: 'var(--warning)',
+  info: 'var(--text-muted)',
 };
 
 const STATUS_OPTIONS = ['new', 'triaged', 'confirmed', 'fixed', 'wont_fix', 'duplicate'];
@@ -289,13 +289,13 @@ export default function BotTestDashboard() {
       {stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px', marginBottom: '24px' }}>
           <div className="stat-card" style={{ padding: '16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: stats.criticalCount > 0 ? '#ff0000' : 'inherit' }}>
+            <div style={{ fontSize: '32px', fontWeight: 'bold', color: stats.criticalCount > 0 ? 'var(--error)' : 'inherit' }}>
               {stats.criticalCount}
             </div>
             <div style={{ color: 'var(--text-muted)' }}>Critical Issues</div>
           </div>
           <div className="stat-card" style={{ padding: '16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: stats.highCount > 0 ? '#ff4444' : 'inherit' }}>
+            <div style={{ fontSize: '32px', fontWeight: 'bold', color: stats.highCount > 0 ? 'var(--error)' : 'inherit' }}>
               {stats.highCount}
             </div>
             <div style={{ color: 'var(--text-muted)' }}>High Priority</div>
@@ -386,7 +386,7 @@ export default function BotTestDashboard() {
                         <span
                           style={{
                             backgroundColor: SEVERITY_COLORS[finding.severity],
-                            color: 'white',
+                            color: 'var(--bg)',
                             padding: '2px 8px',
                             borderRadius: '12px',
                             fontSize: '12px',
@@ -448,7 +448,7 @@ export default function BotTestDashboard() {
                   <div style={{ display: 'flex', gap: '16px', fontSize: '14px', color: 'var(--text-muted)' }}>
                     <span>Pages: {run.pages_visited}</span>
                     <span>Actions: {run.actions_performed}</span>
-                    <span style={{ color: run.bugs_found > 0 ? '#ff4444' : 'inherit' }}>
+                    <span style={{ color: run.bugs_found > 0 ? 'var(--error)' : 'inherit' }}>
                       Bugs: {run.bugs_found}
                     </span>
                     <span>Env: {run.environment}</span>
@@ -457,8 +457,8 @@ export default function BotTestDashboard() {
                 <div style={{ textAlign: 'right' }}>
                   <span
                     style={{
-                      backgroundColor: run.status === 'completed' ? '#00aa00' : run.status === 'failed' ? '#ff4444' : '#ffaa00',
-                      color: 'white',
+                      backgroundColor: run.status === 'completed' ? 'var(--success)' : run.status === 'failed' ? 'var(--error)' : 'var(--warning)',
+                      color: 'var(--bg)',
                       padding: '2px 8px',
                       borderRadius: '12px',
                       fontSize: '12px',
@@ -545,8 +545,8 @@ export default function BotTestDashboard() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <span
                       style={{
-                        backgroundColor: session.status === 'completed' ? '#00aa00' : session.status === 'failed' ? '#ff4444' : '#ffaa00',
-                        color: 'white',
+                        backgroundColor: session.status === 'completed' ? 'var(--success)' : session.status === 'failed' ? 'var(--error)' : 'var(--warning)',
+                        color: 'var(--bg)',
                         padding: '2px 8px',
                         borderRadius: '12px',
                         fontSize: '11px',
@@ -584,8 +584,8 @@ export default function BotTestDashboard() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <strong>{inv.finding?.title || 'Unknown Finding'}</strong>
                     <span style={{
-                      backgroundColor: inv.fix_complexity === 'trivial' ? '#00aa00' : inv.fix_complexity === 'simple' ? '#88aa00' : inv.fix_complexity === 'moderate' ? '#ffaa00' : '#ff4444',
-                      color: 'white',
+                      backgroundColor: inv.fix_complexity === 'trivial' ? 'var(--success)' : inv.fix_complexity === 'simple' ? 'var(--success)' : inv.fix_complexity === 'moderate' ? 'var(--warning)' : 'var(--error)',
+                      color: 'var(--bg)',
                       padding: '2px 8px',
                       borderRadius: '12px',
                       fontSize: '11px',
@@ -646,8 +646,8 @@ export default function BotTestDashboard() {
                     )}
                     <span
                       style={{
-                        backgroundColor: fix.status === 'merged' ? '#00aa00' : fix.status === 'applied' ? '#88aa00' : fix.status === 'rejected' ? '#ff4444' : '#888888',
-                        color: 'white',
+                        backgroundColor: fix.status === 'merged' ? 'var(--success)' : fix.status === 'applied' ? 'var(--success)' : fix.status === 'rejected' ? 'var(--error)' : 'var(--text-muted)',
+                        color: 'var(--bg)',
                         padding: '2px 8px',
                         borderRadius: '12px',
                         fontSize: '11px',
@@ -672,7 +672,7 @@ export default function BotTestDashboard() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
+            backgroundColor: 'var(--overlay)',
             zIndex: 1000,
             display: 'flex',
             alignItems: 'center',
@@ -699,7 +699,7 @@ export default function BotTestDashboard() {
                 <span
                   style={{
                     backgroundColor: SEVERITY_COLORS[selectedFinding.severity],
-                    color: 'white',
+                    color: 'var(--bg)',
                     padding: '4px 12px',
                     borderRadius: '12px',
                     fontSize: '14px',

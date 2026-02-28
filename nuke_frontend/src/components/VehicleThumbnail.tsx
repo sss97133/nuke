@@ -127,8 +127,8 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
 
   const containerStyle = {
     ...sizeStyles[size],
-    backgroundColor: '#f8f9fa',
-    border: '1px solid #dee2e6',
+    backgroundColor: 'var(--bg-secondary)',
+    border: '1px solid var(--border)',
     borderRadius: '4px',
     overflow: 'hidden',
     cursor: onClick ? 'pointer' : 'default',
@@ -141,7 +141,7 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
   if (loading) {
     return (
       <div className={className} style={containerStyle}>
-        <div style={{ fontSize: size === 'small' ? '12px' : '14px', color: '#666' }}>
+        <div style={{ fontSize: size === 'small' ? '12px' : '14px', color: 'var(--text-secondary)' }}>
           Loading...
         </div>
       </div>
@@ -151,7 +151,7 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
   if (error) {
     return (
       <div className={className} style={containerStyle}>
-        <div style={{ fontSize: size === 'small' ? '10px' : '12px', color: '#ff6b6b', textAlign: 'center' }}>
+        <div style={{ fontSize: size === 'small' ? '10px' : '12px', color: 'var(--error)', textAlign: 'center' }}>
           Error: {error}
         </div>
       </div>
@@ -180,7 +180,7 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
             const container = target.parentElement;
             if (container) {
               container.innerHTML = `
-                <div style="font-size: ${size === 'small' ? '10px' : '12px'}; color: #ff6b6b; text-align: center; padding: 4px;">
+                <div style="font-size: ${size === 'small' ? '10px' : '12px'}; color: var(--error); text-align: center; padding: 4px;">
                   Image failed
                 </div>
               `;

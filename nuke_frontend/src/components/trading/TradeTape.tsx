@@ -59,16 +59,16 @@ const TradeTape: React.FC<TradeTapeProps> = ({
       : 'unchanged';
 
     const colors = {
-      up: '#10b981',      // Green
-      down: '#dc2626',    // Red
-      unchanged: '#6b7280', // Gray
+      up: 'var(--success)',
+      down: 'var(--error)',
+      unchanged: 'var(--text-secondary)',
     };
 
     const backgroundColor = index === 0
       ? priceDirection === 'up'
-        ? 'rgba(16, 185, 129, 0.1)'
+        ? 'color-mix(in srgb, var(--success) 10%, transparent)'
         : priceDirection === 'down'
-        ? 'rgba(220, 38, 38, 0.1)'
+        ? 'color-mix(in srgb, var(--error) 10%, transparent)'
         : 'transparent'
       : 'transparent';
 
@@ -82,14 +82,14 @@ const TradeTape: React.FC<TradeTapeProps> = ({
           padding: '6px 12px',
           fontSize: '11px',
           fontFamily: 'var(--font-mono, monospace)',
-          borderBottom: '1px solid #f3f4f6',
+          borderBottom: '1px solid var(--border)',
           background: backgroundColor,
           transition: 'background 0.3s ease',
           animation: index === 0 ? 'flash 0.5s ease' : 'none',
         }}
       >
         {/* Time */}
-        <div style={{ color: '#6b7280' }}>
+        <div style={{ color: 'var(--text-secondary)' }}>
           {formatTime(trade.timestamp)}
         </div>
 
@@ -101,7 +101,7 @@ const TradeTape: React.FC<TradeTapeProps> = ({
         </div>
 
         {/* Size */}
-        <div style={{ textAlign: 'right', color: '#374151' }}>
+        <div style={{ textAlign: 'right', color: 'var(--text)' }}>
           {formatShares(trade.shares)}
         </div>
 
@@ -118,10 +118,10 @@ const TradeTape: React.FC<TradeTapeProps> = ({
               width: '6px',
               height: '6px',
               borderRadius: '50%',
-              background: trade.side === 'buy' ? '#10b981' : '#dc2626',
+              background: trade.side === 'buy' ? 'var(--success)' : 'var(--error)',
             }}
           />
-          <span style={{ fontSize: '9px', color: '#9ca3af', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
             {trade.side}
           </span>
         </div>
@@ -133,7 +133,7 @@ const TradeTape: React.FC<TradeTapeProps> = ({
     <div
       style={{
         background: 'var(--surface)',
-        border: '2px solid #bdbdbd',
+        border: '2px solid var(--border)',
         borderRadius: '4px',
         fontSize: '12px',
         overflow: 'hidden',
@@ -147,15 +147,15 @@ const TradeTape: React.FC<TradeTapeProps> = ({
             justifyContent: 'space-between',
             alignItems: 'center',
             padding: '8px 12px',
-            borderBottom: '1px solid #e5e7eb',
-            background: '#f9fafb',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--bg-secondary)',
           }}
         >
           <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 'bold' }}>
             Time & Sales
           </h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '11px', color: '#6b7280' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               {recentTrades.length} trades
             </span>
             <div
@@ -163,7 +163,7 @@ const TradeTape: React.FC<TradeTapeProps> = ({
                 width: '8px',
                 height: '8px',
                 borderRadius: '50%',
-                background: isConnected ? '#10b981' : '#ef4444',
+                background: isConnected ? 'var(--success)' : 'var(--error)',
               }}
               title={isConnected ? 'Connected' : 'Disconnected'}
             />
@@ -178,12 +178,12 @@ const TradeTape: React.FC<TradeTapeProps> = ({
           gridTemplateColumns: '70px 60px 50px 1fr',
           gap: '8px',
           padding: '6px 12px',
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: '1px solid var(--border)',
           fontSize: '11px',
           fontWeight: 600,
-          color: '#6b7280',
+          color: 'var(--text-secondary)',
           textTransform: 'uppercase',
-          background: '#fafafa',
+          background: 'var(--bg-secondary)',
         }}
       >
         <div>Time</div>
@@ -206,7 +206,7 @@ const TradeTape: React.FC<TradeTapeProps> = ({
             style={{
               padding: '40px 20px',
               textAlign: 'center',
-              color: '#6b7280',
+              color: 'var(--text-secondary)',
             }}
           >
             <div style={{ fontSize: '24px', marginBottom: '8px' }}>
@@ -229,9 +229,9 @@ const TradeTape: React.FC<TradeTapeProps> = ({
         <div
           style={{
             padding: '4px 12px',
-            borderTop: '1px solid #e5e7eb',
+            borderTop: '1px solid var(--border)',
             fontSize: '11px',
-            color: '#9ca3af',
+            color: 'var(--text-muted)',
             textAlign: 'right',
           }}
         >
@@ -242,7 +242,7 @@ const TradeTape: React.FC<TradeTapeProps> = ({
       {/* CSS Animation */}
       <style>{`
         @keyframes flash {
-          0% { background: rgba(59, 130, 246, 0.3); }
+          0% { background: color-mix(in srgb, var(--accent) 30%, transparent); }
           100% { background: transparent; }
         }
       `}</style>

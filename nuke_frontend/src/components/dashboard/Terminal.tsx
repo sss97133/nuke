@@ -30,30 +30,30 @@ export const Terminal: React.FC<TerminalProps> = ({ logs, maxLines = 10 }) => {
         fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
         fontSize: '11px',
         background: 'var(--bg)',
-        borderTop: '1px solid #bdbdbd',
+        borderTop: '1px solid var(--border)',
         padding: '8px',
-        color: '#424242',
+        color: 'var(--text)',
         maxHeight: '100px',
         overflowY: 'auto',
         lineHeight: '1.4'
       }}
     >
       {displayLogs.length === 0 ? (
-        <div style={{ color: '#9e9e9e' }}>{'>'} Ready</div>
+        <div style={{ color: 'var(--text-muted)' }}>{'>'} Ready</div>
       ) : (
         displayLogs.map((log) => (
           <div key={log.id} style={{ marginBottom: '2px' }}>
-            <span style={{ color: '#757575' }}>{'>'}</span>{' '}
+            <span style={{ color: 'var(--text-muted)' }}>{'>'}</span>{' '}
             <span
               style={{
                 color:
                   log.type === 'error'
-                    ? '#dc2626'
+                    ? 'var(--error)'
                     : log.type === 'success'
-                    ? '#10b981'
+                    ? 'var(--success)'
                     : log.type === 'warning'
-                    ? '#f59e0b'
-                    : '#424242'
+                    ? 'var(--warning)'
+                    : 'var(--text)'
               }}
             >
               {log.message}

@@ -308,26 +308,26 @@ export default function TransfersDashboard() {
   };
 
   const milestoneStatusColor = (status: string) => {
-    if (status === 'completed') return '#22c55e';
-    if (status === 'overdue') return '#ef4444';
-    if (status === 'skipped') return '#6b7280';
-    return '#94a3b8';
+    if (status === 'completed') return 'var(--success)';
+    if (status === 'overdue') return 'var(--error)';
+    if (status === 'skipped') return 'var(--text-secondary)';
+    return 'var(--text-secondary)';
   };
 
   return (
-    <div style={{ padding: '24px', fontFamily: 'system-ui, sans-serif', color: '#e2e8f0', minHeight: '100vh' }}>
+    <div style={{ padding: '24px', fontFamily: 'system-ui, sans-serif', color: 'var(--text)', minHeight: '100vh' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#f8fafc' }}>Transfer Dashboard</h1>
-          <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748b' }}>
+          <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: 'var(--text)' }}>Transfer Dashboard</h1>
+          <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
             {total.toLocaleString()} transfers · operator view
           </p>
         </div>
         <button
           onClick={() => setShowLogDeal(true)}
           style={{
-            background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px',
+            background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '6px',
             padding: '8px 16px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
           }}
         >
@@ -343,16 +343,16 @@ export default function TransfersDashboard() {
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(0); }}
           style={{
-            background: '#1e293b', border: '1px solid #334155', borderRadius: '6px',
-            color: '#e2e8f0', padding: '7px 12px', fontSize: '13px', width: '220px',
+            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px',
+            color: 'var(--text)', padding: '7px 12px', fontSize: '13px', width: '220px',
           }}
         />
         <select
           value={statusFilter}
           onChange={e => { setStatusFilter(e.target.value); setPage(0); }}
           style={{
-            background: '#1e293b', border: '1px solid #334155', borderRadius: '6px',
-            color: '#e2e8f0', padding: '7px 12px', fontSize: '13px',
+            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px',
+            color: 'var(--text)', padding: '7px 12px', fontSize: '13px',
           }}
         >
           <option value="in_progress">In Progress</option>
@@ -364,8 +364,8 @@ export default function TransfersDashboard() {
           value={sortBy}
           onChange={e => setSortBy(e.target.value as SortKey)}
           style={{
-            background: '#1e293b', border: '1px solid #334155', borderRadius: '6px',
-            color: '#e2e8f0', padding: '7px 12px', fontSize: '13px',
+            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px',
+            color: 'var(--text)', padding: '7px 12px', fontSize: '13px',
           }}
         >
           <option value="overdue">Sort: Most Overdue</option>
@@ -376,8 +376,8 @@ export default function TransfersDashboard() {
         <button
           onClick={fetchTransfers}
           style={{
-            background: '#1e293b', border: '1px solid #334155', borderRadius: '6px',
-            color: '#94a3b8', padding: '7px 12px', fontSize: '13px', cursor: 'pointer',
+            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px',
+            color: 'var(--text-secondary)', padding: '7px 12px', fontSize: '13px', cursor: 'pointer',
           }}
         >
           Refresh
@@ -385,26 +385,26 @@ export default function TransfersDashboard() {
       </div>
 
       {error && (
-        <div style={{ background: '#450a0a', border: '1px solid #7f1d1d', borderRadius: '6px', padding: '12px', marginBottom: '16px', color: '#fca5a5', fontSize: '13px' }}>
+        <div style={{ background: 'var(--error-dim)', border: '1px solid var(--error)', borderRadius: '6px', padding: '12px', marginBottom: '16px', color: 'var(--error)', fontSize: '13px' }}>
           {error}
         </div>
       )}
 
       {/* Table */}
       {loading ? (
-        <div style={{ color: '#475569', fontSize: '13px', padding: '40px', textAlign: 'center' }}>Loading transfers...</div>
+        <div style={{ color: 'var(--text-secondary)', fontSize: '13px', padding: '40px', textAlign: 'center' }}>Loading transfers...</div>
       ) : transfers.length === 0 ? (
-        <div style={{ color: '#475569', fontSize: '13px', padding: '40px', textAlign: 'center' }}>No transfers found.</div>
+        <div style={{ color: 'var(--text-secondary)', fontSize: '13px', padding: '40px', textAlign: 'center' }}>No transfers found.</div>
       ) : (
-        <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--bg)', border: '1px solid var(--surface)', borderRadius: '8px', overflow: 'hidden' }}>
           {/* Table header */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: '2fr 1fr 1fr 1fr 80px 100px 120px',
             padding: '10px 16px',
-            background: '#1e293b',
+            background: 'var(--surface)',
             fontSize: '11px',
-            color: '#64748b',
+            color: 'var(--text-secondary)',
             fontWeight: 600,
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
@@ -427,7 +427,7 @@ export default function TransfersDashboard() {
               : null;
 
             return (
-              <div key={t.id} style={{ borderTop: idx > 0 ? '1px solid #1e293b' : 'none' }}>
+              <div key={t.id} style={{ borderTop: idx > 0 ? '1px solid var(--surface)' : 'none' }}>
                 {/* Main row */}
                 <div
                   onClick={() => loadMilestones(t.id)}
@@ -438,49 +438,49 @@ export default function TransfersDashboard() {
                     gap: '8px',
                     alignItems: 'center',
                     cursor: 'pointer',
-                    background: isExpanded ? '#1e293b' : 'transparent',
+                    background: isExpanded ? 'var(--surface)' : 'transparent',
                     transition: 'background 0.1s',
                   }}
-                  onMouseEnter={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = '#0f1929'; }}
+                  onMouseEnter={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = 'var(--bg)'; }}
                   onMouseLeave={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                 >
                   {/* Vehicle + Parties */}
                   <div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#f1f5f9', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '2px' }}>
                       <Link
                         to={`/vehicle/${t.vehicle_id}`}
                         onClick={e => e.stopPropagation()}
-                        style={{ color: '#93c5fd', textDecoration: 'none' }}
+                        style={{ color: 'var(--accent)', textDecoration: 'none' }}
                       >
                         {vehicleName}
                       </Link>
                     </div>
-                    <div style={{ fontSize: '11px', color: '#475569' }}>
-                      {t.seller_handle && <span style={{ marginRight: '8px' }}>Seller: <span style={{ color: '#94a3b8' }}>{t.seller_handle}</span></span>}
-                      {t.buyer_handle && <span>Buyer: <span style={{ color: '#94a3b8' }}>{t.buyer_handle}</span></span>}
-                      {!t.seller_handle && !t.buyer_handle && <span style={{ color: '#334155' }}>No party info</span>}
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      {t.seller_handle && <span style={{ marginRight: '8px' }}>Seller: <span style={{ color: 'var(--text-secondary)' }}>{t.seller_handle}</span></span>}
+                      {t.buyer_handle && <span>Buyer: <span style={{ color: 'var(--text-secondary)' }}>{t.buyer_handle}</span></span>}
+                      {!t.seller_handle && !t.buyer_handle && <span style={{ color: 'var(--border)' }}>No party info</span>}
                     </div>
                     {t.inbox_email && (
-                      <div style={{ fontSize: '10px', color: '#334155', marginTop: '2px', fontFamily: 'monospace' }}>{t.inbox_email}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--border)', marginTop: '2px', fontFamily: 'monospace' }}>{t.inbox_email}</div>
                     )}
                   </div>
 
                   {/* Price */}
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#34d399' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--success)' }}>
                     {fmtPrice(t.agreed_price, t.currency)}
                   </div>
 
                   {/* Progress bar */}
                   <div>
-                    <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                       {t.completed_count}/{t.total_milestones}
                     </div>
-                    <div style={{ background: '#1e293b', borderRadius: '4px', height: '6px', width: '100%', overflow: 'hidden' }}>
+                    <div style={{ background: 'var(--surface)', borderRadius: '4px', height: '6px', width: '100%', overflow: 'hidden' }}>
                       <div
                         style={{
                           height: '100%',
                           width: `${t.total_milestones > 0 ? (t.completed_count / t.total_milestones) * 100 : 0}%`,
-                          background: t.overdue_count > 0 ? '#f59e0b' : '#22c55e',
+                          background: t.overdue_count > 0 ? 'var(--warning, #f59e0b)' : 'var(--success)',
                           borderRadius: '4px',
                           transition: 'width 0.3s',
                         }}
@@ -489,26 +489,26 @@ export default function TransfersDashboard() {
                   </div>
 
                   {/* Current step */}
-                  <div style={{ fontSize: '12px', color: '#94a3b8' }}>
-                    {t.current_milestone_type ? MILESTONE_LABELS[t.current_milestone_type] ?? t.current_milestone_type : <span style={{ color: '#334155' }}>—</span>}
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    {t.current_milestone_type ? MILESTONE_LABELS[t.current_milestone_type] ?? t.current_milestone_type : <span style={{ color: 'var(--border)' }}>—</span>}
                   </div>
 
                   {/* Overdue count */}
                   <div>
                     {t.overdue_count > 0 ? (
                       <span style={{
-                        background: '#450a0a', color: '#f87171', borderRadius: '12px',
+                        background: 'var(--error-dim)', color: 'var(--error)', borderRadius: '12px',
                         padding: '2px 8px', fontSize: '12px', fontWeight: 700,
                       }}>
                         {t.overdue_count}
                       </span>
                     ) : (
-                      <span style={{ color: '#334155', fontSize: '12px' }}>—</span>
+                      <span style={{ color: 'var(--border)', fontSize: '12px' }}>—</span>
                     )}
                   </div>
 
                   {/* Last activity */}
-                  <div style={{ fontSize: '12px', color: daysSince !== null && daysSince > 7 ? '#f87171' : '#64748b' }}>
+                  <div style={{ fontSize: '12px', color: daysSince !== null && daysSince > 7 ? 'var(--error)' : 'var(--text-secondary)' }}>
                     {fmtDate(t.last_milestone_at)}
                   </div>
 
@@ -518,7 +518,7 @@ export default function TransfersDashboard() {
                       to={`/t/${t.id}?token=${t.buyer_access_token}`}
                       target="_blank"
                       style={{
-                        background: '#1e3a5f', color: '#93c5fd', borderRadius: '4px',
+                        background: 'var(--surface)', color: 'var(--accent)', borderRadius: '4px',
                         padding: '4px 8px', fontSize: '11px', fontWeight: 600, textDecoration: 'none',
                       }}
                       title="Open buyer view"
@@ -529,7 +529,7 @@ export default function TransfersDashboard() {
                       to={`/t/${t.id}?token=${t.seller_access_token}`}
                       target="_blank"
                       style={{
-                        background: '#1e3a5f', color: '#93c5fd', borderRadius: '4px',
+                        background: 'var(--surface)', color: 'var(--accent)', borderRadius: '4px',
                         padding: '4px 8px', fontSize: '11px', fontWeight: 600, textDecoration: 'none',
                       }}
                       title="Open seller view"
@@ -541,12 +541,12 @@ export default function TransfersDashboard() {
 
                 {/* Expanded milestones */}
                 {isExpanded && (
-                  <div style={{ padding: '0 16px 16px', background: '#0d1a2e' }}>
+                  <div style={{ padding: '0 16px 16px', background: 'var(--bg)' }}>
                     {advanceError && (
-                      <div style={{ color: '#f87171', fontSize: '12px', marginBottom: '8px' }}>{advanceError}</div>
+                      <div style={{ color: 'var(--error)', fontSize: '12px', marginBottom: '8px' }}>{advanceError}</div>
                     )}
                     {milestonesLoading ? (
-                      <div style={{ color: '#475569', fontSize: '12px', padding: '12px 0' }}>Loading milestones...</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '12px', padding: '12px 0' }}>Loading milestones...</div>
                     ) : (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', paddingTop: '8px' }}>
                         {milestones.map(m => {
@@ -560,8 +560,8 @@ export default function TransfersDashboard() {
                               key={m.id}
                               style={{
                                 display: 'flex', alignItems: 'center', gap: '6px',
-                                background: '#1e293b', borderRadius: '6px', padding: '6px 10px',
-                                border: `1px solid ${m.status === 'overdue' ? '#7f1d1d' : '#334155'}`,
+                                background: 'var(--surface)', borderRadius: '6px', padding: '6px 10px',
+                                border: `1px solid ${m.status === 'overdue' ? 'var(--error)' : 'var(--border)'}`,
                                 fontSize: '12px',
                               }}
                             >
@@ -571,14 +571,14 @@ export default function TransfersDashboard() {
                                 background: milestoneStatusColor(m.status),
                                 flexShrink: 0,
                               }} />
-                              <span style={{ color: '#cbd5e1' }}>{label}</span>
+                              <span style={{ color: 'var(--text)' }}>{label}</span>
                               {m.status === 'overdue' && m.deadline_at && (
-                                <span style={{ color: '#f87171', fontSize: '10px' }}>
+                                <span style={{ color: 'var(--error)', fontSize: '10px' }}>
                                   due {new Date(m.deadline_at).toLocaleDateString()}
                                 </span>
                               )}
                               {m.status === 'completed' && m.completed_at && (
-                                <span style={{ color: '#64748b', fontSize: '10px' }}>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>
                                   {new Date(m.completed_at).toLocaleDateString()}
                                 </span>
                               )}
@@ -587,7 +587,7 @@ export default function TransfersDashboard() {
                                   onClick={() => advanceMilestone(t.id, m.milestone_type)}
                                   disabled={isAdvancing || !!advancing}
                                   style={{
-                                    background: '#166534', color: '#86efac', border: 'none',
+                                    background: 'var(--success)', color: '#fff', border: 'none',
                                     borderRadius: '4px', padding: '2px 8px', fontSize: '11px',
                                     fontWeight: 600, cursor: isAdvancing ? 'wait' : 'pointer',
                                     marginLeft: '4px', opacity: advancing && !isAdvancing ? 0.5 : 1,
@@ -616,21 +616,21 @@ export default function TransfersDashboard() {
             disabled={page === 0}
             onClick={() => setPage(p => p - 1)}
             style={{
-              background: '#1e293b', border: '1px solid #334155', color: '#94a3b8',
+              background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)',
               borderRadius: '6px', padding: '6px 14px', fontSize: '13px', cursor: page === 0 ? 'not-allowed' : 'pointer',
               opacity: page === 0 ? 0.4 : 1,
             }}
           >
             ← Prev
           </button>
-          <span style={{ fontSize: '12px', color: '#64748b' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
             {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total.toLocaleString()}
           </span>
           <button
             disabled={(page + 1) * PAGE_SIZE >= total}
             onClick={() => setPage(p => p + 1)}
             style={{
-              background: '#1e293b', border: '1px solid #334155', color: '#94a3b8',
+              background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)',
               borderRadius: '6px', padding: '6px 14px', fontSize: '13px',
               cursor: (page + 1) * PAGE_SIZE >= total ? 'not-allowed' : 'pointer',
               opacity: (page + 1) * PAGE_SIZE >= total ? 0.4 : 1,
@@ -651,74 +651,74 @@ export default function TransfersDashboard() {
           onClick={e => { if (e.target === e.currentTarget) setShowLogDeal(false); }}
         >
           <div style={{
-            background: '#1e293b', border: '1px solid #334155', borderRadius: '12px',
+            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px',
             padding: '28px', width: '420px', maxWidth: '95vw',
           }}>
-            <h2 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>Log a Deal</h2>
-            <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748b' }}>
+            <h2 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: 700, color: 'var(--text)' }}>Log a Deal</h2>
+            <p style={{ margin: '0 0 20px', fontSize: '13px', color: 'var(--text-secondary)' }}>
               Record a private sale that didn't go through an auction.
             </p>
 
             {dealSuccess ? (
-              <div style={{ color: '#86efac', fontSize: '14px', textAlign: 'center', padding: '20px 0' }}>
+              <div style={{ color: 'var(--success)', fontSize: '14px', textAlign: 'center', padding: '20px 0' }}>
                 ✓ Transfer created successfully!
               </div>
             ) : (
               <>
                 {dealError && (
-                  <div style={{ background: '#450a0a', color: '#fca5a5', borderRadius: '6px', padding: '10px', marginBottom: '16px', fontSize: '13px' }}>
+                  <div style={{ background: 'var(--error-dim)', color: 'var(--error)', borderRadius: '6px', padding: '10px', marginBottom: '16px', fontSize: '13px' }}>
                     {dealError}
                   </div>
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <label>
-                    <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Vehicle ID *</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Vehicle ID *</div>
                     <input
                       type="text"
                       placeholder="UUID from vehicles table"
                       value={dealForm.vehicle_id}
                       onChange={e => setDealForm(f => ({ ...f, vehicle_id: e.target.value }))}
-                      style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: '#e2e8f0', padding: '8px 12px', fontSize: '13px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '8px 12px', fontSize: '13px', boxSizing: 'border-box' }}
                     />
                   </label>
                   <label>
-                    <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Agreed Price</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Agreed Price</div>
                     <input
                       type="number"
                       placeholder="e.g. 45000"
                       value={dealForm.agreed_price}
                       onChange={e => setDealForm(f => ({ ...f, agreed_price: e.target.value }))}
-                      style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: '#e2e8f0', padding: '8px 12px', fontSize: '13px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '8px 12px', fontSize: '13px', boxSizing: 'border-box' }}
                     />
                   </label>
                   <label>
-                    <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Seller Handle</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Seller Handle</div>
                     <input
                       type="text"
                       placeholder="e.g. BaT username"
                       value={dealForm.seller_handle}
                       onChange={e => setDealForm(f => ({ ...f, seller_handle: e.target.value }))}
-                      style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: '#e2e8f0', padding: '8px 12px', fontSize: '13px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '8px 12px', fontSize: '13px', boxSizing: 'border-box' }}
                     />
                   </label>
                   <label>
-                    <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Buyer Handle</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Buyer Handle</div>
                     <input
                       type="text"
                       placeholder="e.g. BaT username"
                       value={dealForm.buyer_handle}
                       onChange={e => setDealForm(f => ({ ...f, buyer_handle: e.target.value }))}
-                      style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: '#e2e8f0', padding: '8px 12px', fontSize: '13px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '8px 12px', fontSize: '13px', boxSizing: 'border-box' }}
                     />
                   </label>
                   <label>
-                    <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Sale Date</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Sale Date</div>
                     <input
                       type="date"
                       value={dealForm.sale_date}
                       onChange={e => setDealForm(f => ({ ...f, sale_date: e.target.value }))}
-                      style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: '#e2e8f0', padding: '8px 12px', fontSize: '13px', boxSizing: 'border-box', colorScheme: 'dark' }}
+                      style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', padding: '8px 12px', fontSize: '13px', boxSizing: 'border-box', colorScheme: 'dark' }}
                     />
                   </label>
                 </div>
@@ -726,7 +726,7 @@ export default function TransfersDashboard() {
                 <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}>
                   <button
                     onClick={() => setShowLogDeal(false)}
-                    style={{ background: 'transparent', border: '1px solid #334155', color: '#94a3b8', borderRadius: '6px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer' }}
+                    style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer' }}
                   >
                     Cancel
                   </button>
@@ -734,7 +734,7 @@ export default function TransfersDashboard() {
                     onClick={submitLogDeal}
                     disabled={dealSubmitting || !dealForm.vehicle_id.trim()}
                     style={{
-                      background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px',
+                      background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '6px',
                       padding: '8px 20px', fontSize: '13px', fontWeight: 600, cursor: dealSubmitting ? 'wait' : 'pointer',
                       opacity: !dealForm.vehicle_id.trim() ? 0.5 : 1,
                     }}

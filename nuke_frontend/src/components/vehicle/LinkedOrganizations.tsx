@@ -171,7 +171,7 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
                 fontWeight: 600,
                 border: '1px solid var(--accent)',
                 background: 'var(--accent)',
-                color: 'white',
+                color: 'var(--bg)',
                 borderRadius: '4px',
                 cursor: 'pointer',
                 transition: 'all 0.12s ease',

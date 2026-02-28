@@ -248,7 +248,7 @@ export default function StorefrontSettings({ organization, onSave }: Props) {
             fontFamily: 'Arial, sans-serif',
             fontWeight: 600,
             background: 'var(--accent)',
-            color: '#fff',
+            color: 'var(--bg)',
             border: 'none',
             cursor: saving ? 'wait' : 'pointer',
             opacity: saving ? 0.6 : 1,

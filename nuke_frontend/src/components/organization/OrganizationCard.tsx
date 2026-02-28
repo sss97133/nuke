@@ -34,30 +34,30 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
     switch (role) {
       case 'owner':
       case 'co_founder':
-        return '#00ff00';
+        return 'var(--success)';
       case 'manager':
       case 'board_member':
-        return '#00aaff';
+        return 'var(--accent)';
       case 'employee':
       case 'technician':
-        return '#ffaa00';
+        return 'var(--warning)';
       case 'contractor':
         return '#ff00ff';
       default:
-        return '#666';
+        return 'var(--text-secondary)';
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return { text: 'ACTIVE', color: '#00ff00' };
+        return { text: 'ACTIVE', color: 'var(--success)' };
       case 'inactive':
-        return { text: 'PAST', color: '#666' };
+        return { text: 'PAST', color: 'var(--text-secondary)' };
       case 'pending':
-        return { text: 'PENDING', color: '#ffff00' };
+        return { text: 'PENDING', color: 'var(--warning)' };
       default:
-        return { text: status.toUpperCase(), color: '#666' };
+        return { text: status.toUpperCase(), color: 'var(--text-secondary)' };
     }
   };
 
@@ -115,13 +115,13 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
                 width: '40px',
                 height: '40px',
                 borderRadius: '4px',
-                backgroundColor: '#ddd',
+                backgroundColor: 'var(--border)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '18px',
                 fontWeight: 'bold',
-                color: '#666',
+                color: 'var(--text-secondary)',
               }}
             >
               {(org.business_name || '?').charAt(0).toUpperCase()}
@@ -131,7 +131,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
             <h3 className="heading-3" style={{ margin: 0, fontSize: '16px' }}>
               {org.business_name || 'Unknown Organization'}
             </h3>
-            <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
               {org.business_type?.replace(/_/g, ' ') || ''}
             </div>
           </div>
@@ -166,7 +166,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
               padding: '3px 8px',
               borderRadius: '3px',
               backgroundColor: getRoleColor(organization.role),
-              color: '#fff',
+              color: 'var(--bg)',
             }}
           >
             {formatRole(organization.role)}
@@ -178,7 +178,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
               padding: '3px 8px',
               borderRadius: '3px',
               backgroundColor: statusBadge.color,
-              color: statusBadge.color === '#ffff00' ? '#000' : '#fff',
+              color: statusBadge.color === 'var(--warning)' ? 'var(--text)' : 'var(--bg)',
             }}
           >
             {statusBadge.text}
@@ -190,8 +190,8 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
                 fontWeight: 'bold',
                 padding: '3px 8px',
                 borderRadius: '3px',
-                backgroundColor: '#00ff00',
-                color: '#000',
+                backgroundColor: 'var(--success)',
+                color: 'var(--text)',
               }}
             >
               VERIFIED
@@ -213,27 +213,27 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
           }}
         >
           <div>
-            <div style={{ fontSize: '10px', color: '#666', marginBottom: '2px' }}>Vehicles</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Vehicles</div>
             <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{stats.vehicle_count}</div>
           </div>
           <div>
-            <div style={{ fontSize: '10px', color: '#666', marginBottom: '2px' }}>In Stock</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px' }}>In Stock</div>
             <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{stats.in_stock_count}</div>
           </div>
           <div>
-            <div style={{ fontSize: '10px', color: '#666', marginBottom: '2px' }}>Total Value</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Total Value</div>
             <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
               {formatCurrency(stats.total_value)}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '10px', color: '#666', marginBottom: '2px' }}>Team</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Team</div>
             <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{stats.team_member_count}</div>
           </div>
         </div>
 
         {/* Contribution Count */}
-        <div style={{ fontSize: '11px', color: '#666', marginBottom: '12px' }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
           Your Contributions: <strong>{organization.contribution_count}</strong>
         </div>
 
@@ -246,7 +246,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
                 flex: 1,
                 padding: '6px 12px',
                 fontSize: '11px',
-                backgroundColor: '#0000ff',
+                backgroundColor: 'var(--accent)',
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -262,7 +262,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
                   flex: 1,
                   padding: '6px 12px',
                   fontSize: '11px',
-                  backgroundColor: '#666',
+                  backgroundColor: 'var(--text-secondary)',
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -276,7 +276,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
         )}
 
         {/* Start Date */}
-        <div style={{ fontSize: '10px', color: '#999', marginTop: '8px', textAlign: 'right' }}>
+        <div style={{ fontSize: '10px', color: 'var(--text-disabled)', marginTop: '8px', textAlign: 'right' }}>
           Since {new Date(organization.start_date).toLocaleDateString()}
         </div>
       </div>

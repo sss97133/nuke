@@ -58,6 +58,12 @@ const PriceChart: React.FC<PriceChartProps> = ({
   const [lastPrice, setLastPrice] = useState<number | null>(null);
   const [priceChange, setPriceChange] = useState<{ value: number; percent: number } | null>(null);
 
+  // TODO: These chart colors are hardcoded hex values required by lightweight-charts API
+  // which does not support CSS variables. To theme these, read computed CSS variable values
+  // via getComputedStyle() at runtime and pass them here.
+  // Mapped colors: #ffffff->var(--bg), #333333->var(--text), #f0f0f0->var(--bg),
+  // #10b981/#22c55e->var(--success), #ef4444->var(--error), #2563eb/#3b82f6->var(--accent),
+  // #f59e0b/#fbbf24->var(--warning), #d1d5db->var(--border), #1a1a1a->var(--surface)
   const chartColors = {
     light: {
       background: '#ffffff',
@@ -371,7 +377,7 @@ const PriceChart: React.FC<PriceChartProps> = ({
     <div
       style={{
         background: colors.background,
-        border: '2px solid #bdbdbd',
+        border: '2px solid var(--border)',
         borderRadius: '4px',
         overflow: 'hidden',
       }}
@@ -383,7 +389,7 @@ const PriceChart: React.FC<PriceChartProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: '8px 12px',
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: '1px solid var(--border)',
         }}
       >
         <div>
@@ -419,7 +425,7 @@ const PriceChart: React.FC<PriceChartProps> = ({
                 padding: '2px 6px',
                 borderRadius: '4px',
                 background: [colors.ma1, colors.ma2][index] || colors.ma1,
-                color: 'white',
+                color: 'var(--bg)',
               }}
             >
               MA{period}
@@ -454,7 +460,7 @@ const PriceChart: React.FC<PriceChartProps> = ({
         >
           <div style={{ fontSize: '32px', marginBottom: '12px' }}>📈</div>
           <div>No trading data available</div>
-          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
             Chart will populate once trades occur
           </div>
         </div>

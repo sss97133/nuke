@@ -90,7 +90,7 @@ const QuickStatusBadge: React.FC<Props> = ({
         style={{
           padding: '4px 10px',
           background: currentBadge.color,
-          color: 'white',
+          color: 'var(--bg)',
           fontSize: '9px',
           fontWeight: 700,
           borderRadius: '3px',

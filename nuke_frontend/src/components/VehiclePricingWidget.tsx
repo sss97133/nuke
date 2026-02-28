@@ -667,8 +667,8 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                 <div className="text" style={{
                   fontSize: '16px',
                   fontWeight: 'bold',
-                  color: confidenceScore >= 80 ? '#008000' :
-                         confidenceScore >= 60 ? '#808000' : '#800000'
+                  color: confidenceScore >= 80 ? 'var(--success)' :
+                         confidenceScore >= 60 ? 'var(--warning)' : 'var(--error)'
                 }}>
                   {confidenceScore}%
                 </div>
@@ -684,7 +684,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                 {auctionPulse.platform === 'bat' ? 'BAT' : String(auctionPulse.platform).toUpperCase()}
               </span>
               {String(auctionPulse.listing_status || '').toLowerCase() === 'active' ? (
-                <span className="badge" style={{ fontSize: '11px', fontWeight: 800, background: '#dbeafe', color: '#1d4ed8', border: '1px solid #60a5fa' }}>
+                <span className="badge" style={{ fontSize: '11px', fontWeight: 800, background: 'var(--accent-dim, rgba(var(--accent-rgb), 0.15))', color: 'var(--accent)', border: '1px solid var(--accent)' }}>
                   LIVE
                 </span>
               ) : (
@@ -712,8 +712,8 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                 const pct = (delta / est) * 100;
                 const under = delta < 0;
                 const label = under ? 'UNDER' : 'OVER';
-                const color = under ? '#15803d' : '#b91c1c';
-                const bg = under ? '#dcfce7' : '#fee2e2';
+                const color = under ? 'var(--success)' : 'var(--error)';
+                const bg = under ? 'var(--success-dim)' : 'var(--error-dim)';
                 return (
                   <span className="badge" style={{ fontSize: '11px', fontWeight: 900, background: bg, color, border: `1px solid ${color}` }} title="Bid vs estimate">
                     {label} {formatCurrency(Math.abs(delta))} ({pct.toFixed(1)}%)
@@ -759,7 +759,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
           <div className="card-body" style={{ padding: 'var(--space-2)', borderBottom: '1px solid var(--border-medium)' }}>
             <div className="text text-muted" style={{ fontSize: '9px', fontWeight: 'bold', marginBottom: 'var(--space-1)', letterSpacing: '0.5px' }}>
               BUILD INVESTMENT {breakdown.topParts?.some((p: any) => p.images?.length > 0) && (
-                <span style={{ fontSize: '8px', fontWeight: '400', marginLeft: '4px', color: '#008000' }}>
+                <span style={{ fontSize: '8px', fontWeight: '400', marginLeft: '4px', color: 'var(--success)' }}>
                   ✓ AI-verified parts
                 </span>
               )}
@@ -808,7 +808,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                             height: '40px',
                             borderRadius: '4px',
                             overflow: 'hidden',
-                            border: '1px solid #e5e7eb',
+                            border: '1px solid var(--border)',
                             cursor: 'pointer'
                           }}
                           onClick={() => window.open(img.url, '_blank')}
@@ -828,8 +828,8 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                             bottom: 0,
                             left: 0,
                             right: 0,
-                            background: 'rgba(0,0,0,0.6)',
-                            color: 'white',
+                            background: 'var(--overlay)',
+                            color: 'var(--bg)',
                             fontSize: '8px',
                             padding: '1px 2px',
                             textAlign: 'center'
@@ -848,8 +848,8 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontSize: '10px',
-                          color: '#6b7280',
-                          border: '1px solid #e5e7eb'
+                          color: 'var(--text-secondary)',
+                          border: '1px solid var(--border)'
                         }}>
                           +{part.images.length - 3}
                         </div>
@@ -864,19 +864,19 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
 
         {/* Market Range */}
         {hasEstimate && (
-          <div className="card-body" style={{ padding: '16px', borderBottom: '1px solid #e5e7eb' }}>
-            <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '12px', letterSpacing: '0.5px' }}>
+          <div className="card-body" style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '12px', letterSpacing: '0.5px' }}>
               MARKET RANGE
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               <div>
-                <div style={{ fontSize: '11px', color: '#6b7280' }}>LOW</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>LOW</div>
                 <div style={{ fontSize: '16px', fontWeight: '500' }}>
                   {formatCurrency(estimatedValue * 0.85)}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '11px', color: '#6b7280' }}>HIGH</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>HIGH</div>
                 <div style={{ fontSize: '16px', fontWeight: '500' }}>
                   {formatCurrency(estimatedValue * 1.15)}
                 </div>
@@ -935,7 +935,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                 )}
               </div>
               {pricingStatus.last_analyzed && (
-                <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>
                   Updated {formatDate(pricingStatus.last_analyzed)}
                 </span>
               )}
@@ -1077,7 +1077,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                       }}
                       title={`View ${source} data`}
                     >
-                      <span style={{ color: '#008000' }}>OK</span>
+                      <span style={{ color: 'var(--success)' }}>OK</span>
                       <span style={{ textTransform: 'capitalize' }}>
                         {source}
                       </span>
@@ -1148,8 +1148,8 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
             <span style={{
-              color: toast.type === 'success' ? '#008000' :
-                     toast.type === 'error' ? '#800000' : '#000080'
+              color: toast.type === 'success' ? 'var(--success)' :
+                     toast.type === 'error' ? 'var(--error)' : 'var(--accent)'
             }}>
               {toast.type === 'success' ? 'OK' :
                toast.type === 'error' ? 'ERR' : 'INFO'}
@@ -1168,7 +1168,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.7)',
+            backgroundColor: 'var(--overlay)',
             zIndex: 1001,
             display: 'flex',
             alignItems: 'center',

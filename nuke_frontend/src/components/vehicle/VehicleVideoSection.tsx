@@ -367,7 +367,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
                           height: 0,
                           borderTop: '8px solid transparent',
                           borderBottom: '8px solid transparent',
-                          borderLeft: '12px solid white',
+                          borderLeft: '12px solid var(--bg)',
                           marginLeft: '3px'
                         }} />
                       </div>
@@ -377,7 +377,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
                         bottom: '4px',
                         right: '4px',
                         background: 'rgba(0,0,0,0.8)',
-                        color: 'white',
+                        color: 'var(--bg)',
                         padding: '2px 5px',
                         borderRadius: '3px',
                         fontSize: '9px',

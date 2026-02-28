@@ -94,7 +94,7 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
   }, {} as Record<string, number>);
 
   if (loading) {
-    return <div style={{ padding: '20px', fontSize: '12px', color: '#666' }}>Loading parts...</div>;
+    return <div style={{ padding: '20px', fontSize: '12px', color: 'var(--text-secondary)' }}>Loading parts...</div>;
   }
 
   return (
@@ -105,15 +105,15 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '12px',
-        background: '#f3f4f6',
-        borderBottom: '2px solid #000',
+        background: 'var(--bg-secondary)',
+        borderBottom: '2px solid var(--text)',
         marginBottom: '12px'
       }}>
         <div>
           <div style={{ fontSize: '13px', fontWeight: 700 }}>
             PARTS QUOTE
           </div>
-          <div style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>
+          <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px' }}>
             {parts.length} items • Click to see alternatives
           </div>
         </div>
@@ -122,7 +122,7 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
             ${activeTotal.toFixed(2)}
           </div>
           {laterTotal > 0 && (
-            <div style={{ fontSize: '9px', color: '#666' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
               +${laterTotal.toFixed(2)} later
             </div>
           )}
@@ -135,9 +135,9 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
           <div style={{
             fontSize: '11px',
             fontWeight: 700,
-            color: '#991b1b',
+            color: 'var(--error)',
             padding: '4px 12px',
-            background: '#fee2e2',
+            background: 'var(--error-dim)',
             display: 'flex',
             justifyContent: 'space-between'
           }}>
@@ -173,9 +173,9 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
           <div style={{
             fontSize: '11px',
             fontWeight: 700,
-            color: '#374151',
+            color: 'var(--text)',
             padding: '4px 12px',
-            background: '#f3f4f6',
+            background: 'var(--bg-secondary)',
             display: 'flex',
             justifyContent: 'space-between'
           }}>
@@ -213,9 +213,9 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
             style={{
               fontSize: '11px',
               fontWeight: 700,
-              color: '#1e40af',
+              color: 'var(--accent)',
               padding: '4px 12px',
-              background: '#dbeafe',
+              background: 'var(--info-bg)',
               display: 'flex',
               justifyContent: 'space-between',
               cursor: 'pointer'
@@ -252,8 +252,8 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
       {/* Retailer summary */}
       <div style={{
         padding: '12px',
-        background: '#f9fafb',
-        borderTop: '2px solid #000'
+        background: 'var(--surface)',
+        borderTop: '2px solid var(--text)'
       }}>
         <div style={{
           fontSize: '11px',
@@ -272,12 +272,12 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
                 style={{
                   fontSize: '9px',
                   padding: '4px 8px',
-                  background: '#fff',
-                  border: '1px solid #e5e7eb'
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)'
                 }}
               >
                 <span style={{ fontWeight: 600 }}>{retailer}</span>
-                <span style={{ marginLeft: '6px', color: '#666' }}>${total.toFixed(2)}</span>
+                <span style={{ marginLeft: '6px', color: 'var(--text-secondary)' }}>${total.toFixed(2)}</span>
               </div>
             ))}
         </div>
@@ -286,8 +286,8 @@ export const QuotePartsList: React.FC<QuotePartsListProps> = ({
       {/* Grand total */}
       <div style={{
         padding: '16px 12px',
-        background: '#000',
-        color: '#fff',
+        background: 'var(--text)',
+        color: 'var(--bg)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'

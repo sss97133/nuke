@@ -43,7 +43,7 @@ const BadgeHoverPreview: React.FC<BadgeHoverPreviewProps> = ({ badgeRect, childr
         border: '1px solid rgba(255,255,255,0.12)',
         borderRadius: '6px',
         padding: '8px 10px',
-        color: 'white',
+        color: 'var(--bg)',
         fontSize: '11px',
         lineHeight: 1.5,
         maxWidth: '240px',

@@ -112,7 +112,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: 'var(--overlay)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -130,7 +130,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
         {/* Header */}
         <div style={{
           padding: '20px',
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: '1px solid var(--border)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
@@ -145,7 +145,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
               border: 'none',
               fontSize: '24px',
               cursor: 'pointer',
-              color: '#6b7280'
+              color: 'var(--text-secondary)'
             }}
           >
             ×
@@ -155,7 +155,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
         {/* Tabs */}
         <div style={{
           display: 'flex',
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: '1px solid var(--border)',
           padding: '0 20px'
         }}>
           {['financial', 'technical', 'ownership', 'condition', 'documents'].map(tab => (
@@ -166,8 +166,8 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
                 padding: '12px 20px',
                 background: 'none',
                 border: 'none',
-                borderBottom: activeTab === tab ? '2px solid #3b82f6' : '2px solid transparent',
-                color: activeTab === tab ? '#3b82f6' : '#6b7280',
+                borderBottom: activeTab === tab ? '2px solid var(--accent)' : '2px solid transparent',
+                color: activeTab === tab ? 'var(--accent)' : 'var(--text-secondary)',
                 fontWeight: activeTab === tab ? '600' : '400',
                 cursor: 'pointer',
                 textTransform: 'capitalize'
@@ -188,7 +188,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
           {activeTab === 'financial' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Purchase Price
                 </label>
                 <input
@@ -203,7 +203,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Purchase Date
                 </label>
                 <input
@@ -217,7 +217,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Purchase Location
                 </label>
                 <input
@@ -232,7 +232,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Current Value
                 </label>
                 <input
@@ -247,7 +247,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Original MSRP
                 </label>
                 <input
@@ -267,7 +267,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
           {activeTab === 'technical' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Engine Size
                 </label>
                 <input
@@ -282,7 +282,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Horsepower
                 </label>
                 <input
@@ -297,7 +297,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Torque
                 </label>
                 <input
@@ -312,7 +312,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Transmission
                 </label>
                 <select
@@ -331,7 +331,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Drivetrain
                 </label>
                 <select
@@ -350,7 +350,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Fuel Type
                 </label>
                 <select
@@ -375,7 +375,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
           {activeTab === 'ownership' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Previous Owners
                 </label>
                 <input
@@ -390,7 +390,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Modified?
                 </label>
                 <select
@@ -407,7 +407,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
 
               {formData.is_modified && (
                 <div>
-                  <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                     Modification Details
                   </label>
                   <textarea
@@ -428,7 +428,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
           {activeTab === 'condition' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Condition Rating (1-10)
                 </label>
                 <input
@@ -445,7 +445,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Current Mileage
                 </label>
                 <input
@@ -460,7 +460,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
               </div>
 
               <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   Maintenance Notes
                 </label>
                 <textarea
@@ -547,7 +547,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
 
               {/* Documents Section */}
               <div style={{ 
-                border: '1px solid #e5e7eb', 
+                border: '1px solid var(--border)', 
                 borderRadius: '8px',
                 padding: '16px'
               }}>
@@ -578,7 +578,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
                 {documents.length === 0 ? (
                   <div style={{ 
                     textAlign: 'center', 
-                    color: '#6b7280',
+                    color: 'var(--text-secondary)',
                     padding: '40px 0'
                   }}>
                     <FileText size={48} style={{ margin: '0 auto', opacity: 0.3 }} />
@@ -592,12 +592,12 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
                         display: 'flex',
                         alignItems: 'center',
                         padding: '8px 12px',
-                        border: '1px solid #e5e7eb',
+                        border: '1px solid var(--border)',
                         borderRadius: '6px'
                       }}>
-                        <FileText size={20} style={{ marginRight: '8px', color: '#6b7280' }} />
+                        <FileText size={20} style={{ marginRight: '8px', color: 'var(--text-secondary)' }} />
                         <span style={{ flex: 1 }}>{doc.name}</span>
-                        <span style={{ fontSize: '12px', color: '#6b7280' }}>{doc.type}</span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{doc.type}</span>
                       </div>
                     ))}
                   </div>
@@ -610,14 +610,14 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
         {/* Footer */}
         <div style={{
           padding: '20px',
-          borderTop: '1px solid #e5e7eb',
+          borderTop: '1px solid var(--border)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
           {message && (
             <span style={{
-              color: message.includes('Error') ? '#dc2626' : '#059669',
+              color: message.includes('Error') ? 'var(--error)' : 'var(--success)',
               fontSize: '14px'
             }}>
               {message}

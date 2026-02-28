@@ -157,7 +157,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        e.currentTarget.style.boxShadow = '0 4px 12px color-mix(in srgb, var(--text) 15%, transparent)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
@@ -182,7 +182,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
             style={{
               padding: '4px 8px',
               fontSize: '10px',
-              backgroundColor: '#666',
+              backgroundColor: 'var(--text-secondary)',
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -213,13 +213,13 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
               style={{
                 width: '120px',
                 height: '80px',
-                backgroundColor: '#ddd',
+                backgroundColor: 'var(--bg-secondary)',
                 borderRadius: '4px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '12px',
-                color: '#666',
+                color: 'var(--text-secondary)',
               }}
             >
               No Image
@@ -235,12 +235,12 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
               })() : 'Unknown Vehicle'}
             </h3>
             {listing.vehicle?.trim && (
-              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                 {listing.vehicle.trim}
               </div>
             )}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
-              <span style={{ fontSize: '10px', color: '#666' }}>Seller:</span>
+              <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Seller:</span>
               <ParticipantBadge kind={seller.kind} label={seller.label} href={seller.href} leadingIconUrl={seller.iconUrl} />
             </div>
           </div>
@@ -257,7 +257,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
         >
           {listing.current_bid ? (
             <div style={{ marginBottom: '4px' }}>
-              <div style={{ fontSize: '10px', color: '#666' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
                 Current Bid{highBidder ? ' by' : ''}
               </div>
               <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
@@ -271,7 +271,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
             </div>
           ) : listing.final_price ? (
             <div style={{ marginBottom: '4px' }}>
-              <div style={{ fontSize: '10px', color: '#666' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
                 Sold For{buyer ? ' to' : ''}
               </div>
               <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
@@ -286,17 +286,17 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
           ) : null}
 
           {listing.reserve_price ? (
-            <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
               Reserve: {formatCurrency(listing.reserve_price)}
             </div>
           ) : (
-            <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
               No Reserve
             </div>
           )}
 
           {timeRemaining && (
-            <div style={{ fontSize: '11px', color: '#666' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Ends: {timeRemaining}
             </div>
           )}
@@ -314,19 +314,19 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
         >
           {listing.bid_count !== undefined && (
             <div>
-              <div style={{ color: '#666' }}>Bids</div>
+              <div style={{ color: 'var(--text-secondary)' }}>Bids</div>
               <div style={{ fontWeight: 'bold' }}>{listing.bid_count}</div>
             </div>
           )}
           {listing.view_count !== undefined && (
             <div>
-              <div style={{ color: '#666' }}>Views</div>
+              <div style={{ color: 'var(--text-secondary)' }}>Views</div>
               <div style={{ fontWeight: 'bold' }}>{listing.view_count.toLocaleString()}</div>
             </div>
           )}
           {listing.watcher_count !== undefined && (
             <div>
-              <div style={{ color: '#666' }}>Watchers</div>
+              <div style={{ color: 'var(--text-secondary)' }}>Watchers</div>
               <div style={{ fontWeight: 'bold' }}>{listing.watcher_count}</div>
             </div>
           )}
@@ -341,7 +341,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
                 flex: 1,
                 padding: '6px 12px',
                 fontSize: '11px',
-                backgroundColor: '#0000ff',
+                backgroundColor: 'var(--accent)',
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -357,7 +357,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
                 flex: 1,
                 padding: '6px 12px',
                 fontSize: '11px',
-                backgroundColor: '#0000ff',
+                backgroundColor: 'var(--accent)',
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -370,7 +370,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
         </div>
 
         {/* Listed Date */}
-        <div style={{ fontSize: '10px', color: '#999', marginTop: '8px', textAlign: 'right' }}>
+        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'right' }}>
           Listed {new Date(listing.listed_at).toLocaleDateString()}
         </div>
       </div>

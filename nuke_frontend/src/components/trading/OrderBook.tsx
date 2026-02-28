@@ -80,7 +80,7 @@ const OrderBook: React.FC<OrderBookProps> = ({
           fontFamily: 'var(--font-mono, monospace)',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = isBid ? '#dcfce7' : '#fee2e2';
+          e.currentTarget.style.background = isBid ? 'color-mix(in srgb, var(--success) 10%, transparent)' : 'color-mix(in srgb, var(--error) 10%, transparent)';
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = 'transparent';
@@ -94,7 +94,7 @@ const OrderBook: React.FC<OrderBookProps> = ({
             bottom: 0,
             [isBid ? 'right' : 'left']: 0,
             width: `${cumulativeWidth}%`,
-            background: isBid ? 'rgba(16, 185, 129, 0.08)' : 'rgba(220, 38, 38, 0.08)',
+            background: isBid ? 'color-mix(in srgb, var(--success) 8%, transparent)' : 'color-mix(in srgb, var(--error) 8%, transparent)',
             zIndex: 0,
             transition: 'width 0.2s ease',
           }}
@@ -108,7 +108,7 @@ const OrderBook: React.FC<OrderBookProps> = ({
             bottom: 0,
             [isBid ? 'right' : 'left']: 0,
             width: `${barWidth}%`,
-            background: isBid ? 'rgba(16, 185, 129, 0.2)' : 'rgba(220, 38, 38, 0.2)',
+            background: isBid ? 'color-mix(in srgb, var(--success) 20%, transparent)' : 'color-mix(in srgb, var(--error) 20%, transparent)',
             zIndex: 1,
             transition: 'width 0.2s ease',
           }}
@@ -116,11 +116,11 @@ const OrderBook: React.FC<OrderBookProps> = ({
 
         {isBid ? (
           <>
-            <div style={{ textAlign: 'right', zIndex: 2, color: '#6b7280' }}>
+            <div style={{ textAlign: 'right', zIndex: 2, color: 'var(--text-secondary)' }}>
               {level.orderCount > 1 && <span style={{ fontSize: '9px' }}>({level.orderCount}) </span>}
               {formatShares(level.shares)}
             </div>
-            <div style={{ textAlign: 'center', zIndex: 2, fontWeight: 600, color: '#10b981' }}>
+            <div style={{ textAlign: 'center', zIndex: 2, fontWeight: 600, color: 'var(--success)' }}>
               {formatPrice(level.price)}
             </div>
             <div />
@@ -128,10 +128,10 @@ const OrderBook: React.FC<OrderBookProps> = ({
         ) : (
           <>
             <div />
-            <div style={{ textAlign: 'center', zIndex: 2, fontWeight: 600, color: '#dc2626' }}>
+            <div style={{ textAlign: 'center', zIndex: 2, fontWeight: 600, color: 'var(--error)' }}>
               {formatPrice(level.price)}
             </div>
-            <div style={{ textAlign: 'left', zIndex: 2, color: '#6b7280' }}>
+            <div style={{ textAlign: 'left', zIndex: 2, color: 'var(--text-secondary)' }}>
               {formatShares(level.shares)}
               {level.orderCount > 1 && <span style={{ fontSize: '9px' }}> ({level.orderCount})</span>}
             </div>
@@ -145,7 +145,7 @@ const OrderBook: React.FC<OrderBookProps> = ({
     <div
       style={{
         background: 'var(--surface)',
-        border: '2px solid #bdbdbd',
+        border: '2px solid var(--border)',
         borderRadius: '4px',
         fontSize: '12px',
         overflow: 'hidden',
@@ -158,8 +158,8 @@ const OrderBook: React.FC<OrderBookProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: '8px 12px',
-          borderBottom: '1px solid #e5e7eb',
-          background: '#f9fafb',
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--surface-raised)',
         }}
       >
         <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 'bold' }}>Order Book</h3>
@@ -169,12 +169,12 @@ const OrderBook: React.FC<OrderBookProps> = ({
               width: '8px',
               height: '8px',
               borderRadius: '50%',
-              background: isConnected ? '#10b981' : '#ef4444',
+              background: isConnected ? 'var(--success)' : 'var(--error)',
             }}
             title={isConnected ? 'Connected' : 'Disconnected'}
           />
           {lastUpdate && (
-            <span style={{ fontSize: '11px', color: '#6b7280' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               {lastUpdate.toLocaleTimeString()}
             </span>
           )}
@@ -188,27 +188,27 @@ const OrderBook: React.FC<OrderBookProps> = ({
           gridTemplateColumns: '1fr 60px 80px 80px 60px 1fr',
           gap: '4px',
           padding: '6px 8px',
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: '1px solid var(--border)',
           fontSize: '11px',
           fontWeight: 600,
-          color: '#6b7280',
+          color: 'var(--text-secondary)',
           textTransform: 'uppercase',
         }}
       >
         <div style={{ textAlign: 'right' }}>Size</div>
-        <div style={{ textAlign: 'center', color: '#10b981' }}>Bid</div>
+        <div style={{ textAlign: 'center', color: 'var(--success)' }}>Bid</div>
         <div />
         <div />
-        <div style={{ textAlign: 'center', color: '#dc2626' }}>Ask</div>
+        <div style={{ textAlign: 'center', color: 'var(--error)' }}>Ask</div>
         <div style={{ textAlign: 'left' }}>Size</div>
       </div>
 
       {/* Order Book Content */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
         {/* Bids (left side) */}
-        <div style={{ borderRight: '1px solid #e5e7eb' }}>
+        <div style={{ borderRight: '1px solid var(--border)' }}>
           {bidsWithCumulative.length === 0 ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
               No bids
             </div>
           ) : (
@@ -219,7 +219,7 @@ const OrderBook: React.FC<OrderBookProps> = ({
         {/* Asks (right side) */}
         <div>
           {asksWithCumulative.length === 0 ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
               No asks
             </div>
           ) : (
@@ -233,8 +233,8 @@ const OrderBook: React.FC<OrderBookProps> = ({
         <div
           style={{
             padding: '8px 12px',
-            borderTop: '1px solid #e5e7eb',
-            background: '#f9fafb',
+            borderTop: '1px solid var(--border)',
+            background: 'var(--surface-raised)',
             display: 'flex',
             justifyContent: 'center',
             gap: '16px',
@@ -242,19 +242,19 @@ const OrderBook: React.FC<OrderBookProps> = ({
           }}
         >
           <div>
-            <span style={{ color: '#6b7280' }}>Spread: </span>
+            <span style={{ color: 'var(--text-secondary)' }}>Spread: </span>
             <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono, monospace)' }}>
               ${nbbo.spread.toFixed(2)}
             </span>
             {nbbo.spreadPct !== null && (
-              <span style={{ color: '#6b7280', marginLeft: '4px' }}>
+              <span style={{ color: 'var(--text-secondary)', marginLeft: '4px' }}>
                 ({nbbo.spreadPct.toFixed(2)}%)
               </span>
             )}
           </div>
           {nbbo.midPrice !== null && (
             <div>
-              <span style={{ color: '#6b7280' }}>Mid: </span>
+              <span style={{ color: 'var(--text-secondary)' }}>Mid: </span>
               <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono, monospace)' }}>
                 ${nbbo.midPrice.toFixed(2)}
               </span>
@@ -268,9 +268,9 @@ const OrderBook: React.FC<OrderBookProps> = ({
         <div
           style={{
             padding: '6px 12px',
-            borderTop: '1px solid #e5e7eb',
+            borderTop: '1px solid var(--border)',
             fontSize: '11px',
-            color: '#6b7280',
+            color: 'var(--text-secondary)',
             display: 'flex',
             justifyContent: 'space-between',
           }}

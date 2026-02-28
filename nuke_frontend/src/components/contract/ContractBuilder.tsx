@@ -200,8 +200,8 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
       </div>
 
       {error && (
-        <div className="card" style={{ marginBottom: '16px', border: '2px solid var(--danger, #ef4444)' }}>
-          <div className="card-body" style={{ color: 'var(--danger, #ef4444)', fontSize: '12px' }}>
+        <div className="card" style={{ marginBottom: '16px', border: '2px solid var(--error)' }}>
+          <div className="card-body" style={{ color: 'var(--error)', fontSize: '12px' }}>
             {error}
           </div>
         </div>

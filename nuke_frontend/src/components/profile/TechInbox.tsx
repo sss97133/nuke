@@ -540,7 +540,7 @@ export default function TechInbox({ technicianId }: TechInboxProps) {
               className="button button-small"
               onClick={handleAIClassify}
               disabled={classifying}
-              style={{ background: 'var(--primary)', color: 'white' }}
+              style={{ background: 'var(--primary)', color: 'var(--bg)' }}
             >
               {classifying ? '🤖 Analyzing...' : '🤖 AI Classify'}
             </button>
@@ -713,7 +713,7 @@ export default function TechInbox({ technicianId }: TechInboxProps) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: 'white',
+                        color: 'var(--bg)',
                         fontSize: '12px'
                       }}>
                         ✓

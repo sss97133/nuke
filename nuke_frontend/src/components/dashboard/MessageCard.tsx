@@ -33,24 +33,24 @@ interface MessageCardProps {
 
 const getPriorityColor = (priority: number): string => {
   const colors: Record<number, string> = {
-    1: '#dc2626',
-    2: '#f59e0b',
-    3: '#3b82f6',
-    4: '#10b981',
-    5: '#6b7280'
+    1: 'var(--error)',
+    2: 'var(--warning)',
+    3: 'var(--accent)',
+    4: 'var(--success)',
+    5: 'var(--text-secondary)'
   };
-  return colors[priority] || '#6b7280';
+  return colors[priority] || 'var(--text-secondary)';
 };
 
 const getPriorityBackground = (priority: number): string => {
   const backgrounds: Record<number, string> = {
-    1: '#fef2f2',
-    2: '#fffbeb',
-    3: '#f8fafc',
-    4: '#f0fdf4',
-    5: '#ffffff'
+    1: 'var(--error-dim)',
+    2: 'var(--warning-dim)',
+    3: 'var(--bg)',
+    4: 'var(--success-dim)',
+    5: 'var(--surface)'
   };
-  return backgrounds[priority] || '#ffffff';
+  return backgrounds[priority] || 'var(--surface)';
 };
 
 const getMessageIcon = (type: string): string => {
@@ -153,10 +153,10 @@ export const MessageCard: React.FC<MessageCardProps> = ({
           fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
           fontSize: '11px',
           background: 'var(--bg)',
-          borderLeft: '1px solid #bdbdbd',
+          borderLeft: '1px solid var(--border)',
           padding: '8px',
           marginBottom: '4px',
-          color: '#757575'
+          color: 'var(--text-disabled)'
         }}
       >
         {'>'} Loading...
@@ -165,7 +165,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
   }
   
   const borderColor = getPriorityColor(priority);
-  const backgroundColor = is_read ? '#ffffff' : getPriorityBackground(priority);
+  const backgroundColor = is_read ? 'var(--surface)' : getPriorityBackground(priority);
   const borderWidth = is_read ? '1px' : '4px';
 
   const handleClick = () => {
@@ -186,7 +186,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
         lineHeight: '1.2',
         background: backgroundColor,
         borderLeft: `${borderWidth} solid ${borderColor}`,
-        borderBottom: '1px solid #bdbdbd',
+        borderBottom: '1px solid var(--border)',
         padding: '8px 8px 8px 4px',
         marginBottom: '4px',
         cursor: (onClick || metadata?.vehicle_id || metadata?.action_url) && !needsConfirmation ? 'pointer' : 'default',
@@ -204,7 +204,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
             transform: 'translateY(-50%)',
             width: '4px',
             height: '4px',
-            background: '#3b82f6',
+            background: 'var(--accent)',
             borderRadius: '50%'
           }}
         />
@@ -214,7 +214,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
       <div style={{ paddingLeft: is_read ? '0' : '12px', display: 'flex', gap: '12px' }}>
         {/* Vehicle Image */}
         {vehicleImageUrl && (
-          <div style={{ flex: '0 0 60px', height: '60px', background: 'var(--surface)', border: '1px solid #bdbdbd', overflow: 'hidden' }}>
+          <div style={{ flex: '0 0 60px', height: '60px', background: 'var(--surface)', border: '1px solid var(--border)', overflow: 'hidden' }}>
             <img
               src={vehicleImageUrl}
               alt="Vehicle"
@@ -232,14 +232,14 @@ export const MessageCard: React.FC<MessageCardProps> = ({
 
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Type header */}
-          <div style={{ color: '#757575', marginBottom: '4px' }}>
+          <div style={{ color: 'var(--text-disabled)', marginBottom: '4px' }}>
             {'>'} {getMessageIcon(type)} {type}
           </div>
 
           {/* Title */}
           <div
             style={{
-              color: is_read ? '#424242' : '#000000',
+              color: is_read ? 'var(--text-secondary)' : 'var(--text)',
               fontWeight: is_read ? 'normal' : '600',
               marginBottom: '4px'
             }}
@@ -248,29 +248,29 @@ export const MessageCard: React.FC<MessageCardProps> = ({
           </div>
 
           {/* Message body / Data Point */}
-          <div style={{ color: '#424242', marginBottom: '4px', whiteSpace: 'pre-wrap', fontWeight: needsConfirmation ? '500' : 'normal' }}>
+          <div style={{ color: 'var(--text-secondary)', marginBottom: '4px', whiteSpace: 'pre-wrap', fontWeight: needsConfirmation ? '500' : 'normal' }}>
             {message}
           </div>
         {/* Metadata */}
         {metadata && (
-          <div style={{ color: '#757575', marginTop: '4px', marginBottom: '4px' }}>
+          <div style={{ color: 'var(--text-disabled)', marginTop: '4px', marginBottom: '4px' }}>
             {metadata.vehicle_name && (
-              <div>vehicle: <span style={{ color: '#000000' }}>{metadata.vehicle_name}</span></div>
+              <div>vehicle: <span style={{ color: 'var(--text)' }}>{metadata.vehicle_name}</span></div>
             )}
             {metadata.organization_name && (
-              <div>organization: <span style={{ color: '#000000' }}>{metadata.organization_name}</span></div>
+              <div>organization: <span style={{ color: 'var(--text)' }}>{metadata.organization_name}</span></div>
             )}
             {metadata.confidence !== undefined && (
-              <div>confidence: <span style={{ color: '#000000' }}>{metadata.confidence}%</span></div>
+              <div>confidence: <span style={{ color: 'var(--text)' }}>{metadata.confidence}%</span></div>
             )}
             {metadata.match_type && (
-              <div>match_type: <span style={{ color: '#000000' }}>{metadata.match_type}</span></div>
+              <div>match_type: <span style={{ color: 'var(--text)' }}>{metadata.match_type}</span></div>
             )}
           </div>
         )}
 
         {/* Timestamp */}
-        <div style={{ color: '#9e9e9e', marginTop: '4px', fontSize: '9px' }}>
+        <div style={{ color: 'var(--text-disabled)', marginTop: '4px', fontSize: '9px' }}>
           created: {formatTimeAgo(created_at)}
         </div>
 
@@ -295,9 +295,9 @@ export const MessageCard: React.FC<MessageCardProps> = ({
                   fontSize: '12px',
                   fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
                   padding: '6px 16px',
-                  border: '1px solid #059669',
-                  background: '#059669',
-                  color: 'white',
+                  border: '1px solid var(--success)',
+                  background: 'var(--success)',
+                  color: 'var(--bg)',
                   cursor: 'pointer',
                   fontWeight: '600'
                 }}
@@ -325,9 +325,9 @@ export const MessageCard: React.FC<MessageCardProps> = ({
                   fontSize: '12px',
                   fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
                   padding: '6px 16px',
-                  border: '1px solid #dc2626',
+                  border: '1px solid var(--error)',
                   background: 'var(--surface)',
-                  color: '#dc2626',
+                  color: 'var(--error)',
                   cursor: 'pointer',
                   fontWeight: '600'
                 }}
@@ -357,16 +357,16 @@ export const MessageCard: React.FC<MessageCardProps> = ({
                   fontSize: '11px',
                   fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
                   padding: '4px 8px',
-                  border: '1px solid #bdbdbd',
+                  border: '1px solid var(--border)',
                   background: 'var(--surface)',
                   cursor: 'pointer',
-                  color: '#000000'
+                  color: 'var(--text)'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#f5f5f5';
+                  e.currentTarget.style.background = 'var(--bg)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#ffffff';
+                  e.currentTarget.style.background = 'var(--surface)';
                 }}
               >
                 [{action.label}]
@@ -392,10 +392,10 @@ export const MessageCard: React.FC<MessageCardProps> = ({
                 fontSize: '11px',
                 fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
                 padding: '2px 6px',
-                border: '1px solid #bdbdbd',
+                border: '1px solid var(--border)',
                 background: 'var(--surface)',
                 cursor: 'pointer',
-                color: '#757575'
+                color: 'var(--text-disabled)'
               }}
             >
               [mark_read]

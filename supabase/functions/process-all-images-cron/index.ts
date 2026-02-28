@@ -1,3 +1,9 @@
+// DEPRECATED: This function uses legacy angle strings (exterior_three_quarter,
+// exterior_front, etc.) for AI image classification. The platform has migrated
+// to the 41-zone vehicle_zone system (ext_front, ext_front_driver, mech_engine_bay, etc.).
+// New image classification should go through the YONO pipeline (yono-vision-worker)
+// which writes vehicle_zone + zone_confidence to vehicle_images directly.
+// See: nuke_frontend/src/constants/vehicleZones.ts for the canonical zone taxonomy.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 

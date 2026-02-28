@@ -22,12 +22,12 @@ interface HistoryRow {
 const to8 = { fontSize: '11px' } as const;
 const modalStyle: React.CSSProperties = {
   position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-  background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+  background: 'var(--overlay, rgba(0,0,0,0.35))', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
 };
 const panelStyle: React.CSSProperties = {
-  width: '720px', maxWidth: '95%', background: 'var(--surface)', border: '1px solid #c0c0c0', borderRadius: 2
+  width: '720px', maxWidth: '95%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 2
 };
-const headerStyle: React.CSSProperties = { ...to8, padding: 6, borderBottom: '1px solid #c0c0c0', background: 'var(--bg)', fontWeight: 700 };
+const headerStyle: React.CSSProperties = { ...to8, padding: 6, borderBottom: '1px solid var(--border)', background: 'var(--bg)', fontWeight: 700 };
 const bodyStyle: React.CSSProperties = { padding: 8 };
 
 const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({ vehicleId, isOpen, onClose }) => {
@@ -119,19 +119,19 @@ const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({ vehicleId, isOpen
                 <thead>
                   <tr>
                     {['as_of','price_type','value','confidence','source','flags','baseline'].map(h => (
-                      <th key={h} style={{ ...to8, textAlign: 'left', borderBottom: '1px solid #c0c0c0', padding: '2px 4px' }}>{h}</th>
+                      <th key={h} style={{ ...to8, textAlign: 'left', borderBottom: '1px solid var(--border)', padding: '2px 4px' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map(r => (
                     <tr key={r.id}>
-                      <td style={{ ...to8, borderBottom: '1px solid #e5e7eb', padding: '2px 4px' }}>{new Date(r.as_of).toLocaleString()}</td>
-                      <td style={{ ...to8, borderBottom: '1px solid #e5e7eb', padding: '2px 4px', textTransform: 'uppercase' }}>{r.price_type}</td>
-                      <td style={{ ...to8, borderBottom: '1px solid #e5e7eb', padding: '2px 4px' }}>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(r.value)}</td>
-                      <td style={{ ...to8, borderBottom: '1px solid #e5e7eb', padding: '2px 4px' }}>{r.confidence ?? ''}</td>
-                      <td style={{ ...to8, borderBottom: '1px solid #e5e7eb', padding: '2px 4px' }}>{r.source}</td>
-                      <td style={{ ...to8, borderBottom: '1px solid #e5e7eb', padding: '2px 4px' }}>
+                      <td style={{ ...to8, borderBottom: '1px solid var(--border)', padding: '2px 4px' }}>{new Date(r.as_of).toLocaleString()}</td>
+                      <td style={{ ...to8, borderBottom: '1px solid var(--border)', padding: '2px 4px', textTransform: 'uppercase' }}>{r.price_type}</td>
+                      <td style={{ ...to8, borderBottom: '1px solid var(--border)', padding: '2px 4px' }}>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(r.value)}</td>
+                      <td style={{ ...to8, borderBottom: '1px solid var(--border)', padding: '2px 4px' }}>{r.confidence ?? ''}</td>
+                      <td style={{ ...to8, borderBottom: '1px solid var(--border)', padding: '2px 4px' }}>{r.source}</td>
+                      <td style={{ ...to8, borderBottom: '1px solid var(--border)', padding: '2px 4px' }}>
                         {r.is_outlier ? (
                           <span title={r.outlier_reason || 'outlier'} style={{ color: 'var(--warning, #f59e0b)', fontWeight: 700 }}>
                             OUTLIER
@@ -140,7 +140,7 @@ const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({ vehicleId, isOpen
                           ''
                         )}
                       </td>
-                      <td style={{ ...to8, borderBottom: '1px solid #e5e7eb', padding: '2px 4px' }}>
+                      <td style={{ ...to8, borderBottom: '1px solid var(--border)', padding: '2px 4px' }}>
                         {baselineByType[r.price_type] === r.id ? (
                           <span style={{ fontWeight: 800, color: 'var(--primary)' }}>PINNED (30D)</span>
                         ) : (

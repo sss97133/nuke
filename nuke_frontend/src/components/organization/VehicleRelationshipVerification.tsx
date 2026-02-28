@@ -313,7 +313,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
               fontSize: '11px',
               border: 'none',
               background: submitting ? 'var(--text-muted)' : 'var(--accent)',
-              color: 'white',
+              color: 'var(--bg)',
               cursor: submitting ? 'not-allowed' : 'pointer',
               borderRadius: '3px',
               fontWeight: 600

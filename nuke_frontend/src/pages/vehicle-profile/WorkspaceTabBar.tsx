@@ -23,9 +23,8 @@ const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = ({ activeTab, onTabChang
       flexWrap: 'nowrap',
       overflowX: 'auto',
       WebkitOverflowScrolling: 'touch',
-      background: 'var(--grey-800)',
-      borderTop: '1px solid var(--grey-700)',
-      borderBottom: '2px solid var(--grey-800)',
+      background: 'var(--surface)',
+      borderBottom: '1px solid var(--border)',
       height: 32,
       position: 'sticky',
       top: 0,
@@ -49,19 +48,19 @@ const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = ({ activeTab, onTabChang
               whiteSpace: 'nowrap',
               flexShrink: 0,
               border: 'none',
-              borderBottom: active ? '2px solid #fff' : '2px solid transparent',
+              borderBottom: active ? '2px solid var(--text)' : '2px solid transparent',
               borderRadius: active ? '4px 4px 0 0' : '0',
-              background: active ? 'rgba(255,255,255,0.12)' : 'transparent',
-              color: active ? '#fff' : 'rgba(255,255,255,0.5)',
+              background: active ? 'var(--surface-hover, rgba(128,128,128,0.12))' : 'transparent',
+              color: active ? 'var(--text)' : 'var(--text-muted)',
               cursor: 'pointer',
-              marginBottom: '-2px',
+              marginBottom: '-1px',
               transition: 'color 0.1s, background 0.1s',
             }}
             onMouseEnter={(e) => {
-              if (!active) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.85)';
+              if (!active) (e.currentTarget as HTMLElement).style.color = 'var(--text)';
             }}
             onMouseLeave={(e) => {
-              if (!active) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.5)';
+              if (!active) (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)';
             }}
           >
             {isMobile ? t.shortLabel : t.label}

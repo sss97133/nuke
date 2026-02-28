@@ -123,6 +123,41 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 
 ---
 
+## Agent Hierarchy (Haiku/Sonnet/Opus)
+
+| Intent | Use This | Notes |
+|--------|----------|-------|
+| Run full extraction pipeline (Haiku+Sonnet) | `agent-tier-router` with `{"action":"run_pipeline","pipeline_config":{"haiku_batch_size":10,"max_cycles":1}}` | Dispatches Haiku workers, Sonnet reviews |
+| Route a task to the right tier | `agent-tier-router` with `{"action":"route_task","task_type":"...","task_data":{}}` | Auto-classifies complexity |
+| Get agent system status | `agent-tier-router` with `{"action":"status"}` | Queue counts, tier health, cost estimates |
+| Get cost report | `agent-tier-router` with `{"action":"cost_report"}` | Cost breakdown by tier, savings vs Sonnet-only |
+| Run Opus strategy query | `agent-tier-router` with `{"action":"strategy","strategy_query":"..."}` | Source prioritization, market intel |
+| Extract listing with Haiku (cheap) | `haiku-extraction-worker` with `{"action":"extract_listing","url":"...","html":"..."}` | 3x cheaper than Sonnet |
+| Parse title with Haiku | `haiku-extraction-worker` with `{"action":"parse_title","title":"..."}` | Fast YMM extraction |
+| Batch parse titles | `haiku-extraction-worker` with `{"action":"parse_titles","titles":["..."]}` | Single API call for many titles |
+| Process queue batch with Haiku | `haiku-extraction-worker` with `{"action":"batch_extract","batch_size":10}` | Pulls from import_queue |
+| Supervisor review batch | `sonnet-supervisor` with `{"action":"review_batch","batch_size":10}` | Reviews Haiku escalations |
+| Supervisor dispatch + review | `sonnet-supervisor` with `{"action":"dispatch_haiku"}` | Full loop: dispatch Haiku then review |
+| Resolve edge case | `sonnet-supervisor` with `{"action":"resolve_edge_case","content":"..."}` | Complex vehicles (replicas, restomods) |
+| Quality report | `sonnet-supervisor` with `{"action":"quality_report"}` | Extraction quality metrics |
+
+### Tier Routing Rules
+- **Haiku** ($1/$5 per MTok): Routine extraction, title parsing, field extraction, simple classification
+- **Sonnet** ($3/$15 per MTok): Quality review, edge cases, multi-field validation, escalation decisions
+- **Opus** ($5/$25 per MTok): Source prioritization, market intelligence, pipeline optimization strategy
+
+### import_queue Status Flow
+```
+pending → [haiku-extraction-worker] → complete (auto-approved, quality >= 0.9)
+                                    → pending_review (needs supervisor, quality 0.6-0.9)
+                                    → pending_review (escalated, no content or low confidence)
+pending_review → [sonnet-supervisor] → complete (approved or corrected)
+                                     → pending_strategy (escalated to Opus)
+                                     → failed (rejected)
+```
+
+---
+
 ## Queue Management
 
 | Intent | Use This | Notes |
@@ -195,10 +230,14 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 
 | Intent | Use This | Notes |
 |--------|----------|-------|
-| Classify a single image | `yono-classify` | POST `{image_url}` → returns make/model/year/angle |
-| Batch classify images | `yono-batch-process` | Bulk version |
+| Full image intelligence (make + condition + zone + damage) | `api-v1-vision/analyze` | POST `{image_url}` → make, condition_score, vehicle_zone, damage_flags, $0/image |
+| Classify make from image | `api-v1-vision/classify` or `yono-classify` | Hierarchical: tier1 family, tier2 make. $0/image |
+| Analyze condition/zone/damage | `yono-analyze` | Florence-2 vision analysis. Writes to vehicle_images if image_id provided |
+| Batch classify images | `api-v1-vision/batch` or `yono-batch-process` | Bulk version, max 100 images |
+| Background vision processing | `yono-vision-worker` | Cron worker, claims batches, writes to vehicle_images |
+| Keep sidecar warm | `yono-keepalive` | Pings Modal every 5 min (cron job 249) |
 | Export training data | `export-training-batch` | Prepares training dataset |
-| See YONO state | `yono.md` | Full technical reference |
+| Sidecar URL | `YONO_SIDECAR_URL` env var | Default: `https://sss97133--yono-serve-fastapi-app.modal.run` |
 
 ---
 

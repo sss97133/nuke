@@ -79,13 +79,13 @@ function CompareTooltip({ active, payload }: any) {
   const diff = d.vehicle - d.market;
   return (
     <div style={{
-      background: 'var(--grey-800, #1f2937)', color: '#fff', padding: '6px 10px',
-      borderRadius: 6, fontSize: '11px', fontFamily: 'monospace', boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+      background: 'var(--grey-800, #1f2937)', color: 'var(--bg)', padding: '6px 10px',
+      borderRadius: 6, fontSize: '11px', fontFamily: 'monospace', boxShadow: '0 2px 8px color-mix(in srgb, var(--text) 30%, transparent)',
     }}>
       <div>Time: {d.pctTime}%</div>
-      <div style={{ color: '#3b82f6' }}>Vehicle: {d.vehicle}%</div>
-      <div style={{ color: '#f59e0b' }}>Market: {d.market}%</div>
-      <div style={{ color: diff >= 0 ? '#22c55e' : '#ef4444', fontWeight: 700 }}>
+      <div style={{ color: 'var(--accent)' }}>Vehicle: {d.vehicle}%</div>
+      <div style={{ color: 'var(--warning)' }}>Market: {d.market}%</div>
+      <div style={{ color: diff >= 0 ? 'var(--success)' : 'var(--error)', fontWeight: 700 }}>
         Delta: {diff >= 0 ? '+' : ''}{diff}%
       </div>
     </div>
@@ -158,7 +158,7 @@ export default function BidCompareOverlay({ vehicleId, vehicleBids, make, model 
       }}>
         <span>Normalized bid curve: this vehicle vs {make} {model || ''} market avg</span>
         <span style={{
-          color: outperformed ? '#22c55e' : '#ef4444', fontWeight: 700, fontSize: '12px',
+          color: outperformed ? 'var(--success)' : 'var(--error)', fontWeight: 700, fontSize: '12px',
         }}>
           {outperformed ? 'Outperformed' : 'Underperformed'} market
         </span>
@@ -186,6 +186,7 @@ export default function BidCompareOverlay({ vehicleId, vehicleBids, make, model 
               wrapperStyle={{ fontSize: '11px' }}
             />
             {/* Delta shading */}
+            {/* TODO: Recharts requires string hex/rgba for fill — migrate when CSS var extraction is available */}
             <Area
               type="monotone"
               dataKey="delta"
@@ -195,6 +196,7 @@ export default function BidCompareOverlay({ vehicleId, vehicleBids, make, model 
               legendType="none"
             />
             {/* Vehicle curve - solid */}
+            {/* TODO: Recharts requires string hex for stroke — migrate when CSS var extraction is available */}
             <Line
               type="monotone"
               dataKey="vehicle"
@@ -204,6 +206,7 @@ export default function BidCompareOverlay({ vehicleId, vehicleBids, make, model 
               name="This vehicle"
             />
             {/* Market curve - dashed */}
+            {/* TODO: Recharts requires string hex for stroke — migrate when CSS var extraction is available */}
             <Line
               type="monotone"
               dataKey="market"

@@ -309,7 +309,7 @@ export default function SimpleETFDetails({ segmentSlug }: SimpleETFDetailsProps)
                             border: '1px solid var(--primary)',
                             borderRadius: '2px',
                             background: 'var(--primary)',
-                            color: 'var(--white)',
+                            color: 'var(--bg)',
                             fontSize: '11px',
                             fontWeight: 700,
                             cursor: 'pointer'

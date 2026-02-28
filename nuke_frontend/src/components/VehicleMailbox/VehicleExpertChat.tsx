@@ -990,12 +990,12 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
           </div>
           <ErrorBoundary
             fallback={
-              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: '#666', border: '1px solid var(--border)', borderRadius: '4px' }}>
+              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '4px' }}>
                 3D model viewer unavailable
               </div>
             }
           >
-            <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: '#666' }}>Loading 3D model...</div>}>
+            <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-secondary)' }}>Loading 3D model...</div>}>
               <ModelHarnessAnnotator vehicleId={vehicleId} defaultImportUrl={activeModelSignedUrl} autoImportOnLoad={true} />
             </Suspense>
           </ErrorBoundary>

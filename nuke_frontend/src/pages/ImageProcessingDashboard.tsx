@@ -288,7 +288,7 @@ export default function ImageProcessingDashboard() {
         </div>
 
         {/* Tier 3 Progress */}
-        <div className="card" style={{ padding: '16px', border: '2px solid #8b5cf6' }}>
+        <div className="card" style={{ padding: '16px', border: '2px solid var(--purple, #8b5cf6)' }}>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
             EXPERT ANALYSIS (TIER 3)
           </div>
@@ -296,7 +296,7 @@ export default function ImageProcessingDashboard() {
             {stats.tier3Complete.toLocaleString()}
           </div>
           <div style={{ height: '4px', background: 'var(--bg-secondary)', borderRadius: '2px', overflow: 'hidden' }}>
-            <div style={{ width: `${tier3Percent}%`, height: '100%', background: '#8b5cf6' }} />
+            <div style={{ width: `${tier3Percent}%`, height: '100%', background: 'var(--purple, #8b5cf6)' }} />
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
             {tier3Percent.toFixed(1)}% complete

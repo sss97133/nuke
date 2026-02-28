@@ -204,7 +204,7 @@ export default function VehicleCritiqueMode({
       zIndex: 1000,
       fontSize: '11px'
     }}>
-      <div style={{ color: '#c00', marginBottom: '8px' }}>
+      <div style={{ color: 'var(--error)', marginBottom: '8px' }}>
         Access Restricted
       </div>
       <div style={{ marginBottom: '8px' }}>
@@ -227,13 +227,13 @@ export default function VehicleCritiqueMode({
       zIndex: 1000,
       maxHeight: '400px',
       overflowY: 'auto',
-      boxShadow: '2px 2px 8px rgba(0,0,0,0.2)'
+      boxShadow: '2px 2px 8px color-mix(in srgb, var(--text) 20%, transparent)'
     }}>
       <form onSubmit={handleSubmit}>
         <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' }}>
           Vehicle Critique & Business Impact
           {vehicleData && (
-            <span style={{ fontSize: '11px', fontWeight: 'normal', color: '#666', marginLeft: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--text-secondary)', marginLeft: '8px' }}>
               {vehicleData.year} {vehicleData.make} {vehicleData.model}
             </span>
           )}
@@ -315,7 +315,7 @@ export default function VehicleCritiqueMode({
 
         {/* Business Impact (if category is business_impact) */}
         {formData.category === 'business_impact' && (
-          <div style={{ marginBottom: '8px', padding: '6px', background: '#f8f9fa', border: '1px solid #dee2e6' }}>
+          <div style={{ marginBottom: '8px', padding: '6px', background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
             <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>
               Business Impact Assessment
             </div>
@@ -416,7 +416,7 @@ export default function VehicleCritiqueMode({
         style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0,0,0,0.4)',
+          background: 'var(--overlay)',
           zIndex: 10000,
           display: 'flex',
           alignItems: 'center',

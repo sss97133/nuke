@@ -48,7 +48,7 @@ export default function MakePortal({ make, activePortal, onOpen }: MakePortalPro
                 }
                 color={
                   data.demand_high_pct != null
-                    ? data.demand_high_pct > 60 ? '#22c55e' : data.demand_high_pct > 30 ? '#f59e0b' : '#6b7280'
+                    ? data.demand_high_pct > 60 ? 'var(--success)' : data.demand_high_pct > 30 ? 'var(--warning)' : 'var(--text-secondary)'
                     : undefined
                 }
               />
@@ -59,7 +59,7 @@ export default function MakePortal({ make, activePortal, onOpen }: MakePortalPro
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                 <span style={{
                   width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
-                  background: data.sentiment_score > 0.6 ? '#22c55e' : data.sentiment_score > 0.3 ? '#f59e0b' : '#ef4444',
+                  background: data.sentiment_score > 0.6 ? 'var(--success)' : data.sentiment_score > 0.3 ? 'var(--warning)' : 'var(--error)',
                 }} />
                 <span style={{ color: 'var(--text-muted)' }}>
                   Market sentiment: {data.sentiment_score > 0.6 ? 'Positive' : data.sentiment_score > 0.3 ? 'Neutral' : 'Negative'}

@@ -128,7 +128,7 @@ const MarketDepth: React.FC<MarketDepthProps> = ({
     <div
       style={{
         background: 'var(--surface)',
-        border: '2px solid #bdbdbd',
+        border: '2px solid var(--border)',
         borderRadius: '4px',
         overflow: 'hidden',
       }}
@@ -140,19 +140,19 @@ const MarketDepth: React.FC<MarketDepthProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: '8px 12px',
-          borderBottom: '1px solid #e5e7eb',
-          background: '#f9fafb',
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--surface-raised)',
         }}
       >
         <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 'bold' }}>Market Depth</h3>
         <div style={{ display: 'flex', gap: '12px', fontSize: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <div style={{ width: 12, height: 12, background: 'rgba(16, 185, 129, 0.5)', borderRadius: 2 }} />
-            <span style={{ color: '#10b981' }}>Bids</span>
+            <div style={{ width: 12, height: 12, background: 'color-mix(in srgb, var(--success) 50%, transparent)', borderRadius: 2 }} />
+            <span style={{ color: 'var(--success)' }}>Bids</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <div style={{ width: 12, height: 12, background: 'rgba(220, 38, 38, 0.5)', borderRadius: 2 }} />
-            <span style={{ color: '#dc2626' }}>Asks</span>
+            <div style={{ width: 12, height: 12, background: 'color-mix(in srgb, var(--error) 50%, transparent)', borderRadius: 2 }} />
+            <span style={{ color: 'var(--error)' }}>Asks</span>
           </div>
         </div>
       </div>
@@ -166,7 +166,7 @@ const MarketDepth: React.FC<MarketDepthProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#6b7280',
+              color: 'var(--text-secondary)',
             }}
           >
             No depth data available
@@ -180,7 +180,7 @@ const MarketDepth: React.FC<MarketDepthProps> = ({
             {/* Grid lines */}
             <defs>
               <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#f0f0f0" strokeWidth="1" />
+                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="var(--border)" strokeWidth="1" />
               </pattern>
             </defs>
             <rect width="100%" height="100%" fill="url(#grid)" />
@@ -191,7 +191,7 @@ const MarketDepth: React.FC<MarketDepthProps> = ({
               y1={0}
               x2={chartWidth / 2}
               y2={chartHeight}
-              stroke="#9ca3af"
+              stroke="var(--text-secondary)"
               strokeWidth="1"
               strokeDasharray="4 4"
             />
@@ -199,16 +199,16 @@ const MarketDepth: React.FC<MarketDepthProps> = ({
             {/* Bid area (green) */}
             <path
               d={buildBidPath(chartWidth, chartHeight)}
-              fill="rgba(16, 185, 129, 0.3)"
-              stroke="#10b981"
+              fill="color-mix(in srgb, var(--success) 30%, transparent)"
+              stroke="var(--success)"
               strokeWidth="2"
             />
 
             {/* Ask area (red) */}
             <path
               d={buildAskPath(chartWidth, chartHeight)}
-              fill="rgba(220, 38, 38, 0.3)"
-              stroke="#dc2626"
+              fill="color-mix(in srgb, var(--error) 30%, transparent)"
+              stroke="var(--error)"
               strokeWidth="2"
             />
 
@@ -219,7 +219,7 @@ const MarketDepth: React.FC<MarketDepthProps> = ({
                 y={12}
                 textAnchor="middle"
                 fontSize="10"
-                fill="#6b7280"
+                fill="var(--text-secondary)"
               >
                 Mid: ${nbbo.midPrice.toFixed(2)}
               </text>
@@ -233,7 +233,7 @@ const MarketDepth: React.FC<MarketDepthProps> = ({
             display: 'flex',
             justifyContent: 'space-between',
             fontSize: '12px',
-            color: '#6b7280',
+            color: 'var(--text-secondary)',
             marginTop: '4px',
             fontFamily: 'var(--font-mono, monospace)',
           }}
@@ -251,19 +251,19 @@ const MarketDepth: React.FC<MarketDepthProps> = ({
           gridTemplateColumns: '1fr 1fr',
           gap: '12px',
           padding: '8px 12px',
-          borderTop: '1px solid #e5e7eb',
+          borderTop: '1px solid var(--border)',
           fontSize: '12px',
         }}
       >
         <div>
-          <div style={{ color: '#6b7280', marginBottom: '2px' }}>Total Bid Depth</div>
-          <div style={{ fontWeight: 600, color: '#10b981', fontFamily: 'var(--font-mono, monospace)' }}>
+          <div style={{ color: 'var(--text-secondary)', marginBottom: '2px' }}>Total Bid Depth</div>
+          <div style={{ fontWeight: 600, color: 'var(--success)', fontFamily: 'var(--font-mono, monospace)' }}>
             {bidCurve[bidCurve.length - 1]?.cumulative.toLocaleString() || 0} shares
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ color: '#6b7280', marginBottom: '2px' }}>Total Ask Depth</div>
-          <div style={{ fontWeight: 600, color: '#dc2626', fontFamily: 'var(--font-mono, monospace)' }}>
+          <div style={{ color: 'var(--text-secondary)', marginBottom: '2px' }}>Total Ask Depth</div>
+          <div style={{ fontWeight: 600, color: 'var(--error)', fontFamily: 'var(--font-mono, monospace)' }}>
             {askCurve[askCurve.length - 1]?.cumulative.toLocaleString() || 0} shares
           </div>
         </div>

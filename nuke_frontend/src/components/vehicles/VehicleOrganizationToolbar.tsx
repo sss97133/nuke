@@ -169,7 +169,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
           fontSize: '9px',
           fontWeight: 600,
           border: '1px solid var(--border)',
-          background: preferences?.is_favorite ? '#fef3c7' : 'white',
+          background: preferences?.is_favorite ? '#fef3c7' : 'var(--surface)',
           color: preferences?.is_favorite ? '#92400e' : 'var(--text-muted)',
           cursor: 'pointer',
           borderRadius: '3px',
@@ -188,7 +188,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
           fontSize: '9px',
           fontWeight: 600,
           border: '1px solid var(--border)',
-          background: preferences?.is_hidden ? '#fee2e2' : 'white',
+          background: preferences?.is_hidden ? '#fee2e2' : 'var(--surface)',
           color: preferences?.is_hidden ? '#991b1b' : 'var(--text-muted)',
           cursor: 'pointer',
           borderRadius: '3px',
@@ -262,7 +262,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
                   fontSize: '9px',
                   border: '1px solid var(--accent)',
                   background: 'var(--accent)',
-                  color: 'white',
+                  color: 'var(--bg)',
                   cursor: 'pointer',
                   borderRadius: '3px'
                 }}
@@ -338,7 +338,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
                         transition: 'background 0.12s ease'
                       }}
                       onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'var(--surface)'}
                     >
                       {collection}
                     </button>

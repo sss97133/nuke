@@ -153,7 +153,7 @@ export default function DeveloperDashboard() {
             {newKey}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={copyKey} style={{ padding: '6px 12px', background: copied ? 'var(--success, #22c55e)' : 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--fs-8, 8px)' }}>
+            <button onClick={copyKey} style={{ padding: '6px 12px', background: copied ? 'var(--success, #22c55e)' : 'var(--accent)', color: 'var(--bg)', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--fs-8, 8px)' }}>
               {copied ? 'Copied!' : 'Copy'}
             </button>
             <button onClick={() => setNewKey(null)} style={{ padding: '6px 12px', background: 'var(--surface)', color: 'var(--text)', border: '2px solid var(--border)', cursor: 'pointer', fontSize: 'var(--fs-8, 8px)' }}>
@@ -178,7 +178,7 @@ export default function DeveloperDashboard() {
         />
         <button
           onClick={() => handleCreateKey()} disabled={creatingKey}
-          style={{ padding: '8px 16px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--fs-9, 9px)', whiteSpace: 'nowrap' }}
+          style={{ padding: '8px 16px', background: 'var(--accent)', color: 'var(--bg)', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--fs-9, 9px)', whiteSpace: 'nowrap' }}
         >
           {creatingKey ? 'Creating...' : 'Create Key'}
         </button>

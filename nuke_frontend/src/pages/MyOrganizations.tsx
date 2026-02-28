@@ -99,7 +99,7 @@ const MyOrganizations: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
         Loading organizations...
       </div>
     );
@@ -112,7 +112,7 @@ const MyOrganizations: React.FC = () => {
         <h1 className="heading-1" style={{ marginBottom: 'var(--space-2)' }}>
           My Organizations
         </h1>
-        <p style={{ color: '#666', fontSize: '14px' }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
           Manage your organizational affiliations and access
         </p>
       </div>
@@ -129,7 +129,7 @@ const MyOrganizations: React.FC = () => {
         }}
       >
         <div>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
             Total Organizations
           </div>
           <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
@@ -137,7 +137,7 @@ const MyOrganizations: React.FC = () => {
           </div>
         </div>
         <div>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
             Active
           </div>
           <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
@@ -145,7 +145,7 @@ const MyOrganizations: React.FC = () => {
           </div>
         </div>
         <div>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
             Total Vehicles
           </div>
           <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
@@ -153,7 +153,7 @@ const MyOrganizations: React.FC = () => {
           </div>
         </div>
         <div>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
             Total Value
           </div>
           <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
@@ -161,7 +161,7 @@ const MyOrganizations: React.FC = () => {
           </div>
         </div>
         <div>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
             Contributions
           </div>
           <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
@@ -226,7 +226,7 @@ const MyOrganizations: React.FC = () => {
           style={{
             padding: '6px 12px',
             fontSize: '12px',
-            backgroundColor: '#0000ff',
+            backgroundColor: 'var(--accent)',
           }}
         >
           Browse Organizations
@@ -239,13 +239,13 @@ const MyOrganizations: React.FC = () => {
           <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
             Organizations failed to load
           </div>
-          <div style={{ fontSize: '12px', color: '#666' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
             {loadError}
           </div>
         </div>
       )}
       {organizations.length === 0 ? (
-        <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+        <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
           <div style={{ fontSize: '18px', marginBottom: '10px' }}>
             No Organizations Found
           </div>

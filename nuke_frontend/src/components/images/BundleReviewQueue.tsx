@@ -306,7 +306,7 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
   if (events.length === 0) return null;
 
   return (
-    <div className="card" style={{ marginBottom: '16px', border: '1px solid #f59e0b33', background: '#fffbeb' }}>
+    <div className="card" style={{ marginBottom: '16px', border: '1px solid color-mix(in srgb, var(--warning) 20%, transparent)', background: 'var(--warning-dim)' }}>
       {/* Header */}
       <div
         className="card-header"
@@ -314,12 +314,12 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
         onClick={() => setCollapsed(c => !c)}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#92400e' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--warning)' }}>
             Sessions to Review
           </span>
           <span style={{
-            background: '#f59e0b',
-            color: '#fff',
+            background: 'var(--warning)',
+            color: 'var(--bg)',
             borderRadius: '10px',
             padding: '1px 8px',
             fontSize: '11px',
@@ -328,7 +328,7 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
             {events.length}
           </span>
         </div>
-        <span style={{ fontSize: '11px', color: '#92400e', transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
+        <span style={{ fontSize: '11px', color: 'var(--warning)', transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
       </div>
 
       {!collapsed && (
@@ -344,7 +344,7 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
             const imageCount = event.metadata?.image_count;
 
             return (
-              <div key={event.id} style={{ borderTop: '1px solid #fde68a', padding: '10px 16px' }}>
+              <div key={event.id} style={{ borderTop: '1px solid var(--warning-dim)', padding: '10px 16px' }}>
                 {/* Row summary */}
                 <div
                   style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
@@ -353,22 +353,22 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
                   {/* Thumbnails strip */}
                   <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
                     {thumbs.slice(0, 3).map((url, i) => (
-                      <img key={i} src={url} style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '3px', background: '#e5e7eb' }} alt="" />
+                      <img key={i} src={url} style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '3px', background: 'var(--border)' }} alt="" />
                     ))}
                     {thumbs.length === 0 && (
-                      <div style={{ width: '36px', height: '36px', background: '#fde68a', borderRadius: '3px' }} />
+                      <div style={{ width: '36px', height: '36px', background: 'var(--warning-dim)', borderRadius: '3px' }} />
                     )}
                   </div>
 
                   {/* Date + count + AI label */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ margin: 0, fontSize: '13px', fontWeight: 500, color: '#111' }}>
+                    <p style={{ margin: 0, fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>
                       {form?.saved ? '✓ ' : ''}{form?.title || event.title}
                     </p>
-                    <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#6b7280' }}>
+                    <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-secondary)' }}>
                       {dateLabel}{imageCount ? ` · ${imageCount} photos` : ''}
                       {suggestion && !form?.saved && (
-                        <span style={{ marginLeft: '8px', color: '#92400e', fontStyle: 'italic' }}>
+                        <span style={{ marginLeft: '8px', color: 'var(--warning)', fontStyle: 'italic' }}>
                           {suggestion.event_type}
                         </span>
                       )}
@@ -376,17 +376,17 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
                   </div>
 
                   {form?.saved
-                    ? <span style={{ fontSize: '12px', color: '#10b981', flexShrink: 0 }}>Saved ✓</span>
-                    : <span style={{ fontSize: '11px', color: '#92400e', flexShrink: 0 }}>{isExpanded ? '▲' : '▼'}</span>
+                    ? <span style={{ fontSize: '12px', color: 'var(--success)', flexShrink: 0 }}>Saved ✓</span>
+                    : <span style={{ fontSize: '11px', color: 'var(--warning)', flexShrink: 0 }}>{isExpanded ? '▲' : '▼'}</span>
                   }
                 </div>
 
                 {/* Expanded form */}
                 {isExpanded && form && !form.saved && (
-                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #fde68a' }}>
+                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--warning-dim)' }}>
                     {/* AI suggestion chip */}
                     {suggestion && (
-                      <div style={{ marginBottom: '10px', padding: '8px 10px', background: '#fef3c7', borderRadius: '4px', fontSize: '11px', color: '#92400e', lineHeight: 1.5 }}>
+                      <div style={{ marginBottom: '10px', padding: '8px 10px', background: 'var(--warning-dim)', borderRadius: '4px', fontSize: '11px', color: 'var(--warning)', lineHeight: 1.5 }}>
                         <strong>AI:</strong> "{suggestion.title}" · {suggestion.event_type}
                         {suggestion.reasoning ? ` — ${suggestion.reasoning}` : ''}
                         <button
@@ -394,7 +394,7 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
                             ...prev,
                             [event.id]: { ...prev[event.id], title: suggestion.title, event_type: suggestion.event_type },
                           }))}
-                          style={{ background: '#f59e0b', border: 'none', borderRadius: '3px', padding: '2px 8px', fontSize: '10px', color: '#fff', cursor: 'pointer', marginLeft: '8px' }}
+                          style={{ background: 'var(--warning)', border: 'none', borderRadius: '3px', padding: '2px 8px', fontSize: '10px', color: 'var(--bg)', cursor: 'pointer', marginLeft: '8px' }}
                         >
                           Accept
                         </button>
@@ -403,19 +403,19 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
                       <div>
-                        <label style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '3px' }}>Title</label>
+                        <label style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '3px' }}>Title</label>
                         <input
                           value={form.title}
                           onChange={e => updateForm(event.id, 'title', e.target.value)}
-                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '3px', boxSizing: 'border-box' }}
+                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '3px', boxSizing: 'border-box' }}
                         />
                       </div>
                       <div>
-                        <label style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '3px' }}>Type</label>
+                        <label style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '3px' }}>Type</label>
                         <select
                           value={form.event_type}
                           onChange={e => updateForm(event.id, 'event_type', e.target.value)}
-                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '3px', boxSizing: 'border-box' }}
+                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '3px', boxSizing: 'border-box' }}
                         >
                           {EVENT_TYPE_OPTIONS.map(opt => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -423,32 +423,32 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
                         </select>
                       </div>
                       <div>
-                        <label style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '3px' }}>Cost</label>
+                        <label style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '3px' }}>Cost</label>
                         <input
                           value={form.cost}
                           onChange={e => updateForm(event.id, 'cost', e.target.value)}
                           placeholder="$0.00"
-                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '3px', boxSizing: 'border-box' }}
+                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '3px', boxSizing: 'border-box' }}
                         />
                       </div>
                       <div>
-                        <label style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '3px' }}>Vendor</label>
+                        <label style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '3px' }}>Vendor</label>
                         <input
                           value={form.vendor}
                           onChange={e => updateForm(event.id, 'vendor', e.target.value)}
                           placeholder="Shop name..."
-                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '3px', boxSizing: 'border-box' }}
+                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '3px', boxSizing: 'border-box' }}
                         />
                       </div>
                     </div>
                     <div style={{ marginBottom: '10px' }}>
-                      <label style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '3px' }}>Notes</label>
+                      <label style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '3px' }}>Notes</label>
                       <textarea
                         value={form.notes}
                         onChange={e => updateForm(event.id, 'notes', e.target.value)}
                         placeholder="What happened during this session?"
                         rows={2}
-                        style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '3px', boxSizing: 'border-box', resize: 'vertical' }}
+                        style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '3px', boxSizing: 'border-box', resize: 'vertical' }}
                       />
                     </div>
                     <button

@@ -139,7 +139,7 @@ export default function DebugMarketSegment() {
               <h3 className="heading-3">Error Loading Segment</h3>
             </div>
             <div className="card-body">
-              <div style={{ color: 'var(--danger, #ef4444)', fontSize: '12px', marginBottom: '16px' }}>
+              <div style={{ color: 'var(--error)', fontSize: '12px', marginBottom: '16px' }}>
                 {error}
               </div>
               {debugInfo && (

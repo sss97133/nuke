@@ -242,7 +242,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
       id: 'imports',
       label: useHourly ? 'per hour' : 'per day',
       data,
-      color: '#10b981',
+      color: 'var(--success)',
       showArea: true,
     }];
   }, [recentVehicles, timeSpan, spanMs, resolvedTz]);
@@ -312,7 +312,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
             }}>Recently Added</span>
             <span style={{
               background: 'rgba(16,185,129,0.15)',
-              color: '#10b981',
+              color: 'var(--success)',
               fontSize: 'var(--fs-8)',
               fontWeight: 700,
               padding: '2px 8px',
@@ -432,7 +432,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
                       label={make}
                       count={count}
                       maxCount={summaryStats.maxMakeCount}
-                      color="#10b981"
+                      color="var(--success)"
                     />
                   ))}
                 </div>
@@ -498,7 +498,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
                         {[row.info.city, row.info.state].filter(Boolean).join(', ')}
                       </span>
                     )}
-                    <span style={{ fontWeight: 700, color: '#10b981', marginLeft: 'auto', flexShrink: 0 }}>{row.count}</span>
+                    <span style={{ fontWeight: 700, color: 'var(--success)', marginLeft: 'auto', flexShrink: 0 }}>{row.count}</span>
                     {row.totalValue > 0 && (
                       <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>{formatCurrency(row.totalValue)}</span>
                     )}

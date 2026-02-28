@@ -148,12 +148,12 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
 
   const getServiceTypeColor = (type: string | null) => {
     switch (type) {
-      case 'maintenance': return '#3b82f6';
-      case 'repair': return '#f59e0b';
+      case 'maintenance': return 'var(--accent)';
+      case 'repair': return 'var(--warning)';
       case 'restoration': return '#8b5cf6';
-      case 'modification': return '#10b981';
-      case 'parts_purchase': return '#6b7280';
-      default: return '#6b7280';
+      case 'modification': return 'var(--success)';
+      case 'parts_purchase': return 'var(--text-secondary)';
+      default: return 'var(--text-secondary)';
     }
   };
 
@@ -261,22 +261,22 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
           justifyContent: 'space-between',
           alignItems: 'center',
           fontSize: '11px',
-          color: '#666'
+          color: 'var(--text-secondary)'
         }}>
           <span>
-            <CheckCircle size={12} style={{ display: 'inline', marginRight: '4px', color: '#10b981' }} />
+            <CheckCircle size={12} style={{ display: 'inline', marginRight: '4px', color: 'var(--success)' }} />
             {serviceRecords.length} service records from {documentStats.processed} documents
           </span>
-          <span style={{ fontWeight: 600, color: '#374151' }}>
+          <span style={{ fontWeight: 600, color: 'var(--text)' }}>
             Total: {formatCurrency(totalSpend)}
           </span>
         </div>
 
         {/* Service Records List */}
-        <div className="card" style={{ border: '1px solid #c0c0c0', overflow: 'hidden' }}>
+        <div className="card" style={{ border: '1px solid var(--border)', overflow: 'hidden' }}>
           <div style={{
             background: 'var(--bg)',
-            borderBottom: '1px solid #c0c0c0',
+            borderBottom: '1px solid var(--border)',
             padding: '8px 12px',
             display: 'flex',
             alignItems: 'center',
@@ -292,15 +292,15 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
                 key={record.id}
                 style={{
                   padding: '10px 12px',
-                  borderBottom: i < Math.min(serviceRecords.length, 10) - 1 ? '1px solid #e5e7eb' : 'none',
-                  background: i % 2 === 0 ? 'white' : '#fafafa'
+                  borderBottom: i < Math.min(serviceRecords.length, 10) - 1 ? '1px solid var(--border)' : 'none',
+                  background: i % 2 === 0 ? 'var(--surface)' : 'var(--bg)'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{
                       background: getServiceTypeColor(record.service_type),
-                      color: 'white',
+                      color: 'var(--bg)',
                       padding: '1px 6px',
                       borderRadius: '2px',
                       fontSize: '9px',
@@ -314,13 +314,13 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
                     </span>
                   </div>
                   {record.cost && (
-                    <span style={{ fontWeight: 700, fontSize: '12px', color: '#374151', fontFamily: 'monospace' }}>
+                    <span style={{ fontWeight: 700, fontSize: '12px', color: 'var(--text)', fontFamily: 'monospace' }}>
                       {formatCurrency(record.cost)}
                     </span>
                   )}
                 </div>
 
-                <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                   <Calendar size={10} style={{ display: 'inline', marginRight: '4px' }} />
                   {formatDate(record.service_date)}
                   {record.shop_location && (
@@ -333,7 +333,7 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
                 </div>
 
                 {record.work_performed && (
-                  <div style={{ fontSize: '11px', color: '#4b5563', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
                     {record.work_performed.length > 150
                       ? record.work_performed.substring(0, 150) + '...'
                       : record.work_performed}
@@ -344,18 +344,18 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
                   <div style={{ marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                     {record.parts_replaced.slice(0, 5).map((part, j) => (
                       <span key={j} style={{
-                        background: '#f3f4f6',
-                        border: '1px solid #e5e7eb',
+                        background: 'var(--bg)',
+                        border: '1px solid var(--border)',
                         padding: '1px 6px',
                         borderRadius: '2px',
                         fontSize: '9px',
-                        color: '#4b5563'
+                        color: 'var(--text-secondary)'
                       }}>
                         {part}
                       </span>
                     ))}
                     {record.parts_replaced.length > 5 && (
-                      <span style={{ fontSize: '9px', color: '#9ca3af' }}>
+                      <span style={{ fontSize: '9px', color: 'var(--text-disabled)' }}>
                         +{record.parts_replaced.length - 5} more
                       </span>
                     )}
@@ -363,7 +363,7 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
                 )}
 
                 {record.confidence_score && record.confidence_score < 0.7 && (
-                  <div style={{ marginTop: '4px', fontSize: '9px', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ marginTop: '4px', fontSize: '9px', color: 'var(--warning)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <AlertCircle size={10} />
                     Low confidence extraction - verify details
                   </div>
@@ -375,10 +375,10 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
           {serviceRecords.length > 10 && (
             <div style={{
               padding: '8px 12px',
-              background: '#f9fafb',
-              borderTop: '1px solid #e5e7eb',
+              background: 'var(--bg)',
+              borderTop: '1px solid var(--border)',
               fontSize: '11px',
-              color: '#666',
+              color: 'var(--text-secondary)',
               textAlign: 'center'
             }}>
               Showing 10 of {serviceRecords.length} records

@@ -237,7 +237,7 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.5)',
+        background: 'var(--overlay)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -255,7 +255,7 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
           width: '100%',
           maxHeight: '90vh',
           overflow: 'auto',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+          boxShadow: '0 20px 60px color-mix(in srgb, var(--text) 25%, transparent)',
         }}
         onClick={(e) => e.stopPropagation()}
       >

@@ -1,0 +1,4 @@
+[38;5;142m[dotenvx@1.52.0] injecting env (0) from .env[39m
+ERROR:  unterminated quoted string at or near "'{summary:Built"
+LINE 4:     result='{summary:Built
+                   ^

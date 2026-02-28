@@ -203,7 +203,7 @@ const POPUP_CONTENT: Record<string, { title: string; body: React.ReactNode }> = 
         </ul>
         <p><strong>Conflict resolution:</strong> When multiple sources report different values for the same field, confidence scores determine precedence. A DMV record (0.95) supersedes a forum post (0.50) — but both are retained. Nothing is deleted.</p>
         <p><strong>Why this matters:</strong> Every valuation, every claim about a vehicle's history is traceable to source with a confidence score. This auditability is what makes the data licensable to insurers and lenders who require defensible data provenance — not just "the data says X" but "source Y with 0.95 confidence says X, corroborated by source Z."</p>
-        <p style={{ fontSize: '11px', color: '#888', marginTop: '12px' }}>80 registered sources · 9 categories · 1.36M+ observations stored</p>
+        <p style={{ fontSize: '11px', color: 'var(--text-disabled)', marginTop: '12px' }}>80 registered sources · 9 categories · 1.36M+ observations stored</p>
       </div>
     ),
   },
@@ -239,7 +239,7 @@ const POPUP_CONTENT: Record<string, { title: string; body: React.ReactNode }> = 
         </ol>
         <p><strong>Why auction comments?</strong> The BaT community is uniquely expert. A comment like "incorrect date-code battery, not matching numbers" from a marque specialist carries real price information — the kind of signal that doesn't appear in title history or standard vehicle data. The crowd knows things the record doesn't.</p>
         <p><strong>Average sentiment score across analyzed vehicles: 0.79</strong> (the community skews positive — enthusiasts bid on vehicles they're excited about).</p>
-        <p style={{ fontSize: '11px', color: '#888', marginTop: '12px' }}>127K+ vehicles analyzed · 11.6M+ comments processed</p>
+        <p style={{ fontSize: '11px', color: 'var(--text-disabled)', marginTop: '12px' }}>127K+ vehicles analyzed · 11.6M+ comments processed</p>
       </div>
     ),
   },
@@ -250,11 +250,11 @@ const POPUP_CONTENT: Record<string, { title: string; body: React.ReactNode }> = 
         <p>Across vehicles with both community sentiment scores and confirmed auction sale prices, the correlation is consistent across the full sentiment range:</p>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '12px', fontSize: '11px' }}>
           <thead>
-            <tr style={{ background: '#f5f5f5' }}>
-              <th style={{ border: '1px solid #ccc', padding: '6px 10px', textAlign: 'left' }}>Sentiment</th>
-              <th style={{ border: '1px solid #ccc', padding: '6px 10px', textAlign: 'left' }}>Score</th>
-              <th style={{ border: '1px solid #ccc', padding: '6px 10px', textAlign: 'left' }}>Median Sale Price</th>
-              <th style={{ border: '1px solid #ccc', padding: '6px 10px', textAlign: 'left' }}>vs. Very Negative</th>
+            <tr style={{ background: 'var(--bg)' }}>
+              <th style={{ border: '1px solid var(--border)', padding: '6px 10px', textAlign: 'left' }}>Sentiment</th>
+              <th style={{ border: '1px solid var(--border)', padding: '6px 10px', textAlign: 'left' }}>Score</th>
+              <th style={{ border: '1px solid var(--border)', padding: '6px 10px', textAlign: 'left' }}>Median Sale Price</th>
+              <th style={{ border: '1px solid var(--border)', padding: '6px 10px', textAlign: 'left' }}>vs. Very Negative</th>
             </tr>
           </thead>
           <tbody>
@@ -266,10 +266,10 @@ const POPUP_CONTENT: Record<string, { title: string; body: React.ReactNode }> = 
               ['Very Positive', '0.8+', '$25,000', '+89%', true],
             ] as [string, string, string, string, boolean][]).map(([tier, range, price, vs, highlight]) => (
               <tr key={tier}>
-                <td style={{ border: '1px solid #e0e0e0', padding: '5px 10px' }}>{tier}</td>
-                <td style={{ border: '1px solid #e0e0e0', padding: '5px 10px' }}>{range}</td>
-                <td style={{ border: '1px solid #e0e0e0', padding: '5px 10px', fontWeight: highlight ? 'bold' : 'normal' }}>{price}</td>
-                <td style={{ border: '1px solid #e0e0e0', padding: '5px 10px', color: highlight ? '#2e7d32' : '#888', fontWeight: highlight ? 'bold' : 'normal' }}>{vs}</td>
+                <td style={{ border: '1px solid var(--border)', padding: '5px 10px' }}>{tier}</td>
+                <td style={{ border: '1px solid var(--border)', padding: '5px 10px' }}>{range}</td>
+                <td style={{ border: '1px solid var(--border)', padding: '5px 10px', fontWeight: highlight ? 'bold' : 'normal' }}>{price}</td>
+                <td style={{ border: '1px solid var(--border)', padding: '5px 10px', color: highlight ? 'var(--success)' : 'var(--text-disabled)', fontWeight: highlight ? 'bold' : 'normal' }}>{vs}</td>
               </tr>
             ))}
           </tbody>
@@ -582,7 +582,7 @@ export default function InvestorOffering() {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'var(--bg, #f5f5f5)',
+        background: 'var(--bg)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -726,9 +726,9 @@ export default function InvestorOffering() {
             style={{
               width: '100%',
               padding: '12px',
-              background: '#1a1a1a',
-              color: '#fff',
-              border: '2px solid #1a1a1a',
+              background: 'var(--text)',
+              color: 'var(--bg)',
+              border: '2px solid var(--text)',
               fontSize: '12px',
               fontWeight: 'bold',
               letterSpacing: '1px',
@@ -909,8 +909,8 @@ export default function InvestorOffering() {
             style={{
               width: '100%',
               padding: '10px',
-              background: allChecked && viewerName && viewerEmail ? '#1a1a1a' : 'var(--grey-400)',
-              color: '#fff',
+              background: allChecked && viewerName && viewerEmail ? 'var(--text)' : 'var(--grey-400)',
+              color: 'var(--bg)',
               border: '2px solid transparent',
               fontSize: '12px',
               fontWeight: 'bold',
@@ -976,8 +976,8 @@ export default function InvestorOffering() {
               fontSize: '11px',
               fontWeight: 600,
               padding: '5px 12px',
-              background: '#1a1a1a',
-              color: '#fff',
+              background: 'var(--text)',
+              color: 'var(--bg)',
               textDecoration: 'none',
               letterSpacing: '0.5px',
             }}
@@ -987,9 +987,9 @@ export default function InvestorOffering() {
           <div style={{
             fontSize: '9px',
             padding: '4px 10px',
-            background: '#e8f5e9',
-            color: '#2e7d32',
-            border: '1px solid #c8e6c9',
+            background: 'var(--success-dim)',
+            color: 'var(--success)',
+            border: '1px solid var(--success-dim)',
             fontWeight: 'bold',
             letterSpacing: '0.5px',
           }}>
@@ -1040,8 +1040,8 @@ export default function InvestorOffering() {
             disabled={exportRequested}
             style={{
               padding: '8px 16px',
-              background: exportRequested ? 'var(--grey-200)' : '#1a1a1a',
-              color: exportRequested ? 'var(--text-muted)' : '#fff',
+              background: exportRequested ? 'var(--grey-200)' : 'var(--text)',
+              color: exportRequested ? 'var(--text-muted)' : 'var(--bg)',
               border: '1px solid var(--border-medium)',
               fontSize: '11px',
               fontWeight: 'bold',
@@ -1372,7 +1372,7 @@ export default function InvestorOffering() {
                 Reader Notes
               </div>
               {popup.submitted ? (
-                <div style={{ fontSize: '11px', color: '#2e7d32' }}>Note saved.</div>
+                <div style={{ fontSize: '11px', color: 'var(--success)' }}>Note saved.</div>
               ) : (
                 <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
@@ -1400,8 +1400,8 @@ export default function InvestorOffering() {
                     disabled={!popup.note.trim()}
                     style={{
                       padding: '6px 14px',
-                      background: popup.note.trim() ? '#1a1a1a' : 'var(--grey-300)',
-                      color: '#fff',
+                      background: popup.note.trim() ? 'var(--text)' : 'var(--grey-300)',
+                      color: 'var(--bg)',
                       border: 'none',
                       fontSize: '9px',
                       fontWeight: 'bold',

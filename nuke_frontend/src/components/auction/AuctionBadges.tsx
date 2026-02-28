@@ -12,14 +12,14 @@ export const AuctionStatusBadge: React.FC<{
 }> = ({ status, title, endedAt, fadeAfterDays = 1 }) => {
   // Mirror the visual language used in VehicleHeader (sold/rnm/live)
   const cfg: Record<AuctionStatus, { text: string; color: string; bg: string }> = {
-    sold: { text: 'SOLD', color: '#22c55e', bg: '#dcfce7' },
-    reserve_not_met: { text: 'RNM', color: '#f59e0b', bg: '#fef3c7' },
-    active: { text: 'LIVE', color: '#3b82f6', bg: '#dbeafe' },
-    ending_soon: { text: 'ENDING', color: '#f59e0b', bg: '#fef3c7' },
-    ended: { text: 'ENDED', color: '#6b7280', bg: '#f3f4f6' },
-    expired: { text: 'EXPIRED', color: '#6b7280', bg: '#f3f4f6' },
-    cancelled: { text: 'CANCELLED', color: '#ef4444', bg: '#fee2e2' },
-    pending: { text: 'PENDING', color: '#6b7280', bg: '#f3f4f6' },
+    sold: { text: 'SOLD', color: 'var(--success)', bg: 'var(--success-dim)' },
+    reserve_not_met: { text: 'RNM', color: 'var(--warning)', bg: 'var(--warning-dim)' },
+    active: { text: 'LIVE', color: 'var(--accent)', bg: 'var(--accent-dim, #dbeafe)' },
+    ending_soon: { text: 'ENDING', color: 'var(--warning)', bg: 'var(--warning-dim)' },
+    ended: { text: 'ENDED', color: 'var(--text-secondary)', bg: 'var(--bg)' },
+    expired: { text: 'EXPIRED', color: 'var(--text-secondary)', bg: 'var(--bg)' },
+    cancelled: { text: 'CANCELLED', color: 'var(--error)', bg: 'var(--error-dim)' },
+    pending: { text: 'PENDING', color: 'var(--text-secondary)', bg: 'var(--bg)' },
   };
 
   const s = cfg[status] || cfg.ended;
@@ -170,9 +170,9 @@ export const LiveAuctionBadge: React.FC<{
       className={className || 'badge'}
       title="Live Auction House"
       style={{
-        background: '#dcfce7',
-        color: '#166534',
-        borderColor: '#166534',
+        background: 'var(--success-dim)',
+        color: 'var(--success)',
+        borderColor: 'var(--success)',
         borderWidth: '1px',
         borderStyle: 'solid',
         fontWeight: 700,

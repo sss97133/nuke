@@ -304,7 +304,7 @@ export default function VehicleAuctionQuickStartCard(props: {
     // which can cause major flicker/clipping on complex pages.
     <div
       className="modal-overlay"
-      style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(0, 0, 0, 0.35)' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'var(--overlay)' }}
       onClick={() => !submitting && setShowModal(false)}
     >
       <div className="modal" onClick={(e) => e.stopPropagation()}>

@@ -44,12 +44,21 @@ html, body, #root {
 }
 
 /* ============================================================================
-   DARK MODE COMPAT: Tailwind light utility remaps
-   Many components still use Tailwind light tokens (bg-white, text-gray-900, etc.).
-   In dark mode, remap the most common ones to our theme variables.
+   DARK MODE COMPAT: Tailwind light utility remaps  (LEGACY — shrink over time)
+
+   Many components still use Tailwind color utilities (bg-white, text-gray-900,
+   bg-blue-600, etc.) which have no built-in dark mode awareness.
+
+   This compat layer maps the most common ones to design system tokens so they
+   render correctly in dark mode. As components are migrated to CSS variables,
+   these rules should be removed.
+
+   Audit (2026-02-28): 4,765 Tailwind color utility instances remain in JSX.
+   2,084 (43.7%) are covered by this compat layer; 2,681 (56.3%) are not.
    ============================================================================
 */
 
+/* ── Background utilities ─────────────────────────────────────────────────── */
 :root[data-theme="dark"] .bg-white { background-color: var(--surface) !important; }
 :root[data-theme="dark"] .bg-gray-50 { background-color: var(--bg) !important; }
 :root[data-theme="dark"] .bg-gray-100 { background-color: var(--surface) !important; }
@@ -58,6 +67,7 @@ html, body, #root {
 :root[data-theme="dark"] .bg-gray-400 { background-color: var(--border) !important; }
 :root[data-theme="dark"] .bg-gray-500 { background-color: var(--text-disabled) !important; }
 
+/* ── Text utilities ───────────────────────────────────────────────────────── */
 :root[data-theme="dark"] .text-black { color: var(--text) !important; }
 :root[data-theme="dark"] .text-gray-900 { color: var(--text) !important; }
 :root[data-theme="dark"] .text-gray-800 { color: var(--text) !important; }
@@ -67,6 +77,7 @@ html, body, #root {
 :root[data-theme="dark"] .text-gray-400 { color: var(--text-muted) !important; }
 :root[data-theme="dark"] .text-gray-300 { color: var(--text-disabled) !important; }
 
+/* ── Border utilities ─────────────────────────────────────────────────────── */
 :root[data-theme="dark"] .border-gray-100 { border-color: var(--border) !important; }
 :root[data-theme="dark"] .border-gray-200 { border-color: var(--border) !important; }
 :root[data-theme="dark"] .border-gray-300 { border-color: var(--border) !important; }

@@ -212,13 +212,13 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <span style={{ fontSize: '12px', fontWeight: 700 }}>Fleet Health</span>
           <div style={{ display: 'flex', gap: '12px', fontSize: '11px' }}>
-            <span style={{ color: '#15803d' }}>
+            <span style={{ color: 'var(--success)' }}>
               {healthDistribution.healthy.length} healthy
             </span>
-            <span style={{ color: '#d97706' }}>
+            <span style={{ color: 'var(--warning)' }}>
               {healthDistribution.needsWork.length} need work
             </span>
-            <span style={{ color: '#dc2626' }}>
+            <span style={{ color: 'var(--error)' }}>
               {healthDistribution.critical.length} critical
             </span>
           </div>
@@ -271,17 +271,17 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
             style={{
               flex: '1 1 120px',
               padding: '12px',
-              background: activeFilter === 'healthy' ? '#dcfce7' : '#f0fdf4',
-              border: `2px solid ${activeFilter === 'healthy' ? '#15803d' : '#86efac'}`,
+              background: activeFilter === 'healthy' ? 'var(--success-dim)' : 'var(--success-dim)',
+              border: `2px solid ${activeFilter === 'healthy' ? 'var(--success)' : 'var(--success-dim)'}`,
               borderRadius: '4px',
               cursor: 'pointer',
               textAlign: 'left'
             }}
           >
-            <div style={{ fontSize: '27px', fontWeight: 700, color: '#15803d' }}>
+            <div style={{ fontSize: '27px', fontWeight: 700, color: 'var(--success)' }}>
               {healthDistribution.healthy.length}
             </div>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: '#166534' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--success)' }}>
               Healthy (75%+)
             </div>
           </button>
@@ -293,17 +293,17 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
             style={{
               flex: '1 1 120px',
               padding: '12px',
-              background: activeFilter === 'needs_work' ? '#fef3c7' : '#fffbeb',
-              border: `2px solid ${activeFilter === 'needs_work' ? '#d97706' : '#fcd34d'}`,
+              background: activeFilter === 'needs_work' ? 'var(--warning-dim)' : 'var(--warning-dim)',
+              border: `2px solid ${activeFilter === 'needs_work' ? 'var(--warning)' : 'var(--warning-dim)'}`,
               borderRadius: '4px',
               cursor: 'pointer',
               textAlign: 'left'
             }}
           >
-            <div style={{ fontSize: '27px', fontWeight: 700, color: '#d97706' }}>
+            <div style={{ fontSize: '27px', fontWeight: 700, color: 'var(--warning)' }}>
               {healthDistribution.needsWork.length}
             </div>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: '#92400e' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--warning)' }}>
               Needs Work (50-74%)
             </div>
           </button>
@@ -315,17 +315,17 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
             style={{
               flex: '1 1 120px',
               padding: '12px',
-              background: activeFilter === 'critical' ? '#fee2e2' : '#fef2f2',
-              border: `2px solid ${activeFilter === 'critical' ? '#dc2626' : '#fca5a5'}`,
+              background: activeFilter === 'critical' ? 'var(--error-dim)' : 'var(--error-dim)',
+              border: `2px solid ${activeFilter === 'critical' ? 'var(--error)' : 'var(--error-dim)'}`,
               borderRadius: '4px',
               cursor: 'pointer',
               textAlign: 'left'
             }}
           >
-            <div style={{ fontSize: '27px', fontWeight: 700, color: '#dc2626' }}>
+            <div style={{ fontSize: '27px', fontWeight: 700, color: 'var(--error)' }}>
               {healthDistribution.critical.length}
             </div>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: '#991b1b' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--error)' }}>
               Critical (&lt;50%)
             </div>
           </button>
@@ -348,14 +348,14 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
           </div>
           <div style={{
             height: '8px',
-            background: '#e5e7eb',
+            background: 'var(--border)',
             borderRadius: '4px',
             overflow: 'hidden'
           }}>
             <div style={{
               height: '100%',
               width: `${migrationProgress.percentage}%`,
-              background: 'linear-gradient(90deg, #22c55e, #16a34a)',
+              background: 'linear-gradient(90deg, var(--success), var(--success))',
               borderRadius: '4px',
               transition: 'width 0.3s ease'
             }} />
@@ -409,15 +409,15 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       padding: '8px 12px',
-                      background: '#f9fafb',
-                      border: '1px solid #e5e7eb',
+                      background: 'var(--bg)',
+                      border: '1px solid var(--border)',
                       borderRadius: '4px'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{
                         fontSize: '11px',
-                        background: '#e5e7eb',
+                        background: 'var(--border)',
                         padding: '2px 6px',
                         borderRadius: '2px'
                       }}>
@@ -434,8 +434,8 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
                         padding: '4px 10px',
                         fontSize: '9px',
                         fontWeight: 600,
-                        background: '#1e40af',
-                        color: '#fff',
+                        background: 'var(--accent)',
+                        color: 'var(--bg)',
                         border: 'none',
                         borderRadius: '3px',
                         cursor: 'pointer',

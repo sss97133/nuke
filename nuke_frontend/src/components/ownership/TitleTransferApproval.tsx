@@ -197,7 +197,7 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
       <div style={{
         padding: '12px',
         background: '#dc2626',
-        color: 'white',
+        color: 'var(--bg)',
         fontSize: '12px',
         fontWeight: 700
       }}>
@@ -264,7 +264,7 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
                       fontWeight: 600,
                       border: '1px solid #dc2626',
                       background: '#dc2626',
-                      color: 'white',
+                      color: 'var(--bg)',
                       cursor: processing.has(transfer.id) ? 'wait' : 'pointer',
                       borderRadius: '4px',
                       opacity: processing.has(transfer.id) || !disputeReason.trim() ? 0.5 : 1
@@ -304,7 +304,7 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
                     fontWeight: 600,
                     border: '1px solid #059669',
                     background: '#059669',
-                    color: 'white',
+                    color: 'var(--bg)',
                     cursor: processing.has(transfer.id) ? 'wait' : 'pointer',
                     borderRadius: '4px',
                     opacity: processing.has(transfer.id) ? 0.5 : 1

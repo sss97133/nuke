@@ -23,7 +23,7 @@ import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/r
 import { qualityGate } from '../_shared/extractionQualityGate.ts';
 import { cleanVehicleFields, stripHtmlTags } from '../_shared/pollutionDetector.ts';
 
-const EXTRACTOR_VERSION = '2.0.0';
+const EXTRACTOR_VERSION = '2.1.0';
 
 // ============================================================================
 // TYPES
@@ -68,6 +68,11 @@ interface GoodingExtracted {
   description: string | null;
   vehicle_type: string | null;
   saleroom_addendum: string | null;  // SRA note HTML or plain text
+
+  // Parsed structured fields
+  engine_size: string | null;
+  transmission: string | null;
+  mileage: number | null;
 
   // Images
   image_urls: string[];
@@ -143,6 +148,100 @@ interface GoodingPageData {
 }
 
 // ============================================================================
+// ENGINE / TRANSMISSION / MILEAGE PARSERS
+// ============================================================================
+
+/**
+ * Parse engine_size from Gooding specifications array.
+ * Examples: "331 CID OHV V-8 Engine", "2,418 CC DOHC V-6 Engine",
+ *           "1,076 CC Inline Four Cylinder", "260 CID SOHC Inline 8-Cylinder Engine"
+ */
+function parseEngineFromSpecs(specs: string[]): string | null {
+  const engineKeywords = [
+    /\bEngine\b/i,
+    /\bCylinder(s)?\b/i,
+    /\bV-\d+\b/i,
+    /\bInline[-\s]\d+\b/i,
+    /\bInline[-\s](Four|Six|Eight|Three|Five|Twelve)\b/i,
+    /\bFlat[-\s](Four|Six|Eight)\b/i,
+    /\bBHP\b/i,
+    /\b\d+\s*(?:CC|CID|ci)\b/i,
+  ];
+  const excludeKeywords = [
+    /Carburetor/i, /Injection/i, /Brakes?/i, /Suspension/i,
+    /Wheelbase/i, /Gearbox/i, /Transmission/i, /Axle/i,
+    /Spring/i, /Shock/i, /Chassis/i,
+  ];
+
+  for (const spec of specs) {
+    const trimmed = spec.trim();
+    if (!trimmed) continue;
+    if (excludeKeywords.some(p => p.test(trimmed))) continue;
+    if (engineKeywords.some(p => p.test(trimmed))) {
+      return trimmed.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 100);
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse transmission from Gooding specifications array.
+ * Examples: "4-Speed Hydra-Matic Transmission", "3-Speed Manual Gearbox"
+ */
+function parseTransmissionFromSpecs(specs: string[]): string | null {
+  for (const spec of specs) {
+    const trimmed = spec.trim();
+    if (!trimmed) continue;
+    if (/\b(Transmission|Gearbox|Transaxle)\b/i.test(trimmed)) {
+      return trimmed.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 100);
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse mileage from highlight/note prose.
+ * Examples: "Driven No More Than 500 Miles Since Restoration" → 500
+ *           "Showing Less than 19,300 Miles" → 19300
+ */
+function parseMileageFromText(text: string): number | null {
+  if (!text) return null;
+  const milesPatterns = [
+    /(\d{1,3}(?:,\d{3})*)\s*[-\s]?miles?\b/i,
+    /(\d{1,3}(?:,\d{3})*)\s*-mile\b/i,
+    /showing\s+(?:less\s+than\s+|approximately\s+|just\s+)?([0-9,]+)\s*miles?/i,
+    /driven\s+(?:no\s+more\s+than\s+|only\s+|just\s+)?([0-9,]+)\s*miles?/i,
+    /odometer\s+(?:shows?|reads?|indicates?)\s+([0-9,]+)\s*miles?/i,
+    /approximately\s+([0-9,]+)\s*miles?/i,
+    /only\s+([0-9,]+)\s*miles?/i,
+    /fewer\s+than\s+([0-9,]+)\s*miles?/i,
+    /less\s+than\s+([0-9,]+)\s*miles?/i,
+    /([0-9,]+)\s*miles?\s+(?:from\s+new|since\s+new|since\s+(?:restoration|rebuild|new))/i,
+  ];
+  for (const pattern of milesPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const numStr = match[match.length - 1] || match[1];
+      const miles = parseInt(numStr.replace(/,/g, ''), 10);
+      if (miles > 0 && miles < 5_000_000) return miles;
+    }
+  }
+  // KM → miles
+  const kmPatterns = [
+    /(\d{1,3}(?:,\d{3})*)\s*[-\s]?km\b/i,
+    /(\d{1,3}(?:,\d{3})*)\s*k(?:ilo)?m(?:etres?|eters?)/i,
+  ];
+  for (const pattern of kmPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const km = parseInt(match[1].replace(/,/g, ''), 10);
+      if (km > 0 && km < 5_000_000) return Math.round(km * 0.621371);
+    }
+  }
+  return null;
+}
+
+// ============================================================================
 // VIN EXTRACTION
 // ============================================================================
 
@@ -180,6 +279,42 @@ function buildCloudinaryUrl(publicId: string, width: number = 1800): string {
   // URL encode the public_id since it may contain spaces
   const encodedId = publicId.split('/').map(encodeURIComponent).join('/');
   return `${CLOUDINARY_BASE}/c_fill,g_auto,q_90,w_${width}/v1/${encodedId}`;
+}
+
+// ============================================================================
+// DESCRIPTION BUILDER
+// ============================================================================
+
+/**
+ * Build a rich description from Gooding's two content sources:
+ *   - item.note: typically a short collection credit ("From the John Doe Collection")
+ *                or a 1-2 sentence provenance note. Sometimes null.
+ *   - highlights: array of 3-8 bullet-point facts about the car (the primary content).
+ *
+ * Strategy:
+ *   - Join highlights as the main body (they carry the substantive content).
+ *   - Prepend the note if it's a meaningful provenance statement (> 20 chars).
+ *   - Return null only if both are empty.
+ */
+function buildGoodingDescription(note: string | null, highlights: string[]): string | null {
+  const parts: string[] = [];
+
+  // Add note if it has meaningful content (not just whitespace or single word)
+  const cleanNote = (note || '').replace(/<[^>]+>/g, '').trim();
+  if (cleanNote.length > 20) {
+    parts.push(cleanNote);
+  }
+
+  // Add highlights as the main description body
+  const cleanHighlights = highlights
+    .map(h => h.replace(/<[^>]+>/g, '').trim())
+    .filter(h => h.length > 5);
+  if (cleanHighlights.length > 0) {
+    parts.push(cleanHighlights.join('\n'));
+  }
+
+  if (parts.length === 0) return null;
+  return parts.join('\n\n').slice(0, 5000);
 }
 
 // ============================================================================
@@ -268,6 +403,18 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
     vin = chassis;
   }
 
+  // Parse engine/transmission from structured specifications array
+  const specs = item?.specifications || [];
+  const engineSize = parseEngineFromSpecs(specs);
+  const transmissionStr = parseTransmissionFromSpecs(specs);
+
+  // Parse mileage from prose in highlights + note
+  const proseText = [
+    ...cleanHighlights,
+    item?.note || '',
+  ].join('\n');
+  const mileage = parseMileageFromText(proseText);
+
   // Salesroom addendum (SRA note) – strip HTML for plain text
   let saleroom_addendum: string | null = null;
   const sraHtml = lot.sraNote?.childMarkdownRemark?.html;
@@ -316,9 +463,13 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
 
     highlights: cleanHighlights,
     specifications: item?.specifications || [],
-    description: item?.note || null,
+    description: buildGoodingDescription(item?.note || null, cleanHighlights),
     vehicle_type: item?.type || null,
     saleroom_addendum,
+
+    engine_size: engineSize,
+    transmission: transmissionStr,
+    mileage,
 
     image_urls: allImages,
 
@@ -464,13 +615,19 @@ async function saveToDatabase(
 
   let isNew = false;
 
-  // Build description from highlights + note
+  // Description is already built by buildGoodingDescription() in extractFromPageData
+  // (note + highlights merged). Strip any residual HTML and truncate.
   let description: string | null = extracted.description;
-  if (!description && extracted.highlights.length > 0) {
-    description = extracted.highlights.join('\n');
-  }
   if (description) {
     description = stripHtmlTags(description).trim().slice(0, 5000) || null;
+  }
+  // Final fallback: if extractFromPageData returned null (pre-2.1 callers), use highlights
+  if (!description && extracted.highlights.length > 0) {
+    description = extracted.highlights
+      .map(h => h.replace(/<[^>]+>/g, '').trim())
+      .filter(h => h.length > 5)
+      .join('\n')
+      .slice(0, 5000) || null;
   }
 
   // Quality gate
@@ -482,7 +639,7 @@ async function saveToDatabase(
     sale_price: extracted.sale_price,
     description,
     color: null, // Gooding doesn't provide color directly
-    transmission: null,
+    transmission: extracted.transmission,
   };
   const cleanedData = cleanVehicleFields(rawVehicleData, { platform: 'gooding' });
   const gate = qualityGate(cleanedData, { source: 'gooding', sourceType: 'auction' });
@@ -510,6 +667,10 @@ async function saveToDatabase(
       updated_at: new Date().toISOString(),
       extractor_version: EXTRACTOR_VERSION,
     };
+    // Only fill engine/transmission/mileage if extracted and currently empty
+    if (extracted.engine_size) vehicleUpdate.engine_size = extracted.engine_size;
+    if (extracted.transmission) vehicleUpdate.transmission = extracted.transmission;
+    if (extracted.mileage) vehicleUpdate.mileage = extracted.mileage;
     if (extracted.coachwork || extracted.saleroom_addendum || extracted.auction_calendar_position) {
       const { data: existingVehicle } = await supabase
         .from('vehicles')
@@ -557,6 +718,9 @@ async function saveToDatabase(
       source: 'gooding',
       extractor_version: EXTRACTOR_VERSION,
       notes: notesParts.join('\n'),
+      engine_size: extracted.engine_size || undefined,
+      transmission: extracted.transmission || undefined,
+      mileage: extracted.mileage || undefined,
     };
     if (extracted.coachwork || extracted.saleroom_addendum || extracted.auction_calendar_position) {
       insertPayload.origin_metadata = {

@@ -18,7 +18,7 @@ const IssuePopup = ({ issue, type, vehicleId, onClose }: IssuePopupProps) => {
     <div style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.6)',
+      background: 'var(--overlay)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -136,7 +136,7 @@ const IssuePopup = ({ issue, type, vehicleId, onClose }: IssuePopupProps) => {
                 background: 'var(--primary)',
                 border: '1px solid var(--primary)',
                 cursor: 'pointer',
-                color: 'white',
+                color: 'var(--bg)',
                 width: '100%',
                 fontSize: '11px',
                 fontWeight: 600
@@ -319,14 +319,14 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
     switch (sentiment) {
       case 'positive':
       case 'very positive':
-        return '#16a34a';
+        return 'var(--success)';
       case 'negative':
       case 'very negative':
-        return '#dc2626';
+        return 'var(--error)';
       case 'mixed':
-        return '#ca8a04';
+        return 'var(--warning)';
       default:
-        return '#6b7280';
+        return 'var(--text-secondary)';
     }
   };
 
@@ -430,7 +430,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
   return (
     <div className="space-y-3">
       {/* Header with source info */}
-      <div style={{ fontSize: '11px', color: '#666', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>
           Based on {observationCount} observations from {sourceCategories.join(', ')}
         </span>
@@ -443,10 +443,10 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
 
       {/* Sentiment Analysis Card */}
       {sentimentData && (
-        <div className="card" style={{ border: '1px solid #c0c0c0', overflow: 'hidden' }}>
+        <div className="card" style={{ border: '1px solid var(--border)', overflow: 'hidden' }}>
           <div style={{
             background: 'var(--bg)',
-            borderBottom: '1px solid #c0c0c0',
+            borderBottom: '1px solid var(--border)',
             padding: '8px 12px',
             display: 'flex',
             alignItems: 'center',
@@ -458,7 +458,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             </div>
             <div style={{
               background: getSentimentColor(sentimentData.overall_sentiment),
-              color: 'white',
+              color: 'var(--bg)',
               padding: '2px 8px',
               borderRadius: '2px',
               fontSize: '12px',
@@ -471,14 +471,14 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
           <div style={{ padding: '12px' }}>
             {/* Sentiment Score Bar */}
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                 <span>Negative</span>
                 <span>Score: {(sentimentData.sentiment_score * 100).toFixed(0)}%</span>
                 <span>Positive</span>
               </div>
               <div style={{
                 height: '8px',
-                background: '#e5e7eb',
+                background: 'var(--border)',
                 borderRadius: '4px',
                 overflow: 'hidden',
                 position: 'relative'
@@ -488,7 +488,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                   left: '50%',
                   width: '2px',
                   height: '100%',
-                  background: '#9ca3af'
+                  background: 'var(--text-disabled)'
                 }} />
                 <div style={{
                   position: 'absolute',
@@ -499,8 +499,8 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                   background: getSentimentColor(sentimentData.overall_sentiment),
                   borderRadius: '50%',
                   top: '-2px',
-                  border: '2px solid white',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                  border: '2px solid var(--bg)',
+                  boxShadow: '0 1px 3px var(--overlay)'
                 }} />
               </div>
             </div>
@@ -508,7 +508,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             {/* Themes - handles both string[] and {theme,frequency,sentiment}[] formats */}
             {sentimentData.themes && sentimentData.themes.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: '#374151' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: 'var(--text)' }}>
                   Key Themes
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -520,8 +520,8 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
 
                     return (
                       <div key={i} style={{
-                        background: '#f3f4f6',
-                        border: '1px solid #e5e7eb',
+                        background: 'var(--bg)',
+                        border: '1px solid var(--border)',
                         padding: '4px 8px',
                         borderRadius: '2px',
                         fontSize: '11px',
@@ -539,7 +539,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                           background: getSentimentColor(themeSentiment)
                         }} />
                         <span>{themeText}</span>
-                        {themeFreq && <span style={{ color: '#9ca3af' }}>({themeFreq})</span>}
+                        {themeFreq && <span style={{ color: 'var(--text-disabled)' }}>({themeFreq})</span>}
                       </div>
                     );
                   })}
@@ -554,7 +554,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                   fontSize: '12px',
                   fontWeight: 600,
                   marginBottom: '8px',
-                  color: '#dc2626',
+                  color: 'var(--error)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px'
@@ -563,8 +563,8 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                   Concerns Raised
                 </div>
                 <div style={{
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
+                  background: 'var(--error-dim)',
+                  border: '1px solid var(--error-dim)',
                   borderRadius: '2px',
                   padding: '8px'
                 }}>
@@ -573,7 +573,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                       key={i}
                       style={{
                         fontSize: '11px',
-                        color: '#991b1b',
+                        color: 'var(--error)',
                         marginBottom: i < Math.min(sentimentData.red_flags.length, 5) - 1 ? '4px' : 0,
                         cursor: 'pointer',
                         display: 'flex',
@@ -583,12 +583,12 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                         borderRadius: '2px',
                         transition: 'background 0.1s'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--error-dim)'}
                       onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                       onClick={() => setSelectedIssue({ issue: flag, type: 'concern' })}
                     >
                       <span>• {flag}</span>
-                      <span style={{ fontSize: '9px', color: '#b91c1c', opacity: 0.7 }}>Get Quote →</span>
+                      <span style={{ fontSize: '9px', color: 'var(--error)', opacity: 0.7 }}>Get Quote →</span>
                     </div>
                   ))}
                 </div>
@@ -602,7 +602,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                   fontSize: '12px',
                   fontWeight: 600,
                   marginBottom: '8px',
-                  color: '#16a34a',
+                  color: 'var(--success)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px'
@@ -611,8 +611,8 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                   Highlights
                 </div>
                 <div style={{
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
+                  background: 'var(--success-dim)',
+                  border: '1px solid var(--success-dim)',
                   borderRadius: '2px',
                   padding: '8px'
                 }}>
@@ -621,7 +621,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                       key={i}
                       style={{
                         fontSize: '11px',
-                        color: '#166534',
+                        color: 'var(--success)',
                         marginBottom: i < Math.min(sentimentData.highlights.length, 5) - 1 ? '4px' : 0,
                         cursor: 'pointer',
                         display: 'flex',
@@ -631,12 +631,12 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                         borderRadius: '2px',
                         transition: 'background 0.1s'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#dcfce7'}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--success-dim)'}
                       onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                       onClick={() => setSelectedIssue({ issue: highlight, type: 'highlight' })}
                     >
                       <span>✓ {highlight}</span>
-                      <span style={{ fontSize: '9px', color: '#15803d', opacity: 0.7 }}>Verify →</span>
+                      <span style={{ fontSize: '9px', color: 'var(--success)', opacity: 0.7 }}>Verify →</span>
                     </div>
                   ))}
                 </div>
@@ -650,7 +650,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                   fontSize: '12px',
                   fontWeight: 600,
                   marginBottom: '8px',
-                  color: '#374151',
+                  color: 'var(--text)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px'
@@ -661,11 +661,11 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {sentimentData.notable_quotes.slice(0, 3).map((quote, i) => (
                     <div key={i} style={{
-                      background: '#f9fafb',
-                      borderLeft: '3px solid #3b82f6',
+                      background: 'var(--bg)',
+                      borderLeft: '3px solid var(--accent)',
                       padding: '8px 12px',
                       fontSize: '11px',
-                      color: '#4b5563',
+                      color: 'var(--text-secondary)',
                       fontStyle: 'italic'
                     }}>
                       "{quote}"
@@ -679,9 +679,9 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             <div style={{
               marginTop: '12px',
               paddingTop: '12px',
-              borderTop: '1px solid #e5e7eb',
+              borderTop: '1px solid var(--border)',
               fontSize: '11px',
-              color: '#9ca3af',
+              color: 'var(--text-disabled)',
               textAlign: 'right'
             }}>
               Analysis confidence: {(sentimentData.confidence * 100).toFixed(0)}%
@@ -702,10 +702,10 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
 
       {/* Market Signals Card */}
       {marketData && (
-        <div className="card" style={{ border: '1px solid #c0c0c0', overflow: 'hidden' }}>
+        <div className="card" style={{ border: '1px solid var(--border)', overflow: 'hidden' }}>
           <div style={{
             background: 'var(--bg)',
-            borderBottom: '1px solid #c0c0c0',
+            borderBottom: '1px solid var(--border)',
             padding: '8px 12px',
             display: 'flex',
             alignItems: 'center',
@@ -716,9 +716,9 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
               <span style={{ fontWeight: 600, fontSize: '13px' }}>Market Signals</span>
             </div>
             <div style={{
-              background: marketData.market_trend === 'rising' ? '#16a34a' :
-                         marketData.market_trend === 'falling' ? '#dc2626' : '#6b7280',
-              color: 'white',
+              background: marketData.market_trend === 'rising' ? 'var(--success)' :
+                         marketData.market_trend === 'falling' ? 'var(--error)' : 'var(--text-secondary)',
+              color: 'var(--bg)',
               padding: '2px 8px',
               borderRadius: '2px',
               fontSize: '12px',
@@ -736,7 +736,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                   fontSize: '12px',
                   fontWeight: 600,
                   marginBottom: '8px',
-                  color: '#374151',
+                  color: 'var(--text)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px'
@@ -747,16 +747,16 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                   {marketData.price_mentions.slice(0, 4).map((mention, i) => (
                     <div key={i} style={{
-                      background: '#f0f9ff',
-                      border: '1px solid #bae6fd',
+                      background: 'var(--info-dim)',
+                      border: '1px solid var(--info-dim)',
                       borderRadius: '2px',
                       padding: '6px 10px',
                       fontSize: '11px'
                     }}>
-                      <div style={{ fontWeight: 'bold', fontFamily: 'monospace', color: '#0369a1' }}>
+                      <div style={{ fontWeight: 'bold', fontFamily: 'monospace', color: 'var(--accent)' }}>
                         {formatCurrency(mention.amount)}
                       </div>
-                      <div style={{ color: '#64748b', fontSize: '9px' }}>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '9px' }}>
                         {mention.source_type}
                       </div>
                     </div>
@@ -768,7 +768,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             {/* Value Factors */}
             {marketData.value_factors && marketData.value_factors.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: '#374151' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: 'var(--text)' }}>
                   Value Factors
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -778,22 +778,22 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '4px 8px',
-                      background: factor.impact === 'positive' ? '#f0fdf4' :
-                                 factor.impact === 'negative' ? '#fef2f2' : '#f9fafb',
-                      border: `1px solid ${factor.impact === 'positive' ? '#bbf7d0' :
-                              factor.impact === 'negative' ? '#fecaca' : '#e5e7eb'}`,
+                      background: factor.impact === 'positive' ? 'var(--success-dim)' :
+                                 factor.impact === 'negative' ? 'var(--error-dim)' : 'var(--bg)',
+                      border: `1px solid ${factor.impact === 'positive' ? 'var(--success-dim)' :
+                              factor.impact === 'negative' ? 'var(--error-dim)' : 'var(--border)'}`,
                       borderRadius: '2px',
                       fontSize: '11px'
                     }}>
                       <span style={{
-                        color: factor.impact === 'positive' ? '#166534' :
-                               factor.impact === 'negative' ? '#991b1b' : '#4b5563'
+                        color: factor.impact === 'positive' ? 'var(--success)' :
+                               factor.impact === 'negative' ? 'var(--error)' : 'var(--text-secondary)'
                       }}>
                         {factor.impact === 'positive' ? '↑' : factor.impact === 'negative' ? '↓' : '→'} {factor.factor}
                       </span>
                       <span style={{
                         fontWeight: 600,
-                        color: '#9ca3af'
+                        color: 'var(--text-disabled)'
                       }}>
                         {(factor.weight * 100).toFixed(0)}%
                       </span>
@@ -806,19 +806,19 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             {/* Demand Indicators */}
             {marketData.demand_indicators && marketData.demand_indicators.length > 0 && (
               <div>
-                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: '#374151' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: 'var(--text)' }}>
                   Demand Indicators
                 </div>
                 <div style={{
-                  background: '#f9fafb',
-                  border: '1px solid #e5e7eb',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
                   borderRadius: '2px',
                   padding: '8px'
                 }}>
                   {marketData.demand_indicators.slice(0, 4).map((indicator, i) => (
                     <div key={i} style={{
                       fontSize: '11px',
-                      color: '#4b5563',
+                      color: 'var(--text-secondary)',
                       marginBottom: i < Math.min(marketData.demand_indicators.length, 4) - 1 ? '4px' : 0
                     }}>
                       • {indicator}
@@ -832,9 +832,9 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
             <div style={{
               marginTop: '12px',
               paddingTop: '12px',
-              borderTop: '1px solid #e5e7eb',
+              borderTop: '1px solid var(--border)',
               fontSize: '11px',
-              color: '#9ca3af',
+              color: 'var(--text-disabled)',
               textAlign: 'right'
             }}>
               Analysis confidence: {(marketData.confidence * 100).toFixed(0)}%

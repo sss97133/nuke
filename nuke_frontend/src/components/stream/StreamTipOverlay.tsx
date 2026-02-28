@@ -54,7 +54,7 @@ export default function StreamTipOverlay({ lastTip }: { lastTip: StreamTipEvent 
             right: '12px',
             top: `${12 + idx * 64}px`,
             background: 'rgba(17, 24, 39, 0.88)',
-            color: 'white',
+            color: 'var(--bg)',
             border: '1px solid rgba(255, 255, 255, 0.18)',
             padding: '10px 12px',
             minWidth: '220px',

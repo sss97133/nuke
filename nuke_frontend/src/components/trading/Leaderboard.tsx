@@ -68,7 +68,7 @@ const Leaderboard: React.FC<{ userId?: string }> = ({ userId }) => {
   return (
     <div style={{
       background: 'var(--surface)',
-      border: '2px solid #bdbdbd',
+      border: '2px solid var(--border)',
       borderRadius: '4px',
       padding: '16px'
     }}>
@@ -79,8 +79,8 @@ const Leaderboard: React.FC<{ userId?: string }> = ({ userId }) => {
       {/* Your Rank */}
       {userRank && (
         <div style={{
-          background: '#fef3c7',
-          border: '2px solid #fbbf24',
+          background: 'var(--warning-dim)',
+          border: '2px solid var(--warning)',
           padding: '12px',
           borderRadius: '4px',
           marginBottom: '16px'
@@ -94,7 +94,7 @@ const Leaderboard: React.FC<{ userId?: string }> = ({ userId }) => {
             <div style={{
               fontSize: '27px',
               fontWeight: 'bold',
-              color: '#fbbf24',
+              color: 'var(--warning)',
               minWidth: '40px'
             }}>
               #{userRank.rank}
@@ -103,11 +103,11 @@ const Leaderboard: React.FC<{ userId?: string }> = ({ userId }) => {
               <div style={{
                 fontSize: '12px',
                 fontWeight: 'bold',
-                color: '#1f2937'
+                color: 'var(--text)'
               }}>
                 YOU
               </div>
-              <div style={{ fontSize: '11px', color: '#6b7280' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                 {userRank.total_trades} trades today
               </div>
             </div>
@@ -115,13 +115,13 @@ const Leaderboard: React.FC<{ userId?: string }> = ({ userId }) => {
               <div style={{
                 fontSize: '16px',
                 fontWeight: 'bold',
-                color: userRank.daily_gain_loss >= 0 ? '#10b981' : '#dc2626'
+                color: userRank.daily_gain_loss >= 0 ? 'var(--success)' : 'var(--error)'
               }}>
                 {userRank.daily_gain_loss >= 0 ? '+' : ''} ${userRank.daily_gain_loss.toFixed(2)}
               </div>
               <div style={{
                 fontSize: '12px',
-                color: userRank.daily_gain_loss >= 0 ? '#10b981' : '#dc2626',
+                color: userRank.daily_gain_loss >= 0 ? 'var(--success)' : 'var(--error)',
                 fontWeight: 'bold'
               }}>
                 {userRank.daily_gain_loss_pct >= 0 ? '↑' : '↓'} {Math.abs(userRank.daily_gain_loss_pct).toFixed(1)}%
@@ -136,7 +136,7 @@ const Leaderboard: React.FC<{ userId?: string }> = ({ userId }) => {
         <div style={{
           textAlign: 'center',
           padding: '24px',
-          color: '#6b7280'
+          color: 'var(--text-secondary)'
         }}>
           No data yet
         </div>
@@ -146,8 +146,8 @@ const Leaderboard: React.FC<{ userId?: string }> = ({ userId }) => {
             <div
               key={index}
               style={{
-                background: index === 0 ? '#fef3c7' : '#f9fafb',
-                border: `1px solid ${index === 0 ? '#fbbf24' : '#e5e7eb'}`,
+                background: index === 0 ? 'var(--warning-dim)' : 'var(--bg)',
+                border: `1px solid ${index === 0 ? 'var(--warning)' : 'var(--border)'}`,
                 padding: '10px',
                 borderRadius: '2px',
                 display: 'grid',
@@ -160,7 +160,7 @@ const Leaderboard: React.FC<{ userId?: string }> = ({ userId }) => {
               <div style={{
                 fontSize: index === 0 ? '18pt' : '12pt',
                 fontWeight: 'bold',
-                color: index === 0 ? '#fbbf24' : '#6b7280',
+                color: index === 0 ? 'var(--warning)' : 'var(--text-secondary)',
                 textAlign: 'center'
               }}>
                 {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${trader.rank}`}
@@ -171,12 +171,12 @@ const Leaderboard: React.FC<{ userId?: string }> = ({ userId }) => {
                 <div style={{
                   fontSize: '12px',
                   fontWeight: 'bold',
-                  color: '#1f2937',
+                  color: 'var(--text)',
                   marginBottom: '2px'
                 }}>
                   {trader.user_name}
                 </div>
-                <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                   {trader.total_trades} trades • {trader.win_rate_pct.toFixed(0)}% win {trader.streak > 0 && `• 🔥 ${trader.streak}d`}
                 </div>
               </div>
@@ -186,13 +186,13 @@ const Leaderboard: React.FC<{ userId?: string }> = ({ userId }) => {
                 <div style={{
                   fontSize: '13px',
                   fontWeight: 'bold',
-                  color: trader.daily_gain_loss >= 0 ? '#10b981' : '#dc2626'
+                  color: trader.daily_gain_loss >= 0 ? 'var(--success)' : 'var(--error)'
                 }}>
                   {trader.daily_gain_loss >= 0 ? '+' : ''} ${Math.abs(trader.daily_gain_loss).toFixed(0)}
                 </div>
                 <div style={{
                   fontSize: '11px',
-                  color: trader.daily_gain_loss >= 0 ? '#10b981' : '#dc2626',
+                  color: trader.daily_gain_loss >= 0 ? 'var(--success)' : 'var(--error)',
                   fontWeight: 'bold'
                 }}>
                   {trader.daily_gain_loss >= 0 ? '↑' : '↓'} {Math.abs(trader.daily_gain_loss_pct).toFixed(1)}%
@@ -207,7 +207,7 @@ const Leaderboard: React.FC<{ userId?: string }> = ({ userId }) => {
         <div style={{
           textAlign: 'center',
           marginTop: '12px',
-          color: '#6b7280',
+          color: 'var(--text-secondary)',
           fontSize: '11px'
         }}>
           Updating...

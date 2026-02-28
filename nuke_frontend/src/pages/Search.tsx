@@ -746,7 +746,7 @@ export default function Search() {
             padding: '3px 8px',
             fontSize: '7.5pt',
             fontWeight: 600,
-            border: '1px solid #ccc',
+            border: '1px solid var(--border)',
             background: showVinSearch ? 'var(--text)' : 'transparent',
             color: showVinSearch ? 'var(--surface)' : 'var(--text-secondary)',
             cursor: 'pointer',
@@ -761,7 +761,7 @@ export default function Search() {
             marginTop: '8px',
             padding: '12px 16px',
             background: 'var(--surface)',
-            border: '2px solid #000',
+            border: '2px solid var(--text)',
           }}>
             <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px' }}>
               Look up a vehicle by VIN (full 17-char or partial)
@@ -781,7 +781,7 @@ export default function Search() {
                   padding: '8px 10px',
                   fontSize: '13px',
                   fontFamily: 'monospace',
-                  border: '2px solid #000',
+                  border: '2px solid var(--text)',
                   background: 'var(--surface)',
                   letterSpacing: '0.05em',
                   textTransform: 'uppercase'
@@ -795,9 +795,9 @@ export default function Search() {
                   padding: '8px 16px',
                   fontSize: '11px',
                   fontWeight: 700,
-                  border: '2px solid #000',
-                  background: '#000',
-                  color: '#fff',
+                  border: '2px solid var(--text)',
+                  background: 'var(--text)',
+                  color: 'var(--bg)',
                   cursor: vinSearching ? 'wait' : 'pointer'
                 }}
               >
@@ -809,7 +809,7 @@ export default function Search() {
             </div>
 
             {vinError && (
-              <div style={{ marginTop: '10px', padding: '8px 12px', background: '#fff3f3', border: '1px solid #f00', fontSize: '11px' }}>
+              <div style={{ marginTop: '10px', padding: '8px 12px', background: 'var(--error-dim)', border: '1px solid var(--error)', fontSize: '11px' }}>
                 {vinError}
               </div>
             )}
@@ -864,7 +864,7 @@ export default function Search() {
           <div style={{
             padding: '10px 14px',
             background: 'var(--surface)',
-            border: '2px solid #000',
+            border: '2px solid var(--text)',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -875,7 +875,7 @@ export default function Search() {
                     padding: '4px 10px',
                     fontSize: '11px',
                     fontWeight: 700,
-                    border: '2px solid #000',
+                    border: '2px solid var(--text)',
                     background: vFilters.showFilters ? 'var(--text)' : 'var(--surface)',
                     color: vFilters.showFilters ? 'var(--surface)' : 'var(--text)',
                     cursor: 'pointer',
@@ -891,7 +891,7 @@ export default function Search() {
                       padding: '4px 8px',
                       fontSize: '9px',
                       fontWeight: 700,
-                      border: '1px solid #999',
+                      border: '1px solid var(--text-muted)',
                       background: 'var(--surface)',
                       color: 'var(--text-secondary)',
                       cursor: 'pointer',
@@ -920,7 +920,7 @@ export default function Search() {
                     placeholder="e.g. Porsche"
                     value={vFilters.make}
                     onChange={e => setVFilters(prev => ({ ...prev, make: e.target.value }))}
-                    style={{ width: '110px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: 'var(--surface)' }}
+                    style={{ width: '110px', padding: '4px 6px', fontSize: '11px', border: '2px solid var(--text)', background: 'var(--surface)' }}
                   />
                 </div>
 
@@ -933,7 +933,7 @@ export default function Search() {
                       placeholder="Min"
                       value={vFilters.priceMin}
                       onChange={e => setVFilters(prev => ({ ...prev, priceMin: e.target.value }))}
-                      style={{ width: '80px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: 'var(--surface)' }}
+                      style={{ width: '80px', padding: '4px 6px', fontSize: '11px', border: '2px solid var(--text)', background: 'var(--surface)' }}
                       min={0}
                     />
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>–</span>
@@ -942,7 +942,7 @@ export default function Search() {
                       placeholder="Max"
                       value={vFilters.priceMax}
                       onChange={e => setVFilters(prev => ({ ...prev, priceMax: e.target.value }))}
-                      style={{ width: '80px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: 'var(--surface)' }}
+                      style={{ width: '80px', padding: '4px 6px', fontSize: '11px', border: '2px solid var(--text)', background: 'var(--surface)' }}
                       min={0}
                     />
                   </div>
@@ -957,7 +957,7 @@ export default function Search() {
                       placeholder="From"
                       value={vFilters.yearMin}
                       onChange={e => setVFilters(prev => ({ ...prev, yearMin: e.target.value }))}
-                      style={{ width: '68px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: 'var(--surface)' }}
+                      style={{ width: '68px', padding: '4px 6px', fontSize: '11px', border: '2px solid var(--text)', background: 'var(--surface)' }}
                       min={1886}
                       max={new Date().getFullYear() + 2}
                     />
@@ -967,7 +967,7 @@ export default function Search() {
                       placeholder="To"
                       value={vFilters.yearMax}
                       onChange={e => setVFilters(prev => ({ ...prev, yearMax: e.target.value }))}
-                      style={{ width: '68px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: 'var(--surface)' }}
+                      style={{ width: '68px', padding: '4px 6px', fontSize: '11px', border: '2px solid var(--text)', background: 'var(--surface)' }}
                       min={1886}
                       max={new Date().getFullYear() + 2}
                     />
@@ -982,7 +982,7 @@ export default function Search() {
                     placeholder="e.g. 50000"
                     value={vFilters.mileageMax}
                     onChange={e => setVFilters(prev => ({ ...prev, mileageMax: e.target.value }))}
-                    style={{ width: '100px', padding: '4px 6px', fontSize: '11px', border: '2px solid #000', background: 'var(--surface)' }}
+                    style={{ width: '100px', padding: '4px 6px', fontSize: '11px', border: '2px solid var(--text)', background: 'var(--surface)' }}
                     min={0}
                   />
                 </div>
@@ -993,7 +993,7 @@ export default function Search() {
                   <select
                     value={vFilters.transmission}
                     onChange={e => setVFilters(prev => ({ ...prev, transmission: e.target.value }))}
-                    style={{ padding: '4px 8px', fontSize: '11px', border: '2px solid #000', background: 'var(--surface)', cursor: 'pointer' }}
+                    style={{ padding: '4px 8px', fontSize: '11px', border: '2px solid var(--text)', background: 'var(--surface)', cursor: 'pointer' }}
                   >
                     <option value="">Any</option>
                     <option value="automatic">Automatic</option>
@@ -1018,7 +1018,7 @@ export default function Search() {
                           padding: '4px 8px',
                           fontSize: '11px',
                           fontWeight: 700,
-                          border: '2px solid #000',
+                          border: '2px solid var(--text)',
                           background: vFilters.listingStatus === opt.val ? 'var(--text)' : 'var(--surface)',
                           color: vFilters.listingStatus === opt.val ? 'var(--surface)' : 'var(--text)',
                           cursor: 'pointer',
@@ -1101,14 +1101,14 @@ export default function Search() {
                   padding: '6px 14px',
                   fontSize: '11px',
                   fontWeight: 600,
-                  border: '2px solid #e5e7eb',
+                  border: '2px solid var(--border)',
                   background: 'var(--surface)',
                   color: 'var(--text-secondary)',
                   textDecoration: 'none',
                   cursor: 'pointer',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#000'; e.currentTarget.style.color = 'var(--text)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; e.currentTarget.style.color = 'var(--text)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
               >
                 {term}
               </a>
@@ -1154,7 +1154,7 @@ export default function Search() {
 
       {/* Workstation / quick links — only shown on demand, at bottom */}
       {(results.length > 0 || searchQuery) && (
-        <div style={{ marginTop: '32px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
+        <div style={{ marginTop: '32px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
           <button
             type="button"
             onClick={() => setShowWorkstation((v) => !v)}
@@ -1162,7 +1162,7 @@ export default function Search() {
               padding: '4px 8px',
               fontSize: '7.5pt',
               fontWeight: 600,
-              border: '1px solid #ccc',
+              border: '1px solid var(--border)',
               background: 'transparent',
               color: 'var(--text-secondary)',
               cursor: 'pointer',
@@ -1187,7 +1187,7 @@ export default function Search() {
                           padding: '3px 8px',
                           fontSize: '11px',
                           fontWeight: 700,
-                          border: '2px solid #000',
+                          border: '2px solid var(--text)',
                           background: 'var(--surface)',
                           cursor: 'pointer'
                         }}

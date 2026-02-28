@@ -49,11 +49,11 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
 
   const smallChipStyle: React.CSSProperties = {
     background: 'var(--bg)',
-    border: '1px solid #c0c0c0',
+    border: '1px solid var(--border)',
     padding: '1px 4px',
     borderRadius: '2px',
     fontSize: '11px',
-    color: '#374151'
+    color: 'var(--text)'
   };
 
   // Gallery View - Minimal card with large image
@@ -64,7 +64,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
         className="content-card"
         style={{
           background: 'var(--surface)',
-          border: '1px solid #c0c0c0',
+          border: '1px solid var(--border)',
           borderRadius: '2px',
           overflow: 'hidden',
           textDecoration: 'none',
@@ -85,7 +85,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
           {/* Price and Status */}
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
             {(vehicle.sale_price || vehicle.asking_price || vehicle.current_value) && (
-              <div className="text" style={{ fontSize: '11px', color: '#3b82f6', fontWeight: 'bold' }}>
+              <div className="text" style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 'bold' }}>
                 {formatPrice(vehicle.sale_price || vehicle.asking_price || vehicle.current_value)}
               </div>
             )}
@@ -98,16 +98,16 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
                   fontWeight: 600,
                   background:
                     vehicle.listing_status === 'sold'
-                      ? '#dcfce7'
+                      ? 'var(--success-dim)'
                       : vehicle.listing_status === 'unsold'
-                      ? '#fee2e2'
-                      : '#e0e7ff',
+                      ? 'var(--error-dim)'
+                      : 'var(--accent-dim)',
                   color:
                     vehicle.listing_status === 'sold'
-                      ? '#166534'
+                      ? 'var(--success)'
                       : vehicle.listing_status === 'unsold'
-                      ? '#991b1b'
-                      : '#3730a3',
+                      ? 'var(--error)'
+                      : 'var(--accent)',
                 }}
               >
                 {vehicle.listing_status === 'sold'
@@ -131,7 +131,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
         className="content-card"
         style={{
           background: 'var(--surface)',
-          border: '1px solid #c0c0c0',
+          border: '1px solid var(--border)',
           borderRadius: '2px',
           overflow: 'hidden',
           textDecoration: 'none',
@@ -159,7 +159,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
           {/* Price and Status */}
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
             {(vehicle.sale_price || vehicle.asking_price || vehicle.current_value) && (
-              <span className="badge" style={{ ...smallChipStyle, color: '#3b82f6', fontWeight: 'bold' }}>
+              <span className="badge" style={{ ...smallChipStyle, color: 'var(--accent)', fontWeight: 'bold' }}>
                 {formatPrice(vehicle.sale_price || vehicle.asking_price || vehicle.current_value)}
               </span>
             )}
@@ -169,16 +169,16 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
                   ...smallChipStyle,
                   background:
                     vehicle.listing_status === 'sold'
-                      ? '#dcfce7'
+                      ? 'var(--success-dim)'
                       : vehicle.listing_status === 'unsold'
-                      ? '#fee2e2'
-                      : '#e0e7ff',
+                      ? 'var(--error-dim)'
+                      : 'var(--accent-dim)',
                   color:
                     vehicle.listing_status === 'sold'
-                      ? '#166534'
+                      ? 'var(--success)'
                       : vehicle.listing_status === 'unsold'
-                      ? '#991b1b'
-                      : '#3730a3',
+                      ? 'var(--error)'
+                      : 'var(--accent)',
                   fontWeight: 600,
                 }}
               >
@@ -190,7 +190,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
               </span>
             )}
             {vehicle.is_for_sale && !vehicle.listing_status && (
-              <span className="badge" style={{ ...smallChipStyle, background: '#dcfce7', color: '#166534' }}>
+              <span className="badge" style={{ ...smallChipStyle, background: 'var(--success-dim)', color: 'var(--success)' }}>
                 For Sale
               </span>
             )}
@@ -207,7 +207,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
       className="content-card"
       style={{
         background: 'var(--surface)',
-        border: '1px solid #c0c0c0',
+        border: '1px solid var(--border)',
         borderRadius: '2px',
         overflow: 'hidden',
         textDecoration: 'none',
@@ -246,7 +246,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
           {/* Badges */}
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
             {(vehicle.sale_price || vehicle.asking_price || vehicle.current_value) && (
-              <span className="badge" style={{ ...smallChipStyle, color: '#3b82f6', fontWeight: 'bold' }}>
+              <span className="badge" style={{ ...smallChipStyle, color: 'var(--accent)', fontWeight: 'bold' }}>
                 {formatPrice(vehicle.sale_price || vehicle.asking_price || vehicle.current_value)}
               </span>
             )}
@@ -256,16 +256,16 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
                   ...smallChipStyle,
                   background:
                     vehicle.listing_status === 'sold'
-                      ? '#dcfce7'
+                      ? 'var(--success-dim)'
                       : vehicle.listing_status === 'unsold'
-                      ? '#fee2e2'
-                      : '#e0e7ff',
+                      ? 'var(--error-dim)'
+                      : 'var(--accent-dim)',
                   color:
                     vehicle.listing_status === 'sold'
-                      ? '#166534'
+                      ? 'var(--success)'
                       : vehicle.listing_status === 'unsold'
-                      ? '#991b1b'
-                      : '#3730a3',
+                      ? 'var(--error)'
+                      : 'var(--accent)',
                   fontWeight: 600,
                 }}
               >
@@ -277,7 +277,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
               </span>
             )}
             {vehicle.is_for_sale && !vehicle.listing_status && (
-              <span className="badge" style={{ ...smallChipStyle, background: '#dcfce7', color: '#166534' }}>
+              <span className="badge" style={{ ...smallChipStyle, background: 'var(--success-dim)', color: 'var(--success)' }}>
                 For Sale
               </span>
             )}

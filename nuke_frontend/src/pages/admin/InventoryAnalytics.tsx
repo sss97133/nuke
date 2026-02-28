@@ -16,12 +16,16 @@ import {
 import { supabase } from '../../lib/supabase';
 
 // ─── Color Palettes ─────────────────────────────────────────────────────
+// TODO: Recharts requires string hex colors — cannot use CSS variables directly.
+// When a JS theme bridge (e.g. getComputedStyle or ThemeContext) is available,
+// replace these hardcoded hex values with runtime-resolved CSS variable values.
 const COLORS = [
   '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
   '#06b6d4', '#f97316', '#ec4899', '#14b8a6', '#6366f1',
   '#84cc16', '#e11d48',
 ];
 
+// TODO: Recharts — replace with theme-resolved colors when JS theme bridge is available.
 const ERA_COLORS: Record<string, string> = {
   'pre-war': '#92400e',
   'post-war': '#b45309',
@@ -234,6 +238,10 @@ export default function InventoryAnalytics() {
       </div>
 
       {/* ─── Row 1: Era + Decade + Sources ─────────────────────────── */}
+      {/* TODO: All Recharts fill/stroke/tick colors below are hardcoded hex because
+          Recharts requires string values, not CSS variables. Replace with JS theme bridge
+          (e.g., resolving getComputedStyle(document.documentElement).getPropertyValue('--accent'))
+          when available. */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <ChartCard title="By Era">
           <ResponsiveContainer width="100%" height={280}>

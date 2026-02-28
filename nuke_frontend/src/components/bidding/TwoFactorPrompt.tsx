@@ -236,7 +236,7 @@ export default function TwoFactorPrompt({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.6)',
+        background: 'var(--overlay)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -250,7 +250,7 @@ export default function TwoFactorPrompt({
           borderRadius: '8px',
           maxWidth: '380px',
           width: '100%',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+          boxShadow: '0 8px 24px var(--overlay)'
         }}
       >
         {/* Header */}
@@ -265,7 +265,7 @@ export default function TwoFactorPrompt({
             <div style={{
               width: '32px',
               height: '32px',
-              background: '#fef3c7',
+              background: 'var(--warning-dim)',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
@@ -302,8 +302,8 @@ export default function TwoFactorPrompt({
         <div style={{ padding: '20px' }}>
           {/* Timer */}
           <div style={{
-            background: isExpired ? '#fef2f2' : '#fef3c7',
-            border: `1px solid ${isExpired ? '#fecaca' : '#fcd34d'}`,
+            background: isExpired ? 'var(--error-dim)' : 'var(--warning-dim)',
+            border: `1px solid ${isExpired ? 'var(--error)' : 'var(--warning)'}`,
             padding: '10px 12px',
             borderRadius: '4px',
             marginBottom: '16px',
@@ -311,13 +311,13 @@ export default function TwoFactorPrompt({
             alignItems: 'center',
             justifyContent: 'space-between'
           }}>
-            <span style={{ fontSize: '11px', color: isExpired ? '#991b1b' : '#92400e' }}>
+            <span style={{ fontSize: '11px', color: isExpired ? 'var(--error)' : 'var(--warning)' }}>
               {isExpired ? 'Code expired' : 'Time remaining'}
             </span>
             <span style={{
               fontSize: '15px',
               fontWeight: 700,
-              color: isExpired ? '#ef4444' : '#f59e0b',
+              color: isExpired ? 'var(--error)' : 'var(--warning)',
               fontFamily: 'monospace'
             }}>
               {formatTime(timeRemaining)}
@@ -326,9 +326,9 @@ export default function TwoFactorPrompt({
 
           {error && (
             <div style={{
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
-              color: '#991b1b',
+              background: 'var(--error-dim)',
+              border: '1px solid var(--error)',
+              color: 'var(--error)',
               padding: '10px 12px',
               borderRadius: '4px',
               marginBottom: '16px',

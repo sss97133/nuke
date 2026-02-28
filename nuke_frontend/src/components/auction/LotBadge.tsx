@@ -101,14 +101,14 @@ export const LotBadge: React.FC<LotBadgeProps> = ({
           }
         }}
         style={{
-          background: isPast ? '#dcfce7' : isUpcoming ? '#dbeafe' : '#fef3c7',
-          border: `1px solid ${isPast ? '#22c55e' : isUpcoming ? '#3b82f6' : '#f59e0b'}`,
+          background: isPast ? 'var(--success-dim)' : isUpcoming ? 'var(--info-bg, var(--accent-dim, #dbeafe))' : 'var(--warning-dim)',
+          border: `1px solid ${isPast ? 'var(--success)' : isUpcoming ? 'var(--accent)' : 'var(--warning)'}`,
           borderRadius: '3px',
           padding: '2px 6px',
           cursor: hasDetails ? 'pointer' : 'default',
           fontFamily: 'inherit',
           fontSize: '9px',
-          color: isPast ? '#15803d' : isUpcoming ? '#1e40af' : '#92400e',
+          color: isPast ? 'var(--success)' : isUpcoming ? 'var(--accent)' : 'var(--warning)',
           fontWeight: 700,
           display: 'flex',
           alignItems: 'center',
@@ -195,7 +195,7 @@ export const LotBadge: React.FC<LotBadgeProps> = ({
               <div style={{ color: 'var(--text-muted)', fontSize: '9px', marginBottom: '2px' }}>
                 Sold For
               </div>
-              <div style={{ fontWeight: 700, fontSize: '13px', color: '#22c55e' }}>
+              <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--success)' }}>
                 {formatCurrency(salePrice)}
               </div>
             </div>

@@ -27,7 +27,7 @@ const badgeStyle: React.CSSProperties = {
   fontSize: '10px',
   padding: '2px 6px',
   background: 'var(--bg)',
-  border: '1px solid #e5e7eb',
+  border: '1px solid var(--border)',
   borderRadius: '4px',
   textTransform: 'uppercase'
 };
@@ -107,7 +107,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ scope, id, l
     return <div className="card"><div className="card-body text">Loading activity…</div></div>;
   }
   if (error) {
-    return <div className="card"><div className="card-body" style={{ color: '#b91c1c' }}>{error}</div></div>;
+    return <div className="card"><div className="card-body" style={{ color: 'var(--error)' }}>{error}</div></div>;
   }
   if (orgEvents.length === 0) {
     return <div className="card"><div className="card-body text">No activity yet.</div></div>;

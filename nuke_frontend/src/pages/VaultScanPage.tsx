@@ -74,8 +74,8 @@ export default function VaultScanPage() {
     return (
       <div style={{
         minHeight: '100vh',
-        background: '#000',
-        color: '#fff',
+        background: 'var(--text)',
+        color: 'var(--bg)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -84,13 +84,13 @@ export default function VaultScanPage() {
           <div style={{
             width: '40px',
             height: '40px',
-            border: '3px solid #333',
-            borderTopColor: '#3b82f6',
+            border: '3px solid var(--surface)',
+            borderTopColor: 'var(--accent)',
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto 16px',
           }} />
-          <p style={{ color: '#888' }}>Loading...</p>
+          <p style={{ color: 'var(--text-disabled)' }}>Loading...</p>
           <style>{`
             @keyframes spin {
               to { transform: rotate(360deg); }
@@ -106,8 +106,8 @@ export default function VaultScanPage() {
     return (
       <div style={{
         minHeight: '100vh',
-        background: '#000',
-        color: '#fff',
+        background: 'var(--text)',
+        color: 'var(--bg)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -117,7 +117,7 @@ export default function VaultScanPage() {
           <div style={{
             width: '64px',
             height: '64px',
-            background: '#2a1a1a',
+            background: 'var(--error-dim)',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
@@ -127,8 +127,8 @@ export default function VaultScanPage() {
             <span style={{ fontSize: '32px' }}>!</span>
           </div>
           <h1 style={{ fontSize: '20px', marginBottom: '12px' }}>Invalid Link</h1>
-          <p style={{ color: '#888', marginBottom: '24px' }}>{errorMessage}</p>
-          <p style={{ fontSize: '14px', color: '#666' }}>
+          <p style={{ color: 'var(--text-disabled)', marginBottom: '24px' }}>{errorMessage}</p>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
             Text a document photo to get a new link.
           </p>
         </div>
@@ -141,8 +141,8 @@ export default function VaultScanPage() {
     return (
       <div style={{
         minHeight: '100vh',
-        background: '#000',
-        color: '#fff',
+        background: 'var(--text)',
+        color: 'var(--bg)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -152,7 +152,7 @@ export default function VaultScanPage() {
           <div style={{
             width: '64px',
             height: '64px',
-            background: '#2a1a1a',
+            background: 'var(--error-dim)',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
@@ -162,13 +162,13 @@ export default function VaultScanPage() {
             <span style={{ fontSize: '32px' }}>!</span>
           </div>
           <h1 style={{ fontSize: '20px', marginBottom: '12px' }}>Something Went Wrong</h1>
-          <p style={{ color: '#f87171', marginBottom: '24px' }}>{errorMessage}</p>
+          <p style={{ color: 'var(--error)', marginBottom: '24px' }}>{errorMessage}</p>
           <button
             onClick={handleRetry}
             style={{
               padding: '16px 32px',
-              background: '#3b82f6',
-              color: '#fff',
+              background: 'var(--accent)',
+              color: 'var(--bg)',
               border: 'none',
               borderRadius: '8px',
               fontSize: '16px',
@@ -192,8 +192,8 @@ export default function VaultScanPage() {
     return (
       <div style={{
         minHeight: '100vh',
-        background: '#000',
-        color: '#fff',
+        background: 'var(--text)',
+        color: 'var(--bg)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -203,7 +203,7 @@ export default function VaultScanPage() {
           <div style={{
             width: '80px',
             height: '80px',
-            background: '#1a2e1a',
+            background: 'var(--success-dim)',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
@@ -215,7 +215,7 @@ export default function VaultScanPage() {
               height="40"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#22c55e"
+              stroke="var(--success)"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -225,41 +225,41 @@ export default function VaultScanPage() {
           </div>
 
           <h1 style={{ fontSize: '24px', marginBottom: '8px' }}>Success!</h1>
-          <p style={{ color: '#22c55e', fontSize: '18px', marginBottom: '24px' }}>
+          <p style={{ color: 'var(--success)', fontSize: '18px', marginBottom: '24px' }}>
             {vehicleDesc} verified
           </p>
 
           <div style={{
-            background: '#111',
+            background: 'var(--surface)',
             borderRadius: '8px',
             padding: '16px',
             marginBottom: '24px',
             textAlign: 'left',
           }}>
             <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '12px', color: '#888' }}>VIN</label>
+              <label style={{ fontSize: '12px', color: 'var(--text-disabled)' }}>VIN</label>
               <p style={{ fontFamily: 'monospace', fontSize: '14px' }}>{successData.vin}</p>
             </div>
             {vehicle?.year && (
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '12px', color: '#888' }}>Year</label>
+                <label style={{ fontSize: '12px', color: 'var(--text-disabled)' }}>Year</label>
                 <p>{vehicle.year}</p>
               </div>
             )}
           </div>
 
           <div style={{
-            background: '#1a2e1a',
+            background: 'var(--success-dim)',
             borderRadius: '8px',
             padding: '16px',
             marginBottom: '24px',
           }}>
-            <p style={{ fontSize: '14px', color: '#22c55e' }}>
+            <p style={{ fontSize: '14px', color: 'var(--success)' }}>
               Your document was processed privately. The image never left your device.
             </p>
           </div>
 
-          <p style={{ fontSize: '14px', color: '#666' }}>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
             You'll receive an SMS confirmation shortly. You can close this page.
           </p>
         </div>

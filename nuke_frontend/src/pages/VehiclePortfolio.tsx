@@ -107,7 +107,6 @@ export default function VehiclePortfolio() {
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(0);
   const [lightbox, setLightbox] = useState<number | null>(null);
-  const [copied, setCopied] = useState(false);
 
   // ── Data loading ──────────────────────────────────────────
 
@@ -197,15 +196,6 @@ export default function VehiclePortfolio() {
     return () => window.removeEventListener('keydown', handler);
   }, [lightbox, lightboxPrev, lightboxNext]);
 
-  // ── Copy link ─────────────────────────────────────────────
-
-  const copyLink = () => {
-    navigator.clipboard?.writeText(window.location.href).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
   // ── Render states ─────────────────────────────────────────
 
   if (loading) {
@@ -254,9 +244,6 @@ export default function VehiclePortfolio() {
           <span style={styles.headerDivider}>|</span>
           <span style={styles.headerVehicle}>{title}</span>
         </div>
-        <button onClick={copyLink} style={styles.copyBtn}>
-          {copied ? 'Copied' : 'Share'}
-        </button>
       </header>
 
       {/* ── Hero ──────────────────────────────────────────── */}
@@ -436,10 +423,10 @@ function DocCard({ doc, label }: { doc: VehicleDocument; label: string }) {
     >
       <div style={styles.docIcon}>
         <svg width="18" height="22" viewBox="0 0 18 22" fill="none">
-          <path d="M11 1H3C1.9 1 1 1.9 1 3V19C1 20.1 1.9 21 3 21H15C16.1 21 17 20.1 17 19V7L11 1Z" stroke="#999" strokeWidth="1.5" fill="none" />
-          <path d="M11 1V7H17" stroke="#999" strokeWidth="1.5" />
-          <line x1="5" y1="12" x2="13" y2="12" stroke="#bbb" strokeWidth="1.5" />
-          <line x1="5" y1="16" x2="10" y2="16" stroke="#bbb" strokeWidth="1.5" />
+          <path d="M11 1H3C1.9 1 1 1.9 1 3V19C1 20.1 1.9 21 3 21H15C16.1 21 17 20.1 17 19V7L11 1Z" stroke="var(--text-disabled)" strokeWidth="1.5" fill="none" />
+          <path d="M11 1V7H17" stroke="var(--text-disabled)" strokeWidth="1.5" />
+          <line x1="5" y1="12" x2="13" y2="12" stroke="var(--border)" strokeWidth="1.5" />
+          <line x1="5" y1="16" x2="10" y2="16" stroke="var(--border)" strokeWidth="1.5" />
         </svg>
       </div>
       <div style={styles.docInfo}>
@@ -460,22 +447,22 @@ function DocCard({ doc, label }: { doc: VehicleDocument; label: string }) {
 
 const styles: Record<string, React.CSSProperties> = {
   root: {
-    background: '#f5f3ef',
+    background: 'var(--bg)',
     minHeight: '100vh',
     fontFamily: '"Inter", "SF Pro Display", system-ui, -apple-system, sans-serif',
-    color: '#111',
+    color: 'var(--text)',
   },
 
   // Loading
   loadingWrap: {
-    background: '#0d0d0d',
+    background: 'var(--text)',
     minHeight: '100vh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
   },
   loadingText: {
-    color: '#555',
+    color: 'var(--text-secondary)',
     fontSize: '11px',
     letterSpacing: '0.2em',
     textTransform: 'uppercase',
@@ -493,7 +480,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(245, 243, 239, 0.90)',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
-    borderBottom: '1px solid rgba(0,0,0,0.08)',
+    borderBottom: '1px solid var(--border)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -508,28 +495,16 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 800,
     fontSize: '13px',
     letterSpacing: '0.15em',
-    color: '#111',
+    color: 'var(--text)',
   },
   headerDivider: {
-    color: '#ddd',
+    color: 'var(--border)',
     fontSize: '14px',
   },
   headerVehicle: {
     fontSize: '12px',
-    color: '#777',
+    color: 'var(--text-secondary)',
     letterSpacing: '0.03em',
-  },
-  copyBtn: {
-    background: 'none',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    padding: '5px 14px',
-    fontSize: '11px',
-    color: '#555',
-    cursor: 'pointer',
-    letterSpacing: '0.1em',
-    textTransform: 'uppercase',
-    transition: 'border-color 0.15s, color 0.15s',
   },
 
   // Hero
@@ -566,7 +541,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '0 0 10px',
   },
   heroTitle: {
-    color: '#fff',
+    color: 'var(--bg)',
     fontSize: 'clamp(36px, 5.5vw, 72px)',
     fontWeight: 700,
     lineHeight: 1.0,
@@ -584,7 +559,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Specs Strip
   specsStrip: {
-    background: '#141414',
+    background: 'var(--text)',
     padding: '16px 40px',
     display: 'flex',
     alignItems: 'center',
@@ -592,19 +567,19 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '4px 0',
   },
   specValue: {
-    color: '#d4c5a5',
+    color: 'var(--warning)',
     fontSize: '12px',
     fontWeight: 500,
     letterSpacing: '0.04em',
     whiteSpace: 'nowrap',
   },
   specDot: {
-    color: '#3a3a3a',
+    color: 'var(--surface)',
     margin: '0 14px',
     fontSize: '12px',
   },
   specVin: {
-    color: '#555',
+    color: 'var(--text-secondary)',
     fontSize: '11px',
     fontFamily: '"SF Mono", "Fira Code", monospace',
     letterSpacing: '0.06em',
@@ -612,8 +587,8 @@ const styles: Record<string, React.CSSProperties> = {
 
   // About
   aboutSection: {
-    background: '#fff',
-    borderBottom: '1px solid #eae8e3',
+    background: 'var(--surface)',
+    borderBottom: '1px solid var(--border)',
   },
   aboutInner: {
     maxWidth: '1200px',
@@ -629,13 +604,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     letterSpacing: '0.2em',
     textTransform: 'uppercase',
-    color: '#999',
+    color: 'var(--text-disabled)',
     margin: '0 0 14px',
   },
   aboutText: {
     fontSize: '14px',
     lineHeight: 1.7,
-    color: '#333',
+    color: 'var(--text)',
     margin: 0,
   },
 
@@ -653,7 +628,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   galleryCount: {
     fontSize: '11px',
-    color: '#aaa',
+    color: 'var(--text-disabled)',
   },
   masonryGrid: {
     columns: 'auto 280px',
@@ -676,13 +651,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   loadMoreBtn: {
     background: 'none',
-    border: '1px solid #ccc',
+    border: '1px solid var(--border)',
     padding: '10px 36px',
     fontSize: '11px',
     letterSpacing: '0.15em',
     textTransform: 'uppercase',
     cursor: 'pointer',
-    color: '#666',
+    color: 'var(--text-secondary)',
     borderRadius: '2px',
     transition: 'border-color 0.15s',
   },
@@ -695,7 +670,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   docsDivider: {
     height: '1px',
-    background: '#e0ddd6',
+    background: 'var(--border)',
     margin: '0 0 48px',
   },
   docsGrid: {
@@ -708,22 +683,22 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '16px',
     padding: '16px 18px',
-    background: '#fff',
-    border: '1px solid #e5e2db',
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
     borderRadius: '4px',
     textDecoration: 'none',
     color: 'inherit',
     transition: 'border-color 0.15s, box-shadow 0.15s',
   },
   docCardHover: {
-    borderColor: '#aaa',
+    borderColor: 'var(--text-disabled)',
     boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
   },
   docIcon: {
     flexShrink: 0,
     width: '36px',
     height: '44px',
-    background: '#f2efe9',
+    background: 'var(--bg)',
     borderRadius: '3px',
     display: 'flex',
     alignItems: 'center',
@@ -737,13 +712,13 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: '13px',
     fontWeight: 500,
-    color: '#111',
+    color: 'var(--text)',
     lineHeight: 1.3,
   },
   docDesc: {
     margin: '3px 0 0',
     fontSize: '11px',
-    color: '#888',
+    color: 'var(--text-disabled)',
     lineHeight: 1.4,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -752,17 +727,17 @@ const styles: Record<string, React.CSSProperties> = {
   docDate: {
     margin: '5px 0 0',
     fontSize: '11px',
-    color: '#bbb',
+    color: 'var(--border)',
   },
   docArrow: {
-    color: '#ccc',
+    color: 'var(--border)',
     fontSize: '16px',
     flexShrink: 0,
   },
 
   // Footer
   footer: {
-    background: '#111',
+    background: 'var(--text)',
     padding: '22px 40px',
     display: 'flex',
     alignItems: 'center',
@@ -771,12 +746,12 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
   },
   footerBrand: {
-    color: '#444',
+    color: 'var(--text-secondary)',
     fontSize: '11px',
     letterSpacing: '0.1em',
   },
   footerVin: {
-    color: '#333',
+    color: 'var(--text)',
     fontSize: '11px',
     fontFamily: '"SF Mono", monospace',
     letterSpacing: '0.06em',
@@ -804,7 +779,7 @@ const styles: Record<string, React.CSSProperties> = {
     transform: 'translateY(-50%)',
     background: 'rgba(255,255,255,0.12)',
     border: 'none',
-    color: '#fff',
+    color: 'var(--bg)',
     width: '48px',
     height: '48px',
     borderRadius: '50%',
@@ -821,7 +796,7 @@ const styles: Record<string, React.CSSProperties> = {
     right: '20px',
     background: 'rgba(255,255,255,0.12)',
     border: 'none',
-    color: '#fff',
+    color: 'var(--bg)',
     width: '38px',
     height: '38px',
     borderRadius: '50%',

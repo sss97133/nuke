@@ -609,7 +609,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         left: '50%',
         transform: 'translate(-50%, -50%)',
         background: 'var(--surface)',
-        border: '2px solid #000',
+        border: '2px solid var(--border)',
         padding: '20px',
         zIndex: 10000,
         minWidth: '400px'
@@ -620,10 +620,10 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
   }
 
   const getConfidenceColor = (conf: number) => {
-    if (conf >= 90) return '#10b981';
-    if (conf >= 75) return '#3b82f6';
-    if (conf >= 60) return '#f59e0b';
-    return '#ef4444';
+    if (conf >= 90) return 'var(--success)';
+    if (conf >= 75) return 'var(--accent)';
+    if (conf >= 60) return 'var(--warning)';
+    return 'var(--error)';
   };
 
   const isAuctionResultMode = (() => {
@@ -783,7 +783,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
               <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
                 Trend
               </div>
-              <div style={{ fontSize: '12px', fontWeight: 800, color: context.trend_pct >= 0 ? '#16a34a' : '#dc2626' }}>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: context.trend_pct >= 0 ? 'var(--success)' : 'var(--error)' }}>
                 {context.trend_pct >= 0 ? 'UP' : 'DOWN'} {Math.abs(context.trend_pct).toFixed(1)}% {context.trend_period ? String(context.trend_period).toUpperCase() : ''}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 4 }}>
@@ -1166,9 +1166,9 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                     width: '8px',
                     height: '8px',
                     borderRadius: '50%',
-                    background: '#22c55e',
+                    background: 'var(--success)',
                     animation: 'pulse 1.5s ease-in-out infinite',
-                    boxShadow: '0 0 6px #22c55e',
+                    boxShadow: '0 0 6px var(--success)',
                   }}
                 />
                 Live Auction Activity
@@ -1267,7 +1267,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           {/* Evidence Count */}
           {evidence.length > 0 && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '9px', color: '#666', textTransform: 'uppercase', marginBottom: '4px' }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>
                 Supporting Evidence
               </div>
               <div style={{ fontSize: '12px' }}>
@@ -1279,12 +1279,12 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                     <div key={idx} style={{
                       padding: '6px',
                       marginBottom: '4px',
-                      background: '#f9f9f9',
-                      border: '1px solid #e0e0e0',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
                       fontSize: '9px'
                     }}>
                       <div style={{ fontWeight: 'bold' }}>{getSourceLabel(e.source_type)}</div>
-                      <div style={{ color: '#666' }}>
+                      <div style={{ color: 'var(--text-secondary)' }}>
                         Value: ${parseFloat(e.proposed_value).toLocaleString()} • 
                         Confidence: {e.source_confidence}%
                       </div>
@@ -1304,15 +1304,15 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           {evidence.length === 0 && !(context?.evidence_url || provenance?.bat_url) && (
             <div style={{
               padding: '12px',
-              background: '#fff3cd',
-              border: '1px solid #ffc107',
+              background: 'var(--warning-dim)',
+              border: '1px solid var(--warning)',
               borderRadius: '4px',
               marginBottom: '16px'
             }}>
-              <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#856404', marginBottom: '4px' }}>
+              <div style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--warning)', marginBottom: '4px' }}>
                 NO EVIDENCE FOUND
               </div>
-              <div style={{ fontSize: '9px', color: '#856404' }}>
+              <div style={{ fontSize: '9px', color: 'var(--warning)' }}>
                 This value has no supporting evidence. Upload receipts or build estimates to verify.
               </div>
             </div>
@@ -1321,7 +1321,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             {/* Edit Section (only if user has permission) */}
             {provenance?.can_edit && (
               <div style={{
-                borderTop: '1px solid #e0e0e0',
+                borderTop: '1px solid var(--border)',
                 paddingTop: '16px',
                 marginTop: '16px'
               }}>
@@ -1331,7 +1331,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                   style={{
                     width: '100%',
                     padding: '8px',
-                    border: '2px solid #000',
+                    border: '2px solid var(--border)',
                     background: 'var(--surface)',
                     fontSize: '9px',
                     fontWeight: 'bold',
@@ -1343,7 +1343,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                 </button>
               ) : (
                 <div>
-                  <div style={{ fontSize: '9px', color: '#666', textTransform: 'uppercase', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>
                     New Value
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -1354,7 +1354,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                       style={{
                         flex: 1,
                         padding: '8px',
-                        border: '2px solid #000',
+                        border: '2px solid var(--border)',
                         fontSize: '12px'
                       }}
                     />
@@ -1362,9 +1362,9 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                       onClick={handleUpdate}
                       style={{
                         padding: '8px 16px',
-                        border: '2px solid #000',
-                        background: '#000',
-                        color: '#fff',
+                        border: '2px solid var(--border)',
+                        background: 'var(--text)',
+                        color: 'var(--bg)',
                         fontSize: '9px',
                         fontWeight: 'bold',
                         cursor: 'pointer',
@@ -1380,7 +1380,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                       }}
                       style={{
                         padding: '8px 16px',
-                        border: '2px solid #000',
+                        border: '2px solid var(--border)',
                         background: 'var(--surface)',
                         fontSize: '9px',
                         fontWeight: 'bold',
@@ -1522,7 +1522,7 @@ const BellCurveChart: React.FC<{ value: number; mean: number; stdDev: number; pr
               y={height - padding.bottom - barHeight}
               width={barWidth}
               height={barHeight}
-              fill="#0ea5e9"
+              fill="var(--accent)"
               opacity={0.2}
             />
           );
@@ -1532,7 +1532,7 @@ const BellCurveChart: React.FC<{ value: number; mean: number; stdDev: number; pr
         <path
           d={curvePath}
           fill="none"
-          stroke="#0ea5e9"
+          stroke="var(--accent)"
           strokeWidth="2"
         />
 
@@ -1542,7 +1542,7 @@ const BellCurveChart: React.FC<{ value: number; mean: number; stdDev: number; pr
           y1={padding.top}
           x2={valueX}
           y2={height - padding.bottom}
-          stroke="#dc2626"
+          stroke="var(--error)"
           strokeWidth="2"
           strokeDasharray="4 4"
         />
@@ -1550,7 +1550,7 @@ const BellCurveChart: React.FC<{ value: number; mean: number; stdDev: number; pr
           cx={valueX}
           cy={scaleY((1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * zScore * zScore))}
           r="4"
-          fill="#dc2626"
+          fill="var(--error)"
         />
 
         {/* Labels */}
@@ -1580,7 +1580,7 @@ const BellCurveChart: React.FC<{ value: number; mean: number; stdDev: number; pr
           y={padding.top - 5}
           textAnchor="middle"
           fontSize="7pt"
-          fill="#dc2626"
+          fill="var(--error)"
           fontWeight="bold"
         >
           ${value.toLocaleString()}

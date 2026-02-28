@@ -190,7 +190,7 @@ export default function KSLScraper() {
             style={{
               padding: '12px 24px',
               backgroundColor: 'var(--primary)',
-              color: 'white',
+              color: 'var(--bg)',
               border: 'none',
               borderRadius: '4px',
               fontSize: '14px',

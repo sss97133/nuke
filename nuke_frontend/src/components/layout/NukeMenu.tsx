@@ -70,8 +70,7 @@ export const NukeMenu: React.FC<NukeMenuProps> = ({
           gap: '4px'
         }}
       >
-        <span>Nuke</span>
-        <span style={{ fontSize: '9px' }}>{menuOpen ? '▼' : '▶'}</span>
+        <span style={{ fontSize: '14px', lineHeight: 1 }}>≡</span>
       </button>
 
       {menuOpen && (
@@ -139,7 +138,7 @@ export const NukeMenu: React.FC<NukeMenuProps> = ({
             <Link to="/api" className={`nav-link ${isActivePage('/api') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={closeAll}>API</Link>
             <Link to="/developers" className={`nav-link ${isActivePage('/developers') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={closeAll}>SDK Docs</Link>
             <a href="https://www.npmjs.com/package/@nuke1/sdk" target="_blank" rel="noopener noreferrer" className="nav-link" style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', borderBottom: '1px solid var(--border)' }} onClick={closeAll}>NPM Package</a>
-            <Link to="/offering" className={`nav-link ${isActivePage('/offering') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', color: '#e8c547' }} onClick={closeAll}>Investor Deck</Link>
+            <Link to="/offering" className={`nav-link ${isActivePage('/offering') ? 'active' : ''}`} style={{ display: 'block', padding: '8px 12px', textDecoration: 'none', color: 'var(--accent)' }} onClick={closeAll}>Investor Deck</Link>
           </div>
 
           {/* Vehicles panel - pops out to the RIGHT */}

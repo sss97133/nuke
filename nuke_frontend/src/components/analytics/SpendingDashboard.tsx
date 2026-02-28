@@ -223,8 +223,8 @@ const SpendingDashboard = () => {
             padding: '4px 8px',
             fontSize: '11px',
             border: '1px solid #bdbdbd',
-            background: loading ? '#e0e0e0' : '#424242',
-            color: loading ? '#9e9e9e' : 'white',
+            background: loading ? 'var(--border)' : 'var(--text)',
+            color: loading ? 'var(--text-secondary)' : 'var(--bg)',
             borderRadius: '0px',
             cursor: loading ? 'not-allowed' : 'pointer'
           }}
@@ -260,7 +260,7 @@ const SpendingDashboard = () => {
             <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px' }}>
               {formatCurrency(analytics.total_spent)}
             </div>
-            <div style={{ fontSize: '9px', color: '#6b7280' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
               {analytics.receipt_count} receipts
             </div>
           </div>
@@ -277,7 +277,7 @@ const SpendingDashboard = () => {
             <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px' }}>
               {formatCurrency(analytics.average_receipt_amount)}
             </div>
-            <div style={{ fontSize: '9px', color: '#6b7280' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
               Largest: {formatCurrency(analytics.largest_purchase)}
             </div>
           </div>
@@ -295,19 +295,19 @@ const SpendingDashboard = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
               {getSpendingBreakdown().map(item => (
                 <div key={item.label}>
-                  <div style={{ fontSize: '9px', color: '#6b7280', marginBottom: '2px' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
                     {item.label}
                   </div>
                   <div style={{
                     background: item.color,
-                    color: 'white',
+                    color: 'var(--bg)',
                     padding: '4px',
                     fontSize: '11px',
                     fontWeight: 'bold'
                   }}>
                     {formatCurrency(item.amount)}
                   </div>
-                  <div style={{ fontSize: '9px', color: '#6b7280', marginTop: '2px' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                     {Math.round((item.amount / analytics.total_spent) * 100)}%
                   </div>
                 </div>

@@ -283,7 +283,7 @@ const FeedGrid: React.FC<FeedGridProps> = ({
             onClick={() => window.location.reload()}
             style={{
               background: 'var(--grey-600)',
-              color: 'white',
+              color: 'var(--bg)',
               border: '2px solid var(--border)',
               padding: '6px 16px',
               fontSize: '12px',

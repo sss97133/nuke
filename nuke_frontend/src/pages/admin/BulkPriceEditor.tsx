@@ -24,10 +24,10 @@ interface Draft {
 }
 
 const to8 = { fontSize: '12px' } as const;
-const cardHeaderStyle: React.CSSProperties = { ...to8, padding: '10px', borderBottom: '1px solid #c0c0c0', background: 'var(--bg)' };
-const inputStyle: React.CSSProperties = { ...to8, width: 120, padding: '6px 8px', border: '1px solid #c0c0c0', borderRadius: 4 };
-const cellStyle: React.CSSProperties = { ...to8, padding: '8px 10px', borderBottom: '1px solid #e5e7eb', minHeight: 36 };
-const headCellStyle: React.CSSProperties = { ...to8, padding: '8px 10px', borderBottom: '1px solid #c0c0c0', background: 'var(--bg)', fontWeight: 700 };
+const cardHeaderStyle: React.CSSProperties = { ...to8, padding: '10px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' };
+const inputStyle: React.CSSProperties = { ...to8, width: 120, padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 4 };
+const cellStyle: React.CSSProperties = { ...to8, padding: '8px 10px', borderBottom: '1px solid var(--border)', minHeight: 36 };
+const headCellStyle: React.CSSProperties = { ...to8, padding: '8px 10px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', fontWeight: 700 };
 
 const BulkPriceEditor: React.FC = () => {
   const navigate = useNavigate();
@@ -306,7 +306,7 @@ const BulkPriceEditor: React.FC = () => {
 
   return (
     <div className="container" style={{ maxWidth: '100%' }}>
-      <div className="card" style={{ border: '1px solid #c0c0c0' }}>
+      <div className="card" style={{ border: '1px solid var(--border)' }}>
         <div className="card-header" style={cardHeaderStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="text text-bold" style={to8}>Bulk Price Editor</div>
@@ -316,7 +316,7 @@ const BulkPriceEditor: React.FC = () => {
                 placeholder="Search year/make/model/VIN"
                 value={query}
                 onChange={(e) => { setPage(0); setQuery(e.target.value); }}
-                style={{ ...to8, padding: '6px 8px', border: '1px solid #c0c0c0', width: 360 }}
+                style={{ ...to8, padding: '6px 8px', border: '1px solid var(--border)', width: 360 }}
               />
               <button className="button button-small" onClick={saveAll} disabled={saving || dirtyCount === 0}>
                 {saving ? 'Saving...' : `Save All (${dirtyCount})`}
@@ -342,7 +342,7 @@ const BulkPriceEditor: React.FC = () => {
         </div>
         <div className="card-body" style={{ padding: 0, overflowX: 'auto' }}>
           {/* Header Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '260px 100px 120px 120px 120px 120px 100px 160px 180px', minWidth: 1280, borderBottom: '1px solid #c0c0c0', position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '260px 100px 120px 120px 120px 120px 100px 160px 180px', minWidth: 1280, borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
             <div style={headCellStyle}>Vehicle</div>
             <div style={headCellStyle}>MSRP</div>
             <div style={headCellStyle}>Purchase</div>
@@ -359,7 +359,7 @@ const BulkPriceEditor: React.FC = () => {
             <div style={{ padding: 12, ...to8 }}>Loading...</div>
           ) : (
             filteredRows.map((row, idx) => (
-              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '260px 100px 120px 120px 120px 120px 100px 160px 180px', minWidth: 1280, background: idx % 2 === 0 ? '#ffffff' : '#fbfbfb' }}>
+              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '260px 100px 120px 120px 120px 120px 100px 160px 180px', minWidth: 1280, background: idx % 2 === 0 ? 'var(--surface)' : 'var(--bg)' }}>
                 <div style={{ ...cellStyle }}>
                   <div className="text text-bold" style={to8}>
                     {[row.year, row.make, row.model].filter(Boolean).join(' ') || 'Vehicle'}
@@ -403,13 +403,13 @@ const BulkPriceEditor: React.FC = () => {
                     ) : null}
                   </div>
                 </div>
-                <div style={{ ...cellStyle, color: '#6b7280' }}>{new Date(row.created_at).toLocaleString()}</div>
+                <div style={{ ...cellStyle, color: 'var(--text-secondary)' }}>{new Date(row.created_at).toLocaleString()}</div>
               </div>
             ))
           )}
 
           {/* Pagination */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: 8, borderTop: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: 8, borderTop: '1px solid var(--border)' }}>
             <div className="text" style={to8}>Rows: {rows.length} {dirtyCount > 0 ? `• Unsaved: ${dirtyCount}` : ''}</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="button button-small" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0 || loading}>

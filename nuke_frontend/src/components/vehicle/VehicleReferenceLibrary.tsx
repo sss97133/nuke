@@ -614,7 +614,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                                   <span>{fileName}</span>
                                   <span>{progress}%</span>
                                 </div>
-                                <div style={{ background: '#e5e7eb', borderRadius: '4px', height: '4px', overflow: 'hidden' }}>
+                                <div style={{ background: 'var(--border)', borderRadius: '4px', height: '4px', overflow: 'hidden' }}>
                                   <div style={{ background: 'var(--primary)', height: '100%', width: `${progress}%`, transition: 'width 0.3s' }} />
                                 </div>
                               </div>
@@ -637,15 +637,15 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                   {showSuccess && uploadedFiles.length > 0 && (
                     <div style={{
                       marginTop: '8px',
-                      background: '#f0fdf4',
-                      border: '2px solid #22c55e',
+                      background: 'var(--success-dim)',
+                      border: '2px solid var(--success)',
                       borderRadius: '4px',
                       padding: '8px'
                     }}>
-                      <div style={{ fontSize: '9px', fontWeight: 700, color: '#15803d', marginBottom: '4px' }}>
+                      <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--success)', marginBottom: '4px' }}>
                         ✓ {uploadedFiles.length} Document{uploadedFiles.length > 1 ? 's' : ''} Uploaded!
                       </div>
-                      <div style={{ fontSize: '9px', color: '#166534', marginBottom: '4px' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--success)', marginBottom: '4px' }}>
                         Extraction processing in background.
                       </div>
                       <button
@@ -657,8 +657,8 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                         style={{
                           fontSize: '9px',
                           background: 'transparent',
-                          border: '1px solid #22c55e',
-                          color: '#15803d',
+                          border: '1px solid var(--success)',
+                          color: 'var(--success)',
                           padding: '3px 6px',
                           borderRadius: '3px',
                           cursor: 'pointer'
@@ -705,7 +705,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                         onClick={() => openBook(bookIndex)}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = 'translateY(-4px)';
-                          e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.15)';
+                          e.currentTarget.style.boxShadow = '0 8px 16px color-mix(in srgb, var(--text) 15%, transparent)';
                           e.currentTarget.style.borderColor = 'var(--primary)';
                         }}
                         onMouseLeave={(e) => {
@@ -742,8 +742,8 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                               position: 'absolute',
                               top: '8px',
                               right: '8px',
-                              background: 'rgba(0, 0, 0, 0.8)',
-                              color: 'white',
+                              background: 'var(--overlay)',
+                              color: 'var(--bg)',
                               padding: '4px 8px',
                               borderRadius: '4px',
                               fontSize: '11px',
@@ -767,7 +767,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                             <div style={{ 
                               fontSize: '9px',
                               padding: '4px 6px',
-                              background: book.extraction.status === 'pending_review' ? '#fef3c7' : '#f0fdf4',
+                              background: book.extraction.status === 'pending_review' ? 'var(--warning-dim)' : 'var(--success-dim)',
                               borderRadius: '4px',
                               marginBottom: '8px'
                             }}>

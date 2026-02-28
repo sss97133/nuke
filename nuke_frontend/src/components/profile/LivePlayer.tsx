@@ -137,7 +137,7 @@ const LivePlayer: React.FC<LivePlayerProps> = ({ userId, isOwnProfile }) => {
         </div>
 
         {actionMsg && (
-          <div className="text-small" style={{ color: '#b91c1c', marginBottom: 8 }}>{actionMsg}</div>
+          <div className="text-small" style={{ color: 'var(--error)', marginBottom: 8 }}>{actionMsg}</div>
         )}
 
         {loading ? (
@@ -192,7 +192,7 @@ const LivePlayer: React.FC<LivePlayerProps> = ({ userId, isOwnProfile }) => {
               {!settings ? (
                 <div className="text-small text-muted">Loading…</div>
               ) : settings.error ? (
-                <div className="text-small" style={{ color: '#b91c1c' }}>{String(settings.error)}</div>
+                <div className="text-small" style={{ color: 'var(--error)' }}>{String(settings.error)}</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {settings.rtmpUrl && (

@@ -239,7 +239,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
   return (
     <div style={{
       position: 'relative',
-      border: '2px inset #c0c0c0',
+      border: '2px inset var(--border)',
       background: 'var(--surface)',
       fontFamily: 'MS Sans Serif, sans-serif',
       fontSize: '11px'
@@ -247,9 +247,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
 
       {/* Controls */}
       <div style={{
-        background: '#c0c0c0',
+        background: 'var(--surface)',
         padding: '8px',
-        borderBottom: '1px solid #808080',
+        borderBottom: '1px solid var(--border)',
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
@@ -261,9 +261,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
           <button
             onClick={() => setIsTagging(!isTagging)}
             style={{
-              background: isTagging ? '#0066cc' : '#e0e0e0',
-              color: isTagging ? 'white' : 'black',
-              border: '2px outset #c0c0c0',
+              background: isTagging ? 'var(--accent)' : 'var(--surface-hover)',
+              color: isTagging ? 'var(--bg)' : 'var(--text)',
+              border: '2px outset var(--border)',
               padding: '4px 8px',
               fontSize: '11px',
               cursor: 'pointer'
@@ -282,7 +282,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
               checked={showAITags}
               onChange={e => setShowAITags(e.target.checked)}
             />
-            <span style={{ color: '#ff9900' }}>AI Tags</span>
+            <span style={{ color: 'var(--warning)' }}>AI Tags</span>
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
             <input
@@ -290,12 +290,12 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
               checked={showManualTags}
               onChange={e => setShowManualTags(e.target.checked)}
             />
-            <span style={{ color: '#00aa00' }}>Manual Tags</span>
+            <span style={{ color: 'var(--success)' }}>Manual Tags</span>
           </label>
         </div>
 
         {/* Tag Count */}
-        <div style={{ marginLeft: 'auto', fontSize: '10px', color: '#666' }}>
+        <div style={{ marginLeft: 'auto', fontSize: '10px', color: 'var(--text-muted)' }}>
           {tags.filter(t => t.source_type === 'ai').length} AI •
           {tags.filter(t => t.source_type === 'manual').length} Manual •
           {tags.filter(t => t.verified).length} Verified
@@ -399,7 +399,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
       {pendingPosition && isTagging && !readonly && (
         <div style={{
           background: 'var(--surface)',
-          border: '2px inset #c0c0c0',
+          border: '2px inset var(--border)',
           padding: '8px',
           margin: '8px'
         }}>
@@ -414,7 +414,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
               style={{
                 flex: 1,
                 padding: '2px 4px',
-                border: '2px inset #c0c0c0',
+                border: '2px inset var(--border)',
                 fontSize: '11px'
               }}
               onKeyPress={(e) => {
@@ -429,7 +429,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
               onChange={(e) => setNewTagType(e.target.value as Tag['tag_type'])}
               style={{
                 padding: '2px',
-                border: '2px inset #c0c0c0',
+                border: '2px inset var(--border)',
                 fontSize: '11px'
               }}
             >
@@ -447,9 +447,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
               onClick={handleAddTag}
               disabled={!newTagText.trim()}
               style={{
-                background: '#0066cc',
-                color: 'white',
-                border: '2px outset #c0c0c0',
+                background: 'var(--accent)',
+                color: 'var(--bg)',
+                border: '2px outset var(--border)',
                 padding: '4px 12px',
                 fontSize: '11px',
                 cursor: newTagText.trim() ? 'pointer' : 'not-allowed'
@@ -464,9 +464,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                 setNewTagText('');
               }}
               style={{
-                background: '#e0e0e0',
-                color: 'black',
-                border: '2px outset #c0c0c0',
+                background: 'var(--surface-hover)',
+                color: 'var(--text)',
+                border: '2px outset var(--border)',
                 padding: '4px 12px',
                 fontSize: '11px',
                 cursor: 'pointer'
@@ -481,8 +481,8 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
       {/* Selected Tag Details */}
       {selectedTag && (
         <div style={{
-          background: '#f9f9f9',
-          border: '2px inset #c0c0c0',
+          background: 'var(--bg)',
+          border: '2px inset var(--border)',
           padding: '8px',
           margin: '8px'
         }}>
@@ -490,7 +490,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
             Tag Details: {selectedTag.tag_name}
           </div>
 
-          <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+          <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' }}>
             Type: {selectedTag.tag_type} •
             Source: {selectedTag.source_type} •
             Confidence: {selectedTag.confidence}%
@@ -505,9 +505,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                 <button
                   onClick={() => handleValidateAITag(selectedTag, 'approve')}
                   style={{
-                    background: '#00aa00',
-                    color: 'white',
-                    border: '2px outset #c0c0c0',
+                    background: 'var(--success)',
+                    color: 'var(--bg)',
+                    border: '2px outset var(--border)',
                     padding: '2px 6px',
                     fontSize: '10px',
                     cursor: 'pointer'
@@ -519,9 +519,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                 <button
                   onClick={() => handleValidateAITag(selectedTag, 'reject')}
                   style={{
-                    background: '#cc0000',
-                    color: 'white',
-                    border: '2px outset #c0c0c0',
+                    background: 'var(--error)',
+                    color: 'var(--bg)',
+                    border: '2px outset var(--border)',
                     padding: '2px 6px',
                     fontSize: '10px',
                     cursor: 'pointer'
@@ -533,9 +533,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                 <button
                   onClick={() => handleValidateAITag(selectedTag, 'correct')}
                   style={{
-                    background: '#ff9900',
-                    color: 'white',
-                    border: '2px outset #c0c0c0',
+                    background: 'var(--warning)',
+                    color: 'var(--bg)',
+                    border: '2px outset var(--border)',
                     padding: '2px 6px',
                     fontSize: '10px',
                     cursor: 'pointer'
@@ -550,9 +550,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
               <button
                 onClick={() => handleDeleteTag(selectedTag.id)}
                 style={{
-                  background: '#cc0000',
-                  color: 'white',
-                  border: '2px outset #c0c0c0',
+                  background: 'var(--error)',
+                  color: 'var(--bg)',
+                  border: '2px outset var(--border)',
                   padding: '2px 6px',
                   fontSize: '10px',
                   cursor: 'pointer'
@@ -565,9 +565,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
             <button
               onClick={() => setSelectedTag(null)}
               style={{
-                background: '#e0e0e0',
-                color: 'black',
-                border: '2px outset #c0c0c0',
+                background: 'var(--surface-hover)',
+                color: 'var(--text)',
+                border: '2px outset var(--border)',
                 padding: '2px 6px',
                 fontSize: '10px',
                 cursor: 'pointer'
@@ -664,7 +664,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
     <>
       <div style={{
         position: 'relative',
-        border: '2px inset #c0c0c0',
+        border: '2px inset var(--border)',
         background: 'var(--surface)',
         fontFamily: 'MS Sans Serif, sans-serif',
         fontSize: '11px'
@@ -672,9 +672,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
 
         {/* Controls */}
         <div style={{
-          background: '#c0c0c0',
+          background: 'var(--surface)',
           padding: '8px',
-          borderBottom: '1px solid #808080',
+          borderBottom: '1px solid var(--border)',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
@@ -686,9 +686,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
             <button
               onClick={() => setIsTagging(!isTagging)}
               style={{
-                background: isTagging ? '#0066cc' : '#e0e0e0',
-                color: isTagging ? 'white' : 'black',
-                border: '2px outset #c0c0c0',
+                background: isTagging ? 'var(--accent)' : 'var(--surface-hover)',
+                color: isTagging ? 'var(--bg)' : 'var(--text)',
+                border: '2px outset var(--border)',
                 padding: '4px 8px',
                 fontSize: '11px',
                 cursor: 'pointer'
@@ -707,7 +707,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                 checked={showAITags}
                 onChange={e => setShowAITags(e.target.checked)}
               />
-              <span style={{ color: '#ff9900' }}>AI Tags</span>
+              <span style={{ color: 'var(--warning)' }}>AI Tags</span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
               <input
@@ -715,12 +715,12 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                 checked={showManualTags}
                 onChange={e => setShowManualTags(e.target.checked)}
               />
-              <span style={{ color: '#00aa00' }}>Manual Tags</span>
+              <span style={{ color: 'var(--success)' }}>Manual Tags</span>
             </label>
           </div>
 
           {/* Tag Count */}
-          <div style={{ marginLeft: 'auto', fontSize: '10px', color: '#666' }}>
+          <div style={{ marginLeft: 'auto', fontSize: '10px', color: 'var(--text-muted)' }}>
             {tags.filter(t => t.source_type === 'ai').length} AI •
             {tags.filter(t => t.source_type === 'manual').length} Manual •
             {tags.filter(t => t.verified).length} Verified
@@ -824,7 +824,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
         {pendingPosition && isTagging && !readonly && (
           <div style={{
             background: 'var(--surface)',
-            border: '2px inset #c0c0c0',
+            border: '2px inset var(--border)',
             padding: '8px',
             margin: '8px'
           }}>
@@ -839,7 +839,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                 style={{
                   flex: 1,
                   padding: '2px 4px',
-                  border: '2px inset #c0c0c0',
+                  border: '2px inset var(--border)',
                   fontSize: '11px'
                 }}
                 onKeyPress={(e) => {
@@ -854,7 +854,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                 onChange={(e) => setNewTagType(e.target.value as Tag['tag_type'])}
                 style={{
                   padding: '2px',
-                  border: '2px inset #c0c0c0',
+                  border: '2px inset var(--border)',
                   fontSize: '11px'
                 }}
               >
@@ -872,9 +872,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                 onClick={handleAddTag}
                 disabled={!newTagText.trim()}
                 style={{
-                  background: '#0066cc',
-                  color: 'white',
-                  border: '2px outset #c0c0c0',
+                  background: 'var(--accent)',
+                  color: 'var(--bg)',
+                  border: '2px outset var(--border)',
                   padding: '4px 12px',
                   fontSize: '11px',
                   cursor: newTagText.trim() ? 'pointer' : 'not-allowed'
@@ -889,9 +889,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                   setNewTagText('');
                 }}
                 style={{
-                  background: '#e0e0e0',
-                  color: 'black',
-                  border: '2px outset #c0c0c0',
+                  background: 'var(--surface-hover)',
+                  color: 'var(--text)',
+                  border: '2px outset var(--border)',
                   padding: '4px 12px',
                   fontSize: '11px',
                   cursor: 'pointer'
@@ -906,8 +906,8 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
         {/* Selected Tag Details */}
         {selectedTag && (
           <div style={{
-            background: '#f9f9f9',
-            border: '2px inset #c0c0c0',
+            background: 'var(--bg)',
+            border: '2px inset var(--border)',
             padding: '8px',
             margin: '8px'
           }}>
@@ -915,7 +915,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
               Tag Details: {selectedTag.tag_name}
             </div>
 
-            <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' }}>
               Type: {selectedTag.tag_type} •
               Source: {selectedTag.source_type} •
               Confidence: {selectedTag.confidence}%
@@ -930,9 +930,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                   <button
                     onClick={() => handleValidateAITag(selectedTag, 'approve')}
                     style={{
-                      background: '#00aa00',
-                      color: 'white',
-                      border: '2px outset #c0c0c0',
+                      background: 'var(--success)',
+                      color: 'var(--bg)',
+                      border: '2px outset var(--border)',
                       padding: '2px 6px',
                       fontSize: '10px',
                       cursor: 'pointer'
@@ -944,9 +944,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                   <button
                     onClick={() => handleValidateAITag(selectedTag, 'reject')}
                     style={{
-                      background: '#cc0000',
-                      color: 'white',
-                      border: '2px outset #c0c0c0',
+                      background: 'var(--error)',
+                      color: 'var(--bg)',
+                      border: '2px outset var(--border)',
                       padding: '2px 6px',
                       fontSize: '10px',
                       cursor: 'pointer'
@@ -958,9 +958,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                   <button
                     onClick={() => handleValidateAITag(selectedTag, 'correct')}
                     style={{
-                      background: '#ff9900',
-                      color: 'white',
-                      border: '2px outset #c0c0c0',
+                      background: 'var(--warning)',
+                      color: 'var(--bg)',
+                      border: '2px outset var(--border)',
                       padding: '2px 6px',
                       fontSize: '10px',
                       cursor: 'pointer'
@@ -975,9 +975,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                 <button
                   onClick={() => handleDeleteTag(selectedTag.id)}
                   style={{
-                    background: '#cc0000',
-                    color: 'white',
-                    border: '2px outset #c0c0c0',
+                    background: 'var(--error)',
+                    color: 'var(--bg)',
+                    border: '2px outset var(--border)',
                     padding: '2px 6px',
                     fontSize: '10px',
                     cursor: 'pointer'
@@ -990,9 +990,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
               <button
                 onClick={() => setSelectedTag(null)}
                 style={{
-                  background: '#e0e0e0',
-                  color: 'black',
-                  border: '2px outset #c0c0c0',
+                  background: 'var(--surface-hover)',
+                  color: 'var(--text)',
+                  border: '2px outset var(--border)',
                   padding: '2px 6px',
                   fontSize: '10px',
                   cursor: 'pointer'

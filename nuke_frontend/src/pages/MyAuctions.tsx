@@ -318,7 +318,7 @@ const StatsModal: React.FC<StatsModalProps> = ({ isOpen, onClose, type, listings
           value: listings
             .filter(l => l.platform === platform)
             .reduce((sum, l) => sum + (l.view_count || 0), 0),
-          color: platformColors[platform] || '#666',
+          color: platformColors[platform] || 'var(--text-secondary)',
         })).filter(d => d.value > 0);
 
         return (
@@ -372,7 +372,7 @@ const StatsModal: React.FC<StatsModalProps> = ({ isOpen, onClose, type, listings
           value: listings
             .filter(l => l.platform === platform)
             .reduce((sum, l) => sum + (l.bid_count || 0), 0),
-          color: platformColors[platform] || '#666',
+          color: platformColors[platform] || 'var(--text-secondary)',
         })).filter(d => d.value > 0);
 
         return (
@@ -485,7 +485,7 @@ const StatsModal: React.FC<StatsModalProps> = ({ isOpen, onClose, type, listings
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0, 0, 0, 0.5)',
+        background: 'var(--overlay)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -723,7 +723,7 @@ const MyAuctions: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
         Loading auctions...
       </div>
     );
@@ -736,7 +736,7 @@ const MyAuctions: React.FC = () => {
         <h1 className="heading-1" style={{ marginBottom: 'var(--space-2)' }}>
           My Auctions
         </h1>
-        <p style={{ color: '#666', fontSize: '14px' }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
           Track all your vehicle listings across all platforms
         </p>
       </div>
@@ -747,13 +747,13 @@ const MyAuctions: React.FC = () => {
         style={{
           marginBottom: 'var(--space-3)',
           padding: 'var(--space-3)',
-          background: 'rgba(59, 130, 246, 0.05)',
-          border: '1px solid rgba(59, 130, 246, 0.25)',
+          background: 'color-mix(in srgb, var(--accent) 5%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)',
           fontSize: '12px',
-          color: '#555',
+          color: 'var(--text-secondary)',
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: '4px', color: '#333' }}>Attribution & Permissions</div>
+        <div style={{ fontWeight: 700, marginBottom: '4px', color: 'var(--text)' }}>Attribution & Permissions</div>
         <div>
           This dashboard separates <strong>Personal</strong> auctions from <strong>Organization-access</strong> auctions.
           Organization auctions may be visible because you are an active org contributor (e.g. board member) and <strong>do not imply personal profit</strong>.
@@ -965,7 +965,7 @@ const MyAuctions: React.FC = () => {
           style={{
             padding: '6px 12px',
             fontSize: '12px',
-            backgroundColor: '#666',
+            backgroundColor: 'var(--text-secondary)',
             opacity: syncing ? 0.5 : 1,
           }}
         >
@@ -978,7 +978,7 @@ const MyAuctions: React.FC = () => {
           style={{
             padding: '6px 12px',
             fontSize: '12px',
-            backgroundColor: '#0000ff',
+            backgroundColor: 'var(--accent)',
           }}
         >
           BROWSE AUCTIONS
@@ -987,7 +987,7 @@ const MyAuctions: React.FC = () => {
 
       {/* Listings Grid */}
       {listings.length === 0 ? (
-        <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+        <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
           <div style={{ fontSize: '18px', marginBottom: '10px' }}>No Listings Found</div>
           <div style={{ fontSize: '14px', marginBottom: '20px' }}>
             {filters.status === 'active'

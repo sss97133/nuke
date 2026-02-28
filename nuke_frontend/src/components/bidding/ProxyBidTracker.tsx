@@ -241,15 +241,15 @@ export function BidToast({ notification, onClose }: BidToastProps) {
   const getStyles = () => {
     switch (notification.type) {
       case 'winning':
-        return { bg: '#dcfce7', border: '#22c55e', icon: '🎉', color: '#166534' };
+        return { bg: 'var(--success-dim)', border: 'var(--success)', icon: '🎉', color: 'var(--success)' };
       case 'outbid':
-        return { bg: '#fef3c7', border: '#f59e0b', icon: '⚠️', color: '#92400e' };
+        return { bg: 'var(--warning-dim)', border: 'var(--warning)', icon: '⚠️', color: 'var(--warning)' };
       case 'won':
-        return { bg: '#dbeafe', border: '#3b82f6', icon: '🏆', color: '#1e40af' };
+        return { bg: 'color-mix(in srgb, var(--accent) 15%, transparent)', border: 'var(--accent)', icon: '🏆', color: 'var(--accent)' };
       case 'lost':
-        return { bg: '#f3f4f6', border: '#9ca3af', icon: '😔', color: '#4b5563' };
+        return { bg: 'var(--bg)', border: 'var(--text-disabled)', icon: '😔', color: 'var(--text-secondary)' };
       case 'error':
-        return { bg: '#fef2f2', border: '#ef4444', icon: '❌', color: '#991b1b' };
+        return { bg: 'var(--error-dim)', border: 'var(--error)', icon: '❌', color: 'var(--error)' };
       default:
         return { bg: 'var(--surface)', border: 'var(--border)', icon: '📢', color: 'var(--text)' };
     }
@@ -268,7 +268,7 @@ export function BidToast({ notification, onClose }: BidToastProps) {
         alignItems: 'flex-start',
         gap: '12px',
         maxWidth: '360px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        boxShadow: '0 4px 12px var(--overlay)',
         animation: 'slideIn 0.3s ease',
       }}
     >
@@ -362,13 +362,13 @@ export function ActiveBidsIndicator({ onClick }: ActiveBidsIndicatorProps) {
         alignItems: 'center',
         gap: '6px',
         padding: '6px 12px',
-        background: '#dbeafe',
-        border: '1px solid #3b82f6',
+        background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+        border: '1px solid var(--accent)',
         borderRadius: '20px',
         cursor: 'pointer',
         fontSize: '11px',
         fontWeight: 600,
-        color: '#1e40af',
+        color: 'var(--accent)',
       }}
       title="View active bids"
     >

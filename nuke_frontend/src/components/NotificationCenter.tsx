@@ -110,8 +110,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
           style={{ 
             padding: '8px', 
             marginBottom: '8px', 
-            border: '1px solid #bdbdbd', 
-            backgroundColor: (!notification.read && !notification.is_read) ? '#f5f5f5' : 'white',
+            border: '1px solid var(--border)',
+            backgroundColor: (!notification.read && !notification.is_read) ? 'var(--bg-secondary)' : 'var(--surface)',
             fontSize: '12px'
           }}
         >
@@ -120,14 +120,14 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
               fontSize: '11px', 
               marginRight: '6px', 
               padding: '1px 4px',
-              backgroundColor: '#e0e0e0',
+              backgroundColor: 'var(--border)',
               fontWeight: 'bold'
             }}>
               {getNotificationIcon(notification.type)}
             </span>
             <div style={{ flex: 1 }}>
               <strong style={{ fontSize: '12px' }}>{notification.title}</strong>
-              <span style={{ fontSize: '11px', color: '#757575', marginLeft: '8px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', marginLeft: '8px' }}>
                 {formatDate(notification.created_at)}
               </span>
             </div>
@@ -136,8 +136,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
                 fontSize: '11px',
                 fontWeight: 'bold',
                 padding: '1px 4px',
-                backgroundColor: '#757575',
-                color: 'white'
+                backgroundColor: 'var(--text-secondary)',
+                color: 'var(--bg)'
               }}>
                 NEW
               </span>
@@ -148,19 +148,19 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
             marginBottom: '8px', 
             lineHeight: '1.3',
             fontSize: '12px',
-            color: '#000000'
+            color: 'var(--text)'
           }}>
             {notification.message}
             {notification.type === 'incomplete_profile' && notification.metadata?.completion_percentage && (
               <div style={{ marginTop: '8px' }}>
                 <div style={{ 
-                  background: '#e0e0e0', 
+                  background: 'var(--border)',
                   height: '6px',
-                  border: '1px solid #bdbdbd',
+                  border: '1px solid var(--border)',
                   marginTop: '4px'
                 }}>
                   <div style={{ 
-                    background: notification.metadata.completion_percentage < 50 ? '#9e9e9e' : '#757575',
+                    background: notification.metadata.completion_percentage < 50 ? 'var(--text-muted)' : 'var(--text-secondary)',
                     height: '100%', 
                     width: `${notification.metadata.completion_percentage}%`
                   }} />
@@ -168,7 +168,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
                 <div style={{ 
                   marginTop: '2px',
                   fontSize: '11px',
-                  color: '#757575'
+                  color: 'var(--text-secondary)'
                 }}>
                   {notification.metadata.completion_percentage}% Complete
                   {notification.metadata.missing_items && notification.metadata.missing_items.length > 0 && (
@@ -186,7 +186,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
               marginBottom: '8px',
               padding: '4px',
               backgroundColor: 'var(--bg)',
-              border: '1px solid #e0e0e0',
+              border: '1px solid var(--border)',
               fontSize: '11px'
             }}>
               {notification.metadata.image_count} {notification.metadata.image_count === 1 ? 'image needs' : 'images need'} date information
@@ -203,8 +203,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
                 style={{ 
                   textDecoration: 'none',
                   padding: '2px 8px',
-                  backgroundColor: '#757575',
-                  color: 'white',
+                  backgroundColor: 'var(--text-secondary)',
+                  color: 'var(--bg)',
                   fontSize: '11px',
                   border: 'none',
                   cursor: 'pointer'
@@ -234,8 +234,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
                 style={{
                   padding: '2px 8px',
                   backgroundColor: 'var(--surface)',
-                  color: '#000000',
-                  border: '1px solid #bdbdbd',
+                  color: 'var(--text)',
+                  border: '1px solid var(--border)',
                   fontSize: '11px',
                   cursor: 'pointer'
                 }}

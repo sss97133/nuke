@@ -152,7 +152,7 @@ export default function BusinessIntelligence() {
     <div style={{ padding: '16px' }}>
       <div style={{ marginBottom: '16px' }}>
         <h1 style={{ fontSize: '16px', marginBottom: '8px' }}>Business Intelligence Dashboard</h1>
-        <p style={{ fontSize: '13px', color: '#666', margin: 0 }}>
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
           Vehicle critique analysis and business impact assessment
         </p>
       </div>
@@ -172,8 +172,8 @@ export default function BusinessIntelligence() {
             style={{
               padding: '6px 12px',
               fontSize: '12px',
-              borderBottom: activeTab === tab ? '2px solid #0066cc' : 'none',
-              background: activeTab === tab ? '#e8f4f8' : 'var(--white)',
+              borderBottom: activeTab === tab ? '2px solid var(--accent)' : 'none',
+              background: activeTab === tab ? 'var(--bg)' : 'var(--surface)',
               borderRadius: '0'
             }}
           >
@@ -189,7 +189,7 @@ export default function BusinessIntelligence() {
           <div className="card">
             <div className="card-header">Total Vehicles</div>
             <div className="card-body" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#0066cc' }}>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--accent)' }}>
                 {metrics.totalVehicles.toLocaleString()}
               </div>
             </div>
@@ -198,7 +198,7 @@ export default function BusinessIntelligence() {
           <div className="card">
             <div className="card-header">Pending Critiques</div>
             <div className="card-body" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ffc107' }}>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--warning)' }}>
                 {metrics.pendingCritiques}
               </div>
             </div>
@@ -207,7 +207,7 @@ export default function BusinessIntelligence() {
           <div className="card">
             <div className="card-header">High Priority Issues</div>
             <div className="card-body" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#dc3545' }}>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--error)' }}>
                 {metrics.highPriorityCritiques}
               </div>
             </div>
@@ -216,7 +216,7 @@ export default function BusinessIntelligence() {
           <div className="card">
             <div className="card-header">Avg Resolution Time</div>
             <div className="card-body" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#28a745' }}>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--success)' }}>
                 {metrics.avgResolutionDays}
                 <span style={{ fontSize: '12px', fontWeight: 'normal' }}> days</span>
               </div>
@@ -228,28 +228,28 @@ export default function BusinessIntelligence() {
             <div className="card-header">Business Impact Summary</div>
             <div className="card-body">
               <div style={{ display: 'grid', gap: '8px', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                <div style={{ padding: '8px', background: '#fee', border: '1px solid #fcc' }}>
+                <div style={{ padding: '8px', background: 'var(--error-dim)', border: '1px solid var(--error)' }}>
                   <strong>Financial Impact</strong>
-                  <div style={{ fontSize: '18px', color: '#c00' }}>
+                  <div style={{ fontSize: '18px', color: 'var(--error)' }}>
                     {metrics.businessImpactBreakdown.financial_negative} vehicles
                   </div>
-                  <div style={{ fontSize: '11px', color: '#666' }}>with negative financial impact</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>with negative financial impact</div>
                 </div>
 
-                <div style={{ padding: '8px', background: '#fff3cd', border: '1px solid #ffeaa7' }}>
+                <div style={{ padding: '8px', background: 'var(--warning-dim)', border: '1px solid var(--warning)' }}>
                   <strong>Time Impact</strong>
-                  <div style={{ fontSize: '18px', color: '#856404' }}>
+                  <div style={{ fontSize: '18px', color: 'var(--warning)' }}>
                     {metrics.businessImpactBreakdown.time_high} vehicles
                   </div>
-                  <div style={{ fontSize: '11px', color: '#666' }}>with high time consumption</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>with high time consumption</div>
                 </div>
 
-                <div style={{ padding: '8px', background: '#e2e3e5', border: '1px solid #d6d8db' }}>
+                <div style={{ padding: '8px', background: 'var(--bg)', border: '1px solid var(--border)' }}>
                   <strong>Space Utilization</strong>
-                  <div style={{ fontSize: '18px', color: '#6c757d' }}>
+                  <div style={{ fontSize: '18px', color: 'var(--text-secondary)' }}>
                     {metrics.businessImpactBreakdown.space_utilized} vehicles
                   </div>
-                  <div style={{ fontSize: '11px', color: '#666' }}>utilizing warehouse/lot space</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>utilizing warehouse/lot space</div>
                 </div>
               </div>
             </div>
@@ -264,12 +264,12 @@ export default function BusinessIntelligence() {
       {activeTab === 'analytics' && (
         <div className="card">
           <div className="card-header">Advanced Analytics</div>
-          <div className="card-body" style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+          <div className="card-body" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
             <div style={{ fontSize: '14px', marginBottom: '8px' }}>Advanced Analytics</div>
             <div style={{ fontSize: '13px' }}>
               Detailed trend analysis, predictive insights, and custom reporting coming soon.
             </div>
-            <div style={{ fontSize: '11px', marginTop: '8px', color: '#999' }}>
+            <div style={{ fontSize: '11px', marginTop: '8px', color: 'var(--text-disabled)' }}>
               This will include critique trend analysis, resolution time forecasting, and business impact projections.
             </div>
           </div>

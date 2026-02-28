@@ -93,10 +93,10 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
 
   // Get status
   const getStatus = () => {
-    if (vehicle.auction_outcome === 'sold' || vehicle.sale_status === 'sold') return { label: 'SOLD', color: '#22c55e' };
-    if (vehicle.auction_outcome === 'bid_to' || vehicle.sale_status === 'bid_to') return { label: 'BID TO', color: '#f59e0b' };
-    if (vehicle.auction_outcome === 'not_sold' || vehicle.sale_status === 'not_sold') return { label: 'NOT SOLD', color: '#ef4444' };
-    if (vehicle.sale_status === 'for_sale') return { label: 'FOR SALE', color: '#3b82f6' };
+    if (vehicle.auction_outcome === 'sold' || vehicle.sale_status === 'sold') return { label: 'SOLD', color: 'var(--success)' };
+    if (vehicle.auction_outcome === 'bid_to' || vehicle.sale_status === 'bid_to') return { label: 'BID TO', color: 'var(--warning)' };
+    if (vehicle.auction_outcome === 'not_sold' || vehicle.sale_status === 'not_sold') return { label: 'NOT SOLD', color: 'var(--error)' };
+    if (vehicle.sale_status === 'for_sale') return { label: 'FOR SALE', color: 'var(--accent)' };
     return null;
   };
   const status = getStatus();
@@ -107,18 +107,18 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
     if (!source) return null;
 
     const sourceMap: Record<string, { name: string; color: string }> = {
-      'bringatrailer': { name: 'BaT', color: '#dc2626' },
-      'bat_import': { name: 'BaT', color: '#dc2626' },
+      'bringatrailer': { name: 'BaT', color: 'var(--error)' },
+      'bat_import': { name: 'BaT', color: 'var(--error)' },
       'carsandbids': { name: 'C&B', color: '#7c3aed' },
-      'url_scraper': { name: 'Web', color: '#6b7280' },
-      'user_upload': { name: 'User', color: '#3b82f6' },
+      'url_scraper': { name: 'Web', color: 'var(--text-secondary)' },
+      'user_upload': { name: 'User', color: 'var(--accent)' },
     };
 
     const key = source.toLowerCase().replace(/[^a-z]/g, '');
     for (const [k, v] of Object.entries(sourceMap)) {
       if (key.includes(k.replace(/[^a-z]/g, ''))) return v;
     }
-    return { name: source.slice(0, 8), color: '#6b7280' };
+    return { name: source.slice(0, 8), color: 'var(--text-secondary)' };
   };
   const sourceInfo = getSourceInfo();
 
@@ -144,10 +144,10 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
         left: adjustedPosition.x,
         top: adjustedPosition.y,
         zIndex: 9999,
-        background: 'var(--bg, #fff)',
-        border: '1px solid var(--border, #e5e7eb)',
+        background: 'var(--bg)',
+        border: '1px solid var(--border)',
         borderRadius: '6px',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+        boxShadow: '0 10px 40px var(--overlay)',
         padding: '12px',
         minWidth: '280px',
         maxWidth: '320px',
@@ -186,7 +186,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
         {status && (
           <span style={{
             background: status.color,
-            color: 'white',
+            color: 'var(--bg)',
             padding: '2px 6px',
             borderRadius: '3px',
             fontSize: '9px',
@@ -226,7 +226,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
         gap: '8px',
         marginBottom: '10px',
         padding: '8px',
-        background: 'var(--bg-secondary, #f9fafb)',
+        background: 'var(--bg-secondary)',
         borderRadius: '4px',
       }}>
         <div>
@@ -323,7 +323,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
         <div style={{
           padding: '8px',
           marginBottom: '10px',
-          background: 'var(--grey-50, #f9fafb)',
+          background: 'var(--grey-50)',
           border: '1px solid var(--border)',
           borderRadius: '4px',
           fontSize: '11px',
@@ -339,7 +339,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
                 width: '6px',
                 height: '6px',
                 borderRadius: '50%',
-                background: vehicle.deal_score > 20 ? '#22c55e' : vehicle.deal_score > 0 ? '#84cc16' : vehicle.deal_score > -20 ? '#f59e0b' : '#ef4444',
+                background: vehicle.deal_score > 20 ? 'var(--success)' : vehicle.deal_score > 0 ? 'var(--success)' : vehicle.deal_score > -20 ? 'var(--warning)' : 'var(--error)',
                 flexShrink: 0,
               }} />
               <span style={{ color: 'var(--text)' }}>
@@ -369,7 +369,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
                 <div style={{
                   width: `${Math.min(100, Math.max(5, vehicle.heat_score))}%`,
                   height: '100%',
-                  background: vehicle.heat_score > 70 ? '#ef4444' : vehicle.heat_score > 40 ? '#f59e0b' : '#6b7280',
+                  background: vehicle.heat_score > 70 ? 'var(--error)' : vehicle.heat_score > 40 ? 'var(--warning)' : 'var(--text-secondary)',
                   transition: 'width 0.3s ease',
                 }} />
               </div>
@@ -383,8 +383,8 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
           {vehicle.is_record_price && (
             <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{
-                background: '#fbbf24',
-                color: '#78350f',
+                background: 'var(--warning)',
+                color: 'var(--text)',
                 padding: '1px 6px',
                 borderRadius: '3px',
                 fontSize: '9px',
@@ -420,8 +420,8 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
           style={{
             flex: 1,
             padding: '6px 10px',
-            background: 'var(--primary, #3b82f6)',
-            color: 'white',
+            background: 'var(--primary)',
+            color: 'var(--bg)',
             border: 'none',
             borderRadius: '4px',
             fontSize: '11px',
@@ -444,8 +444,8 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
           disabled={followLoading}
           style={{
             padding: '6px 10px',
-            background: isFollowing ? 'var(--primary, #3b82f6)' : 'var(--bg-secondary, #f3f4f6)',
-            color: isFollowing ? 'white' : 'var(--text)',
+            background: isFollowing ? 'var(--primary)' : 'var(--bg-secondary)',
+            color: isFollowing ? 'var(--bg)' : 'var(--text)',
             border: isFollowing ? 'none' : '1px solid var(--border)',
             borderRadius: '4px',
             fontSize: '11px',

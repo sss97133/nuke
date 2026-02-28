@@ -240,7 +240,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
           }}
         >
           {currentImage.angle_tag && (
-            <div style={{ fontSize: '11px', color: '#aaa', marginBottom: 'var(--space-1)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-1)' }}>
               {currentImage.angle_tag}
             </div>
           )}
@@ -249,7 +249,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
               {currentImage.caption}
             </div>
           )}
-          <div style={{ fontSize: '9px', color: '#888', marginTop: 'var(--space-2)' }}>
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
             {new Date(currentImage.created_at).toLocaleDateString()}
           </div>
           <div
@@ -257,7 +257,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
               marginTop: 'var(--space-3)',
               textAlign: 'center',
               fontSize: '11px',
-              color: '#aaa'
+              color: 'var(--text-muted)'
             }}
           >
             Swipe down to close • Swipe left/right to navigate

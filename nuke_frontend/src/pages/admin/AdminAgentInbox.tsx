@@ -17,33 +17,33 @@ type AgentMessage = {
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  coo: '#3b82f6',
-  cto: '#8b5cf6',
-  cfo: '#10b981',
-  cpo: '#f59e0b',
-  cdo: '#ec4899',
-  cwfto: '#6366f1',
-  'vp-ai': '#14b8a6',
-  'vp-extraction': '#f97316',
-  'vp-platform': '#64748b',
-  'vp-vehicle-intel': '#a16207',
-  'vp-deal-flow': '#0ea5e9',
-  'vp-orgs': '#84cc16',
-  'vp-photos': '#d946ef',
-  'vp-docs': '#fb7185',
-  worker: '#94a3b8',
-  founder: '#f59e0b',
-  system: '#6b7280',
+  coo: 'var(--accent)',
+  cto: 'var(--role-cto, #8b5cf6)',
+  cfo: 'var(--success)',
+  cpo: 'var(--warning)',
+  cdo: 'var(--role-cdo, #ec4899)',
+  cwtfo: 'var(--role-cwtfo, #6366f1)',
+  'vp-ai': 'var(--role-vp-ai, #14b8a6)',
+  'vp-extraction': 'var(--role-vp-extraction, #f97316)',
+  'vp-platform': 'var(--role-vp-platform, #64748b)',
+  'vp-vehicle-intel': 'var(--role-vp-vehicle-intel, #a16207)',
+  'vp-deal-flow': 'var(--role-vp-deal-flow, #0ea5e9)',
+  'vp-orgs': 'var(--role-vp-orgs, #84cc16)',
+  'vp-photos': 'var(--role-vp-photos, #d946ef)',
+  'vp-docs': 'var(--role-vp-docs, #fb7185)',
+  worker: 'var(--text-disabled)',
+  founder: 'var(--warning)',
+  system: 'var(--text-secondary)',
 };
 
 const ALL_ROLES = [
-  'founder', 'coo', 'cto', 'cfo', 'cpo', 'cdo', 'cwfto',
+  'founder', 'coo', 'cto', 'cfo', 'cpo', 'cdo', 'cwtfo',
   'vp-ai', 'vp-extraction', 'vp-platform', 'vp-vehicle-intel',
   'vp-deal-flow', 'vp-orgs', 'vp-photos', 'vp-docs', 'worker',
 ];
 
 function roleColor(role: string) {
-  return ROLE_COLORS[role] || '#6b7280';
+  return ROLE_COLORS[role] || 'var(--text-secondary)';
 }
 
 function RolePill({ role }: { role: string }) {
@@ -54,7 +54,7 @@ function RolePill({ role }: { role: string }) {
       fontSize: '9px',
       fontFamily: 'monospace',
       fontWeight: 600,
-      color: '#fff',
+      color: 'var(--bg)',
       backgroundColor: roleColor(role),
       borderRadius: '3px',
     }}>
@@ -160,7 +160,7 @@ export default function AdminAgentInbox() {
         <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>
           Agent Inbox
           {unreadCount > 0 && (
-            <span style={{ marginLeft: 8, color: '#b91c1c', fontFamily: 'monospace' }}>
+            <span style={{ marginLeft: 8, color: 'var(--error)', fontFamily: 'monospace' }}>
               {unreadCount} unread (founder)
             </span>
           )}
@@ -249,7 +249,7 @@ export default function AdminAgentInbox() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     {msg.read_at == null && (
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#3b82f6', flexShrink: 0 }} />
+                      <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--accent)', flexShrink: 0 }} />
                     )}
                     <RolePill role={msg.from_role} />
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>→</span>

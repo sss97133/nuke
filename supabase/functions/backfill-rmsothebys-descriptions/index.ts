@@ -450,9 +450,12 @@ serve(async (req) => {
           updatePayload.mileage = lotData.mileage;
         }
 
-        if (lotData.vin && !vehicle.vin) {
-          updatePayload.vin = lotData.vin;
-        }
+        // NOTE: We intentionally skip writing vin here.
+        // The chassis_number from RM Sotheby's lot pages can collide with VINs
+        // that belong to other vehicles (different provenance), causing
+        // vehicles_vin_unique_index constraint violations.
+        // Chassis numbers are stored in origin_metadata.chassis_number instead.
+        // VIN backfill is handled by the dedicated backfill-vin-from-snapshots function.
 
         // Store estimate in origin_metadata if available
         if (lotData.estimate || lotData.chassis_number || lotData.engine_number) {

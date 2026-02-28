@@ -684,7 +684,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                         </button>
                         {/* Platform badges for all external sources */}
                         {comment.source === 'bat' && (
-                          <span style={{ fontSize: '9px', color: '#2563eb', fontWeight: 600 }}>
+                          <span style={{ fontSize: '9px', color: 'var(--accent)', fontWeight: 600 }}>
                             BaT
                           </span>
                         )}
@@ -726,8 +726,8 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                           <span style={{
                             fontSize: '11px',
                             fontWeight: 700,
-                            color: '#22c55e',
-                            backgroundColor: '#dcfce7',
+                            color: 'var(--success)',
+                            backgroundColor: 'var(--success-dim)',
                             padding: '2px 6px',
                             borderRadius: '4px',
                             marginLeft: '4px'
@@ -736,11 +736,11 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                           </span>
                         )}
                         {isBid && amount && amount > 0 && (
-                          <span style={{ 
-                            fontSize: '11px', 
-                            fontWeight: 700, 
-                            color: '#059669',
-                            backgroundColor: '#d1fae5',
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: 'var(--success)',
+                            backgroundColor: 'var(--success-dim)',
                             padding: '2px 6px',
                             borderRadius: '4px',
                             marginLeft: '4px'
@@ -749,11 +749,11 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                           </span>
                         )}
                         {comment.is_seller && (
-                          <span style={{ 
-                            fontSize: '9px', 
-                            fontWeight: 600, 
-                            color: '#dc2626',
-                            backgroundColor: '#fee2e2',
+                          <span style={{
+                            fontSize: '9px',
+                            fontWeight: 600,
+                            color: 'var(--error)',
+                            backgroundColor: 'var(--error-dim)',
                             padding: '2px 6px',
                             borderRadius: '4px'
                           }}>
@@ -935,7 +935,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
               marginBottom: '4px',
               background: 'var(--surface)',
               border: '1px solid var(--border)',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              boxShadow: '0 2px 8px color-mix(in srgb, var(--text) 15%, transparent)',
               zIndex: 1000,
               maxHeight: '240px',
               overflow: 'hidden',

@@ -278,7 +278,7 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
                     height: '40px',
                     borderRadius: '50%',
                     background: 'var(--accent)',
-                    color: 'white',
+                    color: 'var(--bg)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -344,7 +344,7 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
                     fontSize: '11px',
                     fontWeight: 600,
                     background: offering.status === 'active' ? 'var(--success)' : 'var(--text-muted)',
-                    color: 'white',
+                    color: 'var(--bg)',
                   }}>
                     {offering.status?.toUpperCase()}
                   </div>

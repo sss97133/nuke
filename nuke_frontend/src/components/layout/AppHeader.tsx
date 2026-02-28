@@ -38,15 +38,36 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   return (
     <div className="header-wrapper" ref={headerWrapperRef}>
       <div className="header-content">
-        {/* Left: Nuke menu */}
+        {/* Left: Wordmark + Nuke menu + primary nav links */}
         <div className="header-slot-left">
           <div className="header-left">
+            <Link
+              to="/"
+              className="nuke-wordmark"
+              aria-label="Nuke — home"
+            >
+              NUKE
+            </Link>
             <NukeMenu
               session={session}
               quickVehicles={quickVehicles}
               quickVehiclesLoading={quickVehiclesLoading}
               onLoadQuickVehicles={onLoadQuickVehicles}
             />
+            <nav className="main-nav header-main-nav">
+              <Link
+                to="/search"
+                className={`nav-link${location.pathname === '/search' ? ' active' : ''}`}
+              >
+                Search
+              </Link>
+              <Link
+                to="/market"
+                className={`nav-link${location.pathname === '/market' || location.pathname.startsWith('/market/') ? ' active' : ''}`}
+              >
+                Market
+              </Link>
+            </nav>
           </div>
         </div>
 
@@ -80,7 +101,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                   return returnUrl ? `/login?returnUrl=${returnUrl}` : '/login';
                 })()}
                 className="button button-primary"
-                style={{ border: '2px solid #0ea5e9', transition: 'all 0.12s ease' }}
+                style={{ border: '2px solid var(--accent)', transition: 'all 0.12s ease' }}
               >
                 Login
               </Link>
