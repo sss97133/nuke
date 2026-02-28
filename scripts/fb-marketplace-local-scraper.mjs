@@ -380,7 +380,7 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
   const { data: existing } = await supabase
     .from("vehicles")
     .select("id")
-    .eq("source_url", fbUrl)
+    .eq("listing_url", fbUrl)
     .limit(1)
     .maybeSingle();
 
@@ -413,7 +413,7 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
         year,
         make: make.charAt(0).toUpperCase() + make.slice(1),
         model: model || null,
-        source_url: fbUrl,
+        listing_url: fbUrl,
         asking_price: price ? Math.round(price) : null,
         description: description || null,
         listing_location: location,
@@ -427,7 +427,7 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
       .single();
 
     if (vehErr) {
-      // Could be a constraint violation, skip
+      console.error(`    Vehicle insert error for ${facebookId}: ${vehErr.message}`);
       return result;
     }
     vehicleId = newVeh.id;
