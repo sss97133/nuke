@@ -48,6 +48,7 @@ const ClaimExternalIdentity: React.FC = () => {
   const [importLog, setImportLog] = React.useState<{ time: Date; text: string; type?: 'info' | 'success' | 'dim' }[]>([]);
   const [queueStatus, setQueueStatus] = React.useState<string>('pending');
   const [importedMetadata, setImportedMetadata] = React.useState<any>(null);
+  const [importedVehicles, setImportedVehicles] = React.useState<any[]>([]);
   const [platformCounts, setPlatformCounts] = React.useState<Record<string, number>>({});
   const logRef = React.useRef<HTMLDivElement>(null);
   const hasLoggedProcessing = React.useRef(false);
@@ -124,8 +125,34 @@ const ClaimExternalIdentity: React.FC = () => {
                 if (m.listings_found != null) {
                   addLog(`Found ${m.listings_found} listing${m.listings_found === 1 ? '' : 's'}`, 'success');
                 }
+
+                // Fetch real vehicle data for the listing URLs
                 if (m.listing_urls?.length > 0) {
-                  addLog(`${m.listing_urls.length} vehicle${m.listing_urls.length === 1 ? '' : 's'} queued for import`, 'success');
+                  const cleanUrls = [...new Set(
+                    (m.listing_urls as string[])
+                      .map((u: string) => u.replace(/#.*$/, '').replace(/\/$/, ''))
+                      .filter((u: string) => !u.includes('#'))
+                  )];
+                  addLog(`Loading vehicle details...`, 'dim');
+                  const { data: vehicles } = await supabase
+                    .from('vehicles')
+                    .select('id, year, make, model, sale_price, primary_image_url, listing_url')
+                    .in('listing_url', cleanUrls)
+                    .limit(50);
+
+                  if (vehicles && vehicles.length > 0) {
+                    // Dedupe by listing_url, keep first
+                    const seen = new Set<string>();
+                    const unique = vehicles.filter((v: any) => {
+                      if (seen.has(v.listing_url)) return false;
+                      seen.add(v.listing_url);
+                      return true;
+                    });
+                    setImportedVehicles(unique);
+                    addLog(`${unique.length} vehicle${unique.length === 1 ? '' : 's'} matched in database`, 'success');
+                  } else {
+                    addLog(`${cleanUrls.length} vehicle${cleanUrls.length === 1 ? '' : 's'} queued for import`, 'success');
+                  }
                 }
               }
             }
@@ -511,64 +538,60 @@ const ClaimExternalIdentity: React.FC = () => {
               </div>
             )}
 
-            {/* Imported data summary */}
-            {importStep === 'done' && importedMetadata && (
-              <div style={{
-                marginTop: 'var(--space-3)',
-                border: '1px solid #4ade8040',
-                borderRadius: '6px',
-                backgroundColor: '#4ade8008',
-                overflow: 'hidden',
-              }}>
-                <div style={{
-                  padding: 'var(--space-3) var(--space-4)',
-                  display: 'flex',
-                  gap: 'var(--space-4)',
-                  alignItems: 'center',
-                  fontSize: '13px',
-                }}>
-                  {importedMetadata.listings_found != null && (
-                    <div><strong>{importedMetadata.listings_found}</strong> <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>listings found</span></div>
-                  )}
-                  {importedMetadata.listing_urls?.length > 0 && (
-                    <div><strong>{importedMetadata.listing_urls.length}</strong> <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>vehicles queued for import</span></div>
-                  )}
-                </div>
-                {importedMetadata.listing_urls?.length > 0 && (
+            {/* Imported vehicles */}
+            {importStep === 'done' && (importedVehicles.length > 0 || importedMetadata) && (
+              <div style={{ marginTop: 'var(--space-3)' }}>
+                {importedVehicles.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    {importedVehicles.map((v: any) => (
+                      <a
+                        key={v.id}
+                        href={v.listing_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 'var(--space-3)',
+                          padding: 'var(--space-2) var(--space-3)',
+                          border: '1px solid var(--border-light)',
+                          borderRadius: '6px',
+                          textDecoration: 'none',
+                          color: 'var(--text)',
+                          backgroundColor: 'var(--white)',
+                        }}
+                      >
+                        {v.primary_image_url ? (
+                          <img
+                            src={v.primary_image_url}
+                            alt=""
+                            style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }}
+                          />
+                        ) : (
+                          <div style={{ width: 56, height: 40, backgroundColor: 'var(--grey-100)', borderRadius: 4, flexShrink: 0 }} />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {[v.year, v.make, v.model].filter(Boolean).join(' ')}
+                          </div>
+                        </div>
+                        {v.sale_price && (
+                          <div style={{ fontSize: '13px', fontWeight: 600, flexShrink: 0 }}>
+                            ${v.sale_price.toLocaleString()}
+                          </div>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                ) : importedMetadata?.listings_found > 0 && (
                   <div style={{
-                    padding: '0 var(--space-4) var(--space-3)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 4,
-                    maxHeight: 200,
-                    overflowY: 'auto',
+                    padding: 'var(--space-3) var(--space-4)',
+                    border: '1px solid #4ade8040',
+                    borderRadius: '6px',
+                    backgroundColor: '#4ade8008',
+                    fontSize: '13px',
                   }}>
-                    {importedMetadata.listing_urls.map((url: string, i: number) => {
-                      const slug = url.replace(/^https?:\/\/bringatrailer\.com\/listing\//, '').replace(/\/$/, '');
-                      const title = slug.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-                      return (
-                        <a
-                          key={i}
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            fontSize: '12px',
-                            color: 'var(--text)',
-                            textDecoration: 'none',
-                            padding: '4px 8px',
-                            borderRadius: '3px',
-                            backgroundColor: 'rgba(255,255,255,0.5)',
-                            display: 'block',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {title}
-                        </a>
-                      );
-                    })}
+                    <strong>{importedMetadata.listings_found}</strong> <span style={{ color: 'var(--text-muted)' }}>listings found — vehicles importing now</span>
                   </div>
                 )}
               </div>
