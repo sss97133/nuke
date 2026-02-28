@@ -678,16 +678,19 @@ export default function UnifiedMap() {
   };
 
   return (
-    <div style={{ position: 'relative', height: '100%', width: '100%' }} onClick={() => setPopup(null)}>
-      <DeckGL
-        viewState={viewState}
-        onViewStateChange={({ viewState: vs }: any) => setViewState(vs)}
-        controller={true}
-        layers={layers}
-        getCursor={({ isHovering }: { isHovering: boolean }) => isHovering ? 'pointer' : 'grab'}
-      >
-        <Map mapStyle={CARTO_DARK} attributionControl={false} />
-      </DeckGL>
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 0, flex: 1 }} onClick={() => setPopup(null)}>
+      <div style={{ position: 'absolute', inset: 0 }}>
+        <DeckGL
+          viewState={viewState}
+          onViewStateChange={({ viewState: vs }: any) => setViewState(vs)}
+          controller={true}
+          layers={layers}
+          getCursor={({ isHovering }: { isHovering: boolean }) => isHovering ? 'pointer' : 'grab'}
+          style={{ position: 'absolute', inset: 0 }}
+        >
+          <Map mapStyle={CARTO_DARK} attributionControl={false} />
+        </DeckGL>
+      </div>
 
       {/* Hover tooltip */}
       {hoverInfo && (
