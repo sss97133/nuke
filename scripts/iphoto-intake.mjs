@@ -427,6 +427,79 @@ async function backfillAlbumGps(albumName, vehicleId = null) {
   return updated;
 }
 
+// ─── Map-only mode (GPS metadata without image upload) ──────────────────────
+
+async function mapOnlyAlbum(albumName, vehicleId = null) {
+  console.log(`\nMap-only: "${albumName}"`);
+
+  if (!vehicleId) {
+    const parsed = parseAlbumName(albumName);
+    if (!parsed) { console.log('  Could not parse album name, skipping'); return 0; }
+    const match = await findVehicle(parsed.year, parsed.make, parsed.model);
+    if (!match) { console.log('  No vehicle match in DB — skipping'); return 0; }
+    vehicleId = match.id;
+    console.log(`  Vehicle: ${match.year} ${match.make} ${match.model} → ${match.id}`);
+  }
+
+  const metaMap = queryAlbumMetadata(albumName);
+  if (metaMap.size === 0) { console.log('  No metadata available'); return 0; }
+
+  // Check existing iphoto images for this vehicle (to avoid dupes)
+  const { data: existing } = await supabase
+    .from('vehicle_images')
+    .select('file_name')
+    .eq('vehicle_id', vehicleId)
+    .eq('source', 'iphoto');
+  const existingNames = new Set((existing || []).map(r => r.file_name));
+
+  let inserted = 0, skipped = 0, noGps = 0;
+  // Deduplicate — metaMap has 2 keys per photo (filename + original_filename).
+  // Track which meta objects we've already processed.
+  const seenMeta = new WeakSet();
+
+  for (const [key, meta] of metaMap.entries()) {
+    if (seenMeta.has(meta)) continue;
+    seenMeta.add(meta);
+    if (!meta.latitude) { noGps++; continue; }
+
+    // Use original-style filename (IMG_XXXX.jpg) for consistency
+    const fileName = key + '.jpg';
+    if (existingNames.has(fileName) || existingNames.has(key + '.JPG') || existingNames.has(key + '.heic')) {
+      skipped++;
+      continue;
+    }
+
+    const row = {
+      vehicle_id: vehicleId,
+      image_url: `https://placeholder.nuke.app/iphoto/${vehicleId}/${fileName}`,
+      source: 'iphoto',
+      file_name: fileName,
+      is_external: false,
+      ai_processing_status: 'pending',
+      optimization_status: 'pending',
+      documented_by_user_id: USER_ID,
+      latitude: meta.latitude,
+      longitude: meta.longitude,
+      ...(meta.location_name && { location_name: meta.location_name }),
+      ...(meta.taken_at && { taken_at: meta.taken_at }),
+      ...(meta.exif_data && { exif_data: meta.exif_data }),
+    };
+
+    const { error } = await supabase.from('vehicle_images').insert(row);
+    if (error) {
+      if (error.message.includes('duplicate') || error.message.includes('unique')) {
+        skipped++;
+      } else if (inserted + skipped === 0) {
+        console.error(`  Insert error: ${error.message.slice(0, 100)}`);
+      }
+    } else {
+      inserted++;
+    }
+  }
+  console.log(`  Inserted ${inserted} photo pins (${skipped} dupe, ${noGps} no GPS)`);
+  return inserted;
+}
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 if (flag('--backfill-gps')) {
@@ -444,6 +517,23 @@ if (flag('--backfill-gps')) {
       total += count;
     }
     console.log(`\nTotal backfilled: ${total} images`);
+  }
+
+} else if (flag('--map-only')) {
+  const albumName = arg('--album');
+  if (albumName) {
+    const vehicleId = arg('--vehicle-id');
+    await mapOnlyAlbum(albumName, vehicleId);
+  } else {
+    const albums = listAlbums();
+    console.log(`Mapping GPS for ${albums.length} vehicle albums (no image upload)...`);
+    let total = 0, albumsDone = 0;
+    for (const a of albums) {
+      const count = await mapOnlyAlbum(a.name);
+      total += count;
+      if (count > 0) albumsDone++;
+    }
+    console.log(`\nTotal: ${total} photo pins mapped across ${albumsDone} albums`);
   }
 
 } else if (flag('--list')) {
@@ -485,5 +575,9 @@ Usage:
 GPS backfill (update existing images with GPS from Apple Photos):
   node scripts/iphoto-intake.mjs --backfill-gps                          # all albums
   node scripts/iphoto-intake.mjs --backfill-gps --album "1984 Chevrolet K20 LWB "
+
+Map-only mode (GPS metadata without image upload — works with iCloud-only photos):
+  node scripts/iphoto-intake.mjs --map-only                              # all albums
+  node scripts/iphoto-intake.mjs --map-only --album "1968 Porsche 911"
   `);
 }
