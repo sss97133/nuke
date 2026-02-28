@@ -40,6 +40,8 @@ import { loadVehicleImpl, selectBestHeroImage } from './vehicle-profile/loadVehi
 import type { HeroImageMeta } from './vehicle-profile/loadVehicleData';
 const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceContent'));
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
+import WalkAroundCarousel from '../components/images/WalkAroundCarousel';
+import type { WalkAroundImage } from '../components/images/WalkAroundCarousel';
 
 /** Quick Stats line shown below hero image */
 const QuickStatsBar: React.FC<{
@@ -132,6 +134,7 @@ const VehicleProfile: React.FC = () => {
   const [ownershipVerifications, setOwnershipVerifications] = useState<any[]>([]);
   const [newEventsNotice, setNewEventsNotice] = useState<{ show: boolean; count: number; dates: string[] }>({ show: false, count: 0, dates: [] });
   const [auctionPulse, setAuctionPulse] = useState<any | null>(null);
+  const [walkAroundImages, setWalkAroundImages] = useState<WalkAroundImage[]>([]);
   const auctionCurrency = React.useMemo(() => {
     const v: any = vehicle as any;
     const externalListing = v?.external_listings?.[0];
@@ -728,6 +731,7 @@ const VehicleProfile: React.FC = () => {
   useEffect(() => {
     if (vehicle?.id) {
       loadVehicleImages();
+      loadWalkAroundImages();
       loadViewCount();
       recordView();
       loadTimelineEvents();
@@ -1614,6 +1618,27 @@ const VehicleProfile: React.FC = () => {
     });
   };
 
+  // Lightweight fetch for walk-around carousel zone data
+  const loadWalkAroundImages = useCallback(async () => {
+    if (!vehicle?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('vehicle_images')
+        .select('id, image_url, vehicle_zone, zone_confidence, photo_quality_score, storage_path')
+        .eq('vehicle_id', vehicle.id)
+        .not('vehicle_zone', 'is', null)
+        .not('is_document', 'is', true)
+        .or('is_duplicate.is.null,is_duplicate.eq.false')
+        .order('photo_quality_score', { ascending: false, nullsFirst: false })
+        .limit(500);
+      if (!error && data) {
+        setWalkAroundImages(data as WalkAroundImage[]);
+      }
+    } catch {
+      // non-blocking
+    }
+  }, [vehicle?.id]);
+
   const handleSetPrimaryImage = async (imageId: string) => {
     if (!vehicle || !isAdmin) {
       return; // Admin privileges required
@@ -1811,6 +1836,27 @@ const VehicleProfile: React.FC = () => {
             />
           </React.Suspense>
         </div>
+
+        {/* Walk-Around Carousel — visual zone coverage strip */}
+        {walkAroundImages.length > 0 && (
+          <WalkAroundCarousel
+            images={walkAroundImages}
+            onSlotClick={(zoneKey, imageId) => {
+              // Scroll to the evidence/gallery tab zone section
+              const el = document.getElementById(`zone-section-${zoneKey}`);
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              } else {
+                // Fall back: switch to evidence tab then try again
+                setActiveWorkspaceTab('evidence');
+                requestAnimationFrame(() => {
+                  const elRetry = document.getElementById(`zone-section-${zoneKey}`);
+                  elRetry?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+              }
+            }}
+          />
+        )}
 
         {/* Quick Stats Bar */}
         <QuickStatsBar

@@ -162,22 +162,22 @@ export function groupImagesByZone(images: any[]): { section: ZoneSectionDef; ima
   return result;
 }
 
-/** Sort images by photo_quality_score DESC (best first), fallback by position/created_at */
+/** Sort images by photo_quality_score DESC (best first), then most recent taken_at/created_at */
 function sortByQuality(images: any[]): any[] {
   return [...images].sort((a, b) => {
     const qa = typeof a?.photo_quality_score === 'number' ? a.photo_quality_score : 0;
     const qb = typeof b?.photo_quality_score === 'number' ? b.photo_quality_score : 0;
     if (qa !== qb) return qb - qa; // higher quality first
 
-    // Tie-break: position
+    // Tie-break: most recent taken_at (freshest first), fallback to created_at
+    const dateA = a?.taken_at ? new Date(a.taken_at).getTime() : (a?.created_at ? new Date(a.created_at).getTime() : 0);
+    const dateB = b?.taken_at ? new Date(b.taken_at).getTime() : (b?.created_at ? new Date(b.created_at).getTime() : 0);
+    if (dateA !== dateB) return dateB - dateA;
+
+    // Final tie-break: position
     const posA = typeof a?.position === 'number' ? a.position : Infinity;
     const posB = typeof b?.position === 'number' ? b.position : Infinity;
-    if (posA !== posB) return posA - posB;
-
-    // Tie-break: created_at DESC
-    const ca = a?.created_at ? new Date(a.created_at).getTime() : 0;
-    const cb = b?.created_at ? new Date(b.created_at).getTime() : 0;
-    return cb - ca;
+    return posA - posB;
   });
 }
 
@@ -228,7 +228,7 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
   if (images.length === 0) return null;
 
   return (
-    <div style={{ borderBottom: '1px solid var(--border)' }}>
+    <div data-zone-section={section.key} style={{ borderBottom: '1px solid var(--border)' }}>
       {/* Section Header */}
       <div
         onClick={() => setCollapsed(!collapsed)}

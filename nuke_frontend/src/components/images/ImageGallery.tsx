@@ -2409,6 +2409,164 @@ const ImageGallery = ({
         </div>
       )}
 
+      {/* Story Summary Bar */}
+      {allImages.length > 0 && (() => {
+        // Walk-around categories: 11 canonical angles
+        const WALKAROUND_CATEGORIES: { key: string; label: string; match: (zone: string) => boolean }[] = [
+          { key: 'front', label: 'FRONT', match: (z) => z === 'ext_front' },
+          { key: 'front_34', label: 'FRONT 3/4', match: (z) => z === 'ext_front_driver' || z === 'ext_front_passenger' },
+          { key: 'driver', label: 'DRIVER', match: (z) => z === 'ext_driver_side' },
+          { key: 'rear_34', label: 'REAR 3/4', match: (z) => z === 'ext_rear_driver' || z === 'ext_rear_passenger' },
+          { key: 'rear', label: 'REAR', match: (z) => z === 'ext_rear' },
+          { key: 'passenger', label: 'PASSENGER', match: (z) => z === 'ext_passenger_side' },
+          { key: 'interior', label: 'INTERIOR', match: (z) => z.startsWith('int_') },
+          { key: 'engine', label: 'ENGINE', match: (z) => z === 'mech_engine_bay' },
+          { key: 'under', label: 'UNDER', match: (z) => z === 'ext_undercarriage' || z === 'mech_suspension' || z === 'mech_transmission' },
+          { key: 'wheels', label: 'WHEELS', match: (z) => z.startsWith('wheel_') },
+          { key: 'detail', label: 'DETAIL', match: (z) => z.startsWith('detail_') },
+        ];
+
+        const totalCount = allImages.length;
+
+        // Angle coverage
+        const coveredCategories = new Set<string>();
+        for (const img of allImages) {
+          const zone = String(img?.vehicle_zone || '').toLowerCase().trim();
+          if (!zone) continue;
+          for (const cat of WALKAROUND_CATEGORIES) {
+            if (cat.match(zone)) { coveredCategories.add(cat.key); break; }
+          }
+        }
+        const anglesCovered = coveredCategories.size;
+        const anglesTotal = WALKAROUND_CATEGORIES.length;
+
+        // Average condition score
+        const conditionScores = allImages
+          .map((img: any) => img?.condition_score)
+          .filter((s: any) => typeof s === 'number' && s > 0);
+        const avgCondition = conditionScores.length > 0
+          ? (conditionScores.reduce((a: number, b: number) => a + b, 0) / conditionScores.length)
+          : null;
+
+        // Damage flags count (unique)
+        const allDamageFlags = new Set<string>();
+        for (const img of allImages) {
+          if (Array.isArray(img?.damage_flags)) {
+            for (const f of img.damage_flags) {
+              if (typeof f === 'string' && f.trim()) allDamageFlags.add(f.trim().toLowerCase());
+            }
+          }
+        }
+        const damageCount = allDamageFlags.size;
+
+        // Most recent photo date
+        let latestDate: Date | null = null;
+        for (const img of allImages) {
+          const d = img?.taken_at || img?.created_at;
+          if (d) {
+            const parsed = new Date(d);
+            if (!isNaN(parsed.getTime()) && (!latestDate || parsed > latestDate)) {
+              latestDate = parsed;
+            }
+          }
+        }
+        const latestDateStr = latestDate
+          ? latestDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          : null;
+
+        // Coverage color
+        const coverageColor = anglesCovered >= 8
+          ? 'var(--success, #22c55e)'
+          : anglesCovered >= 5
+            ? 'var(--warning, #eab308)'
+            : 'var(--error, #ef4444)';
+
+        // Condition sparkline per zone category (EXT, INT, ENG, etc.)
+        const SPARKLINE_ZONES: { key: string; label: string; match: (z: string) => boolean }[] = [
+          { key: 'ext', label: 'EXT', match: (z) => z.startsWith('ext_') },
+          { key: 'int', label: 'INT', match: (z) => z.startsWith('int_') },
+          { key: 'eng', label: 'ENG', match: (z) => z === 'mech_engine_bay' },
+          { key: 'whl', label: 'WHL', match: (z) => z.startsWith('wheel_') },
+          { key: 'dtl', label: 'DTL', match: (z) => z.startsWith('detail_') },
+        ];
+        const zoneConditions: { label: string; avg: number }[] = [];
+        for (const sz of SPARKLINE_ZONES) {
+          const scores = allImages
+            .filter((img: any) => {
+              const zone = String(img?.vehicle_zone || '').toLowerCase().trim();
+              return zone && sz.match(zone) && typeof img?.condition_score === 'number' && img.condition_score > 0;
+            })
+            .map((img: any) => img.condition_score as number);
+          if (scores.length > 0) {
+            zoneConditions.push({
+              label: sz.label,
+              avg: scores.reduce((a, b) => a + b, 0) / scores.length,
+            });
+          }
+        }
+        const showSparkline = zoneConditions.length >= 3;
+
+        // Build sparkline string: 5 blocks = score out of 5
+        const renderSparkline = (score: number) => {
+          const filled = Math.round(score);
+          const empty = 5 - filled;
+          return '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
+        };
+
+        const parts: React.ReactNode[] = [];
+        parts.push(<span key="count">{totalCount} photos</span>);
+        parts.push(
+          <span key="coverage" style={{ color: coverageColor }}>
+            {anglesCovered}/{anglesTotal} angles covered
+          </span>
+        );
+        if (avgCondition !== null) {
+          parts.push(<span key="condition">Avg condition: {avgCondition.toFixed(1)}/5</span>);
+        }
+        parts.push(
+          <span key="damage" style={{ color: damageCount > 0 ? 'var(--error, #ef4444)' : undefined }}>
+            {damageCount} damage flag{damageCount !== 1 ? 's' : ''}
+          </span>
+        );
+        if (latestDateStr) {
+          parts.push(<span key="date">Last photo: {latestDateStr}</span>);
+        }
+
+        return (
+          <div style={{
+            padding: '4px 12px',
+            fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+            fontSize: '11px',
+            color: 'var(--text-muted)',
+            lineHeight: '18px',
+            textAlign: 'left',
+            borderBottom: '1px solid var(--border)',
+          }}>
+            <div>
+              {parts.map((part, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && <span style={{ margin: '0 6px', opacity: 0.4 }}>{'\u00B7'}</span>}
+                  {part}
+                </React.Fragment>
+              ))}
+            </div>
+            {showSparkline && (
+              <div style={{ marginTop: '2px', letterSpacing: '0.5px' }}>
+                {zoneConditions.map((zc, i) => (
+                  <React.Fragment key={zc.label}>
+                    {i > 0 && <span style={{ margin: '0 6px', opacity: 0.3 }}> </span>}
+                    <span style={{ opacity: 0.6 }}>{zc.label}:</span>
+                    <span style={{ color: zc.avg >= 3.5 ? 'var(--success, #22c55e)' : zc.avg >= 2.5 ? 'var(--warning, #eab308)' : 'var(--error, #ef4444)', letterSpacing: '-0.5px' }}>
+                      {renderSparkline(zc.avg)}
+                    </span>
+                  </React.Fragment>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Gallery Controls */}
       <div className="card-header">
         <div style={{ 
@@ -2704,29 +2862,73 @@ const ImageGallery = ({
         <div>
           {(() => {
             const zoneSections = groupImagesByZone(displayedImages);
-            const defaultOpenKeys = new Set(['highlights', 'exterior', 'interior']);
             // Build global index map for lightbox navigation
             const globalIndexMap = new Map<string, number>();
             displayedImages.forEach((img: any, idx: number) => {
               globalIndexMap.set(String(img?.id || ''), idx);
             });
-            return zoneSections.map((zs) => (
-              <ImageZoneSection
-                key={zs.section.key}
-                section={zs.section}
-                images={zs.images}
-                defaultOpen={defaultOpenKeys.has(zs.section.key)}
-                imagesPerRow={imagesPerRow}
-                vehicleId={vehicleId}
-                onImageClick={(_image, globalIndex) => {
-                  if (globalIndex >= 0) openLightbox(globalIndex);
-                }}
-                globalIndexMap={globalIndexMap}
-                selectMode={selectMode}
-                selectedImages={selectedImages}
-                onImageSelect={handleImageSelect}
-              />
-            ));
+
+            // Smart auto-expand: only sections with images, capped at 4
+            // Priority order: highlights, exterior, interior, engine_bay, then by most images
+            const sectionsWithImages = zoneSections.filter((zs) => zs.images.length > 0);
+            const priorityOrder = ['highlights', 'exterior', 'interior', 'engine_bay'];
+            const autoExpandKeys = new Set<string>();
+
+            // First pass: add priority sections that have images
+            for (const key of priorityOrder) {
+              if (autoExpandKeys.size >= 4) break;
+              if (sectionsWithImages.some((zs) => zs.section.key === key)) {
+                autoExpandKeys.add(key);
+              }
+            }
+
+            // Second pass: fill remaining slots with sections sorted by image count desc
+            if (autoExpandKeys.size < 4) {
+              const remaining = sectionsWithImages
+                .filter((zs) => !autoExpandKeys.has(zs.section.key))
+                .sort((a, b) => b.images.length - a.images.length);
+              for (const zs of remaining) {
+                if (autoExpandKeys.size >= 4) break;
+                autoExpandKeys.add(zs.section.key);
+              }
+            }
+
+            // Count empty sections that were skipped (sections defined but with 0 images)
+            const totalDefinedSections = zoneSections.length;
+            const emptySectionCount = totalDefinedSections - sectionsWithImages.length;
+
+            return (
+              <>
+                {sectionsWithImages.map((zs) => (
+                  <ImageZoneSection
+                    key={zs.section.key}
+                    section={zs.section}
+                    images={zs.images}
+                    defaultOpen={autoExpandKeys.has(zs.section.key)}
+                    imagesPerRow={imagesPerRow}
+                    vehicleId={vehicleId}
+                    onImageClick={(_image, globalIndex) => {
+                      if (globalIndex >= 0) openLightbox(globalIndex);
+                    }}
+                    globalIndexMap={globalIndexMap}
+                    selectMode={selectMode}
+                    selectedImages={selectedImages}
+                    onImageSelect={handleImageSelect}
+                  />
+                ))}
+                {emptySectionCount > 0 && (
+                  <div style={{
+                    padding: '6px 12px',
+                    fontSize: '10px',
+                    color: 'var(--text-muted)',
+                    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+                    borderTop: '1px solid var(--border)',
+                  }}>
+                    ({emptySectionCount} more section{emptySectionCount !== 1 ? 's' : ''} empty)
+                  </div>
+                )}
+              </>
+            );
           })()}
           {/* Infinite scroll sentinel */}
           {displayedImages.length < allImages.length && (
