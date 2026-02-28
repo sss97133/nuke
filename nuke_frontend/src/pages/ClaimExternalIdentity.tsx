@@ -39,9 +39,93 @@ const ClaimExternalIdentity: React.FC = () => {
   const [verificationCode, setVerificationCode] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [message, setMessage] = React.useState<string>('');
-  const [importStep, setImportStep] = React.useState<'idle' | 'input' | 'submitting' | 'done'>('idle');
+  const [importStep, setImportStep] = React.useState<'idle' | 'input' | 'submitting' | 'polling' | 'done'>('idle');
   const [importUrl, setImportUrl] = React.useState('');
   const [importError, setImportError] = React.useState('');
+  const [queueItemId, setQueueItemId] = React.useState<string | null>(null);
+  const [importLog, setImportLog] = React.useState<{ time: Date; text: string; type?: 'info' | 'success' | 'dim' }[]>([]);
+  const [queueStatus, setQueueStatus] = React.useState<string>('pending');
+  const [importedMetadata, setImportedMetadata] = React.useState<any>(null);
+  const logRef = React.useRef<HTMLDivElement>(null);
+
+  const addLog = React.useCallback((text: string, type: 'info' | 'success' | 'dim' = 'info') => {
+    setImportLog(prev => [...prev, { time: new Date(), text, type }]);
+  }, []);
+
+  // Auto-scroll log
+  React.useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [importLog]);
+
+  // Poll queue status when we have a queue item
+  React.useEffect(() => {
+    if (!queueItemId || importStep !== 'polling') return;
+
+    let cancelled = false;
+    const poll = async () => {
+      while (!cancelled) {
+        await new Promise(r => setTimeout(r, 2000));
+        if (cancelled) break;
+
+        try {
+          const { data } = await supabase
+            .from('user_profile_queue')
+            .select('status, error_message, completed_at, attempts')
+            .eq('id', queueItemId)
+            .single();
+
+          if (!data || cancelled) break;
+
+          if (data.status === 'processing' && queueStatus !== 'processing') {
+            setQueueStatus('processing');
+            addLog('Extracting profile data from page...', 'info');
+          }
+
+          if (data.status === 'complete') {
+            setQueueStatus('complete');
+            addLog('Extraction complete', 'success');
+
+            // Fetch the enriched identity
+            if (selectedIdentity) {
+              const { data: enriched } = await supabase
+                .from('external_identities')
+                .select('metadata')
+                .eq('id', selectedIdentity.id)
+                .single();
+
+              if (enriched?.metadata) {
+                setImportedMetadata(enriched.metadata);
+                const m = enriched.metadata;
+                if (m.listings_found != null) {
+                  addLog(`Found ${m.listings_found} listing${m.listings_found === 1 ? '' : 's'}`, 'success');
+                }
+                if (m.listing_urls?.length > 0) {
+                  addLog(`${m.listing_urls.length} vehicle${m.listing_urls.length === 1 ? '' : 's'} queued for import`, 'success');
+                }
+              }
+            }
+
+            addLog('Ready to claim — your full reputation is attached.', 'success');
+            setImportStep('done');
+            break;
+          }
+
+          if (data.status === 'failed') {
+            setQueueStatus('failed');
+            addLog(`Extraction failed: ${data.error_message || 'unknown error'}`, 'info');
+            addLog('You can still claim — stats will retry automatically.', 'dim');
+            setImportStep('done');
+            break;
+          }
+        } catch {
+          // network blip, keep polling
+        }
+      }
+    };
+
+    poll();
+    return () => { cancelled = true; };
+  }, [queueItemId, importStep]);
 
   // Read URL params on mount
   React.useEffect(() => {
@@ -132,6 +216,7 @@ const ClaimExternalIdentity: React.FC = () => {
 
   return (
     <div style={{ padding: 'var(--space-4)', maxWidth: 900, margin: '0 auto' }}>
+      <style>{`@keyframes pulse { 0%,100% { opacity: .3 } 50% { opacity: 1 } }`}</style>
       {/* Header */}
       <div style={{ marginBottom: 'var(--space-6)' }}>
         <h1 className="heading-1" style={{ marginBottom: 'var(--space-2)' }}>Claim Your Identity</h1>
@@ -241,7 +326,7 @@ const ClaimExternalIdentity: React.FC = () => {
               <div style={{ textAlign: 'center' }}>
                 <button
                   className="button button-secondary"
-                  onClick={() => { setImportStep('input'); setImportError(''); }}
+                  onClick={() => { setImportStep('input'); setImportError(''); setImportLog([]); }}
                   style={{ fontSize: '13px' }}
                 >
                   Not seeing your profile? Import it
@@ -280,6 +365,8 @@ const ClaimExternalIdentity: React.FC = () => {
                     onClick={async () => {
                       setImportStep('submitting');
                       setImportError('');
+                      setImportLog([]);
+                      addLog(`Importing from ${PLATFORM_LABELS[searchPlatform] || searchPlatform}...`);
                       try {
                         const { data: sessionData } = await supabase.auth.getSession();
                         const userId = sessionData?.session?.user?.id || null;
@@ -294,12 +381,23 @@ const ClaimExternalIdentity: React.FC = () => {
                         if (error) throw error;
                         if (!data?.success) throw new Error(data?.error || 'Import failed');
 
+                        addLog(`Identity created: ${data.identity.handle}`, 'success');
                         setSelectedIdentity(data.identity);
-                        setImportStep('done');
-                        setMessage('Profile imported! Stats are loading in the background — we\'ll notify you when ready.');
+
+                        if (data.queue_item_id) {
+                          setQueueItemId(data.queue_item_id);
+                          setQueueStatus(data.queue_status || 'pending');
+                          addLog('Queued for full profile extraction (priority: high)', 'info');
+                          addLog('Waiting for worker to pick up...', 'dim');
+                          setImportStep('polling');
+                        } else {
+                          addLog('Profile ready — claim it now.', 'success');
+                          setImportStep('done');
+                        }
                       } catch (e: any) {
                         console.error('Import failed:', e);
                         setImportError(e?.message || 'Failed to import profile');
+                        addLog(`Error: ${e?.message || 'Failed to import'}`, 'info');
                         setImportStep('input');
                       }
                     }}
@@ -312,13 +410,77 @@ const ClaimExternalIdentity: React.FC = () => {
                     {importError}
                   </div>
                 )}
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
-                  We'll create your identity instantly. Full stats import runs in the background.
-                </div>
               </div>
             )}
 
-            {importStep !== 'done' && (
+            {/* Live import log */}
+            {importLog.length > 0 && (
+              <div
+                ref={logRef}
+                style={{
+                  marginTop: 'var(--space-3)',
+                  padding: 'var(--space-3)',
+                  backgroundColor: '#0a0a0a',
+                  borderRadius: '6px',
+                  maxHeight: 220,
+                  overflowY: 'auto',
+                  fontFamily: 'ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace',
+                  fontSize: '12px',
+                  lineHeight: 1.7,
+                }}
+              >
+                {importLog.map((entry, i) => (
+                  <div key={i} style={{
+                    color: entry.type === 'success' ? '#4ade80' : entry.type === 'dim' ? '#666' : '#a3a3a3',
+                    display: 'flex',
+                    gap: 8,
+                  }}>
+                    <span style={{ color: '#555', flexShrink: 0 }}>
+                      {entry.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </span>
+                    <span>
+                      {entry.type === 'success' && <span style={{ marginRight: 4 }}>&#10003;</span>}
+                      {entry.text}
+                    </span>
+                  </div>
+                ))}
+                {importStep === 'polling' && (
+                  <div style={{ color: '#555', display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ flexShrink: 0 }}>
+                      {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </span>
+                    <span style={{ animation: 'pulse 1.5s ease-in-out infinite' }}>
+                      &#9679; polling...
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Imported metadata summary */}
+            {importStep === 'done' && importedMetadata && (
+              <div style={{
+                marginTop: 'var(--space-3)',
+                padding: 'var(--space-3) var(--space-4)',
+                border: '1px solid #4ade8040',
+                borderRadius: '6px',
+                backgroundColor: '#4ade8008',
+                display: 'flex',
+                gap: 'var(--space-4)',
+                alignItems: 'center',
+                fontSize: '13px',
+              }}>
+                {importedMetadata.listings_found != null && (
+                  <div><strong>{importedMetadata.listings_found}</strong> <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>listings</span></div>
+                )}
+                {importedMetadata.listing_urls?.length > 0 && (
+                  <div><strong>{importedMetadata.listing_urls.length}</strong> <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>vehicles queued</span></div>
+                )}
+              </div>
+            )}
+
+            {/* Claim anyway fallback */}
+            {importStep !== 'done' && importStep !== 'polling' && importStep !== 'submitting' && (
               <div style={{ textAlign: 'center', marginTop: 'var(--space-3)' }}>
                 <button
                   className="button button-secondary"

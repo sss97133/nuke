@@ -125,9 +125,19 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Ingested profile: ${platform}/${username} (identity: ${identity.id})`);
+    // Fetch the queue item ID for frontend polling
+    const { data: queueRow } = await supabase
+      .from("user_profile_queue")
+      .select("id, status")
+      .eq("profile_url", normalizedUrl)
+      .eq("platform", platform)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
 
-    // Return identity in the shape the frontend expects
+    console.log(`Ingested profile: ${platform}/${username} (identity: ${identity.id}, queue: ${queueRow?.id})`);
+
+    // Return identity + queue item ID for live polling
     return new Response(
       JSON.stringify({
         success: true,
@@ -140,8 +150,10 @@ Deno.serve(async (req) => {
           first_seen: identity.first_seen_at,
           last_seen: identity.last_seen_at,
           claimed: !!identity.claimed_by_user_id,
-          stats: null, // Stats will be populated async by the queue worker
+          stats: null,
         },
+        queue_item_id: queueRow?.id || null,
+        queue_status: queueRow?.status || null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
