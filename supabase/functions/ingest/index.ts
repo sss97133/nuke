@@ -184,14 +184,25 @@ interface MatchResult {
   isNew: boolean;
 }
 
+interface VehicleEnrichment {
+  vin?: string | null;
+  url?: string | null;
+  price?: number | null;
+  location?: string | null;
+  imageUrl?: string | null;
+  imageUrls?: string[];
+  description?: string | null;
+  mileage?: number | null;
+  engine?: string | null;
+  transmission?: string | null;
+  color?: string | null;
+  condition?: string | null;
+  titleStatus?: string | null;
+  sellerName?: string | null;
+}
+
 async function matchOrCreateVehicle(
-  parsed: ParsedVehicle & {
-    vin?: string | null;
-    url?: string | null;
-    price?: number | null;
-    location?: string | null;
-    imageUrl?: string | null;
-  }
+  parsed: ParsedVehicle & VehicleEnrichment
 ): Promise<MatchResult> {
   // 1. VIN match
   if (parsed.vin) {
@@ -202,7 +213,11 @@ async function matchOrCreateVehicle(
       .limit(1)
       .single();
 
-    if (vinMatch) return { vehicleId: vinMatch.id, isNew: false };
+    if (vinMatch) {
+      // Enrich existing vehicle with any new data
+      await enrichVehicle(vinMatch.id, parsed);
+      return { vehicleId: vinMatch.id, isNew: false };
+    }
   }
 
   // 2. URL match in marketplace_listings
@@ -215,34 +230,35 @@ async function matchOrCreateVehicle(
       .limit(1)
       .single();
 
-    if (urlMatch?.vehicle_id) return { vehicleId: urlMatch.vehicle_id, isNew: false };
+    if (urlMatch?.vehicle_id) {
+      await enrichVehicle(urlMatch.vehicle_id, parsed);
+      return { vehicleId: urlMatch.vehicle_id, isNew: false };
+    }
   }
 
-  // 3. Year + make + model fuzzy match (exact year, same make, similar model)
-  if (parsed.year && parsed.make) {
-    const { data: ymmMatch } = await supabaseAdmin
-      .from("vehicles")
-      .select("id")
-      .eq("year", parsed.year)
-      .ilike("make", parsed.make)
-      .limit(1)
-      .single();
+  // 3. Create new vehicle with ALL available data
+  const vehicleData: Record<string, any> = {
+    year: parsed.year,
+    make: parsed.make,
+    model: parsed.model,
+    vin: parsed.vin || null,
+    status: "discovered",
+    primary_image_url: parsed.imageUrl || (parsed.imageUrls?.[0]) || null,
+  };
 
-    // Only use ymm match if we have a model and it's close
-    // For now, skip this — too many false positives with just year+make
-  }
+  // Populate everything we have
+  if (parsed.description) vehicleData.description = parsed.description;
+  if (parsed.mileage) vehicleData.mileage = parsed.mileage;
+  if (parsed.engine) vehicleData.engine = parsed.engine;
+  if (parsed.transmission) vehicleData.transmission = parsed.transmission;
+  if (parsed.color) vehicleData.color = parsed.color;
+  if (parsed.price) vehicleData.asking_price = parsed.price;
+  if (parsed.location) vehicleData.location = parsed.location;
+  if (parsed.condition) vehicleData.condition_notes = parsed.condition;
 
-  // 4. Create new vehicle
   const { data: newVehicle, error } = await supabaseAdmin
     .from("vehicles")
-    .insert({
-      year: parsed.year,
-      make: parsed.make,
-      model: parsed.model,
-      vin: parsed.vin || null,
-      status: "discovered",
-      primary_image_url: parsed.imageUrl || null,
-    })
+    .insert(vehicleData)
     .select("id")
     .single();
 
@@ -250,7 +266,152 @@ async function matchOrCreateVehicle(
     throw new Error(`Failed to create vehicle: ${error.message}`);
   }
 
+  // If we have multiple images, insert them to vehicle_images
+  const allImages = parsed.imageUrls || (parsed.imageUrl ? [parsed.imageUrl] : []);
+  if (allImages.length > 0) {
+    const imageRows = allImages.map((url: string, i: number) => ({
+      vehicle_id: newVehicle.id,
+      image_url: url,
+      is_primary: i === 0,
+      source: "ingest",
+    }));
+    await supabaseAdmin.from("vehicle_images").insert(imageRows);
+  }
+
   return { vehicleId: newVehicle.id, isNew: true };
+}
+
+// Enrich an existing vehicle with new data (only fill NULLs, don't overwrite)
+async function enrichVehicle(vehicleId: string, data: VehicleEnrichment) {
+  const { data: existing } = await supabaseAdmin
+    .from("vehicles")
+    .select("description, mileage, engine, transmission, color, asking_price, primary_image_url, location, vin")
+    .eq("id", vehicleId)
+    .single();
+
+  if (!existing) return;
+
+  const updates: Record<string, any> = {};
+
+  if (!existing.description && data.description) updates.description = data.description;
+  if (!existing.mileage && data.mileage) updates.mileage = data.mileage;
+  if (!existing.engine && data.engine) updates.engine = data.engine;
+  if (!existing.transmission && data.transmission) updates.transmission = data.transmission;
+  if (!existing.color && data.color) updates.color = data.color;
+  if (!existing.asking_price && data.price) updates.asking_price = data.price;
+  if (!existing.primary_image_url && (data.imageUrl || data.imageUrls?.[0])) {
+    updates.primary_image_url = data.imageUrl || data.imageUrls![0];
+  }
+  if (!existing.location && data.location) updates.location = data.location;
+  if (!existing.vin && data.vin) updates.vin = data.vin;
+
+  if (Object.keys(updates).length > 0) {
+    await supabaseAdmin.from("vehicles").update(updates).eq("id", vehicleId);
+  }
+
+  // Add any new images
+  const allImages = data.imageUrls || (data.imageUrl ? [data.imageUrl] : []);
+  if (allImages.length > 0) {
+    // Check which images already exist
+    const { data: existingImages } = await supabaseAdmin
+      .from("vehicle_images")
+      .select("image_url")
+      .eq("vehicle_id", vehicleId);
+
+    const existingUrls = new Set((existingImages || []).map((i: any) => i.image_url));
+    const newImages = allImages.filter((url: string) => !existingUrls.has(url));
+
+    if (newImages.length > 0) {
+      const hasPrimary = !!existing.primary_image_url;
+      const imageRows = newImages.map((url: string, i: number) => ({
+        vehicle_id: vehicleId,
+        image_url: url,
+        is_primary: !hasPrimary && i === 0,
+        source: "ingest",
+      }));
+      await supabaseAdmin.from("vehicle_images").insert(imageRows);
+
+      // Update primary_image_url if vehicle didn't have one
+      if (!hasPrimary) {
+        await supabaseAdmin.from("vehicles")
+          .update({ primary_image_url: newImages[0] })
+          .eq("id", vehicleId);
+      }
+    }
+  }
+}
+
+// ── Auto-Enrichment via Existing Extractors ──────────────────────
+
+interface EnrichedData {
+  year?: number;
+  make?: string;
+  model?: string;
+  price?: number;
+  description?: string;
+  image_url?: string;
+  image_urls?: string[];
+  vin?: string;
+  mileage?: number;
+  engine?: string;
+  transmission?: string;
+  color?: string;
+  location?: string;
+  seller_name?: string;
+}
+
+async function tryAutoEnrich(url: string, platform: string): Promise<EnrichedData | null> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  // Map platform to extractor edge function
+  const extractors: Record<string, string> = {
+    bring_a_trailer: "bat-simple-extract",
+    cars_and_bids: "extract-cars-and-bids-core",
+    hagerty: "extract-hagerty-listing",
+  };
+
+  const extractorName = extractors[platform];
+  if (!extractorName) return null;
+
+  try {
+    const resp = await fetch(`${supabaseUrl}/functions/v1/${extractorName}`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ url }),
+    });
+
+    if (!resp.ok) return null;
+
+    const result = await resp.json();
+    if (result.error) return null;
+
+    // Normalize across extractors (they have slightly different schemas)
+    const vehicle = result.vehicle || result.extracted || result;
+
+    return {
+      year: vehicle.year || null,
+      make: vehicle.make || null,
+      model: vehicle.model || null,
+      price: vehicle.sale_price || vehicle.asking_price || vehicle.price || null,
+      description: vehicle.description || vehicle.listing_description || null,
+      image_url: vehicle.primary_image_url || vehicle.image_url || vehicle.images?.[0] || null,
+      image_urls: vehicle.images || vehicle.image_urls || null,
+      vin: vehicle.vin || null,
+      mileage: vehicle.mileage || null,
+      engine: vehicle.engine || null,
+      transmission: vehicle.transmission || null,
+      color: vehicle.exterior_color || vehicle.color || null,
+      location: vehicle.location || null,
+      seller_name: vehicle.seller_username || vehicle.seller_name || null,
+    };
+  } catch (e) {
+    console.error(`Auto-enrich failed for ${platform}:`, e);
+    return null;
+  }
 }
 
 // ── Single Ingestion ────────────────────────────────────────────
@@ -268,6 +429,15 @@ interface IngestInput {
   notes?: string;
   tags?: string[];
   image_url?: string;
+  image_urls?: string[];
+  description?: string;
+  mileage?: number;
+  engine?: string;
+  transmission?: string;
+  color?: string;
+  condition?: string;
+  title_status?: string;
+  enrich?: boolean; // attempt to auto-enrich from source URL
 }
 
 interface IngestResult {
@@ -333,7 +503,32 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       }
     }
 
-    // Match or create vehicle
+    // Auto-enrich: for BaT/C&B URLs, call existing extractors to get full data
+    if (input.enrich !== false && input.url && !input.description) {
+      const enriched = await tryAutoEnrich(input.url, platform);
+      if (enriched) {
+        if (!input.year && enriched.year) input.year = enriched.year;
+        if (!input.make && enriched.make) input.make = enriched.make;
+        if (!input.model && enriched.model) input.model = enriched.model;
+        if (!input.price && enriched.price) input.price = enriched.price;
+        if (!input.description && enriched.description) input.description = enriched.description;
+        if (!input.image_url && enriched.image_url) input.image_url = enriched.image_url;
+        if (!input.image_urls && enriched.image_urls) input.image_urls = enriched.image_urls;
+        if (!input.vin && enriched.vin) input.vin = enriched.vin;
+        if (!input.mileage && enriched.mileage) input.mileage = enriched.mileage;
+        if (!input.engine && enriched.engine) input.engine = enriched.engine;
+        if (!input.transmission && enriched.transmission) input.transmission = enriched.transmission;
+        if (!input.color && enriched.color) input.color = enriched.color;
+        if (!input.location && enriched.location) input.location = enriched.location;
+        if (!input.seller_name && enriched.seller_name) input.seller_name = enriched.seller_name;
+        // Re-parse if we got new structured data
+        if (enriched.year && enriched.make) {
+          parsed = { year: enriched.year, make: enriched.make, model: enriched.model || parsed.model };
+        }
+      }
+    }
+
+    // Match or create vehicle with ALL available enrichment data
     const match = await matchOrCreateVehicle({
       ...parsed,
       vin: input.vin,
@@ -341,6 +536,14 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       price: input.price,
       location: input.location,
       imageUrl: input.image_url,
+      imageUrls: input.image_urls,
+      description: input.description || input.notes,
+      mileage: input.mileage,
+      engine: input.engine,
+      transmission: input.transmission,
+      color: input.color,
+      condition: input.condition,
+      sellerName: input.seller_name,
     });
 
     // If this is a marketplace listing, upsert it and get the listing ID
