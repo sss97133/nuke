@@ -39,6 +39,9 @@ const ClaimExternalIdentity: React.FC = () => {
   const [verificationCode, setVerificationCode] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [message, setMessage] = React.useState<string>('');
+  const [importStep, setImportStep] = React.useState<'idle' | 'input' | 'submitting' | 'done'>('idle');
+  const [importUrl, setImportUrl] = React.useState('');
+  const [importError, setImportError] = React.useState('');
 
   // Read URL params on mount
   React.useEffect(() => {
@@ -227,31 +230,117 @@ const ClaimExternalIdentity: React.FC = () => {
           </div>
         )}
 
-        {/* No results */}
+        {/* No results — import wizard */}
         {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
-          <div style={{ marginTop: 'var(--space-4)', textAlign: 'center', padding: 'var(--space-4)' }}>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+          <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', marginBottom: 'var(--space-3)' }}>
               No "{searchQuery}" found on {PLATFORM_LABELS[searchPlatform] || searchPlatform}
             </div>
-            <button
-              className="button button-secondary"
-              style={{ marginTop: 'var(--space-3)' }}
-              onClick={() => {
-                setSelectedIdentity({
-                  id: 'manual',
-                  platform: searchPlatform,
-                  handle: searchQuery,
-                  display_name: null,
-                  profile_url: null,
-                  first_seen: null,
-                  last_seen: null,
-                  claimed: false,
-                  stats: null
-                });
-              }}
-            >
-              Claim "{searchQuery}" anyway
-            </button>
+
+            {importStep === 'idle' && (
+              <div style={{ textAlign: 'center' }}>
+                <button
+                  className="button button-secondary"
+                  onClick={() => { setImportStep('input'); setImportError(''); }}
+                  style={{ fontSize: '13px' }}
+                >
+                  Not seeing your profile? Import it
+                </button>
+              </div>
+            )}
+
+            {(importStep === 'input' || importStep === 'submitting') && (
+              <div style={{
+                padding: 'var(--space-4)',
+                border: '1px solid var(--border-light)',
+                borderRadius: '6px',
+                backgroundColor: 'var(--grey-50)',
+              }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
+                  Paste your {PLATFORM_LABELS[searchPlatform] || searchPlatform} profile URL
+                </div>
+                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                  <input
+                    className="form-input"
+                    value={importUrl}
+                    onChange={(e) => { setImportUrl(e.target.value); setImportError(''); }}
+                    placeholder={
+                      searchPlatform === 'bat' ? 'https://bringatrailer.com/member/username/' :
+                      searchPlatform === 'cars_and_bids' ? 'https://carsandbids.com/user/username' :
+                      searchPlatform === 'pcarmarket' ? 'https://pcarmarket.com/member/username' :
+                      'Profile URL'
+                    }
+                    disabled={importStep === 'submitting'}
+                    style={{ flex: 1, fontSize: '13px', padding: '10px 12px' }}
+                  />
+                  <button
+                    className="cursor-button"
+                    disabled={importStep === 'submitting' || !importUrl.trim()}
+                    style={{ padding: '10px 16px', fontSize: '12px', whiteSpace: 'nowrap' }}
+                    onClick={async () => {
+                      setImportStep('submitting');
+                      setImportError('');
+                      try {
+                        const { data: sessionData } = await supabase.auth.getSession();
+                        const userId = sessionData?.session?.user?.id || null;
+
+                        const { data, error } = await supabase.functions.invoke('ingest-external-profile', {
+                          body: {
+                            platform: searchPlatform,
+                            profile_url: importUrl.trim(),
+                            notify_user_id: userId,
+                          },
+                        });
+                        if (error) throw error;
+                        if (!data?.success) throw new Error(data?.error || 'Import failed');
+
+                        setSelectedIdentity(data.identity);
+                        setImportStep('done');
+                        setMessage('Profile imported! Stats are loading in the background — we\'ll notify you when ready.');
+                      } catch (e: any) {
+                        console.error('Import failed:', e);
+                        setImportError(e?.message || 'Failed to import profile');
+                        setImportStep('input');
+                      }
+                    }}
+                  >
+                    {importStep === 'submitting' ? 'IMPORTING...' : 'IMPORT'}
+                  </button>
+                </div>
+                {importError && (
+                  <div style={{ fontSize: '11px', color: 'var(--error)', marginTop: 'var(--space-2)' }}>
+                    {importError}
+                  </div>
+                )}
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
+                  We'll create your identity instantly. Full stats import runs in the background.
+                </div>
+              </div>
+            )}
+
+            {importStep !== 'done' && (
+              <div style={{ textAlign: 'center', marginTop: 'var(--space-3)' }}>
+                <button
+                  className="button button-secondary"
+                  style={{ fontSize: '11px', opacity: 0.7 }}
+                  onClick={() => {
+                    setSelectedIdentity({
+                      id: 'manual',
+                      platform: searchPlatform,
+                      handle: searchQuery,
+                      display_name: null,
+                      profile_url: null,
+                      first_seen: null,
+                      last_seen: null,
+                      claimed: false,
+                      stats: null,
+                    });
+                  }}
+                >
+                  Skip import — claim "{searchQuery}" with no stats
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

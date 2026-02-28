@@ -9,6 +9,7 @@ interface NotifRow {
   message: string;
   is_read: boolean;
   created_at: string;
+  action_url?: string | null;
 }
 
 const Notifications: React.FC = () => {
@@ -32,7 +33,7 @@ const Notifications: React.FC = () => {
       const [userNotifs, generalNotifs, duplicateNotifs] = await Promise.all([
         supabase
         .from('user_notifications')
-        .select('id, type, title, message, is_read, created_at')
+        .select('id, type, title, message, is_read, created_at, action_url')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(100),
@@ -87,7 +88,7 @@ const Notifications: React.FC = () => {
           <div className="card">
             <div className="card-body">
               {loading && <div className="text text-small text-muted">Loading…</div>}
-              {error && <div className="text text-small" style={{ color: '#b91c1c' }}>{error}</div>}
+              {error && <div className="text text-small" style={{ color: 'var(--error)' }}>{error}</div>}
               {!loading && !error && (
                 <div className="space-y-2">
                   {rows.length === 0 ? (
@@ -98,6 +99,11 @@ const Notifications: React.FC = () => {
                         <div>
                           <div className="text text-small" style={{ fontWeight: 600 }}>{n.title || n.type}</div>
                           {n.message && <div className="text text-small text-muted">{n.message}</div>}
+                          {n.action_url && (
+                            <a href={n.action_url} className="text text-small" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>
+                              View &rarr;
+                            </a>
+                          )}
                           <div className="text text-small text-muted">{new Date(n.created_at).toLocaleString()}</div>
                         </div>
                         <div style={{ display:'flex', gap:6 }}>
