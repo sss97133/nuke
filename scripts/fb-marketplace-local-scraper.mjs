@@ -1,21 +1,29 @@
 /**
- * FB Marketplace Local Scraper v2.1
+ * FB Marketplace Local Scraper v3.0
  *
  * Runs locally (residential IP) to fetch vehicle listings from FB Marketplace.
  * Uses logged-out GraphQL endpoint — no LSD/DTSG tokens required.
  *
- * v2.1 additions over v2:
+ * v3.0 additions over v2.1:
+ *   - ALL images captured from images.edges[].node.image.uri (not just primary)
+ *   - Per-listing lat/lng from GraphQL location data
+ *   - Creates vehicle records in vehicles table for each listing
+ *   - Inserts images to vehicle_images table
+ *   - Links marketplace_listings.vehicle_id to vehicles
+ *   - Full description extraction from redacted_description.text
+ *
+ * v2.1 features (retained):
  *   - Seller extraction (seller_id + seller_name from GraphQL edges)
  *   - Raw GraphQL data stored in raw_scrape_data JSONB
  *   - Sweep tracking via fb_sweep_jobs table
  *   - Disappearance detection (listings gone = marked removed)
  *   - Seller ghost profiles (upsert to fb_marketplace_sellers)
- *   - Description + listing_created_at extraction
  *   - doc_id health check (validates response shape)
  *
  * Usage:
  *   dotenvx run -- node scripts/fb-marketplace-local-scraper.mjs [--location austin] [--all] [--max-pages 10] [--dry-run]
  *   dotenvx run -- node scripts/fb-marketplace-local-scraper.mjs --all --max-pages 50
+ *   dotenvx run -- node scripts/fb-marketplace-local-scraper.mjs --all --max-pages 50 --skip-vehicles  # skip vehicle creation
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -39,6 +47,7 @@ const SINGLE_LOCATION = args.includes("--location")
   ? args[args.indexOf("--location") + 1]
   : null;
 const SKIP_DISAPPEARANCE = args.includes("--skip-disappearance");
+const SKIP_VEHICLES = args.includes("--skip-vehicles");
 
 const YEAR_MIN = 1960;
 const YEAR_MAX = 1999;
@@ -219,6 +228,47 @@ function parseTitle(title) {
   };
 }
 
+// Extract ALL image URLs from GraphQL edge (not just primary)
+function extractAllImages(edge) {
+  const listing = edge?.node?.listing;
+  if (!listing) return [];
+
+  const urls = [];
+
+  // Primary photo first
+  const primary = listing.primary_listing_photo?.image?.uri;
+  if (primary) urls.push(primary);
+
+  // All images from the images array
+  const images = listing.listing_photos || listing.images?.edges || listing.all_listing_photos;
+  if (Array.isArray(images)) {
+    for (const img of images) {
+      // Handle edges format: {node: {image: {uri}}}
+      const uri = img?.node?.image?.uri || img?.image?.uri || img?.uri || img?.url;
+      if (uri && !urls.includes(uri)) urls.push(uri);
+    }
+  }
+
+  // Fallback: primary_listing_photo if no images array
+  if (urls.length === 0 && primary) urls.push(primary);
+
+  return urls;
+}
+
+// Extract per-listing lat/lng from GraphQL location data
+function extractCoords(edge) {
+  const listing = edge?.node?.listing;
+  if (!listing) return { lat: null, lng: null };
+
+  const loc = listing.location;
+  if (!loc) return { lat: null, lng: null };
+
+  const lat = loc.latitude || loc.lat || null;
+  const lng = loc.longitude || loc.lng || null;
+
+  return { lat: lat ? parseFloat(lat) : null, lng: lng ? parseFloat(lng) : null };
+}
+
 // Extract seller info from GraphQL edge
 function extractSeller(edge) {
   const listing = edge?.node?.listing;
@@ -316,6 +366,105 @@ async function upsertSeller(sellerId, sellerName) {
     return existing?.id || null;
   }
   return data?.id || null;
+}
+
+// Create or update a vehicle record from a marketplace listing
+async function createVehicleFromListing({ facebookId, allImages, year, make, model, price, description, imageUrl, city, state, listingLat, listingLng, sellerName }) {
+  const result = { vehicleId: null, imagesInserted: 0 };
+  if (!year || !make) return result;
+
+  const fbUrl = `https://www.facebook.com/marketplace/item/${facebookId}`;
+  const location = city && state ? `${city}, ${state}` : city || null;
+
+  // Check if vehicle already exists for this FB listing URL
+  const { data: existing } = await supabase
+    .from("vehicles")
+    .select("id")
+    .eq("source_url", fbUrl)
+    .limit(1)
+    .maybeSingle();
+
+  let vehicleId;
+
+  if (existing) {
+    vehicleId = existing.id;
+    // Update with any new data (fill NULLs only)
+    const updates = {};
+    if (description) updates.description = description;
+    if (price) updates.asking_price = price;
+    if (location) updates.listing_location = location;
+    if (listingLat) updates.gps_latitude = listingLat;
+    if (listingLng) updates.gps_longitude = listingLng;
+    if (imageUrl) updates.primary_image_url = imageUrl;
+
+    if (Object.keys(updates).length > 0) {
+      // Only update NULL fields
+      const setClauses = Object.entries(updates)
+        .map(([k, v]) => `${k} = COALESCE(${k}, '${String(v).replace(/'/g, "''")}')`)
+        .join(", ");
+      // Use simple update — COALESCE preserves existing non-null values
+      await supabase.from("vehicles").update(updates).eq("id", vehicleId);
+    }
+  } else {
+    // Create new vehicle
+    const { data: newVeh, error: vehErr } = await supabase
+      .from("vehicles")
+      .insert({
+        year,
+        make: make.charAt(0).toUpperCase() + make.slice(1),
+        model: model || null,
+        source_url: fbUrl,
+        asking_price: price ? Math.round(price) : null,
+        description: description || null,
+        listing_location: location,
+        gps_latitude: listingLat,
+        gps_longitude: listingLng,
+        primary_image_url: imageUrl,
+        status: "discovered",
+        auction_source: "facebook_marketplace",
+      })
+      .select("id")
+      .single();
+
+    if (vehErr) {
+      // Could be a constraint violation, skip
+      return result;
+    }
+    vehicleId = newVeh.id;
+  }
+
+  result.vehicleId = vehicleId;
+
+  // Insert all images to vehicle_images
+  if (allImages.length > 0 && vehicleId) {
+    // Check which images already exist
+    const { data: existingImgs } = await supabase
+      .from("vehicle_images")
+      .select("image_url")
+      .eq("vehicle_id", vehicleId);
+
+    const existingUrls = new Set((existingImgs || []).map(i => i.image_url));
+    const newImages = allImages.filter(url => !existingUrls.has(url));
+
+    if (newImages.length > 0) {
+      const imgRows = newImages.map((url, idx) => ({
+        vehicle_id: vehicleId,
+        image_url: url,
+        source: "facebook_marketplace",
+        display_order: (existingUrls.size || 0) + idx,
+      }));
+
+      const { error: imgErr } = await supabase
+        .from("vehicle_images")
+        .insert(imgRows);
+
+      if (!imgErr) {
+        result.imagesInserted = newImages.length;
+      }
+    }
+  }
+
+  return result;
 }
 
 // Detect disappeared listings — active in DB but not seen this sweep
@@ -421,7 +570,7 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
   let cursor = null;
   let page = 0;
   let allEdges = []; // Keep full edges for seller extraction
-  let stats = { found: 0, vintage: 0, inserted: 0, updated: 0, errors: 0, sellers: 0 };
+  let stats = { found: 0, vintage: 0, inserted: 0, updated: 0, errors: 0, sellers: 0, vehicles: 0, images: 0 };
 
   while (page < maxPages) {
     try {
@@ -485,8 +634,10 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
     allEdges.slice(0, 5).forEach((e) => {
       const l = e.node?.listing;
       const { sellerId, sellerName } = extractSeller(e);
+      const imgs = extractAllImages(e);
+      const { lat, lng } = extractCoords(e);
       console.log(
-        `    - ${l?.marketplace_listing_title} | $${l?.listing_price?.amount} | seller: ${sellerName || "unknown"} (${sellerId || "no id"})`
+        `    - ${l?.marketplace_listing_title} | $${l?.listing_price?.amount} | ${imgs.length} imgs | coords: ${lat?.toFixed(2)},${lng?.toFixed(2)} | seller: ${sellerName || "unknown"} (${sellerId || "no id"})`
       );
     });
     return stats;
@@ -497,9 +648,11 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
 
   // Batch upsert to database
   const batchSize = 50;
+  const allVehicleData = []; // Collect for vehicle creation after all upserts
   for (let i = 0; i < allEdges.length; i += batchSize) {
     const batch = allEdges.slice(i, i + batchSize);
     const rows = [];
+    const vehicleData = [];
 
     for (const edge of batch) {
       const listing = edge.node?.listing;
@@ -509,11 +662,14 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
       const price = listing.listing_price?.amount
         ? parseFloat(listing.listing_price.amount)
         : null;
-      const imageUrl = listing.primary_listing_photo?.image?.uri || null;
+      const allImages = extractAllImages(edge);
+      const imageUrl = allImages[0] || null;
+      const { lat: listingLat, lng: listingLng } = extractCoords(edge);
       const city = listing.location?.reverse_geocode?.city || null;
       const state = listing.location?.reverse_geocode?.state || null;
       const isSold = listing.is_sold || false;
       const isPending = listing.is_pending || false;
+      const description = listing.redacted_description?.text || null;
 
       // Seller extraction
       const { sellerId, sellerName } = extractSeller(edge);
@@ -537,12 +693,15 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
         location: listing.location,
         is_sold: listing.is_sold,
         is_pending: listing.is_pending,
-        description: listing.redacted_description?.text || null,
+        description: description,
         creation_time: listing.creation_time || null,
         seller_id: sellerId,
         seller_name: sellerName,
         custom_title: listing.custom_title || null,
         category_type: listing.category_type || null,
+        all_image_urls: allImages,
+        listing_lat: listingLat,
+        listing_lng: listingLng,
       };
 
       rows.push({
@@ -560,12 +719,15 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
         status: isSold ? "sold" : isPending ? "pending" : "active",
         seller_name: sellerName,
         fb_seller_id: fbSellerDbId,
-        description: listing.redacted_description?.text || null,
+        description: description,
         raw_scrape_data: rawData,
         last_seen_at: new Date().toISOString(),
         scraped_at: new Date().toISOString(),
         search_query: `vintage-vehicles-${slug}`,
       });
+
+      // Store data for vehicle creation
+      vehicleData.push({ facebookId: listing.id, allImages, year, make, model, price, description, imageUrl, city, state, listingLat, listingLng, sellerName });
     }
 
     if (rows.length === 0) continue;
@@ -594,10 +756,37 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
     } else {
       stats.inserted += rows.length;
     }
+
+    allVehicleData.push(...vehicleData);
+  }
+
+  // --- Create vehicle records for each listing ---
+  if (!SKIP_VEHICLES && allVehicleData.length > 0) {
+    console.log(`  Creating vehicle records for ${allVehicleData.length} listings...`);
+    for (const vd of allVehicleData) {
+      try {
+        const vehResult = await createVehicleFromListing(vd);
+        if (vehResult.vehicleId) {
+          stats.vehicles++;
+          stats.images += vehResult.imagesInserted;
+
+          // Link marketplace_listing to vehicle
+          await supabase.from("marketplace_listings")
+            .update({ vehicle_id: vehResult.vehicleId })
+            .eq("facebook_id", vd.facebookId);
+        }
+      } catch (e) {
+        // Don't let vehicle creation failures stop the scrape
+        if (!e.message?.includes("duplicate")) {
+          console.error(`    Vehicle creation error for ${vd.facebookId}: ${e.message}`);
+        }
+      }
+    }
+    console.log(`  Vehicles created: ${stats.vehicles} | Images inserted: ${stats.images}`);
   }
 
   console.log(
-    `  Done: ${stats.found} scanned -> ${stats.vintage} vintage -> ${stats.inserted} upserted | ${stats.sellers} sellers`
+    `  Done: ${stats.found} scanned -> ${stats.vintage} vintage -> ${stats.inserted} upserted | ${stats.sellers} sellers | ${stats.vehicles} vehicles`
   );
   return stats;
 }
@@ -637,7 +826,7 @@ async function main() {
     console.log(`Sweep ID: ${sweepId}`);
   }
 
-  let totals = { found: 0, vintage: 0, inserted: 0, updated: 0, errors: 0, sellers: 0 };
+  let totals = { found: 0, vintage: 0, inserted: 0, updated: 0, errors: 0, sellers: 0, vehicles: 0, images: 0 };
   const allSeenFacebookIds = new Set();
   let locationsProcessed = 0;
 
@@ -649,6 +838,8 @@ async function main() {
     totals.updated += stats.updated;
     totals.errors += stats.errors;
     totals.sellers += stats.sellers;
+    totals.vehicles += stats.vehicles;
+    totals.images += stats.images;
     locationsProcessed++;
 
     // Update sweep job progress
@@ -714,6 +905,8 @@ async function main() {
   console.log(`Vintage (${YEAR_MIN}-${YEAR_MAX}): ${totals.vintage}`);
   console.log(`Upserted: ${totals.inserted}`);
   console.log(`Unique sellers: ${totals.sellers}`);
+  console.log(`Vehicles created: ${totals.vehicles}`);
+  console.log(`Images inserted: ${totals.images}`);
   console.log(`Disappeared: ${disappeared}`);
   console.log(`Errors: ${totals.errors}`);
 }

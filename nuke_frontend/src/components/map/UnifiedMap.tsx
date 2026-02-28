@@ -169,6 +169,25 @@ interface PhotoPin {
   cameraModel: string | null;
 }
 
+interface MarketplacePin {
+  id: string;
+  fbId: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  lat: number;
+  lng: number;
+  loc: string;
+  img: string | null;
+  price: number | null;
+  title: string;
+  seller: string | null;
+  description: string | null;
+  url: string;
+  status: string;
+  scrapedAt: string | null;
+}
+
 interface LiveEvent { id: string; lat: number; lng: number; ts: number; }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -286,12 +305,15 @@ export default function UnifiedMap() {
   const [showVehicles, setShowVehicles] = useState(true);
   const [showBusinesses, setShowBusinesses] = useState(true);
   const [showPhotos, setShowPhotos] = useState(true);
+  const [showMarketplace, setShowMarketplace] = useState(true);
 
   const [collections, setCollections] = useState<ColPin[]>([]);
   const [vehicles, setVehicles] = useState<VPin[]>([]);
   const [businesses, setBiz] = useState<BizPin[]>([]);
   const [photos, setPhotos] = useState<PhotoPin[]>([]);
+  const [marketplace, setMarketplace] = useState<MarketplacePin[]>([]);
   const [vehLoading, setVehLoading] = useState(true);
+  const [mktLoading, setMktLoading] = useState(true);
 
   const [searchText, setSearchText] = useState('');
   const [queryResults, setQueryResults] = useState<VPin[]>([]);
@@ -304,7 +326,7 @@ export default function UnifiedMap() {
   const [viewState, setViewState] = useState(INITIAL_VIEW);
 
   // Side panel popup (replaces floating popup that overlapped data)
-  const [selectedPin, setSelectedPin] = useState<{ pin: VPin | ColPin | BizPin | PhotoPin; type: 'vehicle' | 'collection' | 'business' | 'photo' } | null>(null);
+  const [selectedPin, setSelectedPin] = useState<{ pin: VPin | ColPin | BizPin | PhotoPin | MarketplacePin; type: 'vehicle' | 'collection' | 'business' | 'photo' | 'marketplace' } | null>(null);
   const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; text: string } | null>(null);
 
   // Slider controls — defaults tuned so data is visible immediately at zoom 4.5
@@ -428,6 +450,70 @@ export default function UnifiedMap() {
         };
       }));
     })();
+  }, []);
+
+  // ---- Load FB Marketplace listings ----
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setMktLoading(true);
+      const all: MarketplacePin[] = [];
+      let lastId = '';
+      let fetched = 0;
+      const maxRows = 20000;
+
+      while (fetched < maxRows) {
+        if (cancelled) return;
+        let q = supabase.from('marketplace_listings')
+          .select('id,facebook_id,title,parsed_year,parsed_make,parsed_model,price,current_price,image_url,location,status,description,seller_name,url,scraped_at')
+          .eq('status', 'active')
+          .not('location', 'is', null);
+        if (lastId) q = q.gt('id', lastId);
+        q = q.order('id', { ascending: true }).limit(1000);
+
+        const { data, error } = await q;
+        if (error) { console.warn('Marketplace fetch error:', error.message); break; }
+        if (!data || data.length === 0) break;
+
+        for (const row of data) {
+          const locStr = row.location || '';
+          const coords = geo(locStr);
+          if (!coords) continue;
+          all.push({
+            id: row.id,
+            fbId: row.facebook_id,
+            year: row.parsed_year,
+            make: row.parsed_make,
+            model: row.parsed_model,
+            lat: coords[0],
+            lng: coords[1],
+            loc: locStr,
+            img: row.image_url,
+            price: row.current_price || row.price || null,
+            title: row.title || [row.parsed_year, row.parsed_make, row.parsed_model].filter(Boolean).join(' ') || 'Listing',
+            seller: row.seller_name,
+            description: row.description,
+            url: row.url || `https://www.facebook.com/marketplace/item/${row.facebook_id}`,
+            status: row.status,
+            scrapedAt: row.scraped_at,
+          });
+        }
+
+        lastId = data[data.length - 1].id;
+        fetched += data.length;
+
+        // Progressive render every 2 batches
+        if (fetched <= 1000 || fetched % 2000 === 0) {
+          if (!cancelled) setMarketplace([...all]);
+        }
+      }
+
+      if (!cancelled) {
+        setMarketplace([...all]);
+        setMktLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // ---- Load base vehicle layer — progressive cursor pagination ----
@@ -604,14 +690,16 @@ export default function UnifiedMap() {
       vehicles: vehCount,
       businesses: businesses.length,
       photos: photos.length,
+      marketplace: marketplace.length,
       query: queryResults.length,
       total: (showCollections && !hasQuery ? collections.length : 0)
            + (showVehicles && !hasQuery ? vehCount : 0)
            + (showBusinesses && !hasQuery ? businesses.length : 0)
            + (showPhotos && !hasQuery ? photos.length : 0)
+           + (showMarketplace && !hasQuery ? marketplace.length : 0)
            + queryResults.length,
     };
-  }, [showCollections, showVehicles, showBusinesses, showPhotos, collections, filteredVehicles, businesses, photos, queryResults, hasQuery]);
+  }, [showCollections, showVehicles, showBusinesses, showPhotos, showMarketplace, collections, filteredVehicles, businesses, photos, marketplace, queryResults, hasQuery]);
 
   // --- deck.gl layers ---
   const zoom = viewState.zoom;
@@ -850,6 +938,47 @@ export default function UnifiedMap() {
       }));
     }
 
+    // --- Marketplace Glow (green — live for-sale listings) ---
+    if (showMarketplace && !hasQuery && marketplace.length > 0 && glowFade > 0) {
+      result.push(new ScatterplotLayer({
+        id: 'marketplace-glow',
+        data: marketplace,
+        getPosition: (d: MarketplacePin) => [d.lng, d.lat],
+        getRadius: 500,
+        getFillColor: [74, 222, 128, Math.round(glowAlpha * 0.8)] as [number, number, number, number],
+        radiusMinPixels: Math.max(8, 10 * zoomScale),
+        radiusMaxPixels: Math.max(20, 35 * zoomScale),
+        opacity: glowFade * 0.8,
+        pickable: false,
+      }));
+    }
+
+    // --- Marketplace Points (green dots — FB listings for sale NOW) ---
+    if (showMarketplace && !hasQuery && marketplace.length > 0) {
+      result.push(new ScatterplotLayer({
+        id: 'marketplace-points',
+        data: marketplace,
+        getPosition: (d: MarketplacePin) => [d.lng, d.lat],
+        getRadius: 60,
+        getFillColor: [74, 222, 128, 220] as [number, number, number, number],
+        radiusMinPixels: Math.max(2.5, ptMin * 1.1),
+        radiusMaxPixels: Math.max(5, ptMax * 1.1),
+        pickable: true,
+        onClick: ({ object }: any) => {
+          if (object) setSelectedPin({ pin: object, type: 'marketplace' as any });
+        },
+        onHover: ({ object, x, y }: any) => {
+          if (object) {
+            const price = object.price ? ' · ' + fmtPrice(object.price) : '';
+            setHoverInfo({ x, y, text: (object.title || 'FB Listing') + price });
+          } else {
+            setHoverInfo(null);
+          }
+        },
+        updateTriggers: { radiusMinPixels: [ptMin], radiusMaxPixels: [ptMax] },
+      }));
+    }
+
     // --- Live Event Rings (animated) ---
     const liveEvents = liveEventsRef.current.filter(e => now - e.ts < 2500);
     if (liveEvents.length > 0) {
@@ -886,8 +1015,8 @@ export default function UnifiedMap() {
     }
 
     return result;
-  }, [filteredVehicles, collections, businesses, photos, queryResults, showVehicles, showCollections, showBusinesses,
-      showPhotos, hasQuery, zoom, mode, glowRadius, glowIntensity, pointSize, tick]);
+  }, [filteredVehicles, collections, businesses, photos, marketplace, queryResults, showVehicles, showCollections, showBusinesses,
+      showPhotos, showMarketplace, hasQuery, zoom, mode, glowRadius, glowIntensity, pointSize, tick]);
 
   const panelW = 320; // side panel width
   const hasSidePanel = selectedPin !== null;
@@ -981,6 +1110,8 @@ export default function UnifiedMap() {
               <span>
                 <span style={{ color: '#3B82F6' }}>{counts.vehicles.toLocaleString()}</span>
                 {' / '}
+                <span style={{ color: '#4ADE80' }}>{counts.marketplace.toLocaleString()}</span>
+                {' / '}
                 <span style={{ color: '#EC4899' }}>{counts.collections.toLocaleString()}</span>
                 {' / '}
                 <span style={{ color: '#14B8A6' }}>{counts.businesses.toLocaleString()}</span>
@@ -999,6 +1130,7 @@ export default function UnifiedMap() {
                 <button onClick={() => setControlsOpen(false)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: '14px', padding: '0 2px' }}>x</button>
               </div>
               <LT label="Vehicles" color="#3B82F6" checked={showVehicles} set={setShowVehicles} n={counts.vehicles} dim={hasQuery} loading={vehLoading} />
+              <LT label="For Sale" color="#4ADE80" checked={showMarketplace} set={setShowMarketplace} n={counts.marketplace} dim={hasQuery} loading={mktLoading} />
               <LT label="Collections" color="#EC4899" checked={showCollections} set={setShowCollections} n={counts.collections} dim={hasQuery} />
               <LT label="Businesses" color="#14B8A6" checked={showBusinesses} set={setShowBusinesses} n={counts.businesses} dim={hasQuery} />
               <LT label="Photos" color="#D946EF" checked={showPhotos} set={setShowPhotos} n={counts.photos} dim={hasQuery} />
@@ -1184,6 +1316,39 @@ export default function UnifiedMap() {
                   <a href={`/org/${b.id}`} style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 6,
                     background: 'rgba(20,184,166,0.2)', color: '#14B8A6', textDecoration: 'none', fontWeight: 600, fontSize: '12px',
                     border: '1px solid rgba(20,184,166,0.3)' }}>View Profile</a>
+                </div>
+              );
+            })()}
+
+            {type === 'marketplace' && (() => {
+              const m = pin as MarketplacePin;
+              const titleParts = [m.year, m.make, m.model].filter(Boolean).join(' ');
+              const displayTitle = titleParts || m.title || 'FB Listing';
+              return (
+                <div>
+                  {m.img && <a href={m.url} target="_blank" rel="noreferrer">
+                    <img src={m.img} alt={displayTitle} style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  </a>}
+                  <div style={{ padding: '14px 16px' }}>
+                    <div style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, background: 'rgba(74,222,128,0.15)', color: '#4ADE80', fontSize: '10px', fontWeight: 600, marginBottom: 8, border: '1px solid rgba(74,222,128,0.3)' }}>
+                      FB Marketplace
+                    </div>
+                    <a href={m.url} target="_blank" rel="noreferrer" style={{ color: '#4ADE80', textDecoration: 'none', fontWeight: 700, fontSize: '16px', display: 'block', marginBottom: 4 }}>
+                      {displayTitle}
+                    </a>
+                    {m.title !== displayTitle && <div style={{ color: '#999', fontSize: '11px', marginBottom: 6 }}>{m.title}</div>}
+                    {m.price && <div style={{ color: '#4ade80', fontWeight: 700, fontSize: '20px', fontFamily: 'monospace', marginBottom: 8 }}>{fmtPrice(m.price)}</div>}
+                    {m.loc && <div style={{ color: '#999', fontSize: '11px', marginBottom: 6 }}>{m.loc}</div>}
+                    {m.seller && <div style={{ color: '#888', fontSize: '11px', marginBottom: 8 }}>Seller: {m.seller}</div>}
+                    {m.description && <div style={{ color: '#777', fontSize: '11px', marginBottom: 12, lineHeight: 1.5, maxHeight: 100, overflow: 'hidden' }}>{m.description}</div>}
+                    {m.scrapedAt && <div style={{ color: '#555', fontSize: '9px', marginBottom: 12 }}>Scraped: {new Date(m.scrapedAt).toLocaleString()}</div>}
+                    <a href={m.url} target="_blank" rel="noreferrer" style={{
+                      display: 'block', textAlign: 'center', padding: '10px', borderRadius: 6,
+                      background: 'rgba(74,222,128,0.15)', color: '#4ADE80', textDecoration: 'none',
+                      fontWeight: 600, fontSize: '12px', border: '1px solid rgba(74,222,128,0.3)',
+                    }}>View on Facebook</a>
+                  </div>
                 </div>
               );
             })()}
