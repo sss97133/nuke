@@ -3,7 +3,7 @@ import type { VehicleHeroImageProps } from './types';
 import MobileImageGallery from '../../components/image/MobileImageGallery';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
-const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overlayNode }) => {
+const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overlayNode, heroMeta }) => {
   const [fitMode, setFitMode] = useState<'cover' | 'contain'>('cover');
   const [showGallery, setShowGallery] = useState(false);
   const isMobile = useIsMobile();
@@ -62,77 +62,119 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
   const renderUrl = getSupabaseRenderUrl(src, 1600, 90);
   const imgUrl = renderUrl || src;
 
+  // Build metadata parts (only render fields that exist)
+  const metaParts: string[] = [];
+  if (heroMeta?.camera) metaParts.push(heroMeta.camera);
+  if (heroMeta?.location) metaParts.push(heroMeta.location);
+  if (heroMeta?.date) metaParts.push(heroMeta.date);
+
   return (
     <>
       <section className="section">
         <div className="card" style={{ border: 'none', overflow: 'hidden' }}>
-          <div
-            style={{
-              width: '100%',
-              aspectRatio: '16/9',
-              maxHeight: '600px',
-              position: 'relative',
-              overflow: 'hidden',
-              borderRadius: 'var(--radius-2)',
-              backgroundColor: 'var(--grey-950, #111)',
-              cursor: isMobile ? 'pointer' : 'default',
-            }}
-            onClick={() => isMobile && setShowGallery(true)}
-          >
-            {/* Blurred backdrop — only shown in fit mode, fills empty sides */}
-            {fitMode === 'contain' && (
+          {/* hero-media-slot: static image now, carousel/livestream later */}
+          <div className="hero-media-slot">
+            <div
+              style={{
+                width: '100%',
+                aspectRatio: '16/9',
+                maxHeight: '600px',
+                position: 'relative',
+                overflow: 'hidden',
+                borderRadius: 'var(--radius-2)',
+                backgroundColor: 'var(--grey-950, #111)',
+                cursor: isMobile ? 'pointer' : 'default',
+              }}
+              onClick={() => isMobile && setShowGallery(true)}
+            >
+              {/* Blurred backdrop -- only shown in fit mode, fills empty sides */}
+              {fitMode === 'contain' && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: '-30px', // extend past edges to hide blur fringe
+                    backgroundImage: `url(${imgUrl})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    filter: 'blur(28px) brightness(0.45)',
+                  }}
+                />
+              )}
+
+              {/* Main image */}
               <div
                 style={{
                   position: 'absolute',
-                  inset: '-30px', // extend past edges to hide blur fringe
-                  backgroundImage: `url(${imgUrl})`,
-                  backgroundSize: 'cover',
+                  inset: 0,
+                  backgroundImage: renderUrl ? `url(${renderUrl}), url(${src})` : `url(${src})`,
+                  backgroundSize: fitMode,
                   backgroundPosition: 'center',
                   backgroundRepeat: 'no-repeat',
-                  filter: 'blur(28px) brightness(0.45)',
                 }}
               />
-            )}
 
-            {/* Main image */}
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                backgroundImage: renderUrl ? `url(${renderUrl}), url(${src})` : `url(${src})`,
-                backgroundSize: fitMode,
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-              }}
-            />
+              {/* Overlay (auction banners etc) */}
+              {overlayNode && (
+                <div style={{ position: 'relative', zIndex: 1 }}>{overlayNode}</div>
+              )}
 
-            {/* Overlay (auction banners etc) */}
-            {overlayNode && (
-              <div style={{ position: 'relative', zIndex: 1 }}>{overlayNode}</div>
-            )}
-
-            {/* Fit / Fill toggle */}
-            <button
-              onClick={e => { e.stopPropagation(); setFitMode(m => m === 'cover' ? 'contain' : 'cover'); }}
-              style={{
-                position: 'absolute',
-                bottom: '10px',
-                right: '10px',
-                background: 'rgba(0,0,0,0.55)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                padding: '4px 10px',
-                fontSize: '11px',
-                cursor: 'pointer',
-                zIndex: 2,
-                backdropFilter: 'blur(6px)',
-                letterSpacing: '0.04em',
-              }}
-            >
-              {fitMode === 'cover' ? 'Fit' : 'Fill'}
-            </button>
+              {/* Fit / Fill toggle */}
+              <button
+                onClick={e => { e.stopPropagation(); setFitMode(m => m === 'cover' ? 'contain' : 'cover'); }}
+                style={{
+                  position: 'absolute',
+                  bottom: '10px',
+                  right: '10px',
+                  background: 'rgba(0,0,0,0.55)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  zIndex: 2,
+                  backdropFilter: 'blur(6px)',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {fitMode === 'cover' ? 'Fit' : 'Fill'}
+              </button>
+            </div>
           </div>
+
+          {/* Metadata bar -- camera, location, date */}
+          {metaParts.length > 0 && (
+            <div style={{
+              padding: '6px 12px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '4px',
+              alignItems: 'center',
+            }}>
+              {metaParts.map((part, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && (
+                    <span style={{
+                      color: 'var(--text-muted)',
+                      opacity: 0.4,
+                      fontFamily: 'var(--font-mono, "SF Mono", "Fira Code", "Fira Mono", monospace)',
+                      fontSize: '11px',
+                    }}>|</span>
+                  )}
+                  <span style={{
+                    fontFamily: 'var(--font-mono, "SF Mono", "Fira Code", "Fira Mono", monospace)',
+                    fontSize: '11px',
+                    color: 'var(--text-muted)',
+                    letterSpacing: '0.02em',
+                    lineHeight: 1.4,
+                  }}>
+                    {part}
+                  </span>
+                </React.Fragment>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

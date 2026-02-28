@@ -49,25 +49,29 @@ const SpatialTagMarker: React.FC<SpatialTagMarkerProps> = ({ tag, isShoppable, o
   const isLinkedVehicle = !!tag.linked_vehicle_id;
   
   // Visual styling logic
-  let borderColor = '#000000';
-  let bgColor = '#ffffff';
+  let borderColor = 'var(--border)';
+  let bgColor = 'var(--surface)';
+  let bgColorWithAlpha = 'rgba(255,255,255,0.67)';
   let borderStyle = 'solid';
-  
+
   if (isAutoTag) {
     if (isVerified) {
-      bgColor = '#22c55e'; // Green - verified auto-tag
-      borderColor = '#16a34a';
+      bgColor = 'var(--success)'; // Green - verified auto-tag
+      bgColorWithAlpha = 'rgba(40,167,69,0.67)';
+      borderColor = 'var(--success)';
     } else {
-      bgColor = '#eab308'; // Yellow - unverified auto-tag
-      borderColor = '#ca8a04';
+      bgColor = 'var(--warning)'; // Yellow - unverified auto-tag
+      bgColorWithAlpha = 'rgba(176,90,0,0.67)';
+      borderColor = 'var(--warning)';
       borderStyle = 'dashed';
     }
   } else if (isShoppable) {
-    bgColor = '#00ff00'; // Green - shoppable
+    bgColor = 'var(--success)'; // Green - shoppable
+    bgColorWithAlpha = 'rgba(40,167,69,0.67)';
   }
-  
+
   if (isLinkedVehicle) {
-    borderColor = '#3b82f6'; // Blue border for linked vehicles
+    borderColor = 'var(--accent)'; // Blue border for linked vehicles
   }
   
   return (
@@ -81,7 +85,7 @@ const SpatialTagMarker: React.FC<SpatialTagMarkerProps> = ({ tag, isShoppable, o
         top: `${tag.y_position}%`,
         width: `${tag.width || 20}%`,
         height: `${tag.height || 20}%`,
-        background: isHovered ? bgColor : `${bgColor}aa`,
+        background: isHovered ? bgColor : bgColorWithAlpha,
         border: `3px ${borderStyle} ${borderColor}`,
         borderRadius: '4px',
         cursor: 'pointer',
@@ -111,7 +115,7 @@ const SpatialTagMarker: React.FC<SpatialTagMarkerProps> = ({ tag, isShoppable, o
         }}>
           <div>{tag.tag_text || tag.tag_name}</div>
           {isAutoTag && (
-            <div style={{ fontSize: '9px', color: '#888', marginTop: '2px' }}>
+            <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
               {isVerified ? 'VERIFIED' : `AI ${confidence}%`}
               {isLinkedVehicle && ' • Click to view'}
             </div>
@@ -843,7 +847,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           color: white;
           padding: 16px 20px;
           border-radius: 8px;
-          border: 2px solid #fff;
+          border: 2px solid var(--border);
           z-index: 10001;
           font-size: 12px;
           max-width: 300px;
@@ -855,8 +859,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
         toast.innerHTML = `
           <div style="font-weight: bold; margin-bottom: 4px;">Linked organization</div>
           <div style="font-size: 11px; margin-bottom: 2px;">${organizationInfo.name}</div>
-          ${organizationInfo.relationshipLabel ? `<div style="font-size: 10px; color: #ccc;">${organizationInfo.relationshipLabel}</div>` : ''}
-          <button onclick="this.parentElement.remove()" style="position: absolute; top: 4px; right: 4px; background: transparent; color: #fff; border: none; padding: 2px 6px; font-size: 14px; cursor: pointer; font-weight: bold;">×</button>
+          ${organizationInfo.relationshipLabel ? `<div style="font-size: 10px; color: rgba(255,255,255,0.7);">${organizationInfo.relationshipLabel}</div>` : ''}
+          <button onclick="this.parentElement.remove()" style="position: absolute; top: 4px; right: 4px; background: transparent; color: rgba(255,255,255,0.9); border: none; padding: 2px 6px; font-size: 14px; cursor: pointer; font-weight: bold;">×</button>
         `;
         document.body.appendChild(toast);
         setTimeout(() => {
@@ -1344,21 +1348,63 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             SENS
           </button>
           
-          <button 
-            onClick={async (e) => {
-              // Alt/Option click = explicit force reprocess
-              await runImageAnalysis({ forceReprocess: (e as any)?.altKey === true });
-            }}
-            disabled={analyzing || !imageUrl || !imageId}
-            className={`px-3 py-1.5 border-2 text-[9px] font-bold uppercase tracking-wide transition-all duration-150 ${
-              analyzing 
-                ? 'bg-[#2a2a2a] text-white/40 border-white/10 cursor-not-allowed' 
-                : 'bg-transparent border-white/30 text-white hover:border-white hover:bg-white/10'
-            }`}
-            style={{ fontFamily: 'Arial, sans-serif' }}
-          >
-            {analyzing ? 'AI...' : 'AI'}
-          </button>
+          {/* AI status indicator - only show retry on failure, subtle status otherwise */}
+          {(() => {
+            const status = imageMetadata?.ai_processing_status;
+            if (status === 'failed') {
+              return (
+                <button
+                  onClick={async (e) => {
+                    await runImageAnalysis({ forceReprocess: (e as any)?.altKey === true });
+                  }}
+                  disabled={analyzing || !imageUrl || !imageId}
+                  className={`px-3 py-1.5 border-2 text-[9px] font-bold uppercase tracking-wide transition-all duration-150 ${
+                    analyzing
+                      ? 'bg-[#2a2a2a] text-white/40 border-white/10 cursor-not-allowed'
+                      : 'bg-transparent border-red-600/50 text-red-400 hover:border-red-500 hover:bg-red-600/10'
+                  }`}
+                  style={{ fontFamily: 'Arial, sans-serif' }}
+                >
+                  {analyzing ? 'RETRYING...' : 'RETRY'}
+                </button>
+              );
+            }
+            if (status === 'processing' || analyzing) {
+              return (
+                <span
+                  className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wide text-white/40"
+                  style={{ fontFamily: 'Arial, sans-serif' }}
+                >
+                  Analyzing...
+                </span>
+              );
+            }
+            if (status === 'pending') {
+              return (
+                <span
+                  className="px-3 py-1.5 text-[9px] uppercase tracking-wide text-white/30"
+                  style={{ fontFamily: 'Arial, sans-serif' }}
+                >
+                  Queued
+                </span>
+              );
+            }
+            // completed or unknown: show nothing in toolbar
+            // Alt+click on the INFO button area still available for power users
+            // Hidden power-user reprocess: hold Alt and click this invisible target
+            return (
+              <span
+                className="px-1 py-1.5 cursor-default"
+                onClick={async (e) => {
+                  if ((e as any)?.altKey) {
+                    await runImageAnalysis({ forceReprocess: true });
+                  }
+                }}
+                title="Alt+click to force reprocess"
+                style={{ opacity: 0, width: '1px', overflow: 'hidden' }}
+              />
+            );
+          })()}
           
           <button 
             onClick={() => setShowSidebar(!showSidebar)}
@@ -1391,7 +1437,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             onClick={() => { setAsPrimary(); setShowQuickActions(false); }}
             disabled={imageMetadata?.is_primary}
             className="flex-1 py-3 text-white text-[10px] font-bold border-2 border-white/30 mx-1"
-            style={{ backgroundColor: imageMetadata?.is_primary ? '#16a34a' : 'rgba(255,255,255,0.1)' }}
+            style={{ backgroundColor: imageMetadata?.is_primary ? 'var(--success)' : 'rgba(255,255,255,0.1)' }}
           >
             PRIMARY
           </button>
@@ -1404,7 +1450,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           <button
             onClick={() => { toggleSensitive(); setShowQuickActions(false); }}
             className="flex-1 py-3 text-[10px] font-bold border-2 border-white/30 mx-1"
-            style={{ backgroundColor: isSensitive ? '#eab308' : 'rgba(255,255,255,0.1)', color: isSensitive ? 'black' : 'white' }}
+            style={{ backgroundColor: isSensitive ? 'var(--warning)' : 'rgba(255,255,255,0.1)', color: isSensitive ? 'black' : 'white' }}
           >
             BLUR
           </button>
@@ -1856,7 +1902,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     style={{
-                                      color: '#4A9EFF',
+                                      color: 'var(--accent)',
                                       textDecoration: 'underline',
                                       fontSize: '9px',
                                       display: 'inline-flex',
@@ -1877,7 +1923,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                       Claimed •{' '}
                                       <a
                                         href={`/profile/${attribution.seller.claimedByUserId}`}
-                                        style={{ color: '#4A9EFF', textDecoration: 'underline' }}
+                                        style={{ color: 'var(--accent)', textDecoration: 'underline' }}
                                       >
                                         View profile →
                                       </a>
@@ -1941,7 +1987,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     style={{
-                                      color: '#4A9EFF',
+                                      color: 'var(--accent)',
                                       textDecoration: 'underline',
                                       wordBreak: 'break-all',
                                       fontSize: '9px',
@@ -2041,6 +2087,149 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     </div>
                   )}
 
+                  {/* Vision Analysis Summary — user-friendly display of YONO + pipeline results */}
+                  {(() => {
+                    const zone = imageMetadata?.vehicle_zone;
+                    const condScore = imageMetadata?.condition_score;
+                    const dmgFlags: string[] = imageMetadata?.damage_flags || [];
+                    const photoQuality = imageMetadata?.photo_quality_score;
+                    const fabStage = imageMetadata?.fabrication_stage;
+                    const pipelineClassification = imageMetadata?.ai_scan_metadata?.classification;
+
+                    const hasAnySummary = zone || condScore || dmgFlags.length > 0 || photoQuality || fabStage;
+                    if (!hasAnySummary) return null;
+
+                    // Render filled/empty stars for a 1-5 score
+                    const renderStars = (score: number, max: number = 5) => {
+                      const clamped = Math.max(1, Math.min(max, Math.round(score)));
+                      const filled = String.fromCodePoint(0x2605); // black star
+                      const empty = String.fromCodePoint(0x2606);  // white star
+                      return filled.repeat(clamped) + empty.repeat(max - clamped);
+                    };
+
+                    return (
+                      <div className="mb-4">
+                        <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Vision Summary</h4>
+                        <div style={{
+                          background: 'rgba(0,0,0,0.3)',
+                          padding: '10px 12px',
+                          border: '1px solid rgba(255,255,255,0.1)'
+                        }}>
+                          {/* Vehicle Zone — prominent */}
+                          {zone && (
+                            <div style={{ marginBottom: '8px' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '3px 8px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                backgroundColor: 'rgba(59,130,246,0.15)',
+                                border: '1px solid rgba(59,130,246,0.3)',
+                                color: 'rgba(147,197,253,1)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px'
+                              }}>
+                                {zone.replace(/_/g, ' ')}
+                              </span>
+                              {fabStage && (
+                                <span style={{
+                                  display: 'inline-block',
+                                  marginLeft: '6px',
+                                  padding: '3px 8px',
+                                  fontSize: '10px',
+                                  backgroundColor: 'rgba(255,255,255,0.05)',
+                                  border: '1px solid rgba(255,255,255,0.15)',
+                                  color: 'rgba(255,255,255,0.6)',
+                                  textTransform: 'uppercase'
+                                }}>
+                                  {fabStage.replace(/_/g, ' ')}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Condition Score as stars */}
+                          {condScore != null && (
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '3px 0',
+                              borderBottom: '1px solid rgba(255,255,255,0.05)'
+                            }}>
+                              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>Condition</span>
+                              <span style={{
+                                fontSize: '13px',
+                                color: condScore >= 4 ? 'rgba(74,222,128,0.9)' :
+                                       condScore >= 3 ? 'rgba(250,204,21,0.9)' :
+                                       'rgba(248,113,113,0.9)',
+                                letterSpacing: '1px'
+                              }}>
+                                {renderStars(condScore)}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Photo Quality */}
+                          {photoQuality != null && (
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '3px 0',
+                              borderBottom: '1px solid rgba(255,255,255,0.05)'
+                            }}>
+                              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>Photo Quality</span>
+                              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.7)' }}>
+                                {photoQuality}/5
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Pipeline classification (image type) */}
+                          {pipelineClassification?.image_type && (
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '3px 0',
+                              borderBottom: '1px solid rgba(255,255,255,0.05)'
+                            }}>
+                              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>Type</span>
+                              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.7)' }}>
+                                {pipelineClassification.image_type.replace(/_/g, ' ')}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Damage Flags — red tags */}
+                          {dmgFlags.length > 0 && (
+                            <div style={{ marginTop: '8px' }}>
+                              <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                                Damage Detected
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {dmgFlags.map((flag: string, i: number) => (
+                                  <span key={i} style={{
+                                    padding: '2px 6px',
+                                    fontSize: '9px',
+                                    fontWeight: 'bold',
+                                    backgroundColor: 'rgba(239,68,68,0.15)',
+                                    border: '1px solid rgba(239,68,68,0.3)',
+                                    color: 'rgba(252,165,165,1)',
+                                    textTransform: 'uppercase'
+                                  }}>
+                                    {flag.replace(/_/g, ' ')}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* AI Analysis Section - Data Inspector View */}
                   {(() => {
                     const tier1Analysis = imageMetadata?.ai_scan_metadata?.tier_1_analysis;
@@ -2102,7 +2291,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                           }}>{label}</span>
                           <span style={{ 
                             fontSize: '9px', 
-                            color: mono ? '#4ade80' : 'white',
+                            color: mono ? 'var(--success)' : 'white',
                             fontFamily: mono ? 'monospace' : 'inherit',
                             textAlign: 'right',
                             wordBreak: 'break-word',
@@ -2116,48 +2305,81 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                       <div className="mb-4">
                         <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">AI Analysis</h4>
                         
-                        {/* Analyze button if no analysis */}
-                        {!hasVisionAnalysis && canTriggerAnalysis && (
-                          <div style={{ marginBottom: '8px' }}>
-                            <button
-                              onClick={async () => {
-                                await runImageAnalysis();
-                              }}
-                              disabled={analyzing}
-                              style={{
-                                width: '100%',
-                                padding: '8px',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                backgroundColor: analyzing ? '#4b5563' : '#ca8a04',
-                                color: 'white',
-                                border: 'none',
-                                cursor: analyzing ? 'not-allowed' : 'pointer'
-                              }}
-                            >
-                              {analyzing ? 'ANALYZING...' : 'ANALYZE NOW'}
-                            </button>
-                          </div>
-                        )}
+                        {/* Status-aware analysis display */}
+                        {(() => {
+                          const status = imageMetadata?.ai_processing_status;
+                          if (status === 'failed') {
+                            return (
+                              <div style={{ marginBottom: '8px' }}>
+                                <button
+                                  onClick={async () => { await runImageAnalysis(); }}
+                                  disabled={analyzing}
+                                  style={{
+                                    width: '100%',
+                                    padding: '6px',
+                                    fontSize: '10px',
+                                    fontWeight: 'bold',
+                                    backgroundColor: 'transparent',
+                                    color: 'var(--error)',
+                                    border: '1px solid rgba(239,68,68,0.3)',
+                                    cursor: analyzing ? 'not-allowed' : 'pointer',
+                                    opacity: analyzing ? 0.5 : 1
+                                  }}
+                                >
+                                  {analyzing ? 'RETRYING...' : 'RETRY ANALYSIS'}
+                                </button>
+                              </div>
+                            );
+                          }
+                          if (status === 'processing' || analyzing) {
+                            return (
+                              <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', marginBottom: '8px' }}>
+                                {analysisProgress || 'Analyzing...'}
+                              </div>
+                            );
+                          }
+                          if (status === 'pending') {
+                            return (
+                              <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)', marginBottom: '8px' }}>
+                                Queued for analysis
+                              </div>
+                            );
+                          }
+                          // completed or no analysis yet with no trigger available — show nothing
+                          return null;
+                        })()}
 
-                        {/* Live progress + last error (so “nothing happened” is obvious) */}
-                        {analyzing && analysisProgress && (
-                          <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.6)', marginBottom: '8px' }}>
-                            {analysisProgress}
-                          </div>
-                        )}
+                        {/* Error display */}
                         {analysisError && (
-                          <div style={{ fontSize: '9px', color: '#fca5a5', marginBottom: '8px' }}>
+                          <div style={{ fontSize: '9px', color: 'var(--error)', marginBottom: '8px' }}>
                             {analysisError}
                           </div>
                         )}
 
+                        {/* Collapsible raw data for power users */}
+                        <details style={{ marginTop: '8px' }}>
+                          <summary style={{
+                            fontSize: '9px',
+                            color: 'rgba(255,255,255,0.3)',
+                            cursor: 'pointer',
+                            padding: '4px 0',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            userSelect: 'none',
+                            listStyle: 'none'
+                          }}>
+                            <span style={{ borderBottom: '1px dashed rgba(255,255,255,0.2)' }}>
+                              Raw analysis data
+                            </span>
+                          </summary>
+                          <div style={{ marginTop: '8px' }}>
+
                         {/* DB Columns Section */}
                         {imageMetadata && (
                           <div style={{ marginBottom: '12px' }}>
-                            <div style={{ 
-                              fontSize: '8px', 
-                              color: 'rgba(255,255,255,0.3)', 
+                            <div style={{
+                              fontSize: '8px',
+                              color: 'rgba(255,255,255,0.3)',
                               textTransform: 'uppercase',
                               marginBottom: '4px',
                               letterSpacing: '0.5px'
@@ -2304,7 +2526,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                           <div style={{ marginBottom: '12px' }}>
                             <div style={{ 
                               fontSize: '8px', 
-                              color: '#4ade80', 
+                              color: 'var(--success)',
                               textTransform: 'uppercase',
                               marginBottom: '4px',
                               letterSpacing: '0.5px'
@@ -2348,6 +2570,9 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                             VIEW RAW JSON
                           </button>
                         )}
+
+                          </div>
+                        </details>
                       </div>
                     );
                   })()}
@@ -2669,7 +2894,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               </div>
 
               {claimError && (
-                <div style={{ fontSize: '9px', color: '#fca5a5' }}>
+                <div style={{ fontSize: '9px', color: 'var(--error)' }}>
                   {claimError}
                 </div>
               )}
@@ -2703,7 +2928,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     padding: '8px 10px',
                     fontSize: '10px',
                     fontWeight: 'bold',
-                    backgroundColor: claimSubmitting ? '#374151' : '#ffffff',
+                    backgroundColor: claimSubmitting ? 'var(--text-disabled)' : '#ffffff',
                     color: claimSubmitting ? 'rgba(255,255,255,0.6)' : '#000',
                     border: '1px solid rgba(255,255,255,0.25)',
                     cursor: claimSubmitting ? 'not-allowed' : 'pointer',

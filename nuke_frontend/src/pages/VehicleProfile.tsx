@@ -36,7 +36,8 @@ import type { WorkspaceTabId } from './vehicle-profile/WorkspaceTabBar';
 import { buildAuctionPulseFromExternalListings } from './vehicle-profile/buildAuctionPulse';
 // Image filter utilities are used by extracted loadVehicleImages.ts and loadVehicleData.ts
 import { loadVehicleImagesImpl } from './vehicle-profile/loadVehicleImages';
-import { loadVehicleImpl } from './vehicle-profile/loadVehicleData';
+import { loadVehicleImpl, selectBestHeroImage } from './vehicle-profile/loadVehicleData';
+import type { HeroImageMeta } from './vehicle-profile/loadVehicleData';
 const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceContent'));
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
 
@@ -123,6 +124,7 @@ const VehicleProfile: React.FC = () => {
   const [liveSession, setLiveSession] = useState<LiveSession | null>(null);
   const [presenceCount, setPresenceCount] = useState<number>(0);
   const [leadImageUrl, setLeadImageUrl] = useState<string | null>(null);
+  const [heroMeta, setHeroMeta] = useState<HeroImageMeta | null>(null);
   const [recentCommentCount, setRecentCommentCount] = useState<number>(0);
   const [totalCommentCount, setTotalCommentCount] = useState<number>(0);
   const [showAddEvent, setShowAddEvent] = useState(false);
@@ -1293,6 +1295,18 @@ const VehicleProfile: React.FC = () => {
       setTimelineEvents,
       setAuctionPulse,
     });
+
+    // Auto-select best hero image based on quality/zone scores (non-blocking)
+    if (vehicleId) {
+      selectBestHeroImage(vehicleId, supabase).then((result) => {
+        if (result?.url) {
+          setLeadImageUrl(result.url);
+          setHeroMeta(result.meta);
+        }
+      }).catch(() => {
+        // Non-fatal: keep whatever leadImageUrl was already set
+      });
+    }
   };
 
   const updatePrivacy = async () => {
@@ -1792,6 +1806,7 @@ const VehicleProfile: React.FC = () => {
           <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading hero image...</div>}>
             <VehicleHeroImage
               leadImageUrl={leadImageUrl}
+              heroMeta={heroMeta}
               overlayNode={<VehicleMemeOverlay lastEvent={lastMemeDrop} />}
             />
           </React.Suspense>

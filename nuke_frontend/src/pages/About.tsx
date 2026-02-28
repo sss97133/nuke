@@ -203,7 +203,7 @@ DUAL VALUE PRINCIPLE:
 │ • id (PK, UUID)                                             │
 │ • vehicle_id (FK → vehicles, NULLABLE for personal library)│
 │ • image_url, thumbnail_url                                  │
-│ • angle (front, rear, side, engine_bay, interior, etc.)    │
+│ • vehicle_zone (ext_front, ext_rear, int_dashboard, etc.)  │
 │ • category (exterior, interior, engine, undercarriage)     │
 │ • taken_at (DATE from EXIF)                                 │
 │ • latitude, longitude (GPS from EXIF)                       │
@@ -1594,7 +1594,7 @@ SHIPPING SYSTEM:
           </section>
 
           {/* Footer */}
-          <div style={{ marginTop: 'var(--space-8)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border-medium)', fontSize: '12px', fontStyle: 'italic', color: '#666', textAlign: 'center' }}>
+          <div style={{ marginTop: 'var(--space-8)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border-medium)', fontSize: '12px', fontStyle: 'italic', color: 'var(--text-secondary)', textAlign: 'center' }}>
             <strong>Nuke</strong> - Building the definitive digital identity for every vehicle.<br/>
             Every data point sourced. Every claim verified. Every timeline preserved. Every contribution recognized.
           </div>

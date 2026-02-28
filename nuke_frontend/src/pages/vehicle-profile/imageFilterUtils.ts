@@ -426,6 +426,18 @@ export const isImportedStoragePath = (p: any): boolean => {
   return s.includes('external_import') || s.includes('organization_import') || s.includes('import_queue');
 };
 
+/**
+ * Score an image for "money shot" quality (hero image selection).
+ *
+ * DEPRECATED: This function uses legacy `ai_detected_angle` / `angle` strings
+ * (e.g. "exterior_three_quarter", "exterior_front"). New code should use
+ * `vehicle_zone` values (e.g. "ext_front_driver") from vehicle_images and
+ * the ZONE_DISPLAY_PRIORITY constant from constants/vehicleZones.ts.
+ *
+ * The `vehicle_zone`-aware hero selection lives in loadVehicleData.ts
+ * (selectHeroImage). This function is kept as a fallback for images that
+ * have not yet been classified by YONO.
+ */
 export const scoreMoneyShot = (url: string, record?: any): number => {
   if (!url) return 0;
   let score = 50; // Base score
@@ -456,17 +468,35 @@ export const scoreMoneyShot = (url: string, record?: any): number => {
     score += 20;
   }
 
-  // Use AI-detected angle from DB record — this is the reliable signal for UUID-named files
-  const angle = record?.ai_detected_angle || record?.angle || '';
-  if (angle) {
-    if (angle.includes('three_quarter')) score += 35;
-    else if (angle.includes('exterior_side')) score += 28;
-    else if (angle.includes('exterior_front')) score += 22;
-    else if (angle.includes('exterior_rear')) score += 18;
-    else if (angle.includes('detail_shot')) score -= 30;
-    else if (angle.includes('interior')) score -= 30;
-    else if (angle.includes('under_hood') || angle.includes('engine')) score -= 20;
-    else if (angle.includes('document') || angle.includes('sticker')) score -= 50;
+  // DEPRECATED: migrate to vehicle_zone. Use ZONE_DISPLAY_PRIORITY from
+  // constants/vehicleZones.ts for new code paths. This legacy angle-string
+  // scoring is kept only for images without vehicle_zone populated.
+  const zone = record?.vehicle_zone || '';
+  if (zone) {
+    // Prefer vehicle_zone when available (new system)
+    // Import dynamically avoided here to keep this a pure util; scores match ZONE_DISPLAY_PRIORITY
+    if (zone.startsWith('ext_front_driver') || zone.startsWith('ext_front_passenger')) score += 35;
+    else if (zone.startsWith('ext_rear_driver') || zone.startsWith('ext_rear_passenger')) score += 30;
+    else if (zone === 'ext_driver_side' || zone === 'ext_passenger_side') score += 28;
+    else if (zone === 'ext_front') score += 22;
+    else if (zone === 'ext_rear') score += 18;
+    else if (zone.startsWith('int_')) score -= 30;
+    else if (zone === 'mech_engine_bay') score -= 20;
+    else if (zone.startsWith('detail_')) score -= 30;
+    else if (zone === 'other') score -= 50;
+  } else {
+    // DEPRECATED: Legacy ai_detected_angle / angle string scoring
+    const angle = record?.ai_detected_angle || record?.angle || '';
+    if (angle) {
+      if (angle.includes('three_quarter')) score += 35;
+      else if (angle.includes('exterior_side')) score += 28;
+      else if (angle.includes('exterior_front')) score += 22;
+      else if (angle.includes('exterior_rear')) score += 18;
+      else if (angle.includes('detail_shot')) score -= 30;
+      else if (angle.includes('interior')) score -= 30;
+      else if (angle.includes('under_hood') || angle.includes('engine')) score -= 20;
+      else if (angle.includes('document') || angle.includes('sticker')) score -= 50;
+    }
   }
 
   // Penalize interior/detail/document shots by URL keywords (fallback for non-AI-analyzed)

@@ -6,6 +6,7 @@ import { uploadQueueService } from '../../services/uploadQueueService';
 import { sortImagesByPriority } from '../../services/imageDisplayPriority';
 import ImageLightbox from '../image/ImageLightbox';
 import { SensitiveImageOverlay } from './SensitiveImageOverlay';
+import ImageZoneSection, { groupImagesByZone } from './ImageZoneSection';
 import { ImageSetService } from '../../services/imageSetService';
 import { OnboardingSlideshow } from '../onboarding/OnboardingSlideshow';
 
@@ -122,43 +123,43 @@ const getImageSource = (image: any): { type: string; label: string; color: strin
   
   // Check explicit source field first
   if (source === 'bat_import' || storagePath.includes('bat_import') || imageUrl.includes('bringatrailer.com')) {
-    return { 
-      type: 'bat', 
-      label: 'BaT', 
-      color: '#ef4444',
+    return {
+      type: 'bat',
+      label: 'BaT',
+      color: 'var(--error)',
       logoUrl: '/vendor/bat/favicon.ico' // Use local vendor favicon for better quality
     };
   }
   if (source === 'organization_import' || storagePath.includes('organization_import') || storagePath.includes('collective')) {
-    return { 
-      type: 'org', 
-      label: 'Dealer', 
-      color: '#3b82f6',
+    return {
+      type: 'org',
+      label: 'Dealer',
+      color: 'var(--accent)',
       logoUrl: undefined // Will be set from organization data
     };
   }
   if (source === 'external_import' || storagePath.includes('external_import')) {
-    return { type: 'external', label: 'External', color: '#8b5cf6' };
+    return { type: 'external', label: 'External', color: 'var(--accent)' };
   }
   if (storagePath.includes('import_queue')) {
-    return { type: 'queue', label: 'Queue', color: '#f59e0b' };
+    return { type: 'queue', label: 'Queue', color: 'var(--warning)' };
   }
   if (image?.is_external || image?.source === 'external_import') {
-    return { type: 'external', label: 'External', color: '#8b5cf6' };
+    return { type: 'external', label: 'External', color: 'var(--accent)' };
   }
-  
+
   // Check if URL is from a known CDN
   if (imageUrl.includes('cdn.dealeraccelerate.com')) {
-    return { 
-      type: 'org', 
-      label: 'Dealer', 
-      color: '#3b82f6',
+    return {
+      type: 'org',
+      label: 'Dealer',
+      color: 'var(--accent)',
       logoUrl: 'https://www.collectiveauto.com/assets/collective/logo-83823e1f57b2700658375bf3477ed1c2.svg'
     };
   }
-  
+
   // Default: user upload
-  return { type: 'user', label: 'User', color: '#10b981' };
+  return { type: 'user', label: 'User', color: 'var(--success)' };
 };
 
 const parseBatUploadMonth = (url: string): string | null => {
@@ -243,7 +244,7 @@ const ImageGallery = ({
   const [error, setError] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [viewMode, setViewMode] = useState<'grid' | 'masonry' | 'list' | 'bundles'>('grid');
+  const [viewMode, setViewMode] = useState<'zones' | 'grid' | 'masonry' | 'list' | 'bundles'>('zones');
   // Default to newest-first to keep ordering stable across vehicles while AI sorting ramps up.
   const [sortBy, setSortBy] = useState<'quality' | 'date_desc' | 'date_asc'>('date_desc');
   // Bundle (sessions) view state
@@ -952,7 +953,7 @@ const ImageGallery = ({
       // Refresh DB-backed gallery view immediately
       const { data: refreshed, error: refreshErr } = await supabase
         .from('vehicle_images')
-        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
+        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags')
         .eq('vehicle_id', vehicleId)
         .not('is_document', 'is', true)
         .not('is_duplicate', 'is', true)
@@ -1046,12 +1047,15 @@ const ImageGallery = ({
         if (posA === null && posB !== null) return 1;
 
         // Category-based priority (exterior > interior > engine > other)
+        // DEPRECATED: These category strings are legacy. New images are grouped by
+        // vehicle_zone (see ImageZoneSection.tsx and constants/vehicleZones.ts).
+        // This fallback sort remains for images without vehicle_zone populated.
         const catPriority: Record<string, number> = {
           exterior: 100,
           hero: 95,
           interior: 80,
           engine: 70,
-          engine_bay: 70,
+          engine_bay: 70, // DEPRECATED: migrate to vehicle_zone 'mech_engine_bay'
           undercarriage: 50,
           detail: 40,
           general: 30,
@@ -1173,11 +1177,12 @@ const ImageGallery = ({
       }
       
       // Sort groups by category priority, then flatten
+      // DEPRECATED: These category strings are legacy. See constants/vehicleZones.ts.
       const catPriority: Record<string, number> = {
         hero: 95,
         interior: 80,
         engine: 70,
-        engine_bay: 70,
+        engine_bay: 70, // DEPRECATED: migrate to vehicle_zone 'mech_engine_bay'
         undercarriage: 50,
         detail: 40,
         general: 30,
@@ -1549,7 +1554,7 @@ const ImageGallery = ({
 
         const { data: rawImages, error } = await supabase
           .from('vehicle_images')
-          .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
+          .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags')
           .eq('vehicle_id', vehicleId)
           // Filter out documents (treat NULL as false for legacy rows)
           .not('is_document', 'is', true)
@@ -1636,7 +1641,7 @@ const ImageGallery = ({
             console.log(`Refresh attempt ${index + 1}/${refreshAttempts.length} after ${delay}ms...`);
             const { data: refreshedImages, error } = await supabase
               .from('vehicle_images')
-              .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
+              .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags')
               .eq('vehicle_id', vehicleId)
               .not('is_document', 'is', true)
               .not('is_duplicate', 'is', true)
@@ -1854,7 +1859,7 @@ const ImageGallery = ({
       // Refresh images and notify parent
       const { data: refreshedImages } = await supabase
         .from('vehicle_images')
-        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
+        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags')
         .eq('vehicle_id', vehicleId)
         // Filter out documents (treat NULL as false)
         .not('is_document', 'is', true)
@@ -2436,15 +2441,32 @@ const ImageGallery = ({
             flexShrink: 0
           }}>
             <button
+              onClick={() => setViewMode('zones')}
+              className={viewMode === 'zones' ? 'button button-primary' : 'button'}
+              style={{
+                padding: '4px 12px',
+                fontSize: '11px',
+                margin: 0,
+                border: 'none',
+                borderRadius: 0,
+                height: '24px',
+                minHeight: '24px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
+            >
+              Zones
+            </button>
+            <button
               onClick={() => setViewMode('grid')}
               className={viewMode === 'grid' ? 'button button-primary' : 'button'}
-              style={{ 
-                padding: '4px 12px', 
-                fontSize: '11px', 
-                margin: 0, 
-                border: 'none', 
-                borderRadius: 0, 
-                height: '24px', 
+              style={{
+                padding: '4px 12px',
+                fontSize: '11px',
+                margin: 0,
+                border: 'none',
+                borderRadius: 0,
+                height: '24px',
                 minHeight: '24px',
                 whiteSpace: 'nowrap',
                 flexShrink: 0
@@ -2587,7 +2609,7 @@ const ImageGallery = ({
           </div>
 
           {/* Images Per Row Slider */}
-          {viewMode === 'grid' && (
+          {(viewMode === 'grid' || viewMode === 'zones') && (
             <div style={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -2674,6 +2696,46 @@ const ImageGallery = ({
           <p className="text text-muted" style={{ fontSize: '9px' }}>
             Images load progressively for better performance
           </p>
+        </div>
+      )}
+
+      {/* Zones View */}
+      {viewMode === 'zones' && showImages && (
+        <div>
+          {(() => {
+            const zoneSections = groupImagesByZone(displayedImages);
+            const defaultOpenKeys = new Set(['highlights', 'exterior', 'interior']);
+            // Build global index map for lightbox navigation
+            const globalIndexMap = new Map<string, number>();
+            displayedImages.forEach((img: any, idx: number) => {
+              globalIndexMap.set(String(img?.id || ''), idx);
+            });
+            return zoneSections.map((zs) => (
+              <ImageZoneSection
+                key={zs.section.key}
+                section={zs.section}
+                images={zs.images}
+                defaultOpen={defaultOpenKeys.has(zs.section.key)}
+                imagesPerRow={imagesPerRow}
+                vehicleId={vehicleId}
+                onImageClick={(_image, globalIndex) => {
+                  if (globalIndex >= 0) openLightbox(globalIndex);
+                }}
+                globalIndexMap={globalIndexMap}
+                selectMode={selectMode}
+                selectedImages={selectedImages}
+                onImageSelect={handleImageSelect}
+              />
+            ));
+          })()}
+          {/* Infinite scroll sentinel */}
+          {displayedImages.length < allImages.length && (
+            <div ref={sentinelRef} style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {loadingMore && (
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Loading more...</span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -2898,7 +2960,7 @@ const ImageGallery = ({
                                 position: 'absolute',
                                 top: 'var(--space-1)',
                                 right: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
-                                backgroundColor: '#10b981',
+                                backgroundColor: 'var(--success)',
                                 color: '#fff',
                                 borderRadius: '0px',
                                 border: '1px solid #fff',
@@ -2949,7 +3011,7 @@ const ImageGallery = ({
                               position: 'absolute',
                               top: 'var(--space-1)',
                               right: 'var(--space-1)',
-                              backgroundColor: '#000',
+                              backgroundColor: 'var(--text)',
                               color: '#fff',
                               borderRadius: '0px',
                               border: '1px solid #fff',
@@ -3063,7 +3125,7 @@ const ImageGallery = ({
                             position: 'absolute',
                             top: 'var(--space-1)',
                             right: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
-                            backgroundColor: '#10b981',
+                            backgroundColor: 'var(--success)',
                             color: '#fff',
                             borderRadius: '0px',
                             border: '1px solid #fff',
@@ -3118,7 +3180,7 @@ const ImageGallery = ({
                           position: 'absolute',
                           top: 'var(--space-1)',
                           right: 'var(--space-1)',
-                          backgroundColor: '#000',
+                          backgroundColor: 'var(--text)',
                           color: '#fff',
                           borderRadius: '0px',
                           border: '1px solid #fff',
@@ -3233,7 +3295,7 @@ const ImageGallery = ({
                     position: 'absolute',
                     top: 'var(--space-1)',
                     right: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
-                    backgroundColor: '#10b981',
+                    backgroundColor: 'var(--success)',
                     color: '#fff',
                     borderRadius: '0px',
                     border: '1px solid #fff',
@@ -3269,7 +3331,7 @@ const ImageGallery = ({
                       width: '24px',
                       height: '24px',
                       borderRadius: '50%',
-                      backgroundColor: 'rgba(0,0,0,0.75)',
+                      backgroundColor: 'var(--overlay)',
                       border: `2px solid ${source.color}`,
                       display: 'flex',
                       alignItems: 'center',
@@ -3277,7 +3339,7 @@ const ImageGallery = ({
                       overflow: 'hidden',
                       zIndex: 10,
                       cursor: 'help',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                      boxShadow: '0 2px 4px color-mix(in srgb, var(--text) 30%, transparent)'
                     }}
                     title={`Verified by: ${source.label}`}
                   >
@@ -3316,7 +3378,7 @@ const ImageGallery = ({
                   position: 'absolute',
                   top: 'var(--space-1)',
                   right: 'var(--space-1)',
-                  backgroundColor: '#000',
+                  backgroundColor: 'var(--text)',
                   color: '#fff',
                   borderRadius: '0px',
                   border: '1px solid #fff',
@@ -3340,7 +3402,7 @@ const ImageGallery = ({
                   position: 'absolute',
                   top: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
                   right: 'var(--space-1)',
-                  backgroundColor: '#4169E1',
+                  backgroundColor: 'var(--accent)',
                   color: '#fff',
                   borderRadius: '0px',
                   border: '1px solid #fff',
@@ -3360,8 +3422,8 @@ const ImageGallery = ({
                   position: 'absolute',
                   bottom: 'var(--space-1)',
                   right: 'var(--space-1)',
-                  backgroundColor: image.manual_priority >= 90 ? '#FFD700' : image.manual_priority >= 70 ? '#C0C0C0' : '#CD7F32',
-                  color: '#000',
+                  backgroundColor: image.manual_priority >= 90 ? 'var(--warning)' : image.manual_priority >= 70 ? 'var(--border)' : 'var(--warning)',
+                  color: 'var(--text)',
                   borderRadius: '0px',
                   border: '2px solid #fff',
                   padding: '2px 6px',
@@ -3384,7 +3446,7 @@ const ImageGallery = ({
                 {image.caption && (
                   <p className="text" style={{ color: 'var(--white)', fontSize: '9px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{image.caption}</p>
                 )}
-                <p className="text" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '8px', marginTop: '2px' }}>
+                <p className="text" style={{ color: 'color-mix(in srgb, var(--bg) 85%, transparent)', fontSize: '8px', marginTop: '2px' }}>
                   {getDisplayDate(image)}
                   {imageTagCounts[image.id] && ` • ${imageTagCounts[image.id]} tags`}
                   {showSetCount && imageSetCounts[image.id] && ` • ${imageSetCounts[image.id]} sets`}
@@ -3462,7 +3524,7 @@ const ImageGallery = ({
                     position: 'absolute',
                     top: 'var(--space-1)',
                     right: 'var(--space-1)',
-                    backgroundColor: '#10b981',
+                    backgroundColor: 'var(--success)',
                     color: '#fff',
                     borderRadius: '0px',
                     border: '1px solid #fff',
@@ -3492,7 +3554,7 @@ const ImageGallery = ({
                       width: '28px',
                       height: '28px',
                       borderRadius: '50%',
-                      backgroundColor: 'rgba(0,0,0,0.75)',
+                      backgroundColor: 'var(--overlay)',
                       border: `2px solid ${source.color}`,
                       display: 'flex',
                       alignItems: 'center',
@@ -3500,7 +3562,7 @@ const ImageGallery = ({
                       overflow: 'hidden',
                       zIndex: 10,
                       cursor: 'help',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                      boxShadow: '0 2px 4px color-mix(in srgb, var(--text) 30%, transparent)'
                     }}
                     title={`Verified by: ${source.label}`}
                   >
@@ -3533,7 +3595,7 @@ const ImageGallery = ({
                 {image.caption && (
                   <p className="text" style={{ color: 'var(--white)', fontSize: '9px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{image.caption}</p>
                 )}
-                <p className="text" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '8px', marginTop: '2px' }}>
+                <p className="text" style={{ color: 'color-mix(in srgb, var(--bg) 85%, transparent)', fontSize: '8px', marginTop: '2px' }}>
                   {getDisplayDate(image)}
                   {(() => {
                     const metadata = image.ai_scan_metadata;
@@ -3595,7 +3657,7 @@ const ImageGallery = ({
                         width: '20px',
                         height: '20px',
                         borderRadius: '50%',
-                        backgroundColor: 'rgba(0,0,0,0.75)',
+                        backgroundColor: 'var(--overlay)',
                         border: `2px solid ${source.color}`,
                         display: 'flex',
                         alignItems: 'center',
@@ -3603,7 +3665,7 @@ const ImageGallery = ({
                         overflow: 'hidden',
                         zIndex: 10,
                         cursor: 'help',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                        boxShadow: '0 1px 2px color-mix(in srgb, var(--text) 30%, transparent)'
                       }}
                       title={`Verified by: ${source.label}`}
                     >

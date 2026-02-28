@@ -1,6 +1,16 @@
 /**
  * Image Angle Service
- * 
+ *
+ * DEPRECATED: This service queries the legacy `ai_angle_classifications_audit`
+ * and `vehicle_image_angles` tables which use `angle_family` / `angle_name`
+ * strings. New code should query `vehicle_images.vehicle_zone` directly and
+ * use constants from `constants/vehicleZones.ts`.
+ *
+ * The ImageZoneSection component and loadVehicleData.ts already use
+ * vehicle_zone for grouping and hero selection. This service is retained for
+ * backward compatibility while legacy classification data is still being
+ * referenced.
+ *
  * Provides query functions for accessing classified images by angle, view, elevation, etc.
  * This makes the classification data queryable and useful.
  */
@@ -158,8 +168,10 @@ export async function getImagesByAngle(filter: ImageAngleFilter): Promise<Classi
 
 /**
  * Get all front corner angle shots for a vehicle
+ * @deprecated Use vehicle_images.vehicle_zone IN ('ext_front', 'ext_front_driver', 'ext_front_passenger') instead
  */
 export async function getFrontCornerShots(vehicleId: string): Promise<ClassifiedImage[]> {
+  // DEPRECATED: migrate to vehicle_zone query
   return getImagesByAngle({
     vehicleId,
     angleFamily: ['front_corner', 'front'],
@@ -169,8 +181,10 @@ export async function getFrontCornerShots(vehicleId: string): Promise<Classified
 
 /**
  * Get all engine bay images
+ * @deprecated Use vehicle_images.vehicle_zone = 'mech_engine_bay' instead
  */
 export async function getEngineBayImages(vehicleId: string): Promise<ClassifiedImage[]> {
+  // DEPRECATED: migrate to vehicle_zone query
   return getImagesByAngle({
     vehicleId,
     angleFamily: 'engine_bay',
@@ -180,8 +194,10 @@ export async function getEngineBayImages(vehicleId: string): Promise<ClassifiedI
 
 /**
  * Get all interior images
+ * @deprecated Use vehicle_images.vehicle_zone LIKE 'int_%' instead
  */
 export async function getInteriorImages(vehicleId: string): Promise<ClassifiedImage[]> {
+  // DEPRECATED: migrate to vehicle_zone query
   return getImagesByAngle({
     vehicleId,
     angleFamily: ['interior', 'dash'],

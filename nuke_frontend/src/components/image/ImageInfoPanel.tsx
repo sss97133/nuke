@@ -311,6 +311,103 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
         </div>
       )}
 
+      {/* Vision Summary — YONO + pipeline results in user-friendly format */}
+      {(() => {
+        const zone = imageMetadata?.vehicle_zone;
+        const condScore = imageMetadata?.condition_score;
+        const dmgFlags: string[] = imageMetadata?.damage_flags || [];
+        const photoQuality = imageMetadata?.photo_quality_score;
+        const fabStage = imageMetadata?.fabrication_stage;
+
+        const hasAnySummary = zone || condScore || dmgFlags.length > 0 || photoQuality || fabStage;
+        if (!hasAnySummary) return null;
+
+        const renderStars = (score: number, max: number = 5) => {
+          const clamped = Math.max(1, Math.min(max, Math.round(score)));
+          const filled = String.fromCodePoint(0x2605);
+          const empty = String.fromCodePoint(0x2606);
+          return filled.repeat(clamped) + empty.repeat(max - clamped);
+        };
+
+        return (
+          <>
+            <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
+            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginBottom: '6px' }}>VISION SUMMARY</div>
+
+            {zone && (
+              <div style={{ marginBottom: '6px' }}>
+                <span style={{
+                  display: 'inline-block',
+                  padding: '2px 6px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  backgroundColor: 'rgba(59,130,246,0.15)',
+                  border: '1px solid rgba(59,130,246,0.3)',
+                  color: 'rgba(147,197,253,1)',
+                  textTransform: 'uppercase'
+                }}>
+                  {zone.replace(/_/g, ' ')}
+                </span>
+                {fabStage && (
+                  <span style={{
+                    display: 'inline-block',
+                    marginLeft: '4px',
+                    padding: '2px 6px',
+                    fontSize: '10px',
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    color: 'rgba(255,255,255,0.6)',
+                    textTransform: 'uppercase'
+                  }}>
+                    {fabStage.replace(/_/g, ' ')}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {condScore != null && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0' }}>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>Condition</span>
+                <span style={{
+                  fontSize: '13px',
+                  color: condScore >= 4 ? 'rgba(74,222,128,0.9)' : condScore >= 3 ? 'rgba(250,204,21,0.9)' : 'rgba(248,113,113,0.9)',
+                  letterSpacing: '1px'
+                }}>
+                  {renderStars(condScore)}
+                </span>
+              </div>
+            )}
+
+            {photoQuality != null && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0' }}>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>Photo Quality</span>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)' }}>{photoQuality}/5</span>
+              </div>
+            )}
+
+            {dmgFlags.length > 0 && (
+              <div style={{ marginTop: '4px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  {dmgFlags.map((flag: string, i: number) => (
+                    <span key={i} style={{
+                      padding: '1px 5px',
+                      fontSize: '9px',
+                      fontWeight: 'bold',
+                      backgroundColor: 'rgba(239,68,68,0.15)',
+                      border: '1px solid rgba(239,68,68,0.3)',
+                      color: 'rgba(252,165,165,1)',
+                      textTransform: 'uppercase'
+                    }}>
+                      {flag.replace(/_/g, ' ')}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
+
       {/* AI Analysis if available - supports both appraiser and tier_1_analysis formats */}
       {(imageMetadata?.ai_scan_metadata?.appraiser || imageMetadata?.ai_scan_metadata?.tier_1_analysis) && (
         <>
@@ -345,9 +442,9 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                 {imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance && (
                   <span style={{
                     padding: '2px 6px',
-                    backgroundColor: imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.includes('excellent') ? 'rgba(34,197,94,0.2)' :
-                                     imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.includes('good') ? 'rgba(59,130,246,0.2)' :
-                                     imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.includes('poor') ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.1)',
+                    backgroundColor: imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.includes('excellent') ? 'color-mix(in srgb, var(--success) 20%, transparent)' :
+                                     imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.includes('good') ? 'color-mix(in srgb, var(--accent) 20%, transparent)' :
+                                     imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.includes('poor') ? 'color-mix(in srgb, var(--error) 20%, transparent)' : 'rgba(255,255,255,0.1)',
                     border: '1px solid rgba(255,255,255,0.2)',
                     fontSize: '11px'
                   }}>
@@ -417,10 +514,10 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                 marginLeft: '6px',
                 padding: '1px 5px',
                 fontSize: '9px',
-                backgroundColor: imageMetadata.components.engine_family_confidence >= 0.8 ? 'rgba(34,197,94,0.25)' :
-                                 imageMetadata.components.engine_family_confidence >= 0.5 ? 'rgba(234,179,8,0.25)' : 'rgba(239,68,68,0.25)',
-                border: `1px solid ${imageMetadata.components.engine_family_confidence >= 0.8 ? 'rgba(34,197,94,0.5)' :
-                                      imageMetadata.components.engine_family_confidence >= 0.5 ? 'rgba(234,179,8,0.5)' : 'rgba(239,68,68,0.5)'}`,
+                backgroundColor: imageMetadata.components.engine_family_confidence >= 0.8 ? 'color-mix(in srgb, var(--success) 25%, transparent)' :
+                                 imageMetadata.components.engine_family_confidence >= 0.5 ? 'color-mix(in srgb, var(--warning) 25%, transparent)' : 'color-mix(in srgb, var(--error) 25%, transparent)',
+                border: `1px solid ${imageMetadata.components.engine_family_confidence >= 0.8 ? 'var(--success)' :
+                                      imageMetadata.components.engine_family_confidence >= 0.5 ? 'var(--warning)' : 'var(--error)'}`,
               }}>
                 {Math.round(imageMetadata.components.engine_family_confidence * 100)}%
               </span>
@@ -475,10 +572,10 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
               <div>
                 <span style={{ color: 'rgba(255,255,255,0.4)' }}>Condition: </span>
                 <span style={{
-                  color: imageMetadata.components.condition === 'show_quality' ? '#22c55e' :
-                         imageMetadata.components.condition === 'well_maintained' ? '#3b82f6' :
-                         imageMetadata.components.condition === 'neglected' ? '#ef4444' :
-                         imageMetadata.components.condition === 'project' ? '#eab308' : 'inherit'
+                  color: imageMetadata.components.condition === 'show_quality' ? 'var(--success)' :
+                         imageMetadata.components.condition === 'well_maintained' ? 'var(--accent)' :
+                         imageMetadata.components.condition === 'neglected' ? 'var(--error)' :
+                         imageMetadata.components.condition === 'project' ? 'var(--warning)' : 'inherit'
                 }}>
                   {imageMetadata.components.condition.replace(/_/g, ' ')}
                 </span>
@@ -621,7 +718,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
           width: '100%',
           padding: '12px',
           backgroundColor: 'var(--surface)',
-          color: 'black',
+          color: 'var(--text)',
           border: '2px solid white',
           fontSize: '12px',
           fontWeight: 'bold'
@@ -637,7 +734,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
         style={{
           width: '100%',
           padding: '12px',
-          backgroundColor: imageMetadata?.is_primary ? '#16a34a' : 'rgba(255,255,255,0.1)',
+          backgroundColor: imageMetadata?.is_primary ? 'var(--success)' : 'rgba(255,255,255,0.1)',
           border: '2px solid rgba(255,255,255,0.3)',
           color: 'white',
           fontSize: '12px',
@@ -669,9 +766,9 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
         style={{
           width: '100%',
           padding: '12px',
-          backgroundColor: imageMetadata?.is_sensitive ? '#eab308' : 'rgba(255,255,255,0.1)',
+          backgroundColor: imageMetadata?.is_sensitive ? 'var(--warning)' : 'rgba(255,255,255,0.1)',
           border: '2px solid rgba(255,255,255,0.3)',
-          color: imageMetadata?.is_sensitive ? 'black' : 'white',
+          color: imageMetadata?.is_sensitive ? 'var(--text)' : 'white',
           fontSize: '12px',
           fontWeight: 'bold'
         }}
@@ -691,8 +788,8 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
         style={{
           width: '100%',
           padding: '12px',
-          backgroundColor: '#dc2626',
-          border: '2px solid #ef4444',
+          backgroundColor: 'var(--error)',
+          border: '2px solid var(--error)',
           color: 'white',
           fontSize: '12px',
           fontWeight: 'bold'
@@ -715,7 +812,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
         right: 0,
         bottom: 0,
         height: windowHeight,
-        backgroundColor: '#0a0a0a',
+        backgroundColor: 'var(--bg)',
         borderTop: '2px solid rgba(255,255,255,0.2)',
         zIndex: 10001,
         touchAction: 'none',

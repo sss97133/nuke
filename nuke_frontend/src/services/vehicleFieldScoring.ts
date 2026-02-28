@@ -58,7 +58,8 @@ export function calculateFieldScore(
   const hasVinImg = labels.includes('vin') || areas.includes('dash');
   const hasExteriorSet = labels.filter((l) => l === 'exterior').length;
   const hasSpeedo = labels.includes('speedometer') || areas.includes('dash');
-  const hasEngineImgs = areas.includes('engine_bay');
+  // DEPRECATED: migrate to vehicle_zone. Use vehicle_zone === 'mech_engine_bay' instead.
+  const hasEngineImgs = areas.includes('engine_bay') || areas.includes('mech_engine_bay');
 
   let score = 0;
   const met: string[] = [];
