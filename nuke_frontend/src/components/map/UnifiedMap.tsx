@@ -1,11 +1,30 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import DeckGL from '@deck.gl/react';
 import { ScatterplotLayer } from '@deck.gl/layers';
+import { HeatmapLayer } from '@deck.gl/aggregation-layers';
 import { Map } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { supabase } from '../../lib/supabase';
-import '../../design-system.css';
+import { useTheme } from '../../contexts/ThemeContext';
+import '../../styles/unified-design-system.css';
 import ZIP_DB from './us-zips.json';
+
+const MAP_FONT = 'Arial, Helvetica, sans-serif';
+const CARTO_DARK = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+const CARTO_LIGHT = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
+
+// Color presets for data layers
+type ColorPreset = 'default' | 'thermal' | 'mono' | 'satellite';
+const COLOR_PRESETS: Record<ColorPreset, {
+  vehicle: [number, number, number]; collection: [number, number, number];
+  business: [number, number, number]; photo: [number, number, number];
+  query: [number, number, number];
+}> = {
+  default:   { vehicle: [245, 158, 11],  collection: [236, 72, 153],  business: [20, 184, 166],  photo: [217, 70, 239],  query: [245, 158, 11] },
+  thermal:   { vehicle: [220, 50, 30],   collection: [255, 200, 50],  business: [255, 160, 20],  photo: [255, 100, 40],  query: [255, 230, 50] },
+  mono:      { vehicle: [200, 200, 200], collection: [180, 180, 180], business: [160, 160, 160], photo: [140, 140, 140], query: [220, 220, 220] },
+  satellite: { vehicle: [139, 119, 86],  collection: [86, 125, 70],   business: [86, 108, 139],  photo: [139, 86, 100],  query: [180, 160, 100] },
+};
 
 // --- ZIP code geocoding (city-level accuracy) ---
 const ZIPS: Record<string, [number, number]> = ZIP_DB as any;
@@ -46,10 +65,75 @@ const ST: Record<string, [number, number]> = {
   'wisconsin': [43.8, -88.8], 'wyoming': [43.1, -107.6], 'district of columbia': [38.9, -77.0],
 };
 
+// Canadian province abbreviations → full name
+const CA_ABBR: Record<string, string> = {
+  'ab':'alberta','bc':'british columbia','mb':'manitoba','nb':'new brunswick',
+  'nl':'newfoundland and labrador','ns':'nova scotia','nt':'northwest territories',
+  'nu':'nunavut','on':'ontario','pe':'prince edward island','qc':'quebec',
+  'sk':'saskatchewan','yt':'yukon',
+};
+
+// Canadian province centroids
+const CA_PROV: Record<string, [number, number]> = {
+  'alberta': [53.9, -116.6], 'british columbia': [53.7, -127.6], 'manitoba': [53.8, -98.8],
+  'new brunswick': [46.5, -66.2], 'newfoundland and labrador': [53.1, -57.7],
+  'nova scotia': [44.7, -63.0], 'northwest territories': [64.3, -119.0], 'nunavut': [70.3, -86.0],
+  'ontario': [51.3, -85.3], 'prince edward island': [46.2, -63.0], 'quebec': [52.9, -73.5],
+  'saskatchewan': [52.9, -106.5], 'yukon': [64.3, -135.0],
+};
+
+// International country/region centroids
+const INTL: Record<string, [number, number]> = {
+  // UK regions
+  'england': [52.3, -1.2], 'scotland': [56.5, -4.0], 'wales': [52.1, -3.8],
+  'united kingdom': [52.3, -1.2], 'london': [51.5, -0.1], 'surrey': [51.3, -0.4],
+  'kent': [51.3, 0.5], 'essex': [51.7, 0.6], 'hampshire': [51.0, -1.3],
+  'west sussex': [50.9, -0.5],
+  // Europe
+  'germany': [51.2, 10.4], 'deutschland': [51.2, 10.4], 'munich': [48.1, 11.6],
+  'münchen': [48.1, 11.6], 'berlin': [52.5, 13.4], 'stuttgart': [48.8, 9.2],
+  'frankfurt': [50.1, 8.7], 'hamburg': [53.6, 10.0],
+  'france': [46.6, 2.2], 'paris': [48.9, 2.3],
+  'italy': [41.9, 12.5], 'roma': [41.9, 12.5], 'milan': [45.5, 9.2],
+  'spain': [40.4, -3.7], 'madrid': [40.4, -3.7], 'barcelona': [41.4, 2.2],
+  'netherlands': [52.1, 5.3], 'amsterdam': [52.4, 4.9],
+  'switzerland': [46.8, 8.2], 'zurich': [47.4, 8.5],
+  'sweden': [59.3, 18.1], 'stockholm': [59.3, 18.1],
+  'belgium': [50.8, 4.4], 'brussels': [50.8, 4.4],
+  'austria': [48.2, 16.4], 'vienna': [48.2, 16.4],
+  'norway': [59.9, 10.8], 'denmark': [55.7, 12.6],
+  'portugal': [38.7, -9.1], 'monaco': [43.7, 7.4],
+  // Asia-Pacific
+  'japan': [36.2, 138.3], 'tokyo': [35.7, 139.7],
+  'australia': [-25.3, 133.8], 'sydney': [-33.9, 151.2], 'melbourne': [-37.8, 145.0],
+  'new south wales': [-33.9, 151.2], 'victoria': [-37.8, 145.0], 'queensland': [-27.5, 153.0],
+  'new zealand': [-36.8, 174.8], 'auckland': [-36.8, 174.8],
+  'uae': [25.2, 55.3], 'dubai': [25.2, 55.3], 'abu dhabi': [24.5, 54.7],
+  'south korea': [37.6, 127.0], 'seoul': [37.6, 127.0],
+  // Americas
+  'mexico': [19.4, -99.1], 'méxico': [19.4, -99.1],
+  'brazil': [-15.8, -47.9], 'brasil': [-15.8, -47.9],
+  'argentina': [-34.6, -58.4],
+  // Africa
+  'south africa': [-33.9, 18.4],
+  // Canadian cities (matched before generic "canada" fallback)
+  'toronto': [43.7, -79.4], 'vancouver': [49.3, -123.1], 'montreal': [45.5, -73.6],
+  'montréal': [45.5, -73.6], 'calgary': [51.0, -114.1], 'ottawa': [45.4, -75.7],
+  'edmonton': [53.5, -113.5], 'winnipeg': [49.9, -97.1], 'halifax': [44.6, -63.6],
+  'quebec city': [46.8, -71.2], 'guelph': [43.5, -80.3], 'maple ridge': [49.2, -122.6],
+};
+
 function simpleHash(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
   return h;
+}
+
+function spread(coords: [number, number], loc: string, range: number): [number, number] {
+  const h = simpleHash(loc);
+  const latOff = ((h & 0xff) / 255 - 0.5) * range;
+  const lngOff = (((h >> 8) & 0xff) / 255 - 0.5) * range;
+  return [coords[0] + latOff, coords[1] + lngOff];
 }
 
 function geo(loc: string): [number, number] | null {
@@ -57,52 +141,50 @@ function geo(loc: string): [number, number] | null {
   const zipMatch = loc.match(/\b(\d{5})\b/);
   if (zipMatch) {
     const coords = ZIPS[zipMatch[1]];
-    if (coords) {
-      // Tiny deterministic spread (±0.02° ≈ 2km) so same-ZIP vehicles don't stack
-      const h = simpleHash(loc);
-      const latOff = ((h & 0xff) / 255 - 0.5) * 0.04;
-      const lngOff = (((h >> 8) & 0xff) / 255 - 0.5) * 0.04;
-      return [coords[0] + latOff, coords[1] + lngOff];
-    }
+    if (coords) return spread(coords, loc, 0.04);
   }
 
   const l = loc.toLowerCase();
 
-  // 2) Try state abbreviation match (e.g. "Phoenix, AZ")
+  // 2) Canadian province abbreviation (e.g. "Maple Ridge, BC, Canada" or "Toronto, ON")
+  //    Must check BEFORE US states — "ON" is not a US state but could conflict
+  const caAbbrMatch = loc.match(/,\s*([A-Z]{2})\s*(?:,\s*Canada)?\s*$/i);
+  if (caAbbrMatch) {
+    const provFull = CA_ABBR[caAbbrMatch[1].toLowerCase()];
+    if (provFull && CA_PROV[provFull]) {
+      return spread(CA_PROV[provFull], loc, 1.2);
+    }
+  }
+
+  // 3) Full Canadian province name or "canada" keyword
+  if (l.includes('canada') || l.includes('canadian')) {
+    for (const [prov, c] of Object.entries(CA_PROV)) {
+      if (l.includes(prov)) return spread(c, loc, 1.2);
+    }
+    // Try Canadian city names
+    for (const city of ['toronto','vancouver','montreal','montréal','calgary','ottawa','edmonton','winnipeg','halifax','guelph','maple ridge','quebec city']) {
+      if (l.includes(city) && INTL[city]) return spread(INTL[city], loc, 0.05);
+    }
+    // Fallback: center of southern Canada
+    return spread([49.3, -96.8], loc, 3.0);
+  }
+
+  // 4) US state abbreviation (e.g. "Phoenix, AZ")
   const abbrMatch = loc.match(/,\s*([A-Z]{2})\s*$/);
   if (abbrMatch) {
     const fullState = ST_ABBR[abbrMatch[1].toLowerCase()];
-    if (fullState && ST[fullState]) {
-      const c = ST[fullState];
-      const h = simpleHash(loc);
-      const latOff = ((h & 0xff) / 255 - 0.5) * 1.0;
-      const lngOff = (((h >> 8) & 0xff) / 255 - 0.5) * 1.0;
-      return [c[0] + latOff, c[1] + lngOff];
-    }
+    if (fullState && ST[fullState]) return spread(ST[fullState], loc, 1.0);
   }
 
-  // 3) Try full state name match — fallback with wider spread
+  // 5) Full US state name — fallback with wider spread
   for (const [s, c] of Object.entries(ST)) {
-    if (l.includes(s)) {
-      const h = simpleHash(loc);
-      const latOff = ((h & 0xff) / 255 - 0.5) * 1.5;
-      const lngOff = (((h >> 8) & 0xff) / 255 - 0.5) * 1.5;
-      return [c[0] + latOff, c[1] + lngOff];
-    }
+    if (l.includes(s)) return spread(c, loc, 1.5);
   }
 
-  // 4) International — try known country patterns
-  if (l.includes('canada')) return [45.4 + (simpleHash(loc) & 0xf) * 0.3, -75.7 - (simpleHash(loc) >> 4 & 0xf) * 0.5];
-  if (l.includes('uk') || l.includes('england') || l.includes('london')) return [51.5, -0.1];
-  if (l.includes('germany') || l.includes('deutschland')) return [50.1, 8.7];
-  if (l.includes('netherlands') || l.includes('amsterdam')) return [52.4, 4.9];
-  if (l.includes('japan') || l.includes('tokyo')) return [35.7, 139.7];
-  if (l.includes('australia') || l.includes('sydney') || l.includes('melbourne')) return [-33.9, 151.2];
-  if (l.includes('italy') || l.includes('roma') || l.includes('milan')) return [41.9, 12.5];
-  if (l.includes('france') || l.includes('paris')) return [48.9, 2.3];
-  if (l.includes('spain') || l.includes('madrid')) return [40.4, -3.7];
-  if (l.includes('sweden') || l.includes('stockholm')) return [59.3, 18.1];
-  if (l.includes('switzerland') || l.includes('zurich')) return [47.4, 8.5];
+  // 6) International — try all known locations
+  for (const [name, c] of Object.entries(INTL)) {
+    if (l.includes(name)) return spread(c, loc, 0.8);
+  }
 
   return null;
 }
@@ -298,9 +380,14 @@ function VehicleCard({ v, accent }: { v: VPin; accent: string }) {
 
 const INITIAL_VIEW = { longitude: -98, latitude: 39, zoom: 4.5, pitch: 0, bearing: 0 };
 
-const CARTO_DARK = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+// Thermal heatmap color ramp: indigo → purple → red → orange → yellow → white
+const THERMAL_RAMP: [number, number, number][] = [
+  [20, 10, 80], [80, 0, 120], [180, 30, 30], [230, 120, 20], [255, 230, 50], [255, 255, 240],
+];
 
 export default function UnifiedMap() {
+  const { theme } = useTheme();
+  const mapStyle = theme === 'dark' ? CARTO_DARK : CARTO_LIGHT;
   const [showCollections, setShowCollections] = useState(true);
   const [showVehicles, setShowVehicles] = useState(true);
   const [showBusinesses, setShowBusinesses] = useState(true);
@@ -333,8 +420,9 @@ export default function UnifiedMap() {
   const [glowRadius, setGlowRadius] = useState(60);
   const [glowIntensity, setGlowIntensity] = useState(25);
   const [pointSize, setPointSize] = useState(4);
-  const [mode, setMode] = useState<'density' | 'points'>('density');
+  const [mode, setMode] = useState<'density' | 'points' | 'thermal'>('density');
   const [controlsOpen, setControlsOpen] = useState(false);
+  const [colorPreset, setColorPreset] = useState<ColorPreset>('default');
 
   // Timeline — filter vehicles by date
   const [timelineEnabled, setTimelineEnabled] = useState(false);
@@ -469,7 +557,7 @@ export default function UnifiedMap() {
           .eq('status', 'active')
           .not('location', 'is', null);
         if (lastId) q = q.gt('id', lastId);
-        q = q.order('id', { ascending: true }).limit(1000);
+        q = q.order('id', { ascending: true }).limit(500);
 
         const { data, error } = await q;
         if (error) { console.warn('Marketplace fetch error:', error.message); break; }
@@ -545,7 +633,7 @@ export default function UnifiedMap() {
           if (cancelled) return;
           let q = buildQuery(supabase.from('vehicles').select(RICH_FIELDS));
           if (lastId) q = q.gt('id', lastId);
-          q = q.order('id', { ascending: true }).limit(1000);
+          q = q.order('id', { ascending: true }).limit(500);
           const { data, error } = await q;
           if (error) { console.warn('Vehicle fetch error:', error.message); break; }
           if (!data || data.length === 0) break;
@@ -653,14 +741,16 @@ export default function UnifiedMap() {
     if (vehicles.length === 0) return { min: 0, max: Date.now(), minLabel: '', maxLabel: '' };
     const dates = vehicles.filter(v => v.dateTs > 0).map(v => v.dateTs);
     if (dates.length === 0) return { min: 0, max: Date.now(), minLabel: '', maxLabel: '' };
+    const now = Date.now();
     const mn = Math.min(...dates.slice(0, 10000)); // avoid perf hit on huge arrays
-    const mx = Math.max(...dates.slice(-10000));
+    const mx = Math.min(Math.max(...dates.slice(-10000)), now);
     // Scan in chunks for accuracy on large datasets
     let realMin = mn, realMax = mx;
     for (let i = 0; i < dates.length; i += 100) {
       if (dates[i] < realMin) realMin = dates[i];
-      if (dates[i] > realMax) realMax = dates[i];
+      if (dates[i] > realMax && dates[i] <= now) realMax = dates[i];
     }
+    realMax = Math.min(realMax, now); // hard cap at today
     const fmtD = (ts: number) => {
       const d = new Date(ts);
       return `${d.toLocaleString('en', { month: 'short' })} ${d.getFullYear()}`;
@@ -707,52 +797,59 @@ export default function UnifiedMap() {
   const layers = useMemo(() => {
     const result: any[] = [];
     const now = Date.now();
+    const colors = COLOR_PRESETS[colorPreset];
 
-    // Zoom-proportional sizing: visible at z4, grows smoothly to large at z15
-    // At z4.5 (default): zoomScale≈1.1, points are ~2px, glow is ~8px — clearly visible
-    // At z8: zoomScale≈2.5, points are ~5px, glow is ~20px — easily clickable
-    // At z12: zoomScale≈6.3, points are ~12px, glow is ~50px — large and detailed
-    const zoomScale = Math.pow(2, (zoom - 4) / 3); // doubles every 3 zoom levels, 1.0 at z4
-    const ptMin = Math.max(1.5, pointSize * 0.5 * zoomScale);
-    const ptMax = Math.max(4, pointSize * 3 * zoomScale);
-    const glowMin = Math.max(6, glowRadius * 0.15 * zoomScale);
-    const glowMax = Math.max(15, glowRadius * 1.2 * zoomScale);
-
-    const showGlow = mode === 'density';
-    const vehColor: [number, number, number] = hasQuery ? [245, 158, 11] : [59, 130, 246];
+    const vehColor: [number, number, number] = hasQuery ? colors.query : colors.vehicle;
     const glowAlpha = Math.max(0, Math.min(255, glowIntensity));
 
-    // Glow fades as you zoom in past z12 (data separates naturally), but never fully disappears
+    // Glow fades as you zoom in past z12, but never fully disappears
+    const showGlow = mode === 'density';
     const glowFade = showGlow ? Math.max(0.15, Math.min(1, (14 - zoom) / 8)) : 0;
 
+    // --- Thermal Heatmap (replaces all vehicle layers when active) ---
+    if (showVehicles && mode === 'thermal') {
+      result.push(new HeatmapLayer({
+        id: 'vehicle-thermal',
+        data: hasQuery ? queryResults : filteredVehicles,
+        getPosition: (d: VPin) => [d.lng, d.lat],
+        getWeight: (d: VPin) => d.weight || 1,
+        radiusPixels: glowRadius,
+        intensity: glowIntensity / 50,
+        threshold: 0.03,
+        colorRange: THERMAL_RAMP,
+      }));
+    }
+
     // --- Vehicle Glow ---
-    if (showVehicles && !hasQuery && glowFade > 0) {
+    if (showVehicles && !hasQuery && mode === 'density' && glowFade > 0) {
       result.push(new ScatterplotLayer({
         id: 'vehicle-glow',
         data: filteredVehicles,
         getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: (d: VPin) => d.weight * 800,
+        getRadius: (d: VPin) => d.weight * 500,
+        radiusUnits: 'meters' as const,
         getFillColor: [...vehColor, glowAlpha] as [number, number, number, number],
-        radiusMinPixels: glowMin,
-        radiusMaxPixels: glowMax,
+        radiusMinPixels: 0,
+        radiusMaxPixels: 30,
         opacity: glowFade,
         pickable: false,
-        updateTriggers: { getFillColor: [glowAlpha], radiusMinPixels: [glowMin], radiusMaxPixels: [glowMax] },
+        updateTriggers: { getFillColor: [glowAlpha, colorPreset] },
       }));
     }
 
-    // --- Vehicle Points — always pickable, always clickable ---
-    if (showVehicles && !hasQuery) {
+    // --- Vehicle Points ---
+    if (showVehicles && !hasQuery && mode !== 'thermal') {
       result.push(new ScatterplotLayer({
         id: 'vehicle-points',
         data: filteredVehicles,
         getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: 50,
+        getRadius: 3,
+        radiusUnits: 'meters' as const,
+        radiusMinPixels: 1.5,
+        radiusMaxPixels: 8,
         getFillColor: [...vehColor, 200] as [number, number, number, number],
-        radiusMinPixels: ptMin,
-        radiusMaxPixels: ptMax,
         pickable: true,
-        onClick: ({ object, x, y }: any) => {
+        onClick: ({ object }: any) => {
           if (object) setSelectedPin({ pin: object, type: 'vehicle' });
         },
         onHover: ({ object, x, y }: any) => {
@@ -764,37 +861,39 @@ export default function UnifiedMap() {
             setHoverInfo(null);
           }
         },
-        updateTriggers: { radiusMinPixels: [ptMin], radiusMaxPixels: [ptMax] },
+        updateTriggers: { getFillColor: [colorPreset] },
       }));
     }
 
     // --- Query Glow ---
-    if (hasQuery && queryResults.length > 0 && glowFade > 0) {
+    if (hasQuery && queryResults.length > 0 && mode === 'density' && glowFade > 0) {
       result.push(new ScatterplotLayer({
         id: 'query-glow',
         data: queryResults,
         getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: (d: VPin) => d.weight * 800,
-        getFillColor: [245, 158, 11, glowAlpha] as [number, number, number, number],
-        radiusMinPixels: glowMin,
-        radiusMaxPixels: glowMax,
+        getRadius: (d: VPin) => d.weight * 500,
+        radiusUnits: 'meters' as const,
+        getFillColor: [...colors.query, glowAlpha] as [number, number, number, number],
+        radiusMinPixels: 0,
+        radiusMaxPixels: 30,
         opacity: glowFade,
         pickable: false,
       }));
     }
 
     // --- Query Points ---
-    if (hasQuery && queryResults.length > 0) {
+    if (hasQuery && queryResults.length > 0 && mode !== 'thermal') {
       result.push(new ScatterplotLayer({
         id: 'query-points',
         data: queryResults,
         getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: 80,
-        getFillColor: [245, 158, 11, 220] as [number, number, number, number],
-        radiusMinPixels: ptMin * 1.2,
-        radiusMaxPixels: ptMax * 1.5,
+        getRadius: 4,
+        radiusUnits: 'meters' as const,
+        radiusMinPixels: 2,
+        radiusMaxPixels: 10,
+        getFillColor: [...colors.query, 220] as [number, number, number, number],
         pickable: true,
-        onClick: ({ object, x, y }: any) => {
+        onClick: ({ object }: any) => {
           if (object) setSelectedPin({ pin: object, type: 'vehicle' });
         },
         onHover: ({ object, x, y }: any) => {
@@ -808,12 +907,6 @@ export default function UnifiedMap() {
         },
       }));
     }
-
-    // Collections + Businesses — larger than vehicle dots, always prominent
-    const colPtMin = Math.max(4, 3 * zoomScale);
-    const colPtMax = Math.max(8, 12 * zoomScale);
-    const colGlowMin = Math.max(8, 12 * zoomScale);
-    const colGlowMax = Math.max(20, 40 * zoomScale);
 
     // --- Collection Glow ---
     if (showCollections && !hasQuery && showGlow) {
@@ -822,9 +915,10 @@ export default function UnifiedMap() {
         data: collections,
         getPosition: (d: ColPin) => [d.lng, d.lat],
         getRadius: 600,
-        getFillColor: (d: ColPin) => [...colColor(d.country), glowAlpha * 0.8] as [number, number, number, number],
-        radiusMinPixels: colGlowMin,
-        radiusMaxPixels: colGlowMax,
+        radiusUnits: 'meters' as const,
+        getFillColor: (d: ColPin) => [...colColor(d.country), Math.round(glowAlpha * 0.8)] as [number, number, number, number],
+        radiusMinPixels: 0,
+        radiusMaxPixels: 25,
         opacity: glowFade * 0.8,
         pickable: false,
       }));
@@ -836,12 +930,13 @@ export default function UnifiedMap() {
         id: 'collection-points',
         data: collections,
         getPosition: (d: ColPin) => [d.lng, d.lat],
-        getRadius: 50,
+        getRadius: 10,
+        radiusUnits: 'meters' as const,
+        radiusMinPixels: 2,
+        radiusMaxPixels: 12,
         getFillColor: (d: ColPin) => [...colColor(d.country), 220] as [number, number, number, number],
-        radiusMinPixels: colPtMin,
-        radiusMaxPixels: colPtMax,
         pickable: true,
-        onClick: ({ object, x, y }: any) => {
+        onClick: ({ object }: any) => {
           if (object) setSelectedPin({ pin: object, type: 'collection' });
         },
         onHover: ({ object, x, y }: any) => {
@@ -861,9 +956,10 @@ export default function UnifiedMap() {
         data: businesses,
         getPosition: (d: BizPin) => [d.lng, d.lat],
         getRadius: 500,
-        getFillColor: [20, 184, 166, glowAlpha * 0.6] as [number, number, number, number],
-        radiusMinPixels: colGlowMin * 0.7,
-        radiusMaxPixels: colGlowMax * 0.7,
+        radiusUnits: 'meters' as const,
+        getFillColor: [...colors.business, Math.round(glowAlpha * 0.6)] as [number, number, number, number],
+        radiusMinPixels: 0,
+        radiusMaxPixels: 20,
         opacity: glowFade * 0.6,
         pickable: false,
       }));
@@ -875,12 +971,13 @@ export default function UnifiedMap() {
         id: 'business-points',
         data: businesses,
         getPosition: (d: BizPin) => [d.lng, d.lat],
-        getRadius: 50,
-        getFillColor: [20, 184, 166, 200] as [number, number, number, number],
-        radiusMinPixels: colPtMin * 0.8,
-        radiusMaxPixels: colPtMax * 0.8,
+        getRadius: 8,
+        radiusUnits: 'meters' as const,
+        radiusMinPixels: 1,
+        radiusMaxPixels: 10,
+        getFillColor: [...colors.business, 200] as [number, number, number, number],
         pickable: true,
-        onClick: ({ object, x, y }: any) => {
+        onClick: ({ object }: any) => {
           if (object) setSelectedPin({ pin: object, type: 'business' });
         },
         onHover: ({ object, x, y }: any) => {
@@ -893,33 +990,35 @@ export default function UnifiedMap() {
       }));
     }
 
-    // --- Photo Glow (magenta) ---
-    if (showPhotos && !hasQuery && photos.length > 0 && glowFade > 0) {
+    // --- Photo Glow ---
+    if (showPhotos && !hasQuery && photos.length > 0 && mode === 'density' && glowFade > 0) {
       result.push(new ScatterplotLayer({
         id: 'photo-glow',
         data: photos,
         getPosition: (d: PhotoPin) => [d.lng, d.lat],
         getRadius: 400,
-        getFillColor: [217, 70, 239, Math.round(glowAlpha * 0.7)] as [number, number, number, number],
-        radiusMinPixels: Math.max(8, 10 * zoomScale),
-        radiusMaxPixels: Math.max(20, 35 * zoomScale),
+        radiusUnits: 'meters' as const,
+        getFillColor: [...colors.photo, Math.round(glowAlpha * 0.7)] as [number, number, number, number],
+        radiusMinPixels: 0,
+        radiusMaxPixels: 20,
         opacity: glowFade * 0.7,
         pickable: false,
       }));
     }
 
-    // --- Photo Points (magenta dots, pickable) ---
-    if (showPhotos && !hasQuery && photos.length > 0) {
+    // --- Photo Points ---
+    if (showPhotos && !hasQuery && photos.length > 0 && mode !== 'thermal') {
       result.push(new ScatterplotLayer({
         id: 'photo-points',
         data: photos,
         getPosition: (d: PhotoPin) => [d.lng, d.lat],
-        getRadius: (d: PhotoPin) => d.hasRealImage ? 60 : 40,
+        getRadius: (d: PhotoPin) => d.hasRealImage ? 5 : 3,
+        radiusUnits: 'meters' as const,
+        radiusMinPixels: 1,
+        radiusMaxPixels: 8,
         getFillColor: (d: PhotoPin) => d.hasRealImage
-          ? [217, 70, 239, 230] as [number, number, number, number]
-          : [217, 70, 239, 120] as [number, number, number, number],
-        radiusMinPixels: Math.max(3, ptMin * 1.2),
-        radiusMaxPixels: Math.max(6, ptMax * 1.2),
+          ? [...colors.photo, 230] as [number, number, number, number]
+          : [...colors.photo, 120] as [number, number, number, number],
         pickable: true,
         onClick: ({ object }: any) => {
           if (object) setSelectedPin({ pin: object, type: 'photo' as any });
@@ -929,40 +1028,41 @@ export default function UnifiedMap() {
             const label = object.vehicleTitle || 'Photo';
             const loc = object.locationName ? ` · ${object.locationName.split(',')[0]}` : '';
             const date = object.takenLabel ? ` · ${object.takenLabel}` : '';
-            setHoverInfo({ x, y, text: `📷 ${label}${loc}${date}` });
+            setHoverInfo({ x, y, text: label + loc + date });
           } else {
             setHoverInfo(null);
           }
         },
-        updateTriggers: { radiusMinPixels: [ptMin], radiusMaxPixels: [ptMax] },
       }));
     }
 
     // --- Marketplace Glow (green — live for-sale listings) ---
-    if (showMarketplace && !hasQuery && marketplace.length > 0 && glowFade > 0) {
+    if (showMarketplace && !hasQuery && marketplace.length > 0 && mode === 'density' && glowFade > 0) {
       result.push(new ScatterplotLayer({
         id: 'marketplace-glow',
         data: marketplace,
         getPosition: (d: MarketplacePin) => [d.lng, d.lat],
         getRadius: 500,
+        radiusUnits: 'meters' as const,
         getFillColor: [74, 222, 128, Math.round(glowAlpha * 0.8)] as [number, number, number, number],
-        radiusMinPixels: Math.max(8, 10 * zoomScale),
-        radiusMaxPixels: Math.max(20, 35 * zoomScale),
+        radiusMinPixels: 0,
+        radiusMaxPixels: 20,
         opacity: glowFade * 0.8,
         pickable: false,
       }));
     }
 
-    // --- Marketplace Points (green dots — FB listings for sale NOW) ---
-    if (showMarketplace && !hasQuery && marketplace.length > 0) {
+    // --- Marketplace Points (green — FB listings) ---
+    if (showMarketplace && !hasQuery && marketplace.length > 0 && mode !== 'thermal') {
       result.push(new ScatterplotLayer({
         id: 'marketplace-points',
         data: marketplace,
         getPosition: (d: MarketplacePin) => [d.lng, d.lat],
-        getRadius: 60,
+        getRadius: 4,
+        radiusUnits: 'meters' as const,
+        radiusMinPixels: 1.5,
+        radiusMaxPixels: 8,
         getFillColor: [74, 222, 128, 220] as [number, number, number, number],
-        radiusMinPixels: Math.max(2.5, ptMin * 1.1),
-        radiusMaxPixels: Math.max(5, ptMax * 1.1),
         pickable: true,
         onClick: ({ object }: any) => {
           if (object) setSelectedPin({ pin: object, type: 'marketplace' as any });
@@ -975,14 +1075,12 @@ export default function UnifiedMap() {
             setHoverInfo(null);
           }
         },
-        updateTriggers: { radiusMinPixels: [ptMin], radiusMaxPixels: [ptMax] },
       }));
     }
 
     // --- Live Event Rings (animated) ---
     const liveEvents = liveEventsRef.current.filter(e => now - e.ts < 2500);
     if (liveEvents.length > 0) {
-      // Expanding ring
       result.push(new ScatterplotLayer({
         id: 'live-rings',
         data: liveEvents,
@@ -1000,8 +1098,6 @@ export default function UnifiedMap() {
         pickable: false,
         updateTriggers: { getRadius: [tick], getFillColor: [tick] },
       }));
-
-      // Center dot
       result.push(new ScatterplotLayer({
         id: 'live-dots',
         data: liveEvents,
@@ -1016,13 +1112,13 @@ export default function UnifiedMap() {
 
     return result;
   }, [filteredVehicles, collections, businesses, photos, marketplace, queryResults, showVehicles, showCollections, showBusinesses,
-      showPhotos, showMarketplace, hasQuery, zoom, mode, glowRadius, glowIntensity, pointSize, tick]);
+      showPhotos, showMarketplace, hasQuery, zoom, mode, glowRadius, glowIntensity, colorPreset, tick]);
 
   const panelW = 320; // side panel width
   const hasSidePanel = selectedPin !== null;
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 0, flex: 1, background: '#0d1117', display: 'flex' }}
+    <div style={{ position: 'absolute', inset: 0, background: 'var(--bg)', display: 'flex', overflow: 'hidden', fontFamily: MAP_FONT }}
       onClick={() => setSelectedPin(null)}>
 
       {/* Map area — shrinks when side panel is open */}
@@ -1036,22 +1132,14 @@ export default function UnifiedMap() {
             getCursor={({ isHovering }: { isHovering: boolean }) => isHovering ? 'pointer' : 'grab'}
             style={{ position: 'absolute', inset: 0 }}
           >
-            <Map mapStyle={CARTO_DARK} attributionControl={false} />
+            <Map mapStyle={mapStyle} attributionControl={false} />
           </DeckGL>
         </div>
 
-        {/* Loading overlay */}
+        {/* Loading progress bar — 1px at top */}
         {vehLoading && (
-          <div style={{
-            position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 1100,
-            background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(59,130,246,0.3)',
-            borderRadius: 8, padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 10,
-            backdropFilter: 'blur(8px)',
-          }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3B82F6', animation: 'pulse 1.5s ease-in-out infinite' }} />
-            <span style={{ color: '#e0e0e0', fontSize: '12px', fontWeight: 500, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-              Loading {vehicles.length.toLocaleString()} vehicles...
-            </span>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1100, height: 1, background: 'var(--border)' }}>
+            <div style={{ height: '100%', background: 'var(--text)', width: `${Math.min(100, (vehicles.length / 15000) * 100)}%`, transition: 'width 0.3s ease' }} />
           </div>
         )}
 
@@ -1059,107 +1147,120 @@ export default function UnifiedMap() {
         {hoverInfo && (
           <div style={{
             position: 'absolute', left: hoverInfo.x + 14, top: hoverInfo.y - 24, zIndex: 1500,
-            background: 'rgba(13,17,23,.92)', color: '#fff', padding: '5px 10px',
-            fontSize: '11px', fontFamily: 'system-ui, -apple-system, sans-serif', pointerEvents: 'none',
-            whiteSpace: 'nowrap', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)',
+            background: 'var(--surface-glass)', color: 'var(--text)', padding: '4px 8px',
+            fontSize: '10px', fontFamily: MAP_FONT, pointerEvents: 'none',
+            whiteSpace: 'nowrap', border: '1px solid var(--border)',
           }}>
             {hoverInfo.text}
           </div>
         )}
 
         {/* Search bar — top left */}
-        <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', gap: 2 }}>
             <input type="text" placeholder="Search: red porsche, 1966 mustang, v8 swap..."
               value={searchText} onChange={e => setSearchText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
-              style={{ width: 280, padding: '8px 12px', fontSize: '12px', fontFamily: 'system-ui, sans-serif',
-                border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6,
-                background: 'rgba(13,17,23,0.85)', color: '#e0e0e0', outline: 'none' }}
+              style={{ width: 300, padding: '6px 10px', fontSize: '11px', fontFamily: MAP_FONT,
+                border: '1px solid var(--border)',
+                background: 'var(--surface-glass)', color: 'var(--text)', outline: 'none' }}
             />
             <button onClick={handleSearch} disabled={searching}
-              style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 600, fontFamily: 'system-ui, sans-serif',
-                background: searching ? 'rgba(59,130,246,0.3)' : 'rgba(59,130,246,0.8)',
-                color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-              {searching ? '...' : 'Search'}
+              style={{ padding: '6px 14px', fontSize: '10px', fontWeight: 600, fontFamily: MAP_FONT,
+                textTransform: 'uppercase', letterSpacing: '0.8px',
+                background: searching ? 'var(--surface)' : 'var(--text)',
+                color: searching ? 'var(--text-disabled)' : 'var(--bg)',
+                border: '1px solid var(--border)', cursor: 'pointer' }}>
+              {searching ? '...' : 'SEARCH'}
             </button>
             {activeQuery && (
-              <button onClick={clearSearch} style={{ padding: '8px 12px', fontSize: '12px', fontFamily: 'system-ui, sans-serif',
-                background: 'rgba(255,255,255,0.08)', color: '#999', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, cursor: 'pointer' }}>
-                Clear
+              <button onClick={clearSearch} style={{ padding: '6px 10px', fontSize: '10px', fontFamily: MAP_FONT,
+                textTransform: 'uppercase', letterSpacing: '0.5px',
+                background: 'var(--surface-glass)', color: 'var(--text-disabled)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                CLEAR
               </button>
             )}
           </div>
           {activeQuery && !searching && (
-            <div style={{ background: 'rgba(13,17,23,0.9)', border: '1px solid rgba(245,158,11,0.3)',
-              borderRadius: 6, padding: '6px 12px', fontSize: '11px', color: '#999', fontFamily: 'system-ui, sans-serif' }}>
-              <strong style={{ color: '#F59E0B' }}>{queryTotal.toLocaleString()}</strong> match &ldquo;{activeQuery}&rdquo; &mdash; <strong style={{ color: '#e0e0e0' }}>{queryResults.length.toLocaleString()}</strong> mapped
-              {queryNoLoc.length > 0 && <span style={{ color: '#666' }}> &middot; {queryNoLoc.length.toLocaleString()} no location</span>}
+            <div style={{ background: 'var(--surface-glass)', border: '1px solid var(--border)',
+              padding: '5px 10px', fontSize: '10px', color: 'var(--text-disabled)', fontFamily: MAP_FONT }}>
+              <strong style={{ color: 'var(--text)' }}>{queryTotal.toLocaleString()}</strong> match &ldquo;{activeQuery}&rdquo; &mdash; <strong style={{ color: 'var(--text)' }}>{queryResults.length.toLocaleString()}</strong> mapped
+              {queryNoLoc.length > 0 && <span> &middot; {queryNoLoc.length.toLocaleString()} no location</span>}
             </div>
           )}
         </div>
 
         {/* Controls — top right */}
-        <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 1000, fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, fontFamily: MAP_FONT }}>
           {!controlsOpen ? (
             <button onClick={(e) => { e.stopPropagation(); setControlsOpen(true); }}
-              style={{ background: 'rgba(13,17,23,0.85)', border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 8, padding: '8px 14px', color: '#e0e0e0', cursor: 'pointer',
-                fontSize: '11px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: '14px' }}>&#9881;</span>
-              <span>
-                <span style={{ color: '#3B82F6' }}>{counts.vehicles.toLocaleString()}</span>
-                {' / '}
-                <span style={{ color: '#4ADE80' }}>{counts.marketplace.toLocaleString()}</span>
-                {' / '}
-                <span style={{ color: '#EC4899' }}>{counts.collections.toLocaleString()}</span>
-                {' / '}
-                <span style={{ color: '#14B8A6' }}>{counts.businesses.toLocaleString()}</span>
-                {counts.photos > 0 && <>
-                  {' / '}
-                  <span style={{ color: '#D946EF' }}>{counts.photos.toLocaleString()}</span>
-                </>}
+              style={{ background: 'var(--surface-glass)', border: '1px solid var(--border)',
+                padding: '6px 12px', color: 'var(--text)', cursor: 'pointer',
+                fontSize: '10px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>LAYERS</span>
+              <span style={{ color: 'var(--text-disabled)', fontSize: '10px', fontVariantNumeric: 'tabular-nums' }}>
+                {counts.vehicles.toLocaleString()}
               </span>
             </button>
           ) : (
-            <div onClick={(e) => e.stopPropagation()} style={{ background: 'rgba(13,17,23,0.92)',
-              border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: 14,
-              minWidth: 200, backdropFilter: 'blur(12px)', color: '#e0e0e0', fontSize: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <span style={{ fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#999' }}>Layers</span>
-                <button onClick={() => setControlsOpen(false)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: '14px', padding: '0 2px' }}>x</button>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface-glass)',
+              border: '1px solid var(--border)', padding: 12,
+              minWidth: 200, color: 'var(--text)', fontSize: '11px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontWeight: 600, fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)' }}>LAYERS</span>
+                <button onClick={() => setControlsOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-disabled)', cursor: 'pointer', fontSize: '12px', padding: '0 2px' }}>x</button>
               </div>
-              <LT label="Vehicles" color="#3B82F6" checked={showVehicles} set={setShowVehicles} n={counts.vehicles} dim={hasQuery} loading={vehLoading} />
+              <LT label="Vehicles" color={`rgb(${COLOR_PRESETS[colorPreset].vehicle.join(',')})`} checked={showVehicles} set={setShowVehicles} n={counts.vehicles} dim={hasQuery} loading={vehLoading} />
               <LT label="For Sale" color="#4ADE80" checked={showMarketplace} set={setShowMarketplace} n={counts.marketplace} dim={hasQuery} loading={mktLoading} />
-              <LT label="Collections" color="#EC4899" checked={showCollections} set={setShowCollections} n={counts.collections} dim={hasQuery} />
-              <LT label="Businesses" color="#14B8A6" checked={showBusinesses} set={setShowBusinesses} n={counts.businesses} dim={hasQuery} />
-              <LT label="Photos" color="#D946EF" checked={showPhotos} set={setShowPhotos} n={counts.photos} dim={hasQuery} />
+              <LT label="Collections" color={`rgb(${COLOR_PRESETS[colorPreset].collection.join(',')})`} checked={showCollections} set={setShowCollections} n={counts.collections} dim={hasQuery} />
+              <LT label="Businesses" color={`rgb(${COLOR_PRESETS[colorPreset].business.join(',')})`} checked={showBusinesses} set={setShowBusinesses} n={counts.businesses} dim={hasQuery} />
+              <LT label="Photos" color={`rgb(${COLOR_PRESETS[colorPreset].photo.join(',')})`} checked={showPhotos} set={setShowPhotos} n={counts.photos} dim={hasQuery} />
               {activeQuery && <>
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '6px 0' }} />
+                <div style={{ borderTop: '1px solid var(--border)', margin: '6px 0' }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#F59E0B', display: 'inline-block' }} />
-                  <span style={{ color: '#F59E0B', fontWeight: 600 }}>Query</span>
-                  <span style={{ color: '#F59E0B', marginLeft: 'auto' }}>{counts.query.toLocaleString()}</span>
+                  <span style={{ width: 8, height: 8, background: `rgb(${COLOR_PRESETS[colorPreset].query.join(',')})`, display: 'inline-block' }} />
+                  <span style={{ fontWeight: 600, fontSize: '10px' }}>Query</span>
+                  <span style={{ marginLeft: 'auto', fontSize: '10px', fontVariantNumeric: 'tabular-nums' }}>{counts.query.toLocaleString()}</span>
                 </div>
               </>}
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '8px 0 6px' }} />
-              <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-                {(['density', 'points'] as const).map(m => (
+              <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0 6px' }} />
+
+              {/* Mode toggle: GLOW | POINTS | THERMAL */}
+              <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)', marginBottom: 4, fontWeight: 600 }}>MODE</div>
+              <div style={{ display: 'flex', gap: 0, marginBottom: 8 }}>
+                {(['density', 'points', 'thermal'] as const).map(m => (
                   <button key={m} onClick={() => setMode(m)} style={{
-                    flex: 1, padding: '5px 0', fontSize: '11px', fontWeight: mode === m ? 600 : 400,
-                    background: mode === m ? 'rgba(59,130,246,0.2)' : 'transparent',
-                    color: mode === m ? '#3B82F6' : '#666',
-                    border: `1px solid ${mode === m ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.08)'}`,
-                    borderRadius: 5, cursor: 'pointer' }}>
-                    {m === 'density' ? 'Glow + Points' : 'Points Only'}
+                    flex: 1, padding: '4px 0', fontSize: '9px', fontWeight: 600,
+                    textTransform: 'uppercase', letterSpacing: '0.5px', fontFamily: MAP_FONT,
+                    background: mode === m ? 'var(--text)' : 'transparent',
+                    color: mode === m ? 'var(--bg)' : 'var(--text-disabled)',
+                    border: '1px solid var(--border)',
+                    cursor: 'pointer' }}>
+                    {m === 'density' ? 'GLOW' : m === 'points' ? 'POINTS' : 'THERMAL'}
                   </button>
                 ))}
               </div>
+
+              {/* Color presets */}
+              <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)', marginBottom: 4, fontWeight: 600 }}>COLOR</div>
+              <div style={{ display: 'flex', gap: 0, marginBottom: 8 }}>
+                {(['default', 'thermal', 'mono', 'satellite'] as const).map(p => (
+                  <button key={p} onClick={() => setColorPreset(p)} style={{
+                    flex: 1, padding: '3px 0', fontSize: '8px', textTransform: 'uppercase',
+                    letterSpacing: '0.5px', fontFamily: MAP_FONT,
+                    background: colorPreset === p ? 'var(--text)' : 'transparent',
+                    color: colorPreset === p ? 'var(--bg)' : 'var(--text-disabled)',
+                    border: '1px solid var(--border)',
+                    cursor: 'pointer' }}>
+                    {p === 'default' ? 'DFLT' : p.slice(0, 4).toUpperCase()}
+                  </button>
+                ))}
+              </div>
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <SliderControl label="Size" value={pointSize} min={1} max={10} step={0.5} onChange={setPointSize} />
-                {mode === 'density' && <>
-                  <SliderControl label="Glow" value={glowRadius} min={10} max={100} onChange={setGlowRadius} />
-                  <SliderControl label="Brightness" value={glowIntensity} min={5} max={50} onChange={setGlowIntensity} />
+                {mode !== 'points' && <>
+                  <SliderControl label="Radius" value={glowRadius} min={10} max={100} onChange={setGlowRadius} />
+                  <SliderControl label="Intensity" value={glowIntensity} min={5} max={50} onChange={setGlowIntensity} />
                 </>}
               </div>
             </div>
@@ -1168,42 +1269,43 @@ export default function UnifiedMap() {
 
         {/* Timeline slider — bottom center */}
         <div style={{
-          position: 'absolute', bottom: 12, left: 12, right: hasSidePanel ? 12 : 12, zIndex: 1000,
+          position: 'absolute', bottom: 10, left: 10, right: 10, zIndex: 1000,
           display: 'flex', alignItems: 'center', gap: 10,
-          background: 'rgba(13,17,23,0.85)', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 8, padding: '8px 14px', fontFamily: 'system-ui, sans-serif',
+          background: 'var(--surface-glass)', border: '1px solid var(--border)',
+          padding: '6px 12px', fontFamily: MAP_FONT,
         }}>
           {/* Stats */}
-          <div style={{ fontSize: '11px', color: '#999', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
-            {vehLoading && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B82F6', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />}
+          <div style={{ fontSize: '10px', color: 'var(--text-disabled)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+            {vehLoading && <span style={{ width: 4, height: 4, background: 'var(--text)', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />}
             {hasQuery
-              ? <><strong style={{ color: '#F59E0B' }}>{counts.query.toLocaleString()}</strong> / {queryTotal.toLocaleString()}</>
-              : <><strong style={{ color: '#e0e0e0' }}>{counts.total.toLocaleString()}</strong> items</>}
+              ? <><strong style={{ color: 'var(--text)' }}>{counts.query.toLocaleString()}</strong> / {queryTotal.toLocaleString()}</>
+              : <><strong style={{ color: 'var(--text)' }}>{counts.total.toLocaleString()}</strong> items</>}
           </div>
 
           {/* Timeline toggle + slider */}
-          <div style={{ borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: 10, display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+          <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 10, display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
             <button
               onClick={() => setTimelineEnabled(!timelineEnabled)}
               style={{
-                padding: '3px 8px', fontSize: '10px', fontWeight: 600,
-                background: timelineEnabled ? 'rgba(139,92,246,0.3)' : 'transparent',
-                color: timelineEnabled ? '#A78BFA' : '#666',
-                border: `1px solid ${timelineEnabled ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap',
+                padding: '3px 8px', fontSize: '9px', fontWeight: 600, fontFamily: MAP_FONT,
+                textTransform: 'uppercase', letterSpacing: '0.5px',
+                background: timelineEnabled ? 'var(--text)' : 'transparent',
+                color: timelineEnabled ? 'var(--bg)' : 'var(--text-disabled)',
+                border: '1px solid var(--border)',
+                cursor: 'pointer', whiteSpace: 'nowrap',
               }}
             >
-              Timeline
+              TIMELINE
             </button>
             {timelineEnabled && (
               <>
-                <span style={{ fontSize: '9px', color: '#666', whiteSpace: 'nowrap' }}>{timelineRange.minLabel}</span>
+                <span style={{ fontSize: '9px', color: 'var(--text-disabled)', whiteSpace: 'nowrap' }}>{timelineRange.minLabel}</span>
                 <input type="range" min={0} max={100} value={timeCutoff}
                   onChange={e => setTimeCutoff(Number(e.target.value))}
-                  style={{ flex: 1, height: 4, WebkitAppearance: 'none' as any, appearance: 'none' as any,
-                    background: 'rgba(139,92,246,0.3)', outline: 'none', cursor: 'pointer', borderRadius: 2 }}
+                  style={{ flex: 1, height: 2, WebkitAppearance: 'none' as any, appearance: 'none' as any,
+                    background: 'var(--border)', outline: 'none', cursor: 'pointer' }}
                 />
-                <span style={{ fontSize: '10px', color: '#A78BFA', fontWeight: 600, whiteSpace: 'nowrap', minWidth: 60 }}>{cutoffLabel}</span>
+                <span style={{ fontSize: '10px', color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap', minWidth: 60, fontVariantNumeric: 'tabular-nums' }}>{cutoffLabel}</span>
               </>
             )}
           </div>
@@ -1211,21 +1313,21 @@ export default function UnifiedMap() {
 
         {/* Unmapped results list */}
         {queryNoLoc.length > 0 && (
-          <div style={{ position: 'absolute', top: 70, left: 12, zIndex: 1000, width: 280, maxHeight: '40vh',
-            overflowY: 'auto', background: 'rgba(13,17,23,0.92)', borderRadius: 8,
-            border: '1px solid rgba(255,255,255,0.1)', fontSize: '12px', fontFamily: 'system-ui, sans-serif', color: '#e0e0e0' }}>
-            <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#999',
-              fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, position: 'sticky', top: 0, background: 'rgba(13,17,23,0.95)' }}>
+          <div style={{ position: 'absolute', top: 56, left: 10, zIndex: 1000, width: 300, maxHeight: '40vh',
+            overflowY: 'auto', background: 'var(--surface-glass)',
+            border: '1px solid var(--border)', fontSize: '11px', fontFamily: MAP_FONT, color: 'var(--text)' }}>
+            <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)', color: 'var(--text-disabled)',
+              fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600, position: 'sticky', top: 0, background: 'var(--surface-glass)' }}>
               No location ({queryNoLoc.length})
             </div>
             {queryNoLoc.slice(0, 50).map(r => (
-              <a key={r.id} href={`/vehicle/${r.id}`} style={{ display: 'block', padding: '6px 12px',
-                borderBottom: '1px solid rgba(255,255,255,0.04)', textDecoration: 'none', color: '#e0e0e0', fontSize: '11px' }}>
+              <a key={r.id} href={`/vehicle/${r.id}`} style={{ display: 'block', padding: '5px 10px',
+                borderBottom: '1px solid var(--border)', textDecoration: 'none', color: 'var(--text)', fontSize: '10px' }}>
                 {r.title}
-                {r.loc && <span style={{ color: '#666', marginLeft: 8, fontSize: '10px' }}>{r.loc}</span>}
+                {r.loc && <span style={{ color: 'var(--text-disabled)', marginLeft: 8, fontSize: '9px' }}>{r.loc}</span>}
               </a>
             ))}
-            {queryNoLoc.length > 50 && <div style={{ padding: '6px 12px', color: '#666', fontSize: '10px' }}>+{queryNoLoc.length - 50} more</div>}
+            {queryNoLoc.length > 50 && <div style={{ padding: '5px 10px', color: 'var(--text-disabled)', fontSize: '9px' }}>+{queryNoLoc.length - 50} more</div>}
           </div>
         )}
       </div>
@@ -1235,16 +1337,18 @@ export default function UnifiedMap() {
         const { pin, type } = selectedPin!;
         return (
           <div onClick={(e) => e.stopPropagation()} style={{
-            width: panelW, flexShrink: 0, background: '#111827', borderLeft: '1px solid rgba(255,255,255,0.08)',
-            overflowY: 'auto', fontFamily: 'system-ui, sans-serif', color: '#e0e0e0',
+            width: panelW, flexShrink: 0, background: 'var(--surface)', borderLeft: '1px solid var(--border)',
+            overflowY: 'auto', fontFamily: MAP_FONT, color: 'var(--text)',
           }}>
             {/* Close button */}
             <button onClick={() => setSelectedPin(null)} style={{
-              position: 'sticky', top: 0, zIndex: 1, width: '100%', padding: '8px 14px',
-              background: 'rgba(17,24,39,0.95)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)',
-              color: '#999', cursor: 'pointer', fontSize: '11px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6,
+              position: 'sticky', top: 0, zIndex: 1, width: '100%', padding: '6px 12px',
+              background: 'var(--surface)', border: 'none', borderBottom: '1px solid var(--border)',
+              color: 'var(--text-disabled)', cursor: 'pointer', fontSize: '10px', textAlign: 'left',
+              display: 'flex', alignItems: 'center', gap: 6, fontFamily: MAP_FONT,
+              textTransform: 'uppercase', letterSpacing: '0.5px',
             }}>
-              <span style={{ fontSize: '16px' }}>&larr;</span> Close
+              CLOSE
             </button>
 
             {type === 'vehicle' && (() => {
@@ -1259,31 +1363,32 @@ export default function UnifiedMap() {
                     <img src={thumb} alt={title} style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }}
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                   </a>}
-                  <div style={{ padding: '14px 16px' }}>
-                    <a href={`/vehicle/${v.id}`} style={{ color: hasQuery ? '#F59E0B' : '#3B82F6', textDecoration: 'none', fontWeight: 700, fontSize: '16px', display: 'block', marginBottom: 4 }}>
+                  <div style={{ padding: '12px 14px' }}>
+                    <a href={`/vehicle/${v.id}`} style={{ color: 'var(--text)', textDecoration: 'none', fontWeight: 700, fontSize: '14px', display: 'block', marginBottom: 4 }}>
                       {title}
                     </a>
-                    {subtitle && <div style={{ color: '#999', fontSize: '12px', marginBottom: 8 }}>{subtitle}</div>}
+                    {subtitle && <div style={{ color: 'var(--text-disabled)', fontSize: '11px', marginBottom: 8 }}>{subtitle}</div>}
                     <div style={{ display: 'flex', gap: 12, marginBottom: 10, alignItems: 'baseline' }}>
-                      {v.price && <span style={{ color: '#4ade80', fontWeight: 700, fontSize: '18px', fontFamily: 'monospace' }}>{fmtPrice(v.price)}</span>}
-                      {v.mileage && <span style={{ color: '#999', fontSize: '12px' }}>{fmtMiles(v.mileage)}</span>}
+                      {v.price && <span style={{ color: '#4ade80', fontWeight: 700, fontSize: '16px', fontFamily: 'monospace' }}>{fmtPrice(v.price)}</span>}
+                      {v.mileage && <span style={{ color: 'var(--text-disabled)', fontSize: '11px' }}>{fmtMiles(v.mileage)}</span>}
                     </div>
-                    {specs.length > 0 && <div style={{ color: '#999', fontSize: '11px', marginBottom: 8, lineHeight: 1.6 }}>{specs.join(' \u00b7 ')}</div>}
-                    {v.intColor && <div style={{ color: '#999', fontSize: '11px', marginBottom: 8 }}>Interior: {v.intColor}</div>}
+                    {specs.length > 0 && <div style={{ color: 'var(--text-disabled)', fontSize: '10px', marginBottom: 8, lineHeight: 1.6 }}>{specs.join(' \u00b7 ')}</div>}
+                    {v.intColor && <div style={{ color: 'var(--text-disabled)', fontSize: '10px', marginBottom: 8 }}>Interior: {v.intColor}</div>}
                     {(v.deal != null || v.heat != null || v.condition != null) && (
-                      <div style={{ display: 'flex', gap: 12, marginBottom: 10, fontSize: '11px' }}>
+                      <div style={{ display: 'flex', gap: 12, marginBottom: 10, fontSize: '10px' }}>
                         {v.deal != null && <span style={{ color: v.deal >= 70 ? '#4ade80' : v.deal >= 40 ? '#facc15' : '#f87171' }}>Deal: {v.deal}</span>}
                         {v.heat != null && <span style={{ color: '#f97316' }}>Heat: {v.heat}</span>}
-                        {v.condition != null && <span style={{ color: '#60a5fa' }}>Condition: {v.condition}/10</span>}
+                        {v.condition != null && <span style={{ color: '#60a5fa' }}>Cond: {v.condition}/10</span>}
                       </div>
                     )}
-                    {v.dateLabel && <div style={{ color: '#666', fontSize: '10px', marginBottom: 8 }}>{v.dateLabel}</div>}
-                    {v.loc && <div style={{ color: '#666', fontSize: '10px', marginBottom: 12 }}>{v.loc}</div>}
+                    {v.dateLabel && <div style={{ color: 'var(--text-disabled)', fontSize: '9px', marginBottom: 6 }}>{v.dateLabel}</div>}
+                    {v.loc && <div style={{ color: 'var(--text-disabled)', fontSize: '9px', marginBottom: 12 }}>{v.loc}</div>}
                     <a href={`/vehicle/${v.id}`} style={{
-                      display: 'block', textAlign: 'center', padding: '10px', borderRadius: 6,
-                      background: 'rgba(59,130,246,0.2)', color: '#3B82F6', textDecoration: 'none',
-                      fontWeight: 600, fontSize: '12px', border: '1px solid rgba(59,130,246,0.3)',
-                    }}>View Full Profile</a>
+                      display: 'block', textAlign: 'center', padding: '8px',
+                      background: 'var(--text)', color: 'var(--bg)', textDecoration: 'none',
+                      fontWeight: 600, fontSize: '10px', border: '1px solid var(--border)',
+                      textTransform: 'uppercase', letterSpacing: '0.5px',
+                    }}>VIEW FULL PROFILE</a>
                   </div>
                 </div>
               );
@@ -1292,17 +1397,17 @@ export default function UnifiedMap() {
             {type === 'collection' && (() => {
               const c = pin as ColPin;
               return (
-                <div style={{ padding: 16 }}>
-                  <div style={{ fontWeight: 700, fontSize: '18px', marginBottom: 6, color: '#fff' }}>{c.name}</div>
-                  <div style={{ color: '#999', fontSize: '12px', marginBottom: 10 }}>{c.city}, {c.country}</div>
-                  {c.totalInventory > 0 && <div style={{ color: '#3B82F6', fontWeight: 600, fontSize: '14px', marginBottom: 12 }}>{c.totalInventory} vehicles</div>}
-                  <a href={`/org/${c.slug}`} style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 6,
-                    background: 'rgba(59,130,246,0.2)', color: '#3B82F6', textDecoration: 'none', fontWeight: 600, fontSize: '12px',
-                    border: '1px solid rgba(59,130,246,0.3)', marginBottom: 8 }}>View Collection</a>
+                <div style={{ padding: 14 }}>
+                  <div style={{ fontWeight: 700, fontSize: '16px', marginBottom: 4, color: 'var(--text)' }}>{c.name}</div>
+                  <div style={{ color: 'var(--text-disabled)', fontSize: '11px', marginBottom: 10 }}>{c.city}, {c.country}</div>
+                  {c.totalInventory > 0 && <div style={{ color: 'var(--text)', fontWeight: 600, fontSize: '13px', marginBottom: 12 }}>{c.totalInventory} vehicles</div>}
+                  <a href={`/org/${c.slug}`} style={{ display: 'block', textAlign: 'center', padding: '8px',
+                    background: 'var(--text)', color: 'var(--bg)', textDecoration: 'none', fontWeight: 600, fontSize: '10px',
+                    border: '1px solid var(--border)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>VIEW COLLECTION</a>
                   {c.ig && <a href={`https://instagram.com/${c.ig}`} target="_blank" rel="noreferrer" style={{
-                    display: 'block', textAlign: 'center', padding: '10px', borderRadius: 6,
-                    background: 'rgba(236,72,153,0.15)', color: '#EC4899', textDecoration: 'none', fontWeight: 600, fontSize: '12px',
-                    border: '1px solid rgba(236,72,153,0.3)' }}>@{c.ig}</a>}
+                    display: 'block', textAlign: 'center', padding: '8px',
+                    background: 'transparent', color: 'var(--text-disabled)', textDecoration: 'none', fontWeight: 600, fontSize: '10px',
+                    border: '1px solid var(--border)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>@{c.ig}</a>}
                 </div>
               );
             })()}
@@ -1310,12 +1415,12 @@ export default function UnifiedMap() {
             {type === 'business' && (() => {
               const b = pin as BizPin;
               return (
-                <div style={{ padding: 16 }}>
-                  <div style={{ fontWeight: 700, fontSize: '18px', marginBottom: 6, color: '#fff' }}>{b.name}</div>
-                  {b.type && <div style={{ color: '#999', fontSize: '12px', marginBottom: 10 }}>{b.type}</div>}
-                  <a href={`/org/${b.id}`} style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: 6,
-                    background: 'rgba(20,184,166,0.2)', color: '#14B8A6', textDecoration: 'none', fontWeight: 600, fontSize: '12px',
-                    border: '1px solid rgba(20,184,166,0.3)' }}>View Profile</a>
+                <div style={{ padding: 14 }}>
+                  <div style={{ fontWeight: 700, fontSize: '16px', marginBottom: 4, color: 'var(--text)' }}>{b.name}</div>
+                  {b.type && <div style={{ color: 'var(--text-disabled)', fontSize: '11px', marginBottom: 10 }}>{b.type}</div>}
+                  <a href={`/org/${b.id}`} style={{ display: 'block', textAlign: 'center', padding: '8px',
+                    background: 'var(--text)', color: 'var(--bg)', textDecoration: 'none', fontWeight: 600, fontSize: '10px',
+                    border: '1px solid var(--border)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>VIEW PROFILE</a>
                 </div>
               );
             })()}
@@ -1330,24 +1435,25 @@ export default function UnifiedMap() {
                     <img src={m.img} alt={displayTitle} style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }}
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                   </a>}
-                  <div style={{ padding: '14px 16px' }}>
-                    <div style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, background: 'rgba(74,222,128,0.15)', color: '#4ADE80', fontSize: '10px', fontWeight: 600, marginBottom: 8, border: '1px solid rgba(74,222,128,0.3)' }}>
-                      FB Marketplace
+                  <div style={{ padding: '12px 14px' }}>
+                    <div style={{ display: 'inline-block', padding: '2px 6px', background: 'var(--surface)', color: '#4ADE80', fontSize: '9px', fontWeight: 600, marginBottom: 8, border: '1px solid var(--border)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      FB MARKETPLACE
                     </div>
-                    <a href={m.url} target="_blank" rel="noreferrer" style={{ color: '#4ADE80', textDecoration: 'none', fontWeight: 700, fontSize: '16px', display: 'block', marginBottom: 4 }}>
+                    <a href={m.url} target="_blank" rel="noreferrer" style={{ color: 'var(--text)', textDecoration: 'none', fontWeight: 700, fontSize: '14px', display: 'block', marginBottom: 4 }}>
                       {displayTitle}
                     </a>
-                    {m.title !== displayTitle && <div style={{ color: '#999', fontSize: '11px', marginBottom: 6 }}>{m.title}</div>}
-                    {m.price && <div style={{ color: '#4ade80', fontWeight: 700, fontSize: '20px', fontFamily: 'monospace', marginBottom: 8 }}>{fmtPrice(m.price)}</div>}
-                    {m.loc && <div style={{ color: '#999', fontSize: '11px', marginBottom: 6 }}>{m.loc}</div>}
-                    {m.seller && <div style={{ color: '#888', fontSize: '11px', marginBottom: 8 }}>Seller: {m.seller}</div>}
-                    {m.description && <div style={{ color: '#777', fontSize: '11px', marginBottom: 12, lineHeight: 1.5, maxHeight: 100, overflow: 'hidden' }}>{m.description}</div>}
-                    {m.scrapedAt && <div style={{ color: '#555', fontSize: '9px', marginBottom: 12 }}>Scraped: {new Date(m.scrapedAt).toLocaleString()}</div>}
+                    {m.title !== displayTitle && <div style={{ color: 'var(--text-disabled)', fontSize: '10px', marginBottom: 6 }}>{m.title}</div>}
+                    {m.price && <div style={{ color: '#4ade80', fontWeight: 700, fontSize: '18px', fontFamily: 'monospace', marginBottom: 8 }}>{fmtPrice(m.price)}</div>}
+                    {m.loc && <div style={{ color: 'var(--text-disabled)', fontSize: '10px', marginBottom: 6 }}>{m.loc}</div>}
+                    {m.seller && <div style={{ color: 'var(--text-disabled)', fontSize: '10px', marginBottom: 8 }}>Seller: {m.seller}</div>}
+                    {m.description && <div style={{ color: 'var(--text-disabled)', fontSize: '10px', marginBottom: 12, lineHeight: 1.5, maxHeight: 100, overflow: 'hidden' }}>{m.description}</div>}
+                    {m.scrapedAt && <div style={{ color: 'var(--text-disabled)', fontSize: '9px', marginBottom: 12 }}>Scraped: {new Date(m.scrapedAt).toLocaleString()}</div>}
                     <a href={m.url} target="_blank" rel="noreferrer" style={{
-                      display: 'block', textAlign: 'center', padding: '10px', borderRadius: 6,
-                      background: 'rgba(74,222,128,0.15)', color: '#4ADE80', textDecoration: 'none',
-                      fontWeight: 600, fontSize: '12px', border: '1px solid rgba(74,222,128,0.3)',
-                    }}>View on Facebook</a>
+                      display: 'block', textAlign: 'center', padding: '8px',
+                      background: 'var(--text)', color: 'var(--bg)', textDecoration: 'none',
+                      fontWeight: 600, fontSize: '10px', border: '1px solid var(--border)',
+                      textTransform: 'uppercase', letterSpacing: '0.5px',
+                    }}>VIEW ON FACEBOOK</a>
                   </div>
                 </div>
               );
@@ -1355,48 +1461,41 @@ export default function UnifiedMap() {
 
             {type === 'photo' && (() => {
               const p = pin as PhotoPin;
-              // Show real photo thumbnail, or fall back to the vehicle's primary image
               const imgSrc = p.hasRealImage ? (p.thumb || p.img) : p.vehicleThumb;
               return (
                 <div>
-                  {imgSrc && <img src={imgSrc} alt={p.vehicleTitle || 'Photo'} style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block', background: '#111' }}
+                  {imgSrc && <img src={imgSrc} alt={p.vehicleTitle || 'Photo'} style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block', background: 'var(--surface)' }}
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
                   {!imgSrc && p.vehicleTitle && (
-                    <div style={{ width: '100%', height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111', color: '#555', fontSize: 13 }}>
+                    <div style={{ width: '100%', height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface)', color: 'var(--text-disabled)', fontSize: 12 }}>
                       No image available
                     </div>
                   )}
-                  <div style={{ padding: '14px 16px' }}>
-                    {/* Vehicle title — the primary thing you care about */}
+                  <div style={{ padding: '12px 14px' }}>
                     {p.vehicleTitle ? (
                       <a href={p.vehicleId ? `/vehicle/${p.vehicleId}` : '#'} style={{
-                        color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: '15px', display: 'block', marginBottom: 6,
+                        color: 'var(--text)', textDecoration: 'none', fontWeight: 700, fontSize: '14px', display: 'block', marginBottom: 6,
                         lineHeight: 1.3,
                       }}>{p.vehicleTitle}</a>
                     ) : (
-                      <div style={{ color: '#888', fontSize: '13px', marginBottom: 6 }}>Unlinked photo</div>
+                      <div style={{ color: 'var(--text-disabled)', fontSize: '12px', marginBottom: 6 }}>Unlinked photo</div>
                     )}
-
-                    {/* Location + date on one line */}
-                    <div style={{ color: '#aaa', fontSize: '12px', marginBottom: 10, lineHeight: 1.5 }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: 10, lineHeight: 1.5 }}>
                       {p.locationName && <div>{p.locationName}</div>}
-                      {p.takenLabel && <div style={{ color: '#888' }}>{p.takenLabel}{p.cameraModel ? ` \u00b7 ${p.cameraModel}` : ''}</div>}
+                      {p.takenLabel && <div style={{ color: 'var(--text-disabled)' }}>{p.takenLabel}{p.cameraModel ? ` \u00b7 ${p.cameraModel}` : ''}</div>}
                     </div>
-
-                    {/* Source badge */}
                     {!p.hasRealImage && (
-                      <div style={{ fontSize: '10px', color: '#D946EF', marginBottom: 10, opacity: 0.7 }}>
-                        GPS location from Apple Photos
+                      <div style={{ fontSize: '9px', color: 'var(--text-disabled)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        GPS LOCATION FROM APPLE PHOTOS
                       </div>
                     )}
-
-                    {/* Action button */}
                     {p.vehicleId && (
                       <a href={`/vehicle/${p.vehicleId}`} style={{
-                        display: 'block', textAlign: 'center', padding: '10px', borderRadius: 6,
-                        background: 'rgba(217,70,239,0.15)', color: '#D946EF', textDecoration: 'none',
-                        fontWeight: 600, fontSize: '13px', border: '1px solid rgba(217,70,239,0.3)',
-                      }}>View {p.vehicleTitle.split(' ').slice(1, 3).join(' ') || 'Vehicle'}</a>
+                        display: 'block', textAlign: 'center', padding: '8px',
+                        background: 'var(--text)', color: 'var(--bg)', textDecoration: 'none',
+                        fontWeight: 600, fontSize: '10px', border: '1px solid var(--border)',
+                        textTransform: 'uppercase', letterSpacing: '0.5px',
+                      }}>VIEW {(p.vehicleTitle.split(' ').slice(1, 3).join(' ') || 'VEHICLE').toUpperCase()}</a>
                     )}
                   </div>
                 </div>
@@ -1406,7 +1505,6 @@ export default function UnifiedMap() {
         );
       })()}
 
-      {/* CSS animations */}
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1; }
@@ -1424,14 +1522,15 @@ function LT({ label, color, checked, set, n, dim, loading }: {
 }) {
   return (
     <label style={{
-      display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
-      padding: '4px 0', opacity: dim ? 0.4 : 1, fontSize: '12px',
+      display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+      padding: '3px 0', opacity: dim ? 0.4 : 1, fontSize: '11px',
+      fontFamily: MAP_FONT,
     }}>
       <input type="checkbox" checked={checked} onChange={e => set(e.target.checked)} style={{ accentColor: color }} />
-      <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
-      <span style={{ color: '#e0e0e0' }}>{label}</span>
-      <span style={{ color: '#666', marginLeft: 'auto', fontSize: '11px', fontVariantNumeric: 'tabular-nums' }}>
-        {loading ? <span style={{ color: color, animation: 'pulse 1.5s ease-in-out infinite' }}>loading</span> : n.toLocaleString()}
+      <span style={{ width: 8, height: 8, background: color, display: 'inline-block', flexShrink: 0 }} />
+      <span style={{ color: 'var(--text)' }}>{label}</span>
+      <span style={{ color: 'var(--text-disabled)', marginLeft: 'auto', fontSize: '10px', fontVariantNumeric: 'tabular-nums' }}>
+        {loading ? <span style={{ color: color, animation: 'pulse 1.5s ease-in-out infinite' }}>...</span> : n.toLocaleString()}
       </span>
     </label>
   );
@@ -1442,8 +1541,8 @@ function SliderControl({ label, value, min, max, step, onChange }: {
   onChange: (v: number) => void;
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '11px' }}>
-      <span style={{ color: '#999', width: 56, textAlign: 'right', flexShrink: 0 }}>{label}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '10px', fontFamily: MAP_FONT }}>
+      <span style={{ color: 'var(--text-disabled)', width: 50, textAlign: 'right', flexShrink: 0, fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</span>
       <input
         type="range"
         min={min}
@@ -1452,12 +1551,11 @@ function SliderControl({ label, value, min, max, step, onChange }: {
         value={value}
         onChange={e => onChange(Number(e.target.value))}
         style={{
-          flex: 1, height: 4, WebkitAppearance: 'none' as any, appearance: 'none' as any,
-          background: 'rgba(255,255,255,0.15)', outline: 'none', cursor: 'pointer',
-          borderRadius: 2,
+          flex: 1, height: 2, WebkitAppearance: 'none' as any, appearance: 'none' as any,
+          background: 'var(--border)', outline: 'none', cursor: 'pointer',
         }}
       />
-      <span style={{ color: '#666', width: 28, fontSize: '10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+      <span style={{ color: 'var(--text-disabled)', width: 24, fontSize: '9px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
     </div>
   );
 }
