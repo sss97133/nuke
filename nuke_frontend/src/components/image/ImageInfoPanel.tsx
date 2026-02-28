@@ -408,6 +408,110 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
         );
       })()}
 
+      {/* Provenance — cross-source duplicate tracking */}
+      {(() => {
+        const scanMeta = imageMetadata?.ai_scan_metadata;
+        const provenance: string[] | undefined = scanMeta?.cross_source_provenance;
+        const duplicateSources: Array<{ source: string; detected_at?: string }> | undefined = scanMeta?.duplicate_sources;
+        const isDuplicate = imageMetadata?.is_duplicate === true;
+        const duplicateOf = imageMetadata?.duplicate_of;
+
+        const sourceLabels: Record<string, string> = {
+          user_upload: 'User Upload',
+          photo_auto_sync: 'Auto Sync',
+          iphoto: 'Apple Photos',
+          bat_import_mirrored: 'BaT (mirrored)',
+          bat_import: 'BaT Import',
+          bat_image_library: 'BaT Library',
+          extractor: 'Extractor',
+          bat_listing: 'BaT Listing',
+        };
+        const getLabel = (s: string) => sourceLabels[s] || s.replace(/_/g, ' ');
+
+        const sourcePriority: Record<string, number> = { user_upload: 1, photo_auto_sync: 2, iphoto: 3 };
+        const isUserSource = (s: string) => (sourcePriority[s] ?? 50) <= 3;
+
+        if (provenance && provenance.length > 1) {
+          const imgSource = imageMetadata?.source || 'unknown';
+          const isOriginal = scanMeta?.is_original === true;
+
+          return (
+            <>
+              <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
+              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginBottom: '6px' }}>PROVENANCE</div>
+              <div style={{
+                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+                fontSize: '10px',
+                lineHeight: '16px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {isOriginal && (
+                    <span style={{
+                      padding: '1px 4px',
+                      fontSize: '8px',
+                      fontWeight: 'bold',
+                      backgroundColor: 'rgba(34,197,94,0.2)',
+                      border: '1px solid rgba(34,197,94,0.4)',
+                      color: 'rgba(74,222,128,1)',
+                      textTransform: 'uppercase',
+                    }}>ORIGINAL</span>
+                  )}
+                  <span style={{ color: 'rgba(255,255,255,0.7)' }}>
+                    Original: {getLabel(imgSource)}
+                  </span>
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
+                  Also found on: {provenance.filter(s => s !== imgSource).map(s => getLabel(s)).join(', ')}
+                </div>
+                {isUserSource(imgSource) && provenance.some(s => !isUserSource(s)) && (
+                  <div style={{
+                    marginTop: '4px',
+                    padding: '3px 6px',
+                    backgroundColor: 'rgba(34,197,94,0.08)',
+                    border: '1px solid rgba(34,197,94,0.15)',
+                    color: 'rgba(163,230,183,0.9)',
+                    fontSize: '9px',
+                  }}>
+                    Uploaded by user before appearing on auction platforms.
+                  </div>
+                )}
+              </div>
+            </>
+          );
+        }
+
+        if (isDuplicate && duplicateOf) {
+          return (
+            <>
+              <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
+              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginBottom: '6px' }}>PROVENANCE</div>
+              <div style={{
+                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+                fontSize: '10px',
+                lineHeight: '16px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{
+                    padding: '1px 4px',
+                    fontSize: '8px',
+                    fontWeight: 'bold',
+                    backgroundColor: 'rgba(239,68,68,0.2)',
+                    border: '1px solid rgba(239,68,68,0.4)',
+                    color: 'rgba(252,165,165,1)',
+                    textTransform: 'uppercase',
+                  }}>DUPLICATE</span>
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: '2px' }}>
+                  Original: {duplicateOf.substring(0, 8)}...
+                </div>
+              </div>
+            </>
+          );
+        }
+
+        return null;
+      })()}
+
       {/* AI Analysis if available - supports both appraiser and tier_1_analysis formats */}
       {(imageMetadata?.ai_scan_metadata?.appraiser || imageMetadata?.ai_scan_metadata?.tier_1_analysis) && (
         <>

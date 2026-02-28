@@ -241,6 +241,15 @@ Deno.serve(async (req) => {
 
     console.log(`[photo-pipeline] Completed in ${durationMs}ms`);
 
+    // Step 8: Fire-and-forget auto-dedup check (non-blocking)
+    // Runs after pipeline completion to detect cross-source duplicates and establish provenance
+    if (resolvedVehicleId || vehicle_id) {
+      callEdgeFunction("auto-dedup-check", {
+        image_id,
+        vehicle_id: resolvedVehicleId || vehicle_id,
+      }).catch((e: any) => console.warn("[photo-pipeline] auto-dedup-check:", e.message));
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
