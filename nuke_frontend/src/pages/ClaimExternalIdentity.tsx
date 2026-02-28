@@ -22,12 +22,14 @@ interface IdentityResult {
   } | null;
 }
 
-const PLATFORM_LABELS: Record<string, string> = {
-  bat: 'Bring a Trailer',
-  cars_and_bids: 'Cars & Bids',
-  pcarmarket: 'PCarMarket',
-  hagerty: 'Hagerty',
-};
+const PLATFORMS = [
+  { key: 'bat', label: 'Bring a Trailer', prefix: 'bringatrailer.com/member/', urlBase: 'https://bringatrailer.com/member/' },
+  { key: 'pcarmarket', label: 'PCarMarket', prefix: 'pcarmarket.com/member/', urlBase: 'https://pcarmarket.com/member/' },
+  { key: 'cars_and_bids', label: 'Cars & Bids', prefix: 'carsandbids.com/user/', urlBase: 'https://carsandbids.com/user/' },
+  { key: 'hagerty', label: 'Hagerty', prefix: 'hagerty.com/member/', urlBase: 'https://hagerty.com/member/' },
+] as const;
+
+const PLATFORM_LABELS: Record<string, string> = Object.fromEntries(PLATFORMS.map(p => [p.key, p.label]));
 
 const ClaimExternalIdentity: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -40,16 +42,38 @@ const ClaimExternalIdentity: React.FC = () => {
   const [submitting, setSubmitting] = React.useState(false);
   const [message, setMessage] = React.useState<string>('');
   const [importStep, setImportStep] = React.useState<'idle' | 'input' | 'submitting' | 'polling' | 'done'>('idle');
-  const [importUrl, setImportUrl] = React.useState('');
+  const [importUsername, setImportUsername] = React.useState('');
   const [importError, setImportError] = React.useState('');
   const [queueItemId, setQueueItemId] = React.useState<string | null>(null);
   const [importLog, setImportLog] = React.useState<{ time: Date; text: string; type?: 'info' | 'success' | 'dim' }[]>([]);
   const [queueStatus, setQueueStatus] = React.useState<string>('pending');
   const [importedMetadata, setImportedMetadata] = React.useState<any>(null);
+  const [platformCounts, setPlatformCounts] = React.useState<Record<string, number>>({});
   const logRef = React.useRef<HTMLDivElement>(null);
 
   const addLog = React.useCallback((text: string, type: 'info' | 'success' | 'dim' = 'info') => {
     setImportLog(prev => [...prev, { time: new Date(), text, type }]);
+  }, []);
+
+  // Load unclaimed counts on mount — one count query per platform
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const results = await Promise.all(
+          PLATFORMS.map(async (p) => {
+            const { count } = await supabase
+              .from('external_identities')
+              .select('id', { count: 'exact', head: true })
+              .eq('platform', p.key)
+              .is('claimed_by_user_id', null);
+            return [p.key, count || 0] as const;
+          })
+        );
+        setPlatformCounts(Object.fromEntries(results));
+      } catch {
+        setPlatformCounts({ bat: 503600, pcarmarket: 3979, cars_and_bids: 1205, hagerty: 13 });
+      }
+    })();
   }, []);
 
   // Auto-scroll log
@@ -85,7 +109,6 @@ const ClaimExternalIdentity: React.FC = () => {
             setQueueStatus('complete');
             addLog('Extraction complete', 'success');
 
-            // Fetch the enriched identity
             if (selectedIdentity) {
               const { data: enriched } = await supabase
                 .from('external_identities')
@@ -146,9 +169,7 @@ const ClaimExternalIdentity: React.FC = () => {
       setSearchResults([]);
       return;
     }
-    const timer = setTimeout(() => {
-      search();
-    }, 300);
+    const timer = setTimeout(() => { search(); }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery, searchPlatform]);
 
@@ -212,51 +233,104 @@ const ClaimExternalIdentity: React.FC = () => {
     }
   };
 
-  const formatNumber = (n: number) => n.toLocaleString();
+  const doImport = async (platform: string, username: string) => {
+    const plat = PLATFORMS.find(p => p.key === platform);
+    if (!plat || !username.trim()) return;
+
+    const profileUrl = plat.urlBase + username.trim().replace(/\/+$/, '');
+    setImportStep('submitting');
+    setImportError('');
+    setImportLog([]);
+    addLog(`Importing ${username.trim()} from ${plat.label}...`);
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData?.session?.user?.id || null;
+
+      const { data, error } = await supabase.functions.invoke('ingest-external-profile', {
+        body: { platform, profile_url: profileUrl, notify_user_id: userId },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Import failed');
+
+      addLog(`Identity created: ${data.identity.handle}`, 'success');
+      setSelectedIdentity(data.identity);
+
+      if (data.queue_item_id) {
+        setQueueItemId(data.queue_item_id);
+        setQueueStatus(data.queue_status || 'pending');
+        addLog('Queued for full profile extraction (priority: high)', 'info');
+        addLog('Waiting for worker to pick up...', 'dim');
+        setImportStep('polling');
+      } else {
+        addLog('Profile ready — claim it now.', 'success');
+        setImportStep('done');
+      }
+    } catch (e: any) {
+      console.error('Import failed:', e);
+      setImportError(e?.message || 'Failed to import profile');
+      addLog(`Error: ${e?.message || 'Failed to import'}`, 'info');
+      setImportStep('input');
+    }
+  };
+
+  const formatNumber = (n: number) => {
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+    if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K`;
+    return n.toLocaleString();
+  };
+
+  const activePlatform = PLATFORMS.find(p => p.key === searchPlatform);
 
   return (
     <div style={{ padding: 'var(--space-4)', maxWidth: 900, margin: '0 auto' }}>
       <style>{`@keyframes pulse { 0%,100% { opacity: .3 } 50% { opacity: 1 } }`}</style>
+
       {/* Header */}
       <div style={{ marginBottom: 'var(--space-6)' }}>
         <h1 className="heading-1" style={{ marginBottom: 'var(--space-2)' }}>Claim Your Identity</h1>
-        <div className="text-small" style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
+        <div className="text-small" style={{ color: 'var(--text-muted)' }}>
           Find your account. Inherit your reputation.
         </div>
-        <div style={{
-          display: 'inline-flex',
-          gap: 'var(--space-4)',
-          padding: 'var(--space-3) var(--space-4)',
-          backgroundColor: 'var(--grey-100)',
-          borderRadius: '4px',
-          fontSize: '12px'
-        }}>
-          <div><strong>443K</strong> BaT identities</div>
-          <div><strong>1K</strong> PCarMarket</div>
-          <div><strong>758</strong> Cars & Bids</div>
-          <div style={{ color: 'var(--text-muted)' }}>waiting to be claimed</div>
-        </div>
+      </div>
+
+      {/* Platform cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+        {PLATFORMS.map(p => {
+          const count = platformCounts[p.key] || (p.key === 'cars_and_bids' ? (platformCounts['carsandbids'] || 0) + (platformCounts['cars_and_bids'] || 0) : 0);
+          const isActive = searchPlatform === p.key;
+          return (
+            <div
+              key={p.key}
+              onClick={() => { setSearchPlatform(p.key); setImportStep('idle'); setImportLog([]); setImportError(''); }}
+              style={{
+                padding: 'var(--space-3) var(--space-4)',
+                border: isActive ? '2px solid var(--primary)' : '1px solid var(--border-light)',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                backgroundColor: isActive ? 'var(--grey-50)' : 'var(--white)',
+                transition: 'border-color 0.15s',
+              }}
+            >
+              <div style={{ fontSize: '13px', fontWeight: 600 }}>{p.label}</div>
+              {count > 0 && (
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 2 }}>
+                  <strong style={{ color: 'var(--text)' }}>{formatNumber(count)}</strong> unclaimed
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Search */}
       <div className="card" style={{ padding: 'var(--space-6)', marginBottom: 'var(--space-4)' }}>
         <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
-          <select
-            className="form-input"
-            value={searchPlatform}
-            onChange={(e) => setSearchPlatform(e.target.value)}
-            style={{ width: 180, fontSize: '13px', padding: '12px' }}
-          >
-            <option value="bat">Bring a Trailer</option>
-            <option value="cars_and_bids">Cars & Bids</option>
-            <option value="pcarmarket">PCarMarket</option>
-            <option value="hagerty">Hagerty</option>
-          </select>
           <input
             className="form-input"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Your username..."
+            placeholder={`Your ${activePlatform?.label || ''} username...`}
             autoFocus
             style={{ flex: 1, fontSize: '19px', padding: '12px 16px' }}
           />
@@ -302,8 +376,8 @@ const ClaimExternalIdentity: React.FC = () => {
                   </div>
                   {identity.stats && (
                     <div style={{ display: 'flex', gap: 'var(--space-4)', fontSize: '12px', color: 'var(--text-muted)' }}>
-                      <div><strong style={{ color: 'var(--text)' }}>{formatNumber(identity.stats.comments)}</strong> comments</div>
-                      <div><strong style={{ color: 'var(--text)' }}>{formatNumber(identity.stats.bids)}</strong> bids</div>
+                      <div><strong style={{ color: 'var(--text)' }}>{identity.stats.comments.toLocaleString()}</strong> comments</div>
+                      <div><strong style={{ color: 'var(--text)' }}>{identity.stats.bids.toLocaleString()}</strong> bids</div>
                       {identity.stats.wins > 0 && (
                         <div><strong style={{ color: 'var(--text)' }}>{identity.stats.wins}</strong> wins</div>
                       )}
@@ -319,14 +393,14 @@ const ClaimExternalIdentity: React.FC = () => {
         {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
           <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)' }}>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', marginBottom: 'var(--space-3)' }}>
-              No "{searchQuery}" found on {PLATFORM_LABELS[searchPlatform] || searchPlatform}
+              No "{searchQuery}" found on {activePlatform?.label || searchPlatform}
             </div>
 
             {importStep === 'idle' && (
               <div style={{ textAlign: 'center' }}>
                 <button
                   className="button button-secondary"
-                  onClick={() => { setImportStep('input'); setImportError(''); setImportLog([]); }}
+                  onClick={() => { setImportStep('input'); setImportError(''); setImportLog([]); setImportUsername(searchQuery); }}
                   style={{ fontSize: '13px' }}
                 >
                   Not seeing your profile? Import it
@@ -334,7 +408,7 @@ const ClaimExternalIdentity: React.FC = () => {
               </div>
             )}
 
-            {(importStep === 'input' || importStep === 'submitting') && (
+            {(importStep === 'input' || importStep === 'submitting') && activePlatform && (
               <div style={{
                 padding: 'var(--space-4)',
                 border: '1px solid var(--border-light)',
@@ -342,65 +416,42 @@ const ClaimExternalIdentity: React.FC = () => {
                 backgroundColor: 'var(--grey-50)',
               }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
-                  Paste your {PLATFORM_LABELS[searchPlatform] || searchPlatform} profile URL
+                  Import from {activePlatform.label}
                 </div>
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 0, border: '1px solid var(--border-light)', borderRadius: '4px', overflow: 'hidden', backgroundColor: 'var(--white)' }}>
+                  <div style={{
+                    padding: '10px 2px 10px 12px',
+                    fontSize: '13px',
+                    color: 'var(--text-muted)',
+                    whiteSpace: 'nowrap',
+                    backgroundColor: 'var(--grey-100)',
+                    borderRight: '1px solid var(--border-light)',
+                    userSelect: 'none',
+                  }}>
+                    {activePlatform.prefix}
+                  </div>
                   <input
-                    className="form-input"
-                    value={importUrl}
-                    onChange={(e) => { setImportUrl(e.target.value); setImportError(''); }}
-                    placeholder={
-                      searchPlatform === 'bat' ? 'https://bringatrailer.com/member/username/' :
-                      searchPlatform === 'cars_and_bids' ? 'https://carsandbids.com/user/username' :
-                      searchPlatform === 'pcarmarket' ? 'https://pcarmarket.com/member/username' :
-                      'Profile URL'
-                    }
+                    value={importUsername}
+                    onChange={(e) => { setImportUsername(e.target.value); setImportError(''); }}
+                    placeholder="username"
                     disabled={importStep === 'submitting'}
-                    style={{ flex: 1, fontSize: '13px', padding: '10px 12px' }}
+                    autoFocus
+                    style={{
+                      flex: 1,
+                      border: 'none',
+                      outline: 'none',
+                      padding: '10px 12px',
+                      fontSize: '15px',
+                      fontWeight: 600,
+                      backgroundColor: 'transparent',
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && importUsername.trim()) doImport(searchPlatform, importUsername); }}
                   />
                   <button
                     className="cursor-button"
-                    disabled={importStep === 'submitting' || !importUrl.trim()}
-                    style={{ padding: '10px 16px', fontSize: '12px', whiteSpace: 'nowrap' }}
-                    onClick={async () => {
-                      setImportStep('submitting');
-                      setImportError('');
-                      setImportLog([]);
-                      addLog(`Importing from ${PLATFORM_LABELS[searchPlatform] || searchPlatform}...`);
-                      try {
-                        const { data: sessionData } = await supabase.auth.getSession();
-                        const userId = sessionData?.session?.user?.id || null;
-
-                        const { data, error } = await supabase.functions.invoke('ingest-external-profile', {
-                          body: {
-                            platform: searchPlatform,
-                            profile_url: importUrl.trim(),
-                            notify_user_id: userId,
-                          },
-                        });
-                        if (error) throw error;
-                        if (!data?.success) throw new Error(data?.error || 'Import failed');
-
-                        addLog(`Identity created: ${data.identity.handle}`, 'success');
-                        setSelectedIdentity(data.identity);
-
-                        if (data.queue_item_id) {
-                          setQueueItemId(data.queue_item_id);
-                          setQueueStatus(data.queue_status || 'pending');
-                          addLog('Queued for full profile extraction (priority: high)', 'info');
-                          addLog('Waiting for worker to pick up...', 'dim');
-                          setImportStep('polling');
-                        } else {
-                          addLog('Profile ready — claim it now.', 'success');
-                          setImportStep('done');
-                        }
-                      } catch (e: any) {
-                        console.error('Import failed:', e);
-                        setImportError(e?.message || 'Failed to import profile');
-                        addLog(`Error: ${e?.message || 'Failed to import'}`, 'info');
-                        setImportStep('input');
-                      }
-                    }}
+                    disabled={importStep === 'submitting' || !importUsername.trim()}
+                    style={{ padding: '10px 16px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: 0 }}
+                    onClick={() => doImport(searchPlatform, importUsername)}
                   >
                     {importStep === 'submitting' ? 'IMPORTING...' : 'IMPORT'}
                   </button>
@@ -524,8 +575,8 @@ const ClaimExternalIdentity: React.FC = () => {
             }}>
               <strong>You'll inherit:</strong>
               <div style={{ marginTop: 'var(--space-2)', display: 'flex', gap: 'var(--space-4)' }}>
-                <div>{formatNumber(selectedIdentity.stats.comments)} comments</div>
-                <div>{formatNumber(selectedIdentity.stats.bids)} bids</div>
+                <div>{selectedIdentity.stats.comments.toLocaleString()} comments</div>
+                <div>{selectedIdentity.stats.bids.toLocaleString()} bids</div>
                 {selectedIdentity.stats.wins > 0 && <div>{selectedIdentity.stats.wins} auction wins</div>}
               </div>
             </div>
@@ -555,7 +606,6 @@ const ClaimExternalIdentity: React.FC = () => {
                 Verify your claim
               </div>
 
-              {/* Primary: Add code to profile */}
               <div style={{
                 padding: 'var(--space-4)',
                 backgroundColor: 'var(--grey-50)',
@@ -583,7 +633,6 @@ const ClaimExternalIdentity: React.FC = () => {
                 </div>
               </div>
 
-              {/* Alternative: SMS */}
               <div style={{
                 padding: 'var(--space-4)',
                 border: '1px solid var(--border-light)',
@@ -598,7 +647,6 @@ const ClaimExternalIdentity: React.FC = () => {
                 </div>
               </div>
 
-              {/* Alternative: Send ID */}
               <div style={{
                 padding: 'var(--space-4)',
                 border: '1px solid var(--border-light)',
