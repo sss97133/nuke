@@ -190,24 +190,27 @@ function extractPhotoMeta(p) {
 
 // ─── Photo export ────────────────────────────────────────────────────────────
 
-function exportAlbum(albumName, destDir) {
+function exportAlbum(albumName, destDir, downloadFromICloud = false) {
   mkdirSync(destDir, { recursive: true });
-  console.log(`  Exporting "${albumName}" → ${destDir}`);
-  // --download-missing uses AppleScript and can block indefinitely on single missing photos.
-  // Since Photos library is fully synced (osxphotos query --missing returns 0-1), skip it.
-  // Use --use-photos-export for Photos-native export (handles edited/HDR correctly).
-  // Note: --download-missing uses AppleScript and blocks indefinitely on iCloud-only photos.
-  // Omitting it means truly missing photos are skipped, which is the desired behavior when
-  // the library is already synced locally.
-  const result = spawnSync('osxphotos', [
-    'export', destDir,
-    '--album', albumName,
-    '--overwrite',
-  ], { encoding: 'utf8', stdio: 'pipe' });
+  console.log(`  Exporting "${albumName}" → ${destDir}${downloadFromICloud ? ' (downloading from iCloud)' : ''}`);
 
-  if (result.status !== 0) {
-    console.error('  Export error:', result.stderr?.slice(0, 200));
-    return false;
+  if (downloadFromICloud) {
+    // Pipe "y" to handle the interactive "Do you want to continue?" prompt
+    const result = spawnSync('bash', ['-c',
+      `echo "y" | osxphotos export "${destDir}" --album "${albumName}" --download-missing --overwrite`
+    ], { encoding: 'utf8', stdio: 'pipe', timeout: 600000 }); // 10 min timeout per album
+    if (result.status !== 0 && result.status !== null) {
+      console.error('  Export error:', (result.stderr || '').slice(0, 200));
+      return false;
+    }
+  } else {
+    const result = spawnSync('osxphotos', [
+      'export', destDir, '--album', albumName, '--overwrite',
+    ], { encoding: 'utf8', stdio: 'pipe' });
+    if (result.status !== 0) {
+      console.error('  Export error:', (result.stderr || '').slice(0, 200));
+      return false;
+    }
   }
   return true;
 }
@@ -500,6 +503,148 @@ async function mapOnlyAlbum(albumName, vehicleId = null) {
   return inserted;
 }
 
+// ─── Sync mode: download from iCloud → upload → replace placeholders ────────
+
+async function syncAlbum(albumName, vehicleId = null) {
+  console.log(`\nSync: "${albumName}"`);
+
+  if (!vehicleId) {
+    const parsed = parseAlbumName(albumName);
+    if (!parsed) { console.log('  Could not parse album name, skipping'); return null; }
+    const match = await findVehicle(parsed.year, parsed.make, parsed.model);
+    if (!match) { console.log('  No vehicle match in DB — skipping'); return null; }
+    vehicleId = match.id;
+    console.log(`  Vehicle: ${match.year} ${match.make} ${match.model} → ${match.id}`);
+  }
+
+  const tmpExport = join(os.tmpdir(), `iphoto_sync_${Date.now()}`);
+  const tmpJpeg = join(os.tmpdir(), `iphoto_jpeg_${Date.now()}`);
+
+  try {
+    // Query metadata BEFORE export
+    const metaMap = queryAlbumMetadata(albumName);
+
+    // Download from iCloud + export
+    const ok = exportAlbum(albumName, tmpExport, true);
+    if (!ok) return null;
+
+    const count = convertHeicToJpeg(tmpExport, tmpJpeg);
+    console.log(`  Converted: ${count} images`);
+    if (count === 0) { console.log('  No images to upload'); return null; }
+
+    // Get existing placeholder records for this vehicle (to replace them)
+    // Placeholders may be keyed by UUID filename or original filename — build a
+    // reverse lookup from the osxphotos metadata that maps original→UUID and vice versa.
+    const { data: placeholders } = await supabase
+      .from('vehicle_images')
+      .select('id, file_name')
+      .eq('vehicle_id', vehicleId)
+      .eq('source', 'iphoto')
+      .like('image_url', '%placeholder.nuke.app%');
+    const placeholderById = new Map();
+    for (const p of (placeholders || [])) {
+      placeholderById.set(baseName(p.file_name), p.id);
+    }
+    // Also build mapping from original_filename → placeholder ID via metaMap's dual keys
+    // metaMap has entries for both UUID filename and original filename pointing to same meta.
+    // Placeholders were keyed by whichever came first. We need to find the placeholder for
+    // each exported file (which uses original_filename like IMG_XXXX).
+    const placeholderMap = new Map(placeholderById);
+    // Walk the metaMap to find UUID↔original pairs
+    const metaToKeys = new Map();
+    for (const [key, meta] of metaMap.entries()) {
+      if (!metaToKeys.has(meta)) metaToKeys.set(meta, []);
+      metaToKeys.get(meta).push(key);
+    }
+    for (const [_meta, keys] of metaToKeys.entries()) {
+      // Find which key has a placeholder
+      let phId = null;
+      for (const k of keys) { phId = placeholderById.get(k); if (phId) break; }
+      // Map ALL keys to that placeholder ID
+      if (phId) { for (const k of keys) placeholderMap.set(k, phId); }
+    }
+
+    // Get existing real images (skip these)
+    const { data: realExisting } = await supabase
+      .from('vehicle_images')
+      .select('file_name')
+      .eq('vehicle_id', vehicleId)
+      .eq('source', 'iphoto')
+      .like('image_url', '%supabase.co/storage%');
+    const realNames = new Set((realExisting || []).map(r => r.file_name));
+
+    const files = readdirSync(tmpJpeg).filter(f => /\.(jpg|jpeg|png)$/i.test(f));
+    let uploaded = 0, replaced = 0, skipped = 0, errors = 0;
+
+    for (let i = 0; i < files.length; i += BATCH_SIZE) {
+      const batch = files.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(async (filename) => {
+        // Skip if already have a real image for this file
+        if (realNames.has(filename)) { skipped++; return; }
+
+        const filePath = join(tmpJpeg, filename);
+        const fileData = readFileSync(filePath);
+        const fileSize = statSync(filePath).size;
+        const storagePath = `${vehicleId}/iphoto/${filename}`;
+        const mimeType = /\.png$/i.test(filename) ? 'image/png' : 'image/jpeg';
+
+        // Upload to storage
+        const { error: uploadError } = await supabase.storage
+          .from(BUCKET)
+          .upload(storagePath, fileData, { contentType: mimeType, upsert: true });
+        if (uploadError) { errors++; return; }
+
+        const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
+        const meta = metaMap.get(baseName(filename)) || {};
+
+        // Check if we have a placeholder to replace
+        const placeholderId = placeholderMap.get(baseName(filename));
+        if (placeholderId) {
+          // Replace placeholder with real image URL
+          const { error: upErr } = await supabase.from('vehicle_images')
+            .update({
+              image_url: publicUrl,
+              storage_path: storagePath,
+              mime_type: mimeType,
+              file_size: fileSize,
+            })
+            .eq('id', placeholderId);
+          if (!upErr) { replaced++; uploaded++; } else { errors++; }
+        } else {
+          // Insert new record
+          const row = {
+            vehicle_id: vehicleId,
+            image_url: publicUrl,
+            storage_path: storagePath,
+            source: 'iphoto',
+            mime_type: mimeType,
+            file_name: filename,
+            file_size: fileSize,
+            is_external: false,
+            ai_processing_status: 'pending',
+            documented_by_user_id: USER_ID,
+            ...(meta.latitude != null && { latitude: meta.latitude }),
+            ...(meta.longitude != null && { longitude: meta.longitude }),
+            ...(meta.location_name && { location_name: meta.location_name }),
+            ...(meta.taken_at && { taken_at: meta.taken_at }),
+            ...(meta.exif_data && { exif_data: meta.exif_data }),
+          };
+          const { error: insErr } = await supabase.from('vehicle_images').insert(row);
+          if (insErr && !insErr.message.includes('duplicate')) { errors++; }
+          else { uploaded++; }
+        }
+      }));
+      process.stdout.write(`\r  ${i + batch.length}/${files.length} (${uploaded} up, ${replaced} replaced, ${skipped} skip, ${errors} err)  `);
+    }
+    process.stdout.write('\n');
+    console.log(`  Done: ${uploaded} uploaded (${replaced} replaced placeholders), ${skipped} skipped, ${errors} errors`);
+    return { uploaded, replaced, skipped, errors, total: files.length };
+  } finally {
+    try { rmSync(tmpExport, { recursive: true, force: true }); } catch {}
+    try { rmSync(tmpJpeg, { recursive: true, force: true }); } catch {}
+  }
+}
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 if (flag('--backfill-gps')) {
@@ -517,6 +662,26 @@ if (flag('--backfill-gps')) {
       total += count;
     }
     console.log(`\nTotal backfilled: ${total} images`);
+  }
+
+} else if (flag('--sync')) {
+  const albumName = arg('--album');
+  const vehicleId = arg('--vehicle-id');
+  if (albumName) {
+    await syncAlbum(albumName, vehicleId);
+  } else {
+    const albums = listAlbums();
+    console.log(`Syncing ${albums.length} vehicle albums (download from iCloud → upload)...`);
+    let totalUploaded = 0, totalReplaced = 0, albumsDone = 0;
+    for (const a of albums) {
+      const result = await syncAlbum(a.name);
+      if (result) {
+        totalUploaded += result.uploaded;
+        totalReplaced += result.replaced;
+        albumsDone++;
+      }
+    }
+    console.log(`\nTotal: ${totalUploaded} photos uploaded (${totalReplaced} replaced) across ${albumsDone} albums`);
   }
 
 } else if (flag('--map-only')) {
@@ -579,5 +744,9 @@ GPS backfill (update existing images with GPS from Apple Photos):
 Map-only mode (GPS metadata without image upload — works with iCloud-only photos):
   node scripts/iphoto-intake.mjs --map-only                              # all albums
   node scripts/iphoto-intake.mjs --map-only --album "1968 Porsche 911"
+
+Full sync (download from iCloud → convert → upload → replace placeholders):
+  node scripts/iphoto-intake.mjs --sync                                  # all albums
+  node scripts/iphoto-intake.mjs --sync --album "1977 K5 Chevrolet Blazer"
   `);
 }
