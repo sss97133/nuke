@@ -309,7 +309,7 @@ async function startSweepJob(locationCount) {
       disappeared_detected: 0,
       errors: 0,
       metadata: {
-        scraper_version: "2.1",
+        scraper_version: "3.0",
         year_range: [YEAR_MIN, YEAR_MAX],
         max_pages: MAX_PAGES,
         started_by: "local-scraper",
@@ -812,12 +812,13 @@ async function main() {
     locationsToScrape = [["austin", METRO_AREAS.austin]];
   }
 
-  console.log(`FB Marketplace Local Scraper v2.1`);
+  console.log(`FB Marketplace Local Scraper v3.0`);
   console.log(`Locations: ${locationsToScrape.length}`);
   console.log(`Year range: ${YEAR_MIN}-${YEAR_MAX}`);
   console.log(`Max pages per location: ${MAX_PAGES}`);
   console.log(`Dry run: ${DRY_RUN}`);
   console.log(`Disappearance detection: ${!SKIP_DISAPPEARANCE && !DRY_RUN}`);
+  console.log(`Vehicle creation: ${!SKIP_VEHICLES && !DRY_RUN}`);
   console.log(`Estimated max listings to scan: ${locationsToScrape.length * MAX_PAGES * 24}`);
 
   // Create sweep job
@@ -888,11 +889,13 @@ async function main() {
       status: "completed",
       completed_at: new Date().toISOString(),
       metadata: {
-        scraper_version: "2.1",
+        scraper_version: "3.0",
         year_range: [YEAR_MIN, YEAR_MAX],
         max_pages: MAX_PAGES,
         started_by: "local-scraper",
         unique_sellers: totals.sellers,
+        vehicles_created: totals.vehicles,
+        images_inserted: totals.images,
         disappeared: disappeared,
       },
     });
