@@ -595,3 +595,9 @@ Automated Labor Estimation Pipeline — all 7 phases built, deployed, and commit
 
 ### Agent: Quality Score Backfill Acceleration — 2026-03-01 ~00:30 UTC — COMPLETED
 - DONE: Scored 790K+ vehicles, 99.94% coverage, maintenance cron installed (job 343)
+
+### Agent: VIN Backfill Deployer — 2026-03-01 ~now
+- Task: Deploy backfill-vin-from-snapshots, test, run batches, set up cron
+- Files: supabase/functions/backfill-vin-from-snapshots/
+- Status: Starting
+

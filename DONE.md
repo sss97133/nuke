@@ -2338,3 +2338,15 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - [frontend] Updated ClaimExternalIdentity.tsx — "Not seeing your profile?" import wizard replaces bare "Claim anyway" button; URL paste → instant identity creation → async stats enrichment
 - [frontend] Updated Notifications.tsx — added action_url to query and renders as clickable "View →" link
 - [identity] Verified end-to-end: skylarwilliams ingested → priority 90 queue → processed → 15 listings found → identity updated
+
+## 2026-03-01
+
+[backfill] Deployed backfill-vin-from-snapshots v1.2.0 — extracts VINs from archived HTML snapshots for vehicles missing VINs
+  - Pure regex extraction, no LLM needed — parses BaT listing details, Mecum __NEXT_DATA__, JSON-LD, generic VIN labels
+  - 76,570 candidates (vehicles with missing VINs + available snapshots) in pipeline
+  - Manual session: 345 VINs found, 194 successfully backfilled, 151 were duplicate records
+  - Hit rate: ~65% of candidates with snapshots have extractable VINs
+  - v1.2.0 added random offset for cron (prevents re-processing same duplicates)
+  - Cron job #345: runs every 10 minutes, batch_size=50
+  - ~30 VINs backfilled per cron invocation at current rates
+  - Estimated: ~30,000+ recoverable VINs from existing snapshot archive
