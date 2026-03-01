@@ -2161,11 +2161,28 @@ body {
   margin-bottom: var(--space-4);
 }
 
-/* Vehicle Profile Two Column Layout */
+/* Vehicle Profile Two Column Layout — BaT-style 2:1 ratio */
 .vehicle-profile-two-column {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 2fr 1fr;
   gap: var(--space-4);
+}
+
+/* Strip gallery chrome when inside vehicle profile right column */
+.vehicle-profile-right-column .gallery-story-bar,
+.vehicle-profile-right-column .gallery-controls-bar {
+  display: none !important;
+}
+/* Hide image diagnostic overlays (condition scores, damage dots, quality badges) in profile */
+.vehicle-profile-right-column [title^="Condition:"],
+.vehicle-profile-right-column [title^="Damage:"],
+.vehicle-profile-right-column [title^="Photo quality:"] {
+  display: none !important;
+}
+/* Override image grid to 2 columns in narrow profile right column */
+.vehicle-profile-right-column [data-zone-section] > div:last-child {
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 2px !important;
 }
 
 /* Buyer view (QR / public): left column is a tight spec strip so gallery is the hero */

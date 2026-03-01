@@ -1835,8 +1835,8 @@ const VehicleProfile: React.FC = () => {
 
         {/* Workspace tab bar removed — all content renders flat */}
 
-        {/* Main Content - Tab-filtered workspace */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
+        {/* Main Content */}
+        <div style={{ marginTop: '0' }}>
           <React.Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>Loading...</div>}>
             {vehicle ? (
               <WorkspaceContent
