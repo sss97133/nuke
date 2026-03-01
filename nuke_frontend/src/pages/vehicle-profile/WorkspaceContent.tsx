@@ -196,8 +196,8 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   return (
     <>
       {/* === Two-Column Layout: Comments (left) | Images (right) === */}
-      {/* Grid container is sticky; each column scrolls independently */}
-      <div style={{ minHeight: '200vh' }}>
+      {/* Grid container is sticky; paddingBottom creates scroll room for hero to scroll away */}
+      <div style={{ paddingBottom: paneHeight }}>
         <div
           className="vehicle-profile-two-column"
           style={{
@@ -212,6 +212,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {/* LEFT COLUMN: Comments + Vehicle Details */}
           <div style={{
             overflowY: 'auto',
+            height: '100%',
             display: 'flex',
             flexDirection: 'column',
             gap: 'var(--space-3)',
@@ -363,6 +364,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {/* RIGHT COLUMN: Images + Videos */}
           <div style={{
             overflowY: 'auto',
+            height: '100%',
             display: 'flex',
             flexDirection: 'column',
             gap: '12px',

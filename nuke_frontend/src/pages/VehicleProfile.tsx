@@ -1768,8 +1768,8 @@ const VehicleProfile: React.FC = () => {
   // Render vehicle profile (responsive for mobile and desktop)
   return (
       <div>
-        {/* Vehicle Header with Price */}
-        <div ref={vehicleHeaderRef}>
+        {/* Vehicle Header with Price — sticky wrapper */}
+        <div ref={vehicleHeaderRef} style={{ position: 'sticky', top: 'var(--header-height, 40px)', zIndex: 900, background: 'var(--surface)' }}>
           <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading header...</div>}>
             <VehicleHeader
               vehicle={vehicle}

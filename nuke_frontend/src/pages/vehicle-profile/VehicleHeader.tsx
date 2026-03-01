@@ -1642,10 +1642,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     <div
       className="vehicle-price-header"
       style={{
-        position: 'sticky',
-        top: 'var(--header-height, 40px)',
-        zIndex: 900,
-        background: 'var(--surface)',
         borderBottom: '1px solid var(--border)',
         padding: '0px 8px',
         margin: 0,

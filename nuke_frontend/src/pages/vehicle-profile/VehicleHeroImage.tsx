@@ -78,7 +78,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
               style={{
                 width: '100%',
                 aspectRatio: '16/9',
-                maxHeight: '600px',
+                maxHeight: '360px',
                 position: 'relative',
                 overflow: 'hidden',
                 borderRadius: 'var(--radius-2)',
