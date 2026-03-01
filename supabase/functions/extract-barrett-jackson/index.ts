@@ -731,7 +731,10 @@ async function fetchAndParse(url: string): Promise<BJVehicle> {
     callerName: "extract-barrett-jackson",
   });
 
-  if (directResult.html && directResult.statusCode !== 403) {
+  const isBlocked = directResult.statusCode === 403 || directResult.statusCode === 503 ||
+    (directResult.html && directResult.html.length < 50000 &&
+     (directResult.html.includes("cf_chl_opt") || directResult.html.includes("Just a moment")));
+  if (directResult.html && !isBlocked) {
     if (isPageRemoved(directResult.html, null)) {
       throw new Error("PAGE_NOT_FOUND");
     }

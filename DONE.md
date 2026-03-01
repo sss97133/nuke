@@ -1,5 +1,26 @@
 # DONE — Completed Work Log
 
+## 2026-03-01
+
+[snapshots] Fixed snapshot success rates for Bonhams, Barrett-Jackson, Cars & Bids, Craigslist
+  - archiveFetch: Added isGarbageHtml() to detect Cloudflare challenges, React shells, and bot walls — marks as success=false instead of true
+  - Craigslist: Replaced raw fetch() with archiveFetch() in extract-craigslist, process-cl-queue, scrape-all-craigslist-squarebodies — was creating 0 snapshots
+  - Craigslist: Removed bot User-Agent that Craigslist blocks, now uses browser UAs via hybridFetcher
+  - Bonhams: Added JSON-LD fallback when Firecrawl fails/credits exhausted — gets year/make/model/price from React shell
+  - Bonhams: Wrapped Firecrawl call in try/catch so credits exhaustion doesn't crash the extractor
+  - Barrett-Jackson: Added 503 and Cloudflare JS challenge detection to skip useless direct fetches faster
+  - Cars & Bids: Increased Firecrawl maxAttempts from 1 to 2 (retry once on transient failure)
+  - Cars & Bids: Added missing fetched_at timestamp to snapshot records
+
+[agent-hierarchy] Wired agent hierarchy into pg_cron for continuous processing
+  - agent-tier-router-pipeline (job 336): every 5 min, runs full Haiku dispatch + Sonnet review cycle (10 items/batch)
+  - haiku-extraction-worker (job 337): every 2 min, additional Haiku extraction capacity (10 items/batch)
+  - sonnet-supervisor-review (job 338): every 10 min, additional Sonnet review for pending_review items (10 items/batch)
+  - All three functions tested manually — healthy and processing correctly
+  - 460 pending items in import_queue at deploy time
+  - Migration: 20260301010000_agent_hierarchy_crons.sql
+  - Enables 10x cheaper extraction via Haiku ($1/$5 MTok) vs Sonnet ($3/$15 MTok)
+
 ## 2026-02-28 (Photo Spatial Mapping — 10K GPS Pins)
 - [scripts] iphoto-intake.mjs: Added `--map-only` mode — inserts GPS metadata from osxphotos without requiring local image files (works with iCloud-only photos)
 - [scripts] iphoto-intake.mjs: `queryAlbumMetadata()` extracts lat/lng/place/date/EXIF from osxphotos JSON, `extractPhotoMeta()` handles nested place objects

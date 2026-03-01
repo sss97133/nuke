@@ -1,30 +1,21 @@
-# Auto-Checkpoint — 2026-02-28 19:16:01
+# Auto-Checkpoint — 2026-03-01 00:31:42
 *(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
 
 ## Recent Commits (last 30 min)
-none
+ed296b2e8 fix: resolve 5 frontend crash bugs in upload, notification, pricing, and comment components
 
 ## Uncommitted Changes
 .claude/ACTIVE_AGENTS.md
 .claude/HANDOFF.md
-.claude/agents/REGISTRY.md
-.claude/agents/cwfto/.claude/settings.local.json
-.claude/agents/cwfto/ACTION_PLAN.md
-.claude/agents/cwfto/CLAUDE.md
-.claude/agents/cwfto/CRITICAL_BUGS_FROM_USER_TESTING.md
-.claude/agents/cwfto/USER_PANEL.md
-.claude/settings.local.json
-CLAUDE.md
 DONE.md
-NUKE_COMPANY_BRIEF.md
-PROJECT_STATE.md
-TOOLS.md
-facebook-marketplace-extraction.md
 mcp-server
-nuke_frontend/package-lock.json
-nuke_frontend/package.json
-nuke_frontend/src/components/ComprehensiveWorkOrderReceipt.tsx
-nuke_frontend/src/components/ErrorBoundary.tsx
+supabase/functions/_shared/archiveFetch.ts
+supabase/functions/extract-barrett-jackson/index.ts
+supabase/functions/extract-bonhams/index.ts
+supabase/functions/extract-cars-and-bids-core/index.ts
+supabase/functions/extract-craigslist/index.ts
+supabase/functions/process-cl-queue/index.ts
+supabase/functions/scrape-all-craigslist-squarebodies/index.ts
 
 ## Staged
 none

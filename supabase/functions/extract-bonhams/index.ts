@@ -541,32 +541,48 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
   let html = fetchResult.html || "";
   let markdown = fetchResult.markdown || null;
 
+  // The direct fetch returns a React shell (~120KB) with JSON-LD metadata but
+  // no lot descriptions. Extract JSON-LD now as a baseline (year/make/model/price).
+  // We'll try Firecrawl for the rich content (description, specs, images).
+  const directJsonLd = html.length > 500 ? extractJsonLd(html) : null;
+  if (directJsonLd) {
+    console.log(`[Bonhams] JSON-LD from direct fetch: ${directJsonLd.name?.slice(0, 80)}`);
+  }
+
   // Check if we got meaningful content.
   // Bonhams uses client-side React rendering — the direct fetch returns a bare
   // React shell (~120KB) with NO lot data visible in the HTML. We need Firecrawl
   // (JS rendering) to extract lot descriptions and specs.
   // Skip Firecrawl only when we already have rich markdown (from a prior Firecrawl run).
-  // NOTE: The React shell always has JSON-LD site metadata AND is 120KB+, so we cannot
-  // use hasJsonLd or html.length as indicators of meaningful content — both are misleading.
   const hasLotContent = markdown && markdown.length > 5000; // Rich markdown means we already have JS-rendered content
   const needsFirecrawl = !hasLotContent; // Always Firecrawl unless we already have good markdown
 
   if (needsFirecrawl) {
-    console.log(`[Bonhams] No cached/JS-rendered content (html=${html.length}b, md=${markdown?.length || 0}b) — using Firecrawl`);
-    fetchResult = await archiveFetch(url, {
-      platform: "bonhams",
-      callerName: "extract-bonhams",
-      useFirecrawl: true,
-      includeMarkdown: true,
-      waitForJs: 4000,
-      skipCache: true, // Force fresh Firecrawl render (not cached direct-fetch HTML)
-    });
-    html = fetchResult.html || "";
-    markdown = fetchResult.markdown || null;
+    console.log(`[Bonhams] No cached/JS-rendered content (html=${html.length}b, md=${markdown?.length || 0}b) — trying Firecrawl`);
+    try {
+      fetchResult = await archiveFetch(url, {
+        platform: "bonhams",
+        callerName: "extract-bonhams",
+        useFirecrawl: true,
+        includeMarkdown: true,
+        waitForJs: 4000,
+        skipCache: true, // Force fresh Firecrawl render (not cached direct-fetch HTML)
+      });
+      if (fetchResult.html && fetchResult.html.length > 500) {
+        html = fetchResult.html;
+        markdown = fetchResult.markdown || null;
+      } else if (directJsonLd) {
+        // Firecrawl returned nothing useful but we have JSON-LD from direct fetch
+        console.log(`[Bonhams] Firecrawl returned insufficient HTML, using JSON-LD from direct fetch`);
+      }
+    } catch (fcError: any) {
+      // Firecrawl failed (likely credits exhausted) — fall back to JSON-LD from direct fetch
+      console.warn(`[Bonhams] Firecrawl failed: ${fcError?.message}. Using JSON-LD from direct fetch.`);
+    }
   }
 
-  if (!html || html.length < 500) {
-    console.warn(`[Bonhams] Insufficient HTML (${html.length} bytes) for ${url}`);
+  if ((!html || html.length < 500) && !directJsonLd) {
+    console.warn(`[Bonhams] Insufficient HTML (${html.length} bytes) and no JSON-LD for ${url}`);
     return emptyResult(url, fetchResult.source, fetchResult.costCents);
   }
 

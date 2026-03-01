@@ -1,8 +1,10 @@
 // Simple Craigslist vehicle extractor - no AI, no Firecrawl needed
 // Craigslist uses clean JSON-LD structured data + HTML attributes
+// Uses archiveFetch to archive all fetched pages to listing_page_snapshots
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { archiveFetch } from '../_shared/archiveFetch.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -94,18 +96,22 @@ function extractPostedDate(html: string): string | null {
 }
 
 async function extractCraigslistListing(url: string): Promise<CraigslistExtracted> {
-  // Fetch HTML directly - Craigslist doesn't require JS rendering
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; Nuke/1.0; +https://nuke.ag/bot)',
-    },
+  // Fetch HTML via archiveFetch — archives to listing_page_snapshots automatically
+  // Craigslist is server-rendered, no JS/Firecrawl needed
+  const fetchResult = await archiveFetch(url, {
+    platform: 'craigslist',
+    callerName: 'extract-craigslist',
+    useFirecrawl: false,
+    maxAgeSec: 86400, // 24h cache — CL listings change/expire frequently
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+  if (!fetchResult.html || fetchResult.html.length < 500) {
+    const errMsg = fetchResult.error || `Insufficient HTML (${fetchResult.html?.length || 0} bytes)`;
+    throw new Error(`Failed to fetch: ${errMsg}`);
   }
 
-  const html = await response.text();
+  const html = fetchResult.html;
+  console.log(`[Craigslist] Fetched ${html.length} bytes (source: ${fetchResult.source}, cached: ${fetchResult.cached})`);
 
   // Parse JSON-LD structured data
   const jsonLd = extractJsonLd(html);

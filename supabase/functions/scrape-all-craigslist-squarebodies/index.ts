@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
+import { archiveFetch } from '../_shared/archiveFetch.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -410,24 +411,22 @@ serve(async (req) => {
         let scrapeData: any
         try {
           console.log(`  📡 Fetching: ${listingUrl}`)
-          // Add timeout to individual fetch requests
-          const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout per listing (increased for paid plan)
-          
-          const response = await fetch(listingUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            },
-            signal: controller.signal
+          const fetchResult = await archiveFetch(listingUrl, {
+            platform: 'craigslist',
+            callerName: 'scrape-all-craigslist-squarebodies',
+            useFirecrawl: false,
+            maxAgeSec: 86400,
           })
-          
-          clearTimeout(timeoutId)
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+
+          if (!fetchResult.html || fetchResult.html.length < 200) {
+            const statusCode = fetchResult.statusCode;
+            if (statusCode === 404 || statusCode === 410) {
+              throw new Error(`Listing expired (HTTP ${statusCode})`)
+            }
+            throw new Error(fetchResult.error || `Insufficient HTML (${fetchResult.html?.length || 0} bytes)`)
           }
-          
-          const html = await response.text()
+
+          const html = fetchResult.html
           const doc = new DOMParser().parseFromString(html, 'text/html')
           
           if (!doc) {
