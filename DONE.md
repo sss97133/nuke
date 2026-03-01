@@ -2,6 +2,18 @@
 
 ## 2026-03-01
 
+[quality] Massively accelerated data_quality_score backfill — scored 790K+ vehicles in ~15 minutes
+  - Created `quality_backfill_shard(shard_index, total_shards, batch_limit)` function with UUID-prefix isolation
+  - Ran 4 parallel shards (5000 rows each, every 3 minutes) to eliminate deadlocks
+  - Result: 99.94% vehicles scored (1,256,107/1,256,922), avg score 75.58
+  - Remaining 815 zero-score vehicles are genuinely empty (no year/make/model/anything)
+  - Disabled old `data-quality-workforce` cron (job 304, 300/run) — replaced with:
+    - `quality-score-maintenance` (job 343): `*/5 * * * *`, 1000/run — handles new incoming vehicles
+  - Removed temporary aggressive shards (jobs 339-342) after backfill completed
+  - Created `fast_backfill_quality_scores(batch_limit)` function — inline scoring with `session_replication_role=replica` (bypasses 29 triggers)
+  - Ran additional sweep: 800K rows in 19m via management API, 10K rows/batch, ~500-690 rows/sec
+  - Replaced old inactive cron (job 237, 50 rows/5min) with `quality-backfill-fast` (job 344, 5000 rows/10min)
+  - Final state: 1,241,306 scored / 1,242,120 total (99.93%), 814 genuinely empty, 0 nulls
 [snapshots] Fixed snapshot success rates for Bonhams, Barrett-Jackson, Cars & Bids, Craigslist
   - archiveFetch: Added isGarbageHtml() to detect Cloudflare challenges, React shells, and bot walls — marks as success=false instead of true
   - Craigslist: Replaced raw fetch() with archiveFetch() in extract-craigslist, process-cl-queue, scrape-all-craigslist-squarebodies — was creating 0 snapshots

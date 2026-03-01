@@ -584,18 +584,14 @@ Automated Labor Estimation Pipeline — all 7 phases built, deployed, and commit
 **Task:** Fixed import_queue failures. Widened vehicle_mailboxes.vin varchar(17)->varchar(50), reset 4 VIN overflow items, skipped 20 Firecrawl credit failures, checked snapshot availability for missing-fields errors.
 **Status:** Done — removing self
 
-### Agent: Data Quality Score Backfill Acceleration
-**Started**: 2026-03-01 ~current
-**Task**: Speed up data_quality_score computation for 837K vehicles
-**Files**: DB functions, cron jobs, possibly edge functions
-**Areas**: vehicles.data_quality_score, quality_backfill_state, cron jobs
+### Agent: Data Quality Score Backfill Acceleration -- COMPLETED
+**Started/Ended**: 2026-03-01
+**Result**: 800K vehicles scored in 19 minutes. 99.93% coverage. New cron job 344 handles ongoing.
 
 ## Agent: Snapshot Success Rate Investigation -- COMPLETED
 **Started:** 2026-03-01
 **Status:** Done. Changes ready for deploy.
 **Files changed:** _shared/archiveFetch.ts, extract-craigslist, extract-bonhams, extract-barrett-jackson, extract-cars-and-bids-core, process-cl-queue, scrape-all-craigslist-squarebodies
 
-### Agent: Quality Score Backfill Acceleration — 2026-03-01 ~00:30 UTC
-- Task: Increase quality score backfill throughput from 300/run to massive parallelism
-- Files: cron jobs, quality scoring SQL functions
-- Areas: cron.job, data_quality_score pipeline
+### Agent: Quality Score Backfill Acceleration — 2026-03-01 ~00:30 UTC — COMPLETED
+- DONE: Scored 790K+ vehicles, 99.94% coverage, maintenance cron installed (job 343)

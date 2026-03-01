@@ -1,21 +1,16 @@
-# Auto-Checkpoint — 2026-03-01 00:31:42
+# Auto-Checkpoint — 2026-03-01 01:04:07
 *(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
 
 ## Recent Commits (last 30 min)
-ed296b2e8 fix: resolve 5 frontend crash bugs in upload, notification, pricing, and comment components
+none
 
 ## Uncommitted Changes
 .claude/ACTIVE_AGENTS.md
 .claude/HANDOFF.md
 DONE.md
 mcp-server
-supabase/functions/_shared/archiveFetch.ts
-supabase/functions/extract-barrett-jackson/index.ts
-supabase/functions/extract-bonhams/index.ts
-supabase/functions/extract-cars-and-bids-core/index.ts
-supabase/functions/extract-craigslist/index.ts
-supabase/functions/process-cl-queue/index.ts
-supabase/functions/scrape-all-craigslist-squarebodies/index.ts
+nuke_frontend/src/components/vehicles/VehicleCardDense.tsx
+supabase/migrations/20260301010000_fast_quality_score_backfill.sql
 
 ## Staged
 none
