@@ -2280,8 +2280,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           </span>
                         </a>
                       </div>
-                      {/* Seller name badge (if available) */}
-                      {classifiedSellerName && (
+                      {/* Seller name badge — skip if headerSeller already shows same name */}
+                      {classifiedSellerName && !(headerSeller && String(headerSeller.label).replace(/^@/, '').toLowerCase() === classifiedSellerName.toLowerCase()) && (
                         <div className="badge-priority-3">
                           <span
                             className="badge"
@@ -2441,7 +2441,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   </div>
                 );
               })()}
-              {headerBuyer && (
+              {/* Buyer badge — skip if transfer status already shows the same buyer */}
+              {headerBuyer && (() => {
+                const transferBuyerHandle = transferStatus?.buyer?.handle ? String(transferStatus.buyer.handle).replace(/^@/, '').toLowerCase() : '';
+                const buyerLabelHandle = (headerBuyer.label.match(/@(\S+)/)?.[1] || '').toLowerCase();
+                if (transferBuyerHandle && buyerLabelHandle && transferBuyerHandle === buyerLabelHandle) return null;
+                return (
                 <div className="badge-priority-3">
                   {headerBuyer.href ? (
                     <a
@@ -2517,7 +2522,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     </span>
                   )}
                 </div>
-              )}
+                );
+              })()}
               {headerCountdown && (
                 <div className="badge-priority-3">
                   <span
@@ -2690,8 +2696,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             </div>
           )}
 
-          {/* Owner Badge with Claim Dropdown - shows best guess owner (only show if not replacing "Claim this vehicle") */}
-          {ownerGuess && !permissions?.isVerifiedOwner && !responsibleName && (
+          {/* Owner Badge with Claim Dropdown - shows best guess owner (skip if buyer badge or transfer status already shows same handle) */}
+          {ownerGuess && !permissions?.isVerifiedOwner && !responsibleName && (() => {
+            const guessHandle = String(ownerGuess.username || '').replace(/^@/, '').toLowerCase();
+            const buyerLabelHandle = headerBuyer ? (headerBuyer.label.match(/@(\S+)/)?.[1] || '').toLowerCase() : '';
+            const transferBuyerHandle = transferStatus?.buyer?.handle ? String(transferStatus.buyer.handle).replace(/^@/, '').toLowerCase() : '';
+            const sellerLabelHandle = headerSeller ? (headerSeller.label.match(/@(\S+)/)?.[1] || String(headerSeller.label).replace(/^@/, '').toLowerCase()) : '';
+            if (guessHandle && buyerLabelHandle && guessHandle === buyerLabelHandle) return false;
+            if (guessHandle && transferBuyerHandle && guessHandle === transferBuyerHandle) return false;
+            if (guessHandle && sellerLabelHandle && guessHandle === sellerLabelHandle) return false;
+            return true;
+          })() && (
             <div ref={ownerClaimRef} className="badge-priority-5" style={{ position: 'relative' }}>
               <button
                 type="button"
