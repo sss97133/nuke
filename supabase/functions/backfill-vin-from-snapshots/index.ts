@@ -26,7 +26,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const VERSION = "backfill-vin-from-snapshots:1.1.0";
+const VERSION = "backfill-vin-from-snapshots:1.2.0";
 
 // Valid VIN characters (no I, O, Q)
 const VIN_CHARS = "A-HJ-NPR-Z0-9";
@@ -205,7 +205,9 @@ serve(async (req) => {
     const batchSize = Math.min(Math.max(Number(body.batch_size) || 50, 1), 200);
     const dryRun = body.dry_run === true;
     const platformFilter = body.platform || null;
-    const offset = Number(body.offset) || 0;
+    const explicitOffset = body.offset !== undefined && body.offset !== null;
+    // When called by cron (no explicit offset), use a random offset to rotate through candidates
+    const offset = explicitOffset ? (Number(body.offset) || 0) : Math.floor(Math.random() * 1500);
     const decode = body.decode === true;
 
     console.log(
