@@ -1855,7 +1855,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 {(() => {
                   const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
                   if (!tierLabel) return null;
-                  const totalObservations = (vehicle.image_count || 0) + (vehicle.event_count || 0);
+                  const imgCount = vehicle.all_images?.length || vehicle.image_count || 0;
+                  const evtCount = vehicle.event_count || 0;
+                  const parts: string[] = [];
+                  if (imgCount > 0) parts.push(`${imgCount} img`);
+                  if (evtCount > 0) parts.push(`${evtCount} evt`);
                   return (
                     <span
                       style={{ fontWeight: 700, cursor: 'pointer', position: 'relative' }}
@@ -1865,11 +1869,27 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     >
                       <span style={{ color: getTierColor(tierLabel), fontWeight: 800 }}>
                         {tierLabel}
-                      </span>{' '}
-                      tier · {totalObservations} data {totalObservations === 1 ? 'point' : 'points'}
+                      </span>
+                      {parts.length > 0 && <>{' '}· {parts.join(' · ')}</>}
                     </span>
                   );
                 })()}
+
+                {/* Deal Score Badge (gallery view) */}
+                {vehicle.deal_score != null && vehicle.deal_score_label && vehicle.deal_score_label !== 'fair' && DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel] && (
+                  <span
+                    style={{
+                      fontWeight: 800,
+                      color: DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel].color,
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => onBadgeEnter('deal', e)}
+                    onMouseLeave={onBadgeLeave}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  >
+                    {DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel].display}
+                  </span>
+                )}
 
                 {infoDense && vehicle.uploader_name && (
                   <span style={{ fontWeight: 600 }}>{vehicle.uploader_name}</span>
@@ -1946,6 +1966,24 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     </BadgeHoverPreview>
                   );
                 })()}
+
+                {/* Deal score hover preview (gallery view) */}
+                {hoveredBadge === 'deal' && vehicle.deal_score != null && vehicle.deal_score_label && DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel] && (
+                  <BadgeHoverPreview badgeRect={badgeRect}>
+                    <div style={{ fontWeight: 700, marginBottom: '4px' }}>
+                      <span style={{ color: DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel].color }}>
+                        {DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel].display}
+                      </span>
+                      {' '}{DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel].description}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', color: 'rgba(255,255,255,0.8)' }}>
+                      {vehicle.nuke_estimate && <div>Nuke Estimate: ${vehicle.nuke_estimate.toLocaleString()}</div>}
+                      {(vehicle.asking_price || vehicle.display_price) && <div>Asking: ${(vehicle.asking_price || vehicle.display_price)?.toLocaleString()}</div>}
+                      <div>Deal Score: {vehicle.deal_score > 0 ? '+' : ''}{vehicle.deal_score.toFixed(1)}</div>
+                      {vehicle.nuke_estimate_confidence && <div>Confidence: {vehicle.nuke_estimate_confidence}%</div>}
+                    </div>
+                  </BadgeHoverPreview>
+                )}
               </div>
             </div>
           )}
