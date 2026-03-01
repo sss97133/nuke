@@ -67,6 +67,8 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
   const [showConfigSelector, setShowConfigSelector] = useState(false);
   const [auctionPulse, setAuctionPulse] = useState<AuctionPulse | null>(null);
   const [auctionNow, setAuctionNow] = useState<number>(() => Date.now());
+  // breakdown must be declared here (not after early returns) to satisfy rules of hooks
+  const [breakdown, setBreakdown] = useState<any>(null);
 
   // Use initialValuation if provided (eliminates duplicate query)
   useEffect(() => {
@@ -619,14 +621,8 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
     );
   }
 
-  // Only show breakdown if we have real data sources
-  const [breakdown, setBreakdown] = useState<any>(null);
-  
-  // Breakdown is now loaded together with pricing status
-  // No need for separate effect
-  
-  // Breakdown is now loaded as part of loadPricingStatus
-  // No separate loadBreakdown function needed
+  // Breakdown is loaded together with pricing status via loadPricingStatus
+  // (breakdown state is declared at top of component to satisfy rules of hooks)
 
   // Don't show widget if there's no value and no analysis status
   if (!pricingStatus && !initialValuation) {

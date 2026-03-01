@@ -112,7 +112,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         allComments.push(...dataPointComments.data.map(c => ({
           ...c,
           target_type: 'data_point',
-          target_label: `${c.data_point_type?.charAt(0).toUpperCase() + c.data_point_type?.slice(1)}: ${c.data_point_value || 'N/A'}`,
+          target_label: `${c.data_point_type ? c.data_point_type.charAt(0).toUpperCase() + c.data_point_type.slice(1) : 'Data Point'}: ${c.data_point_value || 'N/A'}`,
           user_email: undefined,
           user_name: undefined,
           avatar_url: undefined
