@@ -1,17 +1,17 @@
 # PROJECT STATE
-**Updated: 2026-02-26** — Update this when you complete a sprint or shift focus.
+**Updated: 2026-03-01** — Update this when you complete a sprint or shift focus.
 
 ---
 
 ## Platform Status
 - **nuke.ag**: Live and deployed (Vercel)
-- **DB**: Supabase project `qkgaybvrernstplzjaam`, ~33M vehicle images, 18k+ vehicles
+- **DB**: Supabase project `qkgaybvrernstplzjaam`, ~33M vehicle images, 1.25M+ vehicles, 99.94% data quality scored
 - **Image pipeline**: PAUSED globally (`NUKE_ANALYSIS_PAUSED` flag) — do not re-enable without intent
 - **Rebrand**: N-Zero → Marque → Nuke complete. Domain: nuke.ag
 
 ---
 
-## Active Sprint Focus (Feb 2026)
+## Active Sprint Focus (Mar 2026)
 
 ### 1. YONO — Local Vehicle Vision Model [PRIMARY]
 **Status**: Sidecar live on Modal, consumer API deployed, tier-2 hierarchical models active.
@@ -23,15 +23,19 @@
 - Zone classifier (41 zones, 72.8% val_acc) ✓
 - Consumer API `api-v1-vision` v1.1 ✓ — classify + analyze at $0/image
 - Edge functions: `yono-classify`, `yono-analyze`, `yono-batch-process`, `yono-vision-worker`, `yono-keepalive`, `api-v1-vision`
-- **NEXT**: SDK v1.3.0 (`nuke.vision.*` namespace), contextual model (image + sale history → price estimate)
+- @nuke1/sdk v1.5.0 publish-ready (README matches actual vision types, LICENSE added)
+- **NEXT**: Contextual model (image + sale history → price estimate), SDK publish to npm
 
-### 2. Facebook Marketplace Extraction [ACTIVE RESEARCH]
-**Status**: Local residential-IP scraper deployed. Testing logged-out GraphQL path.
+### 2. Facebook Marketplace Extraction [ACTIVE — NATIONAL SWEEP]
+**Status**: National sweep running across 58 US metros. Logged-out GraphQL confirmed working.
 - `extract-facebook-marketplace` — single listing extractor (deployed)
 - `fb-marketplace-orchestrator` — bulk extractor (deployed)
 - `refine-fb-listing` — metadata enrichment via bingbot HTML fallback (deployed)
+- `scripts/fb-marketplace-local-scraper.mjs` — residential-IP scraper, 58 metros, no tokens needed
 - Seller blocklist deployed
-- **NEXT**: Test logged-out GraphQL (`MarketplaceSearchResultsPageContainerNewQuery` + `doc_id` system)
+- National vintage rate: ~12% of all vehicle listings
+- 1,000+ vintage listings captured so far from overnight sweep
+- **NEXT**: Aggregate results, deduplicate, enrich via refine-fb-listing, feed into import queue
 - Reference: MEMORY.md `## Active Focus: Facebook Marketplace Vehicle Extraction`
 
 ### 3. Agent Hierarchy [DEPLOYED]
@@ -42,19 +46,25 @@
 - `_shared/agentTiers.ts` — Shared tier configs and Anthropic API wrapper
 - import_queue statuses: `pending` -> `pending_review` -> `pending_strategy` -> `complete`
 - See TOOLS.md "Agent Hierarchy" section for full usage
-- **NEXT**: Wire into cron for continuous processing, integrate with existing `continuous-queue-processor`
+- **DEPLOYED**: Crons active, queue draining — router (5min), haiku worker (2min), sonnet supervisor (10min)
 
 ---
 
 ## Recently Completed (last 7 days)
 See `DONE.md` for full log. Quick summary:
+- **Overnight autonomous session (Mar 1)**: 330-file commit, 22 edge functions deployed, 7 frontend crash fixes
+- Data quality scoring: 37% → 99.94% (1.25M vehicles scored)
+- Agent hierarchy fully deployed with crons (router/haiku/sonnet)
+- Snapshot extraction fixes: Craigslist, Bonhams, Barrett-Jackson, Cars & Bids
+- @nuke1/sdk v1.5.0 prepared (README, LICENSE, vision types)
+- 61,385 vehicles backfilled with primary_image_url
+- Universal search: dual parameter support (?q= and ?query=)
+- FB Marketplace national sweep: 58 metros, 1000+ vintage listings
+- YONO sidecar verified healthy (2 warm containers)
+- Theme system audit: 89% reduction in inline violations (1,709 → 185)
+- Photo spatial mapping: 10K GPS pins across 48 vehicles
+- First-touch user engagement overhaul (homepage, onboarding)
 - Agent safety infrastructure: TOOLS.md, pipeline_registry, stale locks, column comments
-- Cars & Bids extractor rewrite (cache-first, all fields)
-- FB Marketplace: HTML fallback, residential-IP scraper, seller blocklist
-- Discovery pipeline improvements (gap fix, private-seller filter)
-- nuke.ag domain live, Marque→Nuke rebrand complete
-- Investor offering page (/offering) with live stats
-- Acquisition pipeline + dashboard
 
 ---
 
@@ -92,9 +102,13 @@ See `DONE.md` for full log. Quick summary:
 ## High-Value Next Work (in priority order)
 
 1. ~~**YONO FastAPI sidecar**~~ DONE — sidecar live, consumer API deployed, tier-2 models active
-2. **FB Marketplace GraphQL probe** — logged-out path, test `doc_id` + `fb_dtsg` approach
-3. **Agent hierarchy build** — Haiku workers for extraction (10x token efficiency)
-4. **SDK v1.3.0 prep** — depends on YONO sidecar being functional
+2. ~~**FB Marketplace GraphQL probe**~~ DONE — logged-out path works, national sweep running (58 metros)
+3. ~~**Agent hierarchy build**~~ DONE — deployed with crons, queue draining automatically
+4. ~~**SDK v1.3.0 prep**~~ DONE — v1.5.0 publish-ready with vision types + LICENSE
+5. **SDK publish to npm** — final review and `npm publish` for @nuke1/sdk
+6. **FB Marketplace enrichment** — aggregate sweep results, deduplicate, feed into import queue
+7. **Contextual pricing model** — YONO image features + sale history → price estimate
+8. **Import queue drain** — 460+ pending items, agent hierarchy now processing automatically
 
 ---
 
