@@ -23,7 +23,7 @@ const VehicleAuctionQuickStartCard = React.lazy(() => import('../../components/a
 const VehicleReferenceLibrary = React.lazy(() => import('../../components/vehicle/VehicleReferenceLibrary'));
 const VehicleDescriptionCard = React.lazy(() => import('../../components/vehicle/VehicleDescriptionCard'));
 // VehicleCommunityInsights and VehicleDocumentIntelligence removed — empty-state-only sections
-const VehicleCommentsCard = React.lazy(() => import('../../components/vehicle/VehicleCommentsCard'));
+const VehicleCommentsSection = React.lazy(() => import('./VehicleCommentsSection'));
 const BundleReviewQueue = React.lazy(() => import('../../components/images/BundleReviewQueue'));
 const ImageGallery = React.lazy(() => import('../../components/images/ImageGallery'));
 const VehicleVideoSection = React.lazy(() => import('../../components/vehicle/VehicleVideoSection'));
@@ -465,25 +465,6 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
               </div>
             </CollapsibleWidget>
 
-            {/* Comments */}
-            <CollapsibleWidget
-              title="Comments"
-              defaultCollapsed={false}
-              badge={totalCommentCount > 0 ? <span className="text-xs text-gray-500 dark:text-gray-400">View {totalCommentCount} comment{totalCommentCount === 1 ? '' : 's'}</span> : undefined}
-            >
-              <VehicleCommentsCard
-                vehicleId={vehicle.id}
-                session={session}
-                collapsed={isMobile}
-                maxVisible={isMobile ? 6 : 50}
-                containerId="vehicle-comments"
-                containerStyle={{
-                  scrollMarginTop: `calc(var(--header-height, 40px) + ${vehicleHeaderHeight}px + 8px)`,
-                  maxHeight: `calc(100vh - var(--header-height, 40px) - ${vehicleHeaderHeight}px - 16px)`,
-                }}
-              />
-            </CollapsibleWidget>
-
             {/* Privacy Settings */}
             {!vehicle.isAnonymous && session && (
               <CollapsibleWidget title="Privacy Settings" defaultCollapsed={true} badge={<span className={`text-xs ${isPublic ? 'text-green-500' : 'text-gray-500'}`}>{isPublic ? 'Public' : 'Private'}</span>}>
@@ -538,6 +519,11 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             <CollapsibleWidget title="Videos" defaultCollapsed={true}>
               <VehicleVideoSection vehicleId={vehicle.id} defaultCollapsed={false} />
             </CollapsibleWidget>
+
+            {/* Comments — sticky in right column */}
+            <React.Suspense fallback={null}>
+              <VehicleCommentsSection vehicleId={vehicle.id} />
+            </React.Suspense>
           </div>
         </div>
       </section>
