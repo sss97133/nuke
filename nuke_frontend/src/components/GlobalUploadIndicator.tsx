@@ -123,7 +123,7 @@ const GlobalUploadIndicator: React.FC = () => {
             {queue.map(item => (
               <div key={item.id} style={{ padding: '2px 0', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{item.file.name.substring(0, 25)}...</span>
+                  <span>{(item.file?.name || 'Unknown file').substring(0, 25)}...</span>
                   <span>{item.status === 'completed' ? '✓' : 
                          item.status === 'failed' ? 'X' : 
                          `${item.progress}%`}</span>
@@ -162,14 +162,16 @@ const GlobalUploadIndicator: React.FC = () => {
   );
 };
 
-// Add retro animations
-const style = document.createElement('style');
-style.textContent = `
-  @keyframes blink {
-    0%, 49% { opacity: 1; }
-    50%, 100% { opacity: 0; }
-  }
-`;
-document.head.appendChild(style);
+// Add retro animations (guard for SSR)
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 export default GlobalUploadIndicator;

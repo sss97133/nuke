@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NotificationService, type Notification } from '../services/notificationService';
 
 interface NotificationCenterProps {
@@ -9,20 +9,23 @@ interface NotificationCenterProps {
 const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotificationUpdate }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  // Stable ref to avoid re-subscribing when callback identity changes
+  const onNotificationUpdateRef = useRef(onNotificationUpdate);
+  onNotificationUpdateRef.current = onNotificationUpdate;
 
   useEffect(() => {
     loadNotifications();
-    
+
     // Subscribe to real-time notifications
     const subscription = NotificationService.subscribeToNotifications(userId, (newNotification) => {
       setNotifications(prev => [newNotification, ...prev]);
-      onNotificationUpdate?.();
+      onNotificationUpdateRef.current?.();
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [userId, onNotificationUpdate]);
+  }, [userId]);
 
   const loadNotifications = async () => {
     try {

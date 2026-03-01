@@ -149,9 +149,11 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
   };
 
   const clusterPhotosIntoSessions = async (photos: Photo[]): Promise<PhotoSession[]> => {
+    if (photos.length === 0) return [];
+
     // Sort by timestamp
     const sorted = [...photos].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-    
+
     const sessions: PhotoSession[] = [];
     let currentSession: Photo[] = [sorted[0]];
     
@@ -246,11 +248,11 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
           
           const mostCommon = Object.entries(vehicleCounts).sort((a: any, b: any) => b[1] - a[1])[0];
           const vehicle = recentWork.find((r: any) => r.vehicle_id === mostCommon[0]);
-          
-          if (vehicle) {
+
+          if (vehicle?.vehicles) {
             session.suggestedVehicle = {
               id: vehicle.vehicle_id,
-              name: `${vehicle.vehicles.year} ${vehicle.vehicles.make} ${vehicle.vehicles.model}`,
+              name: `${vehicle.vehicles.year ?? ''} ${vehicle.vehicles.make ?? ''} ${vehicle.vehicles.model ?? ''}`.trim(),
               confidence: 70,
             };
           }
