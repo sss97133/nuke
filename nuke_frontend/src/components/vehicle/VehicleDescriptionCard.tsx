@@ -341,125 +341,31 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
             </div>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {/* Curated summary (editable) - Only show if it's substantial and not just listing boilerplate */}
-            {(() => {
-              const cleaned = sanitizeCuratedSummary(description);
-              const isSubstantial = cleaned && cleaned.length > 100 && !cleaned.toLowerCase().includes('chrome-finished') && !cleaned.toLowerCase().includes('braking is provide');
-              // Hide if it's too short or looks like bad AI generation
-              if (!isSubstantial && !isEmpty) return null;
-              
-              // Hide CURATED SUMMARY if it's identical to any raw listing description (it's not curated, it's raw)
-              const isRawListingText = rawListingDescriptions.some((entry: any) => {
-                const entryStart = entry.text.trim().substring(0, 150);
-                const descStart = cleaned.trim().substring(0, 150);
-                return entryStart === descStart || entry.text.trim() === cleaned.trim();
-              });
-              if (isRawListingText && !isEmpty) return null;
-              
-              return (
-                <div>
-                  <div style={{ fontSize: '9px', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }}>
-                    CURATED SUMMARY
-                  </div>
-                  {isEmpty ? (
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                      No curated summary yet. Use Generate or Edit to create one.
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '12px', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                      {cleaned || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No summary available</span>}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Source description entries (provenance-backed) */}
-            <div>
-              <div style={{ fontSize: '9px', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }}>
-                DESCRIPTION ENTRIES
+          <div>
+            {/* Single description — show vehicles.description, with source attribution if available */}
+            {isEmpty ? (
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                No description yet. Use Generate or Edit to create one.
               </div>
-              {rawListingDescriptions.length === 0 ? (
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                  No source descriptions yet.
+            ) : (
+              <div>
+                <div style={{ fontSize: '12px', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                  {description}
                 </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {rawListingDescriptions.map((row, idx) => {
-                    const domain = getSourceDomain(row.source_url);
-                    const dateLabel = formatEntryDate(row.event_date || row.extracted_at);
-                    const linkLabel = domain ? `${domain} listing` : 'Source listing';
-                    return (
-                      <details
-                        key={`${idx}-${row.extracted_at || 'unknown'}`}
-                        style={{
-                          border: '1px solid var(--border)',
-                          borderRadius: '8px',
-                          padding: '8px 10px',
-                          background: 'var(--bg-secondary)',
-                        }}
-                      >
-                        <summary
-                          style={{
-                            cursor: 'pointer',
-                            listStyle: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '8px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                          }}
-                        >
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                            {row.source_url ? <FaviconIcon url={row.source_url} matchTextSize={true} textSize={8} /> : null}
-                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              Listing description
-                              {domain ? ` • ${domain}` : ''}
-                            </span>
-                          </span>
-                          <span style={{ fontSize: '9px', fontWeight: 500, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                            {dateLabel}
-                          </span>
-                        </summary>
-                        <div style={{ marginTop: '8px' }}>
-                          <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                            {row.source_url ? (
-                              <a
-                                href={row.source_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ textDecoration: 'underline' }}
-                              >
-                                {linkLabel}
-                              </a>
-                            ) : null}
-                          </div>
-                          <div style={{ fontSize: '11px', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                            {row.text}
-                          </div>
-                        </div>
-                      </details>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* AI-generated indicator (source URLs already shown in Description Entries above) */}
-            {isAIGenerated && (
-              <div style={{
-                marginTop: '12px',
-                padding: '8px',
-                background: 'var(--bg-secondary)',
-                borderRadius: '4px',
-                fontSize: '9px',
-                color: 'var(--text-muted)',
-              }}>
-                <span>AI-generated from vehicle images</span>
-                {generatedAt && (
-                  <span> • {new Date(generatedAt).toLocaleDateString()}</span>
+                {/* Source attribution */}
+                {(sourceInfo?.url || isAIGenerated) && (
+                  <div style={{ marginTop: '8px', fontSize: '9px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {sourceInfo?.url && (
+                      <>
+                        <FaviconIcon url={sourceInfo.url} matchTextSize={true} textSize={8} />
+                        <a href={sourceInfo.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>
+                          {getSourceDomain(sourceInfo.url)}
+                        </a>
+                      </>
+                    )}
+                    {isAIGenerated && <span>AI-generated</span>}
+                    {generatedAt && <span>• {new Date(generatedAt).toLocaleDateString()}</span>}
+                  </div>
                 )}
               </div>
             )}
