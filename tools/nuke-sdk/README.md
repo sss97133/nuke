@@ -61,16 +61,19 @@ const comps = await nuke.comps.get({ make: 'Porsche', model: '911', year: 1989, 
 const result = await nuke.vision.classify('https://cdn.bringatrailer.com/porsche-911.jpg');
 // → { make: 'Porsche', family: 'german', confidence: 0.91, top5: [...], is_vehicle: true, cost_usd: 0 }
 
-// Full scene analysis: angle, condition, damage. Cost: $0.0001–$0.004.
+// Full scene analysis: zone, condition, damage, modifications. Cost: $0.
 const analysis = await nuke.vision.analyze('https://cdn.bringatrailer.com/porsche-911-door.jpg');
 // → {
 //     make: 'Porsche', family: 'german', confidence: 0.91,
-//     category: 'exterior',
-//     subject: 'exterior.panel.door.front.driver',
-//     condition_notes: 'Surface rust on lower sill',
-//     visible_damage: true,
-//     camera_position: { azimuth_deg: 90, elevation_deg: 15 },
-//     cost_usd: 0.0001
+//     vehicle_zone: 'ext_front_driver',
+//     zone_confidence: 0.88,
+//     condition_score: 6.5,
+//     damage_flags: ['minor_scratches', 'paint_fade'],
+//     modification_flags: [],
+//     interior_quality: null,
+//     photo_quality: 4,
+//     photo_type: 'exterior',
+//     cost_usd: 0
 //   }
 
 // Batch classify 100 images in one call. Cost: $0.
@@ -222,12 +225,12 @@ const result = await nuke.vision.classify('https://cdn.example.com/car.jpg');
 // or with params:
 const result = await nuke.vision.classify({ image_url: 'https://...', top_k: 10 });
 
-// Analyze: full scene — category, angle, condition, damage
+// Analyze: full scene — zone, condition, damage, modifications
 const analysis = await nuke.vision.analyze('https://cdn.example.com/car.jpg');
 // or:
 const analysis = await nuke.vision.analyze({
   image_url: 'https://...',
-  vehicle_id: 'uuid-for-context', // optional
+  include_comps: true, // optional — include comparable sales
 });
 
 // Batch: up to 100 images, $0 each
@@ -256,14 +259,18 @@ const batch = await nuke.vision.batch([
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `category` | `string \| null` | `exterior`, `interior`, `engine`, `undercarriage`, `document`, `damage` |
-| `subject` | `string \| null` | Detailed taxonomy key, e.g. `'exterior.panel.door.front.driver'` |
-| `description` | `string \| null` | Human-readable description of what is shown |
-| `condition_notes` | `string \| null` | Observed condition issues |
-| `visible_damage` | `boolean \| null` | Whether damage is visible |
-| `camera_position` | `object \| null` | `{ azimuth_deg, elevation_deg, distance_mm, confidence }` |
-| `source` | `string` | `'yono'`, `'yono+cloud'`, or `'unavailable'` |
-| `cost_usd` | `number` | 0 (YONO only) or $0.0001–$0.004 (cloud analysis) |
+| `vehicle_zone` | `string \| null` | Zone/angle classification (41 zones). E.g. `'ext_front_driver'`, `'int_dashboard'`, `'engine_bay'` |
+| `zone_confidence` | `number \| null` | Zone classification confidence 0.0–1.0 |
+| `zone_source` | `string \| null` | Zone model source (e.g. `'zone_classifier'`, `'florence2'`) |
+| `condition_score` | `number \| null` | Vehicle condition 1–10 (1=poor, 10=concours) |
+| `damage_flags` | `string[]` | Detected damage: `'minor_scratches'`, `'dent'`, `'rust'`, `'cracked_glass'`, `'paint_fade'`, etc. |
+| `modification_flags` | `string[]` | Aftermarket mods: `'aftermarket_wheels'`, `'lowered'`, `'custom_paint'`, `'roll_cage'`, etc. |
+| `interior_quality` | `string \| null` | `'poor'`, `'fair'`, `'good'`, `'excellent'` (null for exterior photos) |
+| `photo_quality` | `number \| null` | Photo technical quality 1–5 (1=unusable, 5=professional) |
+| `photo_type` | `string \| null` | `'exterior'`, `'interior'`, `'engine'`, `'undercarriage'`, `'detail'`, `'document'`, `'unknown'` |
+| `comps` | `Array \| null` | Comparable sales (only when `include_comps: true`) |
+| `source` | `string` | `'yono'`, `'yono_classify_only'`, `'yono_analyze_only'`, or `'unavailable'` |
+| `cost_usd` | `number` | Always 0 — all YONO inference is free |
 
 ---
 
@@ -728,7 +735,7 @@ import type {
 
 See [CHANGELOG.md](./CHANGELOG.md) for version history.
 
-**Current version: 1.4.0** — Signal Score (`nuke.signal.score()`), YONO Vision v2 with family/origin classification.
+**Current version: 1.5.0** — YONO Vision v3 with zone detection, condition scoring, damage/modification flags. Signal Score. Free inference for all vision endpoints.
 
 ---
 
