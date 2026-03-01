@@ -5,6 +5,7 @@ import { extractAndCacheFavicon } from '../_shared/extractFavicon.ts'
 import { parseLocation } from '../_shared/parseLocation.ts'
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts'
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
+import { archiveFetch } from '../_shared/archiveFetch.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -336,17 +337,22 @@ Return JSON only (no markdown):
         let scrapeData: any
         try {
           console.log(`[DEBUG] Fetching listing: ${queueItem.listing_url}`)
-          const response = await fetch(queueItem.listing_url, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
+          const fetchResult = await archiveFetch(queueItem.listing_url, {
+            platform: 'craigslist',
+            callerName: 'process-cl-queue',
+            useFirecrawl: false,
+            maxAgeSec: 86400, // 24h cache
           })
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+
+          if (!fetchResult.html || fetchResult.html.length < 200) {
+            const statusCode = fetchResult.statusCode;
+            if (statusCode === 404 || statusCode === 410) {
+              throw new Error(`Listing expired (HTTP ${statusCode})`)
+            }
+            throw new Error(fetchResult.error || `Insufficient HTML (${fetchResult.html?.length || 0} bytes)`)
           }
-          
-          const html = await response.text()
+
+          const html = fetchResult.html
           const doc = new DOMParser().parseFromString(html, 'text/html')
           
           if (!doc) {

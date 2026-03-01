@@ -450,6 +450,7 @@ async function trySaveHtmlSnapshot(args: {
     const payload: any = {
       platform: "carsandbids",
       listing_url: listingUrl,
+      fetched_at: new Date().toISOString(),
       fetch_method: "firecrawl",
       http_status: httpStatus,
       success,
@@ -554,7 +555,7 @@ serve(async (req) => {
         {
           apiKey: firecrawlApiKey,
           timeoutMs: 30000,
-          maxAttempts: 1,
+          maxAttempts: 2,  // Retry once on transient failure (was 1, too fragile)
         }
       );
 

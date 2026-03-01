@@ -89,6 +89,50 @@ async function sha256(text: string): Promise<string> {
 }
 
 /**
+ * Detect HTML that technically loaded but contains no useful content.
+ * Examples: Cloudflare challenge pages, bare React/Next.js shells, bot walls.
+ * These should be archived as success=false so cache lookups don't return garbage.
+ */
+function isGarbageHtml(html: string, platform: string): boolean {
+  if (!html || html.length === 0) return true;
+
+  const lower = html.toLowerCase();
+
+  // Cloudflare challenge / bot wall
+  if (lower.includes("attention required") && lower.includes("cloudflare")) return true;
+  if (lower.includes("just a moment") && lower.includes("cloudflare")) return true;
+  if (lower.includes("cf-browser-verification")) return true;
+  if (lower.includes("cf_chl_opt")) return true;
+
+  // Generic access denied / blocked
+  if (lower.includes("access denied") && html.length < 5000) return true;
+  if (lower.includes("403 forbidden") && html.length < 5000) return true;
+
+  // React/Next.js shell with no rendered content (Bonhams, Barrett-Jackson)
+  // These shells have __NEXT_DATA__ or __next but no actual lot/vehicle content
+  if (platform === "bonhams") {
+    // Bonhams React shell is ~120KB but has NO lot description in the HTML
+    // Real Firecrawl-rendered pages have the lot title in visible text
+    const hasNextShell = lower.includes("__next_data__") || lower.includes("self.__next_f.push");
+    const hasLotContent = /<h[12][^>]*>[^<]*\d{4}\s+[A-Z]/i.test(html) ||
+                          /class="[^"]*lot-title/i.test(html) ||
+                          /property="og:title"[^>]*content="[^"]*\d{4}/i.test(html);
+    if (hasNextShell && !hasLotContent && !html.includes("Footnotes")) return true;
+  }
+
+  if (platform === "barrett-jackson") {
+    // BJ Cloudflare challenge returns small HTML with no vehicle data
+    const hasVehicleData = /\d{4}\s*Year/i.test(html) ||
+                           /"vehicle":\{/i.test(html) ||
+                           /"@type"\s*:\s*"(?:Vehicle|Product|Car)"/i.test(html) ||
+                           /property="og:title"[^>]*content="[^"]*\d{4}/i.test(html);
+    if (!hasVehicleData && html.length < 50000) return true;
+  }
+
+  return false;
+}
+
+/**
  * Archive-aware fetch. Use this for ALL external URL fetches.
  */
 export async function archiveFetch(
@@ -203,7 +247,7 @@ export async function archiveFetch(
       fetched_at: new Date().toISOString(),
       fetch_method: result.source,
       http_status: result.statusCode,
-      success: html !== null && html.length > 0,
+      success: html !== null && html.length > 0 && !isGarbageHtml(html, platform),
       error_message: result.error,
       html: html,
       markdown: result.markdown,
