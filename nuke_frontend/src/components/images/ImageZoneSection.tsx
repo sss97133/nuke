@@ -26,15 +26,7 @@ export interface ZoneSectionDef {
  * HIGHLIGHTS is virtual and computed separately.
  */
 export const ZONE_SECTIONS: ZoneSectionDef[] = [
-  {
-    key: 'highlights',
-    label: 'HIGHLIGHTS',
-    virtual: true,
-    match: (img) => {
-      const score = typeof img?.photo_quality_score === 'number' ? img.photo_quality_score : 0;
-      return score >= 4;
-    },
-  },
+  // HIGHLIGHTS removed — highlights should be human-curated, not auto-scored
   {
     key: 'exterior',
     label: 'EXTERIOR',

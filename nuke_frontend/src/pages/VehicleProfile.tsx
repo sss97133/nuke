@@ -31,8 +31,7 @@ import { calculateFieldScore, analyzeImageEvidence, type FieldSource } from '../
 const VehicleOwnershipPanel = React.lazy(() => import('../components/ownership/VehicleOwnershipPanel'));
 import { AdminNotificationService } from '../services/adminNotificationService';
 // Extracted sub-components
-import WorkspaceTabBar from './vehicle-profile/WorkspaceTabBar';
-import type { WorkspaceTabId } from './vehicle-profile/WorkspaceTabBar';
+// WorkspaceTabBar removed — all sections render flat in left column
 import { buildAuctionPulseFromExternalListings } from './vehicle-profile/buildAuctionPulse';
 // Image filter utilities are used by extracted loadVehicleImages.ts and loadVehicleData.ts
 import { loadVehicleImagesImpl } from './vehicle-profile/loadVehicleImages';
@@ -40,8 +39,7 @@ import { loadVehicleImpl, selectBestHeroImage } from './vehicle-profile/loadVehi
 import type { HeroImageMeta } from './vehicle-profile/loadVehicleData';
 const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceContent'));
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
-import WalkAroundCarousel from '../components/images/WalkAroundCarousel';
-import type { WalkAroundImage } from '../components/images/WalkAroundCarousel';
+// WalkAroundCarousel removed from vehicle profile layout
 
 /** Quick Stats line shown below hero image */
 const QuickStatsBar: React.FC<{
@@ -117,7 +115,7 @@ const VehicleProfile: React.FC = () => {
   const [fallbackListingImageUrls, setFallbackListingImageUrls] = useState<string[]>([]);
   const [viewCount, setViewCount] = useState<number>(0);
   const [referenceLibraryRefreshKey, setReferenceLibraryRefreshKey] = useState(0);
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTabId>('evidence');
+  // Workspace tabs removed — all sections flat
 
   // STATE DECLARATIONS
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
@@ -134,7 +132,7 @@ const VehicleProfile: React.FC = () => {
   const [ownershipVerifications, setOwnershipVerifications] = useState<any[]>([]);
   const [newEventsNotice, setNewEventsNotice] = useState<{ show: boolean; count: number; dates: string[] }>({ show: false, count: 0, dates: [] });
   const [auctionPulse, setAuctionPulse] = useState<any | null>(null);
-  const [walkAroundImages, setWalkAroundImages] = useState<WalkAroundImage[]>([]);
+  // walkAroundImages state removed
   const auctionCurrency = React.useMemo(() => {
     const v: any = vehicle as any;
     const externalListing = v?.external_listings?.[0];
@@ -731,7 +729,6 @@ const VehicleProfile: React.FC = () => {
   useEffect(() => {
     if (vehicle?.id) {
       loadVehicleImages();
-      loadWalkAroundImages();
       loadViewCount();
       recordView();
       loadTimelineEvents();
@@ -1618,26 +1615,7 @@ const VehicleProfile: React.FC = () => {
     });
   };
 
-  // Lightweight fetch for walk-around carousel zone data
-  const loadWalkAroundImages = useCallback(async () => {
-    if (!vehicle?.id) return;
-    try {
-      const { data, error } = await supabase
-        .from('vehicle_images')
-        .select('id, image_url, vehicle_zone, zone_confidence, photo_quality_score, storage_path')
-        .eq('vehicle_id', vehicle.id)
-        .not('vehicle_zone', 'is', null)
-        .not('is_document', 'is', true)
-        .or('is_duplicate.is.null,is_duplicate.eq.false')
-        .order('photo_quality_score', { ascending: false, nullsFirst: false })
-        .limit(500);
-      if (!error && data) {
-        setWalkAroundImages(data as WalkAroundImage[]);
-      }
-    } catch {
-      // non-blocking
-    }
-  }, [vehicle?.id]);
+  // loadWalkAroundImages removed (carousel removed from layout)
 
   const handleSetPrimaryImage = async (imageId: string) => {
     if (!vehicle || !isAdmin) {
@@ -1837,26 +1815,7 @@ const VehicleProfile: React.FC = () => {
           </React.Suspense>
         </div>
 
-        {/* Walk-Around Carousel — visual zone coverage strip */}
-        {walkAroundImages.length > 0 && (
-          <WalkAroundCarousel
-            images={walkAroundImages}
-            onSlotClick={(zoneKey, imageId) => {
-              // Scroll to the evidence/gallery tab zone section
-              const el = document.getElementById(`zone-section-${zoneKey}`);
-              if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              } else {
-                // Fall back: switch to evidence tab then try again
-                setActiveWorkspaceTab('evidence');
-                requestAnimationFrame(() => {
-                  const elRetry = document.getElementById(`zone-section-${zoneKey}`);
-                  elRetry?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                });
-              }
-            }}
-          />
-        )}
+        {/* WalkAroundCarousel removed */}
 
         {/* Quick Stats Bar */}
         <QuickStatsBar
@@ -1882,12 +1841,7 @@ const VehicleProfile: React.FC = () => {
           </React.Suspense>
         )}
 
-        {/* Workspace Tab Bar */}
-        <WorkspaceTabBar
-          activeTab={activeWorkspaceTab}
-          onTabChange={(tab) => setActiveWorkspaceTab(tab)}
-          isMobile={isMobile}
-        />
+        {/* Workspace tab bar removed — all content renders flat */}
 
         {/* Main Content - Tab-filtered workspace */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
@@ -1897,7 +1851,7 @@ const VehicleProfile: React.FC = () => {
                 vehicle={vehicle}
                 session={session}
                 permissions={permissions}
-                activeWorkspaceTab={activeWorkspaceTab}
+                activeWorkspaceTab={'evidence' as any}
                 isMobile={isMobile}
                 isRowOwner={isRowOwner}
                 isVerifiedOwner={isVerifiedOwner}
