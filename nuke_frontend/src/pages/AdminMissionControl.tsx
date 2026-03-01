@@ -16,6 +16,20 @@ interface SystemStats {
   activeProcessing: number;
 }
 
+interface PlatformHealth {
+  dbStats: any | null;
+  ralphSnapshot: any | null;
+  importQueue: {
+    pending: number;
+    processing: number;
+    complete: number;
+    failed: number;
+    pending_review: number;
+    pending_strategy: number;
+  };
+  updatedAt: Date | null;
+}
+
 interface ImageRadarRow {
   kind: string;
   key: string;
@@ -100,15 +114,87 @@ const AdminMissionControl: React.FC = () => {
   const loadInFlightRef = useRef(false);
   const angleCoverageMetricsDisabledRef = useRef(false);
   const batDomFieldBreakdownDisabledRef = useRef(false);
+  const imageScanStatsDisabledRef = useRef(false);
   const mountedRef = useRef(true);
+  const [platformHealth, setPlatformHealth] = useState<PlatformHealth>({
+    dbStats: null,
+    ralphSnapshot: null,
+    importQueue: { pending: 0, processing: 0, complete: 0, failed: 0, pending_review: 0, pending_strategy: 0 },
+    updatedAt: null,
+  });
+  const [platformHealthLoading, setPlatformHealthLoading] = useState(false);
+  const platformHealthInFlightRef = useRef(false);
+
+  // Load platform health from db-stats + ralph snapshot + import_queue counts
+  const loadPlatformHealth = async () => {
+    if (platformHealthInFlightRef.current) return;
+    platformHealthInFlightRef.current = true;
+    setPlatformHealthLoading(true);
+    try {
+      const functionsUrl = getSupabaseFunctionsUrl();
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const authHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      };
+
+      const [dbStatsResult, ralphResult, ...queueResults] = await Promise.allSettled([
+        fetch(`${functionsUrl}/db-stats`, { headers: authHeaders }).then(r => r.json()),
+        fetch(`${functionsUrl}/ralph-wiggum-rlm-extraction-coordinator`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ action: 'dry_run', max_failed_samples: 50 }),
+        }).then(r => r.json()),
+        supabase.from('import_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('import_queue').select('*', { count: 'exact', head: true }).eq('status', 'processing'),
+        supabase.from('import_queue').select('*', { count: 'exact', head: true }).eq('status', 'complete'),
+        supabase.from('import_queue').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
+        supabase.from('import_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending_review'),
+        supabase.from('import_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending_strategy'),
+      ]);
+
+      if (!mountedRef.current) return;
+
+      const dbStats = dbStatsResult.status === 'fulfilled' ? dbStatsResult.value : null;
+      const ralphSnapshot = ralphResult.status === 'fulfilled' ? ralphResult.value : null;
+
+      const getCount = (idx: number) => {
+        const r = queueResults[idx];
+        if (r?.status === 'fulfilled') return (r.value as any)?.count ?? 0;
+        return 0;
+      };
+
+      setPlatformHealth({
+        dbStats,
+        ralphSnapshot,
+        importQueue: {
+          pending: getCount(0),
+          processing: getCount(1),
+          complete: getCount(2),
+          failed: getCount(3),
+          pending_review: getCount(4),
+          pending_strategy: getCount(5),
+        },
+        updatedAt: new Date(),
+      });
+    } catch (err) {
+      console.error('Error loading platform health:', err);
+    } finally {
+      platformHealthInFlightRef.current = false;
+      if (mountedRef.current) setPlatformHealthLoading(false);
+    }
+  };
 
   useEffect(() => {
     mountedRef.current = true;
     loadDashboard();
-    const interval = setInterval(loadDashboard, 5000); // Refresh every 5 seconds for scanning
+    loadPlatformHealth();
+    const interval = setInterval(loadDashboard, 30000); // Refresh every 30 seconds (was 5s, too aggressive)
+    const healthInterval = setInterval(loadPlatformHealth, 60000); // Platform health every 60 seconds
     return () => {
       mountedRef.current = false;
       clearInterval(interval);
+      clearInterval(healthInterval);
     };
   }, []);
 
@@ -227,7 +313,9 @@ const AdminMissionControl: React.FC = () => {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
-        supabase.rpc('get_image_scan_stats'),
+        imageScanStatsDisabledRef.current
+          ? Promise.resolve({ data: null, error: null })
+          : supabase.rpc('get_image_scan_stats'),
         supabase.rpc('get_inventory_completeness_metrics', {
           p_min_fill_pct: 90,
           p_confidence_threshold: 70,
@@ -278,6 +366,13 @@ const AdminMissionControl: React.FC = () => {
         angleCoverageMetricsDisabledRef.current = true;
       }
 
+      if (!imageScanStatsDisabledRef.current && imageScanData?.error) {
+        const msg = String(imageScanData.error?.message || '').toLowerCase();
+        if (msg.includes('timeout') || msg.includes('canceling statement')) {
+          imageScanStatsDisabledRef.current = true;
+        }
+      }
+
       if (!batDomFieldBreakdownDisabledRef.current && batHealthFieldBreakdownData?.error) {
         const msg = String(batHealthFieldBreakdownData.error?.message || '').toLowerCase();
         const code = String(batHealthFieldBreakdownData.error?.code || '').toLowerCase();
@@ -294,7 +389,7 @@ const AdminMissionControl: React.FC = () => {
         pendingAnalysis: queueData?.data?.reduce((sum: number, q: any) => sum + q.pending_count, 0) || 0,
         investmentOpportunities: opportunitiesCount?.count || 0,
         todayUploads: todayData?.count || 0,
-        activeProcessing: 0
+        activeProcessing: vehicleQueueData?.data?.length || 0
       });
 
       setAnalysisQueue(queueData?.data || []);
@@ -763,6 +858,125 @@ const AdminMissionControl: React.FC = () => {
         <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           Real-time system monitoring and control
         </p>
+      </div>
+
+      {/* PLATFORM HEALTH — real-time from db-stats + ralph snapshot */}
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h2 style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            PLATFORM HEALTH
+          </h2>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {platformHealth.updatedAt && (
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                {platformHealth.updatedAt.toLocaleTimeString()}
+              </span>
+            )}
+            <button
+              className="button button-secondary"
+              style={{ fontSize: '11px', padding: '4px 10px' }}
+              disabled={platformHealthLoading}
+              onClick={loadPlatformHealth}
+            >
+              {platformHealthLoading ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
+        </div>
+
+        {/* db-stats counters */}
+        {platformHealth.dbStats && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', marginBottom: '12px' }}>
+            {[
+              { label: 'VEHICLES', value: platformHealth.dbStats.vehicles?.toLocaleString() },
+              { label: 'IMAGES', value: platformHealth.dbStats.images?.toLocaleString() },
+              { label: 'COMMENTS', value: platformHealth.dbStats.comments?.toLocaleString() },
+              { label: 'OBSERVATIONS', value: platformHealth.dbStats.observations?.toLocaleString() },
+              { label: 'NUKE ESTIMATES', value: platformHealth.dbStats.nuke_estimates?.toLocaleString() },
+              { label: 'VALUATION %', value: platformHealth.dbStats.details?.valuations?.coverage_pct != null ? `${platformHealth.dbStats.details.valuations.coverage_pct}%` : '—' },
+              { label: 'BAT IDENTITIES', value: platformHealth.dbStats.bat_identities?.toLocaleString() },
+              { label: 'ACTIVE USERS', value: platformHealth.dbStats.active_users?.toLocaleString() },
+            ].map((stat, idx) => (
+              <div key={idx} style={{ border: '2px solid var(--text)', background: 'var(--surface)', padding: '10px', textAlign: 'center' }}>
+                <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text)' }}>{stat.value ?? '—'}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Import Queue Pipeline Status */}
+        <div style={{ border: '2px solid var(--border)', background: 'var(--surface)', padding: '12px', marginBottom: '12px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            IMPORT QUEUE PIPELINE
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '11px' }}>
+            {[
+              { label: 'PENDING', value: platformHealth.importQueue.pending, color: platformHealth.importQueue.pending > 100 ? 'var(--warning)' : 'var(--text)' },
+              { label: 'PROCESSING', value: platformHealth.importQueue.processing, color: platformHealth.importQueue.processing > 0 ? 'var(--success)' : 'var(--text-muted)' },
+              { label: 'REVIEW', value: platformHealth.importQueue.pending_review, color: platformHealth.importQueue.pending_review > 0 ? 'var(--warning)' : 'var(--text-muted)' },
+              { label: 'STRATEGY', value: platformHealth.importQueue.pending_strategy, color: platformHealth.importQueue.pending_strategy > 0 ? 'var(--warning)' : 'var(--text-muted)' },
+              { label: 'FAILED', value: platformHealth.importQueue.failed, color: platformHealth.importQueue.failed > 0 ? 'var(--error)' : 'var(--text-muted)' },
+              { label: 'COMPLETE', value: platformHealth.importQueue.complete, color: 'var(--text-muted)' },
+            ].map((item, idx) => (
+              <div key={idx} style={{ textAlign: 'center', minWidth: '80px' }}>
+                <div style={{ fontSize: '17px', fontWeight: 700, color: item.color }}>{item.value.toLocaleString()}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>{item.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Ralph Triage — failing domains + error patterns */}
+        {platformHealth.ralphSnapshot?.snapshot?.triage && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div style={{ border: '1px solid var(--border)', background: 'var(--surface)', padding: '10px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>TOP FAILING DOMAINS</div>
+              <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text)' }}>
+                {(platformHealth.ralphSnapshot.snapshot.triage.top_failed_domains || []).slice(0, 8).map((d: any, idx: number) => (
+                  <div key={idx} style={{ color: 'var(--error)' }}>
+                    {String(d?.count ?? 0).padStart(4, ' ')}  {String(d?.key || '')}
+                  </div>
+                ))}
+                {(platformHealth.ralphSnapshot.snapshot.triage.top_failed_domains || []).length === 0 && (
+                  <div style={{ color: 'var(--text-muted)' }}>No failures</div>
+                )}
+              </div>
+            </div>
+            <div style={{ border: '1px solid var(--border)', background: 'var(--surface)', padding: '10px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>TOP ERROR PATTERNS</div>
+              <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text)' }}>
+                {(platformHealth.ralphSnapshot.snapshot.triage.top_error_patterns || []).slice(0, 8).map((e: any, idx: number) => (
+                  <div key={idx} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }} title={String(e?.key || '')}>
+                    {String(e?.count ?? 0).padStart(4, ' ')}  {String(e?.key || '')}
+                  </div>
+                ))}
+                {(platformHealth.ralphSnapshot.snapshot.triage.top_error_patterns || []).length === 0 && (
+                  <div style={{ color: 'var(--text-muted)' }}>No errors</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Source extraction coverage */}
+        {platformHealth.dbStats?.details?.target_coverage?.sources && (
+          <details style={{ border: '1px solid var(--border)', background: 'var(--surface)', padding: '10px', marginBottom: '12px' }}>
+            <summary style={{ fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+              SOURCE EXTRACTION COVERAGE ({platformHealth.dbStats.details.target_coverage.total_extracted?.toLocaleString()} total)
+            </summary>
+            <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '6px', fontSize: '11px', fontFamily: 'monospace' }}>
+              {(platformHealth.dbStats.details.target_coverage.sources || [])
+                .filter((s: any) => s.extracted > 0)
+                .slice(0, 20)
+                .map((s: any, idx: number) => (
+                  <div key={idx}>
+                    <span style={{ fontWeight: 600 }}>{String(s.extracted).padStart(7, ' ')}</span>
+                    <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>{s.source_slug}</span>
+                  </div>
+                ))}
+            </div>
+          </details>
+        )}
       </div>
 
       {/* ORIGIN IMAGE BACKFILL */}
@@ -1309,10 +1523,9 @@ const AdminMissionControl: React.FC = () => {
             { label: 'IMAGES', value: stats?.totalImages.toLocaleString() },
             { label: 'ORGANIZATIONS', value: stats?.totalOrganizations.toLocaleString() },
             { label: 'USERS', value: stats?.totalUsers.toLocaleString() },
-            { label: 'PENDING ANALYSIS', value: stats?.pendingAnalysis.toLocaleString(), alert: (stats?.pendingAnalysis || 0) > 0 },
-            { label: 'OPPORTUNITIES', value: stats?.investmentOpportunities.toLocaleString() },
+            { label: 'ORG ANALYSIS PENDING', value: stats?.pendingAnalysis.toLocaleString(), alert: (stats?.pendingAnalysis || 0) > 0 },
             { label: 'TODAY UPLOADS', value: stats?.todayUploads.toLocaleString() },
-            { label: 'PROCESSING', value: stats?.activeProcessing.toLocaleString() }
+            { label: 'IMAGES AWAITING AI', value: stats?.activeProcessing.toLocaleString(), alert: (stats?.activeProcessing || 0) > 0 }
         ].map((stat, idx) => (
           <div
             key={idx}
