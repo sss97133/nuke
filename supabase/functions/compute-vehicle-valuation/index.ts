@@ -756,19 +756,30 @@ serve(async (req) => {
       );
     }
 
-    // Compute valuations
-    const results = [];
-    const errors = [];
-    for (const vid of vehicleIds) {
-      try {
-        const result = await computeValuation(supabase, vid);
-        if (result.error) {
-          errors.push(result);
+    // Compute valuations in parallel batches of 10
+    const results: any[] = [];
+    const errors: any[] = [];
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < vehicleIds.length; i += BATCH_SIZE) {
+      const batch = vehicleIds.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (vid) => {
+          try {
+            const result = await computeValuation(supabase, vid);
+            return { result, vid };
+          } catch (e: unknown) {
+            return { error: e instanceof Error ? e.message : String(e), vid };
+          }
+        })
+      );
+      for (const br of batchResults) {
+        if ("error" in br && !("result" in br)) {
+          errors.push({ vehicleId: br.vid, error: br.error });
+        } else if (br.result.error) {
+          errors.push(br.result);
         } else {
-          results.push(result);
+          results.push(br.result);
         }
-      } catch (e: any) {
-        errors.push({ vehicleId: vid, error: e instanceof Error ? e.message : String(e) });
       }
     }
 
