@@ -86,7 +86,9 @@
     "tar": "^7.5.8",
     "bn.js": "^5.2.3",
     "hono": "^4.11.10",
-    "qs": "^6.14.2"
+    "qs": "^6.14.2",
+    "fast-xml-parser": "^5.3.8",
+    "ajv": "^8.18.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
@@ -101,7 +103,7 @@
     "concurrently": "^9.2.1",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
-    "eslint": "^9.25.0",
+    "eslint": "^9.27.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "express": "^5.1.0",
