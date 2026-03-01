@@ -2441,8 +2441,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   </div>
                 );
               })()}
-              {/* Buyer badge — skip if transfer status already shows the same buyer */}
+              {/* Buyer badge — skip if transfer status already shows the same buyer, or if it's just RNM/NO SALE (already shown near price) */}
               {headerBuyer && (() => {
+                const buyerLabel = headerBuyer.label.trim().toUpperCase();
+                if (buyerLabel === 'RNM' || buyerLabel === 'NO SALE') return null;
                 const transferBuyerHandle = transferStatus?.buyer?.handle ? String(transferStatus.buyer.handle).replace(/^@/, '').toLowerCase() : '';
                 const buyerLabelHandle = (headerBuyer.label.match(/@(\S+)/)?.[1] || '').toLowerCase();
                 if (transferBuyerHandle && buyerLabelHandle && transferBuyerHandle === buyerLabelHandle) return null;
@@ -2701,7 +2703,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             const guessHandle = String(ownerGuess.username || '').replace(/^@/, '').toLowerCase();
             const buyerLabelHandle = headerBuyer ? (headerBuyer.label.match(/@(\S+)/)?.[1] || '').toLowerCase() : '';
             const transferBuyerHandle = transferStatus?.buyer?.handle ? String(transferStatus.buyer.handle).replace(/^@/, '').toLowerCase() : '';
-            const sellerLabelHandle = headerSeller ? (headerSeller.label.match(/@(\S+)/)?.[1] || String(headerSeller.label).replace(/^@/, '').toLowerCase()) : '';
+            const sellerLabelHandle = headerSeller ? String(headerSeller.label.match(/@(\S+)/)?.[1] || headerSeller.label || '').replace(/^@/, '').toLowerCase() : '';
             if (guessHandle && buyerLabelHandle && guessHandle === buyerLabelHandle) return false;
             if (guessHandle && transferBuyerHandle && guessHandle === transferBuyerHandle) return false;
             if (guessHandle && sellerLabelHandle && guessHandle === sellerLabelHandle) return false;
