@@ -1,5 +1,23 @@
 # DONE — Completed Work Log
 
+## 2026-03-01 (Overnight Autonomous Session)
+
+[git] Committed and pushed 330 files of accumulated multi-agent work (e98d0cb85)
+[frontend] Fixed 7 crash bugs: Rules of Hooks violation, null guards, SSR safety, infinite loop, undefined text
+[frontend] Search results + vehicle cards now show image/event counts and deal score badges
+[db] Backfilled 61,385 vehicles with primary_image_url from vehicle_images
+[db] Data quality scoring: 37% → 99.94% coverage (1.25M vehicles scored in ~15 minutes)
+[db] VIN varchar overflow fix in vehicle_mailboxes (widened to varchar(50))
+[infra] Deployed 22 edge functions (14 updated, 8 new including agent hierarchy)
+[infra] Cron audit: fixed 3 broken jobs + 1 security fix (hardcoded key), cleaned 51K stale log rows
+[infra] Agent hierarchy wired to crons: router (5min), haiku worker (2min), sonnet supervisor (10min)
+[extraction] Snapshot extraction fixes: Craigslist archiveFetch, Bonhams JSON-LD fallback, Barrett-Jackson Cloudflare detection, Cars & Bids retry
+[extraction] Import queue: 170 → 146 failed items, VIN overflow fixed, Firecrawl items skipped
+[search] Universal search accepts both ?q= and ?query= parameters
+[sdk] @nuke1/sdk v1.5.0 README updated to match actual vision types, LICENSE file added
+[fb] National FB Marketplace sweep running (58 metros, ~1000+ vintage listings so far)
+[yono] Verified YONO sidecar healthy (2 warm containers, all tier-2 families loaded)
+
 ## 2026-03-01
 
 [quality] Massively accelerated data_quality_score backfill — scored 790K+ vehicles in ~15 minutes
