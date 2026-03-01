@@ -1815,15 +1815,7 @@ const VehicleProfile: React.FC = () => {
           </React.Suspense>
         </div>
 
-        {/* WalkAroundCarousel removed */}
-
-        {/* Quick Stats Bar */}
-        <QuickStatsBar
-          imageCount={vehicleImages.length}
-          eventCount={timelineEvents.length}
-          commentCount={totalCommentCount}
-          updatedAt={(vehicle as any)?.updated_at}
-        />
+        {/* WalkAroundCarousel and QuickStatsBar removed */}
 
         {/* Add Organization Relationship Modal */}
         {showAddOrgRelationship && vehicle && session?.user?.id && (
