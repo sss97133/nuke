@@ -2554,7 +2554,7 @@ const ImageGallery = ({
         }
 
         return (
-          <div style={{
+          <div className="gallery-story-bar" style={{
             padding: '4px 12px',
             fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
             fontSize: '11px',
@@ -2589,7 +2589,7 @@ const ImageGallery = ({
       })()}
 
       {/* Gallery Controls */}
-      <div className="card-header">
+      <div className="card-header gallery-controls-bar">
         <div style={{ 
           display: 'flex', 
           alignItems: 'center', 

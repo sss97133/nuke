@@ -28,34 +28,30 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
   if (!src || src === 'undefined' || src === 'null') {
     // Show a minimal placeholder so the hero area exists
     return (
-      <section className="section">
+      <div style={{
+        width: '100%',
+        aspectRatio: '16/9',
+        maxHeight: '280px',
+        backgroundColor: 'var(--surface)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
         <div style={{
-          width: '100%',
-          aspectRatio: '16/9',
-          maxHeight: '420px',
-          backgroundColor: 'var(--surface)',
-          border: '1px solid var(--border-light)',
-          borderRadius: 'var(--radius-2)',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
+          gap: '8px',
+          color: 'var(--text-muted)',
         }}>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '8px',
-            color: 'var(--text-muted)',
-          }}>
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="4" y="12" width="40" height="28" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
-              <circle cx="18" cy="22" r="4" stroke="currentColor" strokeWidth="2" fill="none"/>
-              <path d="M4 34 L14 24 L20 30 L30 20 L44 34" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" fill="none"/>
-            </svg>
-            <span style={{ fontSize: '12px', fontWeight: 500 }}>No photo available</span>
-          </div>
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="12" width="40" height="28" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+            <circle cx="18" cy="22" r="4" stroke="currentColor" strokeWidth="2" fill="none"/>
+            <path d="M4 34 L14 24 L20 30 L30 20 L44 34" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" fill="none"/>
+          </svg>
+          <span style={{ fontSize: '12px', fontWeight: 500 }}>No photo available</span>
         </div>
-      </section>
+      </div>
     );
   }
 
@@ -70,8 +66,8 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
 
   return (
     <>
-      <section className="section">
-        <div className="card" style={{ border: 'none', overflow: 'hidden' }}>
+      <div>
+        <div style={{ overflow: 'hidden' }}>
           {/* hero-media-slot: static image now, carousel/livestream later */}
           <div className="hero-media-slot">
             <div
@@ -81,7 +77,6 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
                 maxHeight: '360px',
                 position: 'relative',
                 overflow: 'hidden',
-                borderRadius: 'var(--radius-2)',
                 backgroundColor: 'var(--grey-950, #111)',
                 cursor: isMobile ? 'pointer' : 'default',
               }}
@@ -143,40 +138,9 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
             </div>
           </div>
 
-          {/* Metadata bar -- camera, location, date */}
-          {metaParts.length > 0 && (
-            <div style={{
-              padding: '6px 12px',
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '4px',
-              alignItems: 'center',
-            }}>
-              {metaParts.map((part, i) => (
-                <React.Fragment key={i}>
-                  {i > 0 && (
-                    <span style={{
-                      color: 'var(--text-muted)',
-                      opacity: 0.4,
-                      fontFamily: 'var(--font-mono, "SF Mono", "Fira Code", "Fira Mono", monospace)',
-                      fontSize: '11px',
-                    }}>|</span>
-                  )}
-                  <span style={{
-                    fontFamily: 'var(--font-mono, "SF Mono", "Fira Code", "Fira Mono", monospace)',
-                    fontSize: '11px',
-                    color: 'var(--text-muted)',
-                    letterSpacing: '0.02em',
-                    lineHeight: 1.4,
-                  }}>
-                    {part}
-                  </span>
-                </React.Fragment>
-              ))}
-            </div>
-          )}
+          {/* Metadata bar removed — clean hero like BaT */}
         </div>
-      </section>
+      </div>
 
       {isMobile && showGallery && (
         <MobileImageGallery

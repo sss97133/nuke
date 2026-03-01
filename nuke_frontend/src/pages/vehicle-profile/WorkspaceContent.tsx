@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 // supabase import removed (FactExplorerPanel deleted)
 import { usePageTitle, getVehicleTitle } from '../../hooks/usePageTitle';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
@@ -28,59 +28,30 @@ const BundleReviewQueue = React.lazy(() => import('../../components/images/Bundl
 const ImageGallery = React.lazy(() => import('../../components/images/ImageGallery'));
 const VehicleVideoSection = React.lazy(() => import('../../components/vehicle/VehicleVideoSection'));
 
-// Collapsible wrapper for ImageGallery (moved from VehicleProfile.tsx)
-const CollapsibleGalleryCard: React.FC<{
+// Streamlined image gallery for vehicle profile — no wrapper chrome, just images
+const ProfileGallery: React.FC<{
   vehicleId: string;
   vehicleImages: string[];
   fallbackListingImageUrls: string[];
   vehicle: any;
   onImagesUpdated: () => void;
 }> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, vehicle, onImagesUpdated }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const imageCount = vehicleImages.length || fallbackListingImageUrls.length || 0;
-
   return (
-    <div className={`card ${isCollapsed ? 'is-collapsed' : ''}`}>
-      <div
-        className="card-header"
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        style={{
-          cursor: 'pointer',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}
-      >
-        <span>IMAGES {imageCount > 0 && `(${imageCount})`}</span>
-        <span style={{
-          fontSize: '10px',
-          color: 'var(--text-muted)',
-          transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-          transition: 'transform 0.2s'
-        }}>
-          ▼
-        </span>
-      </div>
-      {!isCollapsed && (
-        <div className="card-body" style={{ padding: 0 }}>
-          <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading gallery...</div>}>
-            <ImageGallery
-              vehicleId={vehicleId}
-              showUpload={true}
-              fallbackImageUrls={vehicleImages.length > 0 ? [] : fallbackListingImageUrls}
-              fallbackLabel="Listing"
-              fallbackSourceUrl={
-                vehicle?.discovery_url ||
-                vehicle?.bat_auction_url ||
-                vehicle?.listing_url ||
-                undefined
-              }
-              onImagesUpdated={onImagesUpdated}
-            />
-          </React.Suspense>
-        </div>
-      )}
-    </div>
+    <React.Suspense fallback={<div style={{ padding: '12px', color: 'var(--text-muted)', fontSize: '12px' }}>Loading gallery...</div>}>
+      <ImageGallery
+        vehicleId={vehicleId}
+        showUpload={false}
+        fallbackImageUrls={vehicleImages.length > 0 ? [] : fallbackListingImageUrls}
+        fallbackLabel="Listing"
+        fallbackSourceUrl={
+          vehicle?.discovery_url ||
+          vehicle?.bat_auction_url ||
+          vehicle?.listing_url ||
+          undefined
+        }
+        onImagesUpdated={onImagesUpdated}
+      />
+    </React.Suspense>
   );
 };
 
@@ -216,8 +187,8 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             display: 'flex',
             flexDirection: 'column',
             gap: 'var(--space-3)',
-            padding: 'var(--space-3) var(--space-2)',
-          }} className="comments-scroll-container">
+            padding: 'var(--space-3) 0',
+          }} className="comments-scroll-container vehicle-profile-left-column">
             {/* Work Memory Capture — owners & contributors only */}
             {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
               <React.Suspense fallback={null}>
@@ -367,8 +338,8 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             height: '100%',
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px',
-          }}>
+            gap: '0',
+          }} className="vehicle-profile-right-column">
             {/* Session Review Queue */}
             {session && (
               <React.Suspense fallback={null}>
@@ -376,8 +347,8 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
               </React.Suspense>
             )}
 
-            {/* Image Gallery */}
-            <CollapsibleGalleryCard
+            {/* Image Gallery — clean stream, no chrome */}
+            <ProfileGallery
               vehicleId={vehicle.id}
               vehicleImages={vehicleImages}
               fallbackListingImageUrls={fallbackListingImageUrls}
