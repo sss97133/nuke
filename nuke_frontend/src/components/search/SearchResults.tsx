@@ -747,6 +747,13 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                         {result.metadata?.transmission && (
                           <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>{result.metadata.transmission}</span>
                         )}
+                        {(result.metadata?.image_count > 0 || result.metadata?.event_count > 0) && (
+                          <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
+                            {result.metadata.image_count > 0 ? `${result.metadata.image_count} img` : ''}
+                            {result.metadata.image_count > 0 && result.metadata.event_count > 0 ? ' · ' : ''}
+                            {result.metadata.event_count > 0 ? `${result.metadata.event_count} evt` : ''}
+                          </span>
+                        )}
                       </div>
                     )}
 
