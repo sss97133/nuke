@@ -38,8 +38,8 @@
 - **NEXT**: Aggregate results, deduplicate, enrich via refine-fb-listing, feed into import queue
 - Reference: MEMORY.md `## Active Focus: Facebook Marketplace Vehicle Extraction`
 
-### 3. Agent Hierarchy [DEPLOYED]
-**Status**: Built and deployed. Tested with real data.
+### 3. Agent Hierarchy [PRIMARY — CQP DISABLED]
+**Status**: Agent hierarchy is now the sole import_queue processor. CQP disabled.
 - `haiku-extraction-worker` — Routine extraction at $1/$5 MTok (3x cheaper than Sonnet)
 - `sonnet-supervisor` — Quality review, edge case handling, dispatch loop
 - `agent-tier-router` — Top-level router with Opus strategy layer
@@ -47,6 +47,8 @@
 - import_queue statuses: `pending` -> `pending_review` -> `pending_strategy` -> `complete`
 - See TOOLS.md "Agent Hierarchy" section for full usage
 - **DEPLOYED**: Crons active, queue draining — router (5min), haiku worker (2min), sonnet supervisor (10min)
+- **CQP overlap resolved (Mar 1)**: CHECK constraint fixed (added pending_review/pending_strategy), CQP trigger + crons disabled, dead go-grinder cron removed. CQP function still callable manually for domain-specific extraction.
+- **NOTE**: Haiku worker only extracts from archived content (listing_page_snapshots). For items without archived content, it escalates to Sonnet. If fresh scraping is needed, invoke CQP or domain extractors manually.
 
 ---
 

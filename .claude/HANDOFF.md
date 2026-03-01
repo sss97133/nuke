@@ -1,16 +1,15 @@
-# Auto-Checkpoint — 2026-03-01 01:04:07
+# Auto-Checkpoint — 2026-03-01 01:10:57
 *(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
 
 ## Recent Commits (last 30 min)
-none
+9c454327a docs: update project state and done log for overnight session
+8e853ca43 docs: update SDK README to match v1.5.0 vision types + add LICENSE
+154b34c58 feat: show image/event counts and deal score badge in vehicle cards
+2a68ff692 feat: fast quality score backfill infrastructure
 
 ## Uncommitted Changes
-.claude/ACTIVE_AGENTS.md
 .claude/HANDOFF.md
-DONE.md
 mcp-server
-nuke_frontend/src/components/vehicles/VehicleCardDense.tsx
-supabase/migrations/20260301010000_fast_quality_score_backfill.sql
 
 ## Staged
 none
