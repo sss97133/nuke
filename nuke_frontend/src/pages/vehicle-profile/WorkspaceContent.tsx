@@ -57,13 +57,15 @@ const ProfileGallery: React.FC<{
 
 // FactExplorerPanel removed — empty-state-only section
 
-export type { WorkspaceTabId } from './WorkspaceTabBar';
+// WorkspaceTabBar was removed — all sections render flat in left column.
+// Keep the type alias so WorkspaceContentProps still compiles.
+export type WorkspaceTabId = 'evidence' | 'gallery' | 'owner';
 
 export interface WorkspaceContentProps {
   vehicle: Vehicle;
   session: any;
   permissions: VehiclePermissions;
-  activeWorkspaceTab: WorkspaceTabId;
+  activeWorkspaceTab?: WorkspaceTabId;
   isMobile: boolean;
 
   // Permission booleans

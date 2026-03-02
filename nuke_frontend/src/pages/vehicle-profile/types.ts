@@ -157,7 +157,6 @@ export interface HeroMeta {
 
 export interface VehicleHeroImageProps {
   leadImageUrl: string | null;
-  vehicleId?: string;
   overlayNode?: React.ReactNode;
   heroMeta?: HeroMeta | null;
 }
