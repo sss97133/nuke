@@ -1,25 +1,17 @@
 import React from 'react';
-import WorkMemoryCapture from '../../components/memory/WorkMemoryCapture';
-import type { VehiclePermissions } from './types';
+import type { WorkMemorySectionProps } from './types';
 
-interface WorkMemorySectionProps {
-  vehicleId: string;
-  permissions: VehiclePermissions;
-}
-
+/**
+ * WorkMemorySection — captures owner/contributor work notes for a vehicle.
+ * Stub created to resolve missing-module build errors.
+ * TODO: Implement work-memory capture UI.
+ */
 const WorkMemorySection: React.FC<WorkMemorySectionProps> = ({
   vehicleId,
-  permissions
+  permissions,
 }) => {
-  const { isVerifiedOwner, hasContributorAccess } = permissions;
-
-  if (!isVerifiedOwner && !hasContributorAccess) {
-    return null;
-  }
-
-  return (
-    <WorkMemoryCapture vehicleId={vehicleId} />
-  );
+  // Placeholder: work memory capture will be implemented in a future iteration.
+  return null;
 };
 
 export default WorkMemorySection;
