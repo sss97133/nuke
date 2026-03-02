@@ -22,7 +22,6 @@ import type {
 } from './vehicle-profile/types';
 import '../design-system.css';
 import '../styles/vehicle-profile.css';
-import './vehicle-profile/vehicle-profile-redesign.css';
 const VehicleSubHeader = React.lazy(() => import('./vehicle-profile/VehicleSubHeader'));
 import { type LinkedOrg } from '../components/vehicle/LinkedOrganizations';
 const AddOrganizationRelationship = React.lazy(() => import('../components/vehicle/AddOrganizationRelationship'));
