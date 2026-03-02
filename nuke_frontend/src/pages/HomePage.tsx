@@ -3,6 +3,9 @@ import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { supabase } from '../lib/supabase';
+import { useVehiclesDashboard } from '../hooks/useVehiclesDashboard';
+import { useAppLayoutContext } from '../components/layout/AppLayoutContext';
+import { GarageToolbar } from '../components/garage/GarageToolbar';
 
 /** Simple stats loader for the public landing page — no auth or complex fallbacks needed. */
 function useLandingStats() {
@@ -668,6 +671,7 @@ export default function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const [showFeed, setShowFeed] = useState(false);
+  const { setToolbarSlot } = useAppLayoutContext();
 
   const defaultTab = useMemo(() => {
     const fromUrl = searchParams.get('tab') as TabId | null;
@@ -678,6 +682,47 @@ export default function HomePage() {
   }, []);
 
   const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
+
+  // Garage dashboard state — lifted here so toolbar + GarageTab share it
+  const garage = useVehiclesDashboard(user?.id);
+
+  // Register / unregister the garage toolbar in the AppHeader
+  useEffect(() => {
+    if (activeTab === 'garage' && user && !garage.isLoading) {
+      setToolbarSlot(
+        <GarageToolbar
+          vehicleCount={garage.vehicles.length}
+          totalValue={garage.totalEstimatedValue}
+          viewMode={garage.viewMode}
+          sortMode={garage.sortMode}
+          filterMode={garage.filterMode}
+          onViewChange={garage.setViewMode}
+          onSortChange={garage.setSortMode}
+          onFilterChange={garage.setFilterMode}
+        />
+      );
+    } else {
+      setToolbarSlot(null);
+    }
+  }, [
+    activeTab,
+    user,
+    garage.isLoading,
+    garage.vehicles.length,
+    garage.totalEstimatedValue,
+    garage.viewMode,
+    garage.sortMode,
+    garage.filterMode,
+    garage.setViewMode,
+    garage.setSortMode,
+    garage.setFilterMode,
+    setToolbarSlot,
+  ]);
+
+  // Clean up toolbar on unmount
+  useEffect(() => {
+    return () => setToolbarSlot(null);
+  }, [setToolbarSlot]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -703,16 +748,15 @@ export default function HomePage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 40px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - var(--header-height, 40px))' }}>
       {/* Tab bar */}
       <div
         style={{
           display: 'flex',
-          alignItems: 'stretch',
+          alignItems: 'center',
           background: 'var(--surface)',
           flexShrink: 0,
-          borderTop: '1px solid var(--border)',
-          borderBottom: '2px solid var(--text)',
+          borderBottom: '2px solid var(--border)',
           height: 30,
         }}
       >
@@ -724,19 +768,20 @@ export default function HomePage() {
               onClick={() => switchTab(tab.id)}
               aria-selected={active}
               style={{
-                padding: '0 20px',
-                fontSize: '11px',
+                padding: '0 16px',
+                height: 30,
+                fontSize: 9,
                 fontFamily: 'Arial, sans-serif',
-                fontWeight: 600,
-                letterSpacing: '0.5px',
+                fontWeight: 700,
+                letterSpacing: '0.12em',
                 textTransform: 'uppercase',
                 border: 'none',
-                borderBottom: active ? '2px solid var(--surface)' : '2px solid transparent',
+                borderBottom: active ? '2px solid var(--text)' : '2px solid transparent',
                 background: active ? 'var(--bg)' : 'transparent',
-                color: active ? 'var(--surface)' : 'var(--text-disabled)',
+                color: active ? 'var(--text)' : 'var(--text-disabled)',
                 cursor: 'pointer',
-                transition: 'color 0.1s, background 0.1s',
-                marginBottom: '-2px',
+                transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1), background 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+                borderRadius: 0,
               }}
               onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)'; }}
               onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-disabled)'; }}
@@ -745,31 +790,24 @@ export default function HomePage() {
             </button>
           );
         })}
-        {/* Right-aligned external links */}
-        <div
-          style={{
-            marginLeft: 'auto',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '2px',
-            paddingRight: '8px',
-          }}
-        >
+
+        {/* Right-aligned links */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 2, paddingRight: 8 }}>
           <Link
             to="/api"
             style={{
-              padding: '0 12px',
-              fontSize: '10px',
+              padding: '0 10px',
+              fontSize: 9,
               fontFamily: 'Arial, sans-serif',
-              fontWeight: 600,
-              letterSpacing: '0.5px',
+              fontWeight: 700,
+              letterSpacing: '0.12em',
               textTransform: 'uppercase',
               textDecoration: 'none',
-              color: 'var(--accent)',
-              cursor: 'pointer',
+              color: 'var(--text-secondary)',
               display: 'flex',
               alignItems: 'center',
-              height: '100%',
+              height: 30,
+              transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
             }}
           >
             API
@@ -777,18 +815,18 @@ export default function HomePage() {
           <Link
             to="/developers"
             style={{
-              padding: '0 12px',
-              fontSize: '10px',
+              padding: '0 10px',
+              fontSize: 9,
               fontFamily: 'Arial, sans-serif',
-              fontWeight: 600,
-              letterSpacing: '0.5px',
+              fontWeight: 700,
+              letterSpacing: '0.12em',
               textTransform: 'uppercase',
               textDecoration: 'none',
-              color: 'var(--accent)',
-              cursor: 'pointer',
+              color: 'var(--text-secondary)',
               display: 'flex',
               alignItems: 'center',
-              height: '100%',
+              height: 30,
+              transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
             }}
           >
             SDK
@@ -799,7 +837,7 @@ export default function HomePage() {
       {/* Tab content */}
       <div style={{ flex: 1, overflow: activeTab === 'map' ? 'hidden' : 'auto', background: 'var(--bg)', position: 'relative' }}>
         <Suspense fallback={<TabSkeleton />}>
-          {activeTab === 'garage' && <GarageTab />}
+          {activeTab === 'garage' && <GarageTab dashboard={garage} />}
           {activeTab === 'feed' && <CursorHomepage />}
           {activeTab === 'map' && <UnifiedMap />}
         </Suspense>

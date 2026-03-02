@@ -99,6 +99,13 @@
   overflow: visible;
 }
 
+/* Collapse VehicleHeader — VehicleSubHeader replaces it as the primary header bar.
+   VehicleHeader is 5000+ lines with broken badge rendering under V3 CSS.
+   VehicleSubHeader provides clean badge display with all the same data. */
+.vehicle-profile-page > .vehicle-profile-sub-header {
+  display: none !important;
+}
+
 .vehicle-sub__left {
   display: flex;
   align-items: center;

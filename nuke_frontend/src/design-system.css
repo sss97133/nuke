@@ -2161,28 +2161,11 @@ body {
   margin-bottom: var(--space-4);
 }
 
-/* Vehicle Profile Two Column Layout — BaT-style 2:1 ratio */
+/* Vehicle Profile Two Column Layout — spec: 55% / 45% */
 .vehicle-profile-two-column {
   display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: var(--space-4);
-}
-
-/* Strip gallery chrome when inside vehicle profile right column */
-.vehicle-profile-right-column .gallery-story-bar,
-.vehicle-profile-right-column .gallery-controls-bar {
-  display: none !important;
-}
-/* Hide image diagnostic overlays (condition scores, damage dots, quality badges) in profile */
-.vehicle-profile-right-column [title^="Condition:"],
-.vehicle-profile-right-column [title^="Damage:"],
-.vehicle-profile-right-column [title^="Photo quality:"] {
-  display: none !important;
-}
-/* Override image grid to 2 columns in narrow profile right column */
-.vehicle-profile-right-column [data-zone-section] > div:last-child {
-  grid-template-columns: repeat(2, 1fr) !important;
-  gap: 2px !important;
+  grid-template-columns: 55% 45%;
+  gap: 4px;
 }
 
 /* Buyer view (QR / public): left column is a tight spec strip so gallery is the hero */
@@ -2244,109 +2227,11 @@ body {
   padding: var(--space-4);
 }
 
-/* Vehicle Profile: collapsible left-column cards */
+/* Vehicle Profile card/widget styling moved to src/styles/vehicle-profile.css */
+/* Kept: collapsible cursor + collapsed state (used by JS toggle logic) */
 .vehicle-profile-left-column .card .card-header {
   cursor: pointer;
   user-select: none;
-}
-
-.vehicle-profile-left-column .card.is-collapsed .card-body {
-  display: none !important;
-}
-
-.vehicle-profile-left-column .card.is-collapsed .card-footer {
-  display: none !important;
-}
-
-.vehicle-profile-left-column .card.is-collapsed .card-header {
-  border-bottom: none;
-}
-
-/* Vehicle Profile: keep left-column spacing uniform (use container gap, not per-card margins) */
-.vehicle-profile-left-column > .card {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
-
-/* Vehicle Profile: unify left-column card look to match Basic Information (compact, same border/header/body) */
-.vehicle-profile-left-column .card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 0;
-  box-shadow: none;
-  overflow: hidden;
-}
-
-.vehicle-profile-left-column .card .card-header {
-  padding: 4px 6px;
-  border-bottom: 1px solid var(--border);
-  background: var(--grey-200);
-  font-size: 8pt;
-  font-weight: bold;
-}
-
-.vehicle-profile-left-column .card .card-body {
-  padding: 8px;
-}
-
-.vehicle-profile-left-column .card .card-footer {
-  padding: 8px;
-  border-top: 1px solid var(--border);
-  background: var(--grey-200);
-}
-
-/* Vehicle Profile: CollapsibleWidget sections (Investment Summary, Proof Tasks, Reference Library, etc.) match same style */
-.vehicle-profile-left-column .vehicle-profile-section {
-  background: var(--bg) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  overflow: hidden;
-}
-
-.vehicle-profile-left-column .vehicle-profile-section > button {
-  background: var(--grey-200) !important;
-  padding: 4px 6px !important;
-  border-bottom: 1px solid var(--border) !important;
-  font-size: 8pt !important;
-  font-weight: bold !important;
-  color: var(--text) !important;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
-.vehicle-profile-left-column .vehicle-profile-section > div[class*="border-t"] {
-  padding: 8px !important;
-  border-top-color: var(--border) !important;
-}
-
-/* Right column cards (gallery, videos) match left column look */
-.vehicle-profile-right-column .card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 0;
-  box-shadow: none;
-  overflow: hidden;
-}
-.vehicle-profile-right-column .card .card-header {
-  padding: 4px 10px;
-  border-bottom: 1px solid var(--border);
-  background: var(--grey-200);
-  font-size: var(--font-size-small);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  color: var(--text);
-}
-.vehicle-profile-right-column .card .card-body {
-  padding: var(--space-3);
-}
-.vehicle-profile-buyer-view .vehicle-profile-right-column .card .card-header {
-  padding: 6px 12px;
-  font-size: 9pt;
-}
-.vehicle-profile-buyer-view .vehicle-profile-right-column .card .card-body {
-  padding: var(--space-4);
 }
 
 @media (max-width: 768px) {
@@ -2357,15 +2242,14 @@ body {
   }
 }
 
-/* Sticky scrollable comments container */
+/* Sticky scrollable comments container — spec: 4px, transparent track, #ddd thumb */
 .comments-scroll-container {
-  /* Webkit scrollbar styling */
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: #ddd transparent;
 }
 
 .comments-scroll-container::-webkit-scrollbar {
-  width: 8px;
+  width: 4px;
 }
 
 .comments-scroll-container::-webkit-scrollbar-track {
@@ -2373,14 +2257,8 @@ body {
 }
 
 .comments-scroll-container::-webkit-scrollbar-thumb {
-  background-color: var(--border);
-  border-radius: 4px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.comments-scroll-container::-webkit-scrollbar-thumb:hover {
-  background-color: var(--border-dark);
+  background-color: #ddd;
+  border-radius: 0;
 }
 
 /* Smooth scrolling for comments */

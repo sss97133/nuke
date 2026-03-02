@@ -51,6 +51,16 @@ const TAG_TYPES = [
   { value: 'tool', label: 'Tool' }
 ];
 
+// Convert a Supabase storage URL to an on-the-fly transform URL.
+// Uses Supabase Image Transformations: /render/image/public/{path}?width=N&quality=Q
+const supabaseTransformUrl = (url: string | undefined, width: number, quality = 60): string => {
+  if (!url) return '';
+  // Only transform Supabase storage URLs
+  const match = url.match(/^(https:\/\/[^/]+\.supabase\.co)\/storage\/v1\/object\/public\/(.+)$/);
+  if (!match) return url;
+  return `${match[1]}/storage/v1/render/image/public/${match[2]}?width=${width}&quality=${quality}`;
+};
+
 // Helper function to get optimal image URL based on variants
 const getOptimalImageUrl = (image: any, size: 'thumbnail' | 'medium' | 'large' | 'full' = 'medium'): string => {
   // For 'full', prioritize variants.full if it exists (true original), otherwise use image_url
@@ -97,10 +107,10 @@ const getOptimalImageUrl = (image: any, size: 'thumbnail' | 'medium' | 'large' |
     }
   }
   
-  // Fallback to column-based URLs
-  if (size === 'thumbnail') return image.thumbnail_url || image.image_url;
-  if (size === 'medium') return image.medium_url || image.image_url;
-  if (size === 'large') return image.large_url || image.image_url;
+  // Fallback to column-based URLs, using Supabase image transforms when no variant exists
+  if (size === 'thumbnail') return image.thumbnail_url || supabaseTransformUrl(image.image_url, 200);
+  if (size === 'medium') return image.medium_url || supabaseTransformUrl(image.image_url, 800);
+  if (size === 'large') return image.large_url || supabaseTransformUrl(image.image_url, 1600);
   return image.image_url;
 };
 

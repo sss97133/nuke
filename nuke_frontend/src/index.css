@@ -4,7 +4,7 @@
  */
 
 @import './styles/unified-design-system.css';
-@import './styles/header-fix.css';
+/* header-fix.css superseded by AppHeader.css (imported in AppHeader.tsx) */
 
 @tailwind base;
 @tailwind components;

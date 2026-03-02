@@ -13,6 +13,7 @@ export type ThemePreference = 'auto' | Theme;
 export type AutoThemeSource = 'system' | 'time';
 export type ContrastProfile = 'standard' | 'greyscale' | 'high';
 export type TextScale = 0.9 | 1 | 1.1 | 1.2;
+export type HeaderVariant = 'command-line' | 'segmented' | 'two-row' | 'minimal';
 
 export type TimeSchedule = {
   start: string; // "HH:MM"
@@ -71,6 +72,10 @@ interface ThemeContextType {
   textScale: TextScale;
   setTextScale: (scale: TextScale) => void;
 
+  // Header variant
+  headerVariant: HeaderVariant;
+  setHeaderVariant: (variant: HeaderVariant) => void;
+
   // Convenience / back-compat
   setTheme: (theme: Theme) => void; // sets preference to explicit theme
   toggleTheme: () => void; // toggles explicit dark/light (exits auto)
@@ -85,6 +90,7 @@ const STORAGE_KEYS = {
   accent: 'uiAccent',
   contrast: 'uiContrast',
   textScale: 'uiTextScale',
+  headerVariant: 'headerVariant',
 } as const;
 
 function parseTextScale(v: string | null): TextScale | null {
@@ -231,6 +237,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return saved ?? 1;
   });
 
+  const [headerVariant, setHeaderVariantState] = useState<HeaderVariant>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.headerVariant) as HeaderVariant | null;
+    if (saved === 'command-line' || saved === 'segmented' || saved === 'two-row' || saved === 'minimal') return saved;
+    return 'command-line';
+  });
+
   const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(() => prefersDarkQuery.matches);
   const [, forceTimeRecalc] = useState(0);
   const timeTimerRef = useRef<number | null>(null);
@@ -289,7 +301,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem(STORAGE_KEYS.accent, accent);
     localStorage.setItem(STORAGE_KEYS.contrast, contrast);
     localStorage.setItem(STORAGE_KEYS.textScale, String(textScale));
-  }, [theme, preference, autoSource, schedule, accent, contrast, textScale]);
+    localStorage.setItem(STORAGE_KEYS.headerVariant, headerVariant);
+    root.setAttribute('data-header-variant', headerVariant);
+  }, [theme, preference, autoSource, schedule, accent, contrast, textScale, headerVariant]);
 
   const setPreference = (pref: ThemePreference) => setPreferenceState(pref);
   const setAutoSource = (source: AutoThemeSource) => setAutoSourceState(source);
@@ -297,6 +311,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const setAccent = (a: AccentId) => setAccentState(a);
   const setContrast = (c: ContrastProfile) => setContrastState(c);
   const setTextScale = (s: TextScale) => setTextScaleState(s);
+  const setHeaderVariant = (v: HeaderVariant) => setHeaderVariantState(v);
 
   const setTheme = (t: Theme) => setPreferenceState(t);
 
@@ -324,6 +339,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setContrast,
         textScale,
         setTextScale,
+        headerVariant,
+        setHeaderVariant,
         setTheme,
         toggleTheme,
       }}

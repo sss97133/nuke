@@ -275,6 +275,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
 
   return (
     <CollapsibleWidget
+      variant="profile"
       className="vehicle-profile-section"
       title="Description"
       defaultCollapsed={false}

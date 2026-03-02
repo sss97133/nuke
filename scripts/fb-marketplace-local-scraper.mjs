@@ -1,8 +1,13 @@
 /**
- * FB Marketplace Local Scraper v3.0
+ * FB Marketplace Local Scraper v3.1
  *
  * Runs locally (residential IP) to fetch vehicle listings from FB Marketplace.
  * Uses logged-out GraphQL endpoint — no LSD/DTSG tokens required.
+ *
+ * v3.1 additions over v3.0:
+ *   - --group N flag: split 58 cities into 4 groups for staggered scheduling
+ *   - Softer rate limiting: skip city on rate limit, abort only after 3 consecutive failures
+ *   - Inter-city cooldown after rate limit (30s extra delay)
  *
  * v3.0 additions over v2.1:
  *   - ALL images captured from images.edges[].node.image.uri (not just primary)
@@ -21,7 +26,7 @@
  *   - doc_id health check (validates response shape)
  *
  * Usage:
- *   dotenvx run -- node scripts/fb-marketplace-local-scraper.mjs [--location austin] [--all] [--max-pages 10] [--dry-run]
+ *   dotenvx run -- node scripts/fb-marketplace-local-scraper.mjs [--location austin] [--all] [--group 1-4] [--max-pages 10] [--dry-run]
  *   dotenvx run -- node scripts/fb-marketplace-local-scraper.mjs --all --max-pages 50
  *   dotenvx run -- node scripts/fb-marketplace-local-scraper.mjs --all --max-pages 50 --skip-vehicles  # skip vehicle creation
  */
@@ -135,12 +140,17 @@ const SINGLE_LOCATION = args.includes("--location")
   : null;
 const SKIP_DISAPPEARANCE = args.includes("--skip-disappearance");
 const SKIP_VEHICLES = args.includes("--skip-vehicles");
+const GROUP = args.includes("--group")
+  ? parseInt(args[args.indexOf("--group") + 1] || "0")
+  : 0; // 0 = all cities (no grouping)
+const TOTAL_GROUPS = 4;
 
 const YEAR_MIN = 1960;
 const YEAR_MAX = 1999;
 
-// Global rate limit flag — abort sweep if Facebook rate limits us
-let RATE_LIMITED = false;
+// Rate limit tracking — skip individual cities, abort only after consecutive failures
+let consecutiveRateLimits = 0;
+const MAX_CONSECUTIVE_RATE_LIMITS = 3;
 
 // US metros: slug -> {lat, lng, label}
 const METRO_AREAS = {
@@ -399,9 +409,11 @@ async function startSweepJob(locationCount) {
       disappeared_detected: 0,
       errors: 0,
       metadata: {
-        scraper_version: "3.0",
+        scraper_version: "3.1",
         year_range: [YEAR_MIN, YEAR_MAX],
         max_pages: MAX_PAGES,
+        group: GROUP || "all",
+        total_groups: GROUP ? TOTAL_GROUPS : 1,
         started_by: "local-scraper",
       },
     })
@@ -655,8 +667,9 @@ async function detectDisappearances(sweepId, seenFacebookIds) {
 }
 
 async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
-  // Abort immediately if we've been rate limited
-  if (RATE_LIMITED) {
+  // Abort if we've hit too many consecutive rate limits
+  if (consecutiveRateLimits >= MAX_CONSECUTIVE_RATE_LIMITS) {
+    console.log(`  Skipping ${label} — ${consecutiveRateLimits} consecutive cities rate limited`);
     return { found: 0, vintage: 0, inserted: 0, updated: 0, errors: 1, sellers: 0, vehicles: 0, images: 0 };
   }
 
@@ -713,8 +726,11 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
         } catch (retryErr) {
           console.error(`  Retry failed: ${retryErr.message}`);
           if (retryErr.message.includes("1675004") || retryErr.message.includes("Rate limit")) {
-            console.error(`\n  *** GLOBAL RATE LIMIT DETECTED — aborting remaining cities ***`);
-            RATE_LIMITED = true;
+            consecutiveRateLimits++;
+            console.error(`  Rate limit on ${label} — skipping (${consecutiveRateLimits}/${MAX_CONSECUTIVE_RATE_LIMITS} consecutive)`);
+            if (consecutiveRateLimits >= MAX_CONSECUTIVE_RATE_LIMITS) {
+              console.error(`\n  *** ${MAX_CONSECUTIVE_RATE_LIMITS} CONSECUTIVE RATE LIMITS — aborting remaining cities ***`);
+            }
           }
           break;
         }
@@ -887,6 +903,12 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
   console.log(
     `  Done: ${stats.found} scanned -> ${stats.vintage} vintage -> ${stats.inserted} upserted | ${stats.sellers} sellers | ${stats.vehicles} vehicles`
   );
+
+  // Reset consecutive rate limit counter on any successful scrape
+  if (stats.found > 0) {
+    consecutiveRateLimits = 0;
+  }
+
   return stats;
 }
 
@@ -906,12 +928,18 @@ async function main() {
     }
     locationsToScrape = [[SINGLE_LOCATION, meta]];
   } else if (ALL) {
-    locationsToScrape = Object.entries(METRO_AREAS);
+    const allLocations = Object.entries(METRO_AREAS);
+    if (GROUP > 0 && GROUP <= TOTAL_GROUPS) {
+      locationsToScrape = allLocations.filter((_, idx) => (idx % TOTAL_GROUPS) + 1 === GROUP);
+    } else {
+      locationsToScrape = allLocations;
+    }
   } else {
     locationsToScrape = [["austin", METRO_AREAS.austin]];
   }
 
-  console.log(`FB Marketplace Local Scraper v3.0`);
+  console.log(`FB Marketplace Local Scraper v3.1`);
+  if (GROUP) console.log(`Group: ${GROUP}/${TOTAL_GROUPS}`);
   console.log(`Locations: ${locationsToScrape.length}`);
   console.log(`Year range: ${YEAR_MIN}-${YEAR_MAX}`);
   console.log(`Max pages per location: ${MAX_PAGES}`);
@@ -952,9 +980,11 @@ async function main() {
       });
     }
 
-    // Inter-city delay (8-15s to avoid rate limiting)
-    if (locationsToScrape.length > 1 && !RATE_LIMITED) {
-      await sleep(8000 + Math.random() * 7000);
+    // Inter-city delay (8-15s normally, 30s extra after a rate limit skip)
+    if (locationsToScrape.length > 1 && consecutiveRateLimits < MAX_CONSECUTIVE_RATE_LIMITS) {
+      const baseDelay = 8000 + Math.random() * 7000;
+      const extraDelay = consecutiveRateLimits > 0 ? 30000 : 0;
+      await sleep(baseDelay + extraDelay);
     }
   }
 

@@ -601,3 +601,36 @@ Automated Labor Estimation Pipeline — all 7 phases built, deployed, and commit
 - Files: supabase/functions/backfill-vin-from-snapshots/
 - Status: Starting
 
+
+### Agent: Admin Dashboard Health Check — 2026-03-01
+- **Task**: Audit and fix AdminMissionControl and admin pages
+- **Files**: `nuke_frontend/src/pages/Admin*`, `nuke_frontend/src/components/admin/`
+- **Status**: COMPLETE
+
+### Agent: Mass Snapshot Extraction v2 — 2026-03-01 ~11:20 UTC
+- **Task**: Extract structured data from 326K archived HTML snapshots across all platforms
+- **Files**: `supabase/functions/batch-extract-snapshots/index.ts`, `scripts/parallel-extract.mjs`
+- **Background processes**: 20 BaT workers + 3 Mecum workers running (PIDs 56999-61351)
+- **Queue**: snapshot_extraction_queue table — BaT 261K pending, Mecum 10K pending
+- **Progress**: 33K completed, 77K+ fields filled
+- **Status**: Running in background (~2h for BaT to complete)
+
+## Agent: Header Redesign + Search Intelligence — 2026-03-01 16:00 UTC
+**Task**: Full implementation of search RPCs, intent router, 4 header variants
+**Files**: 
+- `supabase/migrations/2026030201*` (5 new migrations)
+- `nuke_frontend/src/lib/search/*` (new intent router)
+- `nuke_frontend/src/components/layout/*` (header rewrite)
+- `nuke_frontend/src/contexts/ThemeContext.tsx`
+- `nuke_frontend/src/styles/unified-design-system.css`
+**Status**: Starting
+
+## Agent: St Barth Publication Pipeline — 2026-03-01 19:35 UTC
+- **Task**: Building Issuu publication extraction pipeline (schema, seed, hash extraction, vision analysis)
+- **Files**: supabase/migrations/20260302*, scripts/stbarth/*
+- **Areas**: DB schema, scripts, pipeline registry
+
+## V3 Vehicle Profile Redesign Agent — 2026-03-02
+- **Task**: Implementing V3 Bloomberg Terminal aesthetic for vehicle profile page
+- **Files**: vehicle-profile.css, VehicleProfile.tsx, WorkspaceContent.tsx, new BarcodeTimeline.tsx, new VehicleBadgeBar.tsx
+- **Status**: Active

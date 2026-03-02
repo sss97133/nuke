@@ -1,5 +1,168 @@
 # DONE — Completed Work Log
 
+## 2026-03-02 (session 3 — save-all + enrichment continued)
+
+[data] Collecting Cars: Downloaded 18,037 lots from Typesense API (17,685 sold + 157 live + 195 coming soon)
+  - Saved to scripts/data/collecting-cars/{sold,live,comingsoon}.json
+  - Enrichment: 452 matched by slug, +212 GPS fixes (48.3% → 49.4%)
+  - Fixed matching to use coords field from Typesense + fuzzy slug matching (base without -N suffix)
+  - CC Typesense data has precise coords [lat,lon] for all 18,037 lots
+
+[data] Craigslist: +206 vehicles geocoded from 120 new subdomain→GPS mappings (39.1% → 41.8%)
+  - Built comprehensive CL subdomain → GPS map (abbotsford through youngstown)
+  - Remaining 2 with null subdomains are dead ends
+
+[data] Facebook Marketplace: +120 vehicles geocoded from city name matching (25.3% → 27.0%)
+  - Built "City, ST" → GPS lookup for 100+ US cities
+  - Remaining 420 are small towns (2-3 each), would need Nominatim or similar
+
+[data] BaT API enrichment from 277 cached pages: 1,940 vehicles updated (price/title/date)
+  - BaT API confirmed: lat/lon fields are ALWAYS null — no GPS from API
+  - BaT rate-limiting blocks crawl after ~277 pages (429 errors)
+  - 9,972 listings cached in scripts/data/bat-api-pages/
+
+[data] BaT snapshots: 375,351 HTML snapshots available but NO location data in HTML
+  - Location data is dynamically loaded, not in the archived HTML
+
+[data] Investigation findings (no GPS gains possible):
+  - Gooding: 5,892 vehicles without URLs are historical imports (no URL, no location, no auction info)
+  - PCarMarket: 5,839 vehicles without any location — would require scraping individual listing pages
+  - Cars & Bids: Online-only auction, no location data exists
+  - Barrett-Jackson price: API blocked by Cloudflare WAF (needs residential proxy)
+
+[data] Overall GPS: 282,184 / 746,371 (37.8%)
+
+## 2026-03-02 (session 2 — save-all data caching sprint)
+
+[data] Save-all data caching + enrichment sprint — +37K more vehicles geocoded, 302K Mecum lots saved
+  - Mecum Algolia: Downloaded ALL 302,223 lots from Algolia search index (263 auction events, 1.2GB saved to scripts/data/mecum-algolia/)
+  - Mecum URL enrichment: 28,169 vehicles matched by URL, 27,855 updated (title, make, model, year)
+  - Mecum year+make+price matching: +16,631 GPS fixes for URL-less vehicles, +16,631 listing URLs added (38.5% → 58.9% GPS)
+  - Bonhams: Fetched 899 auction locations from bonhams.com/auction/ pages, saved to scripts/data/bonhams-auction-locations.json
+  - Bonhams: +18,184 vehicles geocoded from auction→city mapping (0% → 72.2% GPS)
+  - Gooding: Downloaded 2,174 lots from Gatsby page-data API, saved to scripts/data/gooding-lots/
+  - Gooding: +1,877 GPS fixes from auction event names (0.9% → 24.2% GPS)
+  - Broad Arrow: URL-based geocoding (12 event codes mapped) → +1,738 vehicles (0.8% → 88.8% GPS)
+  - Scripts created: mecum-algolia-save-all.cjs, bonhams-auction-geocode.cjs, gooding-save-all.cjs, collecting-cars-save-all.cjs
+  - BaT API rate-limited after 277 pages (9,972 listings)
+  - Overall GPS: 244,741 (32.8%) → 282,184 (37.8%) = +37,443 across 2 sessions
+
+## 2026-03-02
+
+[data] Mass geocoding sprint — +41K vehicles geocoded
+  - Barrett-Jackson: URL-based geocoding (9 event cities from URL slugs) → 33,918 vehicles (48% → 99.6% GPS)
+  - Craigslist: subdomain-based geocoding (50+ metros) → 2,782 vehicles
+  - RM Sotheby's: event code geocoding (az/mo/pa/mi → Scottsdale/Monterey/Paris/Milan) → 961 vehicles
+  - GAA Classic Cars: single-location (Greensboro, NC) → 1,294 vehicles
+  - Beverly Hills Car Club: single-location (Los Angeles, CA) → 1,998 vehicles
+  - Gooding: snapshot-based geocoding (Pebble Beach/Scottsdale/Amelia Island) → 63 vehicles
+  - SBX Cars, Collective Auto, Volo Cars: single-location → 356 vehicles
+  - Mecum geocoding function updated with Schaumburg, cron slowed to hourly (exhausted)
+  - Overall GPS: 201K (27.0%) → 241K+ (32.3%)
+[data] Source name consolidation
+  - facebook_marketplace + Facebook Marketplace → facebook-marketplace (3,753 unified)
+  - Broad Arrow → broad_arrow, RM Sothebys → rm-sothebys, barrettjackson → barrett-jackson
+  - classic_com + Classic.com → classic-com
+[data] Barrett-Jackson API discovery
+  - Found REST API at /api/previous-docket-results (prices, VINs, descriptions, 84 events, ~55K lots)
+  - Also /api/facets (event list), /api/docket (active auctions)
+  - BLOCKED: Cloudflare WAF, datacenter IPs rejected (same as FB Marketplace)
+  - Script written: scripts/bj-api-save-all.cjs (needs residential proxy)
+[data] BaT API save-all running overnight
+  - scripts/bat-api-save-all.cjs saving all 6,442 pages to scripts/data/bat-api-pages/
+  - 231K listings with price, GPS, title, noreserve — permanent local cache
+  - Running at ~15 pages/min, ~7hr total
+[data] SQL geocoding functions created:
+  - geocode_bj_from_urls(batch_size) — B-J URL slug → 9 cities
+  - geocode_gooding_from_snapshots(batch_size) — Gooding HTML → 6 cities
+  - geocode_mecum_from_snapshots updated with Schaumburg
+
+[frontend] V3 Vehicle Profile Redesign — badge variants CSS, barcode timeline component, badge bar component, gallery column slider, all widgets variant="profile", overscroll-behavior fix, dense info table CSS, page-level typography
+[stbarth] Modal GPU vision OCR server deployed and running
+  - `scripts/stbarth/modal_vision_server.py` — Qwen2.5-VL-7B-Instruct-AWQ on A10G via vLLM
+  - Ollama-compatible API at https://sss97133--stbarth-vision-ocr-web.modal.run
+  - AWQ quantization (4-bit) fits comfortably on 22GB A10G VRAM
+  - vLLM 0.8.3 + transformers 4.57.x + rope_scaling patch
+  - Production throughput: ~1,800 pages/hr @ concurrency 8
+  - Projected cost: ~$31 for all 41K pages (vs $414 for Haiku API)
+  - 1,000+ pages completed in initial runs, 48 permanently failed (403 CDN)
+[data] organization_locations table — multi-location support for orgs
+  - 4,593 rows backfilled from organizations table (4,589 primary + 5 Epstein metadata locations)
+  - location_id FK added to organization_vehicles
+  - Epstein Collection: 5 locations (LSJ, NYC, Palm Beach, NM, Paris), 32/38 vehicles linked
+  - search_organizations_near() PostGIS RPC deployed — proximity search working
+  - geocode-organization-locations edge function deployed — two-pass (lookup table + Nominatim)
+  - Geocoding COMPLETE: 4,308/4,593 locations geocoded (93.8%)
+    - 3,205 via Nominatim, 971 imported, 120 lookup table, 12 manual
+    - 285 remaining have no city data (can't geocode)
+    - Fixed cron job (invalid JSON body), added COUNTRY_CODE map (30+ countries),
+      JUNK_CITIES filter, COUNTRY_NAME_FALLBACK for small territories
+    - Cleaned 136+ junk city entries (2-char codes, "Exclusive Car Registry", "Homepage", etc.)
+    - Bulk strategy: Python batch geocoder + SQL cross-matching + lookup table bulk update
+    - Cron #364 disabled (complete)
+[data] Epstein Collection provenance completed — 93/93 field provenance rows (38 make + 33 model + 22 year)
+[data] FB Marketplace data quality cleanup
+  - 299 junk records rejected (motorcycles, boats, ATVs, snowmobiles, jet skis, empty listings)
+  - import-fb-marketplace filter expanded: Honda moto models (CB, CBR, Shadow, Goldwing, Magna, etc.),
+    BMW moto models (R-series GS, S1000, G310), Suzuki (Burgman, V-Strom), Triumph (Bonneville, Tiger),
+    generic keywords (motorcycle, sport bike, chopper, bobber, pontoon)
+  - False-positive-safe: scoped rebel/valkyrie to Honda, bonneville/tiger to Triumph, k/c-series to BMW,
+    gs/sv/dr-series to Suzuki. Protects AMC Rebel, Pontiac Bonneville, Sunbeam Tiger, Aston Martin Valkyrie,
+    Buick GS, Lexus GS, Chevy K-trucks, Mercedes C-class
+  - 912 make names case-normalized (ford→Ford, chevrolet→Chevrolet, etc.)
+  - 176 additional non-vehicle junk rejected (boats, planes, golf carts, snowmobiles)
+  - Added MAKE_CANONICAL normalization map to import function (prevents future case issues)
+  - Final state: 3,296 clean FB vehicles, 1,929 rejected (37% rejection rate)
+
+[search] Smart search RPCs deployed — "porsche" now returns 78,221 results (was 7)
+  - search_vehicles_browse: 17-param filtered browse with dynamic SQL, COUNT(*) OVER() totals
+  - search_vehicles_smart: 4-strategy cascade (exact make → make+model → FTS → trigram)
+  - search_autocomplete: categorized results (makes, models, vehicles)
+  - search_market_data: JSONB with median price, distribution, recent sales
+  - browse_stats: JSONB with total, with_images, with_price, avg_price, by_source/era/model
+  - Fixed sold_price type mismatch (INT not NUMERIC)
+[search] Intent router + query parser (src/lib/search/)
+  - 8 intent modes: NAVIGATE, EXACT_VIN, EXACT_URL, MY_VEHICLES, MARKET, QUESTION, BROWSE, QUERY
+  - Query parser extracts: year, price, make, model, body style, color, era
+  - 34 unit tests passing (19 intent + 15 parser)
+  - Dictionaries: 54 makes, 18 aliases, 22 body styles, 12 eras (mapped to DB values), 27 colors, 15 domains
+[header] 4 switchable header variants (command-line, segmented, two-row, minimal)
+  - HeaderVariant type + localStorage persistence in ThemeContext
+  - Zero-prop AppHeader orchestrator with variant delegation
+  - Shared sub-components: SearchBar, SearchOverlay, UserArea, UserDropdown, NavLinks
+  - SearchBar: ghost placeholder rotation, ⌘K hint, 4 modes (inline/expanding/compact/trigger)
+  - SearchOverlay: recent items + categorized autocomplete + keyboard hints
+  - UserDropdown: merged NukeMenu + profile dropdown, header variant picker
+  - Responsive: mobile collapses all variants to [NUKE] [⌘K] [avatar]
+  - Deleted NukeMenu.tsx and SearchSlot.tsx
+[header] AppHeader.css — complete grid layouts for all 4 variants + responsive breakpoints
+[design] --radius: 0px global change in unified-design-system.css
+[browse] BrowseVehicles page — stats bar, model pills, sort/filter, images toggle, pagination
+[db] 4 new indexes (make_status, make_source, make_sold_price, era)
+[db] user_vehicle_links table with RLS
+[settings] Header variant selector added to AppearanceSpecimen (Capsule settings)
+
+## 2026-03-01
+
+[fb-marketplace] Scraper v3.1 — added --group N flag to split 58 cities into 4 groups of ~15
+  - Softer rate limiting: skip-and-continue instead of global abort (3 consecutive = abort)
+  - 30s extra delay after rate-limited city (was: instant abort)
+  - Counter resets on any successful city scrape
+[fb-marketplace] Replaced single daily LaunchAgent with 4 staggered group sweeps (3am/9am/3pm/9pm)
+  - com.nuke.fb-sweep.plist → com.nuke.fb-sweep-g{1,2,3,4}.plist
+  - Each group: --all --group N --max-pages 25 (was: --all --max-pages 50)
+  - 6-hour spacing gives FB rate limit full recovery window
+[fb-marketplace] Created monitor-fb-marketplace edge function — 5 health checks
+  - Sweep freshness (24h), unlinked backlog (500), error rate (50%), data freshness (48h), refine backlog (1000)
+  - Creates admin_notifications on threshold breach, 6h dedup
+[fb-marketplace] Added 3 pg_cron jobs:
+  - fb-marketplace-import: */30 * * * * — converts unlinked listings to vehicles (batch_size=50)
+  - fb-marketplace-refine: 15,45 * * * * — enriches via bingbot HTML (batch_size=15)
+  - fb-marketplace-monitor: 0 */6 * * * — health checks + alerting
+[fb-marketplace] Deployed import-fb-marketplace and refine-fb-listing edge functions (were local-only)
+  - First import batch: 38 vehicles created from 50 listings, 12 blocked (non-cars)
+  - Backlog: 2,810 unlinked → will clear in ~14 hours via cron
+
 ## 2026-03-01 (Overnight Autonomous Session)
 
 [git] Committed and pushed 330 files of accumulated multi-agent work (e98d0cb85)
@@ -17,6 +180,33 @@
 [sdk] @nuke1/sdk v1.5.0 README updated to match actual vision types, LICENSE file added
 [fb] National FB Marketplace sweep running (58 metros, ~1000+ vintage listings so far)
 [yono] Verified YONO sidecar healthy (2 warm containers, all tier-2 families loaded)
+
+## 2026-03-01 (Mass Snapshot Extraction v2)
+
+[extraction] Created snapshot_extraction_queue table with pre-computed vehicle→snapshot matches
+  - Pre-joined vehicles to listing_page_snapshots with URL normalization (trailing slashes, case)
+  - Queue populated: BaT 283K, B-J 23K, Mecum 16K, C&B 1.7K, Bonhams 855 = 326K total
+  - Atomic claim_extraction_batch() RPC for lock-free parallel processing
+
+[extraction] Added queue mode to batch-extract-snapshots v2
+  - `use_queue: true` — claims from pre-computed queue instead of OFFSET scanning
+  - Eliminates statement timeouts at high offsets (40 workers was crashing DB)
+  - 100% snapshot hit rate (0 noSnapshot) vs ~40-50% in legacy mode
+
+[extraction] Fixed C&B URL case-sensitivity — snapshot URLs have different case than vehicle URLs
+  - Added lowercase URL variants for carsandbids platform matching
+
+[extraction] Completed C&B extraction: 1,728 vehicles → 17,409 fields filled (~10 fields/vehicle)
+  - Color +1,389, Transmission +1,387, Engine +1,037, Description +1,393
+
+[extraction] Completed Bonhams extraction: 855 vehicles → 139 fields filled
+
+[extraction] BaT extraction running: 15K+ of 284K processed so far → 38K+ fields filled
+  - Color +6,518, Transmission +13,373, Engine +8,834, Description +5,764, Mileage +12,842
+  - 5 workers running in background, ~268K remaining (~13h estimated)
+
+[extraction] Barrett-Jackson: 23K queued but CSR shells produce 0 extractable fields
+  - Need Playwright/API approach for VIN, colors, engine data
 
 ## 2026-03-01
 

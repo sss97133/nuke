@@ -28,28 +28,74 @@ interface MarketplaceListing {
   listed_days_ago: number | null;
 }
 
-// ─── NON-CAR MAKE BLOCKLIST ───────────────────────────────────────────
-// These makes are NEVER passenger cars/trucks we care about
-const BLOCKED_MAKES = new Set([
-  'harley-davidson', 'harley', 'indian', 'ducati', 'kawasaki', 'suzuki',
-  'yamaha', 'ktm', 'triumph', 'aprilia', 'husqvarna', 'moto guzzi',
-  'can-am', 'polaris', 'arctic cat', 'sea-doo', 'ski-doo',
-  'fleetwood', 'winnebago', 'coachmen', 'jayco', 'thor', 'tiffin',
-  'newmar', 'holiday rambler', 'airstream', 'forest river',
-  'utility', 'wabash', 'great dane', 'hyundai translead', 'stoughton',
-  'mack', 'kenworth', 'peterbilt', 'freightliner', 'western star',
-  'john deere', 'caterpillar', 'case', 'kubota', 'bobcat',
-  'traeger', 'craftsman', 'toro', 'husqvarna',
+// ─── VEHICLE CLASSIFICATION ──────────────────────────────────────────
+// Instead of blocking non-cars, we classify everything and set display_tier.
+// Featured = cool 1955-1991 cars/trucks. Everything else = browse (accessible but not on display).
+
+const MOTORCYCLE_MAKES = new Set([
+  'harley-davidson', 'harley', 'indian', 'ducati', 'kawasaki',
+  'yamaha', 'ktm', 'aprilia', 'husqvarna', 'moto guzzi',
 ]);
 
-// Model names that indicate non-cars
-const BLOCKED_MODEL_PATTERNS = [
-  /\bsoftail\b/i, /\bsportster\b/i, /\bdyna\b/i, /\btouring\b/i,
+const RV_MAKES = new Set([
+  'fleetwood', 'winnebago', 'coachmen', 'jayco', 'thor', 'tiffin',
+  'newmar', 'holiday rambler', 'airstream', 'forest river', 'forest',
+  'dutchmen', 'starcraft', 'palomino', 'monaco', 'holiday', 'chalet',
+  'georgie', 'coleman',
+]);
+
+const BOAT_MAKES = new Set([
+  'bayliner', 'sea', 'searay', 'sea ray', 'sea-ray', 'bass', 'tracker',
+  'chaparral', 'chris', 'grumman', 'gulf', 'tee', 'lund', 'boston whaler', 'malibu',
+]);
+
+const COMMERCIAL_MAKES = new Set([
+  'utility', 'wabash', 'great dane', 'great', 'hyundai translead', 'stoughton',
+  'mack', 'kenworth', 'peterbilt', 'freightliner', 'western star',
+]);
+
+const FARM_MAKES = new Set([
+  'john deere', 'john', 'caterpillar', 'cat', 'case', 'kubota', 'bobcat',
+  'allis', 'cub', 'massey',
+]);
+
+const JUNK_MAKES = new Set([
+  'traeger', 'craftsman', 'toro', 'cessna', 'circlj', 'columbia',
+  'correct', 'cattle', 'homemade', 'más',
+]);
+
+const MOTORCYCLE_PATTERNS = [
+  /\bsoftail\b/i, /\bsportster\b/i, /\bdyna\b/i,
+  /\bmotorcycle\b/i, /\bsport\s*bike\b/i, /\bchopper\b/i, /\bbobber\b/i, /\bmoped\b/i,
+  /\bhayabusa\b/i, /\bgsxr\b/i, /\bgsx-r\b/i, /\bgr650\b/i,
+  /\b(xr|cr|crf|yz|kx|rm|klx|rmx|dr|vs|lt)\d{2,4}\b/i,
+  /\bcb\d{2,4}\b/i, /\bcbr\d{0,4}\b/i, /\bshadow\b/i, /\bgoldwing\b/i,
+  /\bgold\s*wing\b/i, /\bvtx\b/i, /\bmagna\b/i, /\bnighthawk\b/i,
+  /\bruckus\b/i, /\bgrom\b/i, /\bct\s*70\b/i, /\bafrica\s*twin\b/i,
+  /\br\d{2,4}\s*gs\b/i, /\br\s*nine\s*t\b/i, /\bg310\b/i, /\bs1000\b/i,
+  /\bintruder\b/i, /\bkatana\b/i, /\bcavalcade\b/i, /\bsavage\b/i,
+  /\bking\s*quad\b/i, /\bboulevard\b/i, /\bbandit\b/i,
+  /\btriumph\b.*\bbonneville\b/i, /\bthruxton\b/i, /\bspeed\s*triple\b/i,
+];
+
+const RV_PATTERNS = [
   /\bsouthwind\b/i, /\bbounder\b/i, /\bmotorhome\b/i, /\bcamper\b/i,
-  /\btrailer\b/i, /\batv\b/i, /\bquad\b/i, /\bdirt\s*bike\b/i,
-  /\bscooter\b/i, /\bjet\s*ski\b/i, /\bsnowmobile\b/i, /\bboat\b/i,
-  /\bpwc\b/i, /\bside.by.side\b/i, /\butv\b/i, /\brv\b/i,
-  /\b(xr|cr|crf|yz|kx|rm|klx)\d{2,3}\b/i, // dirt bike model codes
+  /\bmotor\s*coach\b/i, /\bmini\s*winnie\b/i, /\bland\s*yacht\b/i,
+  /\bjay\s*flight\b/i, /\bsalem\b/i, /\bwilderness\b/i, /\brv\b/i,
+];
+
+const BOAT_PATTERNS = [
+  /\bboat\b/i, /\bjet\s*ski\b/i, /\bpwc\b/i, /\bpontoon\b/i, /\bbassbuggy\b/i,
+];
+
+const ATV_PATTERNS = [
+  /\batv\b/i, /\bquad\b/i, /\bdirt\s*bike\b/i, /\bscooter\b/i,
+  /\bsnowmobile\b/i, /\bside.by.side\b/i, /\butv\b/i,
+];
+
+const COMMERCIAL_PATTERNS = [
+  /\bbox\s*truck\b/i, /\btow\s*truck\b/i, /\bbus\b/i, /\bsemi\b/i,
+  /\bskidder\b/i, /\bexcavator\b/i, /\bloader\b/i, /\bforklift\b/i,
 ];
 
 // ─── IMAGE VALIDATION ─────────────────────────────────────────────────
@@ -151,7 +197,7 @@ function parseTitle(title: string | null | undefined): { year: number | null; ma
   const afterYear = cleaned.split(String(year))[1]?.trim() || '';
   const words = afterYear.split(/\s+/).filter(w => w.length > 0);
 
-  // Common make normalizations
+  // Common make normalizations (also used by normalizeMake below)
   const makeMap: Record<string, string> = {
     'chevy': 'Chevrolet',
     'chevrolet': 'Chevrolet',
@@ -223,6 +269,38 @@ function parseTitle(title: string | null | undefined): { year: number | null; ma
   return { year, make, model, cleanPrice };
 }
 
+// ─── MAKE NORMALIZATION ─────────────────────────────────────────────
+// Facebook's parsed_make often comes as lowercase or inconsistent
+const MAKE_CANONICAL: Record<string, string> = {
+  'chevy': 'Chevrolet', 'chevrolet': 'Chevrolet', 'ford': 'Ford',
+  'dodge': 'Dodge', 'gmc': 'GMC', 'toyota': 'Toyota', 'jeep': 'Jeep',
+  'plymouth': 'Plymouth', 'pontiac': 'Pontiac', 'buick': 'Buick',
+  'oldsmobile': 'Oldsmobile', 'cadillac': 'Cadillac', 'lincoln': 'Lincoln',
+  'mercury': 'Mercury', 'amc': 'AMC', 'international': 'International',
+  'studebaker': 'Studebaker', 'willys': 'Willys', 'datsun': 'Datsun',
+  'nissan': 'Nissan', 'volkswagen': 'Volkswagen', 'vw': 'Volkswagen',
+  'porsche': 'Porsche', 'mercedes': 'Mercedes-Benz', 'mercedes-benz': 'Mercedes-Benz',
+  'bmw': 'BMW', 'jaguar': 'Jaguar', 'mg': 'MG', 'austin': 'Austin',
+  'alfa': 'Alfa Romeo', 'alfa romeo': 'Alfa Romeo', 'fiat': 'Fiat',
+  'ferrari': 'Ferrari', 'maserati': 'Maserati', 'honda': 'Honda',
+  'mazda': 'Mazda', 'subaru': 'Subaru', 'lexus': 'Lexus', 'acura': 'Acura',
+  'infiniti': 'Infiniti', 'mitsubishi': 'Mitsubishi', 'isuzu': 'Isuzu',
+  'saturn': 'Saturn', 'saab': 'Saab', 'volvo': 'Volvo',
+  'land rover': 'Land Rover', 'rover': 'Rover', 'lotus': 'Lotus',
+  'aston martin': 'Aston Martin', 'aston': 'Aston Martin',
+  'delorean': 'DeLorean', 'shelby': 'Shelby', 'ram': 'Ram',
+  'chrysler': 'Chrysler', 'hyundai': 'Hyundai', 'kia': 'Kia',
+  'suzuki': 'Suzuki', 'triumph': 'Triumph', 'hummer': 'Hummer',
+  'mini': 'Mini', 'smart': 'Smart', 'genesis': 'Genesis',
+  'tesla': 'Tesla', 'rivian': 'Rivian', 'lucid': 'Lucid',
+};
+
+function normalizeMake(make: string | null): string | null {
+  if (!make) return null;
+  const lower = make.toLowerCase().trim();
+  return MAKE_CANONICAL[lower] || make;
+}
+
 /**
  * Extract location components
  */
@@ -238,18 +316,50 @@ function parseLocation(location: string | null): { city: string | null; state: s
 }
 
 /**
- * Check if a listing is a non-car vehicle type we don't want
+ * Classify a vehicle into a category. Returns category + display tier.
+ * Everything gets imported — but only cool 1955-1991 cars/trucks are "featured".
  */
-function isBlockedVehicleType(make: string | null, model: string | null, title: string): boolean {
+function classifyVehicle(make: string | null, model: string | null, title: string, year: number | null): {
+  category: string;
+  displayTier: 'featured' | 'browse' | 'hidden';
+} {
   const makeLower = (make || '').toLowerCase().trim();
-  if (BLOCKED_MAKES.has(makeLower)) return true;
-
   const fullText = `${make || ''} ${model || ''} ${title}`.toLowerCase();
-  for (const pattern of BLOCKED_MODEL_PATTERNS) {
-    if (pattern.test(fullText)) return true;
+
+  // Classify by category
+  let category = 'car'; // default
+
+  if (MOTORCYCLE_MAKES.has(makeLower) || MOTORCYCLE_PATTERNS.some(p => p.test(fullText))) {
+    category = 'motorcycle';
+  } else if (RV_MAKES.has(makeLower) || RV_PATTERNS.some(p => p.test(fullText))) {
+    category = 'rv';
+  } else if (BOAT_MAKES.has(makeLower) || BOAT_PATTERNS.some(p => p.test(fullText))) {
+    category = 'boat';
+  } else if (FARM_MAKES.has(makeLower)) {
+    category = 'farm';
+  } else if (COMMERCIAL_MAKES.has(makeLower) || COMMERCIAL_PATTERNS.some(p => p.test(fullText))) {
+    category = 'commercial';
+  } else if (ATV_PATTERNS.some(p => p.test(fullText))) {
+    category = 'motorcycle'; // ATVs grouped with motorcycles
+  } else if (JUNK_MAKES.has(makeLower)) {
+    category = 'other';
   }
 
-  return false;
+  // Trucks/SUVs are cars for our purposes
+  if (category === 'car' && /\b(truck|pickup|suv|4x4)\b/i.test(fullText)) {
+    category = 'truck';
+  }
+
+  // Display tier: featured = cool 1955-1991 cars/trucks
+  let displayTier: 'featured' | 'browse' | 'hidden' = 'browse';
+  if ((category === 'car' || category === 'truck') && year && year >= 1955 && year <= 1991) {
+    displayTier = 'featured';
+  }
+  if (category === 'other') {
+    displayTier = 'hidden';
+  }
+
+  return { category, displayTier };
 }
 
 /**
@@ -297,11 +407,12 @@ Deno.serve(async (req) => {
     const batchSize = body.batch_size ?? 50;
     const dryRun = body.dry_run ?? false;
 
-    // Get unlinked marketplace listings
+    // Get unlinked marketplace listings (only active — blocked ones are already processed)
     const { data: listings, error: fetchError } = await supabase
       .from('marketplace_listings')
       .select('*')
       .is('vehicle_id', null)
+      .eq('status', 'active')
       .order('scraped_at', { ascending: false })
       .limit(batchSize);
 
@@ -338,7 +449,7 @@ Deno.serve(async (req) => {
 
         // Parse make/model from title if not stored
         const parsed = parseTitle(listing.title);
-        let make = listing.parsed_make || parsed.make;
+        let make = normalizeMake(listing.parsed_make || parsed.make);
         let model = listing.parsed_model || parsed.model;
 
         // Use year from title parsing if not in DB
@@ -354,12 +465,14 @@ Deno.serve(async (req) => {
         // ─── QUALITY GATE 1: Must have year ───────────────────────
         if (!year) {
           results.skipped_no_year++;
+          if (!dryRun) await supabase.from('marketplace_listings').update({ status: 'blocked' }).eq('id', listing.id);
           continue;
         }
 
         // ─── QUALITY GATE 2: Must have make AND valid model ───────
         if (!make) {
           results.skipped_no_make_model++;
+          if (!dryRun) await supabase.from('marketplace_listings').update({ status: 'blocked' }).eq('id', listing.id);
           continue;
         }
 
@@ -367,12 +480,14 @@ Deno.serve(async (req) => {
         model = cleanModelName(model);
         if (!model) {
           results.skipped_garbage_model++;
+          if (!dryRun) await supabase.from('marketplace_listings').update({ status: 'blocked' }).eq('id', listing.id);
           continue;
         }
 
         // ─── QUALITY GATE 3: Block non-car vehicle types ──────────
         if (isBlockedVehicleType(make, model, listing.title)) {
           results.skipped_blocked_type++;
+          if (!dryRun) await supabase.from('marketplace_listings').update({ status: 'blocked' }).eq('id', listing.id);
           continue;
         }
 
@@ -384,26 +499,35 @@ Deno.serve(async (req) => {
 
         if (!primaryImage && validImages.length === 0) {
           results.skipped_no_image++;
+          if (!dryRun) await supabase.from('marketplace_listings').update({ status: 'blocked' }).eq('id', listing.id);
           continue;
         }
 
         // ─── QUALITY GATE 5: Duplicate detection ──────────────────
         if (!dryRun && await isDuplicate(supabase, listing.url, year, make, model)) {
           results.skipped_duplicate++;
-          // Still link the listing to prevent re-processing
-          // Find the existing vehicle to link
+          // Try to link by URL first, then by Y/M/M
           const { data: existing } = await supabase
             .from('vehicles')
             .select('id')
             .eq('discovery_url', listing.url)
             .limit(1)
             .maybeSingle();
-          if (existing) {
-            await supabase
-              .from('marketplace_listings')
-              .update({ vehicle_id: existing.id })
-              .eq('id', listing.id);
-          }
+
+          const linkId = existing?.id || (make && model ? (await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('year', year)
+            .ilike('make', make)
+            .ilike('model', model)
+            .eq('discovery_source', 'facebook_marketplace')
+            .limit(1)
+            .maybeSingle()).data?.id : null);
+
+          await supabase
+            .from('marketplace_listings')
+            .update(linkId ? { vehicle_id: linkId } : { status: 'duplicate' })
+            .eq('id', listing.id);
           continue;
         }
 

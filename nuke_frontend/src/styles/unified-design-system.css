@@ -103,7 +103,7 @@
   --font-mono: 'SF Mono', Monaco, 'Cascadia Code', monospace;
   
   /* Border Radius */
-  --radius: 4px;
+  --radius: 0px;
   
   /* Transitions */
   --transition: 0.12s ease;

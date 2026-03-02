@@ -31,8 +31,8 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
       <div style={{
         width: '100%',
         aspectRatio: '16/9',
-        maxHeight: '280px',
-        backgroundColor: 'var(--surface)',
+        maxHeight: '260px',
+        backgroundColor: '#2a2a2a',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -42,14 +42,14 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
           flexDirection: 'column',
           alignItems: 'center',
           gap: '8px',
-          color: 'var(--text-muted)',
+          color: '#888',
         }}>
           <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="12" width="40" height="28" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+            <rect x="4" y="12" width="40" height="28" stroke="currentColor" strokeWidth="2" fill="none"/>
             <circle cx="18" cy="22" r="4" stroke="currentColor" strokeWidth="2" fill="none"/>
             <path d="M4 34 L14 24 L20 30 L30 20 L44 34" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" fill="none"/>
           </svg>
-          <span style={{ fontSize: '12px', fontWeight: 500 }}>No photo available</span>
+          <span style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const }}>No photo available</span>
         </div>
       </div>
     );
@@ -74,10 +74,10 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
               style={{
                 width: '100%',
                 aspectRatio: '16/9',
-                maxHeight: '360px',
+                maxHeight: '260px',
                 position: 'relative',
                 overflow: 'hidden',
-                backgroundColor: 'var(--grey-950, #111)',
+                backgroundColor: '#2a2a2a',
                 cursor: isMobile ? 'pointer' : 'default',
               }}
               onClick={() => isMobile && setShowGallery(true)}
@@ -124,16 +124,20 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
                   background: 'rgba(0,0,0,0.55)',
                   color: '#fff',
                   border: 'none',
-                  borderRadius: '4px',
-                  padding: '4px 10px',
-                  fontSize: '11px',
+                  borderRadius: '0',
+                  padding: '2px 6px',
+                  fontFamily: 'Arial, Helvetica, sans-serif',
+                  fontSize: '7px',
+                  fontWeight: 600,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase' as const,
                   cursor: 'pointer',
                   zIndex: 2,
                   backdropFilter: 'blur(6px)',
-                  letterSpacing: '0.04em',
+                  transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
               >
-                {fitMode === 'cover' ? 'Fit' : 'Fill'}
+                {fitMode === 'cover' ? 'FIT' : 'FILL'}
               </button>
             </div>
           </div>

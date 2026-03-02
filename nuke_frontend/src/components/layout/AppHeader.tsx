@@ -1,114 +1,153 @@
-import React, { useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import GlobalUploadIndicator from '../GlobalUploadIndicator';
-import { ProfileBalancePill } from './ProfileBalancePill';
-import { NukeMenu } from './NukeMenu';
-import { SearchSlot } from './SearchSlot';
+import React, { useRef, useState } from 'react';
 import { useHeaderHeight } from './hooks/useHeaderHeight';
-import type { QuickVehicle } from './hooks/useQuickVehicles';
-import type { CashBalance } from './hooks/useCashBalance';
+import { useHeaderVariant } from './hooks/useHeaderVariant';
+import { useSearch } from './hooks/useSearch';
+import { useSearchRouter } from './hooks/useSearchRouter';
+import { useRecentItems } from './hooks/useRecentItems';
+import { useCommandPalette } from './hooks/useCommandPalette';
+import { useSession } from './hooks/useSession';
+import { useNotificationBadge } from './hooks/useNotificationBadge';
+import { useAdminStatus } from './hooks/useAdminStatus';
+import { SearchOverlay } from './SearchOverlay';
+import { UserDropdown } from './UserDropdown';
+import { CommandLineLayout } from './variants/CommandLineLayout';
+import { SegmentedLayout } from './variants/SegmentedLayout';
+import { TwoRowLayout } from './variants/TwoRowLayout';
+import { MinimalLayout } from './variants/MinimalLayout';
+import './AppHeader.css';
 
 interface AppHeaderProps {
-  session: any;
-  userProfile: any;
-  unreadCount: number;
-  balance: CashBalance | null;
-  isAdmin: boolean;
-  quickVehicles: QuickVehicle[];
-  quickVehiclesLoading: boolean;
-  onLoadQuickVehicles: (userId: string) => void;
   onOpenNotifications: () => void;
+  toolbarSlot?: React.ReactElement | null;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
-  session,
-  userProfile,
-  unreadCount,
-  balance,
-  isAdmin,
-  quickVehicles,
-  quickVehiclesLoading,
-  onLoadQuickVehicles,
   onOpenNotifications,
+  toolbarSlot,
 }) => {
-  const headerWrapperRef = useRef<HTMLDivElement>(null);
-  const location = useLocation();
-  useHeaderHeight(headerWrapperRef);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  useHeaderHeight(headerRef);
+
+  const [variant] = useHeaderVariant();
+  const { session, userProfile } = useSession();
+  const userId = session?.user?.id;
+  const unreadCount = useNotificationBadge(userId);
+  const isAdmin = useAdminStatus(userId);
+
+  const search = useSearch();
+  const { handleSubmit, handleAutocompleteSelect } = useSearchRouter(search);
+  const recentItems = useRecentItems();
+  const cmdK = useCommandPalette();
+
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+
+  // Cmd+K behavior: focus search input in variants A/B/C, open palette in D
+  const handleCmdK = () => {
+    if (variant === 'minimal') {
+      cmdK.open();
+    } else {
+      searchInputRef.current?.focus();
+      search.setIsOpen(true);
+    }
+  };
+
+  // Register global Cmd+K — the useCommandPalette hook handles the listener,
+  // but we also connect it to focusing the search input
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        handleCmdK();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [variant]);
+
+  const onSearchFocus = () => {
+    search.setIsFocused(true);
+    search.setIsOpen(true);
+  };
+
+  const onSearchBlur = () => {
+    search.setIsFocused(false);
+    // Don't close overlay immediately — let click events on overlay items fire first
+    setTimeout(() => {
+      if (!search.isFocused) {
+        // Will be set false if user didn't click an overlay item
+      }
+    }, 200);
+  };
+
+  const onSearchSubmit = (q: string) => {
+    recentItems.addItem(q, 'search');
+    handleSubmit(q);
+    search.setIsOpen(false);
+  };
+
+  const sharedProps = {
+    query: search.query,
+    onQueryChange: search.setQuery,
+    onSubmit: onSearchSubmit,
+    onSearchFocus,
+    onSearchBlur,
+    searchInputRef,
+    session,
+    userProfile,
+    unreadCount,
+    onUserClick: () => setShowUserDropdown(true),
+  };
 
   return (
-    <div className="header-wrapper" ref={headerWrapperRef}>
-      <div className="header-content">
-        {/* Left: Wordmark + Nuke menu + primary nav links */}
-        <div className="header-slot-left">
-          <div className="header-left">
-            <Link
-              to="/"
-              className="nuke-wordmark"
-              aria-label="Nuke — home"
-            >
-              NUKE
-            </Link>
-            <NukeMenu
-              session={session}
-              quickVehicles={quickVehicles}
-              quickVehiclesLoading={quickVehiclesLoading}
-              onLoadQuickVehicles={onLoadQuickVehicles}
-            />
-            <nav className="main-nav header-main-nav">
-              <Link
-                to="/search"
-                className={`nav-link${location.pathname === '/search' ? ' active' : ''}`}
-              >
-                Search
-              </Link>
-              <Link
-                to="/market"
-                className={`nav-link${location.pathname === '/market' || location.pathname.startsWith('/market/') ? ' active' : ''}`}
-              >
-                Market
-              </Link>
-            </nav>
-          </div>
-        </div>
+    <div className="header-wrapper" ref={headerRef}>
+      {/* Variant layout */}
+      {variant === 'command-line' && <CommandLineLayout {...sharedProps} />}
+      {variant === 'segmented' && <SegmentedLayout {...sharedProps} />}
+      {variant === 'two-row' && <TwoRowLayout {...sharedProps} />}
+      {variant === 'minimal' && (
+        <MinimalLayout
+          {...sharedProps}
+          onCommandPaletteOpen={handleCmdK}
+        />
+      )}
 
-        <div className="header-spacer" aria-hidden="true" />
+      {/* Contextual page toolbar (injected by pages via AppLayoutContext) */}
+      {toolbarSlot && (
+        <div className="header-toolbar-slot">{toolbarSlot}</div>
+      )}
 
-        {/* Center: Search */}
-        <div className="header-slot-center">
-          <SearchSlot />
-        </div>
+      {/* Search overlay (shared across all variants) */}
+      <SearchOverlay
+        isOpen={search.isOpen && (search.query.length >= 2 || (search.isFocused && !search.query))}
+        onClose={() => search.setIsOpen(false)}
+        autocompleteResults={search.autocompleteResults}
+        autocompleteLoading={search.autocompleteLoading}
+        recentItems={recentItems.items}
+        onSelect={(cat, val, label) => {
+          recentItems.addItem(label, cat);
+          handleAutocompleteSelect(cat, val, label);
+        }}
+        onRecentSelect={(q) => {
+          search.setQuery(q);
+          onSearchSubmit(q);
+        }}
+        onRecentRemove={recentItems.removeItem}
+        onRecentClear={recentItems.clearAll}
+        query={search.query}
+      />
 
-        <div className="header-spacer" aria-hidden="true" />
-
-        {/* Right: Upload + Profile/Login */}
-        <div className="header-slot-right">
-          <div className="header-right">
-            <GlobalUploadIndicator />
-            {session ? (
-              <ProfileBalancePill
-                session={session}
-                userProfile={userProfile}
-                balance={balance}
-                isAdmin={isAdmin}
-                unreadCount={unreadCount}
-                onOpenNotifications={onOpenNotifications}
-              />
-            ) : (
-              <Link
-                to={(() => {
-                  const loc = location.pathname + location.search;
-                  const returnUrl = loc && loc !== '/' ? encodeURIComponent(loc) : '';
-                  return returnUrl ? `/login?returnUrl=${returnUrl}` : '/login';
-                })()}
-                className="button button-primary"
-                style={{ border: '2px solid var(--accent)', transition: 'all 0.12s ease' }}
-              >
-                Login
-              </Link>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* User dropdown (shared across all variants) */}
+      {session && (
+        <UserDropdown
+          isOpen={showUserDropdown}
+          onClose={() => setShowUserDropdown(false)}
+          session={session}
+          isAdmin={isAdmin}
+          unreadCount={unreadCount}
+          onOpenNotifications={onOpenNotifications}
+        />
+      )}
     </div>
   );
 };

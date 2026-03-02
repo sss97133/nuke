@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import DeckGL from '@deck.gl/react';
-import { ScatterplotLayer, TextLayer, GeoJsonLayer } from '@deck.gl/layers';
+import { ScatterplotLayer, TextLayer, GeoJsonLayer, IconLayer } from '@deck.gl/layers';
+import { HeatmapLayer } from '@deck.gl/aggregation-layers';
 import { Map } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { supabase } from '../../lib/supabase';
@@ -154,38 +155,38 @@ function geo(loc: string): [number, number] | null {
   if (caAbbrMatch) {
     const provFull = CA_ABBR[caAbbrMatch[1].toLowerCase()];
     if (provFull && CA_PROV[provFull]) {
-      return spread(CA_PROV[provFull], loc, 1.2);
+      return spread(CA_PROV[provFull], loc, 0.4);
     }
   }
 
   // 3) Full Canadian province name or "canada" keyword
   if (l.includes('canada') || l.includes('canadian')) {
     for (const [prov, c] of Object.entries(CA_PROV)) {
-      if (l.includes(prov)) return spread(c, loc, 1.2);
+      if (l.includes(prov)) return spread(c, loc, 0.4);
     }
     // Try Canadian city names
     for (const city of ['toronto','vancouver','montreal','montréal','calgary','ottawa','edmonton','winnipeg','halifax','guelph','maple ridge','quebec city']) {
       if (l.includes(city) && INTL[city]) return spread(INTL[city], loc, 0.05);
     }
     // Fallback: center of southern Canada
-    return spread([49.3, -96.8], loc, 3.0);
+    return spread([49.3, -96.8], loc, 1.0);
   }
 
   // 4) US state abbreviation (e.g. "Phoenix, AZ")
   const abbrMatch = loc.match(/,\s*([A-Z]{2})\s*$/);
   if (abbrMatch) {
     const fullState = ST_ABBR[abbrMatch[1].toLowerCase()];
-    if (fullState && ST[fullState]) return spread(ST[fullState], loc, 1.0);
+    if (fullState && ST[fullState]) return spread(ST[fullState], loc, 0.3);
   }
 
   // 5) Full US state name — fallback with wider spread
   for (const [s, c] of Object.entries(ST)) {
-    if (l.includes(s)) return spread(c, loc, 1.5);
+    if (l.includes(s)) return spread(c, loc, 0.4);
   }
 
   // 6) International — try all known locations
   for (const [name, c] of Object.entries(INTL)) {
-    if (l.includes(name)) return spread(c, loc, 0.8);
+    if (l.includes(name)) return spread(c, loc, 0.25);
   }
 
   return null;
@@ -198,6 +199,10 @@ const COUNTRY_COLORS: Record<string, [number, number, number]> = {
   'UAE': [99, 102, 241], 'Australia': [251, 191, 36], 'Canada': [220, 38, 38], 'default': [236, 72, 153],
 };
 const colColor = (country: string): [number, number, number] => COUNTRY_COLORS[country] || COUNTRY_COLORS['default'];
+
+// SVG data URIs for shape evolution at z14+
+const CAR_SVG_URI = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="4"><rect width="10" height="4" rx="1" fill="white"/></svg>')}`;
+const BUILDING_SVG_URI = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="white"/></svg>')}`;
 
 // --- Vehicle fields for display ---
 const BASE_FIELDS = 'id,year,make,model,trim,listing_location,bat_location,location,gps_latitude,gps_longitude,primary_image_url';
@@ -407,6 +412,18 @@ export default function UnifiedMap() {
   // Side panel popup (replaces floating popup that overlapped data)
   const [selectedPin, setSelectedPin] = useState<{ pin: VPin | ColPin | BizPin | PhotoPin | MarketplacePin; type: 'vehicle' | 'collection' | 'business' | 'photo' | 'marketplace' } | null>(null);
   const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [showCountyOverlay, setShowCountyOverlay] = useState(false);
+
+  // Ref to prevent outer div from clearing selectedPin on deck.gl clicks
+  const deckClickedRef = useRef(false);
+
+  const handleLayerClick = useCallback((object: any, type: 'vehicle' | 'collection' | 'business' | 'photo' | 'marketplace') => {
+    if (object) {
+      deckClickedRef.current = true;
+      setSelectedPin({ pin: object, type });
+      setTimeout(() => { deckClickedRef.current = false; }, 100);
+    }
+  }, []);
 
   // Slider controls — defaults tuned so data is visible immediately at zoom 4.5
   const [glowRadius, setGlowRadius] = useState(60);
@@ -675,7 +692,7 @@ export default function UnifiedMap() {
 
   // ---- Load county boundaries for thermal choropleth ----
   useEffect(() => {
-    if (mode !== 'thermal' || countyGeoJson) return;
+    if ((mode !== 'thermal' && !showCountyOverlay) || countyGeoJson) return;
     setCountyLoading(true);
     fetch('/data/us-counties-10m.json')
       .then(r => r.json())
@@ -699,7 +716,7 @@ export default function UnifiedMap() {
         setCountyLoading(false);
       })
       .catch(err => { console.error('County load error:', err); setCountyLoading(false); });
-  }, [mode, countyGeoJson]);
+  }, [mode, countyGeoJson, showCountyOverlay]);
 
   // ---- Query engine ----
   const handleSearch = useCallback(async () => {
@@ -794,7 +811,7 @@ export default function UnifiedMap() {
   const [countyFeatures, setCountyFeatures] = useState<any>(null);
   const [thermalComputing, setThermalComputing] = useState(false);
   useEffect(() => {
-    if (!countyGeoJson || mode !== 'thermal') { setCountyFeatures(null); return; }
+    if (!countyGeoJson || (mode !== 'thermal' && !showCountyOverlay)) { setCountyFeatures(null); return; }
     const data = hasQuery ? queryResults : filteredVehicles;
     if (data.length === 0) { setCountyFeatures(countyGeoJson); return; }
 
@@ -850,7 +867,7 @@ export default function UnifiedMap() {
       setThermalComputing(false);
     }, 50);
     return () => clearTimeout(timer);
-  }, [countyGeoJson, mode, hasQuery, queryResults, filteredVehicles]);
+  }, [countyGeoJson, mode, showCountyOverlay, hasQuery, queryResults, filteredVehicles]);
 
   const cutoffLabel = useMemo(() => {
     if (!timelineEnabled || timeCutoff >= 100) return timelineRange.maxLabel;
@@ -897,6 +914,10 @@ export default function UnifiedMap() {
     const showGlow = mode === 'density';
     const glowFade = showGlow ? Math.max(0.15, Math.min(1, (14 - zoom) / 8)) : 0;
 
+    // Shape evolution: circles crossfade to rectangles at z14+
+    const shapeFade = Math.max(0, Math.min(1, zoom - 13)); // 0 at z13, 1 at z14+
+    const circleFade = 1 - shapeFade;
+
     // --- Thermal Choropleth (county boundaries colored by vehicle density) ---
     if (showVehicles && mode === 'thermal' && countyFeatures) {
       result.push(new GeoJsonLayer({
@@ -933,21 +954,102 @@ export default function UnifiedMap() {
       }));
     }
 
+    // --- True Thermal Heatmap (continuous gradient) ---
+    if (showVehicles && mode === 'thermal') {
+      const thermalData = hasQuery ? queryResults : filteredVehicles;
+      if (thermalData.length > 0) {
+        result.push(new HeatmapLayer({
+          id: 'thermal-heatmap',
+          data: thermalData,
+          getPosition: (d: VPin) => [d.lng, d.lat],
+          getWeight: (d: VPin) => d.weight || 1,
+          radiusPixels: glowRadius,
+          intensity: glowIntensity / 40,
+          threshold: 0.03,
+          colorRange: [
+            [10, 5, 50],
+            [40, 0, 100],
+            [120, 0, 80],
+            [200, 40, 20],
+            [240, 140, 30],
+            [255, 230, 60],
+            [255, 255, 230],
+          ],
+          aggregation: 'SUM',
+        }));
+        // Ghost dots underneath so data sources remain visible through gradient
+        result.push(new ScatterplotLayer({
+          id: 'thermal-ghost-dots',
+          data: thermalData,
+          getPosition: (d: VPin) => [d.lng, d.lat],
+          getRadius: 2,
+          radiusUnits: 'meters' as const,
+          getFillColor: [255, 200, 100, 60] as [number, number, number, number],
+          radiusMinPixels: 0,
+          radiusMaxPixels: 4,
+          pickable: true,
+          onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
+          onHover: ({ object, x, y }: any) => {
+            if (object) {
+              const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
+              const price = object.price ? ' · ' + fmtPrice(object.price) : '';
+              setHoverInfo({ x, y, text: (t || 'Vehicle') + price });
+            } else {
+              setHoverInfo(null);
+            }
+          },
+        }));
+      }
+    }
+
+    // --- County Overlay (independent toggle, works in any mode) ---
+    if (showCountyOverlay && mode !== 'thermal' && countyFeatures) {
+      result.push(new GeoJsonLayer({
+        id: 'county-overlay',
+        data: countyFeatures,
+        filled: true,
+        stroked: true,
+        getFillColor: (f: any) => {
+          const count = f.properties._count || 0;
+          if (count === 0) return [0, 0, 0, 0];
+          const maxC = f.properties._maxCount || 1;
+          const t = Math.log1p(count) / Math.log1p(maxC);
+          if (t < 0.15) return [20 + t * 400, 10, 80 + t * 267, Math.round(60 + t * 600)];
+          if (t < 0.3)  return [80, 0, 120, Math.round(100 + t * 400)];
+          if (t < 0.5)  return [180, 30, 30, Math.round(140 + t * 200)];
+          if (t < 0.7)  return [230, 120, 20, Math.round(160 + t * 120)];
+          if (t < 0.9)  return [255, 230, 50, Math.round(180 + t * 80)];
+          return [255, 255, 240, 230];
+        },
+        getLineColor: [255, 255, 255, 30],
+        lineWidthMinPixels: 0.5,
+        pickable: true,
+        onHover: ({ object, x, y }: any) => {
+          if (object) {
+            const count = object.properties._count || 0;
+            setHoverInfo({ x, y, text: `${object.properties.name}: ${count.toLocaleString()} vehicles` });
+          } else {
+            setHoverInfo(null);
+          }
+        },
+        updateTriggers: { getFillColor: [countyFeatures] },
+      }));
+    }
+
     // --- Vehicle Glow ---
     if (showVehicles && !hasQuery && mode === 'density' && glowFade > 0) {
       result.push(new ScatterplotLayer({
         id: 'vehicle-glow',
         data: filteredVehicles,
         getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: (d: VPin) => d.weight * glowRadius * zoomScale * 0.3,
+        getRadius: (d: VPin) => d.weight * 500,
+        radiusUnits: 'meters' as const,
         getFillColor: [...vehColor, glowAlpha] as [number, number, number, number],
         radiusMinPixels: 0,
         radiusMaxPixels: glowRadius,
         opacity: glowFade,
         pickable: true,
-        onClick: ({ object }: any) => {
-          if (object) setSelectedPin({ pin: object, type: 'vehicle' });
-        },
+        onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
             const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
@@ -967,14 +1069,13 @@ export default function UnifiedMap() {
         id: 'vehicle-points',
         data: filteredVehicles,
         getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: ptBase,
+        getRadius: 3,
+        radiusUnits: 'meters' as const,
         getFillColor: [...vehColor, 200] as [number, number, number, number],
-        radiusMinPixels: 1.5,
+        radiusMinPixels: 0,
         radiusMaxPixels: 8,
         pickable: true,
-        onClick: ({ object }: any) => {
-          if (object) setSelectedPin({ pin: object, type: 'vehicle' });
-        },
+        onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
             const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
@@ -985,7 +1086,42 @@ export default function UnifiedMap() {
           }
         },
         updateTriggers: { getFillColor: [colorPreset], getRadius: [pointSize, zoom] },
+        opacity: zoom >= 13 ? circleFade : 1,
       }));
+
+      // Vehicle shapes (car rectangles) at z14+
+      if (shapeFade > 0) {
+        result.push(new IconLayer({
+          id: 'vehicle-shapes',
+          data: filteredVehicles,
+          getPosition: (d: VPin) => [d.lng, d.lat],
+          getIcon: () => ({
+            url: CAR_SVG_URI,
+            width: 10,
+            height: 4,
+            anchorX: 5,
+            anchorY: 2,
+          }),
+          getSize: 5,
+          sizeUnits: 'meters' as const,
+          sizeMinPixels: 0,
+          sizeMaxPixels: 8,
+          getAngle: (d: VPin) => simpleHash(d.id) % 360,
+          getColor: (d: VPin) => [...vehColor, Math.round(220 * shapeFade)] as [number, number, number, number],
+          pickable: true,
+          onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
+          onHover: ({ object, x, y }: any) => {
+            if (object) {
+              const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
+              const price = object.price ? ' · ' + fmtPrice(object.price) : '';
+              setHoverInfo({ x, y, text: (t || 'Vehicle') + price });
+            } else {
+              setHoverInfo(null);
+            }
+          },
+          updateTriggers: { getColor: [colorPreset, zoom] },
+        }));
+      }
     }
 
     // --- Query Glow ---
@@ -994,15 +1130,14 @@ export default function UnifiedMap() {
         id: 'query-glow',
         data: queryResults,
         getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: (d: VPin) => d.weight * glowRadius * zoomScale * 0.3,
+        getRadius: (d: VPin) => d.weight * 500,
+        radiusUnits: 'meters' as const,
         getFillColor: [...colors.query, glowAlpha] as [number, number, number, number],
         radiusMinPixels: 0,
         radiusMaxPixels: glowRadius,
         opacity: glowFade,
         pickable: true,
-        onClick: ({ object }: any) => {
-          if (object) setSelectedPin({ pin: object, type: 'vehicle' });
-        },
+        onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
             const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
@@ -1022,14 +1157,13 @@ export default function UnifiedMap() {
         id: 'query-points',
         data: queryResults,
         getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: ptBase * 1.2,
+        getRadius: 4,
+        radiusUnits: 'meters' as const,
         getFillColor: [...colors.query, 220] as [number, number, number, number],
-        radiusMinPixels: 1.5,
-        radiusMaxPixels: 8,
+        radiusMinPixels: 0,
+        radiusMaxPixels: 10,
         pickable: true,
-        onClick: ({ object }: any) => {
-          if (object) setSelectedPin({ pin: object, type: 'vehicle' });
-        },
+        onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
             const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
@@ -1049,15 +1183,14 @@ export default function UnifiedMap() {
         id: 'collection-glow',
         data: collections,
         getPosition: (d: ColPin) => [d.lng, d.lat],
-        getRadius: (d: ColPin) => (d.totalInventory > 20 ? glowRadius * 0.5 : glowRadius * 0.3) * zoomScale,
+        getRadius: (d: ColPin) => d.totalInventory > 20 ? 800 : 400,
+        radiusUnits: 'meters' as const,
         getFillColor: (d: ColPin) => [...colColor(d.country), Math.round(glowAlpha * 0.8)] as [number, number, number, number],
         radiusMinPixels: 0,
         radiusMaxPixels: glowRadius * 0.6,
         opacity: glowFade * 0.8,
         pickable: true,
-        onClick: ({ object }: any) => {
-          if (object) setSelectedPin({ pin: object, type: 'collection' });
-        },
+        onClick: ({ object }: any) => handleLayerClick(object, 'collection'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
             const inv = object.totalInventory ? ` (${object.totalInventory})` : '';
@@ -1076,14 +1209,13 @@ export default function UnifiedMap() {
         id: 'collection-points',
         data: collections,
         getPosition: (d: ColPin) => [d.lng, d.lat],
-        getRadius: ptBase * 1.5,
+        getRadius: 30,
+        radiusUnits: 'meters' as const,
         getFillColor: (d: ColPin) => [...colColor(d.country), 220] as [number, number, number, number],
-        radiusMinPixels: 2,
-        radiusMaxPixels: 8,
+        radiusMinPixels: 0,
+        radiusMaxPixels: 12,
         pickable: true,
-        onClick: ({ object }: any) => {
-          if (object) setSelectedPin({ pin: object, type: 'collection' });
-        },
+        onClick: ({ object }: any) => handleLayerClick(object, 'collection'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
             const inv = object.totalInventory ? ` (${object.totalInventory})` : '';
@@ -1113,6 +1245,30 @@ export default function UnifiedMap() {
           pickable: false,
         }));
       }
+
+      // Collection shapes (building squares) at z14+
+      if (shapeFade > 0) {
+        result.push(new IconLayer({
+          id: 'collection-shapes',
+          data: collections,
+          getPosition: (d: ColPin) => [d.lng, d.lat],
+          getIcon: () => ({
+            url: BUILDING_SVG_URI,
+            width: 8,
+            height: 8,
+            anchorX: 4,
+            anchorY: 4,
+          }),
+          getSize: 25,
+          sizeUnits: 'meters' as const,
+          sizeMinPixels: 0,
+          sizeMaxPixels: 14,
+          getColor: (d: ColPin) => [...colColor(d.country), Math.round(220 * shapeFade)] as [number, number, number, number],
+          pickable: true,
+          onClick: ({ object }: any) => handleLayerClick(object, 'collection'),
+          updateTriggers: { getColor: [zoom] },
+        }));
+      }
     }
 
     // --- Business Glow ---
@@ -1121,15 +1277,14 @@ export default function UnifiedMap() {
         id: 'business-glow',
         data: businesses,
         getPosition: (d: BizPin) => [d.lng, d.lat],
-        getRadius: glowRadius * 0.25 * zoomScale,
+        getRadius: 300,
+        radiusUnits: 'meters' as const,
         getFillColor: [...colors.business, Math.round(glowAlpha * 0.6)] as [number, number, number, number],
         radiusMinPixels: 0,
         radiusMaxPixels: glowRadius * 0.5,
         opacity: glowFade * 0.6,
         pickable: true,
-        onClick: ({ object }: any) => {
-          if (object) setSelectedPin({ pin: object, type: 'business' });
-        },
+        onClick: ({ object }: any) => handleLayerClick(object, 'business'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
             const t = object.type ? ` · ${object.type}` : '';
@@ -1148,14 +1303,13 @@ export default function UnifiedMap() {
         id: 'business-points',
         data: businesses,
         getPosition: (d: BizPin) => [d.lng, d.lat],
-        getRadius: ptBase * 1.2,
+        getRadius: 20,
+        radiusUnits: 'meters' as const,
         getFillColor: [...colors.business, 200] as [number, number, number, number],
-        radiusMinPixels: 1,
+        radiusMinPixels: 0,
         radiusMaxPixels: 7,
         pickable: true,
-        onClick: ({ object }: any) => {
-          if (object) setSelectedPin({ pin: object, type: 'business' });
-        },
+        onClick: ({ object }: any) => handleLayerClick(object, 'business'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
             const t = object.type ? ` · ${object.type}` : '';
@@ -1184,6 +1338,30 @@ export default function UnifiedMap() {
           pickable: false,
         }));
       }
+
+      // Business shapes (building squares) at z14+
+      if (shapeFade > 0) {
+        result.push(new IconLayer({
+          id: 'business-shapes',
+          data: businesses,
+          getPosition: (d: BizPin) => [d.lng, d.lat],
+          getIcon: () => ({
+            url: BUILDING_SVG_URI,
+            width: 8,
+            height: 8,
+            anchorX: 4,
+            anchorY: 4,
+          }),
+          getSize: 15,
+          sizeUnits: 'meters' as const,
+          sizeMinPixels: 0,
+          sizeMaxPixels: 10,
+          getColor: [...colors.business, Math.round(220 * shapeFade)] as [number, number, number, number],
+          pickable: true,
+          onClick: ({ object }: any) => handleLayerClick(object, 'business'),
+          updateTriggers: { getColor: [zoom, colorPreset] },
+        }));
+      }
     }
 
     // --- Photo Glow ---
@@ -1192,15 +1370,14 @@ export default function UnifiedMap() {
         id: 'photo-glow',
         data: photos,
         getPosition: (d: PhotoPin) => [d.lng, d.lat],
-        getRadius: glowRadius * 0.2 * zoomScale,
+        getRadius: 200,
+        radiusUnits: 'meters' as const,
         getFillColor: [...colors.photo, Math.round(glowAlpha * 0.7)] as [number, number, number, number],
         radiusMinPixels: 0,
         radiusMaxPixels: glowRadius * 0.4,
         opacity: glowFade * 0.7,
         pickable: true,
-        onClick: ({ object }: any) => {
-          if (object) setSelectedPin({ pin: object, type: 'photo' });
-        },
+        onClick: ({ object }: any) => handleLayerClick(object, 'photo'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
             setHoverInfo({ x, y, text: object.vehicleTitle || object.locationName || 'Photo' });
@@ -1218,16 +1395,15 @@ export default function UnifiedMap() {
         id: 'photo-points',
         data: photos,
         getPosition: (d: PhotoPin) => [d.lng, d.lat],
-        getRadius: ptBase * 0.8,
-        radiusMinPixels: 1,
+        getRadius: 2,
+        radiusUnits: 'meters' as const,
+        radiusMinPixels: 0,
         radiusMaxPixels: 6,
         getFillColor: (d: PhotoPin) => d.hasRealImage
           ? [...colors.photo, 230] as [number, number, number, number]
           : [...colors.photo, 120] as [number, number, number, number],
         pickable: true,
-        onClick: ({ object }: any) => {
-          if (object) setSelectedPin({ pin: object, type: 'photo' as any });
-        },
+        onClick: ({ object }: any) => handleLayerClick(object, 'photo'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
             const label = object.vehicleTitle || 'Photo';
@@ -1263,14 +1439,13 @@ export default function UnifiedMap() {
         id: 'marketplace-points',
         data: marketplace,
         getPosition: (d: MarketplacePin) => [d.lng, d.lat],
-        getRadius: ptBase,
-        radiusMinPixels: 1,
+        getRadius: 3,
+        radiusUnits: 'meters' as const,
+        radiusMinPixels: 0,
         radiusMaxPixels: 6,
         getFillColor: [74, 222, 128, 220] as [number, number, number, number],
         pickable: true,
-        onClick: ({ object }: any) => {
-          if (object) setSelectedPin({ pin: object, type: 'marketplace' as any });
-        },
+        onClick: ({ object }: any) => handleLayerClick(object, 'marketplace'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
             const price = object.price ? ' · ' + fmtPrice(object.price) : '';
@@ -1322,8 +1497,8 @@ export default function UnifiedMap() {
   const hasSidePanel = selectedPin !== null;
 
   return (
-    <div style={{ position: 'absolute', inset: 0, background: 'var(--bg)', display: 'flex', overflow: 'hidden', fontFamily: MAP_FONT }}
-      onClick={() => setSelectedPin(null)}>
+    <div className="nuke-map-root" style={{ position: 'absolute', inset: 0, background: 'var(--bg)', display: 'flex', overflow: 'hidden', fontFamily: MAP_FONT }}
+      onClick={() => { if (!deckClickedRef.current) setSelectedPin(null); }}>
 
       {/* Map area — shrinks when side panel is open */}
       <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
@@ -1419,6 +1594,10 @@ export default function UnifiedMap() {
               <LT label="Collections" color={`rgb(${COLOR_PRESETS[colorPreset].collection.join(',')})`} checked={showCollections} set={setShowCollections} n={counts.collections} dim={hasQuery} />
               <LT label="Businesses" color={`rgb(${COLOR_PRESETS[colorPreset].business.join(',')})`} checked={showBusinesses} set={setShowBusinesses} n={counts.businesses} dim={hasQuery} />
               <LT label="Photos" color={`rgb(${COLOR_PRESETS[colorPreset].photo.join(',')})`} checked={showPhotos} set={setShowPhotos} n={counts.photos} dim={hasQuery} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '3px 0', fontSize: '11px', fontFamily: MAP_FONT }}>
+                <input type="checkbox" checked={showCountyOverlay} onChange={e => setShowCountyOverlay(e.target.checked)} />
+                <span style={{ color: 'var(--text)' }}>Counties</span>
+              </label>
               {activeQuery && <>
                 <div style={{ borderTop: '1px solid var(--border)', margin: '6px 0' }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
@@ -1463,9 +1642,9 @@ export default function UnifiedMap() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <SliderControl label="Point Size" value={pointSize} min={1} max={12} onChange={setPointSize} />
-                {mode === 'density' && <>
-                  <SliderControl label="Glow Radius" value={glowRadius} min={5} max={200} onChange={setGlowRadius} />
-                  <SliderControl label="Glow Intensity" value={glowIntensity} min={1} max={100} onChange={setGlowIntensity} />
+                {(mode === 'density' || mode === 'thermal') && <>
+                  <SliderControl label={mode === 'thermal' ? 'Heat Rad' : 'Glow Rad'} value={glowRadius} min={5} max={200} onChange={setGlowRadius} />
+                  <SliderControl label={mode === 'thermal' ? 'Heat Int' : 'Glow Int'} value={glowIntensity} min={1} max={100} onChange={setGlowIntensity} />
                 </>}
               </div>
             </div>
@@ -1711,6 +1890,12 @@ export default function UnifiedMap() {
       })()}
 
       <style>{`
+        .nuke-map-root, .nuke-map-root * {
+          font-family: Arial, Helvetica, sans-serif !important;
+        }
+        .nuke-map-root input, .nuke-map-root button, .nuke-map-root select {
+          font-family: Arial, Helvetica, sans-serif !important;
+        }
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.4; }

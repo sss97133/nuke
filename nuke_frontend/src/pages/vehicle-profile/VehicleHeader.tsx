@@ -1579,11 +1579,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           baselineLabel,
           outlierLabel,
         ].filter(Boolean).join(' • ')}
-        style={{ 
-          display: 'inline-flex', 
-          alignItems: 'center', 
-          gap: 3, 
-          fontSize: '8px', 
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 3,
+          fontSize: '8px',
+          fontFamily: "'Courier New', Courier, monospace",
           color,
           cursor: 'pointer',
           userSelect: 'none'
@@ -1591,7 +1592,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       >
         <span style={{ width: 0, height: 0, ...triangleStyle, borderWidth: '4px', borderTopWidth: positive ? '0' : '5px', borderBottomWidth: positive ? '5px' : '0' }} />
         {`${positive ? '+' : ''}${trendPct.toFixed(1)}%`}
-        <span style={{ fontSize: '7px', color: mutedTextColor, marginLeft: '1px' }}>
+        <span style={{ fontSize: '7px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.08em', textTransform: 'uppercase', color: mutedTextColor, marginLeft: '1px' }}>
           {periodLabel}
         </span>
       </span>
@@ -1681,7 +1682,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           {vehicle?.year && (
             <span
               onClick={(e) => { e.stopPropagation(); setActivePopover(activePopover === 'year' ? null : 'year'); }}
-              style={{ fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', borderBottom: '1px dotted transparent', transition: 'border-color 0.15s' }}
+              style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap', cursor: 'pointer', borderBottom: '1px dotted transparent', transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)' }}
               onMouseEnter={(e) => { (e.target as HTMLElement).style.borderBottomColor = 'var(--text-muted)'; }}
               onMouseLeave={(e) => { (e.target as HTMLElement).style.borderBottomColor = 'transparent'; }}
             >
@@ -1691,7 +1692,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           {vehicle?.make && (
             <span
               onClick={(e) => { e.stopPropagation(); setActivePopover(activePopover === 'make' ? null : 'make'); }}
-              style={{ fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', borderBottom: '1px dotted transparent', transition: 'border-color 0.15s' }}
+              style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap', cursor: 'pointer', borderBottom: '1px dotted transparent', transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)' }}
               onMouseEnter={(e) => { (e.target as HTMLElement).style.borderBottomColor = 'var(--text-muted)'; }}
               onMouseLeave={(e) => { (e.target as HTMLElement).style.borderBottomColor = 'transparent'; }}
             >
@@ -1701,7 +1702,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           {displayModel && (
             <span
               onClick={(e) => { e.stopPropagation(); setActivePopover(activePopover === 'model' ? null : 'model'); }}
-              style={{ fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', borderBottom: '1px dotted transparent', transition: 'border-color 0.15s', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}
+              style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap', cursor: 'pointer', borderBottom: '1px dotted transparent', transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}
               onMouseEnter={(e) => { (e.target as HTMLElement).style.borderBottomColor = 'var(--text-muted)'; }}
               onMouseLeave={(e) => { (e.target as HTMLElement).style.borderBottomColor = 'transparent'; }}
             >
@@ -1709,12 +1710,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             </span>
           )}
           {(vehicle as any)?.series && !cleanedModelForHeader.toLowerCase().includes(String((vehicle as any).series).toLowerCase()) && (
-            <span style={{ fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
               {(vehicle as any).series}
             </span>
           )}
           {!vehicle?.year && !vehicle?.make && !displayModel && (
-            <span style={{ fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap' }}>{identityLabel}</span>
+            <span style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{identityLabel}</span>
           )}
 
           {/* Year Popup */}
@@ -1728,39 +1729,39 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               <div style={{ color: 'var(--text-muted)' }}>Loading year data...</div>
             ) : popoverData ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontWeight: 700, fontSize: '13px' }}>{vehicle?.year} Market Overview</div>
+                <div style={{ fontWeight: 700, fontSize: '11px' }}>{vehicle?.year} Market Overview</div>
                 {popoverData.avg_price != null && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ fontWeight: 700, fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Market Stats</div>
+                    <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Market Stats</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Total listings</span>
-                      <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.total_listings?.toLocaleString() || '—'}</span>
+                      <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{popoverData.total_listings?.toLocaleString() || '—'}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Avg. price</span>
-                      <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatCurrency(popoverData.avg_price)}</span>
+                      <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{formatCurrency(popoverData.avg_price)}</span>
                     </div>
                     {popoverData.median_price != null && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: 'var(--text-muted)' }}>Median price</span>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatCurrency(popoverData.median_price)}</span>
+                        <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{formatCurrency(popoverData.median_price)}</span>
                       </div>
                     )}
                     {popoverData.sell_through_pct != null && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: 'var(--text-muted)' }}>Sell-through</span>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{(popoverData.sell_through_pct * 100).toFixed(0)}%</span>
+                        <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{(popoverData.sell_through_pct * 100).toFixed(0)}%</span>
                       </div>
                     )}
                   </div>
                 )}
                 {popoverData.top_makes && Array.isArray(popoverData.top_makes) && popoverData.top_makes.length > 0 && (
                   <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                    <div style={{ fontWeight: 700, fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Top Makes</div>
+                    <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Top Makes</div>
                     {popoverData.top_makes.slice(0, 3).map((m: any, i: number) => (
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0' }}>
                         <span>{m.make || m.name}</span>
-                        <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>{m.count || m.volume}</span>
+                        <span style={{ fontFamily: "'Courier New', Courier, monospace", color: 'var(--text-muted)' }}>{m.count || m.volume}</span>
                       </div>
                     ))}
                   </div>
@@ -1787,39 +1788,39 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               <div style={{ color: 'var(--text-muted)' }}>Loading make data...</div>
             ) : popoverData ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontWeight: 700, fontSize: '13px' }}>{vehicle?.make} Market Overview</div>
+                <div style={{ fontWeight: 700, fontSize: '11px' }}>{vehicle?.make} Market Overview</div>
                 {popoverData.avg_price != null && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ fontWeight: 700, fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Make Stats</div>
+                    <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Make Stats</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Total listed</span>
-                      <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.total_listings?.toLocaleString() || '—'}</span>
+                      <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{popoverData.total_listings?.toLocaleString() || '—'}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Avg. price</span>
-                      <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatCurrency(popoverData.avg_price)}</span>
+                      <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{formatCurrency(popoverData.avg_price)}</span>
                     </div>
                     {popoverData.median_price != null && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: 'var(--text-muted)' }}>Median price</span>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatCurrency(popoverData.median_price)}</span>
+                        <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{formatCurrency(popoverData.median_price)}</span>
                       </div>
                     )}
                     {popoverData.sell_through_pct != null && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: 'var(--text-muted)' }}>Sell-through</span>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{(popoverData.sell_through_pct * 100).toFixed(0)}%</span>
+                        <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{(popoverData.sell_through_pct * 100).toFixed(0)}%</span>
                       </div>
                     )}
                   </div>
                 )}
                 {popoverData.top_models && Array.isArray(popoverData.top_models) && popoverData.top_models.length > 0 && (
                   <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                    <div style={{ fontWeight: 700, fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Top Models by Volume</div>
+                    <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Top Models by Volume</div>
                     {popoverData.top_models.slice(0, 5).map((m: any, i: number) => (
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0' }}>
                         <span>{m.model || m.name}</span>
-                        <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                        <span style={{ fontFamily: "'Courier New', Courier, monospace", color: 'var(--text-muted)' }}>
                           {m.avg_price ? formatCurrency(m.avg_price) : ''} {m.count ? `(${m.count})` : ''}
                         </span>
                       </div>
@@ -1848,46 +1849,46 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               <div style={{ color: 'var(--text-muted)' }}>Loading model data...</div>
             ) : popoverData ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontWeight: 700, fontSize: '13px' }}>{vehicle?.make} {displayModel}</div>
+                <div style={{ fontWeight: 700, fontSize: '11px' }}>{vehicle?.make} {displayModel}</div>
                 {popoverData.avg_price != null && (
                   <>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <div style={{ fontWeight: 700, fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Advisors</div>
+                      <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Advisors</div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: 'var(--text-muted)' }}>Price range (p25–p75)</span>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                        <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>
                           {popoverData.p25 != null ? `${formatCurrency(popoverData.p25)}–${formatCurrency(popoverData.p75)}` : '—'}
                         </span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: 'var(--text-muted)' }}>Avg. price</span>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatCurrency(popoverData.avg_price)}</span>
+                        <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{formatCurrency(popoverData.avg_price)}</span>
                       </div>
                       {popoverData.sell_through_pct != null && (
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--text-muted)' }}>Sell-through</span>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{(popoverData.sell_through_pct * 100).toFixed(0)}%</span>
+                          <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{(popoverData.sell_through_pct * 100).toFixed(0)}%</span>
                         </div>
                       )}
                       {popoverData.avg_days_on_market != null && (
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--text-muted)' }}>Avg. days on market</span>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{Math.round(popoverData.avg_days_on_market)}</span>
+                          <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{Math.round(popoverData.avg_days_on_market)}</span>
                         </div>
                       )}
                     </div>
                     <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <div style={{ fontWeight: 700, fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Enthusiasts</div>
+                      <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Enthusiasts</div>
                       {popoverData.production_count != null && (
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--text-muted)' }}>Production</span>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.production_count?.toLocaleString() || '—'}</span>
+                          <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{popoverData.production_count?.toLocaleString() || '—'}</span>
                         </div>
                       )}
                       {popoverData.survival_rate != null && (
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--text-muted)' }}>Survival rate</span>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{(popoverData.survival_rate * 100).toFixed(0)}%</span>
+                          <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{(popoverData.survival_rate * 100).toFixed(0)}%</span>
                         </div>
                       )}
                       {popoverData.rarity_label && (
@@ -1898,14 +1899,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       )}
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: 'var(--text-muted)' }}>Listed</span>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.total_listings?.toLocaleString() || '—'}</span>
+                        <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{popoverData.total_listings?.toLocaleString() || '—'}</span>
                       </div>
                     </div>
                   </>
                 )}
                 {popoverData.trend_direction && (
                   <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ fontWeight: 700, fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Speculators</div>
+                    <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Speculators</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Price trend</span>
                       <span style={{
@@ -1918,7 +1919,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     {popoverData.heat_score_avg != null && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: 'var(--text-muted)' }}>Heat score</span>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.heat_score_avg.toFixed(1)}</span>
+                        <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{popoverData.heat_score_avg.toFixed(1)}</span>
                       </div>
                     )}
                   </div>
@@ -1956,10 +1957,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               <span
                 className="badge"
                 style={{
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  fontFamily: 'monospace',
-                  letterSpacing: '0.3px',
+                  fontSize: '8px',
+                  fontWeight: 600,
+                  fontFamily: 'Arial, Helvetica, sans-serif',
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase' as const,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 4,
@@ -1969,7 +1971,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                          transferStatus.status === 'stalled' ? 'var(--warning)' : 'var(--text-secondary)',
                   border: `1px solid ${transferStatus.status === 'completed' ? 'var(--success)' :
                                         transferStatus.status === 'stalled' ? 'var(--warning)' : 'var(--border)'}`,
-                  borderRadius: '3px',
+                  borderRadius: 0,
                   padding: '2px 5px',
                 }}
                 title={[
@@ -1984,10 +1986,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   ? transferStatus.current_milestone.label
                   : transferStatus.status === 'completed' ? 'Complete' : 'Transfer'}
                 {transferStatus.progress.pct > 0 && (
-                  <span style={{ opacity: 0.6, fontSize: '8px' }}>{transferStatus.progress.pct}%</span>
+                  <span style={{ opacity: 0.6, fontSize: '8px', fontFamily: "'Courier New', Courier, monospace" }}>{transferStatus.progress.pct}%</span>
                 )}
                 {transferStatus.days_since_activity !== null && transferStatus.days_since_activity >= 7 && (
-                  <span style={{ color: transferStatus.status === 'stalled' ? 'var(--warning)' : 'var(--text-secondary)', fontSize: '8px' }}>
+                  <span style={{ color: transferStatus.status === 'stalled' ? 'var(--warning)' : 'var(--text-secondary)', fontSize: '8px', fontFamily: "'Courier New', Courier, monospace" }}>
                     · {transferStatus.days_since_activity}d
                   </span>
                 )}
@@ -1996,7 +1998,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 <span
                   style={{
                     fontSize: '9px',
-                    fontFamily: 'monospace',
+                    fontFamily: "'Courier New', Courier, monospace",
                     color: transferStatus.buyer.claimed ? 'var(--text)' : 'var(--text-muted)',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -2028,10 +2030,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     setShowAccessInfo((prev) => !prev);
                   }}
                   style={{
-                    fontSize: '9px',
-                    fontWeight: 800,
-                    fontFamily: 'monospace',
-                    letterSpacing: '0.5px',
+                    fontSize: '8px',
+                    fontWeight: 600,
+                    fontFamily: 'Arial, Helvetica, sans-serif',
+                    letterSpacing: '0.1em',
                     display: 'inline-flex',
                     alignItems: 'center',
                     cursor: 'pointer',
@@ -2063,7 +2065,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div style={{ fontWeight: 800, fontSize: '12px', marginBottom: 6 }}>
+                    <div style={{ fontWeight: 700, fontSize: '11px', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6 }}>
                       Why does this profile look different?
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
@@ -2108,7 +2110,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       style={showCompact ? {
                         width: 18,
                         height: 18,
-                        borderRadius: 999,
+                        borderRadius: 0,
                         border: '1px solid var(--border)',
                         background: 'var(--surface)',
                         padding: 0,
@@ -2120,12 +2122,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         boxSizing: 'border-box',
                       } : {
                         fontSize: '8px',
-                        fontWeight: 700,
+                        fontWeight: 600,
+                        fontFamily: 'Arial, Helvetica, sans-serif',
+                        letterSpacing: '0.1em',
+                        textTransform: 'uppercase' as const,
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 4,
                         padding: '2px 6px',
-                        borderRadius: 4,
+                        borderRadius: 0,
                         background: 'var(--surface)',
                         border: '1px solid var(--border)',
                         color: baseTextColor,
@@ -2152,7 +2157,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <FaviconIcon url={sellerPlatformUrl} size={16} />
                             <div>
-                              <div style={{ fontWeight: 700, fontSize: '12px' }}>{headerSeller.label}</div>
+                              <div style={{ fontWeight: 700, fontSize: '11px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{headerSeller.label}</div>
                               <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{headerSeller.roleLabel}</div>
                             </div>
                           </div>
@@ -2165,7 +2170,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                               {popoverData.identity.first_seen_at && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                   <span style={{ color: 'var(--text-muted)' }}>First seen</span>
-                                  <span style={{ fontFamily: 'monospace' }}>{new Date(popoverData.identity.first_seen_at).toLocaleDateString()}</span>
+                                  <span style={{ fontFamily: "'Courier New', Courier, monospace" }}>{new Date(popoverData.identity.first_seen_at).toLocaleDateString()}</span>
                                 </div>
                               )}
                               {popoverData.identity.claimed_by && (
@@ -2177,10 +2182,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                             </div>
                           )}
                           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <div style={{ fontWeight: 700, fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Activity</div>
+                            <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Activity</div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span style={{ color: 'var(--text-muted)' }}>Auctions listed</span>
-                              <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.auctionCount || 0}</span>
+                              <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{popoverData.auctionCount || 0}</span>
                             </div>
                           </div>
                           {headerSeller.href && (
@@ -2208,12 +2213,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     title={headerLocationTitle || headerLocationLabel}
                     style={{
                       fontSize: '8px',
-                      fontWeight: 700,
+                      fontWeight: 600,
+                      fontFamily: 'Arial, Helvetica, sans-serif',
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase' as const,
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 4,
                       padding: '2px 6px',
-                      borderRadius: 4,
+                      borderRadius: 0,
                       background: 'var(--surface)',
                       border: '1px solid var(--border)',
                       color: baseTextColor,
@@ -2260,12 +2268,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                             className="badge"
                             style={{
                               fontSize: '8px',
-                              fontWeight: 700,
+                              fontWeight: 600,
+                              fontFamily: 'Arial, Helvetica, sans-serif',
+                              letterSpacing: '0.1em',
+                              textTransform: 'uppercase' as const,
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: 4,
                               padding: '2px 6px',
-                              borderRadius: 4,
+                              borderRadius: 0,
                               background: 'var(--surface)',
                               border: '1px solid var(--border)',
                               color: baseTextColor,
@@ -2284,12 +2295,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                             title={`Seller: ${classifiedSellerName}`}
                             style={{
                               fontSize: '8px',
-                              fontWeight: 700,
+                              fontWeight: 600,
+                              fontFamily: 'Arial, Helvetica, sans-serif',
+                              letterSpacing: '0.1em',
+                              textTransform: 'uppercase' as const,
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: 4,
                               padding: '2px 6px',
-                              borderRadius: 4,
+                              borderRadius: 0,
                               background: 'var(--surface)',
                               border: '1px solid var(--border)',
                               color: baseTextColor,
@@ -2326,7 +2340,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       style={{
                         width: 18,
                         height: 18,
-                        borderRadius: 999,
+                        borderRadius: 0,
                         border: '1px solid var(--border)',
                         background: 'var(--surface)',
                         padding: 0,
@@ -2360,7 +2374,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                             ) : (
                               <FaviconIcon url={platformUrlForIcon} size={16} />
                             )}
-                            <span style={{ fontWeight: 700, fontSize: '12px' }}>{headerAuctionHouse.label}</span>
+                            <span style={{ fontWeight: 700, fontSize: '11px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{headerAuctionHouse.label}</span>
                           </div>
                           {popoverData.listingUrl && (
                             <a
@@ -2373,35 +2387,35 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                             </a>
                           )}
                           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <div style={{ fontWeight: 700, fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Auction Stats</div>
+                            <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Auction Stats</div>
                             {typeof popoverData.bidCount === 'number' && (
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Bids</span>
-                                <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.bidCount}</span>
+                                <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{popoverData.bidCount}</span>
                               </div>
                             )}
                             {typeof popoverData.viewCount === 'number' && (
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Views</span>
-                                <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.viewCount.toLocaleString()}</span>
+                                <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{popoverData.viewCount.toLocaleString()}</span>
                               </div>
                             )}
                             {typeof popoverData.watcherCount === 'number' && (
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Watchers</span>
-                                <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.watcherCount.toLocaleString()}</span>
+                                <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{popoverData.watcherCount.toLocaleString()}</span>
                               </div>
                             )}
                             {typeof popoverData.commentCount === 'number' && (
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Comments</span>
-                                <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{popoverData.commentCount.toLocaleString()}</span>
+                                <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{popoverData.commentCount.toLocaleString()}</span>
                               </div>
                             )}
                           </div>
                           {popoverData.listingStatus && (
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                              <div style={{ fontWeight: 700, fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Outcome</div>
+                              <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Outcome</div>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Status</span>
                                 <span style={{
@@ -2418,13 +2432,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                               {typeof popoverData.finalPrice === 'number' && popoverData.finalPrice > 0 && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                   <span style={{ color: 'var(--text-muted)' }}>Final price</span>
-                                  <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatCurrency(popoverData.finalPrice)}</span>
+                                  <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{formatCurrency(popoverData.finalPrice)}</span>
                                 </div>
                               )}
                               {typeof popoverData.currentBid === 'number' && popoverData.currentBid > 0 && !popoverData.finalPrice && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                   <span style={{ color: 'var(--text-muted)' }}>Current bid</span>
-                                  <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{formatCurrency(popoverData.currentBid)}</span>
+                                  <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{formatCurrency(popoverData.currentBid)}</span>
                                 </div>
                               )}
                             </div>
@@ -2457,12 +2471,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         className="badge"
                         style={{
                           fontSize: '8px',
-                          fontWeight: 700,
+                          fontWeight: 600,
+                          fontFamily: 'Arial, Helvetica, sans-serif',
+                          letterSpacing: '0.1em',
+                          textTransform: 'uppercase' as const,
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: 4,
                           padding: '2px 6px',
-                          borderRadius: 4,
+                          borderRadius: 0,
                           background:
                             headerBuyer.tone === 'success'
                               ? 'var(--success-bg)'
@@ -2491,12 +2508,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       title={headerBuyer.label}
                       style={{
                         fontSize: '8px',
-                        fontWeight: 700,
+                        fontWeight: 600,
+                        fontFamily: 'Arial, Helvetica, sans-serif',
+                        letterSpacing: '0.1em',
+                        textTransform: 'uppercase' as const,
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 4,
                         padding: '2px 6px',
-                        borderRadius: 4,
+                        borderRadius: 0,
                         background:
                           headerBuyer.tone === 'success'
                             ? 'var(--success-bg)'
@@ -2529,12 +2549,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     title={headerCountdown.title || headerCountdown.label}
                     style={{
                       fontSize: '8px',
-                      fontWeight: 700,
+                      fontWeight: 600,
+                      fontFamily: 'Arial, Helvetica, sans-serif',
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase' as const,
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 4,
                       padding: '2px 6px',
-                      borderRadius: 4,
+                      borderRadius: 0,
                       background: 'var(--surface)',
                       border: '1px solid var(--border)',
                       color: baseTextColor,
@@ -2546,7 +2569,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       style={{
                         width: 6,
                         height: 6,
-                        borderRadius: 999,
+                        borderRadius: 0,
                         background: headerCountdown.isLive ? 'var(--error)' : 'var(--text-disabled)',
                         display: 'inline-block',
                         flexShrink: 0,
@@ -2571,7 +2594,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 className="badge"
                 style={{
                   fontSize: '8px',
-                  fontWeight: 700,
+                  fontWeight: 600,
+                  fontFamily: 'Arial, Helvetica, sans-serif',
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase' as const,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 4,
@@ -2580,7 +2606,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   border: '1px solid var(--border)',
                   padding: '2px 6px',
                   color: baseTextColor,
-                  borderRadius: 4,
+                  borderRadius: 0,
                   lineHeight: 1,
                 }}
                 title={`Location: ${locationDisplay.full || locationDisplay.short}`}
@@ -2613,7 +2639,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     borderBottom: '1px solid var(--border)',
                     paddingBottom: '6px'
                   }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '12px' }}>Last Known Location</span>
+                    <span style={{ fontWeight: 700, fontSize: '11px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Last Known Location</span>
                     <button
                       type="button"
                       onClick={() => setShowLocationDropdown(false)}
@@ -2621,14 +2647,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         background: 'transparent',
                         border: 'none',
                         cursor: 'pointer',
-                        fontSize: '16px',
+                        fontSize: '12px',
                         color: 'var(--text-muted)',
                       }}
                     >
                       x
                     </button>
                   </div>
-                  
+
                   <div style={{ fontSize: '11px' }}>
                     {/* Location Details */}
                     <div style={{ marginBottom: '8px' }}>
@@ -2647,7 +2673,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       {(vehicle as any)?.zip_code && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
                           <span style={{ color: 'var(--text-muted)' }}>ZIP Code</span>
-                          <span style={{ fontFamily: 'monospace' }}>{(vehicle as any).zip_code}</span>
+                          <span style={{ fontFamily: "'Courier New', Courier, monospace" }}>{(vehicle as any).zip_code}</span>
                         </div>
                       )}
                       {!(vehicle as any)?.zip_code && !(vehicle as any)?.city && (vehicle as any)?.bat_location && (
@@ -2664,7 +2690,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       paddingTop: '8px',
                       marginTop: '8px'
                     }}>
-                      <div style={{ fontWeight: 'bold', marginBottom: '4px', color: 'var(--text-muted)', fontSize: '9px' }}>
+                      <div style={{ fontWeight: 700, marginBottom: '4px', color: 'var(--text-muted)', fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
                         AREA VEHICLE DEMOGRAPHICS
                       </div>
                       <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
@@ -2694,8 +2720,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             </div>
           )}
 
-          {/* Owner Badge with Claim Dropdown - shows best guess owner (skip if buyer badge or transfer status already shows same handle) */}
-          {ownerGuess && !permissions?.isVerifiedOwner && !responsibleName && (() => {
+          {/* Owner Badge with Claim Dropdown - shows best guess owner (skip if buyer badge or transfer status already shows same handle, or if current user IS the owner) */}
+          {ownerGuess && !permissions?.isVerifiedOwner && !isOwner && !responsibleName && (() => {
             const guessHandle = String(ownerGuess.username || '').replace(/^@/, '').toLowerCase();
             const buyerLabelHandle = headerBuyer ? (headerBuyer.label.match(/@(\S+)/)?.[1] || '').toLowerCase() : '';
             const transferBuyerHandle = transferStatus?.buyer?.handle ? String(transferStatus.buyer.handle).replace(/^@/, '').toLowerCase() : '';
@@ -2721,8 +2747,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 }}
                 style={{
                   fontSize: '9px',
-                  fontWeight: 600,
-                  fontFamily: 'monospace',
+                  fontWeight: 400,
+                  fontFamily: "'Courier New', Courier, monospace",
                   display: 'inline-flex',
                   alignItems: 'center',
                   cursor: 'pointer',
@@ -2762,7 +2788,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     borderBottom: '1px solid var(--border)',
                     paddingBottom: '6px'
                   }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '12px' }}>Partner card</div>
+                    <div style={{ fontWeight: 700, fontSize: '11px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Partner card</div>
                     <button
                       type="button"
                       onClick={() => setShowOwnerPopover(false)}
@@ -2770,7 +2796,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         background: 'transparent',
                         border: 'none',
                         cursor: 'pointer',
-                        fontSize: '16px',
+                        fontSize: '12px',
                         color: 'var(--text-muted)',
                       }}
                       aria-label="Close"
@@ -2782,7 +2808,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
                   <div style={{ fontSize: '9px', color: 'var(--text)', lineHeight: 1.4 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                      <div style={{ fontFamily: 'monospace', fontWeight: 800 }}>@{ownerGuess.username}</div>
+                      <div style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>@{ownerGuess.username}</div>
                       <div style={{ color: 'var(--text-muted)' }}>
                         {ownerGuess.role === 'buyer' ? 'Role: buyer' : ownerGuess.role === 'seller' ? 'Role: seller' : 'Role: unknown'}
                       </div>
@@ -2790,7 +2816,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
                     {ownerGuess.from ? (
                       <div style={{ marginTop: 6, color: 'var(--text-muted)' }}>
-                        Prior seller: <span style={{ fontFamily: 'monospace' }}>@{ownerGuess.from}</span>
+                        Prior seller: <span style={{ fontFamily: "'Courier New', Courier, monospace" }}>@{ownerGuess.from}</span>
                       </div>
                     ) : null}
 
@@ -2801,23 +2827,23 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     ) : ownerPopoverData ? (
                       <>
                         <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                          <div style={{ fontWeight: 800, color: 'var(--text-muted)', marginBottom: 6 }}>ACTIVITY</div>
+                          <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>ACTIVITY</div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span style={{ color: 'var(--text-muted)' }}>Auctions won</span>
-                              <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{ownerPopoverData.auctionsWon}</span>
+                              <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{ownerPopoverData.auctionsWon}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span style={{ color: 'var(--text-muted)' }}>Auctions sold</span>
-                              <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{ownerPopoverData.auctionsSold}</span>
+                              <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{ownerPopoverData.auctionsSold}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span style={{ color: 'var(--text-muted)' }}>Comments</span>
-                              <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{ownerPopoverData.commentCount}</span>
+                              <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{ownerPopoverData.commentCount}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span style={{ color: 'var(--text-muted)' }}>Last comment</span>
-                              <span style={{ fontFamily: 'monospace' }}>
+                              <span style={{ fontFamily: "'Courier New', Courier, monospace" }}>
                                 {ownerPopoverData.lastCommentAt ? new Date(ownerPopoverData.lastCommentAt).toLocaleDateString() : '—'}
                               </span>
                             </div>
@@ -2825,22 +2851,22 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         </div>
 
                         <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                          <div style={{ fontWeight: 800, color: 'var(--text-muted)', marginBottom: 6 }}>TRUST</div>
+                          <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>TRUST</div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Claimed</span>
-                            <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                            <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>
                               {ownerPopoverData.claimedByUserId ? 'yes' : 'no'}
                             </span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>First seen</span>
-                            <span style={{ fontFamily: 'monospace' }}>
+                            <span style={{ fontFamily: "'Courier New', Courier, monospace" }}>
                               {ownerPopoverData.firstSeenAt ? new Date(ownerPopoverData.firstSeenAt).toLocaleDateString() : '—'}
                             </span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Last seen</span>
-                            <span style={{ fontFamily: 'monospace' }}>
+                            <span style={{ fontFamily: "'Courier New', Courier, monospace" }}>
                               {ownerPopoverData.lastSeenAt ? new Date(ownerPopoverData.lastSeenAt).toLocaleDateString() : '—'}
                             </span>
                           </div>
@@ -2848,17 +2874,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
                         {/* Portfolio stats */}
                         <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                          <div style={{ fontWeight: 800, color: 'var(--text-muted)', marginBottom: 6 }}>PORTFOLIO</div>
+                          <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>PORTFOLIO</div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Vehicles won + sold</span>
-                            <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                            <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>
                               {(ownerPopoverData.auctionsWon || 0) + (ownerPopoverData.auctionsSold || 0)}
                             </span>
                           </div>
                           {ownerPopoverData.firstSeenAt && ownerPopoverData.lastSeenAt && (
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span style={{ color: 'var(--text-muted)' }}>Trading velocity</span>
-                              <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                              <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>
                                 {(() => {
                                   const first = new Date(ownerPopoverData.firstSeenAt!).getTime();
                                   const last = new Date(ownerPopoverData.lastSeenAt!).getTime();
@@ -2967,7 +2993,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     borderBottom: '1px solid var(--border)',
                     paddingBottom: '6px'
                   }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '12px' }}>Claim This Vehicle</span>
+                    <span style={{ fontWeight: 700, fontSize: '11px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Claim This Vehicle</span>
                     <button
                       type="button"
                       onClick={() => setShowOwnerClaimDropdown(false)}
@@ -2975,7 +3001,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         background: 'transparent',
                         border: 'none',
                         cursor: 'pointer',
-                        fontSize: '16px',
+                        fontSize: '12px',
                         color: 'var(--text-muted)',
                       }}
                     >
@@ -3013,7 +3039,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                             padding: 0,
                             color: 'var(--primary)',
                             cursor: 'pointer',
-                            fontFamily: 'monospace',
+                            fontFamily: "'Courier New', Courier, monospace",
                             fontSize: '8px',
                             textDecoration: 'underline',
                           }}
@@ -3022,7 +3048,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         </button>
                       </p>
                     )}
-                    <p style={{ margin: '0 0 8px 0', fontWeight: 'bold' }}>
+                    <p style={{ margin: '0 0 8px 0', fontWeight: 700, fontSize: '9px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                       Is this you?
                     </p>
                     <ol style={{ margin: '0 0 8px 0', paddingLeft: '16px', fontSize: '9px' }}>
@@ -3046,7 +3072,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         border: 'none',
                         padding: '6px 12px',
                         cursor: 'pointer',
-                        fontWeight: 'bold',
+                        fontWeight: 700,
                         fontSize: '11px',
                       }}
                     >
@@ -3112,7 +3138,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   style={{
                     width: 18,
                     height: 18,
-                    borderRadius: 999,
+                    borderRadius: 0,
                     border: '1px solid var(--border)',
                     background: 'var(--surface)',
                     padding: 0,
@@ -3179,7 +3205,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   gap: 6, 
                   flexShrink: 0,
                   opacity: fadeOpacity,
-                  transition: 'opacity 0.3s ease'
+                  transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
                 {/* Always show platform badge (BaT) as circular favicon icon */}
@@ -3200,7 +3226,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         style={{
                           width: 18,
                           height: 18,
-                          borderRadius: 999,
+                          borderRadius: 0,
                           border: '1px solid var(--border)',
                           background: 'var(--surface)',
                           padding: 0,
@@ -3234,7 +3260,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         style={{
                           width: 18,
                           height: 18,
-                          borderRadius: 999,
+                          borderRadius: 0,
                           border: '1px solid var(--border)',
                           background: 'var(--surface)',
                           padding: 0,
@@ -3282,12 +3308,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         style={{
                           width: 18,
                           height: 18,
-                          borderRadius: 999,
+                          borderRadius: 0,
                           border: '1px solid var(--border)',
                           background: 'var(--surface)',
                           color: 'var(--text)',
                           fontSize: '9px',
-                          fontWeight: 800,
+                          fontWeight: 700,
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -3308,8 +3334,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 <span
                   className="badge badge-secondary"
                   style={{
-                    fontSize: '10px',
-                    fontWeight: 700,
+                    fontSize: '8px',
+                    fontWeight: 600,
+                    fontFamily: 'Arial, Helvetica, sans-serif',
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase' as const,
                     color: (() => {
                       const age = formatAge(auctionPulse.updated_at);
                       if (!age) return undefined;
@@ -3329,7 +3358,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               {timerEndDate && !isSold ? (
                 <span
                   className="badge badge-secondary"
-                  style={{ fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  style={{ fontSize: '8px', fontWeight: 600, fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.1em', textTransform: 'uppercase' as const, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                   title={timerEndDate ? `Time remaining: ${formatRemaining(timerEndDate) || '—'}` : 'Time remaining'}
                 >
                   <span
@@ -3337,13 +3366,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     style={{
                       width: 6,
                       height: 6,
-                      borderRadius: 999,
+                      borderRadius: 0,
                       background: isAuctionLive ? 'var(--error)' : 'var(--text-disabled)',
                       display: 'inline-block',
                       flexShrink: 0
                     }}
                   />
-                  <span style={{ fontFamily: 'monospace' }}>
+                  <span style={{ fontFamily: "'Courier New', Courier, monospace" }}>
                     {formatCountdownClock(timerEndDate) || formatRemaining(timerEndDate) || '—'}
                   </span>
                 </span>
@@ -3361,15 +3390,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 
                 if (reservePrice && currentBid) {
                   return (
-                    <span 
-                      className="badge badge-secondary" 
-                      style={{ 
-                        fontSize: '10px', 
-                        fontWeight: 700,
+                    <span
+                      className="badge badge-secondary"
+                      style={{
+                        fontSize: '8px',
+                        fontWeight: 600,
+                        fontFamily: 'Arial, Helvetica, sans-serif',
+                        letterSpacing: '0.1em',
+                        textTransform: 'uppercase' as const,
                         color: reserveMet ? 'var(--success)' : 'var(--warning)',
                         border: `1px solid ${reserveMet ? 'var(--success)' : 'var(--warning)'}`,
                         backgroundColor: reserveMet ? 'var(--success-bg)' : 'var(--warning-bg)'
-                      }} 
+                      }}
                       title={reserveMet ? 'Reserve met - will sell' : `Reserve: ${formatCurrency(reservePrice)}`}
                     >
                       {reserveMet ? '✓ Reserve Met' : `Reserve: ${formatCurrency(reservePrice)}`}
@@ -3391,15 +3423,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   
                   if (isOutperforming || isUnderperforming) {
                     return (
-                      <span 
-                        className="badge badge-secondary" 
-                        style={{ 
-                          fontSize: '10px', 
-                          fontWeight: 700,
+                      <span
+                        className="badge badge-secondary"
+                        style={{
+                          fontSize: '8px',
+                          fontWeight: 600,
+                          fontFamily: 'Arial, Helvetica, sans-serif',
+                          letterSpacing: '0.1em',
+                          textTransform: 'uppercase' as const,
                           color: isOutperforming ? 'var(--success)' : 'var(--warning)',
                           border: `1px solid ${isOutperforming ? 'var(--success)' : 'var(--warning)'}`,
                           backgroundColor: isOutperforming ? 'var(--success-bg)' : 'var(--warning-bg)'
-                        }} 
+                        }}
                         title={`${isOutperforming ? 'Outperforming' : 'Underperforming'} typical sale by ${Math.abs(diffPct).toFixed(0)}%`}
                       >
                         {isOutperforming ? '↑ Outperforming' : '↓ Underperforming'}
@@ -3430,7 +3465,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   color: 'var(--success)',
                   fontWeight: 600,
                   padding: '1px 8px',
-                  borderRadius: '4px',
+                  borderRadius: 0,
                   cursor: 'pointer',
                   fontSize: '11px'
                 }}
@@ -3452,7 +3487,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     color: 'var(--warning)',
                     fontWeight: 600,
                     padding: '1px 8px',
-                    borderRadius: '4px',
+                    borderRadius: 0,
                     cursor: 'pointer',
                     fontSize: '11px'
                   }}
@@ -3467,7 +3502,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       left: 0,
                       background: 'var(--surface)',
                       border: '1px solid var(--border)',
-                      borderRadius: 6,
+                      borderRadius: 0,
                       boxShadow: '0 8px 20px var(--shadow)',
                       padding: 12,
                       width: 320,
@@ -3477,7 +3512,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     }}
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--warning)', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--warning)', marginBottom: '8px' }}>
                       {pendingReasonText}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--warning)', marginBottom: '12px', lineHeight: '1.5' }}>
@@ -3518,7 +3553,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
                     {similarVehicles.length > 0 && (
                       <div>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--warning)', marginBottom: '8px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--warning)', marginBottom: '8px' }}>
                           Similar Vehicles ({similarVehicles.length}):
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -3528,7 +3563,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                               style={{
                                 background: 'var(--warning-bg)',
                                 border: '1px solid var(--warning)',
-                                borderRadius: '4px',
+                                borderRadius: 0,
                                 padding: '8px',
                                 display: 'flex',
                                 justifyContent: 'space-between',
@@ -3536,7 +3571,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                               }}
                             >
                               <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>
+                                <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text)' }}>
                                   {similar.year} {similar.make} {similar.model}
                                 </div>
                                 <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px' }}>
@@ -3551,7 +3586,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                                     border: '1px solid var(--border)',
                                     color: 'var(--text)',
                                     padding: '4px 8px',
-                                    borderRadius: '4px',
+                                    borderRadius: 0,
                                     fontSize: '9px',
                                     cursor: 'pointer',
                                   }}
@@ -3581,7 +3616,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                                       border: '1px solid var(--warning)',
                                       color: 'var(--bg)',
                                       padding: '4px 8px',
-                                      borderRadius: '4px',
+                                      borderRadius: 0,
                                       fontSize: '9px',
                                       cursor: 'pointer',
                                       fontWeight: 600,
@@ -3651,8 +3686,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                             padding: '4px 8px',
                             cursor: 'pointer',
                             fontSize: '11px',
-                            borderRadius: '3px',
-                            transition: 'all 0.12s ease',
+                            borderRadius: 0,
+                            transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                             textDecoration: 'none',
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -3690,7 +3725,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         style={{
                           fontSize: '9px',
                           fontWeight: 600,
-                          fontFamily: 'monospace',
+                          fontFamily: "'Courier New', Courier, monospace",
                           display: 'inline-flex',
                           alignItems: 'center',
                           cursor: 'pointer',
@@ -3714,7 +3749,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           onClick={(e) => e.stopPropagation()}
                           className="badge badge-secondary"
                           title="Winner (internal profile)"
-                          style={{ fontSize: '10px', fontWeight: 700, textDecoration: 'none', color: 'inherit' }}
+                          style={{ fontSize: '8px', fontWeight: 600, fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.1em', textTransform: 'uppercase' as const, textDecoration: 'none', color: 'inherit' }}
                         >
                           Winner: {batIdentityHref.winner.handle}
                         </Link>
@@ -3729,8 +3764,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           padding: '4px 8px',
                           cursor: 'pointer',
                           fontSize: '11px',
-                          borderRadius: '3px',
-                          transition: 'all 0.12s ease',
+                          borderRadius: 0,
+                          transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                           textDecoration: 'none',
                           display: 'inline-flex',
                           alignItems: 'center'
@@ -3772,7 +3807,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         style={{
                           fontSize: '9px',
                           fontWeight: 600,
-                          fontFamily: 'monospace',
+                          fontFamily: "'Courier New', Courier, monospace",
                           display: 'inline-flex',
                           alignItems: 'center',
                           cursor: 'pointer',
@@ -3799,8 +3834,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         padding: '4px 8px',
                         cursor: 'pointer',
                         fontSize: '11px',
-                        borderRadius: '3px',
-                        transition: 'all 0.12s ease',
+                        borderRadius: 0,
+                        transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                         textDecoration: 'none',
                         display: 'inline-flex',
                         alignItems: 'center'
@@ -3873,7 +3908,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     style={{
                       fontSize: '9px',
                       fontWeight: 600,
-                      fontFamily: 'monospace',
+                      fontFamily: "'Courier New', Courier, monospace",
                       display: 'inline-flex',
                       alignItems: 'center',
                       cursor: 'pointer',
@@ -3902,7 +3937,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     color: 'var(--primary)',
                     fontWeight: 600,
                     padding: '2px 8px',
-                    borderRadius: '4px',
+                    borderRadius: 0,
                     cursor: 'pointer',
                     fontSize: '11px',
                     textDecoration: 'none',
@@ -3923,7 +3958,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   left: 0,
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
-                  borderRadius: 6,
+                  borderRadius: 0,
                   boxShadow: '0 8px 20px var(--shadow)',
                   padding: 12,
                   width: 260,
@@ -3933,13 +3968,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               >
                 <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
                   {ownerProfile.avatar_url && (
-                    <img src={ownerProfile.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid var(--border)' }} />
+                    <img src={ownerProfile.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: 0, border: '1px solid var(--border)' }} />
                   )}
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '9px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '9px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                       {ownerProfile.full_name || ownerProfile.username || 'Profile'}
                     </div>
-                    <div style={{ fontSize: '8px', color: mutedTextColor }}>
+                    <div style={{ fontSize: '8px', fontFamily: "'Courier New', Courier, monospace", color: mutedTextColor }}>
                       @{ownerProfile.username || ownerProfile.id.slice(0, 8)}
                     </div>
                   </div>
@@ -4041,7 +4076,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           padding: 0,
                           margin: 0,
                           cursor: 'pointer',
-                          transition: 'transform 0.1s ease',
+                          transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                           background: 'transparent',
                           border: 'none'
                         }}
@@ -4132,11 +4167,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 border: '2px solid var(--border)',
                 background: 'var(--white)',
                 color: 'var(--text)',
-                fontWeight: 800,
+                fontWeight: 700,
                 padding: '4px 8px',
                 cursor: 'pointer',
                 fontSize: '11px',
-                borderRadius: '3px',
+                borderRadius: 0,
                 textDecoration: 'none',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -4195,14 +4230,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             className="vehicle-price-button"
             title="Click to view price source, confidence, and trend"
           >
-            <div 
-              style={{ 
-                fontSize: '12px', 
-                fontWeight: 700, 
-                color: baseTextColor, 
-                lineHeight: 1, 
-                display: 'flex', 
-                alignItems: 'center', 
+            <div
+              style={{
+                fontSize: '12px',
+                fontWeight: 700,
+                fontFamily: "'Courier New', Courier, monospace",
+                color: baseTextColor,
+                lineHeight: 1,
+                display: 'flex',
+                alignItems: 'center',
                 gap: 6,
                 flexWrap: 'wrap',
                 minWidth: 0,
@@ -4238,7 +4274,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   textDecorationColor: 'var(--text-disabled)',
                   // Blur effect for RNM auctions (reserve not met)
                   filter: isRNM && highBid && String(priceDisplay).toUpperCase() !== 'SOLD' ? 'blur(4px)' : 'none',
-                  transition: 'filter 0.2s ease',
+                  transition: 'filter 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                   flexShrink: 0,
                   minWidth: 0,
                   ...(auctionPulseMs && isAuctionLive ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : {}),
@@ -4282,10 +4318,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 })()}
               </span>
               {priceWasCorrected && (
-                <span style={{ fontSize: '9px', color: 'var(--warning)', fontWeight: 500, flexShrink: 0 }}>*</span>
+                <span style={{ fontSize: '9px', color: 'var(--warning)', fontWeight: 400, flexShrink: 0 }}>*</span>
               )}
               {daysSinceSale !== null && daysSinceSale >= 0 && (
-                <span style={{ fontSize: '9px', color: mutedTextColor, fontWeight: 500, marginLeft: '4px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: '9px', color: mutedTextColor, fontWeight: 400, marginLeft: '4px', flexShrink: 0, whiteSpace: 'nowrap' }}>
                   {(() => {
                     if (daysSinceSale === 0) return 'today';
                     if (daysSinceSale >= 365) return `${Math.floor(daysSinceSale / 365)}y ago`;
@@ -4299,12 +4335,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               {auctionContext.badge && (
                 <span style={{
                   fontSize: '8px',
-                  fontWeight: 700,
+                  fontWeight: 600,
+                  fontFamily: 'Arial, Helvetica, sans-serif',
                   color: auctionContext.badge.color,
                   background: auctionContext.badge.bg,
                   padding: '2px 6px',
-                  borderRadius: '3px',
-                  letterSpacing: '0.5px',
+                  borderRadius: 0,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase' as const,
                   lineHeight: 1,
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
@@ -4316,15 +4354,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               
               {/* VIN Authority Badge: only show when both (a) structurally valid VIN and (b) conclusive proof exists. */}
               {vinLooksValid && vinIsEvidenceBacked && (
-                <span 
+                <span
                   style={{
                     fontSize: '8px',
-                    fontWeight: 700,
+                    fontWeight: 600,
+                    fontFamily: 'Arial, Helvetica, sans-serif',
                     color: 'var(--success)',
                     background: 'var(--success-bg)',
                     padding: '2px 6px',
-                    borderRadius: '3px',
-                    letterSpacing: '0.5px',
+                    borderRadius: 0,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase' as const,
                     lineHeight: 1,
                     cursor: 'pointer',
                     whiteSpace: 'nowrap'
@@ -4347,12 +4387,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 <span
                   style={{
                     fontSize: '8px',
-                    fontWeight: 700,
+                    fontWeight: 600,
+                    fontFamily: 'Arial, Helvetica, sans-serif',
                     color: 'var(--text-secondary)',
                     background: 'var(--info-bg)',
                     padding: '2px 6px',
-                    borderRadius: '3px',
-                    letterSpacing: '0.5px',
+                    borderRadius: 0,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase' as const,
                     lineHeight: 1,
                     whiteSpace: 'nowrap'
                   }}
@@ -4373,7 +4415,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 marginTop: 8,
                 background: 'var(--surface)',
                 border: '1px solid var(--border)',
-                borderRadius: 6,
+                borderRadius: 0,
                 boxShadow: '0 12px 24px var(--shadow)',
                 padding: 12,
                 fontSize: '11px',
@@ -4382,7 +4424,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 zIndex: 950
               }}
             >
-              <div style={{ fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+              <div style={{ fontWeight: 700, fontSize: '11px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                 Price timeline
               </div>
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -4438,22 +4480,24 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
                   return (
                     <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <div style={{ fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: '9px', color: 'var(--text-muted)' }}>
+                      <div style={{ fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', color: 'var(--text-muted)' }}>
                         Deal Analysis
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: 'var(--text-muted)' }}>Nuke Estimate vs Price</span>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: gap > 0 ? 'var(--success)' : gap < 0 ? 'var(--error)' : 'var(--text)' }}>
+                        <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700, color: gap > 0 ? 'var(--success)' : gap < 0 ? 'var(--error)' : 'var(--text)' }}>
                           {gap > 0 ? '+' : ''}{formatCurrency(gap)} ({gapPct > 0 ? '+' : ''}{gapPct.toFixed(0)}%)
                         </span>
                       </div>
                       <div style={{
                         textAlign: 'center',
                         padding: '6px 0',
-                        fontWeight: 800,
-                        fontSize: '12px',
+                        fontWeight: 700,
+                        fontSize: '11px',
+                        fontFamily: 'Arial, Helvetica, sans-serif',
                         color: verdictColor,
-                        letterSpacing: '0.5px',
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
                       }}>
                         {verdict}
                       </div>
@@ -4475,11 +4519,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     style={{
                       padding: '6px 12px',
                       fontSize: '11px',
-                      fontWeight: 'bold',
+                      fontWeight: 700,
                       background: 'var(--accent)',
                       color: 'var(--white)',
                       border: 'none',
-                      borderRadius: '4px',
+                      borderRadius: 0,
                       cursor: 'pointer',
                       textAlign: 'center'
                     }}
@@ -4625,7 +4669,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   style={{
                     width: 34,
                     height: 34,
-                    borderRadius: 3,
+                    borderRadius: 0,
                     border: '1px solid var(--border)',
                     background: 'var(--bg)',
                     padding: 0,
@@ -4650,19 +4694,19 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       style={{
                         width: 6,
                         height: 6,
-                        borderRadius: 999,
+                        borderRadius: 0,
                         background: isAuctionLive ? 'var(--error)' : 'var(--text-disabled)',
                         display: 'inline-block',
                         flexShrink: 0,
                       }}
                     />
-                    <span style={{ fontWeight: 800, fontFamily: 'monospace' }}>LIVE AUCTION</span>
+                    <span style={{ fontWeight: 700, fontFamily: "'Courier New', Courier, monospace" }}>LIVE AUCTION</span>
                     {timerEndDate ? (
-                      <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                      <span style={{ fontFamily: "'Courier New', Courier, monospace", color: 'var(--text-muted)' }}>
                         {formatCountdownClock(timerEndDate, true) || formatRemaining(timerEndDate) || '—'}
                       </span>
                     ) : null}
-                    {typeof currentBid === 'number' ? <span style={{ fontWeight: 800 }}>Bid {formatCurrency(currentBid)}</span> : null}
+                    {typeof currentBid === 'number' ? <span style={{ fontWeight: 700, fontFamily: "'Courier New', Courier, monospace" }}>Bid {formatCurrency(currentBid)}</span> : null}
                     {typeof commentCount === 'number' ? (
                       <span style={{ color: 'var(--text-muted)' }}>{commentCount} comments</span>
                     ) : null}
@@ -4676,13 +4720,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       style={{
                         width: 6,
                         height: 6,
-                        borderRadius: 999,
+                        borderRadius: 0,
                         background: 'var(--error)',
                         display: 'inline-block',
                         flexShrink: 0,
                       }}
                     />
-                    <span style={{ fontWeight: 800, fontFamily: 'monospace' }}>LIVE</span>
+                    <span style={{ fontWeight: 700, fontFamily: "'Courier New', Courier, monospace" }}>LIVE</span>
                     {liveSession?.title ? (
                       <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {String(liveSession.title)}
@@ -4700,7 +4744,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="button button-small"
-                  style={{ fontSize: '11px', fontWeight: 800, fontFamily: 'monospace', whiteSpace: 'nowrap' }}
+                  style={{ fontSize: '11px', fontWeight: 700, fontFamily: "'Courier New', Courier, monospace", whiteSpace: 'nowrap' }}
                   title={platformLabel ? `Watch live (${platformLabel})` : 'Watch live'}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -4714,7 +4758,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="button button-small"
-                  style={{ fontSize: '11px', fontWeight: 800, fontFamily: 'monospace', whiteSpace: 'nowrap' }}
+                  style={{ fontSize: '11px', fontWeight: 700, fontFamily: "'Courier New', Courier, monospace", whiteSpace: 'nowrap' }}
                   title="Open live auction on platform"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -4727,8 +4771,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 className="button button-small"
                 style={{
                   fontSize: '11px',
-                  fontWeight: 800,
-                  fontFamily: 'monospace',
+                  fontWeight: 700,
+                  fontFamily: "'Courier New', Courier, monospace",
                   whiteSpace: 'nowrap',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -4747,7 +4791,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     style={{
                       width: 6,
                       height: 6,
-                      borderRadius: 999,
+                      borderRadius: 0,
                       background: 'var(--error)',
                       display: 'inline-block',
                       flexShrink: 0,
