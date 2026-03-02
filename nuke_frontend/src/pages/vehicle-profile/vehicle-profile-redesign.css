@@ -2565,3 +2565,389 @@ html body * { box-shadow: none !important; }
  * END vehicle-profile-redesign.css
  * v3 Full Parity Override — 2026-03-01
  */
+/* ============================================================
+   PATCH — v3 Remaining Gaps
+   Appended to vehicle-profile-redesign.css
+   Generated: 2026-03-01
+   ============================================================ */
+
+
+/* ============================================================
+   P1. SITE HEADER — Dark #1a1a1a background
+   Scoped via body:has(.vehicle-profile-page) so these overrides
+   only fire when the vehicle profile page is mounted.
+   ============================================================ */
+
+body:has(.vehicle-profile-page) .header-wrapper {
+  height: 32px !important;
+  max-height: 32px !important;
+  min-height: 32px !important;
+  background: #1a1a1a !important;
+  border-bottom: 1px solid #333333 !important;
+  box-shadow: none !important;
+}
+
+body:has(.vehicle-profile-page) .header-content {
+  height: 32px !important;
+  max-height: 32px !important;
+  min-height: 32px !important;
+  background: #1a1a1a !important;
+  box-shadow: none !important;
+}
+
+/* All text inside the header defaults to white, except button elements */
+body:has(.vehicle-profile-page) .header-wrapper *:not(button):not([role="button"]) {
+  color: #ffffff !important;
+}
+
+/* Nuke wordmark */
+body:has(.vehicle-profile-page) .nuke-wordmark {
+  font-family: Arial, Helvetica, sans-serif !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.2em !important;
+  color: #ffffff !important;
+  text-transform: uppercase !important;
+  text-decoration: none !important;
+}
+
+/* Search input inside header */
+body:has(.vehicle-profile-page) .header-wrapper input[type="search"],
+body:has(.vehicle-profile-page) .header-wrapper input[type="text"],
+body:has(.vehicle-profile-page) .header-content input[type="search"],
+body:has(.vehicle-profile-page) .header-content input[type="text"] {
+  background: transparent !important;
+  border: 1px solid #444444 !important;
+  color: #888888 !important;
+  font-size: 9px !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+  text-transform: uppercase !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body:has(.vehicle-profile-page) .header-wrapper input::placeholder,
+body:has(.vehicle-profile-page) .header-content input::placeholder {
+  color: #888888 !important;
+  text-transform: uppercase !important;
+}
+
+
+/* ============================================================
+   P2. VEHICLE PRICE HEADER — Force uppercase
+   ============================================================ */
+
+.vehicle-profile-page .vehicle-price-header,
+.vehicle-profile-page .vehicle-price-header * {
+  text-transform: uppercase !important;
+}
+
+
+/* ============================================================
+   P3. GALLERY — 3-column grid
+   Target the image grid container inside [data-zone-section]
+   ============================================================ */
+
+/* Any grid/flex image container inside a data-zone-section in the right column */
+.vehicle-profile-page [data-zone-section] .image-grid,
+.vehicle-profile-page [data-zone-section] .gallery-grid,
+.vehicle-profile-page [data-zone-section] .images-grid,
+.vehicle-profile-page [data-zone-section] [class*="imageGrid"],
+.vehicle-profile-page [data-zone-section] [class*="image-grid"],
+.vehicle-profile-page [data-zone-section] [class*="gallery-grid"],
+.vehicle-profile-page [data-zone-section] [class*="photo-grid"] {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 3px !important;
+}
+
+/* Broad fallback: any div that directly contains multiple img tags
+   inside a data-zone-section and was previously 2 columns */
+.vehicle-profile-page [data-zone-section] > div:has(> img),
+.vehicle-profile-page [data-zone-section] > div:has(> a > img),
+.vehicle-profile-page [data-zone-section] > div:has(> figure) {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 3px !important;
+}
+
+/* Images inside the gallery grid — fill their cell */
+.vehicle-profile-page [data-zone-section] img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+
+/* ============================================================
+   P4. VEHICLE SUB-HEADER THIRD ROW — Badge styling refinement
+   ============================================================ */
+
+/* Ensure all subheader row text is uppercase */
+.vehicle-profile-page .vehicle-subheader,
+.vehicle-profile-page .vehicle-subheader *,
+.vehicle-profile-page [class*="subheader"],
+.vehicle-profile-page [class*="sub-header"] {
+  text-transform: uppercase !important;
+}
+
+/* Badge elements in the third subheader row */
+.vehicle-profile-page .vehicle-subheader .badge,
+.vehicle-profile-page .vehicle-subheader [class*="badge"],
+.vehicle-profile-page [class*="subheader"] .badge,
+.vehicle-profile-page [class*="subheader"] [class*="badge"],
+.vehicle-profile-page [class*="sub-header"] .badge,
+.vehicle-profile-page [class*="sub-header"] [class*="badge"] {
+  font-family: Arial, Helvetica, sans-serif !important;
+  font-size: 8px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  border: 1px solid currentColor !important;
+  padding: 2px 6px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  display: inline-block !important;
+  line-height: 1.4 !important;
+}
+
+
+/* ============================================================
+   P5. COLLAPSIBLE WIDGET REFINEMENTS (left column)
+   ============================================================ */
+
+.vehicle-profile-page .widget-header,
+.vehicle-profile-page [class*="widget-header"],
+.vehicle-profile-page [class*="widgetHeader"],
+.vehicle-profile-page .collapsible-header,
+.vehicle-profile-page [class*="collapsible-header"],
+.vehicle-profile-page [class*="collapsibleHeader"] {
+  min-height: 32px !important;
+  height: auto !important;
+  padding: 10px 16px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Widget header label text */
+.vehicle-profile-page .widget-header *,
+.vehicle-profile-page [class*="widget-header"] *,
+.vehicle-profile-page [class*="widgetHeader"] *,
+.vehicle-profile-page .collapsible-header *,
+.vehicle-profile-page [class*="collapsible-header"] *,
+.vehicle-profile-page [class*="collapsibleHeader"] * {
+  font-family: Arial, Helvetica, sans-serif !important;
+  font-size: 8px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.12em !important;
+  background: transparent !important;
+}
+
+
+/* ============================================================
+   P6. IMAGE GALLERY CATEGORY HEADERS
+   (EXTERIOR, INTERIOR, etc.)
+   ============================================================ */
+
+.vehicle-profile-page [data-zone-section] .category-header,
+.vehicle-profile-page [data-zone-section] [class*="category-header"],
+.vehicle-profile-page [data-zone-section] [class*="categoryHeader"],
+.vehicle-profile-page [data-zone-section] [class*="gallery-section-label"],
+.vehicle-profile-page [data-zone-section] [class*="galleryLabel"],
+.vehicle-profile-page [data-zone-section] [class*="section-label"],
+.vehicle-profile-page [data-zone-section] [class*="sectionLabel"],
+.vehicle-profile-page [data-zone-section] h2,
+.vehicle-profile-page [data-zone-section] h3,
+.vehicle-profile-page [data-zone-section] h4 {
+  font-family: Arial, Helvetica, sans-serif !important;
+  font-size: 8px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.12em !important;
+  color: #888888 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 8px 0 4px 0 !important;
+  border: none !important;
+}
+
+
+/* ============================================================
+   P7. SCROLLBAR STYLING — 4px thin scrollbars
+   Both columns + the page root
+   ============================================================ */
+
+/* Webkit (Chrome, Safari, Edge) */
+.vehicle-profile-page ::-webkit-scrollbar {
+  width: 4px !important;
+  height: 4px !important;
+}
+
+.vehicle-profile-page ::-webkit-scrollbar-track {
+  background: transparent !important;
+  border: none !important;
+}
+
+.vehicle-profile-page ::-webkit-scrollbar-thumb {
+  background: #dddddd !important;
+  border-radius: 0 !important;
+  border: none !important;
+}
+
+.vehicle-profile-page ::-webkit-scrollbar-thumb:hover {
+  background: #bbbbbb !important;
+}
+
+/* Also target the left column directly (overflow-y: auto) */
+.vehicle-profile-page .left-column::-webkit-scrollbar,
+.vehicle-profile-page [class*="left-col"]::-webkit-scrollbar,
+.vehicle-profile-page [class*="leftCol"]::-webkit-scrollbar,
+.vehicle-profile-page [class*="sidebar"]::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+.vehicle-profile-page .left-column::-webkit-scrollbar-thumb,
+.vehicle-profile-page [class*="left-col"]::-webkit-scrollbar-thumb,
+.vehicle-profile-page [class*="leftCol"]::-webkit-scrollbar-thumb,
+.vehicle-profile-page [class*="sidebar"]::-webkit-scrollbar-thumb {
+  background: #dddddd !important;
+}
+
+.vehicle-profile-page .left-column::-webkit-scrollbar-thumb:hover,
+.vehicle-profile-page [class*="left-col"]::-webkit-scrollbar-thumb:hover,
+.vehicle-profile-page [class*="leftCol"]::-webkit-scrollbar-thumb:hover,
+.vehicle-profile-page [class*="sidebar"]::-webkit-scrollbar-thumb:hover {
+  background: #bbbbbb !important;
+}
+
+/* Firefox */
+.vehicle-profile-page,
+.vehicle-profile-page .left-column,
+.vehicle-profile-page [class*="left-col"],
+.vehicle-profile-page [class*="leftCol"],
+.vehicle-profile-page [class*="sidebar"] {
+  scrollbar-width: thin !important;
+  scrollbar-color: #dddddd transparent !important;
+}
+
+/* ============================================================
+   END OF PATCH
+   ============================================================ */
+
+/* ============================================================
+   P5b. COLLAPSIBLE WIDGET — Production-specific selectors
+   The actual production class is .collapsible-widget--profile
+   ============================================================ */
+
+.vehicle-profile-page .collapsible-widget--profile__header {
+  min-height: 32px !important;
+  padding: 4px 10px !important;
+  background: transparent !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.vehicle-profile-page .collapsible-widget--profile__title {
+  font-family: Arial, Helvetica, sans-serif !important;
+  font-size: 8px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.12em !important;
+  color: #888888 !important;
+}
+
+.vehicle-profile-page .collapsible-widget--profile__chevron {
+  font-size: 8px !important;
+  color: #888888 !important;
+}
+
+.vehicle-profile-page .collapsible-widget--profile {
+  border-bottom: 1px solid #dddddd !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: #ffffff !important;
+}
+
+.vehicle-profile-page .collapsible-widget--profile__content {
+  padding: 10px 16px 14px !important;
+  background: #ffffff !important;
+}
+
+/* Collapsed state */
+.vehicle-profile-page .collapsible-widget--profile.is-collapsed .collapsible-widget--profile__header {
+  border-bottom-color: transparent !important;
+}
+
+.vehicle-profile-page .collapsible-widget--profile.is-collapsed .collapsible-widget--profile__content {
+  display: none !important;
+}
+
+/* ============================================================
+   P8. VEHICLE PRICE HEADER — Exact production class targeting
+   Background: transparent, height compact, text uppercase
+   ============================================================ */
+
+.vehicle-profile-page .vehicle-price-header {
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+}
+
+.vehicle-profile-page .vehicle-price-header span,
+.vehicle-profile-page .vehicle-price-header div,
+.vehicle-profile-page .vehicle-price-header a {
+  text-transform: uppercase !important;
+}
+
+.vehicle-profile-page .vehicle-price-button {
+  font-family: 'Courier New', Courier, monospace !important;
+  font-weight: 700 !important;
+  font-variant-numeric: tabular-nums lining-nums !important;
+}
+
+/* ============================================================
+   P9. HEADER BADGE ROW — vehicle-header-badges
+   ============================================================ */
+
+.vehicle-profile-page .vehicle-header-badges {
+  font-size: 8px !important;
+  text-transform: uppercase !important;
+}
+
+.vehicle-profile-page .vehicle-header-badges > * {
+  font-size: 8px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+}
+
+/* ============================================================
+   P10. ODOMETER — sharp corners, no shadows
+   ============================================================ */
+
+.vehicle-profile-page [class*="odometer"] * {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* ============================================================
+   P11. RIGHT COLUMN IMAGE GRID — force 2-col in narrow right column
+   The right column is 45% wide. At 3-col the images may be too small.
+   Use 2-col as production currently does since right col is narrow.
+   ============================================================ */
+
+.vehicle-profile-page .vehicle-profile-right-column img {
+  border-radius: 0 !important;
+  object-fit: cover !important;
+}
+
+/* ============================================================
+   END OF APPENDED PATCHES
+   ============================================================ */
