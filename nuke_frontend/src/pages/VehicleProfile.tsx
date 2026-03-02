@@ -21,6 +21,8 @@ import type {
   LiveSession
 } from './vehicle-profile/types';
 import '../design-system.css';
+import './vehicle-profile/vehicle-profile-redesign.css';
+const VehicleSubHeader = React.lazy(() => import('./vehicle-profile/VehicleSubHeader'));
 import { type LinkedOrg } from '../components/vehicle/LinkedOrganizations';
 const AddOrganizationRelationship = React.lazy(() => import('../components/vehicle/AddOrganizationRelationship'));
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
@@ -1767,7 +1769,7 @@ const VehicleProfile: React.FC = () => {
 
   // Render vehicle profile (responsive for mobile and desktop)
   return (
-      <div>
+      <div className="vehicle-profile-page">
         {/* Vehicle Header with Price — sticky wrapper */}
         <div ref={vehicleHeaderRef} style={{ position: 'sticky', top: 'var(--header-height, 40px)', zIndex: 900, background: 'var(--surface)' }}>
           <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading header...</div>}>
@@ -1791,6 +1793,11 @@ const VehicleProfile: React.FC = () => {
           </React.Suspense>
         </div>
 
+        {/* Vehicle Sub-Header — sticky badge bar */}
+        <React.Suspense fallback={null}>
+          <VehicleSubHeader vehicle={vehicle} />
+        </React.Suspense>
+
         {/* Banners: BaT data flag, live auction, external auction, orphaned vehicle, merge proposals */}
         <React.Suspense fallback={null}>
           <VehicleBanners
@@ -1805,7 +1812,7 @@ const VehicleProfile: React.FC = () => {
         </React.Suspense>
 
         {/* Hero Image Section */}
-        <div id="vehicle-hero" style={{ scrollMarginTop: 'calc(var(--header-height, 40px) + 88px)' }}>
+        <div id="vehicle-hero" className="hero" style={{ scrollMarginTop: 'calc(var(--header-height, 40px) + 88px)' }}>
           <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading hero image...</div>}>
             <VehicleHeroImage
               leadImageUrl={leadImageUrl}
