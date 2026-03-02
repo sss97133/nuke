@@ -147,6 +147,7 @@ export function VehiclePricingValueCard(props: {
   return (
     <>
       <CollapsibleWidget
+        variant="profile"
         className="vehicle-profile-section"
         title="Pricing & Value"
         defaultCollapsed={false}

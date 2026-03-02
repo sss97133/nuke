@@ -4,10 +4,6 @@ import { supabase } from '../../lib/supabase';
 import { AppLayoutProvider, useAppLayoutContext, usePreventDoubleLayout } from './AppLayoutContext';
 import { getVehicleIdentityParts } from '../../utils/vehicleIdentity';
 import { useSession } from './hooks/useSession';
-import { useNotificationBadge } from './hooks/useNotificationBadge';
-import { useAdminStatus } from './hooks/useAdminStatus';
-import { useCashBalance } from './hooks/useCashBalance';
-import { useQuickVehicles } from './hooks/useQuickVehicles';
 import { UploadStatusBar } from './UploadStatusBar';
 import { AppHeader } from './AppHeader';
 import { VehicleTabBar } from './VehicleTabBar';
@@ -40,17 +36,12 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   primaryAction,
   breadcrumbs
 }) => {
-  const { session, loading, userProfile } = useSession();
-  const userId = session?.user?.id;
-  const unreadCount = useNotificationBadge(userId);
-  const isAdmin = useAdminStatus(userId);
-  const balance = useCashBalance(userId);
-  const { vehicles: quickVehicles, loading: quickVehiclesLoading, load: loadQuickVehicles } = useQuickVehicles();
+  const { session, loading } = useSession();
   const [showNotifications, setShowNotifications] = useState(false);
 
   const location = useLocation();
   const navigate = useNavigate();
-  const { openVehicleTab, activeVehicleId, vehicleTabs } = useAppLayoutContext();
+  const { openVehicleTab, activeVehicleId, vehicleTabs, toolbarSlot } = useAppLayoutContext();
 
   // Sync vehicle tabs with URL
   useEffect(() => {
@@ -174,15 +165,8 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
       <UploadStatusBar />
 
       <AppHeader
-        session={session}
-        userProfile={userProfile}
-        unreadCount={unreadCount}
-        balance={balance}
-        isAdmin={isAdmin}
-        quickVehicles={quickVehicles}
-        quickVehiclesLoading={quickVehiclesLoading}
-        onLoadQuickVehicles={loadQuickVehicles}
         onOpenNotifications={() => setShowNotifications(true)}
+        toolbarSlot={toolbarSlot}
       />
 
       <VehicleTabBar />

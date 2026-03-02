@@ -12,6 +12,7 @@ const EULA = React.lazy(() => import('../pages/EULA'));
 
 // Search: lazy-loaded (chunk retry logic in main.tsx handles failures)
 const Search = React.lazy(() => import('../pages/Search'));
+const BrowseVehicles = React.lazy(() => import('../pages/BrowseVehicles'));
 
 // Lazy load domain modules
 const VehicleRoutes = React.lazy(() => import('./modules/vehicle/routes'));
@@ -126,8 +127,9 @@ export const DomainRoutes = () => {
         <Route path="/test-contributions" element={<Navigate to="/admin/test-contributions" replace />} />
 
         {/* ── Public pages ─────────────────────────────────────────────── */}
-        {/* Search: public browse */}
+        {/* Search + Browse: public */}
         <Route path="/search" element={<Search />} />
+        <Route path="/browse" element={<BrowseVehicles />} />
         {/* Public auction listings */}
         <Route path="/auctions" element={<AuctionMarketplace />} />
         <Route path="/auction/:listingId" element={<AuctionListing />} />

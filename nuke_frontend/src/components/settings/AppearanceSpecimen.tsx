@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { APPEARANCE_PRESETS } from './appearancePresets';
-import { useTheme, type ThemePreference, type AutoThemeSource, type ContrastProfile, type AccentId, type TextScale } from '../../contexts/ThemeContext';
+import { useTheme, type ThemePreference, type AutoThemeSource, type ContrastProfile, type AccentId, type TextScale, type HeaderVariant } from '../../contexts/ThemeContext';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -62,6 +62,8 @@ export default function AppearanceSpecimen() {
     setContrast,
     textScale,
     setTextScale,
+    headerVariant,
+    setHeaderVariant,
     toggleTheme,
   } = useTheme();
 
@@ -127,6 +129,19 @@ export default function AppearanceSpecimen() {
               <option value="1">Standard (100%)</option>
               <option value="1.1">Large (110%)</option>
               <option value="1.2">XL (120%)</option>
+            </select>
+          </label>
+
+          <label className="text-9" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            Header layout
+            <select
+              value={headerVariant}
+              onChange={(e) => setHeaderVariant(e.target.value as HeaderVariant)}
+            >
+              <option value="command-line">Command Line</option>
+              <option value="segmented">Segmented</option>
+              <option value="two-row">Two Row</option>
+              <option value="minimal">Minimal</option>
             </select>
           </label>
 

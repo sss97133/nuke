@@ -434,8 +434,8 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
             </button>
           )}
 
-          {/* Always allow title submission for verification (even if uploader) */}
-          {session && (
+          {/* Title submission for verification — only show when user is NOT already the uploader/owner */}
+          {session && session?.user?.id !== (vehicle?.uploaded_by || vehicle?.user_id) && (
             <button
               className="button button-primary button-small"
               onClick={() => setShowOwnershipForm(true)}

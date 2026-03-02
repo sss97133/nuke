@@ -1817,11 +1817,6 @@ const VehicleProfile: React.FC = () => {
           />
         </React.Suspense>
 
-        {/* Badge Bar — V3 identity + auction badges */}
-        <React.Suspense fallback={null}>
-          <VehicleBadgeBar vehicle={vehicle} auctionPulse={auctionPulse} liveSession={liveSession} />
-        </React.Suspense>
-
         {/* Barcode Timeline — sticky, 10px collapsed, expandable to heatmap */}
         <React.Suspense fallback={null}>
           <BarcodeTimeline vehicle={vehicle} timelineEvents={timelineEvents} />

@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, ReactElement } from 'react';
 
 export type VehicleTab = {
   vehicleId: string;
@@ -13,6 +13,9 @@ interface AppLayoutContextValue {
   openVehicleTab: (tab: VehicleTab) => void;
   closeVehicleTab: (vehicleId: string) => void;
   setActiveVehicleTab: (vehicleId?: string) => void;
+  /** Contextual toolbar rendered inside the header-wrapper (sticky, auto-measured). */
+  toolbarSlot: ReactElement | null;
+  setToolbarSlot: (content: ReactElement | null) => void;
 }
 
 const AppLayoutContext = createContext<AppLayoutContextValue>({
@@ -22,11 +25,14 @@ const AppLayoutContext = createContext<AppLayoutContextValue>({
   openVehicleTab: () => undefined,
   closeVehicleTab: () => undefined,
   setActiveVehicleTab: () => undefined,
+  toolbarSlot: null,
+  setToolbarSlot: () => {},
 });
 
 export const AppLayoutProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [vehicleTabs, setVehicleTabs] = useState<VehicleTab[]>([]);
   const [activeVehicleId, setActiveVehicleId] = useState<string | undefined>(undefined);
+  const [toolbarSlot, setToolbarSlot] = useState<ReactElement | null>(null);
 
   const openVehicleTab = useCallback((tab: VehicleTab) => {
     const vid = String(tab.vehicleId || '').trim();
@@ -64,8 +70,10 @@ export const AppLayoutProvider: React.FC<{ children: ReactNode }> = ({ children 
       openVehicleTab,
       closeVehicleTab,
       setActiveVehicleTab,
+      toolbarSlot,
+      setToolbarSlot,
     };
-  }, [vehicleTabs, activeVehicleId, openVehicleTab, closeVehicleTab, setActiveVehicleTab]);
+  }, [vehicleTabs, activeVehicleId, openVehicleTab, closeVehicleTab, setActiveVehicleTab, toolbarSlot]);
 
   return (
     <AppLayoutContext.Provider value={value}>

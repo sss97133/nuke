@@ -65,11 +65,95 @@ function jsonVal(html: string, key: string): string | null {
 
 /** Extract mileage integer from strings like "180K miles", "88,000 miles" */
 function parseMileage(s: string): number | null {
-  const km = s.match(/^([\d,.]+)\s*[Kk]\s*(?:miles?)?$/);
+  const km = s.match(/([\d,.]+)\s*[Kk]\s*(?:miles?)?/);
   if (km) return Math.round(parseFloat(km[1].replace(/,/g, "")) * 1000);
   const plain = s.match(/([\d,]+)\s*miles?/i);
   if (plain) return parseInt(plain[1].replace(/,/g, ""), 10);
   return null;
+}
+
+/** Extract structured vehicle details from seller descriptions */
+function parseDescription(desc: string): {
+  vin: string | null;
+  engine: string | null;
+  trim: string | null;
+  body_style: string | null;
+  title_status: string | null;
+  drivetrain: string | null;
+  mileage: number | null;
+  transmission: string | null;
+  exterior_color: string | null;
+} {
+  const result: ReturnType<typeof parseDescription> = {
+    vin: null, engine: null, trim: null, body_style: null,
+    title_status: null, drivetrain: null, mileage: null,
+    transmission: null, exterior_color: null,
+  };
+
+  // VIN — 17 alphanumeric, no I/O/Q
+  const vinMatch = desc.match(/\b([A-HJ-NPR-Z0-9]{17})\b/);
+  if (vinMatch) result.vin = vinMatch[1];
+
+  // Engine
+  const enginePatterns = [
+    /\b(\d{3})\s*(ci|cubic\s*inch|cu\.?\s*in)/i,          // "350 ci"
+    /\b(small|big)\s*block\s*(\d{3})?/i,                   // "small block 350"
+    /\b(\d\.\d)\s*[lL]\b/,                                 // "5.7L"
+    /\b(v-?[468]|inline[- ]?[46]|flat[- ]?[46]|i[46])\b/i, // "V8", "inline 6"
+    /\b(\d{3,4})\s*(v8|v6|v4)\b/i,                         // "350 V8"
+    /\b(\d{3})\s*(motor|engine)\b/i,                       // "400 motor", "350 engine"
+    /\b(ls\d|lt\d|sbc|bbc|hemi|flathead|windsor|cleveland|coyote|vortec|ecoboost)\b/i,
+  ];
+  for (const p of enginePatterns) {
+    const m = desc.match(p);
+    if (m) { result.engine = m[0].trim(); break; }
+  }
+
+  // Trim / package
+  const trimPatterns = [
+    /\b(scottsdale|cheyenne|silverado|custom\s*deluxe|sierra\s*classic|sierra\s*grande|high\s*sierra|big\s*10)\b/i,
+    /\b(sport|gt|ss|rs|z28|z\/28|rt|r\/t|srt|sr5|limited|xlt|lariat|king\s*ranch|laramie|sle|slt)\b/i,
+    /\b(base|standard|deluxe|special|custom)\b/i,
+  ];
+  for (const p of trimPatterns) {
+    const m = desc.match(p);
+    if (m) { result.trim = m[1].trim(); break; }
+  }
+
+  // Body style
+  const bodyPatterns = [
+    /\b(short\s*(?:bed|box)|long\s*(?:bed|box)|stepside|fleetside|step\s*side|fleet\s*side)\b/i,
+    /\b(crew\s*cab|ext(?:ended)?\s*cab|regular\s*cab|single\s*cab|quad\s*cab|super\s*cab)\b/i,
+    /\b(convertible|hardtop|fastback|hatchback|wagon|coupe|sedan|roadster)\b/i,
+  ];
+  for (const p of bodyPatterns) {
+    const m = desc.match(p);
+    if (m) { result.body_style = m[1].trim(); break; }
+  }
+
+  // Title status
+  if (/\bclean\s*title\b/i.test(desc)) result.title_status = "clean";
+  else if (/\bsalvage\s*title\b/i.test(desc)) result.title_status = "salvage";
+  else if (/\brebuilt\s*title\b/i.test(desc)) result.title_status = "rebuilt";
+  else if (/\bno\s*title\b/i.test(desc)) result.title_status = "none";
+
+  // Drivetrain
+  if (/\b4x4\b|4wd\b|four\s*wheel\s*drive\b/i.test(desc)) result.drivetrain = "4WD";
+  else if (/\b2wd\b|2x4\b|two\s*wheel\s*drive\b/i.test(desc)) result.drivetrain = "2WD";
+  else if (/\bawd\b|all\s*wheel\s*drive\b/i.test(desc)) result.drivetrain = "AWD";
+
+  // Mileage
+  result.mileage = parseMileage(desc);
+
+  // Transmission
+  const transMatch = desc.match(/\b(automatic|manual|standard|5[- ]?speed|4[- ]?speed|3[- ]?speed|th350|th400|turbo\s*350|turbo\s*400|muncie|t5|t56|nv3500|nv4500|700r4|4l60|4l80|powerglide)\b/i);
+  if (transMatch) result.transmission = transMatch[1].trim().toLowerCase();
+
+  // Exterior color
+  const colorMatch = desc.match(/\b(black|white|red|blue|green|yellow|orange|silver|gray|grey|brown|tan|beige|gold|maroon|burgundy|cream|bronze|copper|teal|purple)\b/i);
+  if (colorMatch) result.exterior_color = colorMatch[1].toLowerCase();
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -398,14 +482,20 @@ Deno.serve(async (req) => {
     }
 
     // ---- Batch refinement ----
-    const limit = Math.min(batch_size || 10, 25);
+    // Phase 1: Parse descriptions we already have from the GraphQL scrape
+    //          and propagate structured data to the vehicle record.
+    //          No external fetching needed — we're the expert, we just
+    //          need to read what sellers already told us.
+    const limit = Math.min(batch_size || 50, 200);
 
+    // Prioritize listings that have descriptions (more to extract from)
     const { data: listings, error: fetchError } = await supabase
       .from("marketplace_listings")
-      .select("facebook_id, url, title")
-      .or("description.is.null,mileage.is.null,refined_at.is.null")
-      .eq("platform", "facebook_marketplace")
+      .select("facebook_id, url, title, vehicle_id, description, mileage, transmission, exterior_color, all_images, price")
+      .is("refined_at", null)
       .eq("status", "active")
+      .not("vehicle_id", "is", null)
+      .not("description", "is", null)
       .order("first_seen_at", { ascending: false })
       .limit(limit);
 
@@ -417,48 +507,72 @@ Deno.serve(async (req) => {
       );
     }
 
-    const results: { facebook_id: string; success: boolean; error?: string }[] = [];
+    const results: { facebook_id: string; success: boolean; fields_extracted?: number; error?: string }[] = [];
 
     for (const listing of listings) {
       try {
-        const refined = await extractFullListing(listing.url);
+        const desc = listing.description || "";
+        const titleParsed = listing.title ? parseTitle(listing.title) : { year: null, make: null, model: null, cleanPrice: null };
 
-        const updates: Record<string, unknown> = {
+        // Parse structured data from description
+        const parsed = desc ? parseDescription(desc) : null;
+
+        // Contact info from description
+        const { phones, emails } = extractContactInfo(desc);
+
+        // ─── Update the listing record ──────────────────────────
+        const listingUpdates: Record<string, unknown> = {
           refined_at: new Date().toISOString(),
         };
-        if (refined.title) updates.title = refined.title;
-        if (refined.parsed_year) {
-          updates.parsed_year = refined.parsed_year;
-          updates.extracted_year = refined.parsed_year;
-        }
-        if (refined.parsed_make) {
-          updates.parsed_make = refined.parsed_make.toLowerCase();
-          updates.extracted_make = refined.parsed_make.toLowerCase();
-        }
-        if (refined.parsed_model) {
-          updates.parsed_model = refined.parsed_model.toLowerCase();
-          updates.extracted_model = refined.parsed_model.toLowerCase();
-        }
-        if (refined.description) updates.description = refined.description;
-        if (refined.mileage) {
-          updates.mileage = refined.mileage;
-          updates.extracted_mileage = refined.mileage;
-        }
-        if (refined.transmission) updates.transmission = refined.transmission;
-        if (refined.all_images.length > 0) updates.all_images = refined.all_images;
-        if (refined.contact_phones.length > 0 || refined.contact_emails.length > 0) {
-          updates.contact_info = {
-            phones: refined.contact_phones,
-            emails: refined.contact_emails,
-          };
+        if (parsed?.mileage && !listing.mileage) listingUpdates.mileage = parsed.mileage;
+        if (parsed?.transmission && !listing.transmission) listingUpdates.transmission = parsed.transmission;
+        if (parsed?.exterior_color && !listing.exterior_color) listingUpdates.exterior_color = parsed.exterior_color;
+        if (phones.length > 0 || emails.length > 0) {
+          listingUpdates.contact_info = { phones, emails };
         }
 
         await supabase
           .from("marketplace_listings")
-          .update(updates)
+          .update(listingUpdates)
           .eq("facebook_id", listing.facebook_id);
 
-        results.push({ facebook_id: listing.facebook_id, success: true });
+        // ─── Propagate enrichments to the linked vehicle ─────────
+        let fieldsExtracted = 0;
+        if (listing.vehicle_id) {
+          const vehicleUpdates: Record<string, unknown> = {};
+
+          if (parsed?.vin) { vehicleUpdates.vin = parsed.vin; fieldsExtracted++; }
+          if (parsed?.trim) { vehicleUpdates.trim = parsed.trim; fieldsExtracted++; }
+          if (parsed?.drivetrain) { vehicleUpdates.drivetrain = parsed.drivetrain; fieldsExtracted++; }
+          if (parsed?.mileage) { vehicleUpdates.mileage = parsed.mileage; fieldsExtracted++; }
+          if (parsed?.transmission) { vehicleUpdates.transmission = parsed.transmission; fieldsExtracted++; }
+          if (parsed?.exterior_color) { vehicleUpdates.color = parsed.exterior_color; fieldsExtracted++; }
+          if (desc) { vehicleUpdates.description = desc; fieldsExtracted++; }
+
+          // Enrich origin_metadata with engine, body style, title status, contact info
+          const { data: existing } = await supabase
+            .from("vehicles")
+            .select("origin_metadata")
+            .eq("id", listing.vehicle_id)
+            .maybeSingle();
+          const meta = (existing?.origin_metadata as Record<string, unknown>) || {};
+          if (parsed?.engine) { meta.engine = parsed.engine; fieldsExtracted++; }
+          if (parsed?.body_style) { meta.body_style = parsed.body_style; fieldsExtracted++; }
+          if (parsed?.title_status) { meta.title_status = parsed.title_status; fieldsExtracted++; }
+          if (phones.length > 0) meta.contact_phones = phones;
+          if (emails.length > 0) meta.contact_emails = emails;
+          meta.refined_at = new Date().toISOString();
+          vehicleUpdates.origin_metadata = meta;
+
+          if (Object.keys(vehicleUpdates).length > 0) {
+            await supabase
+              .from("vehicles")
+              .update(vehicleUpdates)
+              .eq("id", listing.vehicle_id);
+          }
+        }
+
+        results.push({ facebook_id: listing.facebook_id, success: true, fields_extracted: fieldsExtracted });
       } catch (e: any) {
         results.push({
           facebook_id: listing.facebook_id,
@@ -466,15 +580,15 @@ Deno.serve(async (req) => {
           error: e.message,
         });
       }
-
-      // Polite delay between item-page fetches
-      await new Promise((r) => setTimeout(r, 1500 + Math.random() * 1000));
     }
+
+    const totalFields = results.reduce((sum, r) => sum + (r.fields_extracted || 0), 0);
 
     return new Response(
       JSON.stringify({
         processed: results.length,
         successful: results.filter((r) => r.success).length,
+        total_fields_extracted: totalFields,
         results,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

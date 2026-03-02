@@ -1,158 +1,365 @@
-import React, { useState, useCallback } from 'react';
+/**
+ * GarageTab.tsx
+ * Redesigned garage tab following the NUKE design system.
+ *
+ * Features:
+ *  - Toolbar: vehicle count, total value, view/sort/filter toggles, ADD VEHICLE
+ *  - Sections grouped by relationship type with counts
+ *  - Grid / List / Compact view modes
+ *  - Skeleton loading (static rectangles, no animation)
+ *  - Utilitarian empty state (no illustration)
+ */
+
+import React, { useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
-import { useVehiclesDashboard } from '../../hooks/useVehiclesDashboard';
-import GarageVehicleCard from '../vehicles/GarageVehicleCard';
-import '../../design-system.css';
+import type { ViewMode, FilterMode, GarageSection, VehiclesDashboardState } from '../../hooks/useVehiclesDashboard';
+import { GarageVehicleCard } from '../vehicles/GarageVehicleCard';
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+// ---------------------------------------------------------------------------
+// Design tokens (inline, referencing CSS vars)
+// ---------------------------------------------------------------------------
 
-export default function GarageTab() {
-  const { user, loading: authLoading } = useAuth();
-  const { data, loading, error, refresh } = useVehiclesDashboard(user?.id);
-  const [showMissingFields, setShowMissingFields] = useState(true);
+const FONT_BODY = 'Arial, sans-serif';
+const FONT_MONO = "'Courier New', Courier, monospace";
 
-  const handleRefresh = useCallback(() => { refresh(); }, [refresh]);
+const s = {
+  wrap: {
+    fontFamily: FONT_BODY,
+    fontSize: '9px',
+    color: 'var(--text, #2a2a2a)',
+    backgroundColor: 'var(--bg, #f5f5f5)',
+    minHeight: '100%',
+  } as React.CSSProperties,
 
-  if (authLoading) {
-    return <div style={{ padding: 'var(--space-5)', color: 'var(--text-muted)', fontSize: 'var(--font-size)' }}>Loading...</div>;
-  }
+  content: {
+    padding: '12px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 16,
+  } as React.CSSProperties,
 
-  if (!user) {
-    return (
-      <div style={{ padding: 'var(--space-10)', textAlign: 'center', fontFamily: 'var(--font-family)' }}>
-        <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: 'var(--space-3)' }}>Sign in to see your garage</div>
-        <div style={{ fontSize: 'var(--font-size)', color: 'var(--text-muted)', marginBottom: 'var(--space-5)' }}>
-          Track your vehicles, monitor health scores, and manage your collection.
-        </div>
-        <Link to="/login" style={{
-          display: 'inline-block',
-          padding: '6px 16px',
-          background: 'var(--primary)',
-          color: 'var(--white)',
-          textDecoration: 'none',
-          fontSize: 'var(--font-size)',
-          fontFamily: 'var(--font-family)',
-          border: '1px solid var(--border-dark)',
-        }}>
-          Sign In
-        </Link>
-      </div>
-    );
-  }
+  sectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  } as React.CSSProperties,
 
-  if (loading) {
-    return (
-      <div style={{ padding: 'var(--space-5)' }}>
-        {/* Skeleton rows */}
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            style={{
-              height: 80,
-              marginBottom: 'var(--space-4)',
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 2,
-              opacity: 0.8,
-            }}
-          />
-        ))}
-      </div>
-    );
-  }
+  sectionTitle: {
+    fontSize: '9px',
+    fontWeight: 700,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    color: 'var(--text, #2a2a2a)',
+  } as React.CSSProperties,
 
-  if (error) {
-    return (
-      <div style={{ padding: 'var(--space-5)', fontSize: 'var(--font-size)' }}>
-        <span style={{ color: 'var(--error)' }}>Error loading garage: {error.message}</span>
-        <button onClick={handleRefresh} style={{ marginLeft: 'var(--space-3)', padding: '2px 8px', fontSize: 'var(--font-size)', fontFamily: 'var(--font-family)', cursor: 'pointer' }}>
-          Retry
-        </button>
-      </div>
-    );
-  }
+  sectionCount: {
+    fontSize: '8px',
+    fontFamily: FONT_MONO,
+    fontVariantNumeric: 'tabular-nums lining-nums' as const,
+    color: 'var(--text-secondary, #666666)',
+    border: '2px solid var(--border, #bdbdbd)',
+    padding: '0 4px',
+    borderRadius: 0,
+  } as React.CSSProperties,
 
-  const vehicles = data?.my_vehicles || [];
-  const summary = data?.summary;
-  const totalValue = vehicles.reduce((sum, v) => sum + (v.current_value || v.purchase_price || 0), 0);
+  sectionDivider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'var(--border, #bdbdbd)',
+  } as React.CSSProperties,
 
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+    gap: 8,
+  } as React.CSSProperties,
+
+  list: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 4,
+  } as React.CSSProperties,
+
+  compact: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 2,
+  } as React.CSSProperties,
+};
+
+// ---------------------------------------------------------------------------
+// Section header
+// ---------------------------------------------------------------------------
+
+function SectionHeaderRow({ title, count }: { title: string; count: number }) {
   return (
-    <div style={{ padding: 'var(--space-4)', fontFamily: 'var(--font-family)' }}>
-      {/* Stats row */}
-      <div style={{
-        display: 'flex',
-        gap: 'var(--space-5)',
-        alignItems: 'center',
-        padding: 'var(--space-3) var(--space-4)',
-        background: 'var(--grey-100)',
-        border: '1px solid var(--border-light)',
-        marginBottom: 'var(--space-4)',
-        flexWrap: 'wrap',
-      }}>
-        <Stat label="Vehicles" value={String(summary?.total_my_vehicles || vehicles.length)} />
-        {totalValue > 0 && <Stat label="Est. Value" value={formatCurrency(totalValue)} />}
-        <Stat label="Active (30d)" value={String(summary?.recent_activity_30d || 0)} />
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
-          <label style={{ fontSize: 'var(--font-size)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-            <input type="checkbox" checked={showMissingFields} onChange={e => setShowMissingFields(e.target.checked)} />
-            Show missing
-          </label>
-          <Link to="/vehicle/add" style={{
-            padding: '3px 10px',
-            background: 'var(--primary)',
-            color: 'var(--white)',
-            textDecoration: 'none',
-            fontSize: 'var(--font-size)',
-            fontFamily: 'var(--font-family)',
-            border: '1px solid var(--border-dark)',
-          }}>
-            + Add Vehicle
-          </Link>
-        </div>
-      </div>
-
-      {/* Vehicle grid */}
-      {vehicles.length === 0 ? (
-        <div style={{ padding: 'var(--space-10)', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size)' }}>
-          No vehicles yet. <Link to="/vehicle/add" style={{ color: 'var(--text)' }}>Add your first vehicle</Link>.
-        </div>
-      ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-          gap: 'var(--space-4)',
-        }}>
-          {vehicles.map(v => (
-            <GarageVehicleCard
-              key={v.vehicle_id}
-              vehicle={{
-                id: v.vehicle_id,
-                year: v.year,
-                make: v.make,
-                model: v.model,
-                vin: v.vin,
-                primary_image_url: v.primary_image_url,
-                current_value: v.current_value,
-                purchase_price: v.purchase_price,
-              }}
-              relationship={{ relationshipType: (v.ownership_role as any) || 'owned' }}
-              onRefresh={handleRefresh}
-              showMissingFields={showMissingFields}
-            />
-          ))}
-        </div>
-      )}
+    <div style={s.sectionHeader}>
+      <span style={s.sectionTitle}>{title}</span>
+      <span style={s.sectionCount}>{count}</span>
+      <div style={s.sectionDivider} />
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+// ---------------------------------------------------------------------------
+// Vehicle grid / list for one section
+// ---------------------------------------------------------------------------
+
+function SectionVehicles({
+  section,
+  viewMode,
+  onRefresh,
+}: {
+  section: GarageSection;
+  viewMode: ViewMode;
+  onRefresh: () => void;
+}) {
+  const containerStyle =
+    viewMode === 'GRID' ? s.grid : viewMode === 'LIST' ? s.list : s.compact;
+
   return (
-    <div style={{ display: 'flex', gap: '4px', alignItems: 'baseline' }}>
-      <span style={{ fontSize: 'var(--font-size)', color: 'var(--text-muted)' }}>{label}:</span>
-      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>{value}</span>
+    <div style={containerStyle}>
+      {section.vehicles.map((v) => (
+        <GarageVehicleCard
+          key={v.id}
+          vehicle={v}
+          viewMode={viewMode}
+          onRefresh={onRefresh}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Loading skeleton
+// ---------------------------------------------------------------------------
+
+function LoadingSkeleton({ viewMode }: { viewMode: ViewMode }) {
+  const count = viewMode === 'COMPACT' ? 8 : 6;
+  const heights: Record<ViewMode, number> = { GRID: 300, LIST: 88, COMPACT: 32 };
+  const containerStyle = viewMode === 'GRID' ? s.grid : viewMode === 'LIST' ? s.list : s.compact;
+
+  return (
+    <div style={s.content}>
+      <div style={containerStyle}>
+        {Array.from({ length: count }).map((_, i) => (
+          <div
+            key={i}
+            style={{
+              height: heights[viewMode],
+              backgroundColor: 'var(--border, #bdbdbd)',
+              borderRadius: 0,
+              border: '2px solid var(--border, #bdbdbd)',
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Empty state
+// ---------------------------------------------------------------------------
+
+function EmptyState({
+  filterMode,
+  onClearFilter,
+}: {
+  filterMode: FilterMode;
+  onClearFilter: () => void;
+}) {
+  const isFiltered = filterMode !== 'ALL';
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '48px 24px',
+        gap: 12,
+        border: '2px solid var(--border, #bdbdbd)',
+        margin: '12px',
+      }}
+    >
+      <span
+        style={{
+          fontSize: '11px',
+          fontWeight: 700,
+          textTransform: 'uppercase' as const,
+          letterSpacing: '0.5px',
+          color: 'var(--text, #2a2a2a)',
+        }}
+      >
+        {isFiltered ? `NO ${filterMode} VEHICLES` : 'NO VEHICLES'}
+      </span>
+      <span
+        style={{
+          fontSize: '9px',
+          color: 'var(--text-secondary, #666666)',
+          textAlign: 'center',
+          maxWidth: 320,
+          lineHeight: 1.5,
+        }}
+      >
+        {isFiltered
+          ? `No vehicles match the "${filterMode}" filter.`
+          : 'Add your first vehicle to start building your garage.'}
+      </span>
+      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+        {isFiltered && (
+          <button
+            onClick={onClearFilter}
+            style={{
+              fontSize: '9px',
+              fontFamily: FONT_BODY,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.5px',
+              fontWeight: 700,
+              padding: '5px 12px',
+              border: '2px solid var(--border, #bdbdbd)',
+              borderRadius: 0,
+              backgroundColor: 'transparent',
+              color: 'var(--text, #2a2a2a)',
+              cursor: 'pointer',
+              transition: 'border-color 0.12s ease',
+            }}
+          >
+            CLEAR FILTER
+          </button>
+        )}
+        <Link to="/vehicle/add" style={{ textDecoration: 'none' }}>
+          <div
+            style={{
+              fontSize: '9px',
+              fontFamily: FONT_BODY,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.5px',
+              fontWeight: 700,
+              padding: '5px 12px',
+              border: '2px solid var(--text, #2a2a2a)',
+              borderRadius: 0,
+              backgroundColor: 'var(--text, #2a2a2a)',
+              color: 'var(--bg, #f5f5f5)',
+              whiteSpace: 'nowrap' as const,
+            }}
+          >
+            ADD VEHICLE
+          </div>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Error state
+// ---------------------------------------------------------------------------
+
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '32px 24px',
+        gap: 10,
+        border: '2px solid var(--error, #d13438)',
+        margin: '12px',
+      }}
+    >
+      <span
+        style={{
+          fontSize: '9px',
+          fontWeight: 700,
+          textTransform: 'uppercase' as const,
+          letterSpacing: '0.5px',
+          color: 'var(--error, #d13438)',
+        }}
+      >
+        FAILED TO LOAD GARAGE
+      </span>
+      <span style={{ fontSize: '9px', color: 'var(--text-secondary, #666666)', fontFamily: FONT_MONO }}>
+        {message}
+      </span>
+      <button
+        onClick={onRetry}
+        style={{
+          marginTop: 4,
+          fontSize: '9px',
+          fontFamily: FONT_BODY,
+          textTransform: 'uppercase' as const,
+          letterSpacing: '0.5px',
+          fontWeight: 700,
+          padding: '5px 12px',
+          border: '2px solid var(--error, #d13438)',
+          borderRadius: 0,
+          backgroundColor: 'transparent',
+          color: 'var(--error, #d13438)',
+          cursor: 'pointer',
+        }}
+      >
+        RETRY
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
+export default function GarageTab({ dashboard }: { dashboard: VehiclesDashboardState }) {
+  const {
+    sections,
+    vehicles,
+    isLoading,
+    error,
+    viewMode,
+    filterMode,
+    setFilterMode,
+    refresh,
+  } = dashboard;
+
+  const clearFilter = useCallback(() => setFilterMode('ALL'), [setFilterMode]);
+
+  const showSections = sections.length > 1;
+
+  return (
+    <div style={s.wrap}>
+      {isLoading ? (
+        <LoadingSkeleton viewMode={viewMode} />
+      ) : error ? (
+        <ErrorState message={error} onRetry={refresh} />
+      ) : vehicles.length === 0 ? (
+        <EmptyState filterMode={filterMode} onClearFilter={clearFilter} />
+      ) : (
+        <div style={s.content}>
+          {showSections
+            ? sections.map((section) => (
+                <div key={section.relationship_type}>
+                  <SectionHeaderRow
+                    title={section.relationship_type}
+                    count={section.vehicles.length}
+                  />
+                  <SectionVehicles section={section} viewMode={viewMode} onRefresh={refresh} />
+                </div>
+              ))
+            : sections.map((section) => (
+                <SectionVehicles
+                  key={section.relationship_type}
+                  section={section}
+                  viewMode={viewMode}
+                  onRefresh={refresh}
+                />
+              ))}
+        </div>
+      )}
     </div>
   );
 }

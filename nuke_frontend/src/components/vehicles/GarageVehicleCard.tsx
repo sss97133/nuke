@@ -1,802 +1,757 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * GarageVehicleCard.tsx
+ * Redesigned vehicle card following the NUKE design system.
+ *
+ * Design rules enforced:
+ *   - 0px border-radius everywhere
+ *   - No backdrop-filter, no box-shadow, no translateY
+ *   - Hover = border-color change to --border-focus only
+ *   - All labels ALL CAPS, 8px, letter-spacing 0.5px
+ *   - Monospace (Courier New) for all numeric data
+ *   - Health bar as 2px progress bar below content
+ *   - Solid opaque backgrounds — no blur overlays
+ */
+
+import React, { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import type { GarageVehicle, RelationshipType, ViewMode } from '../../hooks/useVehiclesDashboard';
 import VehicleThumbnail from '../VehicleThumbnail';
-import VehicleRelationshipMetrics from './VehicleRelationshipMetrics';
-import VehicleValueEditModal from './VehicleValueEditModal';
-import { handleExpectedError } from '../../utils/errorCache';
-import '../../design-system.css';
 
-interface GarageVehicleCardProps {
-  vehicle: any;
-  relationship?: {
-    relationshipType: 'owned' | 'contributing' | 'interested' | 'discovered' | 'curated' | 'consigned' | 'previously_owned';
-    role?: string;
-    context?: string;
-  };
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+
+export interface GarageVehicleCardProps {
+  vehicle: GarageVehicle;
+  viewMode?: ViewMode;
   onRefresh?: () => void;
-  onEditRelationship?: (vehicleId: string, currentRelationship: string | null) => void;
-  onQuickEdit?: (vehicleId: string, field: string) => void;
-  showMissingFields?: boolean;
 }
 
-const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ 
-  vehicle, 
-  relationship, 
-  onRefresh, 
-  onEditRelationship,
-  onQuickEdit,
-  showMissingFields = true
-}) => {
-  const [liveData, setLiveData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [organizationRelationships, setOrganizationRelationships] = useState<any[]>([]);
-  const [session, setSession] = useState<any>(null);
-  const [showValueTooltip, setShowValueTooltip] = useState(false);
-  const [showValueModal, setShowValueModal] = useState(false);
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-  const FEATURE_VEHICLE_ANALYTICS_UNAVAILABLE_KEY = 'featureVehicleAnalyticsUnavailable';
+function formatVehicleTitle(v: GarageVehicle): string {
+  return [v.year, v.make, v.model, v.trim]
+    .filter(Boolean)
+    .join(' ')
+    .toUpperCase();
+}
 
-  function isMissingResourceError(err: any): boolean {
-    const code = err?.code ? String(err.code) : '';
-    const status = typeof err?.status === 'number' ? err.status : undefined;
-    const message = err?.message ? String(err.message) : '';
-    return (
-      status === 404 ||
-      code === 'PGRST116' ||
-      code === 'PGRST301' ||
-      code === '42P01' ||
-      message.toLowerCase().includes('does not exist') ||
-      message.toLowerCase().includes('not found')
-    );
+function formatCurrency(n: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(n);
+}
+
+function formatRelativeTime(iso: string | null): string {
+  if (!iso) return '—';
+  const delta = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(delta / 60_000);
+  if (mins < 60) return `${mins}M AGO`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}H AGO`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}D AGO`;
+  const months = Math.floor(days / 30);
+  return `${months}MO AGO`;
+}
+
+function truncateVin(vin: string | null): string {
+  if (!vin) return '';
+  return vin.length > 17 ? vin.slice(0, 17) : vin;
+}
+
+function optimizeImageUrl(url: string): string {
+  if (url.includes('/storage/v1/object/public/')) {
+    return url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') +
+      '?width=632&height=356&quality=85&resize=cover';
   }
+  return url;
+}
 
-  // Load actual metrics for this vehicle
-  useEffect(() => {
-    loadVehicleMetrics();
-    loadOrganizationRelationships();
-    loadSession();
-  }, [vehicle.id]);
+function relationshipAccent(rel: RelationshipType): { bg: string; border: string; color: string } {
+  switch (rel) {
+    case 'VERIFIED OWNER':
+      return { bg: 'var(--bg, #f5f5f5)', border: 'var(--success, #16825d)', color: 'var(--success, #16825d)' };
+    case 'OWNER':
+      return { bg: 'var(--bg, #f5f5f5)', border: 'var(--success, #16825d)', color: 'var(--success, #16825d)' };
+    case 'CO-OWNER':
+      return { bg: 'var(--bg, #f5f5f5)', border: 'var(--success, #16825d)', color: 'var(--success, #16825d)' };
+    case 'CONSIGNED':
+      return { bg: 'var(--bg, #f5f5f5)', border: 'var(--warning, #b05a00)', color: 'var(--warning, #b05a00)' };
+    case 'PREVIOUSLY OWNED':
+      return { bg: 'var(--bg, #f5f5f5)', border: 'var(--text-secondary, #666666)', color: 'var(--text-secondary, #666666)' };
+    case 'CONTRIBUTOR':
+      return { bg: 'var(--bg, #f5f5f5)', border: 'var(--text-secondary, #666666)', color: 'var(--text-secondary, #666666)' };
+    case 'UPLOADER':
+      return { bg: 'var(--bg, #f5f5f5)', border: 'var(--border, #bdbdbd)', color: 'var(--text-secondary, #666666)' };
+    case 'WATCHING':
+    default:
+      return { bg: 'var(--bg, #f5f5f5)', border: 'var(--border, #bdbdbd)', color: 'var(--text-secondary, #666666)' };
+  }
+}
 
-  const loadSession = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    setSession(session);
-  };
+// ---------------------------------------------------------------------------
+// Style constants
+// ---------------------------------------------------------------------------
 
-  const loadOrganizationRelationships = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('organization_vehicles')
-        .select('organization_id, relationship_type, status')
-        .eq('vehicle_id', vehicle.id)
-        .eq('status', 'active');
+const FONT_BODY = 'Arial, sans-serif';
+const FONT_MONO = "'Courier New', Courier, monospace";
 
-      if (error) {
-        console.error('Error loading org relationships:', error);
-        return;
-      }
+const BASE: React.CSSProperties = {
+  fontFamily: FONT_BODY,
+  fontSize: '9px',
+  color: 'var(--text, #2a2a2a)',
+  backgroundColor: 'var(--surface, #ebebeb)',
+  border: '2px solid var(--border, #bdbdbd)',
+  borderRadius: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+  transition: 'border-color 0.12s ease',
+  cursor: 'pointer',
+};
 
-      // De-duplicate organization relationships to prevent duplicate keys
-      const unique = new Map<string, any>();
-      (data || []).forEach((rel: any) => {
-        const key = `${rel.organization_id || 'null'}-${rel.relationship_type || 'default'}`;
-        if (!unique.has(key)) {
-          unique.set(key, rel);
-        }
-      });
+const BASE_HOVER: React.CSSProperties = {
+  borderColor: 'var(--border-focus, #2a2a2a)',
+};
 
-      setOrganizationRelationships(Array.from(unique.values()));
-    } catch (error) {
-      console.error('Error loading org relationships:', error);
-    }
-  };
+const MONO: React.CSSProperties = {
+  fontFamily: FONT_MONO,
+  fontVariantNumeric: 'tabular-nums lining-nums',
+};
 
-  const loadVehicleMetrics = async () => {
-    try {
-      // Get real counts and data
-      const [
-        { count: imageCount, error: imageCountError },
-        { count: eventCount, error: eventCountError },
-        { data: latestEventRows, error: latestEventError },
-        { data: valuationRows, error: valuationError },
-        { count: viewCount, error: viewCountError }
-      ] = await Promise.all([
-        // Image count
-        supabase
-          .from('vehicle_images')
-          .select('id', { count: 'estimated', head: true })
-          .eq('vehicle_id', vehicle.id),
-        
-        // Timeline event count
-        supabase
-          .from('timeline_events')
-          .select('id', { count: 'estimated', head: true })
-          .eq('vehicle_id', vehicle.id),
-        
-        // Latest activity
-        supabase
-          .from('timeline_events')
-          .select('event_date, event_type, title')
-          .eq('vehicle_id', vehicle.id)
-          .order('event_date', { ascending: false })
-          .limit(1),
-        
-        // Latest valuation
-        supabase
-          .from('vehicle_valuations')
-          .select('estimated_value, valuation_date, confidence_score')
-          .eq('vehicle_id', vehicle.id)
-          .order('valuation_date', { ascending: false })
-          .limit(1),
-        
-        // View count (use vehicle_views table instead of vehicle_analytics)
-        supabase
-          .from('vehicle_views')
-          .select('id', { count: 'estimated', head: true })
-          .eq('vehicle_id', vehicle.id)
-      ]);
+const LABEL: React.CSSProperties = {
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px',
+  fontSize: '8px',
+  fontWeight: 700,
+  color: 'var(--text-secondary, #666666)',
+};
 
-      // Silently handle missing resources - these are expected in some deployments
-      if (imageCountError) handleExpectedError(imageCountError, 'Image Count');
-      if (eventCountError) handleExpectedError(eventCountError, 'Event Count');
-      if (latestEventError) handleExpectedError(latestEventError, 'Latest Event');
-      if (valuationError) handleExpectedError(valuationError, 'Valuation');
-      if (viewCountError) {
-        if (isMissingResourceError(viewCountError)) {
-          try {
-            localStorage.setItem(FEATURE_VEHICLE_ANALYTICS_UNAVAILABLE_KEY, '1');
-          } catch {
-            // ignore
-          }
-          // Silently handle missing analytics feature
-          handleExpectedError(viewCountError, 'Vehicle Analytics');
-        } else {
-          // Only log unexpected errors once
-          handleExpectedError(viewCountError, 'Vehicle Analytics');
-        }
-      }
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
 
-      const latestEvent = Array.isArray(latestEventRows) ? latestEventRows[0] : null;
-      const valuation = Array.isArray(valuationRows) ? valuationRows[0] : null;
-
-      setLiveData({
-        imageCount: imageCount || 0,
-        eventCount: eventCount || 0,
-        latestEvent: latestEvent || null,
-        valuation: valuation || null,
-        viewCount: viewCount || 0
-      });
-    } catch (error) {
-      console.error('Error loading vehicle metrics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
-    if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
-    return `${Math.floor(diffInHours / 168)}w ago`;
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(value);
-  };
-
-  const getStatusBadge = () => {
-    if (!relationship) return null;
-    
-    const badges: Record<string, { text: string; color: string; bg: string }> = {
-      owned: { text: relationship.role || 'Verified Owner', color: 'var(--success)', bg: 'var(--success-dim)' },
-      contributing: { text: 'Contributor', color: 'var(--accent)', bg: 'var(--info-dim)' },
-      interested: { text: 'Watching', color: 'var(--warning)', bg: 'var(--warning-dim)' },
-      discovered: { text: 'Discovered', color: '#6b21a8', bg: '#f3e8ff' },
-      curated: { text: 'Curated', color: '#b45309', bg: '#fed7aa' },
-      consigned: { text: 'Consigned', color: '#0e7490', bg: '#cffafe' },
-      previously_owned: { text: 'Previous Owner', color: 'var(--text-secondary)', bg: 'var(--border)' }
-    };
-
-    const badge = badges[relationship.relationshipType];
-    if (!badge) return null;
-
-    return (
-      <span
-        style={{
-          fontSize: '9px',
-          fontWeight: 700,
-          padding: '4px 8px',
-          borderRadius: '3px',
-          color: badge.color,
-          background: badge.bg,
-          border: `2px solid ${badge.color}`,
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-          backdropFilter: 'blur(4px)'
-        }}
-      >
-        {badge.text}
-      </span>
-    );
-  };
-
-  // Calculate what action is most important
-  const getPrimaryAction = () => {
-    if (!liveData) return null;
-
-    // Priority 1: No value set
-    if (!vehicle.current_value && !vehicle.purchase_price) {
-      return {
-        text: 'Set Value',
-        type: 'critical',
-        icon: '$',
-        reason: 'Track your investment'
-      };
-    }
-
-    // Priority 2: No photos (but has events)
-    if (liveData.eventCount > 0 && liveData.imageCount === 0) {
-      return {
-        text: 'Add Photos',
-        type: 'high',
-        icon: 'IMG',
-        reason: `${liveData.eventCount} events need documentation`
-      };
-    }
-
-    // Priority 3: No activity in 30+ days
-    if (liveData.latestEvent) {
-      const daysSinceActivity = Math.floor(
-        (new Date().getTime() - new Date(liveData.latestEvent.event_date).getTime()) / (1000 * 60 * 60 * 24)
-      );
-      if (daysSinceActivity > 30) {
-        return {
-          text: 'Log Activity',
-          type: 'medium',
-          icon: 'TIME',
-          reason: `${daysSinceActivity} days since last update`
-        };
-      }
-    }
-
-    // Priority 4: No activity at all
-    if (liveData.eventCount === 0 && liveData.imageCount === 0) {
-      return {
-        text: 'Start Building',
-        type: 'high',
-        icon: 'NEW',
-        reason: 'Document your first work'
-      };
-    }
-
-    return null;
-  };
-
-  const primaryAction = getPrimaryAction();
-
-  // Calculate health score (0-100) - Profile completeness indicator
-  const getHealthScore = () => {
-    let score = 0;
-    const breakdown: string[] = [];
-    if (!liveData) return { score: 0, breakdown: ['No data loaded'] };
-
-    // Has value info: +25
-    if (vehicle.current_value || vehicle.purchase_price) {
-      score += 25;
-      breakdown.push('Has value info (+25%)');
-    } else {
-      breakdown.push('Missing value info (0%)');
-    }
-
-    // Has images: +25
-    if (liveData.imageCount > 0) {
-      score += 25;
-      breakdown.push(`Has ${liveData.imageCount} image${liveData.imageCount !== 1 ? 's' : ''} (+25%)`);
-    } else {
-      breakdown.push('No images (0%)');
-    }
-
-    // Has timeline events: +25
-    if (liveData.eventCount > 0) {
-      score += 25;
-      breakdown.push(`Has ${liveData.eventCount} timeline event${liveData.eventCount !== 1 ? 's' : ''} (+25%)`);
-    } else {
-      breakdown.push('No timeline events (0%)');
-    }
-
-    // Recent activity (within 30 days): +25
-    if (liveData.latestEvent) {
-      const daysSinceActivity = Math.floor(
-        (new Date().getTime() - new Date(liveData.latestEvent.event_date).getTime()) / (1000 * 60 * 60 * 24)
-      );
-      if (daysSinceActivity <= 30) {
-        score += 25;
-        breakdown.push(`Recent activity (${daysSinceActivity}d ago) (+25%)`);
-      } else {
-        breakdown.push(`Stale activity (${daysSinceActivity}d ago) (0%)`);
-      }
-    } else {
-      breakdown.push('No recent activity (0%)');
-    }
-
-    return { score, breakdown };
-  };
-
-  const healthScoreData = getHealthScore();
-  const healthScore = typeof healthScoreData === 'number' ? healthScoreData : healthScoreData.score;
-  const healthBreakdown = typeof healthScoreData === 'object' && 'breakdown' in healthScoreData ? healthScoreData.breakdown : [];
-
-  // Calculate missing fields for indicator
-  const getMissingFields = () => {
-    const missing: string[] = [];
-    if (!vehicle.vin) missing.push('VIN');
-    if (!vehicle.purchase_price && !vehicle.current_value) missing.push('Price');
-    if (!vehicle.mileage) missing.push('Mileage');
-    if (!vehicle.color) missing.push('Color');
-    if (liveData && liveData.imageCount === 0) missing.push('Images');
-    return missing;
-  };
-
-  const missingFields = getMissingFields();
-
+function RelationshipBadge({ rel }: { rel: RelationshipType }) {
+  const accent = relationshipAccent(rel);
   return (
-    <>
-    <Link
-      to={`/vehicle/${vehicle.id}`}
+    <span
       style={{
-        display: 'block',
-        background: 'var(--surface)',
-        border: '2px solid var(--border)',
-        borderRadius: '2px',
-        overflow: 'hidden',
-        textDecoration: 'none',
-        color: 'inherit',
-        transition: 'all 0.12s ease',
-        cursor: 'pointer'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--text)';
-        e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'var(--border)';
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = 'none';
+        ...LABEL,
+        color: accent.color,
+        border: `2px solid ${accent.border}`,
+        backgroundColor: accent.bg,
+        borderRadius: 0,
+        padding: '1px 4px',
+        display: 'inline-block',
+        whiteSpace: 'nowrap',
       }}
     >
-      {/* Image with status overlay - 16:9 aspect ratio */}
-      <div style={{ 
-        position: 'relative', 
-        width: '100%', 
-        aspectRatio: '16 / 9',
-        overflow: 'hidden', 
-        background: 'var(--bg)'
-      }}>
-        {(() => {
-          // Try to get image URL from multiple sources
-          let imageUrl: string | null = null;
-          
-          // First try: pre-loaded primaryImageUrl
-          if (vehicle.primaryImageUrl && typeof vehicle.primaryImageUrl === 'string') {
-            imageUrl = vehicle.primaryImageUrl;
-          }
-          // Second try: extract from vehicle_images array
-          else if (vehicle.vehicle_images && Array.isArray(vehicle.vehicle_images) && vehicle.vehicle_images.length > 0) {
-            const primaryImage = vehicle.vehicle_images.find((img: any) => img?.is_primary) || vehicle.vehicle_images[0];
-            if (primaryImage) {
-              imageUrl = primaryImage.variants?.large || primaryImage.variants?.medium || primaryImage.image_url || null;
-            }
-          }
-          // Third try: fallback to vehicle.primary_image_url or vehicle.image_url
-          else if (vehicle.primary_image_url && typeof vehicle.primary_image_url === 'string') {
-            imageUrl = vehicle.primary_image_url;
-          } else if (vehicle.image_url && typeof vehicle.image_url === 'string') {
-            imageUrl = vehicle.image_url;
-          }
-          
-          // Transform Supabase storage URLs for optimized rendering
-          if (imageUrl && typeof imageUrl === 'string') {
-            if (imageUrl.includes('/storage/v1/object/public/')) {
-              imageUrl = imageUrl.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=632&height=356&quality=85&resize=cover';
-            }
-            
-            return (
-              <img
-                src={imageUrl}
-                alt={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  objectPosition: 'center'
-                }}
-                onError={(e) => {
-                  // Hide broken image - VehicleThumbnail will render as fallback
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                }}
-                loading="lazy"
-              />
-            );
-          }
-          
-          // No image found - use VehicleThumbnail component
-          return <VehicleThumbnail vehicleId={vehicle.id} />;
-        })()}
-        
-        {/* Relationship badge - top left */}
-        <div style={{ position: 'absolute', top: '6px', left: '6px' }}>
-          {getStatusBadge()}
-        </div>
+      {rel}
+    </span>
+  );
+}
 
-        {/* Health score - top right with breakdown tooltip */}
+function MissingTag({ label }: { label: string }) {
+  return (
+    <span
+      style={{
+        ...LABEL,
+        fontSize: '8px',
+        color: 'var(--warning, #b05a00)',
+        border: '2px solid var(--warning, #b05a00)',
+        borderRadius: 0,
+        padding: '1px 4px',
+        display: 'inline-block',
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function HealthBar({ score }: { score: number | null }) {
+  const pct = score != null ? Math.max(0, Math.min(100, score)) : null;
+  const barColor =
+    pct == null
+      ? 'var(--border, #bdbdbd)'
+      : pct >= 70
+      ? 'var(--success, #16825d)'
+      : pct >= 40
+      ? 'var(--warning, #b05a00)'
+      : 'var(--error, #d13438)';
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={LABEL}>HEALTH</span>
+      <div
+        style={{
+          flex: 1,
+          height: 2,
+          backgroundColor: 'var(--border, #bdbdbd)',
+          borderRadius: 0,
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
         <div
           style={{
             position: 'absolute',
-            top: '8px',
-            right: '8px',
-            background: healthScore >= 75 ? 'var(--success-dim)' : healthScore >= 50 ? 'var(--warning-dim)' : 'var(--error-dim)',
-            border: `2px solid ${healthScore >= 75 ? 'var(--success)' : healthScore >= 50 ? 'var(--warning)' : 'var(--error)'}`,
-            color: healthScore >= 75 ? 'var(--success)' : healthScore >= 50 ? 'var(--warning)' : 'var(--error)',
-            padding: '4px 8px',
-            borderRadius: '3px',
-            fontSize: '9px',
-            fontWeight: 700,
-            backdropFilter: 'blur(4px)',
-            cursor: 'help'
+            left: 0,
+            top: 0,
+            height: '100%',
+            width: pct != null ? `${pct}%` : '0%',
+            backgroundColor: barColor,
+            transition: 'width 0.12s ease',
           }}
-          title={`Profile Health: ${healthScore}%\n\nBreakdown:\n${healthBreakdown.join('\n')}\n\nThis score indicates how complete your vehicle profile is. Add value info, images, timeline events, and recent activity to improve it.`}
-        >
-          {healthScore}%
-        </div>
+        />
+      </div>
+      <span style={{ ...MONO, fontSize: '8px', color: 'var(--text-secondary, #666666)', minWidth: 22 }}>
+        {pct != null ? `${pct}` : '—'}
+      </span>
+    </div>
+  );
+}
 
-        {/* Image count indicator - bottom left */}
-        {liveData && liveData.imageCount > 0 && (
+// ---------------------------------------------------------------------------
+// Quick-assign chips for UPLOADER vehicles
+// ---------------------------------------------------------------------------
+
+const QUICK_ASSIGN_CHIPS = [
+  { label: 'OWN', table: 'vehicle_user_permissions', role: 'owner' },
+  { label: 'CO-OWN', table: 'vehicle_user_permissions', role: 'co_owner' },
+  { label: 'PREV OWNER', table: 'discovered_vehicles', type: 'previously_owned' },
+  { label: 'WORKED ON', table: 'vehicle_contributors', role: 'contributor' },
+  { label: 'WATCHING', table: 'discovered_vehicles', type: 'interested' },
+  { label: 'DISMISS', table: 'discovered_vehicles', type: 'discovered', dismiss: true },
+] as const;
+
+function QuickAssignStrip({
+  vehicleId,
+  onRefresh,
+}: {
+  vehicleId: string;
+  onRefresh?: () => void;
+}) {
+  const [assigning, setAssigning] = useState<string | null>(null);
+
+  const handleAssign = useCallback(async (chip: typeof QUICK_ASSIGN_CHIPS[number]) => {
+    setAssigning(chip.label);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      if (chip.table === 'vehicle_user_permissions') {
+        await supabase.from('vehicle_user_permissions').upsert({
+          vehicle_id: vehicleId,
+          user_id: user.id,
+          role: chip.role,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'vehicle_id,user_id' });
+      } else if (chip.table === 'discovered_vehicles') {
+        const isDismiss = 'dismiss' in chip && (chip as any).dismiss;
+        await supabase.from('discovered_vehicles').upsert({
+          vehicle_id: vehicleId,
+          user_id: user.id,
+          relationship_type: (chip as any).type,
+          is_active: !isDismiss,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'vehicle_id,user_id' });
+      } else if (chip.table === 'vehicle_contributors') {
+        await supabase.from('vehicle_contributors').upsert({
+          vehicle_id: vehicleId,
+          user_id: user.id,
+          role: chip.role,
+          status: 'active',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'vehicle_id,user_id' });
+      }
+
+      onRefresh?.();
+    } catch (err) {
+      console.error('Quick assign error:', err);
+    } finally {
+      setAssigning(null);
+    }
+  }, [vehicleId, onRefresh]);
+
+  return (
+    <div
+      style={{
+        borderTop: '2px solid var(--border, #bdbdbd)',
+        padding: '6px 8px',
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 4,
+        alignItems: 'center',
+      }}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+    >
+      <span style={{ ...LABEL, width: '100%', marginBottom: 2 }}>ASSIGN RELATIONSHIP</span>
+      {QUICK_ASSIGN_CHIPS.map((chip) => {
+        const isDismiss = 'dismiss' in chip && (chip as any).dismiss;
+        return (
+          <button
+            key={chip.label}
+            disabled={assigning !== null}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAssign(chip);
+            }}
+            style={{
+              padding: '2px 6px',
+              fontSize: '8px',
+              fontWeight: 700,
+              fontFamily: FONT_BODY,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              border: `2px solid ${isDismiss ? 'var(--error, #d13438)' : 'var(--border, #bdbdbd)'}`,
+              borderRadius: 0,
+              backgroundColor: assigning === chip.label
+                ? 'var(--text, #2a2a2a)'
+                : isDismiss
+                ? 'var(--error-dim, rgba(209, 52, 56, 0.1))'
+                : 'transparent',
+              color: assigning === chip.label
+                ? 'var(--bg, #f5f5f5)'
+                : isDismiss
+                ? 'var(--error, #d13438)'
+                : 'var(--text, #2a2a2a)',
+              cursor: assigning ? 'wait' : 'pointer',
+              opacity: assigning && assigning !== chip.label ? 0.5 : 1,
+              transition: 'background-color 0.12s ease, color 0.12s ease',
+              marginLeft: isDismiss ? 'auto' : undefined,
+            }}
+          >
+            {assigning === chip.label ? '...' : chip.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Action strip
+// ---------------------------------------------------------------------------
+
+function ActionStrip({
+  vehicle,
+  vertical = false,
+}: {
+  vehicle: GarageVehicle;
+  vertical?: boolean;
+}) {
+  const primaryAction =
+    vehicle.estimated_value == null
+      ? 'SET VALUE'
+      : (vehicle.image_count ?? 0) < 3
+      ? 'ADD PHOTOS'
+      : 'VIEW DETAILS';
+
+  if (vertical) {
+    return (
+      <div
+        style={{
+          padding: '8px 10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          ...LABEL,
+          fontSize: '8px',
+          color: 'var(--text, #2a2a2a)',
+          writingMode: 'vertical-rl',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {primaryAction}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        borderTop: '2px solid var(--border, #bdbdbd)',
+        display: 'flex',
+        alignItems: 'stretch',
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          padding: '6px 8px',
+          ...LABEL,
+          fontSize: '9px',
+          color: 'var(--text, #2a2a2a)',
+          textAlign: 'center',
+          borderRight: '2px solid var(--border, #bdbdbd)',
+        }}
+      >
+        {primaryAction}
+      </div>
+      <div
+        style={{
+          padding: '6px 8px',
+          ...LABEL,
+          fontSize: '9px',
+          color: 'var(--text-secondary, #666666)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        RELATIONSHIP
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Grid card (full detail)
+// ---------------------------------------------------------------------------
+
+function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const title = formatVehicleTitle(vehicle);
+  const isUploader = vehicle.relationship_type === 'UPLOADER';
+
+  return (
+    <Link
+      to={`/vehicle/${vehicle.id}`}
+      style={{ textDecoration: 'none', display: 'block', color: 'inherit' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <article style={{ ...BASE, ...(hovered ? BASE_HOVER : {}) }}>
+        {/* Image 16:9 */}
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            paddingBottom: '56.25%',
+            backgroundColor: 'var(--bg, #f5f5f5)',
+            overflow: 'hidden',
+            flexShrink: 0,
+          }}
+        >
+          {vehicle.primary_image_url ? (
+            <img
+              src={optimizeImageUrl(vehicle.primary_image_url)}
+              alt={title}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+              }}
+              loading="lazy"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <VehicleThumbnail vehicleId={vehicle.id} />
+            </div>
+          )}
+
+          {/* Relationship badge — top-left, solid bg */}
           <div
             style={{
               position: 'absolute',
-              bottom: '8px',
-              left: '8px',
-              background: 'var(--overlay)',
-              color: 'var(--bg)',
-              padding: '4px 8px',
-              borderRadius: '3px',
-              fontSize: '9px',
-              fontWeight: 600,
-              backdropFilter: 'blur(4px)'
+              top: 6,
+              left: 6,
+              backgroundColor: 'var(--surface, #ebebeb)',
+              border: '2px solid var(--border, #bdbdbd)',
+              borderRadius: 0,
+              padding: '1px 4px',
             }}
           >
-            {liveData.imageCount} photos
+            <span style={{ ...LABEL, fontSize: '8px', color: 'var(--text-secondary, #666666)' }}>
+              {vehicle.relationship_type}
+            </span>
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Content */}
-      <div style={{ padding: '10px' }}>
-        {/* Vehicle name */}
-        <h3
-          style={{
-            fontSize: '15px',
-            fontWeight: 700,
-            margin: '0 0 8px 0',
-            lineHeight: 1.3,
-            color: 'var(--text)'
-          }}
-        >
-          {vehicle.year} {vehicle.make} {vehicle.model}
-        </h3>
-
-        {/* Missing fields indicator */}
-        {showMissingFields && missingFields.length > 0 && (
+        {/* Body */}
+        <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+          {/* Title */}
           <div
             style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '4px',
-              marginBottom: '8px'
+              fontSize: '11px',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              color: 'var(--text, #2a2a2a)',
+              lineHeight: 1.2,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}
           >
-            {missingFields.map(field => (
-              <span
-                key={field}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (onQuickEdit) {
-                    onQuickEdit(vehicle.id, field.toLowerCase());
-                  }
-                }}
-                style={{
-                  fontSize: '8px',
-                  fontWeight: 600,
-                  padding: '3px 6px',
-                  borderRadius: '2px',
-                  background: 'var(--warning-dim)',
-                  color: 'var(--warning)',
-                  border: '1px solid var(--warning)',
-                  cursor: onQuickEdit ? 'pointer' : 'default',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.3px'
-                }}
-                title={`Missing ${field} - ${onQuickEdit ? 'Click to add' : 'Visit profile to add'}`}
-              >
-                No {field}
-              </span>
-            ))}
+            {title || 'UNKNOWN VEHICLE'}
           </div>
-        )}
 
-        {/* Key metrics grid */}
-        {!loading && liveData && (
-          <div style={{ marginBottom: '8px' }}>
-            {/* Value/ROI */}
-            {vehicle.current_value && vehicle.purchase_price ? (
-              <div style={{ fontSize: '11px', marginBottom: '4px' }}>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Value: </span>
-                <span style={{ fontWeight: 700, color: 'var(--text)' }}>
-                  {formatCurrency(vehicle.current_value)}
+          {/* VIN + missing tags */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+            {vehicle.vin ? (
+              <span
+                style={{
+                  ...MONO,
+                  fontSize: '8px',
+                  color: 'var(--text-secondary, #666666)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: 130,
+                }}
+                title={vehicle.vin}
+              >
+                {truncateVin(vehicle.vin)}
+              </span>
+            ) : (
+              <MissingTag label="NO VIN" />
+            )}
+            {vehicle.estimated_value == null && <MissingTag label="NO PRICE" />}
+          </div>
+
+          {/* Divider */}
+          <div style={{ borderTop: '1px solid var(--border, #bdbdbd)' }} />
+
+          {/* Data rows */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {/* Value */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={LABEL}>VALUE</span>
+              {vehicle.estimated_value != null ? (
+                <span style={{ ...MONO, fontSize: '10px', fontWeight: 700, color: 'var(--text, #2a2a2a)' }}>
+                  {formatCurrency(vehicle.estimated_value)}
                 </span>
+              ) : (
+                <span style={{ ...MONO, fontSize: '9px', color: 'var(--text-secondary, #666666)' }}>—</span>
+              )}
+              {vehicle.value_delta != null && vehicle.value_delta !== 0 && (
                 <span
                   style={{
-                    marginLeft: '6px',
-                    color: vehicle.current_value >= vehicle.purchase_price ? 'var(--success)' : 'var(--error)',
-                    fontWeight: 700
+                    ...MONO,
+                    fontSize: '8px',
+                    color: vehicle.value_delta > 0 ? 'var(--success, #16825d)' : 'var(--error, #d13438)',
                   }}
                 >
-                  {vehicle.current_value >= vehicle.purchase_price ? '+' : ''}
-                  {formatCurrency(vehicle.current_value - vehicle.purchase_price)}
+                  {vehicle.value_delta > 0 ? '+' : ''}{formatCurrency(vehicle.value_delta)}
                 </span>
-              </div>
-            ) : vehicle.current_value ? (
-              <div style={{ fontSize: '11px', marginBottom: '4px' }}>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Value: </span>
-                <span style={{ fontWeight: 700, color: 'var(--text)' }}>{formatCurrency(vehicle.current_value)}</span>
-              </div>
-            ) : null}
-
-            {/* Latest activity */}
-            {liveData.latestEvent ? (
-              <div style={{ fontSize: '11px', marginBottom: '4px' }}>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Last: </span>
-                <span style={{ color: 'var(--text)', fontWeight: 500 }}>
-                  {liveData.latestEvent.title || liveData.latestEvent.event_type}
-                </span>
-                <span style={{ color: 'var(--text-secondary)', marginLeft: '4px' }}>
-                  {getTimeAgo(liveData.latestEvent.event_date)}
-                </span>
-              </div>
-            ) : (
-              <div style={{ fontSize: '11px', marginBottom: '4px', color: 'var(--text-secondary)' }}>
-                No activity yet
-              </div>
-            )}
-
-            {/* Stats row */}
-            <div
-              style={{
-                display: 'flex',
-                gap: '8px',
-                fontSize: '9px',
-                color: 'var(--text-secondary)',
-                borderTop: '1px solid var(--border)',
-                paddingTop: '8px',
-                marginTop: '6px'
-              }}
-            >
-              <span style={{ fontWeight: 500 }}>{liveData.eventCount} events</span>
-              <span>·</span>
-              <span>{liveData.viewCount} views</span>
-              {vehicle.mileage && (
-                <>
-                  <span>·</span>
-                  <span>{(vehicle.mileage / 1000).toFixed(0)}k mi</span>
-                </>
               )}
             </div>
-          </div>
-        )}
 
-        {/* Primary action callout */}
-        {primaryAction && (
-          <div
-            style={{
-              position: 'relative',
-              marginTop: '8px',
-              padding: '8px 10px',
-              background: primaryAction.type === 'critical' ? 'var(--error-dim)' : primaryAction.type === 'high' ? 'var(--warning-dim)' : 'var(--bg)',
-              border: `2px solid ${primaryAction.type === 'critical' ? 'var(--error)' : primaryAction.type === 'high' ? 'var(--warning)' : 'var(--text-secondary)'}`,
-              borderRadius: '2px'
-            }}
-            onMouseEnter={(e) => {
-              if (primaryAction.text === 'Set Value') {
-                setShowValueTooltip(true);
-              }
-            }}
-            onMouseLeave={() => setShowValueTooltip(false)}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              // Open modal for "Set Value", navigate for other actions
-              if (primaryAction.text === 'Set Value') {
-                setShowValueModal(true);
-              } else {
-                window.location.href = `/vehicle/${vehicle.id}`;
-              }
-            }}
-          >
-            <div
+            {/* Counts */}
+            <div style={{ display: 'flex', gap: 12 }}>
+              {([
+                ['VIEWS', vehicle.view_count],
+              ] as [string, number | null][]).map(([lbl, val]) => (
+                <div key={lbl} style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+                  <span style={LABEL}>{lbl}</span>
+                  <span style={{ ...MONO, fontSize: '9px', fontWeight: 700 }}>{val ?? '—'}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Health bar */}
+            <HealthBar score={vehicle.health_score} />
+          </div>
+        </div>
+
+        {/* Action strip or quick-assign for uploaders */}
+        {isUploader ? (
+          <QuickAssignStrip vehicleId={vehicle.id} onRefresh={onRefresh} />
+        ) : (
+          <ActionStrip vehicle={vehicle} />
+        )}
+      </article>
+    </Link>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// List card (horizontal)
+// ---------------------------------------------------------------------------
+
+function ListCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const title = formatVehicleTitle(vehicle);
+  const isUploader = vehicle.relationship_type === 'UPLOADER';
+
+  return (
+    <Link
+      to={`/vehicle/${vehicle.id}`}
+      style={{ textDecoration: 'none', display: 'block', color: 'inherit' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <article style={{ ...BASE, flexDirection: 'row', alignItems: 'stretch', ...(hovered ? BASE_HOVER : {}) }}>
+        {/* Thumbnail */}
+        <div
+          style={{
+            width: 120,
+            flexShrink: 0,
+            backgroundColor: 'var(--bg, #f5f5f5)',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          {vehicle.primary_image_url ? (
+            <img
+              src={optimizeImageUrl(vehicle.primary_image_url)}
+              alt={title}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              loading="lazy"
+            />
+          ) : (
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ ...LABEL, fontSize: '8px' }}>NO IMAGE</span>
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
               style={{
                 fontSize: '11px',
                 fontWeight: 700,
-                color: primaryAction.type === 'critical' ? 'var(--error)' : primaryAction.type === 'high' ? 'var(--warning)' : 'var(--text)',
-                marginBottom: '4px',
                 textTransform: 'uppercase',
-                letterSpacing: '0.5px'
+                letterSpacing: '0.5px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
-              {primaryAction.icon} {primaryAction.text}
-            </div>
-            <div style={{ 
-              fontSize: '9px', 
-              color: primaryAction.type === 'critical' ? 'var(--error)' : primaryAction.type === 'high' ? 'var(--warning)' : 'var(--text-secondary)',
-              lineHeight: 1.4
-            }}>
-              {primaryAction.reason}
-            </div>
-            
-            {/* Tooltip for Set Value / Track Investment */}
-            {showValueTooltip && primaryAction.text === 'Set Value' && (
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: '100%',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  marginBottom: '8px',
-                  padding: '10px 12px',
-                  background: 'var(--text)',
-                  color: 'var(--bg)',
-                  borderRadius: '4px',
-                  fontSize: '9px',
-                  lineHeight: 1.5,
-                  whiteSpace: 'nowrap',
-                  zIndex: 1000,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  border: '1px solid var(--text-secondary)'
-                }}
-              >
-                <div style={{ fontWeight: 700, marginBottom: '4px' }}>Track Your Investment</div>
-                <div style={{ color: 'var(--border)' }}>
-                  Set purchase price and current value to see your vehicle's ROI over time
-                </div>
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: '-4px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: 0,
-                    height: 0,
-                    borderLeft: '4px solid transparent',
-                    borderRight: '4px solid transparent',
-                    borderTop: '4px solid var(--text)'
-                  }}
-                />
-              </div>
-            )}
+              {title || 'UNKNOWN VEHICLE'}
+            </span>
+            <RelationshipBadge rel={vehicle.relationship_type} />
+            {!vehicle.vin && <MissingTag label="NO VIN" />}
+            {vehicle.estimated_value == null && <MissingTag label="NO PRICE" />}
           </div>
-        )}
 
-        {/* Relationship edit link */}
-        {relationship && onEditRelationship && (
-          <div
-            style={{
-              marginTop: '6px',
-              fontSize: '9px',
-              color: 'var(--accent)',
-              textDecoration: 'underline',
-              cursor: 'pointer'
-            }}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onEditRelationship(vehicle.id, relationship.relationshipType);
-            }}
-          >
-            Edit relationship
-          </div>
-        )}
+          {vehicle.vin && (
+            <span style={{ ...MONO, fontSize: '8px', color: 'var(--text-secondary, #666666)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {truncateVin(vehicle.vin)}
+            </span>
+          )}
 
-        {/* Relationship-aware metrics */}
-        {organizationRelationships.length > 0 && session?.user?.id && (
-          <div key={`org-metrics-wrapper-${vehicle.id}`} onClick={(e) => e.stopPropagation()}>
-            {organizationRelationships.map((orgRel, orgIndex) => {
-              // Create a unique composite key that handles all edge cases
-              const orgId = orgRel.organization_id || `null-org-${orgIndex}`;
-              const relType = orgRel.relationship_type || 'default';
-              const uniqueKey = `metrics-${vehicle.id}-${orgId}-${relType}-${orgIndex}`;
-              // Only show metrics for relationship types that support them
-              const supportsMetrics = ['service_provider', 'work_location', 'owner'].includes(relType);
-              if (!supportsMetrics) return null;
-              return (
-                <VehicleRelationshipMetrics
-                  key={uniqueKey}
-                  vehicleId={vehicle.id}
-                  organizationId={orgRel.organization_id}
-                  relationshipType={orgRel.relationship_type}
-                  userId={session.user.id}
-                />
-              );
-            })}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'baseline' }}>
+              <span style={LABEL}>VALUE</span>
+              <span style={{ ...MONO, fontSize: '9px', fontWeight: 700 }}>
+                {vehicle.estimated_value != null ? formatCurrency(vehicle.estimated_value) : '—'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 3, alignItems: 'baseline' }}>
+              <span style={LABEL}>VWS</span>
+              <span style={{ ...MONO, fontSize: '9px' }}>{vehicle.view_count ?? '—'}</span>
+            </div>
+          </div>
+
+          <div style={{ maxWidth: 280 }}>
+            <HealthBar score={vehicle.health_score} />
+          </div>
+        </div>
+
+        {/* Right strip */}
+        {isUploader ? (
+          <div style={{ borderLeft: '2px solid var(--border, #bdbdbd)', padding: '8px', display: 'flex', alignItems: 'center' }}
+               onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+            <span style={{ ...LABEL, fontSize: '8px', color: 'var(--warning, #b05a00)' }}>CATEGORIZE</span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', borderLeft: '2px solid var(--border, #bdbdbd)' }}>
+            <ActionStrip vehicle={vehicle} vertical />
           </div>
         )}
-        
-        {/* Info message when vehicle has no organization relationships */}
-        {organizationRelationships.length === 0 && session?.user?.id && (
-          <div 
-            style={{
-              marginTop: '8px',
-              padding: '6px 8px',
-              background: 'var(--bg)',
-              border: '1px solid var(--border)',
-              borderRadius: '2px',
-              fontSize: '9px',
-              color: 'var(--text-secondary)',
-              textAlign: 'center'
-            }}
-            title="Service metrics appear when this vehicle is linked to an organization (service provider, work location, or owner). Link this vehicle to an organization on the vehicle profile page to see cost tracking, days on lot, and other metrics."
-          >
-            No organization link — metrics unavailable
-          </div>
-        )}
+      </article>
+    </Link>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Compact card (one-liner)
+// ---------------------------------------------------------------------------
+
+function CompactCard({ vehicle }: { vehicle: GarageVehicle }) {
+  const [hovered, setHovered] = useState(false);
+  const title = formatVehicleTitle(vehicle);
+
+  return (
+    <Link
+      to={`/vehicle/${vehicle.id}`}
+      style={{ textDecoration: 'none', display: 'block', color: 'inherit' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div
+        style={{
+          ...BASE,
+          flexDirection: 'row',
+          alignItems: 'center',
+          padding: '6px 8px',
+          gap: 8,
+          ...(hovered ? BASE_HOVER : {}),
+        }}
+      >
+        <span
+          style={{
+            fontSize: '9px',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            flex: 1,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {title || 'UNKNOWN VEHICLE'}
+        </span>
+        <RelationshipBadge rel={vehicle.relationship_type} />
+        {!vehicle.vin && <MissingTag label="NO VIN" />}
+        <span style={{ ...MONO, fontSize: '9px', fontWeight: 700, flexShrink: 0 }}>
+          {vehicle.estimated_value != null ? formatCurrency(vehicle.estimated_value) : '—'}
+        </span>
+        <span style={{ ...LABEL, fontSize: '8px', flexShrink: 0 }}>
+          {formatRelativeTime(vehicle.updated_at)}
+        </span>
       </div>
     </Link>
-
-    {/* Value Edit Modal - Outside Link to prevent navigation */}
-    {showValueModal && (
-      <VehicleValueEditModal
-        vehicleId={vehicle.id}
-        vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-        currentPurchasePrice={vehicle.purchase_price || null}
-        currentValue={vehicle.current_value || null}
-        onClose={() => setShowValueModal(false)}
-        onSave={async () => {
-          // Reload vehicle data from database to get updated values
-          try {
-            const { data: updatedVehicle } = await supabase
-              .from('vehicles')
-              .select('purchase_price, current_value')
-              .eq('id', vehicle.id)
-              .single();
-            
-            if (updatedVehicle) {
-              // Update local vehicle object
-              vehicle.purchase_price = updatedVehicle.purchase_price;
-              vehicle.current_value = updatedVehicle.current_value;
-            }
-          } catch (error) {
-            console.error('Error refreshing vehicle data:', error);
-          }
-          
-          // Reload vehicle metrics and refresh parent
-          loadVehicleMetrics();
-          if (onRefresh) onRefresh();
-        }}
-      />
-    )}
-    </>
   );
-};
+}
+
+// ---------------------------------------------------------------------------
+// Public export
+// ---------------------------------------------------------------------------
+
+export function GarageVehicleCard({
+  vehicle,
+  viewMode = 'GRID',
+  onRefresh,
+}: GarageVehicleCardProps) {
+  if (viewMode === 'LIST') return <ListCard vehicle={vehicle} onRefresh={onRefresh} />;
+  if (viewMode === 'COMPACT') return <CompactCard vehicle={vehicle} />;
+  return <GridCard vehicle={vehicle} onRefresh={onRefresh} />;
+}
 
 export default GarageVehicleCard;
-
