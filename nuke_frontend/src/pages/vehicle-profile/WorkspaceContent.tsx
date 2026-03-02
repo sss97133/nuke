@@ -1,61 +1,47 @@
-import React from 'react';
-// supabase import removed (FactExplorerPanel deleted)
-import { usePageTitle, getVehicleTitle } from '../../hooks/usePageTitle';
+import React, { useState, useCallback } from 'react';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import type { Vehicle, VehiclePermissions, LiveSession } from './types';
 
-// Lazy-load heavy tab-specific components
+// Lazy-load heavy components
 const VehicleTimelineSection = React.lazy(() => import('./VehicleTimelineSection'));
 const WorkMemorySection = React.lazy(() => import('./WorkMemorySection'));
 const VehicleBasicInfo = React.lazy(() => import('./VehicleBasicInfo'));
-const VehicleStreamingCard = React.lazy(() => import('../../components/vehicle/VehicleStreamingCard'));
 const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/vehicle/VehicleLedgerDocumentsCard').then(m => ({ default: m.VehicleLedgerDocumentsCard })));
 const VehicleDealJacketForensicsCard = React.lazy(() => import('../../components/vehicle/VehicleDealJacketForensicsCard'));
 import WiringQueryContextBar from '../../components/wiring/WiringQueryContextBar';
 const PartsQuoteGenerator = React.lazy(() => import('../../components/PartsQuoteGenerator').then(m => ({ default: m.PartsQuoteGenerator })));
-// VehicleDataGapsCard and VehicleResearchItemsCard removed — empty-state-only sections
-const VehiclePerformanceCard = React.lazy(() => import('../../components/vehicle/VehiclePerformanceCard'));
 const VehicleROISummaryCard = React.lazy(() => import('../../components/vehicle/VehicleROISummaryCard'));
 const NukeEstimatePanel = React.lazy(() => import('../../components/vehicle/NukeEstimatePanel'));
 const VehiclePricingValueCard = React.lazy(() => import('../../components/vehicle/VehiclePricingValueCard').then(m => ({ default: m.VehiclePricingValueCard })));
 const ExternalListingCard = React.lazy(() => import('../../components/vehicle/ExternalListingCard'));
-const VehicleAuctionQuickStartCard = React.lazy(() => import('../../components/auction/VehicleAuctionQuickStartCard'));
 const VehicleReferenceLibrary = React.lazy(() => import('../../components/vehicle/VehicleReferenceLibrary'));
 const VehicleDescriptionCard = React.lazy(() => import('../../components/vehicle/VehicleDescriptionCard'));
-// VehicleCommunityInsights and VehicleDocumentIntelligence removed — empty-state-only sections
 const VehicleCommentsSection = React.lazy(() => import('./VehicleCommentsSection'));
 const BundleReviewQueue = React.lazy(() => import('../../components/images/BundleReviewQueue'));
 const ImageGallery = React.lazy(() => import('../../components/images/ImageGallery'));
 const VehicleVideoSection = React.lazy(() => import('../../components/vehicle/VehicleVideoSection'));
+const VehicleScoresWidget = React.lazy(() => import('./VehicleScoresWidget'));
+const ColumnDivider = React.lazy(() => import('./ColumnDivider'));
 
-// Streamlined image gallery for vehicle profile — no wrapper chrome, just images
+// Streamlined image gallery — no wrapper chrome
 const ProfileGallery: React.FC<{
   vehicleId: string;
   vehicleImages: string[];
   fallbackListingImageUrls: string[];
   vehicle: any;
   onImagesUpdated: () => void;
-}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, vehicle, onImagesUpdated }) => {
-  return (
-    <React.Suspense fallback={<div style={{ padding: '12px', color: 'var(--text-muted)', fontSize: '12px' }}>Loading gallery...</div>}>
-      <ImageGallery
-        vehicleId={vehicleId}
-        showUpload={false}
-        fallbackImageUrls={vehicleImages.length > 0 ? [] : fallbackListingImageUrls}
-        fallbackLabel="Listing"
-        fallbackSourceUrl={
-          vehicle?.discovery_url ||
-          vehicle?.bat_auction_url ||
-          vehicle?.listing_url ||
-          undefined
-        }
-        onImagesUpdated={onImagesUpdated}
-      />
-    </React.Suspense>
-  );
-};
-
-// FactExplorerPanel removed — empty-state-only section
+}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, vehicle, onImagesUpdated }) => (
+  <React.Suspense fallback={<div className="widget__label" style={{ padding: '10px 16px' }}>Loading gallery...</div>}>
+    <ImageGallery
+      vehicleId={vehicleId}
+      showUpload={false}
+      fallbackImageUrls={vehicleImages.length > 0 ? [] : fallbackListingImageUrls}
+      fallbackLabel="Listing"
+      fallbackSourceUrl={vehicle?.discovery_url || vehicle?.bat_auction_url || vehicle?.listing_url || undefined}
+      onImagesUpdated={onImagesUpdated}
+    />
+  </React.Suspense>
+);
 
 // WorkspaceTabBar was removed — all sections render flat in left column.
 // Keep the type alias so WorkspaceContentProps still compiles.
@@ -67,16 +53,12 @@ export interface WorkspaceContentProps {
   permissions: VehiclePermissions;
   activeWorkspaceTab?: WorkspaceTabId;
   isMobile: boolean;
-
-  // Permission booleans
   isRowOwner: boolean;
   isVerifiedOwner: boolean;
   hasContributorAccess: boolean;
   canEdit: boolean;
   isAdminUser: boolean;
   canTriggerProofAnalysis: boolean;
-
-  // Data
   timelineEvents: any[];
   vehicleImages: string[];
   fallbackListingImageUrls: string[];
@@ -88,8 +70,6 @@ export interface WorkspaceContentProps {
   auctionPulse: any;
   valuationIntel: any;
   readinessSnapshot: any;
-
-  // Callbacks
   onAddEventClick: () => void;
   onDataPointClick: (event: React.MouseEvent, dataType: string, dataValue: string, label: string) => void;
   onEditClick: () => void;
@@ -102,18 +82,17 @@ export interface WorkspaceContentProps {
   onSetReferenceLibraryRefreshKey: (fn: (v: number) => number) => void;
 }
 
+const DEFAULT_LEFT_PCT = 55;
+
 const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   vehicle,
   session,
   permissions,
-  activeWorkspaceTab,
   isMobile,
   isRowOwner,
   isVerifiedOwner,
   hasContributorAccess,
   canEdit,
-  isAdminUser,
-  canTriggerProofAnalysis,
   timelineEvents,
   vehicleImages,
   fallbackListingImageUrls,
@@ -128,7 +107,6 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   onAddEventClick,
   onDataPointClick,
   onEditClick,
-  onLoadLiveSession,
   onLoadVehicle,
   onLoadTimelineEvents,
   onLoadVehicleImages,
@@ -136,6 +114,12 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   onSetIsPublic,
   onSetReferenceLibraryRefreshKey,
 }) => {
+  const [galleryCols, setGalleryCols] = useState(3);
+  const [leftPct, setLeftPct] = useState(DEFAULT_LEFT_PCT);
+
+  const handleResize = useCallback((pct: number) => setLeftPct(pct), []);
+  const handleReset = useCallback(() => setLeftPct(DEFAULT_LEFT_PCT), []);
+
   const importMeta = (vehicle as any)?.import_metadata || {};
   const evidenceUrls = Array.isArray(importMeta.evidence_urls) ? importMeta.evidence_urls : [];
   const rawSources = [
@@ -162,210 +146,249 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
     }
   };
 
-  // Sticky pane top offset = site header + vehicle header
-  const stickyTop = `calc(var(--header-height, 40px) + ${vehicleHeaderHeight}px)`;
-  const paneHeight = `calc(100vh - var(--header-height, 40px) - ${vehicleHeaderHeight}px)`;
+  // Use CSS variables for sticky positioning
+  const paneHeight = `calc(100vh - var(--vp-sticky-top))`;
 
   return (
-    <>
-      {/* === Two-Column Layout: Comments (left) | Images (right) === */}
-      {/* Grid container is sticky; paddingBottom creates scroll room for hero to scroll away */}
-      <div style={{ paddingBottom: paneHeight }}>
+    <div style={{ paddingBottom: paneHeight }}>
+      <div
+        className="vp-columns"
+        style={{
+          position: 'sticky',
+          top: 'var(--vp-sticky-top)',
+          height: paneHeight,
+        }}
+      >
+        {/* LEFT COLUMN */}
         <div
-          className="vehicle-profile-two-column"
-          style={{
-            position: 'sticky',
-            top: stickyTop,
-            height: paneHeight,
-            overflow: 'hidden',
-            alignItems: 'stretch',
-          }}
+          className="vp-col-left vehicle-profile-left-column"
+          style={{ width: `${leftPct}%` }}
         >
-
-          {/* LEFT COLUMN: Comments + Vehicle Details */}
-          <div style={{
-            overflowY: 'auto',
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-3)',
-            padding: 'var(--space-3) 0',
-          }} className="comments-scroll-container vehicle-profile-left-column">
-            {/* Work Memory Capture — owners & contributors only */}
-            {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
-              <React.Suspense fallback={null}>
-                <WorkMemorySection vehicleId={vehicle.id} permissions={permissions} />
-              </React.Suspense>
-            )}
-
-            {/* Description */}
-            <VehicleDescriptionCard
-              vehicleId={vehicle.id}
-              initialDescription={vehicle.description}
-              isEditable={canEdit}
-              onUpdate={() => {}}
-            />
-
-            {/* Vehicle Info */}
-            <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading basic info...</div>}>
-              <VehicleBasicInfo
-                vehicle={vehicle}
-                session={session}
-                permissions={permissions}
-                onDataPointClick={onDataPointClick}
-                onEditClick={onEditClick}
-              />
+          {/* Work Memory */}
+          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
+            <React.Suspense fallback={null}>
+              <WorkMemorySection vehicleId={vehicle.id} permissions={permissions} />
             </React.Suspense>
+          )}
 
-            {/* Timeline */}
-            <CollapsibleWidget
-              title="Timeline"
-              defaultCollapsed={false}
-              badge={<span className="text-xs text-gray-500 dark:text-gray-400">{timelineEvents.length} event{timelineEvents.length === 1 ? '' : 's'}</span>}
+          {/* Vehicle Information */}
+          <React.Suspense fallback={<div className="widget__label" style={{ padding: '10px 16px' }}>Loading...</div>}>
+            <VehicleBasicInfo
+              vehicle={vehicle}
+              session={session}
+              permissions={permissions}
+              onDataPointClick={onDataPointClick}
+              onEditClick={onEditClick}
+            />
+          </React.Suspense>
+
+          {/* Description */}
+          <VehicleDescriptionCard
+            vehicleId={vehicle.id}
+            initialDescription={vehicle.description}
+            isEditable={canEdit}
+            onUpdate={() => {}}
+          />
+
+          {/* Pricing & Value */}
+          <VehiclePricingValueCard
+            vehicle={vehicle}
+            auctionPulse={auctionPulse}
+            valuationIntel={valuationIntel as any}
+            readinessSnapshot={readinessSnapshot as any}
+          />
+
+          {/* Timeline */}
+          <CollapsibleWidget variant="profile" title="Timeline" defaultCollapsed={false}
+            badge={<span className="widget__count">{timelineEvents.length}</span>}
+          >
+            <VehicleTimelineSection vehicle={vehicle} session={session} permissions={permissions} onAddEventClick={onAddEventClick} />
+          </CollapsibleWidget>
+
+          {/* Engine Bay Analysis */}
+          {(vehicle as any)?.origin_metadata?.engine_bay_analysis?.engine_family && (
+            <CollapsibleWidget variant="profile" title="Engine Bay Analysis" defaultCollapsed={true}
+              badge={<span className="widget__count">{(vehicle as any).origin_metadata.engine_bay_analysis.engine_family}</span>}
             >
-              <VehicleTimelineSection vehicle={vehicle} session={session} permissions={permissions} onAddEventClick={onAddEventClick} />
-            </CollapsibleWidget>
-
-            {/* Engine Bay Analysis — only if data exists */}
-            {(vehicle as any)?.origin_metadata?.engine_bay_analysis?.engine_family && (
-              <CollapsibleWidget title="Engine Bay Analysis" defaultCollapsed={true} badge={
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {(vehicle as any).origin_metadata.engine_bay_analysis.engine_family}
-                  {(vehicle as any).origin_metadata.engine_bay_analysis.estimated_displacement
-                    ? ` ${(vehicle as any).origin_metadata.engine_bay_analysis.estimated_displacement}` : ''}
-                </span>
-              }>
-                {(() => {
-                  const eba = (vehicle as any).origin_metadata.engine_bay_analysis;
-                  const confPct = eba.engine_family_confidence != null ? Math.round(eba.engine_family_confidence * 100) : null;
-                  return (
-                    <div style={{ fontSize: '13px', lineHeight: '1.8' }}>
-                      <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '4px' }}>
-                        {eba.engine_family}{eba.estimated_displacement ? ` ${eba.estimated_displacement}` : ''}
-                        {confPct != null && (
-                          <span style={{ marginLeft: '8px', padding: '2px 6px', fontSize: '11px', fontWeight: 400, borderRadius: '2px',
-                            backgroundColor: confPct >= 80 ? 'rgba(34,197,94,0.15)' : confPct >= 50 ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
-                            color: confPct >= 80 ? '#22c55e' : confPct >= 50 ? '#eab308' : '#ef4444',
-                          }}>{confPct}% confidence</span>
-                        )}
-                      </div>
-                      <div className="text-small" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 12px' }}>
-                        {eba.fuel_system_type && (<><span className="text-muted">Fuel System</span><span>{eba.fuel_system_brand && eba.fuel_system_brand !== 'unknown' ? `${eba.fuel_system_brand} ` : ''}{eba.fuel_system_type.replace(/_/g, ' ')}</span></>)}
-                        {eba.ignition_type && (<><span className="text-muted">Ignition</span><span>{eba.ignition_brand && eba.ignition_brand !== 'unknown' ? `${eba.ignition_brand.replace(/_/g, ' ')} ` : ''}{eba.ignition_type.replace(/_/g, ' ')}</span></>)}
-                        {eba.headers && eba.headers !== 'unknown' && (<><span className="text-muted">Exhaust</span><span>{eba.headers.replace(/_/g, ' ')}</span></>)}
-                        {eba.condition && eba.condition !== 'unknown' && (<><span className="text-muted">Condition</span><span>{eba.condition.replace(/_/g, ' ')}</span></>)}
-                        {eba.modifications?.length > 0 && (<><span className="text-muted">Modifications</span><span>{eba.modifications.length} identified</span></>)}
-                      </div>
+              {(() => {
+                const eba = (vehicle as any).origin_metadata.engine_bay_analysis;
+                const confPct = eba.engine_family_confidence != null ? Math.round(eba.engine_family_confidence * 100) : null;
+                return (
+                  <div style={{ fontFamily: 'var(--vp-font-sans)', fontSize: '9px', lineHeight: '1.6' }}>
+                    <div style={{ fontWeight: 700, fontSize: '9px', marginBottom: '4px' }}>
+                      {eba.engine_family}{eba.estimated_displacement ? ` ${eba.estimated_displacement}` : ''}
+                      {confPct != null && (
+                        <span style={{ marginLeft: '8px', padding: '2px 6px', fontFamily: 'var(--vp-font-mono)', fontSize: '8px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
+                          border: '1px solid var(--vp-ink)',
+                          color: confPct >= 80 ? 'var(--vp-brg)' : confPct >= 50 ? 'var(--vp-gulf-orange)' : 'var(--vp-martini-red)',
+                        }}>{confPct}%</span>
+                      )}
                     </div>
-                  );
-                })()}
-              </CollapsibleWidget>
-            )}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 12px', fontSize: '8px' }}>
+                      {eba.fuel_system_type && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Fuel System</span><span>{eba.fuel_system_brand && eba.fuel_system_brand !== 'unknown' ? `${eba.fuel_system_brand} ` : ''}{eba.fuel_system_type.replace(/_/g, ' ')}</span></>)}
+                      {eba.ignition_type && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ignition</span><span>{eba.ignition_brand && eba.ignition_brand !== 'unknown' ? `${eba.ignition_brand.replace(/_/g, ' ')} ` : ''}{eba.ignition_type.replace(/_/g, ' ')}</span></>)}
+                      {eba.headers && eba.headers !== 'unknown' && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Exhaust</span><span>{eba.headers.replace(/_/g, ' ')}</span></>)}
+                      {eba.condition && eba.condition !== 'unknown' && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Condition</span><span>{eba.condition.replace(/_/g, ' ')}</span></>)}
+                      {eba.modifications?.length > 0 && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Modifications</span><span>{eba.modifications.length} identified</span></>)}
+                    </div>
+                  </div>
+                );
+              })()}
+            </CollapsibleWidget>
+          )}
 
-            {/* Collapsible detail sections */}
-            <CollapsibleWidget title="Deal Jacket Forensics" defaultCollapsed={true}>
-              <VehicleDealJacketForensicsCard vehicleId={vehicle.id} />
-            </CollapsibleWidget>
-            <VehicleROISummaryCard vehicleId={vehicle.id} />
-            <CollapsibleWidget title="Nuke Estimate" defaultCollapsed={true}>
-              <NukeEstimatePanel vehicleId={vehicle.id} vehicle={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} />
-            </CollapsibleWidget>
-            <VehiclePricingValueCard vehicle={vehicle} auctionPulse={auctionPulse} valuationIntel={valuationIntel as any} readinessSnapshot={readinessSnapshot as any} />
-            <CollapsibleWidget title="Auction History" defaultCollapsed={true}>
-              <ExternalListingCard vehicleId={vehicle.id} />
-            </CollapsibleWidget>
+          {/* Detail sections */}
+          <CollapsibleWidget variant="profile" title="Deal Jacket Forensics" defaultCollapsed={true}>
+            <VehicleDealJacketForensicsCard vehicleId={vehicle.id} />
+          </CollapsibleWidget>
+          <VehicleROISummaryCard vehicleId={vehicle.id} />
+          <CollapsibleWidget variant="profile" title="Nuke Estimate" defaultCollapsed={true}>
+            <NukeEstimatePanel vehicleId={vehicle.id} vehicle={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} />
+          </CollapsibleWidget>
+          <CollapsibleWidget variant="profile" title="Auction History" defaultCollapsed={true}>
+            <ExternalListingCard vehicleId={vehicle.id} />
+          </CollapsibleWidget>
 
-            {/* Comments */}
+          {/* Comments & Bids */}
+          <CollapsibleWidget variant="profile" title="Comments & Bids" defaultCollapsed={false}
+            badge={<span className="widget__count">{totalCommentCount}</span>}
+          >
             <React.Suspense fallback={null}>
               <VehicleCommentsSection vehicleId={vehicle.id} />
             </React.Suspense>
+          </CollapsibleWidget>
 
-            {/* Owner-only tools */}
-            {(isRowOwner || isVerifiedOwner) && (
-              <>
-                <CollapsibleWidget title="Wiring Plan" defaultCollapsed={true}>
-                  <WiringQueryContextBar vehicleId={vehicle.id} vehicleInfo={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} onQuoteGenerated={() => {}} />
-                </CollapsibleWidget>
-                <CollapsibleWidget title="AI Parts Quote Generator" defaultCollapsed={true}>
-                  <PartsQuoteGenerator vehicleId={vehicle.id} vehicleInfo={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} />
-                </CollapsibleWidget>
-              </>
-            )}
-            {(isVerifiedOwner || hasContributorAccess) && (
-              <CollapsibleWidget title="Ledger Documents" defaultCollapsed={true}>
-                <VehicleLedgerDocumentsCard vehicleId={vehicle.id} canManage={Boolean(isVerifiedOwner || hasContributorAccess)} />
+          {/* Owner-only tools */}
+          {(isRowOwner || isVerifiedOwner) && (
+            <>
+              <CollapsibleWidget variant="profile" title="Wiring Plan" defaultCollapsed={true}>
+                <WiringQueryContextBar vehicleId={vehicle.id} vehicleInfo={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} onQuoteGenerated={() => {}} />
               </CollapsibleWidget>
-            )}
-            <CollapsibleWidget title="Reference Library" defaultCollapsed={true}>
-              <VehicleReferenceLibrary vehicleId={vehicle.id} userId={session?.user?.id} year={vehicle.year} make={vehicle.make} series={(vehicle as any).series} model={vehicle.model} bodyStyle={(vehicle as any).body_style} refreshKey={referenceLibraryRefreshKey} onUploadComplete={() => { onLoadVehicle(); onSetReferenceLibraryRefreshKey((v) => v + 1); }} />
+              <CollapsibleWidget variant="profile" title="AI Parts Quote Generator" defaultCollapsed={true}>
+                <PartsQuoteGenerator vehicleId={vehicle.id} vehicleInfo={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} />
+              </CollapsibleWidget>
+            </>
+          )}
+          {(isVerifiedOwner || hasContributorAccess) && (
+            <CollapsibleWidget variant="profile" title="Ledger Documents" defaultCollapsed={true}>
+              <VehicleLedgerDocumentsCard vehicleId={vehicle.id} canManage={Boolean(isVerifiedOwner || hasContributorAccess)} />
             </CollapsibleWidget>
-            <CollapsibleWidget title="Data Sources" defaultCollapsed={true} badge={dataSources.length > 0 ? <span className="text-xs text-gray-500 dark:text-gray-400">{dataSources.length} source{dataSources.length === 1 ? '' : 's'}</span> : undefined}>
-              <div>
-                {(importMeta.builder || importMeta.seller) && (
-                  <div className="text-small text-muted" style={{ marginBottom: '8px' }}>
-                    {importMeta.builder ? `Builder: ${importMeta.builder}` : null}
-                    {importMeta.builder && importMeta.seller ? ' • ' : null}
-                    {importMeta.seller ? `Seller: ${importMeta.seller}` : null}
-                  </div>
-                )}
-                {dataSources.length === 0 ? (
-                  <div className="text-small text-muted">No external sources attached yet.</div>
-                ) : (
-                  <ul style={{ margin: '0', paddingLeft: '18px' }}>
-                    {dataSources.map((url) => (
-                      <li key={url} className="text-small"><a href={url} target="_blank" rel="noreferrer">{sourceLabel(url)}</a></li>
-                    ))}
-                  </ul>
-                )}
+          )}
+          <CollapsibleWidget variant="profile" title="Reference Library" defaultCollapsed={true}>
+            <VehicleReferenceLibrary vehicleId={vehicle.id} userId={session?.user?.id} year={vehicle.year} make={vehicle.make} series={(vehicle as any).series} model={vehicle.model} bodyStyle={(vehicle as any).body_style} refreshKey={referenceLibraryRefreshKey} onUploadComplete={() => { onLoadVehicle(); onSetReferenceLibraryRefreshKey((v) => v + 1); }} />
+          </CollapsibleWidget>
+          <CollapsibleWidget variant="profile" title="Data Sources" defaultCollapsed={true}
+            badge={dataSources.length > 0 ? <span className="widget__count">{dataSources.length}</span> : undefined}
+          >
+            <div>
+              {(importMeta.builder || importMeta.seller) && (
+                <div style={{ fontSize: '8px', color: 'var(--vp-pencil)', marginBottom: '8px' }}>
+                  {importMeta.builder ? `Builder: ${importMeta.builder}` : null}
+                  {importMeta.builder && importMeta.seller ? ' · ' : null}
+                  {importMeta.seller ? `Seller: ${importMeta.seller}` : null}
+                </div>
+              )}
+              {dataSources.length === 0 ? (
+                <div style={{ fontSize: '9px', color: 'var(--vp-pencil)' }}>No external sources attached yet.</div>
+              ) : (
+                <ul style={{ margin: '0', paddingLeft: '18px', fontSize: '9px' }}>
+                  {dataSources.map((url) => (
+                    <li key={url}><a href={url} target="_blank" rel="noreferrer">{sourceLabel(url)}</a></li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </CollapsibleWidget>
+          {!vehicle.isAnonymous && session && (
+            <CollapsibleWidget variant="profile" title="Privacy Settings" defaultCollapsed={true}
+              badge={<span className="widget__count">{isPublic ? 'PUBLIC' : 'PRIVATE'}</span>}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px' }}>
+                <span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: '8px' }}>Visibility</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>{isPublic ? 'Public' : 'Private'}</span>
+                  <label style={{ display: 'flex', alignItems: 'center' }}>
+                    <input type="checkbox" checked={isPublic} onChange={(e) => { onSetIsPublic(e.target.checked); onUpdatePrivacy(); }} />
+                  </label>
+                </div>
               </div>
             </CollapsibleWidget>
-            {!vehicle.isAnonymous && session && (
-              <CollapsibleWidget title="Privacy Settings" defaultCollapsed={true} badge={<span className={`text-xs ${isPublic ? 'text-green-500' : 'text-gray-500'}`}>{isPublic ? 'Public' : 'Private'}</span>}>
-                <div className="vehicle-detail">
-                  <span>Visibility</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className={`badge ${isPublic ? 'badge-success' : 'badge-secondary'}`}>{isPublic ? 'Public' : 'Private'}</span>
-                    <label style={{ display: 'flex', alignItems: 'center' }}>
-                      <input type="checkbox" checked={isPublic} onChange={(e) => { onSetIsPublic(e.target.checked); onUpdatePrivacy(); }} />
-                    </label>
-                  </div>
-                </div>
-              </CollapsibleWidget>
-            )}
+          )}
+        </div>
+
+        {/* COLUMN DIVIDER */}
+        <React.Suspense fallback={<div style={{ width: '4px', flexShrink: 0 }} />}>
+          <ColumnDivider onResize={handleResize} onReset={handleReset} />
+        </React.Suspense>
+
+        {/* RIGHT COLUMN */}
+        <div
+          className="vp-col-right vehicle-profile-right-column"
+          style={{
+            width: `${100 - leftPct}%`,
+            ['--vp-gallery-cols' as any]: galleryCols,
+          }}
+        >
+          {/* Session Review Queue */}
+          {session && (
+            <React.Suspense fallback={null}>
+              <BundleReviewQueue vehicleId={vehicle.id} onComplete={() => onLoadTimelineEvents()} />
+            </React.Suspense>
+          )}
+
+          {/* Gallery toolbar */}
+          <div className="widget__header gallery-header" style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--vp-bg)', flexShrink: 0, flexWrap: 'wrap' }}>
+            <div className="widget__header-left">
+              <span className="widget__label">Images</span>
+              <span className="widget__count">{vehicleImages.length || '—'}</span>
+            </div>
+            <div className="widget__controls" style={{ flexWrap: 'wrap', gap: '4px' }}>
+              <div className="gallery-toolbar">
+                {['ZONES', 'GRID', 'FULL', 'INFO', 'SESSIONS', 'CATEGORY', 'CHRONO', 'SOURCE'].map((view) => (
+                  <button
+                    key={view}
+                    className={`gallery-btn ${view === 'CATEGORY' ? 'gallery-btn--active' : ''}`}
+                  >
+                    {view}
+                  </button>
+                ))}
+              </div>
+              <div className="gallery-slider-row">
+                <span className="gallery-slider-label">COLS</span>
+                <input
+                  className="gallery-slider"
+                  type="range"
+                  min={1}
+                  max={8}
+                  value={galleryCols}
+                  onChange={e => setGalleryCols(Number(e.target.value))}
+                />
+                <span className="gallery-slider-val">{galleryCols}</span>
+              </div>
+            </div>
           </div>
 
-          {/* RIGHT COLUMN: Images + Videos */}
-          <div style={{
-            overflowY: 'auto',
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0',
-          }} className="vehicle-profile-right-column">
-            {/* Session Review Queue */}
-            {session && (
-              <React.Suspense fallback={null}>
-                <BundleReviewQueue vehicleId={vehicle.id} onComplete={() => onLoadTimelineEvents()} />
-              </React.Suspense>
-            )}
+          {/* Image Gallery */}
+          <ProfileGallery
+            vehicleId={vehicle.id}
+            vehicleImages={vehicleImages}
+            fallbackListingImageUrls={fallbackListingImageUrls}
+            vehicle={vehicle}
+            onImagesUpdated={() => { onLoadVehicle(); onLoadTimelineEvents(); onLoadVehicleImages(); }}
+          />
 
-            {/* Image Gallery — clean stream, no chrome */}
-            <ProfileGallery
-              vehicleId={vehicle.id}
-              vehicleImages={vehicleImages}
-              fallbackListingImageUrls={fallbackListingImageUrls}
-              vehicle={vehicle}
-              onImagesUpdated={() => { onLoadVehicle(); onLoadTimelineEvents(); onLoadVehicleImages(); }}
-            />
+          {/* Vehicle Scores */}
+          <React.Suspense fallback={null}>
+            <VehicleScoresWidget vehicle={vehicle} />
+          </React.Suspense>
 
-            {/* Videos */}
-            <CollapsibleWidget title="Videos" defaultCollapsed={true}>
-              <VehicleVideoSection vehicleId={vehicle.id} defaultCollapsed={false} />
-            </CollapsibleWidget>
-          </div>
+          {/* Videos */}
+          <CollapsibleWidget variant="profile" title="Videos" defaultCollapsed={true}>
+            <VehicleVideoSection vehicleId={vehicle.id} defaultCollapsed={false} />
+          </CollapsibleWidget>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

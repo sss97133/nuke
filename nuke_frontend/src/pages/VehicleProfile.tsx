@@ -21,6 +21,7 @@ import type {
   LiveSession
 } from './vehicle-profile/types';
 import '../design-system.css';
+import '../styles/vehicle-profile.css';
 import './vehicle-profile/vehicle-profile-redesign.css';
 const VehicleSubHeader = React.lazy(() => import('./vehicle-profile/VehicleSubHeader'));
 import { type LinkedOrg } from '../components/vehicle/LinkedOrganizations';
@@ -41,6 +42,8 @@ import { loadVehicleImpl, selectBestHeroImage } from './vehicle-profile/loadVehi
 import type { HeroImageMeta } from './vehicle-profile/loadVehicleData';
 const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceContent'));
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
+const BarcodeTimeline = React.lazy(() => import('./vehicle-profile/BarcodeTimeline'));
+const VehicleBadgeBar = React.lazy(() => import('./vehicle-profile/VehicleBadgeBar'));
 // WalkAroundCarousel removed from vehicle profile layout
 
 /** Quick Stats line shown below hero image */
@@ -85,9 +88,12 @@ const QuickStatsBar: React.FC<{
       background: 'transparent',
     }}>
       <div style={{
-        fontSize: '11px',
-        color: 'var(--text-muted)',
-        letterSpacing: '0.02em',
+        fontFamily: "'Courier New', Courier, monospace",
+        fontSize: '8px',
+        fontWeight: 400,
+        color: '#888',
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase' as const,
         display: 'flex',
         flexWrap: 'wrap',
         gap: '4px',
@@ -1770,8 +1776,8 @@ const VehicleProfile: React.FC = () => {
   // Render vehicle profile (responsive for mobile and desktop)
   return (
       <div className="vehicle-profile-page">
-        {/* Vehicle Header with Price — sticky wrapper */}
-        <div ref={vehicleHeaderRef} style={{ position: 'sticky', top: 'var(--header-height, 40px)', zIndex: 900, background: 'var(--surface)' }}>
+        {/* Vehicle Sub-Header with Price — sticky, z-900 per V3 spec */}
+        <div ref={vehicleHeaderRef} className="vehicle-profile-sub-header" style={{ position: 'sticky', top: 'var(--header-height, 40px)', zIndex: 900 }}>
           <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading header...</div>}>
             <VehicleHeader
               vehicle={vehicle}
@@ -1811,6 +1817,16 @@ const VehicleProfile: React.FC = () => {
           />
         </React.Suspense>
 
+        {/* Badge Bar — V3 identity + auction badges */}
+        <React.Suspense fallback={null}>
+          <VehicleBadgeBar vehicle={vehicle} auctionPulse={auctionPulse} liveSession={liveSession} />
+        </React.Suspense>
+
+        {/* Barcode Timeline — sticky, 10px collapsed, expandable to heatmap */}
+        <React.Suspense fallback={null}>
+          <BarcodeTimeline vehicle={vehicle} timelineEvents={timelineEvents} />
+        </React.Suspense>
+
         {/* Hero Image Section */}
         <div id="vehicle-hero" className="hero" style={{ scrollMarginTop: 'calc(var(--header-height, 40px) + 88px)' }}>
           <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading hero image...</div>}>
@@ -1844,7 +1860,7 @@ const VehicleProfile: React.FC = () => {
 
         {/* Main Content */}
         <div style={{ marginTop: '0' }}>
-          <React.Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>Loading...</div>}>
+          <React.Suspense fallback={<div style={{ padding: '10px 16px', textAlign: 'center', color: '#888', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Loading...</div>}>
             {vehicle ? (
               <WorkspaceContent
                 vehicle={vehicle}
