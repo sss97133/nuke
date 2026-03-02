@@ -1303,6 +1303,30 @@
 /* ============ MOBILE ============ */
 
 @media (max-width: 768px) {
+  /* Sub-header: wrap to multiple lines on mobile */
+  .vp-sub-header {
+    height: auto !important;
+    min-height: 36px !important;
+    overflow: visible !important;
+    flex-wrap: wrap !important;
+    padding: 4px 8px !important;
+    gap: 4px !important;
+  }
+  .vp-sub-header__left {
+    flex-shrink: 1 !important;
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+  .vp-sub-header__title {
+    max-width: none !important;
+    font-size: 10px !important;
+  }
+  .vp-sub-header__badges {
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+    gap: 3px !important;
+  }
+
   .vehicle-sub__badges { display: none; }
   .vehicle-sub__title { font-size: 10px; }
   .vp-columns { flex-direction: column; position: static; height: auto; }

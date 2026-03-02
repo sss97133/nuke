@@ -356,10 +356,10 @@ const VehicleSubHeader: React.FC<VehicleSubHeaderProps> = ({
   };
 
   return (
-    <div style={containerStyle}>
+    <div className="vp-sub-header" style={containerStyle}>
       {/* Left: title + mileage */}
-      <div style={leftStyle}>
-        <span style={titleStyle} title={titleStr}>
+      <div className="vp-sub-header__left" style={leftStyle}>
+        <span className="vp-sub-header__title" style={titleStyle} title={titleStr}>
           {titleStr || 'VEHICLE'}
         </span>
 
@@ -376,7 +376,7 @@ const VehicleSubHeader: React.FC<VehicleSubHeaderProps> = ({
       <div style={dividerStyle} />
 
       {/* Badges strip */}
-      <div style={badgesWrapStyle}>
+      <div className="vp-sub-header__badges" style={badgesWrapStyle}>
         {/* Status */}
         <Badge
           variant={status.variant}
