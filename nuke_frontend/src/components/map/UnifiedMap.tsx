@@ -204,6 +204,36 @@ const colColor = (country: string): [number, number, number] => COUNTRY_COLORS[c
 const CAR_SVG_URI = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="4"><rect width="10" height="4" rx="1" fill="white"/></svg>')}`;
 const BUILDING_SVG_URI = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="white"/></svg>')}`;
 
+// ============================================================
+// HEX BINNING — zoom-dependent radius for elegant density handling
+// At z4 a hex covers ~50km (state-level). At z12 a hex covers ~200m (block-level).
+// Points inside a hex are aggregated — no overlap, clean edges, count via color.
+// ============================================================
+function hexRadiusForZoom(z: number): number {
+  // Exponential decay: wider hexes at low zoom, tighter as you zoom in.
+  // z4 → 50000m (50km), z8 → 5000m (5km), z10 → 1500m, z12 → 200m, z13 → 100m
+  return Math.max(50, Math.round(50000 / Math.pow(2, Math.max(0, z - 4))));
+}
+
+// Hex color ramp: count-based, from dim to bright using the active color
+function hexColorRange(base: [number, number, number]): [number, number, number][] {
+  return [
+    [Math.round(base[0] * 0.15), Math.round(base[1] * 0.15), Math.round(base[2] * 0.15)],
+    [Math.round(base[0] * 0.30), Math.round(base[1] * 0.30), Math.round(base[2] * 0.30)],
+    [Math.round(base[0] * 0.50), Math.round(base[1] * 0.50), Math.round(base[2] * 0.50)],
+    [Math.round(base[0] * 0.70), Math.round(base[1] * 0.70), Math.round(base[2] * 0.70)],
+    [Math.round(base[0] * 0.85), Math.round(base[1] * 0.85), Math.round(base[2] * 0.85)],
+    [base[0], base[1], base[2]],
+  ];
+}
+
+// Transition zone: hex bins fade out z11→z12.5, individual points fade in z11.5→z13
+const HEX_FADE_START = 11;
+const HEX_FADE_END = 12.5;
+const POINTS_FADE_START = 11.5;
+const POINTS_FADE_END = 13;
+
+
 // --- Vehicle fields for display ---
 const BASE_FIELDS = 'id,year,make,model,trim,listing_location,bat_location,location,gps_latitude,gps_longitude,primary_image_url';
 const RICH_FIELDS = `${BASE_FIELDS},sale_price,asking_price,current_value,nuke_estimate,mileage,color,interior_color,engine_type,engine_size,horsepower,transmission,drivetrain,body_style,condition_rating,deal_score,heat_score,created_at,bat_sale_date,auction_end_date`;
@@ -1036,64 +1066,126 @@ export default function UnifiedMap() {
       }));
     }
 
-    // --- Vehicle Hex Grid (density mode — tessellating hexagons, no stacking) ---
-    if (showVehicles && !hasQuery && mode === 'density') {
-      // Zoom-adaptive hex radius: 40km at z4 → 200m floor, scaled by slider
-      const hexRadius = Math.max(200, 40000 / Math.pow(2, Math.max(0, zoom - 4))) * (glowRadius / 60);
-      const hexColorRange: [number, number, number][] = [
-        [Math.round(vehColor[0] * 0.15), Math.round(vehColor[1] * 0.15), Math.round(vehColor[2] * 0.15)],
-        [Math.round(vehColor[0] * 0.4), Math.round(vehColor[1] * 0.4), Math.round(vehColor[2] * 0.4)],
-        [Math.round(vehColor[0] * 0.7), Math.round(vehColor[1] * 0.7), Math.round(vehColor[2] * 0.7)],
-        [vehColor[0], vehColor[1], vehColor[2]],
-        [Math.min(255, Math.round(vehColor[0] * 1.2)), Math.min(255, Math.round(vehColor[1] * 1.3)), Math.min(255, Math.round(vehColor[2] * 1.5))],
-        [255, 255, 240],
-      ];
+    // ============================================================
+    // VEHICLE LAYERS — hex binning + crossfade architecture
+    // z3-z11: HexagonLayer (aggregated hex bins)
+    // z11-z12.5: hex fades out
+    // z11.5-z13: individual ScatterplotLayer points fade in
+    // z14+: IconLayer shape evolution (rectangles)
+    // ============================================================
+    const hexRadius = hexRadiusForZoom(zoom);
+    const hexOpacity = zoom < HEX_FADE_START ? 0.85
+      : zoom > HEX_FADE_END ? 0
+      : 0.85 * ((HEX_FADE_END - zoom) / (HEX_FADE_END - HEX_FADE_START));
+    const pointsOpacity = zoom < POINTS_FADE_START ? 0
+      : zoom > POINTS_FADE_END ? 1
+      : (zoom - POINTS_FADE_START) / (POINTS_FADE_END - POINTS_FADE_START);
+
+    // --- Vehicle hex bins (all non-thermal modes, z3-z12.5) ---
+    if (showVehicles && !hasQuery && mode !== 'thermal' && hexOpacity > 0) {
       result.push(new HexagonLayer({
-        id: 'vehicle-hex',
+        id: 'vehicle-hexbins',
         data: filteredVehicles,
+        gpuAggregation: false,  // Required — CPU mode gives us object.points for the side panel
         getPosition: (d: VPin) => [d.lng, d.lat],
+        getColorWeight: (d: VPin) => d.weight || 1,
+        colorAggregation: 'SUM',
         radius: hexRadius,
+        coverage: 0.88,
         extruded: false,
-        coverage: 0.85,
-        colorRange: hexColorRange,
-        opacity: Math.min(1, glowIntensity / 50),
+        colorRange: hexColorRange(vehColor),
+        colorScaleType: 'quantile',
+        opacity: hexOpacity,
         pickable: true,
         onHover: ({ object, x, y }: any) => {
           if (object) {
-            const count = object.count || 0;
-            setHoverInfo({ x, y, text: `${count.toLocaleString()} vehicle${count !== 1 ? 's' : ''}` });
+            const count = object.points?.length || object.colorValue || 0;
+            const pts = object.points as VPin[] | undefined;
+            let detail = `${count.toLocaleString()} vehicles`;
+            if (pts && pts.length > 0) {
+              const prices = pts.filter((p: VPin) => p.price).map((p: VPin) => p.price as number);
+              if (prices.length > 0) {
+                const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+                detail += ` · avg ${fmtPrice(avg)}`;
+              }
+            }
+            setHoverInfo({ x, y, text: detail });
           } else {
             setHoverInfo(null);
           }
         },
         onClick: ({ object }: any) => {
-          if (object?.position) {
-            setViewState(vs => ({
-              ...vs,
-              longitude: object.position[0],
-              latitude: object.position[1],
-              zoom: Math.min(vs.zoom + 3, 18),
-            }));
+          if (object) {
+            deckClickedRef.current = true;
+            const pts = (object.points || []) as VPin[];
+            setSelectedPin({
+              pin: {
+                id: `hex-${object.position?.[0]?.toFixed(4)}-${object.position?.[1]?.toFixed(4)}`,
+                _isHexBin: true,
+                _hexCount: pts.length,
+                _hexPoints: pts,
+                _hexPosition: object.position,
+                lat: object.position?.[1] || 0,
+                lng: object.position?.[0] || 0,
+              } as any,
+              type: 'vehicle',
+            });
+            setTimeout(() => { deckClickedRef.current = false; }, 100);
           }
         },
         updateTriggers: {
-          radius: [glowRadius, zoom],
           colorRange: [colorPreset],
+          radius: [zoom],
         },
       }));
     }
 
-    // --- Vehicle Points (individual dots — points mode only) ---
-    if (showVehicles && !hasQuery && mode === 'points') {
+    // --- Vehicle individual points (fade in z11.5 → z13) ---
+    if (showVehicles && !hasQuery && mode !== 'thermal' && pointsOpacity > 0) {
       result.push(new ScatterplotLayer({
         id: 'vehicle-points',
         data: filteredVehicles,
         getPosition: (d: VPin) => [d.lng, d.lat],
         getRadius: 3,
         radiusUnits: 'meters' as const,
-        getFillColor: [...vehColor, 200] as [number, number, number, number],
         radiusMinPixels: 0,
         radiusMaxPixels: 8,
+        getFillColor: [...vehColor, 200] as [number, number, number, number],
+        opacity: pointsOpacity * (zoom >= 13 ? circleFade : 1),
+        pickable: pointsOpacity > 0.5,
+        onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
+        onHover: ({ object, x, y }: any) => {
+          if (object) {
+            const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
+            const price = object.price ? ' · ' + fmtPrice(object.price) : '';
+            setHoverInfo({ x, y, text: (t || 'Vehicle') + price });
+          } else {
+            setHoverInfo(null);
+          }
+        },
+        updateTriggers: { getFillColor: [colorPreset], getRadius: [pointSize, zoom], opacity: [pointsOpacity, circleFade] },
+      }));
+    }
+
+    // --- Vehicle shape evolution — rectangles at z14+ ---
+    if (showVehicles && !hasQuery && mode !== 'thermal' && shapeFade > 0) {
+      result.push(new IconLayer({
+        id: 'vehicle-shapes',
+        data: filteredVehicles,
+        getPosition: (d: VPin) => [d.lng, d.lat],
+        getIcon: () => ({
+          url: CAR_SVG_URI,
+          width: 10,
+          height: 4,
+          anchorX: 5,
+          anchorY: 2,
+        }),
+        getSize: 5,
+        sizeUnits: 'meters' as const,
+        sizeMinPixels: 0,
+        sizeMaxPixels: 8,
+        getAngle: (d: VPin) => simpleHash(d.id) % 360,
+        getColor: (d: VPin) => [...vehColor, Math.round(220 * shapeFade)] as [number, number, number, number],
         pickable: true,
         onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
         onHover: ({ object, x, y }: any) => {
@@ -1105,103 +1197,119 @@ export default function UnifiedMap() {
             setHoverInfo(null);
           }
         },
-        updateTriggers: { getFillColor: [colorPreset], getRadius: [pointSize, zoom] },
-        opacity: zoom >= 13 ? circleFade : 1,
+        updateTriggers: { getColor: [colorPreset, zoom] },
       }));
-
-      // Vehicle shapes (car rectangles) at z14+
-      if (shapeFade > 0) {
-        result.push(new IconLayer({
-          id: 'vehicle-shapes',
-          data: filteredVehicles,
-          getPosition: (d: VPin) => [d.lng, d.lat],
-          getIcon: () => ({
-            url: CAR_SVG_URI,
-            width: 10,
-            height: 4,
-            anchorX: 5,
-            anchorY: 2,
-          }),
-          getSize: 5,
-          sizeUnits: 'meters' as const,
-          sizeMinPixels: 0,
-          sizeMaxPixels: 8,
-          getAngle: (d: VPin) => simpleHash(d.id) % 360,
-          getColor: (d: VPin) => [...vehColor, Math.round(220 * shapeFade)] as [number, number, number, number],
-          pickable: true,
-          onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
-          onHover: ({ object, x, y }: any) => {
-            if (object) {
-              const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
-              const price = object.price ? ' · ' + fmtPrice(object.price) : '';
-              setHoverInfo({ x, y, text: (t || 'Vehicle') + price });
-            } else {
-              setHoverInfo(null);
-            }
-          },
-          updateTriggers: { getColor: [colorPreset, zoom] },
-        }));
-      }
     }
 
-    // --- Query Hex Grid (density mode) ---
-    if (hasQuery && queryResults.length > 0 && mode === 'density') {
-      const qColor = colors.query;
-      const hexRadius = Math.max(200, 40000 / Math.pow(2, Math.max(0, zoom - 4))) * (glowRadius / 60);
-      const qHexColorRange: [number, number, number][] = [
-        [Math.round(qColor[0] * 0.15), Math.round(qColor[1] * 0.15), Math.round(qColor[2] * 0.15)],
-        [Math.round(qColor[0] * 0.4), Math.round(qColor[1] * 0.4), Math.round(qColor[2] * 0.4)],
-        [Math.round(qColor[0] * 0.7), Math.round(qColor[1] * 0.7), Math.round(qColor[2] * 0.7)],
-        [qColor[0], qColor[1], qColor[2]],
-        [Math.min(255, Math.round(qColor[0] * 1.2)), Math.min(255, Math.round(qColor[1] * 1.3)), Math.min(255, Math.round(qColor[2] * 1.5))],
-        [255, 255, 240],
-      ];
+    // ============================================================
+    // QUERY RESULTS — hex binning + crossfade (same architecture as vehicles)
+    // ============================================================
+
+    // --- Query hex bins (z3-z12.5) ---
+    if (hasQuery && queryResults.length > 0 && mode !== 'thermal' && hexOpacity > 0) {
       result.push(new HexagonLayer({
-        id: 'query-hex',
+        id: 'query-hexbins',
         data: queryResults,
+        gpuAggregation: false,  // Required — CPU mode gives us object.points for the side panel
         getPosition: (d: VPin) => [d.lng, d.lat],
+        getColorWeight: (d: VPin) => d.weight || 1,
+        colorAggregation: 'SUM',
         radius: hexRadius,
+        coverage: 0.88,
         extruded: false,
-        coverage: 0.85,
-        colorRange: qHexColorRange,
-        opacity: Math.min(1, glowIntensity / 50),
+        colorRange: hexColorRange(colors.query),
+        colorScaleType: 'quantile',
+        opacity: hexOpacity,
         pickable: true,
         onHover: ({ object, x, y }: any) => {
           if (object) {
-            const count = object.count || 0;
-            setHoverInfo({ x, y, text: `${count.toLocaleString()} result${count !== 1 ? 's' : ''}` });
+            const count = object.points?.length || object.colorValue || 0;
+            const pts = object.points as VPin[] | undefined;
+            let detail = `${count.toLocaleString()} results`;
+            if (pts && pts.length > 0) {
+              const prices = pts.filter((p: VPin) => p.price).map((p: VPin) => p.price as number);
+              if (prices.length > 0) {
+                const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+                detail += ` · avg ${fmtPrice(avg)}`;
+              }
+            }
+            setHoverInfo({ x, y, text: detail });
           } else {
             setHoverInfo(null);
           }
         },
         onClick: ({ object }: any) => {
-          if (object?.position) {
-            setViewState(vs => ({
-              ...vs,
-              longitude: object.position[0],
-              latitude: object.position[1],
-              zoom: Math.min(vs.zoom + 3, 18),
-            }));
+          if (object) {
+            deckClickedRef.current = true;
+            const pts = (object.points || []) as VPin[];
+            setSelectedPin({
+              pin: {
+                id: `qhex-${object.position?.[0]?.toFixed(4)}-${object.position?.[1]?.toFixed(4)}`,
+                _isHexBin: true,
+                _hexCount: pts.length,
+                _hexPoints: pts,
+                _hexPosition: object.position,
+                lat: object.position?.[1] || 0,
+                lng: object.position?.[0] || 0,
+              } as any,
+              type: 'vehicle',
+            });
+            setTimeout(() => { deckClickedRef.current = false; }, 100);
           }
         },
         updateTriggers: {
-          radius: [glowRadius, zoom],
           colorRange: [colorPreset],
+          radius: [zoom],
         },
       }));
     }
 
-    // --- Query Points (individual dots — points mode only) ---
-    if (hasQuery && queryResults.length > 0 && mode === 'points') {
+    // --- Query individual points (fade in z11.5 → z13) ---
+    if (hasQuery && queryResults.length > 0 && mode !== 'thermal' && pointsOpacity > 0) {
       result.push(new ScatterplotLayer({
         id: 'query-points',
         data: queryResults,
         getPosition: (d: VPin) => [d.lng, d.lat],
         getRadius: 4,
         radiusUnits: 'meters' as const,
-        getFillColor: [...colors.query, 220] as [number, number, number, number],
         radiusMinPixels: 0,
         radiusMaxPixels: 10,
+        getFillColor: [...colors.query, 220] as [number, number, number, number],
+        opacity: pointsOpacity,
+        pickable: pointsOpacity > 0.5,
+        onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
+        onHover: ({ object, x, y }: any) => {
+          if (object) {
+            const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
+            const price = object.price ? ' · ' + fmtPrice(object.price) : '';
+            setHoverInfo({ x, y, text: (t || 'Vehicle') + price });
+          } else {
+            setHoverInfo(null);
+          }
+        },
+        updateTriggers: { getRadius: [pointSize, zoom], opacity: [pointsOpacity] },
+      }));
+    }
+
+    // --- Query shape evolution — rectangles at z14+ ---
+    if (hasQuery && queryResults.length > 0 && mode !== 'thermal' && shapeFade > 0) {
+      result.push(new IconLayer({
+        id: 'query-shapes',
+        data: queryResults,
+        getPosition: (d: VPin) => [d.lng, d.lat],
+        getIcon: () => ({
+          url: CAR_SVG_URI,
+          width: 10,
+          height: 4,
+          anchorX: 5,
+          anchorY: 2,
+        }),
+        getSize: 5,
+        sizeUnits: 'meters' as const,
+        sizeMinPixels: 0,
+        sizeMaxPixels: 14,
+        getAngle: (d: VPin) => simpleHash(d.id) % 360,
+        getColor: [...colors.query, Math.round(220 * shapeFade)] as [number, number, number, number],
         pickable: true,
         onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
         onHover: ({ object, x, y }: any) => {
@@ -1213,7 +1321,7 @@ export default function UnifiedMap() {
             setHoverInfo(null);
           }
         },
-        updateTriggers: { getRadius: [pointSize, zoom] },
+        updateTriggers: { getColor: [colorPreset, zoom] },
       }));
     }
 
@@ -1776,7 +1884,112 @@ export default function UnifiedMap() {
             </button>
 
             {type === 'vehicle' && (() => {
-              const v = pin as VPin;
+              
+              const v = pin as any;
+
+              // ---- HEX BIN aggregate panel ----
+              if (v._isHexBin) {
+                const pts = (v._hexPoints || []) as VPin[];
+                const count = pts.length;
+                const prices = pts.filter((p: VPin) => p.price).map((p: VPin) => p.price as number);
+                const avgPrice = prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null;
+                const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+                const maxPrice = prices.length > 0 ? Math.max(...prices) : null;
+                const makeCounts: Record<string, number> = {};
+                pts.forEach((p: VPin) => { if (p.make) makeCounts[p.make] = (makeCounts[p.make] || 0) + 1; });
+                const topMakes = Object.entries(makeCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+                const modelCounts: Record<string, number> = {};
+                pts.forEach((p: VPin) => {
+                  const key = [p.make, p.model].filter(Boolean).join(' ');
+                  if (key) modelCounts[key] = (modelCounts[key] || 0) + 1;
+                });
+                const topModels = Object.entries(modelCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+                const years = pts.filter((p: VPin) => p.year).map((p: VPin) => Number(p.year)).filter(y => y > 1900);
+                const yearMin = years.length > 0 ? Math.min(...years) : null;
+                const yearMax = years.length > 0 ? Math.max(...years) : null;
+
+                return (
+                  <div style={{ padding: 0 }}>
+                    <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)', marginBottom: 4, fontWeight: 600 }}>HEX BIN</div>
+                      <div style={{ fontWeight: 700, fontSize: '22px', fontFamily: 'monospace', color: 'var(--text)' }}>{count.toLocaleString()}</div>
+                      <div style={{ color: 'var(--text-disabled)', fontSize: '10px' }}>vehicles in this area</div>
+                    </div>
+                    {avgPrice != null && (
+                      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)', marginBottom: 6, fontWeight: 600 }}>PRICE</div>
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'baseline', marginBottom: 4 }}>
+                          <span style={{ color: '#4ade80', fontWeight: 700, fontSize: '16px', fontFamily: 'monospace' }}>{fmtPrice(avgPrice)}</span>
+                          <span style={{ color: 'var(--text-disabled)', fontSize: '10px' }}>avg</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 16, fontSize: '10px', color: 'var(--text-disabled)' }}>
+                          {minPrice != null && <span>Low: <strong style={{ color: 'var(--text)' }}>{fmtPrice(minPrice)}</strong></span>}
+                          {maxPrice != null && <span>High: <strong style={{ color: 'var(--text)' }}>{fmtPrice(maxPrice)}</strong></span>}
+                        </div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-disabled)', marginTop: 4 }}>{prices.length} priced of {count}</div>
+                      </div>
+                    )}
+                    {yearMin != null && yearMax != null && (
+                      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)', marginBottom: 4, fontWeight: 600 }}>YEARS</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text)', fontFamily: 'monospace' }}>
+                          {yearMin === yearMax ? yearMin : `${yearMin} \u2013 ${yearMax}`}
+                        </div>
+                      </div>
+                    )}
+                    {topMakes.length > 0 && (
+                      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)', marginBottom: 6, fontWeight: 600 }}>TOP MAKES</div>
+                        {topMakes.map(([make, n]) => (
+                          <div key={make} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text)' }}>{make}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <div style={{ width: Math.max(4, Math.round((n / count) * 80)), height: 3, background: 'var(--text-disabled)' }} />
+                              <span style={{ fontSize: '10px', color: 'var(--text-disabled)', fontVariantNumeric: 'tabular-nums', minWidth: 20, textAlign: 'right' }}>{n}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {topModels.length > 0 && (
+                      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)', marginBottom: 6, fontWeight: 600 }}>TOP MODELS</div>
+                        {topModels.map(([model, n]) => (
+                          <div key={model} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0' }}>
+                            <span style={{ fontSize: '10px', color: 'var(--text)' }}>{model}</span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-disabled)', fontVariantNumeric: 'tabular-nums' }}>{n}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ padding: '10px 14px' }}>
+                      <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)', marginBottom: 6, fontWeight: 600 }}>
+                        VEHICLES ({count > 10 ? 'TOP 10' : count})
+                      </div>
+                      {pts
+                        .slice()
+                        .sort((a, b) => (b.price || 0) - (a.price || 0))
+                        .slice(0, 10)
+                        .map((p: VPin) => {
+                          const t = [p.year, p.make, p.model].filter(Boolean).join(' ') || 'Vehicle';
+                          return (
+                            <a key={p.id} href={`/vehicle/${p.id}`} style={{
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              padding: '4px 0', textDecoration: 'none', borderBottom: '1px solid var(--border)',
+                            }}>
+                              <span style={{ fontSize: '10px', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>{t}</span>
+                              <span style={{ fontSize: '10px', color: p.price ? '#4ade80' : 'var(--text-disabled)', fontFamily: 'monospace', flexShrink: 0 }}>
+                                {p.price ? fmtPrice(p.price) : '\u2014'}
+                              </span>
+                            </a>
+                          );
+                        })}
+                    </div>
+                  </div>
+                );
+              }
+
+              // ---- Single vehicle panel (original) ----
               const title = [v.year, v.make, v.model].filter(Boolean).join(' ') || 'Vehicle';
               const subtitle = [v.trim, v.body].filter(Boolean).join(' \u00b7 ');
               const specs = [v.color, v.engine, v.hp ? `${v.hp}hp` : null, v.trans, v.drive].filter(Boolean);
