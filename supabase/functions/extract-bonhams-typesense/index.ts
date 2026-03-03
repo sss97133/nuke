@@ -20,6 +20,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *   POST { "mode": "ingest", "filter": "price.hammerPrice:>0", "batch_size": 250 }
  *     → Ingest only sold cars
  *
+ *   POST { "mode": "archive", "batch_size": 50, "max_pages": 2 }
+ *     → Typesense discovers URLs → archiveFetch (Firecrawl) archives raw HTML/markdown
+ *     → Stored in listing_page_snapshots. "Fetch once, extract forever."
+ *
  *   POST { "mode": "stats" }
  *     → Return count of available cars and import_queue overlap
  *
@@ -28,6 +32,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { archiveFetch } from "../_shared/archiveFetch.ts";
 
 // ─── Typesense API config ─────────────────────────────────────────────────────
 
@@ -565,7 +570,124 @@ Deno.serve(async (req) => {
       });
     }
 
-    return okJson({ success: false, error: `Unknown mode: ${mode}. Use "search", "ingest", or "stats".` }, 400);
+    // ─── MODE: archive ──────────────────────────────────────────────────
+    // Typesense for URL discovery → archiveFetch (Firecrawl) for raw page archival.
+    // "Fetch once, extract forever." Stores raw HTML/markdown in listing_page_snapshots.
+    if (mode === "archive") {
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      );
+
+      const stats = {
+        pages_fetched: 0,
+        urls_discovered: 0,
+        archived: 0,
+        already_cached: 0,
+        archive_errors: 0,
+        errors: [] as string[],
+      };
+
+      const startTime = Date.now();
+      const TIMEOUT_MS = 50_000; // 50s — leave room for final archiveFetch calls
+
+      // Phase 1: Get URLs from Typesense (free, fast)
+      let currentPage = startPage;
+      const maxPagesLimit = Number(max_pages) || 2; // default 2 pages for archive
+      const urls: Array<{ url: string; title: string }> = [];
+
+      while (urls.length < perPage * maxPagesLimit) {
+        if (Date.now() - startTime > TIMEOUT_MS / 2) break; // save half the time for archiving
+        if (maxPagesLimit > 0 && stats.pages_fetched >= maxPagesLimit) break;
+
+        let data: TypesenseResponse;
+        try {
+          data = await searchTypesense(query, currentPage, perPage, filter || undefined);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          stats.errors.push(`Typesense page ${currentPage}: ${msg}`);
+          break;
+        }
+
+        stats.pages_fetched++;
+        if (!data.hits || data.hits.length === 0) break;
+
+        for (const hit of data.hits) {
+          const doc = hit.document;
+          if (!doc.title || doc.title.length < 3) continue;
+          urls.push({ url: buildLotUrl(doc), title: doc.title });
+        }
+
+        if (data.hits.length < perPage) break;
+        currentPage++;
+      }
+
+      stats.urls_discovered = urls.length;
+
+      // Phase 2: Check which URLs are already archived
+      const urlList = urls.map((u) => u.url);
+      const { data: existing } = await supabase
+        .from("listing_page_snapshots")
+        .select("listing_url")
+        .in("listing_url", urlList.slice(0, 500)) // Supabase IN limit
+        .eq("success", true);
+
+      const alreadyArchived = new Set((existing ?? []).map((r: any) => r.listing_url));
+      const toArchive = urls.filter((u) => !alreadyArchived.has(u.url));
+      stats.already_cached = urls.length - toArchive.length;
+
+      // Phase 3: archiveFetch each unarchived URL (Firecrawl for Bonhams SPA)
+      for (const item of toArchive) {
+        if (Date.now() - startTime > TIMEOUT_MS) {
+          stats.errors.push(`Timeout after archiving ${stats.archived} pages`);
+          break;
+        }
+
+        try {
+          const result = await archiveFetch(item.url, {
+            platform: "bonhams",
+            useFirecrawl: true,
+            includeMarkdown: true,
+            waitForJs: 5000,
+            maxAgeSec: 86400 * 30, // 30 day cache — Bonhams lots don't change often
+            callerName: "extract-bonhams-typesense",
+            metadata: { title: item.title, source: "typesense-discovery" },
+          });
+
+          if (result.cached) {
+            stats.already_cached++;
+          } else if (result.html && result.html.length > 1000) {
+            stats.archived++;
+          } else {
+            stats.archive_errors++;
+            stats.errors.push(`${item.url}: empty or garbage HTML (${result.html?.length ?? 0} bytes)`);
+          }
+        } catch (err: unknown) {
+          stats.archive_errors++;
+          const msg = err instanceof Error ? err.message : String(err);
+          stats.errors.push(`${item.url}: ${msg}`);
+        }
+      }
+
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+      return okJson({
+        success: true,
+        mode: "archive",
+        query,
+        filter: filter || null,
+        stats: {
+          ...stats,
+          elapsed_seconds: elapsed,
+          resume_page: currentPage + 1,
+        },
+        next: toArchive.length > stats.archived
+          ? { message: `More URLs to archive. Resume with page=${currentPage + 1}` }
+          : null,
+      });
+    }
+
+    return okJson({ success: false, error: `Unknown mode: ${mode}. Use "search", "ingest", "archive", or "stats".` }, 400);
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
