@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import DeckGL from '@deck.gl/react';
 import { ScatterplotLayer, TextLayer, GeoJsonLayer, IconLayer } from '@deck.gl/layers';
-import { HeatmapLayer } from '@deck.gl/aggregation-layers';
+import { HeatmapLayer, HexagonLayer } from '@deck.gl/aggregation-layers';
 import { Map } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { supabase } from '../../lib/supabase';
@@ -1036,35 +1036,55 @@ export default function UnifiedMap() {
       }));
     }
 
-    // --- Vehicle Glow ---
-    if (showVehicles && !hasQuery && mode === 'density' && glowFade > 0) {
-      result.push(new ScatterplotLayer({
-        id: 'vehicle-glow',
+    // --- Vehicle Hex Grid (density mode — tessellating hexagons, no stacking) ---
+    if (showVehicles && !hasQuery && mode === 'density') {
+      // Zoom-adaptive hex radius: 40km at z4 → 200m floor, scaled by slider
+      const hexRadius = Math.max(200, 40000 / Math.pow(2, Math.max(0, zoom - 4))) * (glowRadius / 60);
+      const hexColorRange: [number, number, number][] = [
+        [Math.round(vehColor[0] * 0.15), Math.round(vehColor[1] * 0.15), Math.round(vehColor[2] * 0.15)],
+        [Math.round(vehColor[0] * 0.4), Math.round(vehColor[1] * 0.4), Math.round(vehColor[2] * 0.4)],
+        [Math.round(vehColor[0] * 0.7), Math.round(vehColor[1] * 0.7), Math.round(vehColor[2] * 0.7)],
+        [vehColor[0], vehColor[1], vehColor[2]],
+        [Math.min(255, Math.round(vehColor[0] * 1.2)), Math.min(255, Math.round(vehColor[1] * 1.3)), Math.min(255, Math.round(vehColor[2] * 1.5))],
+        [255, 255, 240],
+      ];
+      result.push(new HexagonLayer({
+        id: 'vehicle-hex',
         data: filteredVehicles,
         getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: (d: VPin) => d.weight * 500,
-        radiusUnits: 'meters' as const,
-        getFillColor: [...vehColor, glowAlpha] as [number, number, number, number],
-        radiusMinPixels: 0,
-        radiusMaxPixels: glowRadius,
-        opacity: glowFade,
+        radius: hexRadius,
+        extruded: false,
+        coverage: 0.85,
+        colorRange: hexColorRange,
+        opacity: Math.min(1, glowIntensity / 50),
         pickable: true,
-        onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
-            const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
-            const price = object.price ? ' · ' + fmtPrice(object.price) : '';
-            setHoverInfo({ x, y, text: (t || 'Vehicle') + price });
+            const count = object.count || 0;
+            setHoverInfo({ x, y, text: `${count.toLocaleString()} vehicle${count !== 1 ? 's' : ''}` });
           } else {
             setHoverInfo(null);
           }
         },
-        updateTriggers: { getFillColor: [glowAlpha, colorPreset], getRadius: [glowRadius, zoom] },
+        onClick: ({ object }: any) => {
+          if (object?.position) {
+            setViewState(vs => ({
+              ...vs,
+              longitude: object.position[0],
+              latitude: object.position[1],
+              zoom: Math.min(vs.zoom + 3, 18),
+            }));
+          }
+        },
+        updateTriggers: {
+          radius: [glowRadius, zoom],
+          colorRange: [colorPreset],
+        },
       }));
     }
 
-    // --- Vehicle Points ---
-    if (showVehicles && !hasQuery && mode !== 'thermal') {
+    // --- Vehicle Points (individual dots — points mode only) ---
+    if (showVehicles && !hasQuery && mode === 'points') {
       result.push(new ScatterplotLayer({
         id: 'vehicle-points',
         data: filteredVehicles,
@@ -1124,35 +1144,55 @@ export default function UnifiedMap() {
       }
     }
 
-    // --- Query Glow ---
-    if (hasQuery && queryResults.length > 0 && mode === 'density' && glowFade > 0) {
-      result.push(new ScatterplotLayer({
-        id: 'query-glow',
+    // --- Query Hex Grid (density mode) ---
+    if (hasQuery && queryResults.length > 0 && mode === 'density') {
+      const qColor = colors.query;
+      const hexRadius = Math.max(200, 40000 / Math.pow(2, Math.max(0, zoom - 4))) * (glowRadius / 60);
+      const qHexColorRange: [number, number, number][] = [
+        [Math.round(qColor[0] * 0.15), Math.round(qColor[1] * 0.15), Math.round(qColor[2] * 0.15)],
+        [Math.round(qColor[0] * 0.4), Math.round(qColor[1] * 0.4), Math.round(qColor[2] * 0.4)],
+        [Math.round(qColor[0] * 0.7), Math.round(qColor[1] * 0.7), Math.round(qColor[2] * 0.7)],
+        [qColor[0], qColor[1], qColor[2]],
+        [Math.min(255, Math.round(qColor[0] * 1.2)), Math.min(255, Math.round(qColor[1] * 1.3)), Math.min(255, Math.round(qColor[2] * 1.5))],
+        [255, 255, 240],
+      ];
+      result.push(new HexagonLayer({
+        id: 'query-hex',
         data: queryResults,
         getPosition: (d: VPin) => [d.lng, d.lat],
-        getRadius: (d: VPin) => d.weight * 500,
-        radiusUnits: 'meters' as const,
-        getFillColor: [...colors.query, glowAlpha] as [number, number, number, number],
-        radiusMinPixels: 0,
-        radiusMaxPixels: glowRadius,
-        opacity: glowFade,
+        radius: hexRadius,
+        extruded: false,
+        coverage: 0.85,
+        colorRange: qHexColorRange,
+        opacity: Math.min(1, glowIntensity / 50),
         pickable: true,
-        onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
-            const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
-            const price = object.price ? ' · ' + fmtPrice(object.price) : '';
-            setHoverInfo({ x, y, text: (t || 'Vehicle') + price });
+            const count = object.count || 0;
+            setHoverInfo({ x, y, text: `${count.toLocaleString()} result${count !== 1 ? 's' : ''}` });
           } else {
             setHoverInfo(null);
           }
         },
-        updateTriggers: { getRadius: [glowRadius, zoom] },
+        onClick: ({ object }: any) => {
+          if (object?.position) {
+            setViewState(vs => ({
+              ...vs,
+              longitude: object.position[0],
+              latitude: object.position[1],
+              zoom: Math.min(vs.zoom + 3, 18),
+            }));
+          }
+        },
+        updateTriggers: {
+          radius: [glowRadius, zoom],
+          colorRange: [colorPreset],
+        },
       }));
     }
 
-    // --- Query Points ---
-    if (hasQuery && queryResults.length > 0 && mode !== 'thermal') {
+    // --- Query Points (individual dots — points mode only) ---
+    if (hasQuery && queryResults.length > 0 && mode === 'points') {
       result.push(new ScatterplotLayer({
         id: 'query-points',
         data: queryResults,
@@ -1619,7 +1659,7 @@ export default function UnifiedMap() {
                     color: mode === m ? 'var(--bg)' : 'var(--text-disabled)',
                     border: '1px solid var(--border)',
                     cursor: 'pointer' }}>
-                    {m === 'density' ? 'GLOW' : m === 'points' ? 'POINTS' : 'THERMAL'}
+                    {m === 'density' ? 'HEX' : m === 'points' ? 'POINTS' : 'THERMAL'}
                   </button>
                 ))}
               </div>
@@ -1643,8 +1683,8 @@ export default function UnifiedMap() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <SliderControl label="Point Size" value={pointSize} min={1} max={12} onChange={setPointSize} />
                 {(mode === 'density' || mode === 'thermal') && <>
-                  <SliderControl label={mode === 'thermal' ? 'Heat Rad' : 'Glow Rad'} value={glowRadius} min={5} max={200} onChange={setGlowRadius} />
-                  <SliderControl label={mode === 'thermal' ? 'Heat Int' : 'Glow Int'} value={glowIntensity} min={1} max={100} onChange={setGlowIntensity} />
+                  <SliderControl label={mode === 'thermal' ? 'Heat Rad' : 'Hex Size'} value={glowRadius} min={5} max={200} onChange={setGlowRadius} />
+                  <SliderControl label={mode === 'thermal' ? 'Heat Int' : 'Opacity'} value={glowIntensity} min={1} max={100} onChange={setGlowIntensity} />
                 </>}
               </div>
             </div>
