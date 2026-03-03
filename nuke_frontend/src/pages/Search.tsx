@@ -496,7 +496,7 @@ export default function Search() {
     }
   }, [searchQuery, setSearchParams]);
 
-  const handleSearchResults = (searchResults: SearchResult[], summary: string) => {
+  const handleSearchResults = useCallback((searchResults: SearchResult[], summary: string) => {
     setResults(searchResults);
     setSearchSummary(summary);
     setLoading(false);
@@ -508,7 +508,7 @@ export default function Search() {
       resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
 
-    const q = (searchParams.get('q') || searchQuery || '').trim();
+    const q = searchQuery.trim();
     if (looksLikeQuestion(q)) {
       generateAnswer(q, searchResults);
     } else {
@@ -517,7 +517,7 @@ export default function Search() {
       setAnswerLoading(false);
       setAnswerSources([]);
     }
-  };
+  }, [searchQuery]);
 
   // Fetch enrichment data (price, mileage, transmission, for-sale, location) for vehicle results
   useEffect(() => {
@@ -709,15 +709,14 @@ export default function Search() {
     resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // Sync searchQuery with URL parameter — set loading immediately when URL changes
+  // Sync searchQuery with URL parameter — only update query text, let IntelligentSearch
+  // handle the search lifecycle (loading state, results). Clearing results here caused a
+  // race condition where the effect fired mid-search and wiped already-returned results.
   useEffect(() => {
     const urlQuery = searchParams.get('q') || '';
     if (urlQuery !== searchQuery) {
       setSearchQuery(urlQuery);
-      if (urlQuery) {
-        setLoading(true);
-        setSearchSummary('');
-      } else {
+      if (!urlQuery) {
         setLoading(false);
         setResults([]);
         setSearchSummary('');

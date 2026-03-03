@@ -838,6 +838,11 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
     }
   }, [initialQuery, query]);
 
+  // Stable ref for executeSearch so the auto-trigger effect doesn't re-fire
+  // every time onSearchResults (and thus executeSearch) is recreated.
+  const executeSearchRef = useRef(executeSearch);
+  executeSearchRef.current = executeSearch;
+
   // Auto-trigger search when initialQuery is provided
   useEffect(() => {
     const trimmed = initialQuery?.trim();
@@ -846,10 +851,10 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
       setHasInitialSearched(true);
       setIsSearching(true);
       setTimeout(() => {
-        executeSearch(trimmed);
+        executeSearchRef.current(trimmed);
       }, 100);
     }
-  }, [initialQuery, executeSearch]);
+  }, [initialQuery]);
 
   const searchVehicles = async (query: string, analysis: any): Promise<SearchResult[]> => {
     try {
