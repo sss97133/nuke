@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@annotorious/react": "^3.7.18",
+    "@deck.gl/aggregation-layers": "^9.2.10",
     "@deck.gl/core": "^9.2.10",
     "@deck.gl/layers": "^9.2.10",
     "@deck.gl/react": "^9.2.10",
