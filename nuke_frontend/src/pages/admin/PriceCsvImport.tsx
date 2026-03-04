@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { AdminNotificationService } from '../../services/adminNotificationService';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface CsvRow {
   id: string;
