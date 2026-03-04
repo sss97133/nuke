@@ -1,1 +1,0 @@
-LOAD_FROM_FILE:/home/user/workspace/org_push_args.json
