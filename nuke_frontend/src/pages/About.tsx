@@ -1,5 +1,5 @@
 import React from 'react';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 const About: React.FC = () => {
   return (
@@ -1604,4 +1604,3 @@ SHIPPING SYSTEM:
 };
 
 export default About;
-
