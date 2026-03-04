@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useAcquisitionPipeline } from '../hooks/useAcquisitionPipeline';
 import type { PipelineEntry } from '../hooks/useAcquisitionPipeline';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 type ViewFilter = 'targets' | 'active' | 'all';
 
