@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import SearchFilters from './feed/SearchFilters';
 import ContentCard from './feed/ContentCard';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 export interface FeedItem {
   id: string;
