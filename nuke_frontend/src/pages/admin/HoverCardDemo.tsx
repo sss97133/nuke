@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { ImageHoverPreview, AnalysisModelPopup, IDHoverCard, IDText } from '../../components/admin';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 export default function HoverCardDemo() {
   // Example IDs (these won't load real data, but show the UI)
