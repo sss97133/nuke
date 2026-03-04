@@ -30,8 +30,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
     return (
       <div style={{
         width: '100%',
-        aspectRatio: '16/9',
-        maxHeight: '260px',
+        height: 'var(--h-hero, 420px)',
         backgroundColor: '#2a2a2a',
         display: 'flex',
         alignItems: 'center',
@@ -73,8 +72,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
             <div
               style={{
                 width: '100%',
-                aspectRatio: '16/9',
-                maxHeight: '260px',
+                height: 'var(--h-hero, 420px)',
                 position: 'relative',
                 overflow: 'hidden',
                 backgroundColor: '#2a2a2a',
