@@ -5,239 +5,229 @@ interface LotBadgeProps {
   lotNumber?: string | null;
   date?: string | null;
   location?: string | null;
+  auctionHouse?: string | null;
   salePrice?: number | null;
+  currency?: string;
   estimateLow?: number | null;
   estimateHigh?: number | null;
-  listingUrl?: string | null;
-  className?: string;
-  style?: React.CSSProperties;
+  compact?: boolean;
+  showDetails?: boolean;
 }
 
-/**
- * LotBadge - Clickable badge showing lot number, date, and location for live auctions (e.g., Mecum)
- * Clicking reveals additional auction details
- */
-export const LotBadge: React.FC<LotBadgeProps> = ({
+const LotBadge: React.FC<LotBadgeProps> = ({
   lotNumber,
   date,
   location,
+  auctionHouse,
   salePrice,
+  currency = 'USD',
   estimateLow,
   estimateHigh,
-  listingUrl,
-  className,
-  style,
+  compact = false,
+  showDetails = true
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Don't render if we don't have the essential data
-  if (!lotNumber && !date && !location) {
+  if (!lotNumber && !date && !location && !auctionHouse && !salePrice) {
     return null;
   }
 
-  const formatDate = (dateString: string | null | undefined): string => {
-    if (!dateString) return '';
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
     try {
-      const date = new Date(dateString);
-      if (!Number.isFinite(date.getTime())) return dateString;
-      
-      const options: Intl.DateTimeFormatOptions = { 
-        month: 'long', 
-        day: 'numeric', 
-        year: 'numeric' 
-      };
-      const formattedDate = date.toLocaleDateString('en-US', options);
-      const day = date.getDate();
-      
-      // Add ordinal suffix
-      let suffix = 'th';
-      if (day === 1 || day === 21 || day === 31) {
-        suffix = 'st';
-      } else if (day === 2 || day === 22) {
-        suffix = 'nd';
-      } else if (day === 3 || day === 23) {
-        suffix = 'rd';
-      }
-      
-      // Replace the day number with day + suffix
-      return formattedDate.replace(/\d+/, `${day}${suffix}`);
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
     } catch {
       return dateString;
     }
   };
 
-  const formatCurrency = (amount: number | null | undefined): string => {
-    if (!amount || !Number.isFinite(amount)) return '';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const containerStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    flexDirection: compact ? 'row' : 'column',
+    gap: compact ? '8px' : '4px',
+    padding: compact ? '4px 8px' : '8px 12px',
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: '4px',
+    fontSize: compact ? '11px' : '12px',
+    cursor: showDetails ? 'pointer' : 'default',
+    maxWidth: compact ? 'none' : '280px',
+    width: '100%'
   };
 
-  const formattedDate = formatDate(date);
-  const hasDetails = salePrice || estimateLow || estimateHigh || listingUrl || lotNumber || date || location;
-  
-  // Determine if auction is upcoming (date is in the future)
-  const isUpcoming = date ? new Date(date) > new Date() : false;
-  const isPast = salePrice !== null && salePrice !== undefined;
+  const headerStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexWrap: 'wrap'
+  };
+
+  const badgeStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '2px 6px',
+    background: 'var(--accent)',
+    color: 'var(--bg)',
+    borderRadius: '3px',
+    fontWeight: 700,
+    fontSize: compact ? '10px' : '11px',
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase'
+  };
+
+  const priceStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '2px 6px',
+    background: salePrice ? 'var(--success)' : 'var(--bg)',
+    color: salePrice ? 'var(--bg)' : 'var(--text-muted)',
+    border: salePrice ? 'none' : '1px solid var(--border)',
+    borderRadius: '3px',
+    fontWeight: salePrice ? 700 : 400,
+    fontSize: compact ? '10px' : '11px'
+  };
+
+  const detailStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+    marginTop: '4px',
+    paddingTop: '4px',
+    borderTop: '1px solid var(--border)',
+    fontSize: '11px',
+    color: 'var(--text-secondary)'
+  };
+
+  const detailRowStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '8px'
+  };
+
+  const hasEstimates = estimateLow || estimateHigh;
 
   return (
     <div
-      className={className}
-      style={{
-        position: 'relative',
-        display: 'inline-block',
-        ...style,
-      }}
+      style={containerStyle}
+      onClick={() => showDetails && setIsExpanded(!isExpanded)}
+      title={showDetails ? (isExpanded ? 'Click to collapse' : 'Click for details') : undefined}
     >
-      <button
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (hasDetails) {
-            setIsExpanded(!isExpanded);
-          }
-        }}
-        style={{
-          background: isPast ? 'var(--success-dim)' : isUpcoming ? 'var(--info-bg, var(--accent-dim, #dbeafe))' : 'var(--warning-dim)',
-          border: `1px solid ${isPast ? 'var(--success)' : isUpcoming ? 'var(--accent)' : 'var(--warning)'}`,
-          borderRadius: '3px',
-          padding: '2px 6px',
-          cursor: hasDetails ? 'pointer' : 'default',
-          fontFamily: 'inherit',
-          fontSize: '9px',
-          color: isPast ? 'var(--success)' : isUpcoming ? 'var(--accent)' : 'var(--warning)',
-          fontWeight: 700,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          transition: 'all 0.12s ease',
-          textAlign: 'left',
-          whiteSpace: 'nowrap',
-          lineHeight: '1.2'
-        }}
-        onMouseEnter={(e) => {
-          if (hasDetails) {
-            e.currentTarget.style.opacity = '0.85';
-          }
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.opacity = '1';
-        }}
-        title={hasDetails ? 'Click for auction details' : undefined}
-      >
-        {isPast ? 'SOLD' : isUpcoming ? 'UPCOMING' : 'AUCTION'}
-        {hasDetails && (
-          <span style={{ 
-            fontSize: '8px',
-            transition: 'transform 0.12s ease',
-            transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-            lineHeight: '1'
-          }}>
-            ▼
+      {/* Header Row */}
+      <div style={headerStyle}>
+        {/* Auction Badge */}
+        {lotNumber && (
+          <div style={badgeStyle}>
+            <span>Lot</span>
+            <span>#{lotNumber}</span>
+          </div>
+        )}
+
+        {/* Sale Price */}
+        <div style={priceStyle}>
+          {salePrice ? (
+            <>
+              <span>Sold</span>
+              <span>{formatCurrency(salePrice)}</span>
+            </>
+          ) : (
+            <span>Price TBD</span>
+          )}
+        </div>
+
+        {/* Auction House shorthand */}
+        {auctionHouse && compact && (
+          <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>
+            {auctionHouse.length > 20 ? auctionHouse.substring(0, 20) + '...' : auctionHouse}
           </span>
         )}
-      </button>
 
-      {isExpanded && hasDetails && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            right: 0,
-            marginTop: '4px',
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            padding: '8px 10px',
-            minWidth: '180px',
-            maxWidth: '250px',
-            zIndex: 1000,
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            fontSize: '11px',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {lotNumber && (
-            <div style={{ marginBottom: '6px' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '9px', marginBottom: '2px' }}>
-                Lot Number
-              </div>
-              <div style={{ fontWeight: 600, fontSize: '12px' }}>
-                {lotNumber}
-              </div>
+        {/* Expand indicator */}
+        {showDetails && !compact && (
+          <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '10px' }}>
+            {isExpanded ? '▲' : '▼'}
+          </span>
+        )}
+      </div>
+
+      {/* Date/Location Row - always visible in non-compact */}
+      {!compact && (date || location) && (
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
+          {date && (
+            <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+              📅 {formatDate(date)}
+            </span>
+          )}
+          {location && (
+            <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+              📍 {location.length > 25 ? location.substring(0, 25) + '...' : location}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Expanded Details */}
+      {isExpanded && showDetails && (
+        <div style={detailStyle}>
+          {auctionHouse && (
+            <div style={detailRowStyle}>
+              <span style={{ fontWeight: 600 }}>Auction House</span>
+              <span>{auctionHouse}</span>
             </div>
           )}
-          {formattedDate && (
-            <div style={{ marginBottom: '6px' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '9px', marginBottom: '2px' }}>
-                Date
-              </div>
-              <div style={{ fontWeight: 600, fontSize: '12px' }}>
-                {formattedDate}
-              </div>
+          {date && (
+            <div style={detailRowStyle}>
+              <span style={{ fontWeight: 600 }}>Date</span>
+              <span>{formatDate(date)}</span>
             </div>
           )}
           {location && (
-            <div style={{ marginBottom: '6px' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '9px', marginBottom: '2px' }}>
-                Location
-              </div>
-              <div style={{ fontWeight: 600, fontSize: '12px' }}>
-                {location}
-              </div>
+            <div style={detailRowStyle}>
+              <span style={{ fontWeight: 600 }}>Location</span>
+              <span>{location}</span>
+            </div>
+          )}
+          {hasEstimates && (
+            <div style={detailRowStyle}>
+              <span style={{ fontWeight: 600 }}>Estimate</span>
+              <span>
+                {estimateLow && formatCurrency(estimateLow)}
+                {estimateLow && estimateHigh && ' – '}
+                {estimateHigh && formatCurrency(estimateHigh)}
+              </span>
             </div>
           )}
           {salePrice && (
-            <div style={{ marginBottom: '6px' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '9px', marginBottom: '2px' }}>
-                Sold For
-              </div>
-              <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--success)' }}>
+            <div style={detailRowStyle}>
+              <span style={{ fontWeight: 600 }}>Sale Price</span>
+              <span style={{ color: 'var(--success)', fontWeight: 700 }}>
                 {formatCurrency(salePrice)}
-              </div>
+              </span>
             </div>
           )}
-          {(estimateLow || estimateHigh) && (
-            <div style={{ marginBottom: '6px' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '9px', marginBottom: '2px' }}>
-                Estimate
-              </div>
-              <div style={{ fontWeight: 600, fontSize: '12px' }}>
-                {estimateLow && estimateHigh
-                  ? `${formatCurrency(estimateLow)} - ${formatCurrency(estimateHigh)}`
-                  : estimateLow
-                  ? `From ${formatCurrency(estimateLow)}`
-                  : estimateHigh
-                  ? `Up to ${formatCurrency(estimateHigh)}`
-                  : ''}
-              </div>
-            </div>
-          )}
-          {listingUrl && (
-            <div>
-              <a
-                href={listingUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  color: 'var(--accent)',
-                  textDecoration: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.textDecoration = 'underline';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.textDecoration = 'none';
-                }}
-              >
-                View Listing →
-              </a>
+          {salePrice && estimateLow && (
+            <div style={detailRowStyle}>
+              <span style={{ fontWeight: 600 }}>vs. Estimate</span>
+              <span style={{
+                color: salePrice >= estimateLow ? 'var(--success)' : 'var(--error)',
+                fontWeight: 700
+              }}>
+                {salePrice >= estimateLow ? '+' : ''}
+                {((salePrice - estimateLow) / estimateLow * 100).toFixed(1)}%
+              </span>
             </div>
           )}
         </div>
@@ -246,3 +236,4 @@ export const LotBadge: React.FC<LotBadgeProps> = ({
   );
 };
 
+export default LotBadge;
