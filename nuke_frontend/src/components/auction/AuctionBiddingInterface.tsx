@@ -4,7 +4,7 @@ import { AuctionService } from '../../services/auctionService';
 import AuctionPaymentService from '../../services/auctionPaymentService';
 import { useAuth } from '../../hooks/useAuth';
 import PaymentMethodSetup from './PaymentMethodSetup';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface AuctionBiddingInterfaceProps {
   listingId: string;

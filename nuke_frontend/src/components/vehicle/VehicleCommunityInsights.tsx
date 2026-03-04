@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { MessageCircle, TrendingUp, AlertTriangle, Star, Quote, DollarSign, X, Wrench, Search, ExternalLink, Sparkles, Loader2 } from 'lucide-react';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 // Issue detail popup for red flags and highlights
 interface IssuePopupProps {

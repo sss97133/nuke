@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, getCurrentUserId } from '../../lib/supabase';
 import { useToast } from '../../hooks/useToast';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface Critique {
   id: string;

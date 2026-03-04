@@ -14,7 +14,7 @@ import { ClickablePartModal } from '../parts/ClickablePartModal';
 import { AnnotoriousImageTagger } from './AnnotoriousImageTagger';
 import { ImageInfoPanel } from './ImageInfoPanel';
 import { AdminNotificationService } from '../../services/adminNotificationService';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface ImageLightboxProps {
   imageUrl: string;
@@ -920,7 +920,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     async (opts?: { forceReprocess?: boolean }) => {
       if (!imageUrl) return;
 
-      // Without image_id we can’t reliably hit caching/persistence.
+      // Without image_id we can't reliably hit caching/persistence.
       if (!imageId) {
         const msg = 'Missing image ID — cannot run analysis safely.';
         console.warn('[ImageLightbox] Skipping AI analysis:', msg);
@@ -1493,7 +1493,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               Tag Image
             </button>
             <button
-              onClick={() => { 
+              onClick={() => {
                 if (typeof navigator !== 'undefined' && navigator.clipboard) {
                   navigator.clipboard.writeText(imageUrl);
                 }
@@ -2784,9 +2784,9 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                           );
                         })}
                       </div>
-        </div>
-      )}
-      
+                    </div>
+                  )}
+                  
 
                   {/* Action Buttons - At bottom of info tab */}
                   {(canEdit || isAdmin) && (
@@ -2815,8 +2815,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                       </button>
                     </div>
                   )}
-        </div>
-      )}
+                </div>
+              )}
 
               {/* Comments Tab */}
               {activeTab === 'comments' && (
@@ -2872,8 +2872,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                       POST COMMENT
                     </button>
                   </div>
-        </div>
-      )}
+                </div>
+              )}
 
               {/* Tags Tab */}
               {activeTab === 'tags' && (
@@ -2998,7 +2998,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             </div>
 
             <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', marginBottom: '12px' }}>
-              You’re claiming <span style={{ color: 'white', fontWeight: 700 }}>@{claimTarget.handle}</span> on{' '}
+              You're claiming <span style={{ color: 'white', fontWeight: 700 }}>@{claimTarget.handle}</span> on{' '}
               <span style={{ color: 'white', fontWeight: 700 }}>{claimTarget.platform}</span>. Provide proof so we can link it to your N‑Zero profile.
             </div>
 

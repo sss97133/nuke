@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { UnifiedListing } from '../../services/myAuctionsService';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 import { AuctionPlatformBadge, AuctionStatusBadge, ParticipantBadge } from './AuctionBadges';
 import { getVehicleIdentityParts } from '../../utils/vehicleIdentity';
 
@@ -379,6 +379,3 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
 };
 
 export default ListingCard;
-
-
-

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { supabase } from '../lib/supabase';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 type DocTab = 'teaser' | 'business_plan' | 'information_memorandum' | 'revenue_model' | 'data_inventory' | 'technical_exhibits';
 
@@ -66,7 +66,7 @@ const sha256 = async (s: string): Promise<string> => {
 };
 const PORTAL_PROFILE_KEY = 'nuke_investor_portal_profile';
 
-// ── Live stats for template interpolation ────────────────────────────────────
+// ── Live stats for template interpolation ────────────────────────────────────────────
 
 interface PortalStats {
   vehicle_count: number;
@@ -149,7 +149,7 @@ function interpolate(md: string, vars: Record<string, string>): string {
   return Object.entries(vars).reduce((s, [k, v]) => s.replaceAll(k, v), md);
 }
 
-// ── Popup content ─────────────────────────────────────────────────────────────
+// ── Popup content ───────────────────────────────────────────────────────────────────────────────
 
 const POPUP_CONTENT: Record<string, { title: string; body: React.ReactNode }> = {
   yono: {
@@ -1298,7 +1298,7 @@ export default function InvestorOffering() {
         </div>
       </div>
 
-      {/* ── Popup Modal ────────────────────────────────────────────────────── */}
+      {/* ── Popup Modal ────────────────────────────────────────────────────────────────────── */}
       {popup && (
         <div
           onClick={closePopup}

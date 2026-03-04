@@ -6,7 +6,7 @@ import VehicleMakeModelInput from '../components/forms/VehicleMakeModelInput';
 import SeriesSelector from '../components/forms/SeriesSelector';
 import TrimSelector from '../components/forms/TrimSelector';
 import { TimelineEventService } from '../services/timelineEventService';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 type DetailLevel = 'basic' | 'detailed' | 'professional' | 'expert';
 

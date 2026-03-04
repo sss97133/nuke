@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import OwnerAuctionDashboard from '../components/auction/OwnerAuctionDashboard';
 import AuctionBiddingInterface from '../components/auction/AuctionBiddingInterface';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 type ListingRow = {
   id: string;
@@ -68,7 +68,6 @@ export default function AuctionListing() {
   const [vehicle, setVehicle] = useState<VehicleRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
-
   const [premiumBudgetUsd, setPremiumBudgetUsd] = useState('');
   const [premiumLoading, setPremiumLoading] = useState(false);
   const [premiumError, setPremiumError] = useState<string | null>(null);
@@ -77,37 +76,19 @@ export default function AuctionListing() {
   useEffect(() => {
     if (!listingId) return;
     let cancelled = false;
-
     (async () => {
       try {
         setLoading(true);
         setError(null);
-
         const { data: listingData, error: listingErr } = await supabase
           .from('vehicle_listings')
-          .select(
-            'id, vehicle_id, seller_id, sale_type, status, auction_start_time, auction_end_time, auction_duration_minutes, list_price_cents, reserve_price_cents, current_high_bid_cents, bid_count, auto_start_enabled, schedule_strategy, premium_status, premium_budget_cents, premium_paid_at, premium_priority, readiness_last_result, created_at'
-          )
+          .select('id, vehicle_id, seller_id, sale_type, status, auction_start_time, auction_end_time, auction_duration_minutes, list_price_cents, reserve_price_cents, current_high_bid_cents, bid_count, auto_start_enabled, schedule_strategy, premium_status, premium_budget_cents, premium_paid_at, premium_priority, readiness_last_result, created_at')
           .eq('id', listingId)
           .single();
-
         if (cancelled) return;
-
-        if (listingErr || !listingData) {
-          setListing(null);
-          setVehicle(null);
-          setError(listingErr?.message || 'Listing not found');
-          return;
-        }
-
+        if (listingErr || !listingData) { setListing(null); setVehicle(null); setError(listingErr?.message || 'Listing not found'); return; }
         setListing(listingData as ListingRow);
-
-        const { data: vehicleData } = await supabase
-          .from('vehicles')
-          .select('id, year, make, model, trim, primary_image_url')
-          .eq('id', listingData.vehicle_id)
-          .maybeSingle();
-
+        const { data: vehicleData } = await supabase.from('vehicles').select('id, year, make, model, trim, primary_image_url').eq('id', listingData.vehicle_id).maybeSingle();
         if (cancelled) return;
         setVehicle((vehicleData as VehicleRow) || null);
       } catch (e: any) {
@@ -117,10 +98,7 @@ export default function AuctionListing() {
         if (!cancelled) setLoading(false);
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [listingId, refreshNonce]);
 
   const isOwner = useMemo(() => {
@@ -130,37 +108,19 @@ export default function AuctionListing() {
 
   const handlePurchasePremium = async () => {
     if (!listing) return;
-    setPremiumError(null);
-    setPremiumSuccess(null);
-
+    setPremiumError(null); setPremiumSuccess(null);
     const budgetUsd = Number(premiumBudgetUsd);
-    if (!Number.isFinite(budgetUsd) || budgetUsd <= 0) {
-      setPremiumError('Enter a valid amount');
-      return;
-    }
-
+    if (!Number.isFinite(budgetUsd) || budgetUsd <= 0) { setPremiumError('Enter a valid amount'); return; }
     if (!confirm(`Purchase premium timing for $${budgetUsd.toFixed(2)}?`)) return;
-
     setPremiumLoading(true);
     try {
       const budgetCents = Math.floor(budgetUsd * 100);
-      const { data, error: rpcError } = await supabase.rpc('purchase_auction_premium_timing', {
-        p_listing_id: listing.id,
-        p_budget_cents: budgetCents,
-      });
+      const { data, error: rpcError } = await supabase.rpc('purchase_auction_premium_timing', { p_listing_id: listing.id, p_budget_cents: budgetCents });
       if (rpcError) throw rpcError;
-      if (data?.success) {
-        setPremiumSuccess('Premium timing purchased');
-        setPremiumBudgetUsd('');
-        setRefreshNonce((n) => n + 1);
-      } else {
-        setPremiumError(data?.error || 'Failed to purchase premium timing');
-      }
-    } catch (e: any) {
-      setPremiumError(e?.message || 'Failed to purchase premium timing');
-    } finally {
-      setPremiumLoading(false);
-    }
+      if (data?.success) { setPremiumSuccess('Premium timing purchased'); setPremiumBudgetUsd(''); setRefreshNonce((n) => n + 1); }
+      else { setPremiumError(data?.error || 'Failed to purchase premium timing'); }
+    } catch (e: any) { setPremiumError(e?.message || 'Failed to purchase premium timing'); }
+    finally { setPremiumLoading(false); }
   };
 
   const vehicleTitle = useMemo(() => {
@@ -169,29 +129,16 @@ export default function AuctionListing() {
     return parts.length > 0 ? String(parts.join(' ')) : 'Auction Listing';
   }, [vehicle]);
 
-  if (loading) {
-    return (
-      <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '12px' }}>
-        Loading auction...
+  if (loading) return <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '12px' }}>Loading auction...</div>;
+  if (error || !listing) return (
+    <div style={{ padding: '24px' }}>
+      <div className="card" style={{ padding: '16px' }}>
+        <div style={{ fontWeight: 800, marginBottom: 8 }}>Auction</div>
+        <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{error || 'Not found'}</div>
+        <div style={{ marginTop: 12 }}><button className="button button-small" onClick={() => navigate('/auctions')}>Back to Auctions</button></div>
       </div>
-    );
-  }
-
-  if (error || !listing) {
-    return (
-      <div style={{ padding: '24px' }}>
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Auction</div>
-          <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{error || 'Not found'}</div>
-          <div style={{ marginTop: 12 }}>
-            <button className="button button-small" onClick={() => navigate('/auctions')}>
-              Back to Auctions
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+    </div>
+  );
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -200,120 +147,42 @@ export default function AuctionListing() {
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: '16px', fontWeight: 800 }}>{vehicleTitle}</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 4 }}>
-                Listing: <span style={{ fontFamily: 'monospace' }}>{listing.id}</span>
-              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 4 }}>Listing: <span style={{ fontFamily: 'monospace' }}>{listing.id}</span></div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span
-                style={{
-                  padding: '4px 8px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--surface)',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  borderRadius: 4,
-                }}
-              >
-                {String(listing.status || '').toUpperCase()}
-              </span>
-              <Link to={`/vehicle/${listing.vehicle_id}`} className="button button-small">
-                View Vehicle
-              </Link>
+              <span style={{ padding: '4px 8px', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '11px', fontWeight: 700, borderRadius: 4 }}>{String(listing.status || '').toUpperCase()}</span>
+              <Link to={`/vehicle/${listing.vehicle_id}`} className="button button-small">View Vehicle</Link>
             </div>
           </div>
           <div className="card-body" style={{ fontSize: '12px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-              <div>
-                <div style={{ color: 'var(--text-muted)' }}>Current</div>
-                <div style={{ fontWeight: 800 }}>{formatCurrency(listing.current_high_bid_cents)}</div>
-              </div>
-              <div>
-                <div style={{ color: 'var(--text-muted)' }}>Bids</div>
-                <div style={{ fontWeight: 800 }}>{Number(listing.bid_count || 0)}</div>
-              </div>
-              <div>
-                <div style={{ color: 'var(--text-muted)' }}>Time Remaining</div>
-                <div style={{ fontWeight: 800 }}>{formatTimeRemaining(listing.auction_end_time)}</div>
-              </div>
-              <div>
-                <div style={{ color: 'var(--text-muted)' }}>Reserve</div>
-                <div style={{ fontWeight: 800 }}>
-                  {listing.reserve_price_cents ? formatCurrency(listing.reserve_price_cents) : 'No reserve'}
-                </div>
-              </div>
+              <div><div style={{ color: 'var(--text-muted)' }}>Current</div><div style={{ fontWeight: 800 }}>{formatCurrency(listing.current_high_bid_cents)}</div></div>
+              <div><div style={{ color: 'var(--text-muted)' }}>Bids</div><div style={{ fontWeight: 800 }}>{Number(listing.bid_count || 0)}</div></div>
+              <div><div style={{ color: 'var(--text-muted)' }}>Time Remaining</div><div style={{ fontWeight: 800 }}>{formatTimeRemaining(listing.auction_end_time)}</div></div>
+              <div><div style={{ color: 'var(--text-muted)' }}>Reserve</div><div style={{ fontWeight: 800 }}>{listing.reserve_price_cents ? formatCurrency(listing.reserve_price_cents) : 'No reserve'}</div></div>
             </div>
           </div>
         </div>
-
         {isOwner ? (
-          <>
-            <div className="card" style={{ marginBottom: 'var(--space-4)' }}>
-              <div className="card-header" style={{ fontWeight: 800 }}>
-                Premium Timing
-              </div>
-              <div className="card-body" style={{ fontSize: '12px' }}>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <div style={{ minWidth: 220 }}>
-                    <div style={{ color: 'var(--text-muted)', marginBottom: 4 }}>Status</div>
-                    <div style={{ fontWeight: 800 }}>
-                      {String(listing.premium_status || 'none').toUpperCase()}
-                      {typeof listing.premium_budget_cents === 'number' && listing.premium_budget_cents > 0
-                        ? ` · ${formatCurrency(listing.premium_budget_cents)}`
-                        : ''}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <input
-                      type="number"
-                      value={premiumBudgetUsd}
-                      onChange={(e) => setPremiumBudgetUsd(e.target.value)}
-                      placeholder="Budget USD"
-                      min={0}
-                      step="1"
-                      style={{
-                        padding: '6px 10px',
-                        border: '1px solid var(--border)',
-                        fontSize: '12px',
-                        width: 140,
-                      }}
-                      disabled={premiumLoading}
-                    />
-                    <button
-                      className="button button-small"
-                      onClick={handlePurchasePremium}
-                      disabled={premiumLoading}
-                    >
-                      {premiumLoading ? 'Processing...' : 'Buy Premium Timing'}
-                    </button>
-                  </div>
-                </div>
-
-                {premiumError && (
-                  <div style={{ marginTop: 10, color: 'var(--error)', fontSize: '12px' }}>{premiumError}</div>
-                )}
-                {premiumSuccess && (
-                  <div style={{ marginTop: 10, color: 'var(--success)', fontSize: '12px' }}>{premiumSuccess}</div>
-                )}
-                <div style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: '11px' }}>
-                  Premium timing is a scheduling priority rail. As we learn market patterns from ingested auction data, this budget will translate into better placement and targeted buyer outreach.
+          <><div className="card" style={{ marginBottom: 'var(--space-4)' }}>
+            <div className="card-header" style={{ fontWeight: 800 }}>Premium Timing</div>
+            <div className="card-body" style={{ fontSize: '12px' }}>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ minWidth: 220 }}><div style={{ color: 'var(--text-muted)', marginBottom: 4 }}>Status</div><div style={{ fontWeight: 800 }}>{String(listing.premium_status || 'none').toUpperCase()}{typeof listing.premium_budget_cents === 'number' && listing.premium_budget_cents > 0 ? ` · ${formatCurrency(listing.premium_budget_cents)}` : ''}</div></div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input type="number" value={premiumBudgetUsd} onChange={(e) => setPremiumBudgetUsd(e.target.value)} placeholder="Budget USD" min={0} step="1" style={{ padding: '6px 10px', border: '1px solid var(--border)', fontSize: '12px', width: 140 }} disabled={premiumLoading} />
+                  <button className="button button-small" onClick={handlePurchasePremium} disabled={premiumLoading}>{premiumLoading ? 'Processing...' : 'Buy Premium Timing'}</button>
                 </div>
               </div>
+              {premiumError && <div style={{ marginTop: 10, color: 'var(--error)', fontSize: '12px' }}>{premiumError}</div>}
+              {premiumSuccess && <div style={{ marginTop: 10, color: 'var(--success)', fontSize: '12px' }}>{premiumSuccess}</div>}
+              <div style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: '11px' }}>Premium timing is a scheduling priority rail.</div>
             </div>
-
-            <OwnerAuctionDashboard listingId={listing.id} />
-          </>
+          </div><OwnerAuctionDashboard listingId={listing.id} /></>
         ) : (
-          <div className="card">
-            <div className="card-header" style={{ fontWeight: 800 }}>Place Bid</div>
-            <div className="card-body">
-              <AuctionBiddingInterface listingId={listing.id} />
-            </div>
-          </div>
+          <div className="card"><div className="card-header" style={{ fontWeight: 800 }}>Place Bid</div><div className="card-body"><AuctionBiddingInterface listingId={listing.id} /></div></div>
         )}
       </div>
     </div>
   );
 }
-

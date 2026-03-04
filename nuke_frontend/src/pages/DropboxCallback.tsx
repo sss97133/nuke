@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 const DropboxCallback: React.FC = () => {
   const [searchParams] = useSearchParams();

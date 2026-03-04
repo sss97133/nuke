@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface VehicleOption {
   id: string;
@@ -591,4 +591,3 @@ export default function CreateAuctionListing() {
     </div>
   );
 }
-

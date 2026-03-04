@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { MyOrganizationsService, type MyOrganization } from '../services/myOrganizationsService';
 import OrganizationCard from '../components/organization/OrganizationCard';
 import { useAuth } from '../hooks/useAuth';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 const MyOrganizations: React.FC = () => {
   const navigate = useNavigate();
@@ -285,6 +285,3 @@ const MyOrganizations: React.FC = () => {
 };
 
 export default MyOrganizations;
-
-
-

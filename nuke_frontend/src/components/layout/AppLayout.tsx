@@ -10,7 +10,7 @@ import { VehicleTabBar } from './VehicleTabBar';
 import { PageHeader } from './PageHeader';
 import { AppFooter } from './AppFooter';
 import { MobileBottomNav } from './MobileBottomNav';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 const LazyNotificationCenter = lazy(() => import('../notifications/NotificationCenter'));
 

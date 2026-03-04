@@ -15,7 +15,7 @@ import FleetHealthOverview from '../components/vehicles/FleetHealthOverview';
 import QuickFixModal from '../components/vehicles/QuickFixModal';
 import { MyOrganizationsService, type MyOrganization } from '../services/myOrganizationsService';
 import { usePageTitle } from '../hooks/usePageTitle';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 interface Vehicle {
   id: string;

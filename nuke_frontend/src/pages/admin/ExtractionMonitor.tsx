@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 import { ImageHoverPreview, IDHoverCard, AutoIDWrapper, AnalysisModelPopup } from '../../components/admin';
 
 const ExtractionMonitor: React.FC = () => {
@@ -684,4 +684,3 @@ const ExtractionMonitor: React.FC = () => {
 };
 
 export default ExtractionMonitor;
-

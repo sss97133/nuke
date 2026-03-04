@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AdminNotificationService } from '../../services/adminNotificationService';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface VehicleRow {
   id: string;

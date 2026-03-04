@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface SpendingAnalytics {
   id: string;

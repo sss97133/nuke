@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 interface NotifRow {
   id: string;
@@ -122,5 +122,3 @@ const Notifications: React.FC = () => {
 };
 
 export default Notifications;
-
-

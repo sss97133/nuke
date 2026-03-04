@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import AIModelSelector from './search/AIModelSelector';
 import type { AIProvider } from './search/AIModelSelector';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 interface SearchResult {
   id: string;

@@ -4,7 +4,7 @@ import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'leaflet/dist/leaflet.css';
 import { supabase } from '../../lib/supabase';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 // Fix Leaflet default marker icons
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -55,7 +55,6 @@ const ST: Record<string, [number, number]> = {
   'wisconsin': [43.8, -88.8], 'wyoming': [43.1, -107.6], 'district of columbia': [38.9, -77.0],
 };
 
-// Deterministic hash — same string always produces the same number
 function simpleHash(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
@@ -66,10 +65,6 @@ function geo(loc: string): [number, number] | null {
   const l = loc.toLowerCase();
   for (const [s, c] of Object.entries(ST)) {
     if (l.includes(s)) {
-      // Deterministic offset based on location string so the same city/state
-      // always renders at the same spot. No more jitter on reload.
-      // Offset range: ±0.75° (~83 km at equator) — enough to spread same-state
-      // vehicles across a visible area while staying within state boundaries.
       const h = simpleHash(loc);
       const latOff = ((h & 0xff) / 255 - 0.5) * 1.5;
       const lngOff = (((h >> 8) & 0xff) / 255 - 0.5) * 1.5;
@@ -79,7 +74,6 @@ function geo(loc: string): [number, number] | null {
   return null;
 }
 
-// --- Custom cluster icon — white count on blue pill, visible on dark basemap ---
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function makeClusterIcon(bg: string, textColor: string) {
   return (cluster: any): L.DivIcon => {
@@ -98,11 +92,9 @@ function makeClusterIcon(bg: string, textColor: string) {
 const createClusterCustomIcon = makeClusterIcon('rgba(59,130,246,0.92)', '#ffffff');
 const createQueryClusterIcon  = makeClusterIcon('rgba(245,158,11,0.92)', '#000000');
 
-// --- Vehicle fields for display ---
 const BASE_FIELDS = 'id,year,make,model,trim,listing_location,bat_location,location,gps_latitude,gps_longitude,primary_image_url';
 const RICH_FIELDS = `${BASE_FIELDS},sale_price,asking_price,current_value,nuke_estimate,mileage,color,interior_color,engine_type,engine_size,horsepower,transmission,drivetrain,body_style,condition_rating,deal_score,heat_score`;
 
-// Search filter builder
 function buildOr(q: string): string {
   const escaped = q.replace(/'/g, "''");
   return ['make', 'model', 'trim', 'color', 'interior_color', 'engine_type', 'engine_code',
@@ -111,7 +103,6 @@ function buildOr(q: string): string {
   ].map(c => `${c}.ilike.%${escaped}%`).join(',');
 }
 
-// --- Vehicle pin with rich data ---
 interface VPin {
   id: string; year: number | null; make: string | null; model: string | null; trim: string | null;
   lat: number; lng: number; loc: string;
@@ -166,7 +157,6 @@ function pinFromRow(v: any): VPin | null {
   };
 }
 
-// --- Helpers ---
 function FlyTo({ center, zoom }: { center: [number, number] | null; zoom?: number }) {
   const map = useMap();
   useEffect(() => { if (center) map.flyTo(center, zoom || 5, { duration: 0.8 }); }, [center]);
@@ -176,7 +166,6 @@ function FlyTo({ center, zoom }: { center: [number, number] | null; zoom?: numbe
 const fmtPrice = (p: number) => '$' + p.toLocaleString();
 const fmtMiles = (m: number) => m.toLocaleString() + ' mi';
 
-// Optimized Supabase image URL
 function thumbUrl(url: string | null): string | null {
   if (!url) return null;
   if (url.includes('/storage/v1/object/public/')) {
@@ -185,7 +174,6 @@ function thumbUrl(url: string | null): string | null {
   return url;
 }
 
-// --- Vehicle popup card ---
 function VehicleCard({ v, accent }: { v: VPin; accent: string }) {
   const title = [v.year, v.make, v.model].filter(Boolean).join(' ') || 'Vehicle';
   const subtitle = [v.trim, v.body].filter(Boolean).join(' · ');
@@ -194,7 +182,6 @@ function VehicleCard({ v, accent }: { v: VPin; accent: string }) {
 
   return (
     <div style={{ width: 260, fontFamily: 'Arial, sans-serif', fontSize: '11px', lineHeight: 1.4 }}>
-      {/* Image */}
       {thumb && (
         <a href={`/vehicle/${v.id}`}>
           <img
@@ -207,29 +194,24 @@ function VehicleCard({ v, accent }: { v: VPin; accent: string }) {
       )}
 
       <div style={{ padding: '6px 2px 2px' }}>
-        {/* Title */}
         <a href={`/vehicle/${v.id}`} style={{ color: accent, textDecoration: 'none', fontWeight: 700, fontSize: '12px', display: 'block' }}>
           {title}
         </a>
         {subtitle && <div style={{ color: 'var(--text-secondary)', fontSize: '10px', marginBottom: 2 }}>{subtitle}</div>}
 
-        {/* Price + Mileage row */}
         <div style={{ display: 'flex', gap: 8, marginTop: 3, marginBottom: 3, alignItems: 'baseline' }}>
           {v.price && <span style={{ color: '#4ade80', fontWeight: 700, fontSize: '13px', fontFamily: 'monospace' }}>{fmtPrice(v.price)}</span>}
           {v.mileage && <span style={{ color: 'var(--text-disabled)', fontSize: '10px' }}>{fmtMiles(v.mileage)}</span>}
         </div>
 
-        {/* Specs row */}
         {specs.length > 0 && (
           <div style={{ color: 'var(--text-disabled)', fontSize: '10px', marginBottom: 3 }}>
             {specs.join(' · ')}
           </div>
         )}
 
-        {/* Interior color */}
         {v.intColor && <div style={{ color: 'var(--text-disabled)', fontSize: '10px' }}>Int: {v.intColor}</div>}
 
-        {/* Scores */}
         {(v.deal || v.heat || v.condition) && (
           <div style={{ display: 'flex', gap: 8, marginTop: 3, fontSize: '10px' }}>
             {v.deal != null && <span style={{ color: v.deal >= 70 ? '#4ade80' : v.deal >= 40 ? '#facc15' : '#f87171' }}>Deal: {v.deal}</span>}
@@ -238,16 +220,12 @@ function VehicleCard({ v, accent }: { v: VPin; accent: string }) {
           </div>
         )}
 
-        {/* Location */}
         {v.loc && <div style={{ color: 'var(--text-disabled)', fontSize: '9px', marginTop: 3 }}>{v.loc}</div>}
       </div>
     </div>
   );
 }
 
-// ===========================================
-// MAIN COMPONENT
-// ===========================================
 export default function UnifiedMap() {
   const [showCollections, setShowCollections] = useState(true);
   const [showVehicles, setShowVehicles] = useState(true);
@@ -266,7 +244,6 @@ export default function UnifiedMap() {
   const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null);
   const [activeQuery, setActiveQuery] = useState('');
 
-  // ---- Load collections from DB ----
   useEffect(() => {
     supabase.from('businesses')
       .select('id, business_name, slug, latitude, longitude, city, country, social_links, total_inventory')
@@ -283,7 +260,6 @@ export default function UnifiedMap() {
       });
   }, []);
 
-  // ---- Load businesses ----
   useEffect(() => {
     supabase.from('businesses').select('id, business_name, latitude, longitude, entity_type')
       .not('latitude', 'is', null).not('longitude', 'is', null).limit(1000)
@@ -292,7 +268,6 @@ export default function UnifiedMap() {
       });
   }, []);
 
-  // ---- Load base vehicle layer — cursor-based pagination (fast at any depth) ----
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -309,7 +284,6 @@ export default function UnifiedMap() {
         }
       };
 
-      // Cursor-based pagination: use id > lastId for O(1) page fetches
       const paginate = async (
         buildQuery: (q: any) => any,
         maxRows: number,
@@ -327,28 +301,24 @@ export default function UnifiedMap() {
           addRows(data);
           lastId = data[data.length - 1].id;
           fetched += data.length;
-          // Progressive render: update every ~5k pins
           if (all.length % 5000 < 1000) {
             setVehicles([...all]);
           }
         }
       };
 
-      // 1) listing_location vehicles — up to 80k
       await paginate(
         (q: any) => q.not('listing_location', 'is', null),
         80000,
       );
       if (!cancelled) setVehicles([...all]);
 
-      // 2) bat_location vehicles (no listing_location) — skip "United States" only entries
       await paginate(
         (q: any) => q.is('listing_location', null).not('bat_location', 'is', null).neq('bat_location', 'United States'),
         10000,
       );
       if (!cancelled) setVehicles([...all]);
 
-      // 3) GPS coord vehicles
       await paginate(
         (q: any) => q.not('gps_latitude', 'is', null).not('gps_longitude', 'is', null),
         5000,
@@ -362,7 +332,6 @@ export default function UnifiedMap() {
     return () => { cancelled = true; };
   }, []);
 
-  // ---- Query engine ----
   const handleSearch = useCallback(async () => {
     const q = searchText.trim();
     if (!q) { clearSearch(); return; }
@@ -441,7 +410,6 @@ export default function UnifiedMap() {
         />
         <FlyTo center={flyTarget} />
 
-        {/* Collections */}
         {showCollections && !hasQuery && collections.map((c, i) => (
           <Marker key={`c${i}`} position={[c.lat, c.lng]} icon={colIcon(c.country)}>
             <Popup>
@@ -457,7 +425,6 @@ export default function UnifiedMap() {
           </Marker>
         ))}
 
-        {/* Base vehicles */}
         {showVehicles && !hasQuery && (
           <MarkerClusterGroup
             chunkedLoading
@@ -474,7 +441,6 @@ export default function UnifiedMap() {
           </MarkerClusterGroup>
         )}
 
-        {/* Businesses */}
         {showBusinesses && !hasQuery && businesses.map(b => (
           <Marker key={`b${b.id}`} position={[b.lat, b.lng]} icon={BUSINESS_ICON}>
             <Popup>
@@ -487,7 +453,6 @@ export default function UnifiedMap() {
           </Marker>
         ))}
 
-        {/* Query results */}
         {queryResults.length > 0 && (
           <MarkerClusterGroup
             chunkedLoading
@@ -505,7 +470,6 @@ export default function UnifiedMap() {
         )}
       </MapContainer>
 
-      {/* Query bar */}
       <div style={{ position: 'absolute', top: 10, left: 54, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', gap: 4 }}>
           <input
@@ -533,7 +497,6 @@ export default function UnifiedMap() {
         )}
       </div>
 
-      {/* Layer toggles */}
       <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, background: 'var(--bg)', padding: '8px 10px', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'Arial, sans-serif', color: 'var(--text)' }}>
         <div style={{ fontWeight: 600, marginBottom: 4, fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-disabled)' }}>Layers</div>
         <LT label="Collections" color="#EC4899" checked={showCollections} set={setShowCollections} n={counts.collections} dim={hasQuery} />
@@ -549,14 +512,12 @@ export default function UnifiedMap() {
         </>}
       </div>
 
-      {/* Stats */}
       <div style={{ position: 'absolute', bottom: 10, left: 10, zIndex: 1000, background: 'var(--bg)', padding: '4px 8px', border: '1px solid var(--border)', fontSize: '10px', fontFamily: 'Arial, sans-serif', color: 'var(--text-disabled)' }}>
         {hasQuery
           ? <>{counts.query.toLocaleString()} mapped / {queryTotal.toLocaleString()} total</>
           : <>{counts.total.toLocaleString()} items on map</>}
       </div>
 
-      {/* Unmapped sidebar */}
       {queryNoLoc.length > 0 && (
         <div style={{ position: 'absolute', top: 80, left: 54, zIndex: 1000, width: 340, maxHeight: '50vh', overflowY: 'auto', background: 'var(--bg)', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'Arial, sans-serif', color: 'var(--text)' }}>
           <div style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)', color: 'var(--text-disabled)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>

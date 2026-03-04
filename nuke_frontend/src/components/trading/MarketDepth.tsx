@@ -7,7 +7,7 @@
 
 import { useMemo } from 'react';
 import { useTradingWebSocket } from '../../hooks/useTradingWebSocket';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface MarketDepthProps {
   offeringId: string;

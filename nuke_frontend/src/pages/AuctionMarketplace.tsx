@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getVehicleIdentityParts } from '../utils/vehicleIdentity';
 import { formatCurrencyFromCents, resolveCurrencyCode } from '../utils/currency';
 import ProxyBidModal from '../components/ProxyBidModal';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 // Add pulse animation for LIVE badge + skeleton loading
 const liveBadgeStyle = `

@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { MyOrganization } from '../../services/myOrganizationsService';
 import { LiveAuctionBadge } from '../auction/AuctionBadges';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface OrganizationCardProps {
   organization: MyOrganization;

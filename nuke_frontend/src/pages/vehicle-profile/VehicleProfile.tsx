@@ -20,7 +20,7 @@ import type {
   FieldAudit,
   LiveSession
 } from './vehicle-profile/types';
-import '../design-system.css';
+import '../../styles/unified-design-system.css';
 import { type LinkedOrg } from '../components/vehicle/LinkedOrganizations';
 const AddOrganizationRelationship = React.lazy(() => import('../components/vehicle/AddOrganizationRelationship'));
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';

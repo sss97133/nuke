@@ -7,7 +7,7 @@ import { universalSearchService, type UniversalSearchResult } from '../../servic
 import { useToast } from '../../hooks/useToast';
 import VehicleCritiqueMode from './VehicleCritiqueMode';
 import { SmartInvoiceUploader } from '../SmartInvoiceUploader';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 function normalizeUrlInput(value: string): string | null {
   const raw = String(value || '').trim();
@@ -351,7 +351,7 @@ export default function AIDataIngestionSearch() {
 
     const questions: string[] = [];
     if (needsReceipts) {
-      questions.push(`I don’t see any receipts/invoices attached to this vehicle yet. Do you want to upload them now so I can build the parts inventory from proof?`);
+      questions.push(`I don't see any receipts/invoices attached to this vehicle yet. Do you want to upload them now so I can build the parts inventory from proof?`);
     }
     if (needsManuals) {
       questions.push(`Do you have service manual pages (wiring diagrams / connector views / pinouts)? Uploading those lets me build accurate endpoint + pin maps.`);
@@ -1778,4 +1778,3 @@ export default function AIDataIngestionSearch() {
     </div>
   );
 }
-

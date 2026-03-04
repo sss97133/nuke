@@ -1,5 +1,5 @@
 import React from 'react';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 import { AuctionPlatformBadge, AuctionStatusBadge, ParticipantBadge } from '../auction/AuctionBadges';
 
 type PublicAuctionListing = {
@@ -103,7 +103,7 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ listings, loading = 
           </div>
           <p style={{ fontSize: 'var(--fs-10)', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
             {profileName ? `${profileName}'s` : 'This'} track record only shows listings that are tied to a verified BaT identity.
-            Claim your BaT handle to publish your auction history once it’s proven.
+            Claim your BaT handle to publish your auction history once it's proven.
           </p>
           <a className="cursor-button" href="/claim-identity?platform=bat" style={{ fontSize: '10px' }}>
             Claim BaT Identity
@@ -120,7 +120,7 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ listings, loading = 
           Auction Track Record
         </h2>
         <p style={{ color: '#666', fontSize: '14px' }}>
-          Pulls directly from Bring a Trailer telemetry that’s been linked to this profile. If a source can’t be verified, it stays out.
+          Pulls directly from Bring a Trailer telemetry that's been linked to this profile. If a source can't be verified, it stays out.
         </p>
       </div>
 
@@ -268,5 +268,3 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ listings, loading = 
 };
 
 export default PublicAuctionTrackRecord;
-
-

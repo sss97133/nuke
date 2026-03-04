@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Link } from 'react-router-dom';
 import VehicleThumbnail from '../VehicleThumbnail';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface DataContextModalProps {
   isOpen: boolean;

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CashBalanceService } from '../services/cashBalanceService';
 import type { CashBalance } from '../services/cashBalanceService';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 export default function PortfolioWithdraw() {
   const navigate = useNavigate();
@@ -23,13 +23,8 @@ export default function PortfolioWithdraw() {
         navigate(`/login?returnUrl=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`);
         return;
       }
-
       const userBalance = await CashBalanceService.getUserBalance(user.id);
-      if (!userBalance) {
-        setBalance(null);
-        setError('Unable to load your cash balance.');
-        return;
-      }
+      if (!userBalance) { setBalance(null); setError('Unable to load your cash balance.'); return; }
       setBalance(userBalance);
     } catch (err: any) {
       setBalance(null);
@@ -39,32 +34,16 @@ export default function PortfolioWithdraw() {
     }
   };
 
-  useEffect(() => {
-    void loadBalance();
-  }, []);
+  useEffect(() => { void loadBalance(); }, []);
 
   const handleWithdraw = async (event: React.FormEvent) => {
     event.preventDefault();
-    setError(null);
-    setSuccess(null);
-
+    setError(null); setSuccess(null);
     const amountUsd = Number(amount);
-    if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
-      setError('Enter a valid withdrawal amount.');
-      return;
-    }
-
-    if (!balance) {
-      setError('Balance unavailable. Please reload and try again.');
-      return;
-    }
-
+    if (!Number.isFinite(amountUsd) || amountUsd <= 0) { setError('Enter a valid withdrawal amount.'); return; }
+    if (!balance) { setError('Balance unavailable. Please reload and try again.'); return; }
     const amountCents = Math.round(amountUsd * 100);
-    if (amountCents > balance.available_cents) {
-      setError('Withdrawal amount exceeds available balance.');
-      return;
-    }
-
+    if (amountCents > balance.available_cents) { setError('Withdrawal amount exceeds available balance.'); return; }
     try {
       setSubmitting(true);
       await CashBalanceService.withdrawCash(amountUsd);
@@ -85,63 +64,24 @@ export default function PortfolioWithdraw() {
           <div className="card" style={{ maxWidth: '520px', margin: '0 auto' }}>
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Withdraw Cash</span>
-              <button
-                className="button button-secondary"
-                style={{ fontSize: '11px' }}
-                onClick={() => navigate('/portfolio')}
-              >
-                Back to Portfolio
-              </button>
+              <button className="button button-secondary" style={{ fontSize: '11px' }} onClick={() => navigate('/portfolio')}>Back to Portfolio</button>
             </div>
             <div className="card-body">
               {loading && <p className="text-small text-muted">Loading balance...</p>}
               {!loading && balance && (
                 <div style={{ marginBottom: '16px' }}>
                   <div className="text-small text-muted">Available balance</div>
-                  <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--accent)' }}>
-                    {CashBalanceService.formatCurrency(balance.available_cents)}
-                  </div>
+                  <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--accent)' }}>{CashBalanceService.formatCurrency(balance.available_cents)}</div>
                 </div>
               )}
-
-              {error && (
-                <div className="alert alert-error" style={{ marginBottom: '12px' }}>
-                  {error}
-                </div>
-              )}
-              {success && (
-                <div className="alert alert-success" style={{ marginBottom: '12px' }}>
-                  {success}
-                </div>
-              )}
-
+              {error && <div className="alert alert-error" style={{ marginBottom: '12px' }}>{error}</div>}
+              {success && <div className="alert alert-success" style={{ marginBottom: '12px' }}>{success}</div>}
               <form onSubmit={handleWithdraw}>
-                <label className="text-small font-bold" htmlFor="withdraw-amount">
-                  Amount (USD)
-                </label>
-                <input
-                  id="withdraw-amount"
-                  className="form-input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={amount}
-                  onChange={(event) => setAmount(event.target.value)}
-                  disabled={loading || submitting}
-                  style={{ marginTop: '6px', marginBottom: '16px' }}
-                />
-                <button
-                  type="submit"
-                  className="button button-primary"
-                  disabled={loading || submitting}
-                >
-                  {submitting ? 'Submitting…' : 'Submit Withdrawal'}
-                </button>
+                <label className="text-small font-bold" htmlFor="withdraw-amount">Amount (USD)</label>
+                <input id="withdraw-amount" className="form-input" type="number" min="0" step="0.01" placeholder="0.00" value={amount} onChange={(event) => setAmount(event.target.value)} disabled={loading || submitting} style={{ marginTop: '6px', marginBottom: '16px' }} />
+                <button type="submit" className="button button-primary" disabled={loading || submitting}>{submitting ? 'Submitting…' : 'Submit Withdrawal'}</button>
               </form>
-              <p className="text-small text-muted" style={{ marginTop: '12px' }}>
-                Withdrawals are processed via Stripe payouts and may take several days.
-              </p>
+              <p className="text-small text-muted" style={{ marginTop: '12px' }}>Withdrawals are processed via Stripe payouts and may take several days.</p>
             </div>
           </div>
         </div>

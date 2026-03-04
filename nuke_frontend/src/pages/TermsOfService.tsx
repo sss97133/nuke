@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 const TermsOfService: React.FC = () => {
   const [content, setContent] = useState<string>('');

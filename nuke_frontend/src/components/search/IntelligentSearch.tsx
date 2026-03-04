@@ -8,7 +8,7 @@ import { FaviconIcon } from '../common/FaviconIcon';
 import { extractAndCacheFavicon, detectSourceType } from '../../services/sourceFaviconService';
 import { useKeyboardShortcut } from '../../hooks/useKeyboardShortcut';
 import type { SearchResult } from '../../types/search';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface SearchResponse {
   results: SearchResult[];

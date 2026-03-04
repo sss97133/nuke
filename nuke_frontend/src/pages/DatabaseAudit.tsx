@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 interface DatabaseStats {
   totalVehicles: number;
@@ -536,4 +536,4 @@ const DatabaseAudit: React.FC = () => {
   );
 };
 
-export default DatabaseAudit; 
+export default DatabaseAudit;

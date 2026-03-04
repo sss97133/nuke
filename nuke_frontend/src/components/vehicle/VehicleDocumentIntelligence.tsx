@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { FileText, Loader2, CheckCircle, Calendar, MapPin, Wrench, AlertCircle } from 'lucide-react';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface VehicleDocumentIntelligenceProps {
   vehicleId: string;

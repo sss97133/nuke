@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useTradingWebSocket } from '../../hooks/useTradingWebSocket';
 import type { OrderBookLevel } from '../../hooks/useTradingWebSocket';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface OrderBookProps {
   offeringId: string;

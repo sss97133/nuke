@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 interface ProcessingStats {
   // Progress

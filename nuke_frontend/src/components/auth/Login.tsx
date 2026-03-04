@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import ForgotPasswordForm from '../auth/ForgotPasswordForm';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 const Login = () => {
   const [email, setEmail] = useState('');

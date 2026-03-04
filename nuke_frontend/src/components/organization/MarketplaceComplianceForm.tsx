@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 type MarketplaceProfile = {
   support_email?: string;
@@ -423,4 +423,3 @@ const MarketplaceComplianceForm: React.FC<MarketplaceComplianceFormProps> = ({ o
 };
 
 export default MarketplaceComplianceForm;
-
