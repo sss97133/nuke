@@ -1,9 +1,10 @@
 /**
  * MAIN ENTRY POINT
- * Imports unified design system only
+ * Imports unified design system + Tailwind override layer
  */
 
 @import './styles/unified-design-system.css';
+@import './styles/tailwind-design-system-overrides.css';
 /* header-fix.css superseded by AppHeader.css (imported in AppHeader.tsx) */
 
 @tailwind base;
@@ -58,7 +59,7 @@ html, body, #root {
    ============================================================================
 */
 
-/* ── Background utilities ─────────────────────────────────────────────────── */
+/* ── Background utilities ───────────────────────────────────────────────────────────────── */
 :root[data-theme="dark"] .bg-white { background-color: var(--surface) !important; }
 :root[data-theme="dark"] .bg-gray-50 { background-color: var(--bg) !important; }
 :root[data-theme="dark"] .bg-gray-100 { background-color: var(--surface) !important; }
@@ -67,7 +68,7 @@ html, body, #root {
 :root[data-theme="dark"] .bg-gray-400 { background-color: var(--border) !important; }
 :root[data-theme="dark"] .bg-gray-500 { background-color: var(--text-disabled) !important; }
 
-/* ── Text utilities ───────────────────────────────────────────────────────── */
+/* ── Text utilities ─────────────────────────────────────────────────────────────────── */
 :root[data-theme="dark"] .text-black { color: var(--text) !important; }
 :root[data-theme="dark"] .text-gray-900 { color: var(--text) !important; }
 :root[data-theme="dark"] .text-gray-800 { color: var(--text) !important; }
@@ -77,7 +78,7 @@ html, body, #root {
 :root[data-theme="dark"] .text-gray-400 { color: var(--text-muted) !important; }
 :root[data-theme="dark"] .text-gray-300 { color: var(--text-disabled) !important; }
 
-/* ── Border utilities ─────────────────────────────────────────────────────── */
+/* ── Border utilities ───────────────────────────────────────────────────────────────── */
 :root[data-theme="dark"] .border-gray-100 { border-color: var(--border) !important; }
 :root[data-theme="dark"] .border-gray-200 { border-color: var(--border) !important; }
 :root[data-theme="dark"] .border-gray-300 { border-color: var(--border) !important; }
@@ -85,4 +86,3 @@ html, body, #root {
 :root[data-theme="dark"] .border-gray-500 { border-color: var(--border) !important; }
 :root[data-theme="dark"] .border-gray-600 { border-color: var(--border) !important; }
 :root[data-theme="dark"] .border-b { border-bottom-color: var(--border) !important; }
-
