@@ -429,6 +429,7 @@ export default function UnifiedMap() {
   const [marketplace, setMarketplace] = useState<MarketplacePin[]>([]);
   const [vehLoading, setVehLoading] = useState(true);
   const [mktLoading, setMktLoading] = useState(true);
+  const [photoLoading, setPhotoLoading] = useState(true);
 
   const [searchText, setSearchText] = useState('');
   const [queryResults, setQueryResults] = useState<VPin[]>([]);
@@ -469,6 +470,10 @@ export default function UnifiedMap() {
   const [timeCutoff, setTimeCutoff] = useState(100); // 0-100 percentage of date range
   const [timelinePlaying, setTimelinePlaying] = useState(false);
   const [timelineSpeed, setTimelineSpeed] = useState(1); // 1x, 2x, 5x
+  // Timeline zoom/pan
+  const [timelineZoom, setTimelineZoom] = useState(1); // 1 = full range, higher = zoomed in (max 20)
+  const [timelineCenter, setTimelineCenter] = useState(50); // center position as % of full range
+  const timelineDragRef = useRef<{ startX: number; startCenter: number } | null>(null);
 
   // County choropleth for thermal mode
   const [countyGeoJson, setCountyGeoJson] = useState<any>(null);
@@ -521,45 +526,25 @@ export default function UnifiedMap() {
   // ---- Load businesses ----
   useEffect(() => {
     supabase.from('businesses').select('id, business_name, latitude, longitude, entity_type')
-      .not('latitude', 'is', null).not('longitude', 'is', null).limit(1000)
+      .not('latitude', 'is', null).not('longitude', 'is', null).limit(5000)
       .then(({ data }) => {
         if (data) setBiz(data.map((b: any) => ({ id: b.id, name: b.business_name || 'Business', lat: b.latitude, lng: b.longitude, type: b.entity_type })));
       });
   }, []);
 
-  // ---- Load GPS-tagged photos ----
+  // ---- Load GPS-tagged photos — cursor-paginated like vehicles ----
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      const { data } = await supabase.from('vehicle_images')
-        .select('id, latitude, longitude, image_url, thumbnail_url, vehicle_id, location_name, taken_at, source, exif_data')
-        .not('latitude', 'is', null).not('longitude', 'is', null)
-        .order('taken_at', { ascending: false })
-        .limit(20000);
-      if (!data) return;
-
-      // Get vehicle titles + primary images for linked photos
-      const vehicleIds = [...new Set(data.map(d => d.vehicle_id).filter(Boolean))];
+      setPhotoLoading(true);
+      const allRows: any[] = [];
       const vehicleInfo: Record<string, { title: string; thumb: string | null }> = {};
-      if (vehicleIds.length > 0) {
-        // Fetch in batches of 200 (Supabase .in() limit)
-        for (let i = 0; i < vehicleIds.length; i += 200) {
-          const batch = vehicleIds.slice(i, i + 200);
-          const { data: vehs } = await supabase.from('vehicles')
-            .select('id, year, make, model, primary_image_url')
-            .in('id', batch);
-          for (const v of vehs || []) {
-            const thumb = v.primary_image_url?.includes('/storage/v1/object/public/')
-              ? v.primary_image_url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=200&height=140&quality=70&resize=cover'
-              : v.primary_image_url || null;
-            vehicleInfo[v.id] = {
-              title: [v.year, v.make, v.model].filter(Boolean).join(' '),
-              thumb,
-            };
-          }
-        }
-      }
+      let lastId = '';
+      let fetched = 0;
+      let batchesSinceRender = 0;
+      const maxRows = 50000;
 
-      setPhotos(data.map(d => {
+      const buildPins = (rows: any[]): PhotoPin[] => rows.map(d => {
         const dt = d.taken_at ? new Date(d.taken_at) : null;
         const exif = d.exif_data as any;
         const isPlaceholder = d.image_url?.includes('placeholder.nuke.app');
@@ -582,8 +567,58 @@ export default function UnifiedMap() {
           source: d.source || 'unknown',
           cameraModel: exif?.camera_model || null,
         };
-      }));
+      });
+
+      const fetchVehicleInfo = async (rows: any[]) => {
+        const newIds = [...new Set(rows.map((d: any) => d.vehicle_id).filter(Boolean))]
+          .filter((id: string) => !vehicleInfo[id]);
+        if (newIds.length === 0) return;
+        for (let i = 0; i < newIds.length; i += 200) {
+          const batch = newIds.slice(i, i + 200);
+          const { data: vehs } = await supabase.from('vehicles')
+            .select('id, year, make, model, primary_image_url')
+            .in('id', batch);
+          for (const v of vehs || []) {
+            const thumb = v.primary_image_url?.includes('/storage/v1/object/public/')
+              ? v.primary_image_url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=200&height=140&quality=70&resize=cover'
+              : v.primary_image_url || null;
+            vehicleInfo[v.id] = {
+              title: [v.year, v.make, v.model].filter(Boolean).join(' '),
+              thumb,
+            };
+          }
+        }
+      };
+
+      while (fetched < maxRows) {
+        if (cancelled) return;
+        let q = supabase.from('vehicle_images')
+          .select('id, latitude, longitude, image_url, thumbnail_url, vehicle_id, location_name, taken_at, source, exif_data')
+          .not('latitude', 'is', null).not('longitude', 'is', null);
+        if (lastId) q = q.gt('id', lastId);
+        q = q.order('id', { ascending: true }).limit(500);
+        const { data, error } = await q;
+        if (error) { console.warn('Photo fetch error:', error.message); break; }
+        if (!data || data.length === 0) break;
+
+        await fetchVehicleInfo(data);
+        for (const row of data) allRows.push(row);
+        lastId = data[data.length - 1].id;
+        fetched += data.length;
+        batchesSinceRender++;
+
+        // Progressive render every 3 batches
+        if (batchesSinceRender === 1 || batchesSinceRender % 3 === 0) {
+          if (!cancelled) setPhotos(buildPins(allRows));
+        }
+      }
+
+      if (!cancelled) {
+        setPhotos(buildPins(allRows));
+        setPhotoLoading(false);
+      }
     })();
+    return () => { cancelled = true; };
   }, []);
 
   // ---- Load FB Marketplace listings ----
@@ -848,20 +883,72 @@ export default function UnifiedMap() {
     return { min: realMin, max: realMax, minLabel: fmtD(realMin), maxLabel: fmtD(realMax) };
   }, [vehicles]);
 
-  // --- Timeline: 48-bin monthly histogram for mini bar chart ---
+  // --- Timeline: visible window based on zoom/pan ---
+  const visibleRange = useMemo(() => {
+    if (timelineZoom <= 1) return { start: 0, end: 100 };
+    const windowSize = 100 / timelineZoom;
+    const start = Math.max(0, timelineCenter - windowSize / 2);
+    const end = Math.min(100, start + windowSize);
+    return { start, end };
+  }, [timelineZoom, timelineCenter]);
+
+  // --- Timeline: 48-bin histogram computed over visible window ---
   const timelineHistogram = useMemo(() => {
     if (vehicles.length === 0 || timelineRange.min === timelineRange.max) return [];
     const NUM_BINS = 48;
-    const range = timelineRange.max - timelineRange.min;
+    const fullRange = timelineRange.max - timelineRange.min;
+    const visStart = timelineRange.min + (fullRange * visibleRange.start / 100);
+    const visEnd = timelineRange.min + (fullRange * visibleRange.end / 100);
+    const visDuration = visEnd - visStart;
+    if (visDuration <= 0) return [];
     const bins = new Array(NUM_BINS).fill(0);
     for (const v of vehicles) {
-      if (v.dateTs <= 0) continue;
-      const idx = Math.min(NUM_BINS - 1, Math.floor(((v.dateTs - timelineRange.min) / range) * NUM_BINS));
+      if (v.dateTs <= 0 || v.dateTs < visStart || v.dateTs > visEnd) continue;
+      const idx = Math.min(NUM_BINS - 1, Math.floor(((v.dateTs - visStart) / visDuration) * NUM_BINS));
       bins[idx]++;
     }
     const maxBin = Math.max(...bins, 1);
-    return bins.map(n => n / maxBin); // normalize 0–1
-  }, [vehicles, timelineRange]);
+    return bins.map(n => n / maxBin);
+  }, [vehicles, timelineRange, visibleRange]);
+
+  // --- Date ticks for timeline ---
+  const dateTicks = useMemo(() => {
+    if (!timelineEnabled || timelineRange.min === timelineRange.max) return [];
+    const fullRange = timelineRange.max - timelineRange.min;
+    const visStart = timelineRange.min + (fullRange * visibleRange.start / 100);
+    const visEnd = timelineRange.min + (fullRange * visibleRange.end / 100);
+    const visDuration = visEnd - visStart;
+    if (visDuration <= 0) return [];
+    const msPerDay = 86400000;
+    let interval: number;
+    let format: (d: Date) => string;
+    if (timelineZoom >= 10) {
+      interval = 7 * msPerDay;
+      format = (d) => `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })}`;
+    } else if (timelineZoom >= 4) {
+      interval = 30 * msPerDay;
+      format = (d) => `${d.toLocaleString('en', { month: 'short' })} ${d.getFullYear()}`;
+    } else {
+      interval = 365 * msPerDay;
+      format = (d) => `${d.getFullYear()}`;
+    }
+    const ticks: { pct: number; label: string }[] = [];
+    let t = Math.ceil(visStart / interval) * interval;
+    while (t <= visEnd) {
+      const pct = ((t - visStart) / visDuration) * 100;
+      ticks.push({ pct, label: format(new Date(t)) });
+      t += interval;
+    }
+    return ticks;
+  }, [timelineRange, visibleRange, timelineZoom, timelineEnabled]);
+
+  // --- Timeline scroll wheel zoom handler ---
+  const handleTimelineWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const delta = e.deltaY > 0 ? -1 : 1;
+    setTimelineZoom(z => Math.max(1, Math.min(20, z + delta * 0.5)));
+  }, []);
 
   const filteredVehicles = useMemo(() => {
     if (!timelineEnabled || timeCutoff >= 100) return vehicles;
@@ -1549,33 +1636,63 @@ export default function UnifiedMap() {
       }
     }
 
-    // --- Photo Glow ---
-    if (showPhotos && !hasQuery && photos.length > 0 && mode === 'density' && glowFade > 0) {
-      result.push(new ScatterplotLayer({
-        id: 'photo-glow',
+    // ============================================================
+    // PHOTO LAYERS — hex binning + crossfade architecture (mirrors vehicles)
+    // z3-z11: HexagonLayer (aggregated photo hex bins)
+    // z11-z14: hex fades out, individual points fade in
+    // ============================================================
+
+    // --- Photo hex bins (density mode, z3-z12.5) ---
+    if (showPhotos && !hasQuery && photos.length > 0 && mode !== 'thermal' && hexOpacity > 0) {
+      result.push(new HexagonLayer({
+        id: 'photo-hexbins',
         data: photos,
+        gpuAggregation: false,
         getPosition: (d: PhotoPin) => [d.lng, d.lat],
-        getRadius: 200,
-        radiusUnits: 'meters' as const,
-        getFillColor: [...colors.photo, Math.round(glowAlpha * 0.7)] as [number, number, number, number],
-        radiusMinPixels: 0,
-        radiusMaxPixels: glowRadius * 0.4,
-        opacity: glowFade * 0.7,
+        getColorWeight: () => 1,
+        colorAggregation: 'SUM',
+        radius: hexRadiusForZoom(zoom),
+        coverage: 0.88,
+        extruded: false,
+        colorRange: hexColorRange(colors.photo),
+        colorScaleType: 'quantile',
+        opacity: hexOpacity,
         pickable: true,
-        onClick: ({ object }: any) => handleLayerClick(object, 'photo'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
-            setHoverInfo({ x, y, text: object.vehicleTitle || object.locationName || 'Photo' });
+            const count = object.points?.length || object.colorValue || 0;
+            setHoverInfo({ x, y, text: `${count.toLocaleString()} photos` });
           } else {
             setHoverInfo(null);
           }
         },
-        updateTriggers: { getRadius: [glowRadius, zoom] },
+        onClick: ({ object }: any) => {
+          if (object) {
+            deckClickedRef.current = true;
+            const pts = (object.points || []).map((p: any) => p.source || p) as PhotoPin[];
+            setSelectedPin({
+              pin: {
+                id: `photo-hex-${object.position?.[0]?.toFixed(4)}-${object.position?.[1]?.toFixed(4)}`,
+                _isPhotoHexBin: true,
+                _hexCount: pts.length,
+                _hexPoints: pts,
+                lat: object.position?.[1] || 0,
+                lng: object.position?.[0] || 0,
+              } as any,
+              type: 'photo',
+            });
+            setTimeout(() => { deckClickedRef.current = false; }, 100);
+          }
+        },
+        updateTriggers: {
+          colorRange: [colorPreset],
+          radius: [zoom],
+        },
       }));
     }
 
-    // --- Photo Points ---
-    if (showPhotos && !hasQuery && photos.length > 0 && mode !== 'thermal') {
+    // --- Photo individual points (fade in z13 → z15) ---
+    if (showPhotos && !hasQuery && photos.length > 0 && mode !== 'thermal' && pointsOpacity > 0) {
       result.push(new ScatterplotLayer({
         id: 'photo-points',
         data: photos,
@@ -1587,7 +1704,8 @@ export default function UnifiedMap() {
         getFillColor: (d: PhotoPin) => d.hasRealImage
           ? [...colors.photo, 230] as [number, number, number, number]
           : [...colors.photo, 120] as [number, number, number, number],
-        pickable: true,
+        opacity: pointsOpacity,
+        pickable: pointsOpacity > 0.5,
         onClick: ({ object }: any) => handleLayerClick(object, 'photo'),
         onHover: ({ object, x, y }: any) => {
           if (object) {
@@ -1599,6 +1717,7 @@ export default function UnifiedMap() {
             setHoverInfo(null);
           }
         },
+        updateTriggers: { getFillColor: [colorPreset], opacity: [pointsOpacity] },
       }));
     }
 
@@ -1778,7 +1897,7 @@ export default function UnifiedMap() {
               <LT label="For Sale" color="#4ADE80" checked={showMarketplace} set={setShowMarketplace} n={counts.marketplace} dim={hasQuery} loading={mktLoading} />
               <LT label="Collections" color={`rgb(${COLOR_PRESETS[colorPreset].collection.join(',')})`} checked={showCollections} set={setShowCollections} n={counts.collections} dim={hasQuery} />
               <LT label="Businesses" color={`rgb(${COLOR_PRESETS[colorPreset].business.join(',')})`} checked={showBusinesses} set={setShowBusinesses} n={counts.businesses} dim={hasQuery} />
-              <LT label="Photos" color={`rgb(${COLOR_PRESETS[colorPreset].photo.join(',')})`} checked={showPhotos} set={setShowPhotos} n={counts.photos} dim={hasQuery} />
+              <LT label="Photos" color={`rgb(${COLOR_PRESETS[colorPreset].photo.join(',')})`} checked={showPhotos} set={setShowPhotos} n={counts.photos} dim={hasQuery} loading={photoLoading} />
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '3px 0', fontSize: '11px', fontFamily: MAP_FONT }}>
                 <input type="checkbox" checked={showCountyOverlay} onChange={e => setShowCountyOverlay(e.target.checked)} />
                 <span style={{ color: 'var(--text)' }}>Counties</span>
@@ -1897,12 +2016,34 @@ export default function UnifiedMap() {
                 <span style={{ fontSize: '9px', color: 'var(--text-disabled)', whiteSpace: 'nowrap' }}>{timelineRange.minLabel}</span>
                 {/* Histogram + slider composite */}
                 <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {/* Mini bar chart histogram */}
+                  {/* Mini bar chart histogram with scroll-zoom + drag-pan */}
                   {timelineHistogram.length > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'flex-end', height: 20, gap: 1, pointerEvents: 'none' }}>
+                    <div
+                      style={{ display: 'flex', alignItems: 'flex-end', height: 20, gap: 1, cursor: timelineZoom > 1 ? 'ew-resize' : 'default' }}
+                      onWheel={handleTimelineWheel}
+                      onMouseDown={(e) => {
+                        if (timelineZoom <= 1) return;
+                        timelineDragRef.current = { startX: e.clientX, startCenter: timelineCenter };
+                      }}
+                      onMouseMove={(e) => {
+                        if (!timelineDragRef.current || timelineZoom <= 1) return;
+                        const dx = e.clientX - timelineDragRef.current.startX;
+                        const containerWidth = (e.currentTarget as HTMLElement).offsetWidth;
+                        const panAmount = (dx / containerWidth) * 100;
+                        const windowSize = 100 / timelineZoom;
+                        const newCenter = Math.max(windowSize / 2, Math.min(100 - windowSize / 2,
+                          timelineDragRef.current.startCenter - panAmount
+                        ));
+                        setTimelineCenter(newCenter);
+                      }}
+                      onMouseUp={() => { timelineDragRef.current = null; }}
+                      onMouseLeave={() => { timelineDragRef.current = null; }}
+                    >
                       {timelineHistogram.map((h, i) => {
-                        const pct = (i / timelineHistogram.length) * 100;
-                        const active = pct <= timeCutoff;
+                        // Map bin position within visible range to global %
+                        const binPctInWindow = (i / timelineHistogram.length) * 100;
+                        const globalPct = visibleRange.start + (binPctInWindow / 100) * (visibleRange.end - visibleRange.start);
+                        const active = globalPct <= timeCutoff;
                         return (
                           <div key={i} style={{
                             flex: 1, height: `${Math.max(2, Math.round(h * 18))}px`,
@@ -1913,12 +2054,55 @@ export default function UnifiedMap() {
                       })}
                     </div>
                   )}
-                  {/* Range slider — overlays the histogram */}
-                  <input type="range" min={0} max={100} step={0.5} value={timeCutoff}
-                    onChange={e => { setTimelinePlaying(false); setTimeCutoff(Number(e.target.value)); }}
-                    style={{ width: '100%', height: 2, WebkitAppearance: 'none' as any, appearance: 'none' as any,
-                      background: 'transparent', outline: 'none', cursor: 'pointer', margin: 0 }}
-                  />
+                  {/* Date ticks below histogram */}
+                  {dateTicks.length > 0 && (
+                    <div style={{ position: 'relative', height: 10, pointerEvents: 'none' }}>
+                      {dateTicks.map((tick, i) => (
+                        <span key={i} style={{
+                          position: 'absolute', left: `${tick.pct}%`, transform: 'translateX(-50%)',
+                          fontSize: '7px', color: 'var(--text-disabled)', whiteSpace: 'nowrap', lineHeight: 1,
+                        }}>{tick.label}</span>
+                      ))}
+                    </div>
+                  )}
+                  {/* Range slider — maps within visible window */}
+                  {(() => {
+                    const sliderVal = visibleRange.end > visibleRange.start
+                      ? Math.max(0, Math.min(100, ((timeCutoff - visibleRange.start) / (visibleRange.end - visibleRange.start)) * 100))
+                      : 100;
+                    return (
+                      <input type="range" min={0} max={100} step={0.5} value={sliderVal}
+                        onChange={e => {
+                          setTimelinePlaying(false);
+                          const globalVal = visibleRange.start + (Number(e.target.value) / 100) * (visibleRange.end - visibleRange.start);
+                          setTimeCutoff(globalVal);
+                        }}
+                        style={{ width: '100%', height: 2, WebkitAppearance: 'none' as any, appearance: 'none' as any,
+                          background: 'transparent', outline: 'none', cursor: 'pointer', margin: 0 }}
+                      />
+                    );
+                  })()}
+                  {/* Mini overview bar — shows full range with visible window highlighted */}
+                  {timelineZoom > 1 && (
+                    <div style={{ position: 'relative', height: 4, background: 'var(--border)', marginTop: 1 }}>
+                      <div style={{
+                        position: 'absolute',
+                        left: `${visibleRange.start}%`,
+                        width: `${visibleRange.end - visibleRange.start}%`,
+                        height: '100%',
+                        background: 'var(--text)',
+                        opacity: 0.7,
+                      }} />
+                      {/* Playhead position on overview */}
+                      <div style={{
+                        position: 'absolute',
+                        left: `${timeCutoff}%`,
+                        width: 1,
+                        height: '100%',
+                        background: '#4ade80',
+                      }} />
+                    </div>
+                  )}
                 </div>
                 <span style={{ fontSize: '10px', color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap', minWidth: 60, fontVariantNumeric: 'tabular-nums' }}>{cutoffLabel}</span>
               </>
@@ -2055,6 +2239,27 @@ export default function UnifiedMap() {
                         ))}
                       </div>
                     )}
+                    {/* Mini thumbnail grid — up to 4 vehicle images from hex */}
+                    {(() => {
+                      const thumbPts = pts.filter((p: VPin) => p.img).slice(0, 4);
+                      if (thumbPts.length === 0) return null;
+                      return (
+                        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)', marginBottom: 6, fontWeight: 600 }}>PHOTOS</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 4 }}>
+                            {thumbPts.map((p: VPin) => {
+                              const t = thumbUrl(p.img);
+                              return t ? (
+                                <a key={p.id} href={`/vehicle/${p.id}`}>
+                                  <img src={t} alt="" style={{ width: '100%', aspectRatio: '3/2', objectFit: 'cover', display: 'block', background: 'var(--surface)' }}
+                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                </a>
+                              ) : null;
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     <div style={{ padding: '10px 14px' }}>
                       <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)', marginBottom: 6, fontWeight: 600 }}>
                         VEHICLES ({count > 10 ? 'TOP 10' : count})
@@ -2082,11 +2287,15 @@ export default function UnifiedMap() {
                 );
               }
 
-              // ---- Single vehicle panel (original) ----
+              // ---- Single vehicle panel (original + enhanced) ----
               const title = [v.year, v.make, v.model].filter(Boolean).join(' ') || 'Vehicle';
               const subtitle = [v.trim, v.body].filter(Boolean).join(' \u00b7 ');
               const specs = [v.color, v.engine, v.hp ? `${v.hp}hp` : null, v.trans, v.drive].filter(Boolean);
               const thumb = thumbUrl(v.img);
+              // SIMILAR NEARBY: same make in current filteredVehicles
+              const similarNearby = v.make
+                ? filteredVehicles.filter((fv: VPin) => fv.make === v.make && fv.id !== v.id).length
+                : 0;
               return (
                 <div>
                   {thumb && <a href={`/vehicle/${v.id}`}>
@@ -2104,15 +2313,45 @@ export default function UnifiedMap() {
                     </div>
                     {specs.length > 0 && <div style={{ color: 'var(--text-disabled)', fontSize: '10px', marginBottom: 8, lineHeight: 1.6 }}>{specs.join(' \u00b7 ')}</div>}
                     {v.intColor && <div style={{ color: 'var(--text-disabled)', fontSize: '10px', marginBottom: 8 }}>Interior: {v.intColor}</div>}
+                    {/* Stat badges: Deal Score, Heat Score, Condition */}
                     {(v.deal != null || v.heat != null || v.condition != null) && (
-                      <div style={{ display: 'flex', gap: 12, marginBottom: 10, fontSize: '10px' }}>
-                        {v.deal != null && <span style={{ color: v.deal >= 70 ? '#4ade80' : v.deal >= 40 ? '#facc15' : '#f87171' }}>Deal: {v.deal}</span>}
-                        {v.heat != null && <span style={{ color: '#f97316' }}>Heat: {v.heat}</span>}
-                        {v.condition != null && <span style={{ color: '#60a5fa' }}>Cond: {v.condition}/10</span>}
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                        {v.deal != null && (
+                          <span style={{
+                            padding: '2px 7px', fontSize: '9px', fontWeight: 700, letterSpacing: '0.5px',
+                            background: v.deal >= 70 ? 'rgba(74,222,128,0.15)' : v.deal >= 40 ? 'rgba(250,204,21,0.15)' : 'rgba(248,113,113,0.15)',
+                            color: v.deal >= 70 ? '#4ade80' : v.deal >= 40 ? '#facc15' : '#f87171',
+                            border: `1px solid ${v.deal >= 70 ? '#4ade8040' : v.deal >= 40 ? '#facc1540' : '#f8717140'}`,
+                          }}>DEAL {v.deal}</span>
+                        )}
+                        {v.heat != null && (
+                          <span style={{ padding: '2px 7px', fontSize: '9px', fontWeight: 700, letterSpacing: '0.5px',
+                            background: 'rgba(249,115,22,0.15)', color: '#f97316', border: '1px solid rgba(249,115,22,0.3)' }}>HEAT {v.heat}</span>
+                        )}
+                        {v.condition != null && (
+                          <span style={{ padding: '2px 7px', fontSize: '9px', fontWeight: 700, letterSpacing: '0.5px',
+                            background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)' }}>COND {v.condition}/10</span>
+                        )}
                       </div>
                     )}
-                    {v.dateLabel && <div style={{ color: 'var(--text-disabled)', fontSize: '9px', marginBottom: 6 }}>{v.dateLabel}</div>}
+                    {/* Date label — prominent */}
+                    {v.dateLabel && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                        <span style={{ width: 4, height: 4, background: 'var(--text-disabled)', borderRadius: '50%', flexShrink: 0 }} />
+                        <span style={{ color: 'var(--text-disabled)', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                          {v.dateLabel}
+                        </span>
+                      </div>
+                    )}
                     {v.loc && <div style={{ color: 'var(--text-disabled)', fontSize: '9px', marginBottom: 12 }}>{v.loc}</div>}
+                    {/* SIMILAR NEARBY */}
+                    {v.make && similarNearby > 0 && (
+                      <div style={{ padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', marginBottom: 10, fontSize: '10px' }}>
+                        <span style={{ color: 'var(--text-disabled)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>SIMILAR NEARBY </span>
+                        <span style={{ color: 'var(--text)', fontWeight: 700 }}>{similarNearby.toLocaleString()}</span>
+                        <span style={{ color: 'var(--text-disabled)' }}> {v.make} in view</span>
+                      </div>
+                    )}
                     <a href={`/vehicle/${v.id}`} style={{
                       display: 'block', textAlign: 'center', padding: '8px',
                       background: 'var(--text)', color: 'var(--bg)', textDecoration: 'none',
@@ -2190,7 +2429,67 @@ export default function UnifiedMap() {
             })()}
 
             {type === 'photo' && (() => {
-              const p = pin as PhotoPin;
+              const p = pin as any;
+
+              // ---- PHOTO HEX BIN aggregate panel ----
+              if (p._isPhotoHexBin) {
+                const pts = ((p._hexPoints || []) as any[]).map((pt: any) => pt.source || pt) as PhotoPin[];
+                const count = pts.length;
+                const withRealImage = pts.filter((ph: PhotoPin) => ph.hasRealImage).length;
+                const placeholders = count - withRealImage;
+                // Top vehicles by photo count
+                const vehicleCounts: Record<string, { title: string; count: number; thumb: string | null }> = {};
+                pts.forEach((ph: PhotoPin) => {
+                  if (ph.vehicleId && ph.vehicleTitle) {
+                    if (!vehicleCounts[ph.vehicleId]) vehicleCounts[ph.vehicleId] = { title: ph.vehicleTitle, count: 0, thumb: ph.vehicleThumb };
+                    vehicleCounts[ph.vehicleId].count++;
+                  }
+                });
+                const topVehicles = Object.entries(vehicleCounts).sort((a, b) => b[1].count - a[1].count).slice(0, 5);
+                // Thumb grid: up to 6 photos with real images
+                const thumbPhotos = pts.filter((ph: PhotoPin) => ph.hasRealImage && ph.thumb).slice(0, 6);
+                return (
+                  <div style={{ padding: 0 }}>
+                    <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)', marginBottom: 4, fontWeight: 600 }}>PHOTO HEX BIN</div>
+                      <div style={{ fontWeight: 700, fontSize: '22px', fontFamily: 'monospace', color: 'var(--text)' }}>{count.toLocaleString()}</div>
+                      <div style={{ color: 'var(--text-disabled)', fontSize: '10px' }}>photos in this area</div>
+                    </div>
+                    <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)', marginBottom: 6, fontWeight: 600 }}>IMAGE QUALITY</div>
+                      <div style={{ display: 'flex', gap: 16, fontSize: '11px' }}>
+                        <span style={{ color: '#4ade80' }}><strong>{withRealImage.toLocaleString()}</strong> real</span>
+                        <span style={{ color: 'var(--text-disabled)' }}><strong>{placeholders.toLocaleString()}</strong> GPS-only</span>
+                      </div>
+                    </div>
+                    {thumbPhotos.length > 0 && (
+                      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)', marginBottom: 6, fontWeight: 600 }}>PHOTOS</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+                          {thumbPhotos.map((ph: PhotoPin) => (
+                            <img key={ph.id} src={ph.thumb!} alt="" onClick={() => setSelectedPin({ pin: ph, type: 'photo' })}
+                              style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', cursor: 'pointer', background: 'var(--surface)' }}
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {topVehicles.length > 0 && (
+                      <div style={{ padding: '10px 14px' }}>
+                        <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-disabled)', marginBottom: 6, fontWeight: 600 }}>TOP VEHICLES</div>
+                        {topVehicles.map(([vid, info]) => (
+                          <a key={vid} href={`/vehicle/${vid}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', textDecoration: 'none', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ fontSize: '10px', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '75%' }}>{info.title}</span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-disabled)', flexShrink: 0 }}>{info.count} photos</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              // ---- Single photo panel (original) ----
               const imgSrc = p.hasRealImage ? (p.thumb || p.img) : p.vehicleThumb;
               return (
                 <div>
