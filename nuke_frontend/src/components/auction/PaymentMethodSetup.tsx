@@ -220,3 +220,4 @@ export default function PaymentMethodSetup({ onSuccess, onCancel }: PaymentMetho
     </div>
   );
 }
+
