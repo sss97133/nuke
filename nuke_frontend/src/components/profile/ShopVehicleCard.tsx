@@ -18,7 +18,7 @@ interface VehicleData {
   asking_price?: number | null;
   current_value?: number | null;
   is_for_sale?: boolean | null;
-  listing_status?: string | null; // 'sold', 'unsold', 'active', etc.
+  listing_status?: string | null;
   uploaded_by?: string;
   profiles?: any;
 }
@@ -56,7 +56,6 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
     color: 'var(--text)'
   };
 
-  // Gallery View - Minimal card with large image
   if (viewMode === 'gallery') {
     return (
       <Link
@@ -72,17 +71,13 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
           cursor: 'pointer'
         }}
       >
-        {/* Image */}
         <div style={{ position: 'relative', width: '100%', height: denseMode ? '160px' : '200px', overflow: 'hidden' }}>
           <VehicleThumbnail vehicleId={vehicle.id} />
         </div>
-        
-        {/* Content */}
         <div style={{ padding: '8px' }}>
           <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '13px', lineHeight: 1.3 }}>
             {title}
           </h3>
-          {/* Price and Status */}
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
             {(vehicle.sale_price || vehicle.asking_price || vehicle.current_value) && (
               <div className="text" style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 'bold' }}>
@@ -96,25 +91,11 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
                   padding: '2px 6px',
                   borderRadius: '2px',
                   fontWeight: 600,
-                  background:
-                    vehicle.listing_status === 'sold'
-                      ? 'var(--success-dim)'
-                      : vehicle.listing_status === 'unsold'
-                      ? 'var(--error-dim)'
-                      : 'var(--accent-dim)',
-                  color:
-                    vehicle.listing_status === 'sold'
-                      ? 'var(--success)'
-                      : vehicle.listing_status === 'unsold'
-                      ? 'var(--error)'
-                      : 'var(--accent)',
+                  background: vehicle.listing_status === 'sold' ? 'var(--success-dim)' : vehicle.listing_status === 'unsold' ? 'var(--error-dim)' : 'var(--accent-dim)',
+                  color: vehicle.listing_status === 'sold' ? 'var(--success)' : vehicle.listing_status === 'unsold' ? 'var(--error)' : 'var(--accent)',
                 }}
               >
-                {vehicle.listing_status === 'sold'
-                  ? 'SOLD'
-                  : vehicle.listing_status === 'unsold'
-                  ? 'UNSOLD'
-                  : vehicle.listing_status.toUpperCase()}
+                {vehicle.listing_status === 'sold' ? 'SOLD' : vehicle.listing_status === 'unsold' ? 'UNSOLD' : vehicle.listing_status.toUpperCase()}
               </span>
             )}
           </div>
@@ -123,40 +104,19 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
     );
   }
 
-  // Compact View - Medium card with more info
   if (viewMode === 'compact') {
     return (
       <Link
         to={`/vehicle/${vehicle.id}`}
         className="content-card"
-        style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: '2px',
-          overflow: 'hidden',
-          textDecoration: 'none',
-          display: 'block',
-          cursor: 'pointer'
-        }}
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '2px', overflow: 'hidden', textDecoration: 'none', display: 'block', cursor: 'pointer' }}
       >
-        {/* Image */}
         <div style={{ position: 'relative', width: '100%', height: denseMode ? '100px' : '120px', overflow: 'hidden' }}>
           <VehicleThumbnail vehicleId={vehicle.id} />
         </div>
-        
-        {/* Content */}
         <div style={{ padding: '8px' }}>
-          {/* Title */}
-          <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '13px', lineHeight: 1.3 }}>
-            {title}
-          </h3>
-          
-          {/* Owner */}
-          <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '4px' }}>
-            {getUserDisplay()}
-          </div>
-          
-          {/* Price and Status */}
+          <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '13px', lineHeight: 1.3 }}>{title}</h3>
+          <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '4px' }}>{getUserDisplay()}</div>
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
             {(vehicle.sale_price || vehicle.asking_price || vehicle.current_value) && (
               <span className="badge" style={{ ...smallChipStyle, color: 'var(--accent)', fontWeight: 'bold' }}>
@@ -164,35 +124,12 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
               </span>
             )}
             {vehicle.listing_status && (
-              <span
-                style={{
-                  ...smallChipStyle,
-                  background:
-                    vehicle.listing_status === 'sold'
-                      ? 'var(--success-dim)'
-                      : vehicle.listing_status === 'unsold'
-                      ? 'var(--error-dim)'
-                      : 'var(--accent-dim)',
-                  color:
-                    vehicle.listing_status === 'sold'
-                      ? 'var(--success)'
-                      : vehicle.listing_status === 'unsold'
-                      ? 'var(--error)'
-                      : 'var(--accent)',
-                  fontWeight: 600,
-                }}
-              >
-                {vehicle.listing_status === 'sold'
-                  ? 'SOLD'
-                  : vehicle.listing_status === 'unsold'
-                  ? 'UNSOLD'
-                  : vehicle.listing_status.toUpperCase()}
+              <span style={{ ...smallChipStyle, background: vehicle.listing_status === 'sold' ? 'var(--success-dim)' : vehicle.listing_status === 'unsold' ? 'var(--error-dim)' : 'var(--accent-dim)', color: vehicle.listing_status === 'sold' ? 'var(--success)' : vehicle.listing_status === 'unsold' ? 'var(--error)' : 'var(--accent)', fontWeight: 600 }}>
+                {vehicle.listing_status === 'sold' ? 'SOLD' : vehicle.listing_status === 'unsold' ? 'UNSOLD' : vehicle.listing_status.toUpperCase()}
               </span>
             )}
             {vehicle.is_for_sale && !vehicle.listing_status && (
-              <span className="badge" style={{ ...smallChipStyle, background: 'var(--success-dim)', color: 'var(--success)' }}>
-                For Sale
-              </span>
+              <span className="badge" style={{ ...smallChipStyle, background: 'var(--success-dim)', color: 'var(--success)' }}>For Sale</span>
             )}
           </div>
         </div>
@@ -200,85 +137,25 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
     );
   }
 
-  // Technical View - List with all details
   return (
     <Link
       to={`/vehicle/${vehicle.id}`}
       className="content-card"
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: '2px',
-        overflow: 'hidden',
-        textDecoration: 'none',
-        display: 'block',
-        cursor: 'pointer'
-      }}
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '2px', overflow: 'hidden', textDecoration: 'none', display: 'block', cursor: 'pointer' }}
     >
       <div style={{ display: 'flex', gap: '12px', padding: '8px' }}>
-        {/* Small Thumbnail */}
         <div style={{ width: denseMode ? '80px' : '120px', height: denseMode ? '60px' : '90px', flexShrink: 0, overflow: 'hidden' }}>
           <VehicleThumbnail vehicleId={vehicle.id} />
         </div>
-        
-        {/* Details */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Title */}
-          <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '13px', lineHeight: 1.3 }}>
-            {title}
-          </h3>
-          
-          {/* VIN */}
-          <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '2px' }}>
-            VIN: {vehicle.vin || 'Not provided'}
-          </div>
-          
-          {/* Owner */}
-          <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '2px' }}>
-            Owner: {getUserDisplay()}
-          </div>
-          
-          {/* Date */}
-          <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '4px' }}>
-            Added: {vehicle.created_at ? new Date(vehicle.created_at).toLocaleDateString() : 'Unknown'}
-          </div>
-          
-          {/* Badges */}
+          <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '13px', lineHeight: 1.3 }}>{title}</h3>
+          <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '2px' }}>VIN: {vehicle.vin || 'Not provided'}</div>
+          <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '2px' }}>Owner: {getUserDisplay()}</div>
+          <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '4px' }}>Added: {vehicle.created_at ? new Date(vehicle.created_at).toLocaleDateString() : 'Unknown'}</div>
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
             {(vehicle.sale_price || vehicle.asking_price || vehicle.current_value) && (
               <span className="badge" style={{ ...smallChipStyle, color: 'var(--accent)', fontWeight: 'bold' }}>
                 {formatPrice(vehicle.sale_price || vehicle.asking_price || vehicle.current_value)}
-              </span>
-            )}
-            {vehicle.listing_status && (
-              <span
-                style={{
-                  ...smallChipStyle,
-                  background:
-                    vehicle.listing_status === 'sold'
-                      ? 'var(--success-dim)'
-                      : vehicle.listing_status === 'unsold'
-                      ? 'var(--error-dim)'
-                      : 'var(--accent-dim)',
-                  color:
-                    vehicle.listing_status === 'sold'
-                      ? 'var(--success)'
-                      : vehicle.listing_status === 'unsold'
-                      ? 'var(--error)'
-                      : 'var(--accent)',
-                  fontWeight: 600,
-                }}
-              >
-                {vehicle.listing_status === 'sold'
-                  ? 'SOLD'
-                  : vehicle.listing_status === 'unsold'
-                  ? 'UNSOLD'
-                  : vehicle.listing_status.toUpperCase()}
-              </span>
-            )}
-            {vehicle.is_for_sale && !vehicle.listing_status && (
-              <span className="badge" style={{ ...smallChipStyle, background: 'var(--success-dim)', color: 'var(--success)' }}>
-                For Sale
               </span>
             )}
           </div>
@@ -289,4 +166,3 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
 };
 
 export default ShopVehicleCard;
-
