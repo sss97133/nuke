@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import OwnerAuctionDashboard from '../components/auction/OwnerAuctionDashboard';
 import AuctionBiddingInterface from '../components/auction/AuctionBiddingInterface';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 type ListingRow = {
   id: string;
