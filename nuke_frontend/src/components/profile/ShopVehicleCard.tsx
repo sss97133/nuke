@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import VehicleThumbnail from '../VehicleThumbnail';
 import { getVehicleIdentityParts } from '../../utils/vehicleIdentity';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface VehicleData {
   id: string;
