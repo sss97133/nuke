@@ -379,6 +379,3 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
 };
 
 export default ListingCard;
-
-
-
