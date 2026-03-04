@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CashBalanceService } from '../services/cashBalanceService';
 import type { CashBalance } from '../services/cashBalanceService';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 export default function PortfolioWithdraw() {
   const navigate = useNavigate();
