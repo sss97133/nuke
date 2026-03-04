@@ -96,7 +96,7 @@ export default function HoverCardDemo() {
             Click popup shows:
             <ul style={{ marginTop: 'var(--space-1)', paddingLeft: 'var(--space-4)' }}>
               <li>600px wide modal (centered)</li>
-              <li>Model description & tier</li>
+              <li>Model description &amp; tier</li>
               <li>Usage statistics</li>
               <li>What it searches for (list)</li>
               <li>What it outputs (list)</li>
