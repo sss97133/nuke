@@ -1,1 +1,17 @@
-PLACEHOLDER_READ_FROM_FILE
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { supabase } from '../../lib/supabase';
+import { useImageTags } from '../../hooks/useImageTags';
+import { ImageAIChat } from './ImageAIChat';
+import { FaviconIcon } from '../common/FaviconIcon';
+import { useImageAnalysis } from '../../hooks/useImageAnalysis';
+import { useAutoTagging } from '../../hooks/useAutoTagging';
+import SpatialPartPopup from '../parts/SpatialPartPopup';
+import PartCheckoutModal from '../parts/PartCheckoutModal';
+import PartEnrichmentModal from '../parts/PartEnrichmentModal';
+import { ManualAnnotationViewer } from './ManualAnnotationViewer';
+import { ClickablePartModal } from '../parts/ClickablePartModal';
+import { AnnotoriousImageTagger } from './AnnotoriousImageTagger';
+import { ImageInfoPanel } from './ImageInfoPanel';
+import { AdminNotificationService } from '../../services/adminNotificationService';
+import '../../styles/unified-design-system.css';
