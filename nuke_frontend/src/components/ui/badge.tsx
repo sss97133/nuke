@@ -1,42 +1,99 @@
-import React from 'react';
+import * as React from "react"
 
-interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: 'default' | 'secondary' | 'outline' | 'success' | 'warning' | 'danger';
-  size?: 'sm' | 'md' | 'lg';
+// Nuke Design System — Badge Component
+// Rules: 0px border-radius, ALL CAPS, CSS vars only, no Tailwind text-*, no rounded-*
+
+export type BadgeVariant = "default" | "secondary" | "outline" | "success" | "warning" | "danger"
+export type BadgeSize = "sm" | "md" | "lg"
+
+export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
+  variant?: BadgeVariant
+  size?: BadgeSize
 }
 
-const Badge: React.FC<BadgeProps> = ({
+const variantStyles: Record<BadgeVariant, React.CSSProperties> = {
+  default: {
+    backgroundColor: "var(--surface)",
+    color: "var(--text)",
+    borderColor: "var(--border)",
+  },
+  secondary: {
+    backgroundColor: "var(--surface)",
+    color: "var(--text-secondary)",
+    borderColor: "var(--border)",
+  },
+  outline: {
+    backgroundColor: "transparent",
+    color: "var(--text)",
+    borderColor: "var(--border)",
+  },
+  success: {
+    backgroundColor: "var(--success-dim, rgba(22,130,93,0.12))",
+    color: "var(--success, #16825d)",
+    borderColor: "var(--success, #16825d)",
+  },
+  warning: {
+    backgroundColor: "var(--warning-dim, rgba(176,90,0,0.12))",
+    color: "var(--warning, #b05a00)",
+    borderColor: "var(--warning, #b05a00)",
+  },
+  danger: {
+    backgroundColor: "var(--error-dim, rgba(209,52,56,0.12))",
+    color: "var(--error, #d13438)",
+    borderColor: "var(--error, #d13438)",
+  },
+}
+
+const sizeStyles: Record<BadgeSize, React.CSSProperties> = {
+  sm: {
+    padding: "2px 6px",
+    fontSize: "var(--fs-8, 8px)",
+  },
+  md: {
+    padding: "2px 8px",
+    fontSize: "var(--fs-9, 9px)",
+  },
+  lg: {
+    padding: "4px 10px",
+    fontSize: "var(--fs-10, 10px)",
+  },
+}
+
+const baseStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontFamily: "Arial, sans-serif",
+  fontWeight: 600,
+  letterSpacing: "0.05em",
+  textTransform: "uppercase",
+  borderRadius: 0,
+  border: "1px solid",
+  lineHeight: 1.4,
+  whiteSpace: "nowrap",
+  userSelect: "none",
+  transition: "color 0.12s ease, background-color 0.12s ease, border-color 0.12s ease",
+}
+
+export function Badge({
+  variant = "default",
+  size = "md",
+  style,
   children,
-  variant = 'default',
-  size = 'md',
-  className = '',
   ...props
-}) => {
-  const baseClasses = 'inline-flex items-center justify-center rounded-full font-medium';
-
-  const variantClasses = {
-    default: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-700',
-    secondary: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600',
-    outline: 'bg-white border text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600',
-    success: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/50 dark:text-green-300 dark:border-green-700',
-    warning: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-700',
-    danger: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/50 dark:text-red-300 dark:border-red-700'
-  };
-
-  const sizeClasses = {
-    sm: 'px-2 py-0.5 text-xs',
-    md: 'px-2.5 py-1 text-sm',
-    lg: 'px-3 py-1.5 text-base'
-  };
+}: BadgeProps) {
+  const combinedStyle: React.CSSProperties = {
+    ...baseStyle,
+    ...variantStyles[variant],
+    ...sizeStyles[size],
+    ...style,
+  }
 
   return (
-    <span
-      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} border ${className}`}
-      {...props}
-    >
+    <span style={combinedStyle} {...props}>
       {children}
     </span>
-  );
-};
+  )
+}
 
-export { Badge };
+export default Badge
