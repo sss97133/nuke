@@ -474,6 +474,7 @@ export default function UnifiedMap() {
   const [timelineZoom, setTimelineZoom] = useState(1); // 1 = full range, higher = zoomed in (max 20)
   const [timelineCenter, setTimelineCenter] = useState(50); // center position as % of full range
   const timelineDragRef = useRef<{ startX: number; startCenter: number } | null>(null);
+  const histogramRef = useRef<HTMLDivElement | null>(null);
 
   // County choropleth for thermal mode
   const [countyGeoJson, setCountyGeoJson] = useState<any>(null);
@@ -942,13 +943,20 @@ export default function UnifiedMap() {
     return ticks;
   }, [timelineRange, visibleRange, timelineZoom, timelineEnabled]);
 
-  // --- Timeline scroll wheel zoom handler ---
-  const handleTimelineWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const delta = e.deltaY > 0 ? -1 : 1;
-    setTimelineZoom(z => Math.max(1, Math.min(20, z + delta * 0.5)));
-  }, []);
+  // --- Timeline scroll wheel zoom handler (native listener to intercept before deck.gl) ---
+  useEffect(() => {
+    const el = histogramRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      const delta = e.deltaY > 0 ? -1 : 1;
+      setTimelineZoom(z => Math.max(1, Math.min(20, z + delta * 0.5)));
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  });
 
   const filteredVehicles = useMemo(() => {
     if (!timelineEnabled || timeCutoff >= 100) return vehicles;
@@ -2019,8 +2027,8 @@ export default function UnifiedMap() {
                   {/* Mini bar chart histogram with scroll-zoom + drag-pan */}
                   {timelineHistogram.length > 0 && (
                     <div
-                      style={{ display: 'flex', alignItems: 'flex-end', height: 20, gap: 1, cursor: timelineZoom > 1 ? 'ew-resize' : 'default' }}
-                      onWheel={handleTimelineWheel}
+                      ref={histogramRef}
+                      style={{ display: 'flex', alignItems: 'flex-end', height: 40, gap: 1, cursor: timelineZoom > 1 ? 'ew-resize' : 'default' }}
                       onMouseDown={(e) => {
                         if (timelineZoom <= 1) return;
                         timelineDragRef.current = { startX: e.clientX, startCenter: timelineCenter };
@@ -2046,7 +2054,7 @@ export default function UnifiedMap() {
                         const active = globalPct <= timeCutoff;
                         return (
                           <div key={i} style={{
-                            flex: 1, height: `${Math.max(2, Math.round(h * 18))}px`,
+                            flex: 1, height: `${Math.max(2, Math.round(h * 36))}px`,
                             background: active ? 'var(--text)' : 'var(--border)',
                             minWidth: 1,
                           }} />
