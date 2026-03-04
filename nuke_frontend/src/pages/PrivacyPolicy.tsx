@@ -14,13 +14,13 @@ const PrivacyPolicy: React.FC = () => {
       })
       .catch((err) => {
         console.error('Failed to load privacy policy:', err);
-        setContent('# Privacy Policy\n\nFailed to load policy. Please contact legal@marque.com');
+        setContent('# Privacy Policy\n\nFailed to load privacy policy. Please contact privacy@marque.com');
         setLoading(false);
       });
   }, []);
 
   if (loading) {
-    return <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: '11px' }}>Loading policy…</div>;
+    return <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: '11px' }}>Loading privacy policy…</div>;
   }
 
   return (
@@ -33,5 +33,4 @@ const PrivacyPolicy: React.FC = () => {
 };
 
 export default PrivacyPolicy;
-
 
