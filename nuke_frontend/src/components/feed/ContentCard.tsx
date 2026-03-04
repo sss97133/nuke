@@ -217,7 +217,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
     >
 
       {/* Image */}
-      {images.length > 0 && !imageError && (
+      {images.length > 0 && (
         <div
           style={{
             position: 'relative',
@@ -225,25 +225,40 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
             height: viewMode === 'gallery' ? '200px' :
                    viewMode === 'compact' ? '120px' :
                    '60px',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            backgroundColor: 'var(--bg)',
           }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           onDoubleClick={handleDoubleClick}
           onClick={handleImageClick}
         >
-          <img
-            src={images[currentImageIdx]}
-            alt={item.title}
-            onError={handleImageError}
-            style={{
+          {!imageError ? (
+            <img
+              src={images[currentImageIdx]}
+              alt={item.title}
+              onError={handleImageError}
+              loading="lazy"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                cursor: 'pointer'
+              }}
+            />
+          ) : (
+            <div style={{
               width: '100%',
               height: '100%',
-              objectFit: 'cover',
-              cursor: 'pointer'
-            }}
-          />
-          {images.length > 1 && (
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'var(--bg)',
+            }}>
+              <img src="/nuke.png" alt="" style={{ width: '32px', height: '32px', opacity: 0.15 }} />
+            </div>
+          )}
+          {images.length > 1 && !imageError && (
             <div style={{ position: 'absolute', top: '6px', right: '6px', fontSize: '9px', color: 'var(--surface-glass)' }}>
               {currentImageIdx + 1}/{images.length}
             </div>

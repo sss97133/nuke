@@ -91,7 +91,6 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
 
       // Load record price for this make/model
       if (vehicle.make && vehicle.model && vehicle.year) {
-        const yearBucket = Math.floor(vehicle.year / 5) * 5;
         const { data: rec } = await supabase
           .from('record_prices')
           .select('record_price, record_sale_date, previous_record_price, times_record_broken')
@@ -115,6 +114,22 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
       }
 
       if (!cancelled) setLoading(false);
+
+      // Auto-compute if no estimate exists
+      if (!cancelled && !est) {
+        setComputing(true);
+        try {
+          const { data, error } = await supabase.functions.invoke('compute-vehicle-valuation', {
+            body: { vehicle_id: vehicleId, force: false },
+          });
+          if (!cancelled && !error && data?.results?.[0]) {
+            setEstimate(data.results[0] as NukeEstimate);
+          }
+        } catch {
+          // silent — user can still click Compute manually
+        }
+        if (!cancelled) setComputing(false);
+      }
     };
 
     void load();
@@ -172,8 +187,53 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
       </div>
       <div className="card-body" style={{ padding: '12px' }}>
         {!estimate ? (
-          <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
-            No estimate computed yet. Click "Compute" to generate.
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {computing ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '8px', height: '8px', borderRadius: '50%',
+                    background: '#10b981',
+                    animation: 'pulse 1.5s ease-in-out infinite',
+                  }} />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Computing estimate...
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {['Comparable Sales', 'Market Trend', 'Rarity', 'Condition'].map((s, i) => (
+                    <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ width: '100px', fontSize: '8px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{s}</span>
+                      <div style={{
+                        flex: 1, height: '3px', background: 'var(--grey-100)', borderRadius: '2px', overflow: 'hidden',
+                      }}>
+                        <div style={{
+                          width: `${30 + i * 15}%`, height: '100%',
+                          background: 'var(--border)',
+                          borderRadius: '2px',
+                          animation: `shimmer 1.5s ease-in-out infinite`,
+                          animationDelay: `${i * 0.2}s`,
+                        }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <style>{`
+                  @keyframes shimmer {
+                    0%, 100% { opacity: 0.3; }
+                    50% { opacity: 0.8; }
+                  }
+                  @keyframes pulse {
+                    0%, 100% { opacity: 0.4; transform: scale(0.8); }
+                    50% { opacity: 1; transform: scale(1); }
+                  }
+                `}</style>
+              </>
+            ) : (
+              <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+                No estimate available. Click "Compute" to generate.
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
