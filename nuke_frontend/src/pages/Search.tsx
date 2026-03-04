@@ -1,1 +1,10 @@
-PLACEHOLDER_SEARCH
+import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import IntelligentSearch from '../components/search/IntelligentSearch';
+import SearchResults from '../components/search/SearchResults';
+import VehicleCardDense from '../components/vehicles/VehicleCardDense';
+import { aiGateway } from '../lib/aiGateway';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
+import type { SearchResult } from '../types/search';
+import '../styles/unified-design-system.css';
