@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase, getCurrentUserId } from '../../lib/supabase';
 import { useToast } from '../../hooks/useToast';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 const CATEGORY_SUBCATEGORIES: Record<
   'categorization' | 'business_impact' | 'data_correction' | 'operational_note',
