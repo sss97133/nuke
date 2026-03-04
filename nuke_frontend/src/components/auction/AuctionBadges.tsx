@@ -1,6 +1,6 @@
 import React from 'react';
 import { FaviconIcon } from '../common/FaviconIcon';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 type AuctionStatus = 'active' | 'sold' | 'ended' | 'expired' | 'cancelled' | 'pending' | 'ending_soon' | 'reserve_not_met';
 
