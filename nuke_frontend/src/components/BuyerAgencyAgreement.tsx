@@ -1,766 +1,280 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import {
-  COMMISSION_TIERS,
-  type CommissionTier,
-  formatCommissionRate,
-  formatCurrencyFromCents,
-  getCommissionRate,
-  getCommissionTier,
-} from '../utils/commission';
-import '../design-system.css';
+import { useNavigate } from 'react-router-dom';
+import { Database } from '../types/supabase';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
+import { Checkbox } from '../components/ui/checkbox';
+import '../styles/unified-design-system.css';
 
-interface BuyerAgencyAgreementProps {
-  onComplete?: (agreementId: string) => void;
-  onCancel?: () => void;
-}
+type Profile = Database['public']['Tables']['profiles']['Row'];
 
-interface AgreementData {
-  id: string;
-  status: string;
-  commission_rate: number;
-  max_authorized_bid_cents: number | null;
-  legal_name: string;
-  legal_address: {
-    street?: string;
-    city?: string;
-    state?: string;
-    zip?: string;
-    country?: string;
-  } | null;
-  signed_at: string | null;
-}
-
-export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgencyAgreementProps) {
+const BuyerAgencyAgreementContent: React.FC = () => {
   const { user } = useAuth();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const [step, setStep] = useState<'terms' | 'details' | 'sign'>('terms');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [existingAgreement, setExistingAgreement] = useState<AgreementData | null>(null);
-
-  // Form fields
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [legalName, setLegalName] = useState('');
-  const [street, setStreet] = useState('');
+  const navigate = useNavigate();
+  const [fullName, setFullName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [zip, setZip] = useState('');
-  const [country, setCountry] = useState('United States');
-  const [maxBidAmount, setMaxBidAmount] = useState<string>('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
+  const [agreeToFees, setAgreeToFees] = useState(false);
+  const [agreeToExclusive, setAgreeToExclusive] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
-  const parsedMaxBidAmount = maxBidAmount.trim() ? parseFloat(maxBidAmount) : 0;
-  const maxBidCents =
-    Number.isFinite(parsedMaxBidAmount) && parsedMaxBidAmount > 0
-      ? Math.round(parsedMaxBidAmount * 100)
-      : null;
-  const commissionTier = getCommissionTier(maxBidCents);
-  const commissionRate = getCommissionRate(maxBidCents);
-  const commissionRateDisplay = formatCommissionRate(commissionRate);
-  const commissionRateRounded = Number(commissionRate.toFixed(2));
-
-  const formatTierRange = (tier: CommissionTier, index: number) => {
-    if (index === 0 && tier.maxCents !== null) {
-      return `Up to ${formatCurrencyFromCents(tier.maxCents)}`;
-    }
-
-    const previousMax = COMMISSION_TIERS[index - 1]?.maxCents ?? null;
-    if (tier.maxCents === null) {
-      return `Over ${formatCurrencyFromCents(previousMax || 0)}`;
-    }
-
-    return `Over ${formatCurrencyFromCents(previousMax || 0)} up to ${formatCurrencyFromCents(
-      tier.maxCents,
-    )}`;
-  };
-
-  // Signature state
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [signatureExists, setSignatureExists] = useState(false);
-  const [lastX, setLastX] = useState(0);
-  const [lastY, setLastY] = useState(0);
-
-  const formatError = (err: any, fallback: string) => {
-    if (!err) return fallback;
-    if (typeof err === 'string') return err;
-    const message = err.message || err.error_description || fallback;
-    const details = err.details ? ` (${err.details})` : '';
-    const hint = err.hint ? ` ${err.hint}` : '';
-    return `${message}${details}${hint}`.trim();
-  };
-
-  // Load existing agreement
   useEffect(() => {
-    if (!user) return;
-
-    const loadExisting = async () => {
+    const loadProfile = async () => {
+      if (!user) return;
+      
       const { data, error } = await supabase
-        .from('buyer_agency_agreements')
+        .from('profiles')
         .select('*')
-        .eq('user_id', user.id)
-        .in('status', ['draft', 'pending_signature', 'active'])
-        .order('created_at', { ascending: false })
-        .limit(1)
+        .eq('id', user.id)
         .single();
-
+        
       if (data && !error) {
-        if (data.status === 'active') {
-          // Already have active agreement
-          onComplete?.(data.id);
-          return;
-        }
-
-        setExistingAgreement(data);
-        setLegalName(data.legal_name || '');
-        if (data.legal_address) {
-          setStreet(data.legal_address.street || '');
-          setCity(data.legal_address.city || '');
-          setState(data.legal_address.state || '');
-          setZip(data.legal_address.zip || '');
-          setCountry(data.legal_address.country || 'United States');
-        }
-        if (data.max_authorized_bid_cents) {
-          setMaxBidAmount((data.max_authorized_bid_cents / 100).toString());
-        }
-
-        setTermsAccepted(true);
-        if (data.status === 'pending_signature') {
-          setStep('sign');
-        } else if (data.status === 'draft') {
-          setStep('details');
-        }
+        setFullName(data.full_name || '');
+        setEmail(user.email || '');
       }
     };
-
-    loadExisting();
+    
+    loadProfile();
   }, [user]);
 
-  // Initialize signature canvas
-  useEffect(() => {
-    if (step !== 'sign') return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    canvas.width = 400;
-    canvas.height = 150;
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.strokeStyle = '#cccccc';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(20, canvas.height - 20);
-    ctx.lineTo(canvas.width - 20, canvas.height - 20);
-    ctx.stroke();
-
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-  }, [step]);
-
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
-    setLastX(clientX - rect.left);
-    setLastY(clientY - rect.top);
-    setIsDrawing(true);
-  };
-
-  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
-    const currentX = clientX - rect.left;
-    const currentY = clientY - rect.top;
-
-    ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-    ctx.lineTo(currentX, currentY);
-    ctx.stroke();
-
-    setLastX(currentX);
-    setLastY(currentY);
-    setSignatureExists(true);
-  };
-
-  const stopDrawing = () => {
-    setIsDrawing(false);
-  };
-
-  const clearSignature = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.strokeStyle = '#cccccc';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(20, canvas.height - 20);
-    ctx.lineTo(canvas.width - 20, canvas.height - 20);
-    ctx.stroke();
-
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-
-    setSignatureExists(false);
-  };
-
-  const handleAcceptTerms = () => {
-    if (termsAccepted) {
-      setStep('details');
-    }
-  };
-
-  const handleSaveDetails = async () => {
-    if (!user) return;
-    if (!legalName.trim()) {
-      setError('Legal name is required');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!agreeToTerms || !agreeToFees || !agreeToExclusive) {
+      setError('Please agree to all terms before submitting.');
       return;
     }
-
-    const trimmedMaxBidAmount = maxBidAmount.trim();
-    if (trimmedMaxBidAmount && maxBidCents === null) {
-      setError('Maximum bid must be a positive number or left blank');
-      return;
-    }
-
-    const hasAddress = [street, city, state, zip].some((value) => value.trim());
-    const legalAddress = hasAddress ? {
-      street: street.trim(),
-      city: city.trim(),
-      state: state.trim(),
-      zip: zip.trim(),
-      country: country.trim(),
-    } : null;
-
-    setLoading(true);
+    
+    setIsSubmitting(true);
     setError(null);
-
+    
     try {
-      const agreementData = {
-        user_id: user.id,
-        status: 'pending_signature',
-        legal_name: legalName.trim(),
-        legal_address: legalAddress,
-        max_authorized_bid_cents: maxBidCents,
-        commission_rate: commissionRateRounded,
-      };
-
-      let result;
-      if (existingAgreement?.id) {
-        result = await supabase
-          .from('buyer_agency_agreements')
-          .update(agreementData)
-          .eq('id', existingAgreement.id)
-          .select()
-          .single();
-      } else {
-        result = await supabase
-          .from('buyer_agency_agreements')
-          .insert(agreementData)
-          .select()
-          .single();
-      }
-
-      if (result.error) throw result.error;
-
-      setExistingAgreement(result.data);
-      setStep('sign');
-    } catch (err: any) {
-      console.error('Failed to save agreement:', err);
-      setError(formatError(err, 'Failed to save agreement'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSign = async () => {
-    if (!user || !existingAgreement || !signatureExists) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const imageData = canvas.toDataURL('image/png');
-
-      const { error: updateError } = await supabase
-        .from('buyer_agency_agreements')
-        .update({
-          status: 'active',
-          signature_data: {
-            image: imageData,
-            timestamp: new Date().toISOString(),
-            signerName: legalName,
-          },
+      if (!user) throw new Error('Must be logged in');
+      
+      const { error: submitError } = await supabase
+        .from('buyer_agreements')
+        .insert({
+          user_id: user.id,
+          full_name: fullName,
+          date_of_birth: dateOfBirth,
+          address,
+          city,
+          state,
+          zip,
+          email,
+          phone,
+          agreed_to_terms: agreeToTerms,
+          agreed_to_fees: agreeToFees,
+          agreed_to_exclusive: agreeToExclusive,
           signed_at: new Date().toISOString(),
-        })
-        .eq('id', existingAgreement.id);
-
-      if (updateError) throw updateError;
-
-      onComplete?.(existingAgreement.id);
-    } catch (err: any) {
-      console.error('Failed to sign agreement:', err);
-      setError(formatError(err, 'Failed to sign agreement'));
+        });
+        
+      if (submitError) throw submitError;
+      
+      setSuccess(true);
+      setTimeout(() => navigate('/dashboard'), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  if (!user) {
+  if (success) {
     return (
-      <div className="card">
-        <div className="card-body text-center">
-          <p>Please log in to create a buyer agency agreement.</p>
-        </div>
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <h2>Agreement Signed Successfully</h2>
+        <p>Redirecting to dashboard...</p>
       </div>
     );
   }
 
   return (
-    <div className="card" style={{ maxWidth: '700px', margin: '0 auto' }}>
-      <div className="card-header">
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Buyer Agency Agreement</h2>
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-          Authorize Nuke to bid on your behalf at external auctions
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 20px' }}>
+      <h1 style={{ marginBottom: '24px' }}>Buyer Agency Agreement</h1>
+      
+      <div style={{ 
+        backgroundColor: 'var(--bg-secondary)', 
+        padding: '24px', 
+        borderRadius: '8px',
+        marginBottom: '32px',
+        fontSize: '14px',
+        lineHeight: '1.6'
+      }}>
+        <h2 style={{ marginBottom: '16px', fontSize: '18px' }}>Terms and Conditions</h2>
+        <p style={{ marginBottom: '12px' }}>
+          This Buyer Agency Agreement ("Agreement") is entered into between Nuke Marketplace ("Agency") 
+          and the undersigned buyer ("Client"). This Agreement establishes the terms under which the 
+          Agency will represent the Client in the purchase of vehicles.
+        </p>
+        <p style={{ marginBottom: '12px' }}>
+          <strong>Services:</strong> The Agency agrees to provide buyer representation services, 
+          including vehicle search, price negotiation, and purchase facilitation.
+        </p>
+        <p style={{ marginBottom: '12px' }}>
+          <strong>Fees:</strong> Client agrees to pay a buyer's premium of 2.5% of the final 
+          purchase price for any vehicle acquired through Agency's services.
+        </p>
+        <p>
+          <strong>Exclusivity:</strong> During the term of this Agreement, Client agrees to work 
+          exclusively through Agency for vehicle purchases within the agreed parameters.
         </p>
       </div>
-
-      <div className="card-body">
+      
+      <form onSubmit={handleSubmit}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+          <div>
+            <Label htmlFor="fullName">Full Legal Name</Label>
+            <Input
+              id="fullName"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="dateOfBirth">Date of Birth</Label>
+            <Input
+              id="dateOfBirth"
+              type="date"
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+              required
+            />
+          </div>
+          <div style={{ gridColumn: 'span 2' }}>
+            <Label htmlFor="address">Street Address</Label>
+            <Input
+              id="address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="city">City</Label>
+            <Input
+              id="city"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              required
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <Label htmlFor="state">State</Label>
+              <Input
+                id="state"
+                value={state}
+                onChange={(e) => setState(e.target.value)}
+                maxLength={2}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="zip">ZIP Code</Label>
+              <Input
+                id="zip"
+                value={zip}
+                onChange={(e) => setZip(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="email">Email Address</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="phone">Phone Number</Label>
+            <Input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+            />
+          </div>
+        </div>
+        
+        <div style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <Checkbox
+              id="agreeToTerms"
+              checked={agreeToTerms}
+              onCheckedChange={(checked) => setAgreeToTerms(!!checked)}
+            />
+            <Label htmlFor="agreeToTerms" style={{ cursor: 'pointer', lineHeight: '1.5' }}>
+              I have read and agree to the terms and conditions of this Buyer Agency Agreement
+            </Label>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <Checkbox
+              id="agreeToFees"
+              checked={agreeToFees}
+              onCheckedChange={(checked) => setAgreeToFees(!!checked)}
+            />
+            <Label htmlFor="agreeToFees" style={{ cursor: 'pointer', lineHeight: '1.5' }}>
+              I agree to the buyer's premium fee structure (2.5% of final purchase price)
+            </Label>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <Checkbox
+              id="agreeToExclusive"
+              checked={agreeToExclusive}
+              onCheckedChange={(checked) => setAgreeToExclusive(!!checked)}
+            />
+            <Label htmlFor="agreeToExclusive" style={{ cursor: 'pointer', lineHeight: '1.5' }}>
+              I agree to the exclusivity clause and will work exclusively through Nuke Marketplace 
+              for vehicle purchases during the term of this agreement
+            </Label>
+          </div>
+        </div>
+        
         {error && (
-          <div style={{
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            color: '#991b1b',
-            padding: '10px 12px',
-            borderRadius: '4px',
+          <div style={{ 
+            backgroundColor: 'var(--error-bg, #fee)', 
+            color: 'var(--error, #c00)',
+            padding: '12px 16px',
+            borderRadius: '6px',
             marginBottom: '16px',
-            fontSize: '12px'
+            fontSize: '14px'
           }}>
             {error}
           </div>
         )}
-
-        {/* Step indicators */}
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          marginBottom: '20px',
-          fontSize: '11px'
-        }}>
-          {['terms', 'details', 'sign'].map((s, i) => (
-            <div key={s} style={{
-              flex: 1,
-              padding: '8px',
-              textAlign: 'center',
-              borderRadius: '4px',
-              background: step === s ? 'var(--accent-dim)' : 'var(--surface-hover)',
-              color: step === s ? 'var(--accent)' : 'var(--text-muted)',
-              fontWeight: step === s ? 700 : 400,
-            }}>
-              {i + 1}. {s.charAt(0).toUpperCase() + s.slice(1)}
-            </div>
-          ))}
-        </div>
-
-        {/* Step 1: Terms */}
-        {step === 'terms' && (
-          <div>
-            <div style={{
-              background: 'var(--surface-hover)',
-              padding: '16px',
-              borderRadius: '4px',
-              maxHeight: '400px',
-              overflowY: 'auto',
-              fontSize: '12px',
-              lineHeight: '1.6',
-              marginBottom: '16px'
-            }}>
-              <h3 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px' }}>
-                MARQUE BUYER AGENCY AGREEMENT
-              </h3>
-
-              <p><strong>1. Appointment as Agent</strong></p>
-              <p style={{ marginBottom: '12px' }}>
-                By signing this agreement, you ("Buyer") appoint Nuke ("Agent") as your exclusive
-                buyer's agent for the purpose of bidding on and purchasing vehicles at external
-                auction platforms including but not limited to Bring a Trailer, Cars & Bids,
-                RM Sotheby's, Gooding & Company, and other online and in-person auctions.
-              </p>
-
-              <p><strong>2. Agent's Duties</strong></p>
-              <p style={{ marginBottom: '12px' }}>
-                Agent agrees to: (a) bid on vehicles specified by Buyer up to the maximum
-                authorized bid amount; (b) provide updates on bid status; (c) facilitate payment
-                and delivery arrangements upon winning bid; (d) maintain confidentiality of
-                Buyer's maximum bid amounts and bidding strategy.
-              </p>
-
-              <p><strong>3. Commission (Risk-Adjusted)</strong></p>
-              <p style={{ marginBottom: '12px' }}>
-                Buyer agrees to pay Agent a risk-adjusted commission based on the final hammer price
-                for any vehicle successfully purchased through Agent's services. Rates are tiered by
-                value to reflect handling risk and required coverage:
-              </p>
-              <ul style={{ paddingLeft: '18px', marginBottom: '12px' }}>
-                {COMMISSION_TIERS.map((tier, index) => (
-                  <li key={tier.label} style={{ marginBottom: '6px' }}>
-                    <strong>{tier.label}</strong> ({formatTierRange(tier, index)}):{' '}
-                    {formatCommissionRate(tier.rate)}%
-                    <span style={{ color: 'var(--text-muted)' }}> — {tier.description}</span>
-                  </li>
-                ))}
-              </ul>
-              <p style={{ marginBottom: '12px' }}>
-                Commission is due upon successful completion of the purchase transaction. The exact
-                rate is determined by the final hammer price if the bid is successful.
-              </p>
-
-              <p><strong>4. Deposit Authorization</strong></p>
-              <p style={{ marginBottom: '12px' }}>
-                Buyer authorizes Agent to collect a refundable deposit of 10% of the maximum
-                bid amount prior to placing bids. This deposit will be applied toward the
-                commission upon successful purchase, or fully refunded if the bid is unsuccessful.
-              </p>
-
-              <p><strong>5. Buyer's Responsibilities</strong></p>
-              <p style={{ marginBottom: '12px' }}>
-                Buyer agrees to: (a) provide accurate bidding instructions; (b) maintain
-                sufficient funds to complete authorized purchases; (c) complete purchase
-                transactions within the auction's required timeframe; (d) pay all applicable
-                buyer's premiums, taxes, and fees directly to the auction house.
-              </p>
-
-              <p><strong>6. No Guarantees</strong></p>
-              <p style={{ marginBottom: '12px' }}>
-                Agent does not guarantee that Buyer will win any auction. Agent will use
-                reasonable efforts to place bids according to Buyer's instructions but is not
-                liable for missed bids due to technical issues, auction house policies, or
-                other circumstances beyond Agent's control.
-              </p>
-
-              <p><strong>7. Term</strong></p>
-              <p style={{ marginBottom: '12px' }}>
-                This agreement is effective upon signing and remains in effect for one (1) year,
-                unless terminated earlier by either party with 30 days written notice.
-              </p>
-
-              <p><strong>8. Governing Law</strong></p>
-              <p>
-                This agreement shall be governed by and construed in accordance with the
-                laws of the State of California.
-              </p>
-            </div>
-
-            <label style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '10px',
-              marginBottom: '16px',
-              cursor: 'pointer'
-            }}>
-              <input
-                type="checkbox"
-                checked={termsAccepted}
-                onChange={(e) => setTermsAccepted(e.target.checked)}
-                style={{ marginTop: '2px' }}
-              />
-              <span style={{ fontSize: '12px' }}>
-                I have read and agree to the terms and conditions of this Buyer Agency Agreement.
-                I understand that Nuke will act as my agent for bidding on external auctions
-                and that I am responsible for a risk-adjusted commission based on the schedule above.
-              </span>
-            </label>
-
-            <div style={{ display: 'flex', gap: '12px' }}>
-              {onCancel && (
-                <button
-                  type="button"
-                  className="button"
-                  onClick={onCancel}
-                  style={{ fontSize: '12px' }}
-                >
-                  Cancel
-                </button>
-              )}
-              <button
-                type="button"
-                className="button button-primary"
-                onClick={handleAcceptTerms}
-                disabled={!termsAccepted}
-                style={{ fontSize: '12px' }}
-              >
-                Accept & Continue
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Personal Details */}
-        {step === 'details' && (
-          <div>
-            <p style={{ fontSize: '12px', marginBottom: '16px', color: 'var(--text-secondary)' }}>
-              Please provide your legal information for the agreement.
-            </p>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
-                Legal Full Name *
-              </label>
-              <input
-                type="text"
-                value={legalName}
-                onChange={(e) => setLegalName(e.target.value)}
-                placeholder="As it appears on your ID"
-                style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  border: '1px solid var(--border)',
-                  fontSize: '12px'
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
-                Street Address
-              </label>
-              <input
-                type="text"
-                value={street}
-                onChange={(e) => setStreet(e.target.value)}
-                placeholder="123 Main Street"
-                style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  border: '1px solid var(--border)',
-                  fontSize: '12px'
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
-                  City
-                </label>
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    border: '1px solid var(--border)',
-                    fontSize: '12px'
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
-                  State
-                </label>
-                <input
-                  type="text"
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    border: '1px solid var(--border)',
-                    fontSize: '12px'
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
-                  ZIP
-                </label>
-                <input
-                  type="text"
-                  value={zip}
-                  onChange={(e) => setZip(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    border: '1px solid var(--border)',
-                    fontSize: '12px'
-                  }}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
-                Maximum Authorized Bid (Optional)
-              </label>
-              <div style={{ position: 'relative' }}>
-                <span style={{
-                  position: 'absolute',
-                  left: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  fontSize: '12px',
-                  color: 'var(--text-muted)'
-                }}>$</span>
-                <input
-                  type="number"
-                  value={maxBidAmount}
-                  onChange={(e) => setMaxBidAmount(e.target.value)}
-                  placeholder="No limit"
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px 8px 20px',
-                    border: '1px solid var(--border)',
-                    fontSize: '12px'
-                  }}
-                />
-              </div>
-              <p style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                Leave blank for no maximum limit. You can set limits per-bid later.
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                type="button"
-                className="button"
-                onClick={() => setStep('terms')}
-                style={{ fontSize: '12px' }}
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                className="button button-primary"
-                onClick={handleSaveDetails}
-                disabled={loading || !legalName.trim()}
-                style={{ fontSize: '12px' }}
-              >
-                {loading ? 'Saving...' : 'Continue to Sign'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Signature */}
-        {step === 'sign' && (
-          <div>
-            <p style={{ fontSize: '12px', marginBottom: '16px', color: 'var(--text-secondary)' }}>
-              Please sign below to complete the agreement.
-            </p>
-
-            <div style={{
-              background: 'var(--surface-hover)',
-              padding: '12px',
-              borderRadius: '4px',
-              marginBottom: '16px',
-              fontSize: '11px'
-            }}>
-              <p><strong>Signer:</strong> {legalName}</p>
-              <p><strong>Commission Schedule:</strong> Risk-adjusted by value tier</p>
-              {maxBidAmount && (
-                <p>
-                  <strong>Estimated Rate (based on max authorized bid):</strong>{' '}
-                  {commissionRateDisplay}% ({commissionTier.label})
-                </p>
-              )}
-              {maxBidAmount && (
-                <p><strong>Max Authorized Bid:</strong> ${parseFloat(maxBidAmount).toLocaleString()}</p>
-              )}
-              <p><strong>Date:</strong> {new Date().toLocaleDateString()}</p>
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '8px' }}>
-                Sign in the area below:
-              </label>
-              <div style={{
-                border: '2px solid var(--border)',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                display: 'inline-block'
-              }}>
-                <canvas
-                  ref={canvasRef}
-                  style={{ display: 'block', cursor: 'crosshair', touchAction: 'none' }}
-                  onMouseDown={startDrawing}
-                  onMouseMove={draw}
-                  onMouseUp={stopDrawing}
-                  onMouseLeave={stopDrawing}
-                  onTouchStart={startDrawing}
-                  onTouchMove={draw}
-                  onTouchEnd={stopDrawing}
-                />
-              </div>
-              <p style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                Use your mouse or touch screen to sign above
-              </p>
-            </div>
-
-            <p style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              By signing above, I acknowledge that I have read and agree to all terms and conditions
-              of this Buyer Agency Agreement. This electronic signature has the same legal effect
-              as a handwritten signature.
-            </p>
-
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                type="button"
-                className="button"
-                onClick={() => setStep('details')}
-                style={{ fontSize: '12px' }}
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                className="button"
-                onClick={clearSignature}
-                disabled={!signatureExists}
-                style={{ fontSize: '12px' }}
-              >
-                Clear
-              </button>
-              <button
-                type="button"
-                className="button button-primary"
-                onClick={handleSign}
-                disabled={loading || !signatureExists}
-                style={{ fontSize: '12px' }}
-              >
-                {loading ? 'Signing...' : 'Sign & Complete Agreement'}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+        
+        <Button type="submit" disabled={isSubmitting} style={{ width: '100%', padding: '12px' }}>
+          {isSubmitting ? 'Submitting...' : 'Sign Agreement'}
+        </Button>
+      </form>
     </div>
   );
-}
+};
+
+const BuyerAgencyAgreement: React.FC = () => (
+  <ErrorBoundary>
+    <BuyerAgencyAgreementContent />
+  </ErrorBoundary>
+);
+
+export default BuyerAgencyAgreement;
