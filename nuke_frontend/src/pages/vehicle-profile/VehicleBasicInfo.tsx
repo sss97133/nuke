@@ -9,6 +9,8 @@ import type { VehicleBasicInfoProps} from './types';
 import { useToast } from '../../components/ui/Toast';
 import { supabase } from '../../lib/supabase';
 import { getPlatformDisplayName, normalizePlatform } from '../../services/platformNomenclature';
+import FieldProvenanceDrawer, { SourceBadge } from './FieldProvenanceDrawer';
+import { useFieldEvidence, type FieldEvidenceMap } from './hooks/useFieldEvidence';
 
 async function getEdgeFunctionErrorMessage(err: any): Promise<string> {
   try {
@@ -92,6 +94,14 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
       console.error('[VehicleBasicInfo] Error in handleDataPointClick:', error, { fieldName, fieldValue, fieldLabel });
     }
   }, [safeOnDataPointClick]);
+
+  // ---- Provenance evidence ----
+  const { evidence: _fetchedEvidence } = useFieldEvidence(vehicle?.id);
+  const resolvedEvidence: FieldEvidenceMap = _fetchedEvidence;
+  const [openDrawer, setOpenDrawer] = useState<string | null>(null);
+  const toggleDrawer = React.useCallback((fieldName: string) => {
+    setOpenDrawer((prev) => (prev === fieldName ? null : fieldName));
+  }, []);
 
   // Check for VIN in multiple sources if vehicle.vin is not set
   const [vinFromImages, setVinFromImages] = useState<string | null>(null);
@@ -416,7 +426,8 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
         const showCraigslistFlag = isCraigslistListing && CRAIGSLIST_FIELD_KEYS.has(key);
 
         return (
-          <div key={key} className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
+          <React.Fragment key={key}>
+          <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               {label}
               {showCraigslistFlag && (
@@ -454,8 +465,21 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               style={{ cursor: 'pointer' }}
             >
               {value}
+              {resolvedEvidence?.[key] && (
+                <SourceBadge group={resolvedEvidence[key]} onClick={() => toggleDrawer(key)} />
+              )}
             </span>
           </div>
+          {resolvedEvidence?.[key] && (
+            <FieldProvenanceDrawer
+              fieldName={key}
+              fieldLabel={label}
+              group={resolvedEvidence[key]}
+              isOpen={openDrawer === key}
+              onToggle={() => toggleDrawer(key)}
+            />
+          )}
+          </React.Fragment>
         );
       });
   };
@@ -517,7 +541,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
         partCleaned = partCleaned.replace(/\s*\(\d+of\d+\)\s*$/i, '').trim();
         
         // Remove trailing dashes
-        partCleaned = partCleaned.replace(/[-–—]\s*$/, '').trim();
+        partCleaned = partCleaned.replace(/[-\u2013\u2014]\s*$/, '').trim();
         
         // Remove color patterns like " - BLACK" if it's still there
         partCleaned = partCleaned.replace(/\s*-\s*(BLACK|WHITE|RED|BLUE|GREEN|SILVER|GRAY|GREY|YELLOW|ORANGE|PURPLE|BROWN|BEIGE|TAN)\s*$/i, '').trim();
@@ -543,7 +567,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
         // Remove parenthetical production numbers if they're at the end
         partCleaned = partCleaned.replace(/\s*\(\d+of\d+\)\s*$/i, '').trim();
         // Remove trailing dashes
-        partCleaned = partCleaned.replace(/[-–—]\s*$/, '').trim();
+        partCleaned = partCleaned.replace(/[-\u2013\u2014]\s*$/, '').trim();
         if (partCleaned.length > 0 && partCleaned.length < cleaned.length) {
           cleaned = partCleaned;
         }
@@ -576,7 +600,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
         cursor: 'pointer'
       }} onClick={() => setCollapsed(c => !c)} title={collapsed ? 'Expand' : 'Collapse'}>
         <span style={{ fontSize: '11px', fontWeight: 'bold' }}>
-          {collapsed ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''}${vehicle.vin ? ' • ' + String(vehicle.vin).slice(0,8) + '…' : ''}`.trim() || 'Vehicle' : 'Basic Information'}
+          {collapsed ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''}${vehicle.vin ? ' \u2022 ' + String(vehicle.vin).slice(0,8) + '\u2026' : ''}`.trim() || 'Vehicle' : 'Basic Information'}
         </span>
         {canEdit && (
           <button
@@ -634,8 +658,20 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                   </button>
                 </span>
               )}
+              {resolvedEvidence?.['vin'] && (
+                <SourceBadge group={resolvedEvidence['vin']} onClick={() => toggleDrawer('vin')} />
+              )}
             </span>
           </div>
+          {resolvedEvidence?.['vin'] && (
+            <FieldProvenanceDrawer
+              fieldName="vin"
+              fieldLabel="VIN"
+              group={resolvedEvidence['vin']}
+              isOpen={openDrawer === 'vin'}
+              onToggle={() => toggleDrawer('vin')}
+            />
+          )}
           
           {/* Owner claim moved to header - only show verified owner badge here */}
           {isVerifiedOwner && currentOwnerUsername && (
@@ -686,8 +722,20 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                   </button>
                 </span>
               )}
+              {resolvedEvidence?.['year'] && (
+                <SourceBadge group={resolvedEvidence['year']} onClick={() => toggleDrawer('year')} />
+              )}
             </span>
           </div>
+          {resolvedEvidence?.['year'] && (
+            <FieldProvenanceDrawer
+              fieldName="year"
+              fieldLabel="Year"
+              group={resolvedEvidence['year']}
+              isOpen={openDrawer === 'year'}
+              onToggle={() => toggleDrawer('year')}
+            />
+          )}
           <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span>Make</span>
             <span
@@ -700,8 +748,20 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               style={{ cursor: 'pointer', userSelect: 'none' }}
             >
               {vehicle.make}
+              {resolvedEvidence?.['make'] && (
+                <SourceBadge group={resolvedEvidence['make']} onClick={() => toggleDrawer('make')} />
+              )}
             </span>
           </div>
+          {resolvedEvidence?.['make'] && (
+            <FieldProvenanceDrawer
+              fieldName="make"
+              fieldLabel="Make"
+              group={resolvedEvidence['make']}
+              isOpen={openDrawer === 'make'}
+              onToggle={() => toggleDrawer('make')}
+            />
+          )}
           <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span>Model</span>
             <span
@@ -727,9 +787,22 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                 }
                 return cleaned || 'Not specified';
               })()}
+              {resolvedEvidence?.['model'] && (
+                <SourceBadge group={resolvedEvidence['model']} onClick={() => toggleDrawer('model')} />
+              )}
             </span>
           </div>
+          {resolvedEvidence?.['model'] && (
+            <FieldProvenanceDrawer
+              fieldName="model"
+              fieldLabel="Model"
+              group={resolvedEvidence['model']}
+              isOpen={openDrawer === 'model'}
+              onToggle={() => toggleDrawer('model')}
+            />
+          )}
           {vehicle.engine && (
+            <>
             <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
               <span>Engine</span>
               <span
@@ -742,8 +815,21 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                 style={{ cursor: 'pointer' }}
               >
                 {sanitizeInlineValue(vehicle.engine)}
+                {resolvedEvidence?.['engine'] && (
+                  <SourceBadge group={resolvedEvidence['engine']} onClick={() => toggleDrawer('engine')} />
+                )}
               </span>
             </div>
+            {resolvedEvidence?.['engine'] && (
+              <FieldProvenanceDrawer
+                fieldName="engine"
+                fieldLabel="Engine"
+                group={resolvedEvidence['engine']}
+                isOpen={openDrawer === 'engine'}
+                onToggle={() => toggleDrawer('engine')}
+              />
+            )}
+            </>
           )}
           <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span>Transmission</span>
@@ -761,8 +847,20 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               ) : (
                 <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '11px' }}>Unknown</span>
               )}
+              {resolvedEvidence?.['transmission'] && (
+                <SourceBadge group={resolvedEvidence['transmission']} onClick={() => toggleDrawer('transmission')} />
+              )}
             </span>
           </div>
+          {resolvedEvidence?.['transmission'] && (
+            <FieldProvenanceDrawer
+              fieldName="transmission"
+              fieldLabel="Transmission"
+              group={resolvedEvidence['transmission']}
+              isOpen={openDrawer === 'transmission'}
+              onToggle={() => toggleDrawer('transmission')}
+            />
+          )}
           <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span>Mileage</span>
             <span
@@ -779,8 +877,20 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               ) : (
                 <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '11px' }}>Unknown</span>
               )}
+              {resolvedEvidence?.['mileage'] && (
+                <SourceBadge group={resolvedEvidence['mileage']} onClick={() => toggleDrawer('mileage')} />
+              )}
             </span>
           </div>
+          {resolvedEvidence?.['mileage'] && (
+            <FieldProvenanceDrawer
+              fieldName="mileage"
+              fieldLabel="Mileage"
+              group={resolvedEvidence['mileage']}
+              isOpen={openDrawer === 'mileage'}
+              onToggle={() => toggleDrawer('mileage')}
+            />
+          )}
 
           {/* Secondary Fields */}
           {(vehicle as any).series && (
@@ -827,8 +937,20 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               style={{ cursor: 'pointer' }}
             >
               {sanitizeInlineValue(vehicle.color) || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '11px' }}>Unknown</span>}
+              {resolvedEvidence?.['color'] && (
+                <SourceBadge group={resolvedEvidence['color']} onClick={() => toggleDrawer('color')} />
+              )}
             </span>
           </div>
+          {resolvedEvidence?.['color'] && (
+            <FieldProvenanceDrawer
+              fieldName="color"
+              fieldLabel="Color"
+              group={resolvedEvidence['color']}
+              isOpen={openDrawer === 'color'}
+              onToggle={() => toggleDrawer('color')}
+            />
+          )}
 
           {/* Additional details */}
           {renderVehicleDetails()}
