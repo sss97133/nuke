@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { SearchFilters } from './types';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface SearchFiltersProps {
   searchQuery: string;
