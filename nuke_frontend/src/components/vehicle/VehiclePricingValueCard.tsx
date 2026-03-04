@@ -105,6 +105,7 @@ export function VehiclePricingValueCard(props: {
     const conf = typeof (valuationIntel as any)?.confidence_score === 'number' ? (valuationIntel as any).confidence_score : null;
     if (!base || !readiness) return null;
 
+    // Conservative default policy preview (placeholder until finance policy is formalized).
     const rate =
       readiness >= 80 && (conf ?? 0) >= 80 ? 0.65 :
       readiness >= 70 ? 0.55 :
@@ -188,6 +189,7 @@ export function VehiclePricingValueCard(props: {
 
             {sub('Outcome', sold ? 'sold' : (auctionOutcome || listingStatus || '—'), () => listingUrl && window.open(listingUrl, '_blank'))}
 
+            {/* Auction stats */}
             {sub('Bids', typeof auctionPulse?.bid_count === 'number' ? auctionPulse.bid_count.toLocaleString() : '—')}
             {sub('Comments', typeof auctionPulse?.comment_count === 'number' ? auctionPulse.comment_count.toLocaleString() : '—')}
             {sub('Views', typeof auctionPulse?.view_count === 'number' && auctionPulse.view_count > 0 ? auctionPulse.view_count.toLocaleString() : '—')}
@@ -238,4 +240,3 @@ export function VehiclePricingValueCard(props: {
     </>
   );
 }
-
