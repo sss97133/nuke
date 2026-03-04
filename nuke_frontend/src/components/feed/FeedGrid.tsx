@@ -93,7 +93,18 @@ const FeedGrid: React.FC<FeedGridProps> = ({
     // Capture rect synchronously — currentTarget is null after the event handler returns
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     hoverTimerRef.current = setTimeout(() => {
-      setHoverPosition({ x: rect.right + 10, y: rect.top });
+      // Clamp to viewport bounds — prevent overflow right or bottom
+      const hoverW = 320;
+      const hoverH = 400;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      let x = rect.right + 10;
+      let y = rect.top;
+      if (x + hoverW > vw) x = rect.left - hoverW - 10;
+      if (x < 0) x = 8;
+      if (y + hoverH > vh) y = vh - hoverH - 8;
+      if (y < 0) y = 8;
+      setHoverPosition({ x, y });
       setHoverVehicle(vehicle);
     }, 200);
   }, []);
@@ -126,7 +137,15 @@ const FeedGrid: React.FC<FeedGridProps> = ({
     const touch = e.touches[0];
     longPressTimerRef.current = setTimeout(() => {
       longPressTriggeredRef.current = true;
-      setHoverPosition({ x: touch.clientX, y: touch.clientY - 100 });
+      // Clamp mobile hover card to viewport
+      const hoverW = 280;
+      const hoverH = 360;
+      let x = touch.clientX - hoverW / 2;
+      let y = touch.clientY - hoverH - 20;
+      if (x + hoverW > window.innerWidth) x = window.innerWidth - hoverW - 8;
+      if (x < 8) x = 8;
+      if (y < 8) y = touch.clientY + 20;
+      setHoverPosition({ x, y });
       setHoverVehicle(vehicle);
     }, 500);
   }, []);
