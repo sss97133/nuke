@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import OwnershipVerificationDashboard from '../components/admin/OwnershipVerificationDashboard';
 import AdminAnalytics from './AdminAnalytics';
 import CraigslistQueueDashboard from '../components/admin/CraigslistQueueDashboard';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 interface PendingApproval {
   id: string;
