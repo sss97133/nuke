@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 export type ActivityScope = 'org' | 'vehicle' | 'user';
 
