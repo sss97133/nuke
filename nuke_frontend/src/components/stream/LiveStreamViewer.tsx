@@ -7,7 +7,7 @@ import type { StreamActionEvent } from '../../services/streamActionsService';
 import StreamTipOverlay, { type StreamTipEvent } from './StreamTipOverlay';
 import { StreamTipService } from '../../services/streamTipService';
 import { CashflowDealsService, type CashflowDealSummary, type CashflowDealType } from '../../services/cashflowDealsService';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface LiveStream {
   id: string;
@@ -243,7 +243,6 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
       setTipMessage('');
     } catch (error: any) {
       console.error('Tip failed:', error);
-      // Avoid noisy UI frameworks here; minimal error
       alert(error?.message || 'Tip failed');
     } finally {
       setTipping(false);
@@ -309,8 +308,8 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
           subjectUserId: stream.streamer_id,
           dealType: 'advance',
           title: 'Advance (Recoupable)',
-          rateBps: 2000, // 20%
-          capMultipleBps: 13000, // 1.30x
+          rateBps: 2000,
+          capMultipleBps: 13000,
           isPublic: true,
         });
       } else {
@@ -318,7 +317,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
           subjectUserId: stream.streamer_id,
           dealType: 'revenue_share',
           title: 'Revenue Share',
-          rateBps: 1000, // 10%
+          rateBps: 1000,
           capMultipleBps: null,
           isPublic: true,
         });
