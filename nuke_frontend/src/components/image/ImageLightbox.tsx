@@ -15,3 +15,5 @@ import { AnnotoriousImageTagger } from './AnnotoriousImageTagger';
 import { ImageInfoPanel } from './ImageInfoPanel';
 import { AdminNotificationService } from '../../services/adminNotificationService';
 import '../../styles/unified-design-system.css';
+
+export default function Placeholder_ImageLightbox_NEEDS_FULL_FILE() { return null; }
