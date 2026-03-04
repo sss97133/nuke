@@ -1,13 +1,1 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import DeckGL from '@deck.gl/react';
-import { ScatterplotLayer, TextLayer, GeoJsonLayer, IconLayer } from '@deck.gl/layers';
-import { HeatmapLayer, HexagonLayer } from '@deck.gl/aggregation-layers';
-import { Map } from 'react-map-gl/maplibre';
-import 'maplibre-gl/dist/maplibre-gl.css';
-import { supabase } from '../../lib/supabase';
-import { useTheme } from '../../contexts/ThemeContext';
-import '../../styles/unified-design-system.css';
-import ZIP_DB from './us-zips.json';
-import * as topojson from 'topojson-client';
-import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
-import { point as turfPoint } from '@turf/helpers';
+%%FILE:/home/user/workspace/UnifiedMap_v4_hotfix.tsx%%
