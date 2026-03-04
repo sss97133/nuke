@@ -1,48 +1,84 @@
-import React from 'react';
+import * as React from "react"
 
-interface BlueGlowIconProps {
-  size?: number;
-  style?: React.CSSProperties;
-  className?: string;
+// Nuke Design System — BlueGlowIcon Component
+// FIXED: Removed all gradients, glow filters, and feGaussianBlur
+// Now renders a clean solid circle using var(--accent) with a 1px border
+// No box-shadow glow, no radialGradient, no filter effects
+
+export interface BlueGlowIconProps {
+  children?: React.ReactNode
+  size?: number
+  color?: string
+  className?: string
+  style?: React.CSSProperties
+  "aria-label"?: string
 }
 
-const BlueGlowIcon: React.FC<BlueGlowIconProps> = ({ 
-  size = 16, 
-  style = {}, 
-  className = '' 
-}) => {
+export function BlueGlowIcon({
+  children,
+  size = 32,
+  color,
+  className,
+  style,
+  "aria-label": ariaLabel,
+}: BlueGlowIconProps) {
+  const radius = size / 2
+  const accentColor = color ?? "var(--accent, #2a2a2a)"
+
+  const containerStyle: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: size,
+    height: size,
+    flexShrink: 0,
+    position: "relative",
+    ...style,
+  }
+
   return (
-    <svg 
-      width={size} 
-      height={size} 
-      viewBox="0 0 32 32" 
-      xmlns="http://www.w3.org/2000/svg"
-      style={style}
+    <span
       className={className}
+      style={containerStyle}
+      aria-label={ariaLabel}
+      role={ariaLabel ? "img" : undefined}
     >
-      <defs>
-        <radialGradient id="blueGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" style={{stopColor:'var(--accent, #3b82f6)',stopOpacity:1}} />
-          <stop offset="70%" style={{stopColor:'var(--accent-hover, #1d4ed8)',stopOpacity:0.8}} />
-          <stop offset="100%" style={{stopColor:'var(--accent-dark, #1e3a8a)',stopOpacity:0.4}} />
-        </radialGradient>
-        <filter id="glow">
-          <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-          <feMerge> 
-            <feMergeNode in="coloredBlur"/>
-            <feMergeNode in="SourceGraphic"/>
-          </feMerge>
-        </filter>
-      </defs>
-      <circle cx="16" cy="16" r="12" fill="url(#blueGlow)" filter="url(#glow)"/>
-      <circle cx="16" cy="16" r="8" fill="#3b82f6" opacity="0.9"/>
-      <circle cx="16" cy="16" r="4" fill="#60a5fa" opacity="0.8"/>
-    </svg>
-  );
-};
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+        style={{ display: "block" }}
+      >
+        <circle
+          cx={radius}
+          cy={radius}
+          r={radius - 0.5}
+          fill={accentColor}
+          stroke={accentColor}
+          strokeWidth="1"
+        />
+      </svg>
+      {children && (
+        <span
+          style={{
+            position: "absolute",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: size,
+            height: size,
+            color: "var(--bg, #f5f5f5)",
+            pointerEvents: "none",
+          }}
+        >
+          {children}
+        </span>
+      )}
+    </span>
+  )
+}
 
-export default BlueGlowIcon;
-
-
-
-
+export default BlueGlowIcon
