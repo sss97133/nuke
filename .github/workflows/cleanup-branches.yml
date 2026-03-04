@@ -1,0 +1,51 @@
+name: Cleanup Stale Branches
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete stale branches
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = 'sss97133';
+            const repo = 'nuke';
+            const keepBranches = ['main', 'feat/parts-monetization-system'];
+            
+            const { data: branches } = await github.rest.repos.listBranches({
+              owner,
+              repo,
+              per_page: 100
+            });
+            
+            let deleted = 0;
+            let failed = 0;
+            
+            for (const branch of branches) {
+              if (keepBranches.includes(branch.name)) {
+                console.log(`KEEP: ${branch.name}`);
+                continue;
+              }
+              
+              try {
+                await github.rest.git.deleteRef({
+                  owner,
+                  repo,
+                  ref: `heads/${branch.name}`
+                });
+                console.log(`DELETED: ${branch.name}`);
+                deleted++;
+              } catch (err) {
+                console.log(`FAILED: ${branch.name} - ${err.message}`);
+                failed++;
+              }
+            }
+            
+            console.log(`\nDone. Deleted: ${deleted}, Failed: ${failed}, Kept: ${keepBranches.length}`);
