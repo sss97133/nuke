@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { calculateCommissionCents, getCommissionRate } from '../../utils/commission';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface ProxyBidRequest {
   id: string;
