@@ -268,4 +268,3 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ listings, loading = 
 };
 
 export default PublicAuctionTrackRecord;
-
