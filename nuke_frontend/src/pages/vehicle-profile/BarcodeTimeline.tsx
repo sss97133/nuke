@@ -35,10 +35,10 @@ function formatDate(ds: string): string {
 
 const BARCODE_COLORS: Record<number, string> = {
   0: 'transparent',
-  1: '#d0d0d0',
-  2: '#a0a0a0',
-  3: '#606060',
-  4: '#1a1a1a',
+  1: 'var(--heat-2, #a7f3d0)',
+  2: 'var(--heat-3, #34d399)',
+  3: 'var(--heat-4, #059669)',
+  4: 'var(--heat-5, #047857)',
 };
 
 const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -167,6 +167,18 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ vehicle, timelineEven
       return !prev;
     });
   }, []);
+
+  // Auto-scroll heatmap to right (most recent events) when expanded
+  useEffect(() => {
+    if (expanded && heatmapRef.current) {
+      const scrollContainer = heatmapRef.current.querySelector('.timeline-heatmap') as HTMLElement;
+      if (scrollContainer) {
+        requestAnimationFrame(() => {
+          scrollContainer.scrollLeft = scrollContainer.scrollWidth;
+        });
+      }
+    }
+  }, [expanded]);
 
   // Escape to close
   useEffect(() => {

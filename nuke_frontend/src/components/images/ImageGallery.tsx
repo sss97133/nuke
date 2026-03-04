@@ -3083,7 +3083,7 @@ const ImageGallery = ({
                   </div>
                   
                   {/* Images in this group */}
-                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${imagesPerRow}, 1fr)`, gap: 0 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${imagesPerRow}, 1fr)`, gap: '3px' }}>
                     {(() => {
                       const imagesInGroup = (() => {
                         if (group.source.type === 'bat' && group.sourceUrl) {
@@ -3114,13 +3114,12 @@ const ImageGallery = ({
                       return (
                         <div
                           key={`${group.key}:${String(image.id || '')}`}
-                          style={{ 
-                            cursor: 'pointer', 
-                            position: 'relative', 
-                            overflow: 'hidden', 
-                            backgroundColor: 'var(--grey-100)',
+                          className="gallery-thumb"
+                          style={{
+                            cursor: 'pointer',
+                            position: 'relative',
+                            overflow: 'hidden',
                             aspectRatio: preserveAspectRatio ? undefined : '1 / 1',
-                            border: 'none',
                             boxShadow: isRecentUpload ? 'inset 0 0 0 3px var(--warning)' : undefined,
                             ...(preserveAspectRatio ? { height: 'auto' } : {})
                           }}
@@ -3272,20 +3271,19 @@ const ImageGallery = ({
             
             // Default: flat grid without headers
             return (
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${imagesPerRow}, 1fr)`, gap: 0 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${imagesPerRow}, 1fr)`, gap: '3px' }}>
                 {displayedImages.map((image, index) => {
                   const isSelected = selectMode && selectedImages?.has(image.id);
                   const isRecentUpload = recentUploadSet.has(String(image?.id || ''));
                   return (
                     <div
                       key={image.id}
-                      style={{ 
-                        cursor: 'pointer', 
-                        position: 'relative', 
-                        overflow: 'hidden', 
-                        backgroundColor: 'var(--grey-100)',
+                      className="gallery-thumb"
+                      style={{
+                        cursor: 'pointer',
+                        position: 'relative',
+                        overflow: 'hidden',
                         aspectRatio: preserveAspectRatio ? undefined : '1 / 1',
-                        border: 'none',
                         boxShadow: isRecentUpload ? 'inset 0 0 0 3px var(--warning)' : undefined,
                         ...(preserveAspectRatio ? { height: 'auto' } : {})
                       }}
@@ -3441,7 +3439,7 @@ const ImageGallery = ({
       
       {/* Legacy grid rendering (disabled, kept for reference) */}
       {viewMode === 'grid' && showImages && false && (
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${imagesPerRow}, 1fr)`, gap: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${imagesPerRow}, 1fr)`, gap: '3px' }}>
           {displayedImages.map((image, index) => {
             const isSelected = selectMode && selectedImages?.has(image.id);
             return (

@@ -28,6 +28,17 @@
   --vp-gulf-orange: #EE7623;
   --vp-martini-red: #C8102E;
   --vp-jps-gold: #C8A951;
+}
+
+/* Dark mode overrides for vehicle profile tokens */
+:root[data-theme="dark"] .vehicle-profile-page {
+  --vp-bg: #1e1e1e;
+  --vp-surface: #252526;
+  --vp-ink: #cccccc;
+  --vp-pencil: #858585;
+  --vp-ghost: #3e3e42;
+  --vp-text-faint: #555555;
+  --vp-row-alt: #2d2d30;
   --vp-brg: #004225;
   --vp-papaya: #FF8000;
   --vp-live-green: #4ade80;
@@ -448,16 +459,16 @@
   width: 10px;
   height: 10px;
   margin: 0.5px;
-  background: #ebedf0;
+  background: var(--heat-0, #ebedf0);
   position: relative;
 }
 .hm-c[data-date] { cursor: pointer; }
 .hm-c[data-date]:hover { outline: 1px solid var(--vp-ink); outline-offset: -1px; }
 .hm-c.hl { outline: 2px solid var(--vp-gulf-blue) !important; outline-offset: -1px; }
-.hm-c.l1 { background: #d0d0d0; }
-.hm-c.l2 { background: #a0a0a0; }
-.hm-c.l3 { background: #606060; }
-.hm-c.l4 { background: #1a1a1a; }
+.hm-c.l1 { background: var(--heat-2, #a7f3d0); }
+.hm-c.l2 { background: var(--heat-3, #34d399); }
+.hm-c.l3 { background: var(--heat-4, #059669); }
+.hm-c.l4 { background: var(--heat-5, #047857); }
 .hm-c.empty { background: transparent; }
 .hm-months {
   position: relative;
