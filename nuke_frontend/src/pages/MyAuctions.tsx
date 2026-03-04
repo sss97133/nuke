@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MyAuctionsService, type UnifiedListing, type AuctionStats } from '../services/myAuctionsService';
 import ListingCard from '../components/auction/ListingCard';
 import { supabase } from '../lib/supabase';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 // Modal component for stats details
 interface StatsModalProps {
@@ -1031,6 +1031,3 @@ const MyAuctions: React.FC = () => {
 };
 
 export default MyAuctions;
-
-
-

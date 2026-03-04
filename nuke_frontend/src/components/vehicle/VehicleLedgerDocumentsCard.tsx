@@ -285,4 +285,3 @@ export function VehicleLedgerDocumentsCard(props: {
     </div>
   );
 }
-

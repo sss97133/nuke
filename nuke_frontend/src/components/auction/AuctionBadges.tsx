@@ -187,5 +187,3 @@ export const LiveAuctionBadge: React.FC<{
     </span>
   );
 };
-
-
