@@ -328,6 +328,9 @@ export default function VehicleCritiqueMode({
                     ...prev,
                     businessImpact: {
                       ...prev.businessImpact,
+                      timeImpact: prev.businessImpact?.timeImpact || 'low',
+                      spaceImpact: prev.businessImpact?.spaceImpact || 'none',
+                      reputationImpact: prev.businessImpact?.reputationImpact || 'none',
                       financialImpact: e.target.value as any
                     }
                   }))}
@@ -346,6 +349,9 @@ export default function VehicleCritiqueMode({
                     ...prev,
                     businessImpact: {
                       ...prev.businessImpact,
+                      financialImpact: prev.businessImpact?.financialImpact || 'neutral',
+                      spaceImpact: prev.businessImpact?.spaceImpact || 'none',
+                      reputationImpact: prev.businessImpact?.reputationImpact || 'none',
                       timeImpact: e.target.value as any
                     }
                   }))}
