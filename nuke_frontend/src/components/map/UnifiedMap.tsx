@@ -212,7 +212,7 @@ const BUILDING_SVG_URI = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="h
 function hexRadiusForZoom(z: number): number {
   // Exponential decay: wider hexes at low zoom, tighter as you zoom in.
   // z4 → 50000m (50km), z8 → 5000m (5km), z10 → 1500m, z12 → 200m, z13 → 100m
-  return Math.max(50, Math.round(50000 / Math.pow(2, Math.max(0, z - 4))));
+  return Math.max(30, Math.round(50000 / Math.pow(2, Math.max(0, z - 4))));
 }
 
 // Hex color ramp: count-based, from dim to bright using the active color
@@ -227,11 +227,12 @@ function hexColorRange(base: [number, number, number]): [number, number, number]
   ];
 }
 
-// Transition zone: hex bins fade out z11→z12.5, individual points fade in z11.5→z13
-const HEX_FADE_START = 11;
-const HEX_FADE_END = 12.5;
-const POINTS_FADE_START = 11.5;
-const POINTS_FADE_END = 13;
+// Transition zone: hex bins fade out z12→z14, individual points fade in z13→z15
+// Keeping hexes visible longer prevents point stacking at city/metro zoom levels
+const HEX_FADE_START = 12;
+const HEX_FADE_END = 14;
+const POINTS_FADE_START = 13;
+const POINTS_FADE_END = 15;
 
 
 // --- Vehicle fields for display ---
@@ -466,6 +467,8 @@ export default function UnifiedMap() {
   // Timeline — filter vehicles by date
   const [timelineEnabled, setTimelineEnabled] = useState(false);
   const [timeCutoff, setTimeCutoff] = useState(100); // 0-100 percentage of date range
+  const [timelinePlaying, setTimelinePlaying] = useState(false);
+  const [timelineSpeed, setTimelineSpeed] = useState(1); // 1x, 2x, 5x
 
   // County choropleth for thermal mode
   const [countyGeoJson, setCountyGeoJson] = useState<any>(null);
@@ -687,7 +690,11 @@ export default function UnifiedMap() {
 
           // Progressive render: first batch immediately, then every 3 batches (3k rows)
           if (batchesSinceRender === 1 || batchesSinceRender % 3 === 0) {
-            if (!cancelled) setVehicles([...all]);
+            if (!cancelled) {
+              // Sort newest-first so the most recently added vehicles render at the front
+              all.sort((a, b) => b.dateTs - a.dateTs);
+              setVehicles([...all]);
+            }
           }
         }
       };
@@ -719,6 +726,22 @@ export default function UnifiedMap() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // ---- Timeline play/pause auto-advance ----
+  useEffect(() => {
+    if (!timelinePlaying || !timelineEnabled) return;
+    // Advance speed: 1x = 1% per 100ms (10s full), 2x = 2%/100ms, 5x = 5%/100ms
+    const intervalMs = 100;
+    const step = timelineSpeed;
+    const id = setInterval(() => {
+      setTimeCutoff(c => {
+        const next = c + step;
+        if (next >= 100) { setTimelinePlaying(false); return 100; }
+        return next;
+      });
+    }, intervalMs);
+    return () => clearInterval(id);
+  }, [timelinePlaying, timelineEnabled, timelineSpeed]);
 
   // ---- Load county boundaries for thermal choropleth ----
   useEffect(() => {
@@ -814,21 +837,31 @@ export default function UnifiedMap() {
     const dates = vehicles.filter(v => v.dateTs > 0).map(v => v.dateTs);
     if (dates.length === 0) return { min: 0, max: Date.now(), minLabel: '', maxLabel: '' };
     const now = Date.now();
-    const mn = Math.min(...dates.slice(0, 10000)); // avoid perf hit on huge arrays
-    const mx = Math.min(Math.max(...dates.slice(-10000)), now);
-    // Scan in chunks for accuracy on large datasets
-    let realMin = mn, realMax = mx;
-    for (let i = 0; i < dates.length; i += 100) {
-      if (dates[i] < realMin) realMin = dates[i];
-      if (dates[i] > realMax && dates[i] <= now) realMax = dates[i];
-    }
-    realMax = Math.min(realMax, now); // hard cap at today
+    // Full scan — no sampling approximation
+    const sorted = dates.slice().sort((a, b) => a - b);
+    const realMin = sorted[0];
+    const realMax = Math.min(sorted[sorted.length - 1], now);
     const fmtD = (ts: number) => {
       const d = new Date(ts);
       return `${d.toLocaleString('en', { month: 'short' })} ${d.getFullYear()}`;
     };
     return { min: realMin, max: realMax, minLabel: fmtD(realMin), maxLabel: fmtD(realMax) };
   }, [vehicles]);
+
+  // --- Timeline: 48-bin monthly histogram for mini bar chart ---
+  const timelineHistogram = useMemo(() => {
+    if (vehicles.length === 0 || timelineRange.min === timelineRange.max) return [];
+    const NUM_BINS = 48;
+    const range = timelineRange.max - timelineRange.min;
+    const bins = new Array(NUM_BINS).fill(0);
+    for (const v of vehicles) {
+      if (v.dateTs <= 0) continue;
+      const idx = Math.min(NUM_BINS - 1, Math.floor(((v.dateTs - timelineRange.min) / range) * NUM_BINS));
+      bins[idx]++;
+    }
+    const maxBin = Math.max(...bins, 1);
+    return bins.map(n => n / maxBin); // normalize 0–1
+  }, [vehicles, timelineRange]);
 
   const filteredVehicles = useMemo(() => {
     if (!timelineEnabled || timeCutoff >= 100) return vehicles;
@@ -1100,7 +1133,7 @@ export default function UnifiedMap() {
         onHover: ({ object, x, y }: any) => {
           if (object) {
             const count = object.points?.length || object.colorValue || 0;
-            const pts = object.points as VPin[] | undefined;
+            const pts = object.points?.map((p: any) => p.source || p) as VPin[] | undefined;
             let detail = `${count.toLocaleString()} vehicles`;
             if (pts && pts.length > 0) {
               const prices = pts.filter((p: VPin) => p.price).map((p: VPin) => p.price as number);
@@ -1117,7 +1150,7 @@ export default function UnifiedMap() {
         onClick: ({ object }: any) => {
           if (object) {
             deckClickedRef.current = true;
-            const pts = (object.points || []) as VPin[];
+            const pts = (object.points || []).map((p: any) => p.source || p) as VPin[];
             setSelectedPin({
               pin: {
                 id: `hex-${object.position?.[0]?.toFixed(4)}-${object.position?.[1]?.toFixed(4)}`,
@@ -1162,6 +1195,10 @@ export default function UnifiedMap() {
           } else {
             setHoverInfo(null);
           }
+        },
+        transitions: {
+          getPosition: { duration: 600 },
+          getFillColor: { duration: 800 },
         },
         updateTriggers: { getFillColor: [colorPreset], getRadius: [pointSize, zoom], opacity: [pointsOpacity, circleFade] },
       }));
@@ -1224,7 +1261,7 @@ export default function UnifiedMap() {
         onHover: ({ object, x, y }: any) => {
           if (object) {
             const count = object.points?.length || object.colorValue || 0;
-            const pts = object.points as VPin[] | undefined;
+            const pts = object.points?.map((p: any) => p.source || p) as VPin[] | undefined;
             let detail = `${count.toLocaleString()} results`;
             if (pts && pts.length > 0) {
               const prices = pts.filter((p: VPin) => p.price).map((p: VPin) => p.price as number);
@@ -1241,7 +1278,7 @@ export default function UnifiedMap() {
         onClick: ({ object }: any) => {
           if (object) {
             deckClickedRef.current = true;
-            const pts = (object.points || []) as VPin[];
+            const pts = (object.points || []).map((p: any) => p.source || p) as VPin[];
             setSelectedPin({
               pin: {
                 id: `qhex-${object.position?.[0]?.toFixed(4)}-${object.position?.[1]?.toFixed(4)}`,
@@ -1814,10 +1851,10 @@ export default function UnifiedMap() {
               : <><strong style={{ color: 'var(--text)' }}>{counts.total.toLocaleString()}</strong> items</>}
           </div>
 
-          {/* Timeline toggle + slider */}
+          {/* Timeline toggle + controls */}
           <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 10, display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
             <button
-              onClick={() => setTimelineEnabled(!timelineEnabled)}
+              onClick={() => { setTimelineEnabled(!timelineEnabled); if (timelinePlaying) setTimelinePlaying(false); }}
               style={{
                 padding: '3px 8px', fontSize: '9px', fontWeight: 600, fontFamily: MAP_FONT,
                 textTransform: 'uppercase', letterSpacing: '0.5px',
@@ -1831,12 +1868,58 @@ export default function UnifiedMap() {
             </button>
             {timelineEnabled && (
               <>
+                {/* Play/pause button */}
+                <button
+                  onClick={() => {
+                    if (timeCutoff >= 100 && !timelinePlaying) setTimeCutoff(0);
+                    setTimelinePlaying(p => !p);
+                  }}
+                  style={{
+                    padding: '3px 8px', fontSize: '9px', fontWeight: 600, fontFamily: MAP_FONT,
+                    background: timelinePlaying ? 'var(--text)' : 'transparent',
+                    color: timelinePlaying ? 'var(--bg)' : 'var(--text-disabled)',
+                    border: '1px solid var(--border)', cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  {timelinePlaying ? '■ STOP' : '▶ PLAY'}
+                </button>
+                {/* Speed selector */}
+                <div style={{ display: 'flex', gap: 0 }}>
+                  {([1, 2, 5] as const).map(s => (
+                    <button key={s} onClick={() => setTimelineSpeed(s)} style={{
+                      padding: '3px 6px', fontSize: '8px', fontWeight: 600, fontFamily: MAP_FONT,
+                      background: timelineSpeed === s ? 'var(--text)' : 'transparent',
+                      color: timelineSpeed === s ? 'var(--bg)' : 'var(--text-disabled)',
+                      border: '1px solid var(--border)', cursor: 'pointer',
+                    }}>{s}x</button>
+                  ))}
+                </div>
                 <span style={{ fontSize: '9px', color: 'var(--text-disabled)', whiteSpace: 'nowrap' }}>{timelineRange.minLabel}</span>
-                <input type="range" min={0} max={100} value={timeCutoff}
-                  onChange={e => setTimeCutoff(Number(e.target.value))}
-                  style={{ flex: 1, height: 2, WebkitAppearance: 'none' as any, appearance: 'none' as any,
-                    background: 'var(--border)', outline: 'none', cursor: 'pointer' }}
-                />
+                {/* Histogram + slider composite */}
+                <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {/* Mini bar chart histogram */}
+                  {timelineHistogram.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'flex-end', height: 20, gap: 1, pointerEvents: 'none' }}>
+                      {timelineHistogram.map((h, i) => {
+                        const pct = (i / timelineHistogram.length) * 100;
+                        const active = pct <= timeCutoff;
+                        return (
+                          <div key={i} style={{
+                            flex: 1, height: `${Math.max(2, Math.round(h * 18))}px`,
+                            background: active ? 'var(--text)' : 'var(--border)',
+                            minWidth: 1,
+                          }} />
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Range slider — overlays the histogram */}
+                  <input type="range" min={0} max={100} step={0.5} value={timeCutoff}
+                    onChange={e => { setTimelinePlaying(false); setTimeCutoff(Number(e.target.value)); }}
+                    style={{ width: '100%', height: 2, WebkitAppearance: 'none' as any, appearance: 'none' as any,
+                      background: 'transparent', outline: 'none', cursor: 'pointer', margin: 0 }}
+                  />
+                </div>
                 <span style={{ fontSize: '10px', color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap', minWidth: 60, fontVariantNumeric: 'tabular-nums' }}>{cutoffLabel}</span>
               </>
             )}
@@ -1889,12 +1972,19 @@ export default function UnifiedMap() {
 
               // ---- HEX BIN aggregate panel ----
               if (v._isHexBin) {
-                const pts = (v._hexPoints || []) as VPin[];
+                // Unwrap HexagonLayer CPU-mode point objects: each is {source: VPin, index: n}
+                const pts = ((v._hexPoints || []) as any[]).map((p: any) => p.source || p) as VPin[];
                 const count = pts.length;
                 const prices = pts.filter((p: VPin) => p.price).map((p: VPin) => p.price as number);
                 const avgPrice = prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null;
                 const minPrice = prices.length > 0 ? Math.min(...prices) : null;
                 const maxPrice = prices.length > 0 ? Math.max(...prices) : null;
+                // Compute median
+                const medianPrice = prices.length > 0 ? (() => {
+                  const sorted = [...prices].sort((a, b) => a - b);
+                  const mid = Math.floor(sorted.length / 2);
+                  return sorted.length % 2 !== 0 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+                })() : null;
                 const makeCounts: Record<string, number> = {};
                 pts.forEach((p: VPin) => { if (p.make) makeCounts[p.make] = (makeCounts[p.make] || 0) + 1; });
                 const topMakes = Object.entries(makeCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
@@ -1907,7 +1997,6 @@ export default function UnifiedMap() {
                 const years = pts.filter((p: VPin) => p.year).map((p: VPin) => Number(p.year)).filter(y => y > 1900);
                 const yearMin = years.length > 0 ? Math.min(...years) : null;
                 const yearMax = years.length > 0 ? Math.max(...years) : null;
-
                 return (
                   <div style={{ padding: 0 }}>
                     <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
@@ -1921,6 +2010,10 @@ export default function UnifiedMap() {
                         <div style={{ display: 'flex', gap: 12, alignItems: 'baseline', marginBottom: 4 }}>
                           <span style={{ color: '#4ade80', fontWeight: 700, fontSize: '16px', fontFamily: 'monospace' }}>{fmtPrice(avgPrice)}</span>
                           <span style={{ color: 'var(--text-disabled)', fontSize: '10px' }}>avg</span>
+                          {medianPrice != null && <>
+                            <span style={{ color: '#60a5fa', fontWeight: 700, fontSize: '14px', fontFamily: 'monospace' }}>{fmtPrice(medianPrice)}</span>
+                            <span style={{ color: 'var(--text-disabled)', fontSize: '10px' }}>median</span>
+                          </>}
                         </div>
                         <div style={{ display: 'flex', gap: 16, fontSize: '10px', color: 'var(--text-disabled)' }}>
                           {minPrice != null && <span>Low: <strong style={{ color: 'var(--text)' }}>{fmtPrice(minPrice)}</strong></span>}
