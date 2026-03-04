@@ -276,7 +276,6 @@ export function VehicleLedgerDocumentsCard(props: {
                       );
                     })}
                   </tbody>
- switching tables
                 </table>
               </div>
             )}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuctionSubscription } from '../../hooks/useAuctionSubscription';
 import { AuctionService, type AuctionListing, type AuctionBid } from '../../services/auctionService';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface OwnerAuctionDashboardProps {
   listingId: string;
