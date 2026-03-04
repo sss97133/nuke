@@ -1949,7 +1949,7 @@ export default function UnifiedMap() {
                 {(mode === 'density' || mode === 'thermal') && <>
                   <SliderControl label={mode === 'thermal' ? 'Heat Rad' : 'Hex Size'} value={glowRadius} min={5} max={200} onChange={setGlowRadius} />
                   <SliderControl label={mode === 'thermal' ? 'Heat Int' : 'Opacity'} value={glowIntensity} min={1} max={100} onChange={setGlowIntensity} />
-                </>}
+                </> }
               </div>
             </div>
           )}
