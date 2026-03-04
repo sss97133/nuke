@@ -9,7 +9,7 @@ import {
   ClientWorkZone,
   BusinessFleetZone
 } from '../components/vehicles/dashboard';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 const DashboardSkeleton: React.FC = () => (
   <div style={{ padding: '16px' }}>
