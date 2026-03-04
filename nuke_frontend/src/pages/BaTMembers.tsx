@@ -35,6 +35,7 @@ export default function BaTMembers() {
         .select('id, handle, display_name, profile_url, metadata, claimed_by_user_id, first_seen_at, created_at')
         .eq('platform', platformFilter);
 
+      // Apply search filter
       if (searchQuery.trim()) {
         query = query.or(`handle.ilike.%${searchQuery}%,display_name.ilike.%${searchQuery}%`);
       }
@@ -43,6 +44,7 @@ export default function BaTMembers() {
 
       if (error) throw error;
 
+      // Process members with stats
       const membersWithStats = await Promise.all(
         (data || []).map(async (member) => {
           const metadata = member.metadata || {};
@@ -50,15 +52,18 @@ export default function BaTMembers() {
           const commentsCount = metadata.comments_count || metadata.total_comments || 0;
           const listingsCount = metadata.listings_count || metadata.total_listings || 0;
 
+          // If we don't have counts in metadata, try to get them from the database
           let actualCommentsCount = commentsCount;
           let actualListingsCount = listingsCount;
 
           if (commentsCount === 0 || listingsCount === 0) {
+            // Get comment count
             const { count: commentCount } = await supabase
               .from('bat_comments')
               .select('*', { count: 'exact', head: true })
               .eq('external_identity_id', member.id);
 
+            // Get listing count (as seller)
             const { count: listingCount } = await supabase
               .from('bat_listings')
               .select('*', { count: 'exact', head: true })
@@ -82,6 +87,7 @@ export default function BaTMembers() {
         })
       );
 
+      // Sort members
       const sorted = membersWithStats.sort((a, b) => {
         switch (sortBy) {
           case 'comments':
@@ -98,6 +104,7 @@ export default function BaTMembers() {
         }
       });
 
+      // Filter out members with no activity (optional - you might want to show all)
       const activeMembers = sorted.filter(m => m.comments_count > 0 || m.listings_count > 0);
 
       setMembers(activeMembers);
@@ -128,6 +135,7 @@ export default function BaTMembers() {
 
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+      {/* Header */}
       <div style={{ marginBottom: '20px' }}>
         <h1 style={{ fontSize: '21px', fontWeight: 700, marginBottom: '6px' }}>
           BaT Members
@@ -137,6 +145,7 @@ export default function BaTMembers() {
         </p>
       </div>
 
+      {/* Search & Filters */}
       <div style={{
         background: 'var(--white)',
         border: '1px solid var(--border)',
@@ -145,6 +154,7 @@ export default function BaTMembers() {
         marginBottom: '20px'
       }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '12px', alignItems: 'center' }}>
+          {/* Search */}
           <input
             type="text"
             value={searchQuery}
@@ -154,6 +164,7 @@ export default function BaTMembers() {
             style={{ fontSize: '12px' }}
           />
 
+          {/* Platform filter */}
           <select
             value={platformFilter}
             onChange={(e) => setPlatformFilter(e.target.value)}
@@ -164,6 +175,7 @@ export default function BaTMembers() {
             <option value="cars_and_bids">Cars & Bids</option>
           </select>
 
+          {/* Sort */}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
@@ -178,11 +190,13 @@ export default function BaTMembers() {
         </div>
       </div>
 
+      {/* Stats */}
       <div style={{ marginBottom: '20px', fontSize: '11px', color: 'var(--text-muted)' }}>
         Showing {members.length} {platformFilter === 'bat' ? 'BaT' : 'Cars & Bids'} members
         {searchQuery && ` matching "${searchQuery}"`}
       </div>
 
+      {/* Members Grid */}
       {members.length === 0 ? (
         <div style={{
           padding: '40px',
@@ -223,6 +237,7 @@ export default function BaTMembers() {
                 e.currentTarget.style.boxShadow = 'none';
               }}
             >
+              {/* Avatar placeholder */}
               <div style={{
                 width: '48px',
                 height: '48px',
@@ -240,6 +255,7 @@ export default function BaTMembers() {
                 {member.handle.charAt(0).toUpperCase()}
               </div>
 
+              {/* Name */}
               <div style={{
                 fontSize: '15px',
                 fontWeight: 700,
@@ -249,6 +265,7 @@ export default function BaTMembers() {
                 {member.display_name || member.handle}
               </div>
 
+              {/* Handle */}
               <div style={{
                 fontSize: '11px',
                 color: 'var(--text-muted)',
@@ -260,6 +277,7 @@ export default function BaTMembers() {
                 )}
               </div>
 
+              {/* Stats */}
               <div style={{
                 display: 'flex',
                 gap: '16px',
@@ -274,6 +292,7 @@ export default function BaTMembers() {
                 </div>
               </div>
 
+              {/* Member since */}
               {member.member_since && (
                 <div style={{
                   fontSize: '9px',
