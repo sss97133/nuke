@@ -149,7 +149,7 @@ function interpolate(md: string, vars: Record<string, string>): string {
   return Object.entries(vars).reduce((s, [k, v]) => s.replaceAll(k, v), md);
 }
 
-// ── Popup content ──────────────────────────────────────────────────────
+// ── Popup content ───────────────────────────────────────────────────────────────────────────────
 
 const POPUP_CONTENT: Record<string, { title: string; body: React.ReactNode }> = {
   yono: {
@@ -1298,7 +1298,7 @@ export default function InvestorOffering() {
         </div>
       </div>
 
-      {/* ── Popup Modal ──────────────────────────────────────────────────────────────── */}
+      {/* ── Popup Modal ────────────────────────────────────────────────────────────────────── */}
       {popup && (
         <div
           onClick={closePopup}
