@@ -909,7 +909,9 @@ export default function UnifiedMap() {
       bins[idx]++;
     }
     const maxBin = Math.max(...bins, 1);
-    return bins.map(n => n / maxBin);
+    // Log-scale normalization: prevents one dominant bin from flattening all others
+    const logMax = Math.log1p(maxBin);
+    return bins.map(n => logMax > 0 ? Math.log1p(n) / logMax : 0);
   }, [vehicles, timelineRange, visibleRange]);
 
   // --- Date ticks for timeline ---
@@ -943,19 +945,26 @@ export default function UnifiedMap() {
     return ticks;
   }, [timelineRange, visibleRange, timelineZoom, timelineEnabled]);
 
-  // --- Timeline scroll wheel zoom handler (native listener to intercept before deck.gl) ---
+  // --- Timeline scroll wheel zoom handler ---
+  // Must use capture-phase native listener on the timeline CONTAINER (not just histogram)
+  // because deck.gl registers its own capture-phase wheel listener on the canvas.
+  // We attach to the entire bottom timeline bar so any scroll over it is intercepted.
+  const timelineBarRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const el = histogramRef.current;
+    const el = timelineBarRef.current;
     if (!el) return;
     const handler = (e: WheelEvent) => {
+      // Only zoom timeline when timeline is enabled and histogram is showing
+      if (!histogramRef.current) return;
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
       const delta = e.deltaY > 0 ? -1 : 1;
       setTimelineZoom(z => Math.max(1, Math.min(20, z + delta * 0.5)));
     };
-    el.addEventListener('wheel', handler, { passive: false });
-    return () => el.removeEventListener('wheel', handler);
+    // Capture phase = fires BEFORE deck.gl's bubble-phase handler
+    el.addEventListener('wheel', handler, { capture: true, passive: false });
+    return () => el.removeEventListener('wheel', handler, { capture: true } as any);
   });
 
   const filteredVehicles = useMemo(() => {
@@ -1964,7 +1973,7 @@ export default function UnifiedMap() {
         </div>
 
         {/* Timeline slider — bottom center */}
-        <div style={{
+        <div ref={timelineBarRef} style={{
           position: 'absolute', bottom: 10, left: 10, right: 10, zIndex: 1000,
           display: 'flex', alignItems: 'center', gap: 10,
           background: 'var(--surface-glass)', border: '1px solid var(--border)',
