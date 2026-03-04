@@ -1,6 +1,6 @@
 import React from 'react';
 import { supabase } from '../lib/supabase';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 interface IdentityResult {
   id: string;
@@ -130,7 +130,7 @@ const ClaimExternalIdentity: React.FC = () => {
                 if (m.listing_urls?.length > 0) {
                   const cleanUrls = [...new Set(
                     (m.listing_urls as string[])
-                      .map((u: string) => u.replace(/#.*$/, '').replace(/\/$/, ''))
+                      .map((u: string) => u.replace(/#.*$/, '').replace(/\/+$/, ''))
                       .filter((u: string) => !u.includes('#'))
                   )];
                   addLog(`Loading vehicle details...`, 'dim');
