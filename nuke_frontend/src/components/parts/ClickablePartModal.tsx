@@ -15,7 +15,7 @@ import {
   documentInstallation
 } from '../../services/partsMarketplaceService';
 import type { PartSearchResult } from '../../services/partsMarketplaceService';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface ClickablePartModalProps {
   isOpen: boolean;

@@ -5,7 +5,7 @@ import ContentCard from '../feed/ContentCard';
 import VehicleCardDense from '../vehicles/VehicleCardDense';
 import { highlightSearchTerm } from '../../utils/searchHighlight';
 import type { SearchResult } from '../../types/search';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 type SearchFilter =
   | 'all'
@@ -753,6 +753,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                             {result.metadata.image_count > 0 && result.metadata.event_count > 0 ? ' · ' : ''}
                             {result.metadata.event_count > 0 ? `${result.metadata.event_count} evt` : ''}
                           </span>
+
                         )}
                       </div>
                     )}

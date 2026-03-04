@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase, getCurrentUserId } from '../../lib/supabase';
 import { useToast } from '../../hooks/useToast';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 const CATEGORY_SUBCATEGORIES: Record<
   'categorization' | 'business_impact' | 'data_correction' | 'operational_note',
@@ -328,6 +328,9 @@ export default function VehicleCritiqueMode({
                     ...prev,
                     businessImpact: {
                       ...prev.businessImpact,
+                      timeImpact: prev.businessImpact?.timeImpact || 'low',
+                      spaceImpact: prev.businessImpact?.spaceImpact || 'none',
+                      reputationImpact: prev.businessImpact?.reputationImpact || 'none',
                       financialImpact: e.target.value as any
                     }
                   }))}
@@ -346,6 +349,9 @@ export default function VehicleCritiqueMode({
                     ...prev,
                     businessImpact: {
                       ...prev.businessImpact,
+                      financialImpact: prev.businessImpact?.financialImpact || 'neutral',
+                      spaceImpact: prev.businessImpact?.spaceImpact || 'none',
+                      reputationImpact: prev.businessImpact?.reputationImpact || 'none',
                       timeImpact: e.target.value as any
                     }
                   }))}

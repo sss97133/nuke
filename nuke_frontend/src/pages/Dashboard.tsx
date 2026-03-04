@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { DashboardService } from '../services/dashboardService';
 import type { DashboardNotification, PendingWorkApproval, PendingVehicleAssignment } from '../services/dashboardService';
 import { MessageCard } from '../components/dashboard/MessageCard';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 interface PendingCounts {
   work_approvals: number;

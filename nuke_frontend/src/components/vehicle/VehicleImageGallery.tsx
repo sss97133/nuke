@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import ImageLightbox from '../image/ImageLightbox';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface VehicleImage {
   id: string;

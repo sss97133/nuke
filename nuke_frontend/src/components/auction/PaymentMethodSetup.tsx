@@ -14,7 +14,7 @@ import {
   useElements,
 } from '@stripe/react-stripe-js';
 import AuctionPaymentService from '../../services/auctionPaymentService';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 

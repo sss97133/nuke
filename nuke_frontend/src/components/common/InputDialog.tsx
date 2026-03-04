@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface InputDialogProps {
   isOpen: boolean;

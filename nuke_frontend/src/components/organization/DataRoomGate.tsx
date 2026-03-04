@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 const NDA_AND_TERMS = `
 CONFIDENTIALITY AND NON-DISCLOSURE AGREEMENT
@@ -349,7 +349,7 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
                           required
                           style={{ width: '100%' }}
                         />
-                        <p style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>We’ll only use this to link your access to an account if you sign up later. No code required.</p>
+                        <p style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>We'll only use this to link your access to an account if you sign up later. No code required.</p>
                       </div>
                     )}
                     {showPasswordForm && (

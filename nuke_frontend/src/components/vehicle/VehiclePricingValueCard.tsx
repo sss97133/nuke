@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 import { isListingLive, parseMoneyNumber } from '../../lib/auctionUtils';
 import { getPlatformDisplayName, normalizePlatform } from '../../services/platformNomenclature';
 import PriceAnalysisPanel from './PriceAnalysisPanel';

@@ -7,7 +7,7 @@ import { aiGateway } from '../lib/aiGateway';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import type { SearchResult } from '../types/search';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 interface VehicleEnrichment {
   sale_price: number | null;

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { readCachedSession } from '../utils/cachedSession';
 import VehicleCritiqueManager from '../components/management/VehicleCritiqueManager';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 interface BusinessMetrics {
   totalVehicles: number;

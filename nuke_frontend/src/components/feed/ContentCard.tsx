@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import type { FeedItem } from './types';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
 import ImageLightbox from '../image/ImageLightbox';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 import { computePrimaryPrice, computeDelta, formatCurrency, computeReadinessScore } from '../../services/priceSignalService';
 
 interface ContentCardProps {

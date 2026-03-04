@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 type ListingStatus = 'draft' | 'active' | 'sold' | 'cancelled' | 'expired' | string;
 type SaleType = 'auction' | 'live_auction';
@@ -300,8 +300,6 @@ export default function VehicleAuctionQuickStartCard(props: {
   const canCreateNew = !isDraft && !isActive;
 
   const modalNode = showModal ? (
-    // Render the modal in a portal to avoid "position: fixed" being scoped by transformed ancestors,
-    // which can cause major flicker/clipping on complex pages.
     <div
       className="modal-overlay"
       style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'var(--overlay)' }}

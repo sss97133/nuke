@@ -21,7 +21,7 @@ import TradePanel from './TradePanel';
 import Portfolio from './Portfolio';
 import { useTradingWebSocket } from '../../hooks/useTradingWebSocket';
 import { supabase } from '../../lib/supabase';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface TradingTerminalProps {
   offeringId: string;

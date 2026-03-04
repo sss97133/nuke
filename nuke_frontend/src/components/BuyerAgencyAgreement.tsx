@@ -9,7 +9,7 @@ import {
   getCommissionRate,
   getCommissionTier,
 } from '../utils/commission';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 interface BuyerAgencyAgreementProps {
   onComplete?: (agreementId: string) => void;

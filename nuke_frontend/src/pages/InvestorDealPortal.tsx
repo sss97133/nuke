@@ -17,7 +17,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import VehiclePerformanceCard from '../components/vehicle/VehiclePerformanceCard';
-import '../design-system.css';
+import '../styles/unified-design-system.css';
 
 interface VehicleData {
   id: string;

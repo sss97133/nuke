@@ -8,7 +8,7 @@
 import { useRef, useEffect } from 'react';
 import { useTradingWebSocket } from '../../hooks/useTradingWebSocket';
 import type { Trade } from '../../hooks/useTradingWebSocket';
-import '../../design-system.css';
+import '../../styles/unified-design-system.css';
 
 interface TradeTapeProps {
   offeringId: string;
