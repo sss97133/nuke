@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useVINProofs } from '../../hooks/useVINProofs';
+import { useFieldIntelligence, type FieldIntelligence } from '../../hooks/useFieldIntelligence';
 
 interface ValidationSource {
-  source_type: string; // "title_upload", "registration_image", "bat_auction", "dealer_listing"
-  document_type?: string; // "title", "registration", "bill_of_sale"
-  document_state?: string; // "ARIZONA", "CALIFORNIA", etc.
+  source_type: string;
+  document_type?: string;
+  document_state?: string;
   confidence_score: number;
   image_url?: string;
   created_at: string;
   verified_by?: string;
-  source_name?: string; // "Bring a Trailer", "Collective Auto Group"
-  source_url?: string; // Link to original source
-  logo_url?: string; // Logo for external source
+  source_name?: string;
+  source_url?: string;
+  logo_url?: string;
 }
 
 interface ValidationPopupV2Props {
@@ -24,6 +25,335 @@ interface ValidationPopupV2Props {
   onClose: () => void;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+const fmt = (n: number | null | undefined): string => {
+  if (n == null) return '--';
+  return n.toLocaleString('en-US');
+};
+
+const fmtPrice = (n: number | null | undefined): string => {
+  if (n == null) return '--';
+  return '$' + Math.round(n).toLocaleString('en-US');
+};
+
+const fmtPct = (n: number | null | undefined): string => {
+  if (n == null) return '--';
+  const sign = n > 0 ? '+' : '';
+  return `${sign}${n}%`;
+};
+
+const getConfidenceColor = (score: number) => {
+  if (score >= 90) return 'var(--success)';
+  if (score >= 75) return 'var(--text)';
+  if (score >= 60) return 'var(--warning)';
+  return 'var(--error)';
+};
+
+const getSourceLabel = (source: ValidationSource) => {
+  const type = source.document_type || 'document';
+  const state = source.document_state;
+
+  if (source.source_type === 'bat_auction') return source.source_name || 'BRING A TRAILER';
+  if (source.source_type === 'dealer_listing') return source.source_name || 'DEALER LISTING';
+  if (source.source_type === 'factory_reference') {
+    if (type === 'parts_catalog') return 'PARTS CATALOG';
+    if (type === 'repair_manual') return 'FACTORY MANUAL';
+    if (type === 'assembly_manual') return 'ASSEMBLY MANUAL';
+    return 'FACTORY REFERENCE';
+  }
+  if (type === 'title' && state) return `${state} TITLE`;
+  if (type === 'registration' && state) return `${state} REGISTRATION`;
+  if (type === 'bill_of_sale') return 'BILL OF SALE';
+  if (type === 'vin_plate') return 'VIN PLATE';
+
+  return type.toUpperCase().replace(/_/g, ' ');
+};
+
+const getRarityColor = (rarity: string) => {
+  switch (rarity) {
+    case 'UNIQUE': return 'var(--error)';
+    case 'RARE': return 'var(--warning)';
+    case 'UNCOMMON': return 'var(--text)';
+    default: return 'var(--text-secondary)';
+  }
+};
+
+/* ------------------------------------------------------------------ */
+/*  Inline styles — Nuke design system compliant                       */
+/* ------------------------------------------------------------------ */
+
+const S = {
+  overlay: {
+    position: 'fixed' as const,
+    top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(0,0,0,0.85)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10000,
+  },
+  panel: {
+    width: '90%',
+    maxWidth: '520px',
+    maxHeight: '85vh',
+    background: 'var(--surface)',
+    border: '2px solid var(--border)',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column' as const,
+  },
+  header: {
+    padding: '8px 12px',
+    borderBottom: '2px solid var(--border)',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    background: 'var(--bg)',
+  },
+  label: {
+    fontFamily: 'Arial, sans-serif',
+    fontSize: '9px',
+    fontWeight: 700,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase' as const,
+    color: 'var(--text-secondary)',
+  },
+  value: {
+    fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+    fontSize: '11px',
+    fontWeight: 700,
+    color: 'var(--text)',
+  },
+  sectionLabel: {
+    fontFamily: 'Arial, sans-serif',
+    fontSize: '8px',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase' as const,
+    color: 'var(--text-secondary)',
+    marginBottom: '6px',
+  },
+  statBox: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '4px',
+  },
+  statValue: {
+    fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+    fontSize: '11px',
+    fontWeight: 700,
+    color: 'var(--text)',
+  },
+  statUnit: {
+    fontFamily: 'Arial, sans-serif',
+    fontSize: '8px',
+    color: 'var(--text-secondary)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.05em',
+  },
+  footer: {
+    padding: '8px 12px',
+    borderTop: '2px solid var(--border)',
+    background: 'var(--bg)',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    fontSize: '9px',
+    fontFamily: 'Arial, sans-serif',
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/*  Intelligence Section                                               */
+/* ------------------------------------------------------------------ */
+
+const IntelligenceSection: React.FC<{
+  intel: FieldIntelligence;
+  fieldName: string;
+  fieldValue: string;
+}> = ({ intel, fieldName, fieldValue }) => {
+  const hasPriceData = intel.avg_price_with != null && intel.price_sample_count != null && intel.price_sample_count > 2;
+  const hasTemporalData = intel.min_year != null && intel.max_year != null;
+
+  return (
+    <div style={{ padding: '12px', borderBottom: '2px solid var(--border)', background: 'var(--bg)' }}>
+      <div style={S.sectionLabel}>FIELD INTELLIGENCE</div>
+
+      {/* Row 1: Count + Rank + Rarity */}
+      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        <div style={S.statBox}>
+          <span style={S.statValue}>{fmt(intel.exact_match_count)}</span>
+          <span style={S.statUnit}>OF {fmt(intel.total_with_field)} VEHICLES</span>
+        </div>
+        <div style={S.statBox}>
+          <span style={S.statUnit}>RANK</span>
+          <span style={S.statValue}>#{fmt(intel.rank)}</span>
+          <span style={S.statUnit}>OF {fmt(intel.total_distinct_values)}</span>
+        </div>
+        <div style={{
+          ...S.statBox,
+          padding: '1px 6px',
+          border: '2px solid var(--border)',
+          background: 'var(--surface)',
+        }}>
+          <span style={{
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '8px',
+            fontWeight: 700,
+            letterSpacing: '0.05em',
+            color: getRarityColor(intel.rarity),
+          }}>
+            {intel.rarity}
+          </span>
+        </div>
+      </div>
+
+      {/* Row 2: Price Impact */}
+      {hasPriceData && (
+        <div style={{ marginBottom: '8px' }}>
+          <div style={{ ...S.sectionLabel, marginBottom: '2px' }}>PRICE IMPACT</div>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={S.statBox}>
+              <span style={S.statValue}>{fmtPrice(intel.avg_price_with)}</span>
+              <span style={S.statUnit}>AVG</span>
+            </div>
+            <div style={S.statBox}>
+              <span style={S.statValue}>{fmtPrice(intel.median_price_with)}</span>
+              <span style={S.statUnit}>MED</span>
+            </div>
+            {intel.price_premium_pct != null && (
+              <div style={S.statBox}>
+                <span style={{
+                  ...S.statValue,
+                  color: intel.price_premium_pct > 0 ? 'var(--success)' : intel.price_premium_pct < -10 ? 'var(--error)' : 'var(--text)',
+                }}>
+                  {fmtPct(intel.price_premium_pct)}
+                </span>
+                <span style={S.statUnit}>VS OTHERS</span>
+              </div>
+            )}
+            <div style={S.statBox}>
+              <span style={{ ...S.statUnit, color: 'var(--text-disabled)' }}>
+                ({fmt(intel.price_sample_count)} PRICED)
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Row 3: Temporal */}
+      {hasTemporalData && (
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '10px' }}>
+          <div style={S.statBox}>
+            <span style={S.statUnit}>YEAR RANGE</span>
+            <span style={S.statValue}>{intel.min_year}–{intel.max_year}</span>
+          </div>
+          {intel.peak_year && (
+            <div style={S.statBox}>
+              <span style={S.statUnit}>PEAK</span>
+              <span style={S.statValue}>{intel.peak_year}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Row 4: Top Values */}
+      {intel.top_values && intel.top_values.length > 0 && (
+        <div style={{ marginBottom: '10px' }}>
+          <div style={{ ...S.sectionLabel, marginBottom: '4px' }}>
+            TOP {fieldName.toUpperCase().replace(/_/g, ' ')} VALUES
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+            {intel.top_values.map((tv, i) => {
+              const isCurrentValue = tv.value.toLowerCase().trim() === fieldValue.toLowerCase().trim();
+              return (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '2px 4px',
+                    background: isCurrentValue ? 'var(--accent-dim)' : 'transparent',
+                    borderLeft: isCurrentValue ? '2px solid var(--accent)' : '2px solid transparent',
+                  }}
+                >
+                  <span style={{
+                    fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                    fontSize: '9px',
+                    color: isCurrentValue ? 'var(--text)' : 'var(--text-secondary)',
+                    fontWeight: isCurrentValue ? 700 : 400,
+                    flex: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap' as const,
+                  }}>
+                    {tv.value}
+                  </span>
+                  <span style={{
+                    fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    color: isCurrentValue ? 'var(--text)' : 'var(--text-disabled)',
+                    minWidth: '40px',
+                    textAlign: 'right' as const,
+                  }}>
+                    {fmt(tv.count)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Row 5: Companions */}
+      {intel.companions && intel.companions.length > 0 && (
+        <div>
+          <div style={S.sectionLabel}>COMMON COMPANIONS</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            {intel.companions.map((comp, i) => (
+              comp.values.length > 0 && (
+                <div key={i} style={{ display: 'flex', gap: '4px', alignItems: 'baseline', flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '8px',
+                    fontWeight: 700,
+                    color: 'var(--text-secondary)',
+                    letterSpacing: '0.05em',
+                    minWidth: '60px',
+                  }}>
+                    {comp.label}:
+                  </span>
+                  <span style={{
+                    fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                    fontSize: '9px',
+                    color: 'var(--text)',
+                  }}>
+                    {comp.values.slice(0, 4).map((v, j) => (
+                      <React.Fragment key={j}>
+                        {j > 0 && <span style={{ color: 'var(--text-disabled)', margin: '0 3px' }}>/</span>}
+                        {v.value} <span style={{ color: 'var(--text-disabled)' }}>({v.count})</span>
+                      </React.Fragment>
+                    ))}
+                  </span>
+                </div>
+              )
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/*  Main Component                                                     */
+/* ------------------------------------------------------------------ */
+
 const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
   vehicleId,
   fieldName,
@@ -34,16 +364,18 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
 }) => {
   const [sources, setSources] = useState<ValidationSource[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showConfidenceExplainer, setShowConfidenceExplainer] = useState(false);
-  const [showValidatorExplainer, setShowValidatorExplainer] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedValue, setEditedValue] = useState(fieldValue);
   const [saving, setSaving] = useState(false);
   const [fieldAttribution, setFieldAttribution] = useState<any | null>(null);
+  const [showConfidenceDetail, setShowConfidenceDetail] = useState(false);
 
   const isVinField = String(fieldName || '').toLowerCase() === 'vin';
   const { summary: vinProofSummary, loading: vinProofLoading } = useVINProofs(isVinField ? vehicleId : undefined);
+
+  // Field intelligence — living aggregate data
+  const { data: intelligence, isLoading: intelLoading } = useFieldIntelligence(fieldName, fieldValue);
 
   useEffect(() => {
     loadValidations();
@@ -68,7 +400,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
       setLoading(true);
       const allSources: ValidationSource[] = [];
 
-      // Field attribution (where the current field value came from)
+      // Field attribution
       try {
         const { data: attrRow, error: attrErr } = await supabase
           .from('vehicle_field_sources')
@@ -81,30 +413,6 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
         if (!attrErr) setFieldAttribution(attrRow || null);
       } catch {
         setFieldAttribution(null);
-      }
-
-      // 0. Factory Reference Pages - SPECIFIC PAGES for this field (HIGHEST AUTHORITY)
-      const { data: manualPages, error: pagesError } = await supabase
-        .rpc('get_manual_pages_for_field', {
-          p_vehicle_id: vehicleId,
-          p_field_name: fieldName
-        });
-
-      if (!pagesError && manualPages && manualPages.length > 0) {
-        console.log(`Found ${manualPages.length} relevant manual pages for ${fieldName}`);
-        
-        manualPages.forEach((page: any) => {
-          allSources.push({
-            source_type: 'factory_manual_page',
-            document_type: 'manual_page',
-            document_state: `${page.catalog_name} - Page ${page.page_number}`,
-            confidence_score: page.relevance_score || 100,
-            image_url: page.image_url,
-            created_at: new Date().toISOString()
-          });
-        });
-      } else if (pagesError) {
-        console.warn('Failed to load manual pages:', pagesError);
       }
 
       // 1. Ownership documents (title, registration)
@@ -133,7 +441,6 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
       // 2. Tagged images (title/registration/VIN photos)
       const { data: docImages } = await supabase
         .from('vehicle_images')
-        // `vehicle_images` does not have an `uploaded_by` column in production schema; use attribution fields.
         .select('sensitive_type, image_url, created_at, user_id, documented_by_user_id, exif_data')
         .eq('vehicle_id', vehicleId)
         .in('sensitive_type', ['title', 'registration', 'vin_plate', 'bill_of_sale'])
@@ -152,7 +459,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
         });
       }
 
-      // 3. BaT auction data (external validator)
+      // 3. BaT auction data
       const { data: batListing } = await supabase
         .from('bat_listings')
         .select('id, listing_url, sale_price, sale_date, vin, created_at')
@@ -172,7 +479,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
         });
       }
 
-      // 4. Organization/dealer data (external validator)
+      // 4. Organization/dealer data
       const { data: orgVehicle } = await supabase
         .from('organization_vehicles')
         .select('id, organization_id, notes, created_at, businesses:organization_id(name, logo_url, website_url)')
@@ -194,7 +501,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
         });
       }
 
-      // 5. Check origin_organization_id on vehicle itself
+      // 5. Vehicle origin check
       const { data: vehicleOrigin } = await supabase
         .from('vehicles')
         .select('origin_organization_id, bat_auction_url, businesses:origin_organization_id(name, logo_url, website_url)')
@@ -202,7 +509,6 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
         .maybeSingle();
 
       if (vehicleOrigin?.bat_auction_url && !batListing) {
-        // BaT URL exists but no bat_listings record - still count as source
         allSources.push({
           source_type: 'bat_auction',
           document_type: 'auction_listing',
@@ -240,39 +546,27 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
   const handleSave = async () => {
     try {
       setSaving(true);
-      
       const updates: any = {};
       const normalizedValue = normalizeEditedValue();
-      
-      // Convert value to proper type
-      if (fieldName === 'year' || fieldName === 'mileage' || fieldName === 'horsepower') {
-        updates[fieldName] = normalizedValue;
-      } else {
-        updates[fieldName] = normalizedValue;
-      }
-      
+      updates[fieldName] = normalizedValue;
+
       const { error } = await supabase
         .from('vehicles')
         .update(updates)
         .eq('id', vehicleId);
-      
+
       if (error) {
         const adminResult = await supabase.functions.invoke('admin-update-vehicle-field', {
-          body: {
-            vehicle_id: vehicleId,
-            field_name: fieldName,
-            field_value: normalizedValue
-          }
+          body: { vehicle_id: vehicleId, field_name: fieldName, field_value: normalizedValue }
         });
         if (adminResult.error) throw adminResult.error;
         if (!(adminResult.data as any)?.ok) {
           throw new Error((adminResult.data as any)?.error || 'Admin update failed');
         }
       }
-      
-      // Success - close modal and trigger reload
+
       setSaving(false);
-      window.location.reload(); // Force refresh to show updated data
+      window.location.reload();
     } catch (err) {
       console.error('Save failed:', err);
       setSaving(false);
@@ -280,72 +574,8 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
     }
   };
 
-  const calculateConfidence = () => {
-    if (sources.length === 0) return 50; // Manual entry
-    const avg = sources.reduce((sum, s) => sum + s.confidence_score, 0) / sources.length;
-    return Math.round(avg);
-  };
-
-  const getConfidenceColor = (score: number) => {
-    if (score >= 90) return '#10b981';
-    if (score >= 75) return '#3b82f6';
-    if (score >= 60) return '#f59e0b';
-    return '#ef4444';
-  };
-
-  const getSourceLabel = (source: ValidationSource) => {
-    const type = source.document_type || 'document';
-    const state = source.document_state;
-    
-    // External sources - use source_name
-    if (source.source_type === 'bat_auction') {
-      return source.source_name || 'BRING A TRAILER';
-    }
-    if (source.source_type === 'dealer_listing') {
-      return source.source_name || 'DEALER LISTING';
-    }
-    
-    // Factory manual pages - show page context
-    if (source.source_type === 'factory_manual_page') {
-      return state || 'FACTORY MANUAL';  // state = "1987 Service Manual - Page 15"
-    }
-    
-    // Factory references
-    if (source.source_type === 'factory_reference') {
-      if (type === 'parts_catalog') return 'PARTS CATALOG';
-      if (type === 'repair_manual') return 'FACTORY MANUAL';
-      if (type === 'assembly_manual') return 'ASSEMBLY MANUAL';
-      return 'FACTORY REFERENCE';
-    }
-    
-    if (type === 'title' && state) return `${state} TITLE`;
-    if (type === 'registration' && state) return `${state} REGISTRATION`;
-    if (type === 'bill_of_sale') return 'BILL OF SALE';
-    if (type === 'vin_plate') return 'VIN PLATE';
-    
-    return type.toUpperCase().replace(/_/g, ' ');
-  };
-
-  const getEmblemUrl = () => {
-    const make = (vehicleMake || '').toLowerCase();
-    
-    // Use generic emblems for now (year-specific can be added later)
-    if (make.includes('chevrolet') || make.includes('chevy')) {
-      return '/emblems/chevrolet/bowtie.svg';
-    }
-    if (make.includes('gmc')) {
-      return '/emblems/gmc/shield.svg';
-    }
-    
-    return null;
-  };
-
-  const confidence = calculateConfidence();
-  const emblemUrl = getEmblemUrl();
-  // Count unique validators - include external sources by their source_name
-  const uniqueValidators = new Set(
-    sources.map(s => s.verified_by || s.source_name).filter(Boolean)
-  ).size;
+  const confidence = sources.length === 0 ? 50 : Math.round(sources.reduce((sum, s) => sum + s.confidence_score, 0) / sources.length);
+  const uniqueValidators = new Set(sources.map(s => s.verified_by || s.source_name).filter(Boolean)).size;
 
   const attribution = (() => {
     if (!fieldAttribution) return null;
@@ -358,62 +588,28 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
   })();
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.85)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 10000
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          width: '90%',
-          maxWidth: '500px',
-          maxHeight: '85vh',
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Minimal header */}
-        <div style={{
-          padding: '8px 12px',
-          borderBottom: '1px solid var(--border)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          background: 'var(--bg)'
-        }}>
+    <div style={S.overlay} onClick={onClose}>
+      <div style={S.panel} onClick={(e) => e.stopPropagation()}>
+
+        {/* ── Header ── */}
+        <div style={S.header}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>
-              {fieldName.toUpperCase()}
-            </span>
+            <span style={S.label}>{fieldName.toUpperCase().replace(/_/g, ' ')}</span>
             {isEditing ? (
               <input
-                type={fieldName === 'year' || fieldName === 'mileage' ? 'number' : 'text'}
+                type={['year', 'mileage', 'horsepower', 'doors', 'seats'].includes(fieldName) ? 'number' : 'text'}
                 value={editedValue}
                 onChange={(e) => setEditedValue(e.target.value)}
                 autoFocus
                 style={{
-                  fontSize: '13px',
+                  fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                  fontSize: '11px',
                   fontWeight: 700,
                   padding: '4px 8px',
                   border: '2px solid var(--accent)',
                   background: 'var(--surface)',
                   color: 'var(--text)',
-                  borderRadius: '4px',
-                  width: '200px'
+                  width: '200px',
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSave();
@@ -421,9 +617,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                 }}
               />
             ) : (
-              <span style={{ fontSize: '13px', fontWeight: 700 }}>
-                {fieldValue}
-              </span>
+              <span style={S.value}>{fieldValue}</span>
             )}
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -433,28 +627,25 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                   onClick={handleSave}
                   disabled={saving}
                   className="button button-primary"
-                  style={{ fontSize: '11px', padding: '4px 12px' }}
+                  style={{ fontSize: '9px', padding: '4px 12px' }}
                 >
-                  {saving ? 'Saving...' : 'Save'}
+                  {saving ? 'SAVING...' : 'SAVE'}
                 </button>
                 <button
-                  onClick={() => {
-                    setEditedValue(fieldValue);
-                    setIsEditing(false);
-                  }}
+                  onClick={() => { setEditedValue(fieldValue); setIsEditing(false); }}
                   className="button"
-                  style={{ fontSize: '11px', padding: '4px 12px' }}
+                  style={{ fontSize: '9px', padding: '4px 12px' }}
                 >
-                  Cancel
+                  CANCEL
                 </button>
               </>
             ) : (
               <button
                 onClick={() => setIsEditing(true)}
                 className="button"
-                style={{ fontSize: '11px', padding: '4px 12px' }}
+                style={{ fontSize: '9px', padding: '4px 12px' }}
               >
-                Edit
+                EDIT
               </button>
             )}
             <button
@@ -462,470 +653,327 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
               style={{
                 background: 'transparent',
                 border: 'none',
-                fontSize: '21px',
+                fontSize: '18px',
                 cursor: 'pointer',
                 padding: 0,
                 lineHeight: 1,
-                color: 'var(--text-muted)'
+                color: 'var(--text-secondary)',
+                fontFamily: 'Arial, sans-serif',
               }}
             >
-              ×
+              x
             </button>
           </div>
         </div>
 
-        {/* VIN provenance (where the VIN value came from) */}
-        {isVinField ? (
-          <div
-            style={{
-              padding: '6px 12px',
-              borderBottom: '1px solid var(--border)',
-              background: 'var(--surface)',
-              fontSize: '9px',
-              color: 'var(--text-muted)',
-              lineHeight: 1.4
-            }}
-          >
+        {/* ── VIN Provenance (VIN fields only) ── */}
+        {isVinField && (
+          <div style={{
+            padding: '6px 12px',
+            borderBottom: '2px solid var(--border)',
+            background: 'var(--surface)',
+            fontSize: '9px',
+            fontFamily: 'Arial, sans-serif',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.4,
+          }}>
             <div>
-              <strong>VIN origin:</strong>{' '}
+              <strong>VIN ORIGIN:</strong>{' '}
               {attribution ? (
                 <>
                   {attribution.sourceType}
-                  {attribution.when ? ` • ${new Date(attribution.when).toLocaleString()}` : ''}
+                  {attribution.when ? ` / ${new Date(attribution.when).toLocaleString()}` : ''}
                   {attribution.sourceUrl ? (
-                    <>
-                      {' '}
-                      •{' '}
-                      <a
-                        href={attribution.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ color: 'var(--text)', textDecoration: 'underline' }}
-                      >
-                        source
-                      </a>
-                    </>
+                    <> / <a href={attribution.sourceUrl} target="_blank" rel="noreferrer"
+                      style={{ color: 'var(--text)', textDecoration: 'underline' }}>source</a></>
                   ) : null}
-                  {attribution.storedValue && attribution.storedValue !== fieldValue ? (
-                    <>
-                      {' '}
-                      • stored value differs
-                    </>
-                  ) : null}
+                  {attribution.storedValue && attribution.storedValue !== fieldValue ? ' / STORED VALUE DIFFERS' : null}
                 </>
-              ) : (
-                <>No citation found (VIN is just present on the vehicle record)</>
-              )}
+              ) : 'No citation found'}
             </div>
             <div>
-              <strong>Evidence-backed proofs:</strong>{' '}
-              {vinProofLoading ? (
-                <>Loading…</>
-              ) : vinProofSummary?.hasConclusiveProof ? (
-                <>
-                  {vinProofSummary.conclusiveProofCount} conclusive proof{vinProofSummary.conclusiveProofCount !== 1 ? 's' : ''} • {vinProofSummary.totalConfidence}%
-                </>
-              ) : (
-                <>None yet</>
-              )}
+              <strong>EVIDENCE-BACKED PROOFS:</strong>{' '}
+              {vinProofLoading ? 'Loading...' : vinProofSummary?.hasConclusiveProof ? (
+                <>{vinProofSummary.conclusiveProofCount} conclusive / {vinProofSummary.totalConfidence}%</>
+              ) : 'None yet'}
             </div>
           </div>
-        ) : null}
+        )}
 
-        {/* Document previews - main focus */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px', fontSize: '11px', color: 'var(--text-muted)' }}>
-              Loading...
-            </div>
-          ) : sources.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                {isVinField
-                  ? 'No uploaded proof artifacts yet (title/registration/VIN plate). This does not explain where the VIN value came from.'
-                  : 'No proof yet'}
-              </div>
-              <button
-                className="button button-primary"
-                style={{ fontSize: '11px', padding: '4px 12px' }}
-                onClick={() => {
-                  onClose();
-                  window.dispatchEvent(new CustomEvent('trigger_image_upload', { detail: { vehicleId } }));
-                }}
-              >
-                Upload proof
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {/* Validator Stamps - Round badges showing who verified */}
-              {sources.filter(s => s.logo_url || s.source_name).length > 0 && (
-                <div style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  gap: '8px',
-                  padding: '12px',
-                  background: 'var(--bg)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px'
-                }}>
-                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Verified By
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    {sources.filter(s => s.logo_url || s.source_name).map((source, idx) => (
-                      <a
-                        key={idx}
-                        href={source.source_url || '#'}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => !source.source_url && e.preventDefault()}
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: '4px',
-                          textDecoration: 'none',
-                          cursor: source.source_url ? 'pointer' : 'default'
-                        }}
-                        title={source.source_url ? `View on ${source.source_name}` : source.source_name || ''}
-                      >
-                        {/* Round badge */}
-                        <div style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '50%',
-                          background: 'var(--surface)',
-                          border: `2px solid ${getConfidenceColor(source.confidence_score)}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          overflow: 'hidden',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-                        }}>
-                          {source.logo_url ? (
-                            <img 
-                              src={source.logo_url} 
-                              alt={source.source_name || ''} 
-                              style={{ 
-                                width: '28px', 
-                                height: '28px', 
-                                objectFit: 'contain'
-                              }}
-                              onError={(e) => { 
-                                (e.target as HTMLImageElement).style.display = 'none';
-                                (e.target as HTMLImageElement).parentElement!.innerHTML = `<span style="font-size: 14px; font-weight: 700;">${(source.source_name || 'V')[0]}</span>`;
-                              }}
-                            />
-                          ) : (
-                            <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>
-                              {(source.source_name || 'V')[0]}
-                            </span>
-                          )}
-                        </div>
-                        {/* Label */}
-                        <span style={{ 
-                          fontSize: '8px', 
-                          color: 'var(--text-muted)', 
-                          textAlign: 'center',
-                          maxWidth: '60px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          {source.source_name || getSourceLabel(source)}
-                        </span>
-                        {/* Confidence indicator */}
-                        <span style={{ 
-                          fontSize: '8px', 
-                          color: getConfidenceColor(source.confidence_score),
-                          fontWeight: 700
-                        }}>
-                          {source.confidence_score}%
-                        </span>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
+        {/* ── Scrollable Body ── */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
 
-              {/* Document sources list */}
-              {sources.map((source, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    border: '1px solid var(--border)',
-                    overflow: 'hidden',
-                    cursor: source.image_url ? 'pointer' : 'default'
-                  }}
-                  onClick={() => {
-                    if (source.image_url) {
-                      setSelectedImage(source.image_url);
-                    }
-                  }}
-                >
-                  {/* Document image (blurred) */}
-                  {source.image_url && (
-                    <div style={{ position: 'relative', height: '180px', overflow: 'hidden', background: 'var(--bg)' }}>
-                      <img
-                        src={source.image_url}
-                        alt="Proof document"
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'contain',
-                          filter: 'blur(6px)',
-                          opacity: 0.8
-                        }}
-                      />
-                      {/* Info overlay */}
-                      <div style={{
-                        position: 'absolute',
-                        top: '8px',
-                        left: '8px',
-                        background: 'rgba(0,0,0,0.75)',
-                        padding: '4px 8px',
-                        fontSize: '9px',
-                        color: '#fff',
-                        fontWeight: 700
-                      }}>
-                        {getSourceLabel(source)}
-                      </div>
-                      <div style={{
-                        position: 'absolute',
-                        bottom: '8px',
-                        right: '8px',
-                        background: 'rgba(0,0,0,0.75)',
-                        padding: '4px 8px',
-                        fontSize: '9px',
-                        color: getConfidenceColor(source.confidence_score),
-                        fontWeight: 700
-                      }}>
-                        {source.confidence_score}%
-                      </div>
-                      <div style={{
-                        position: 'absolute',
-                        bottom: '8px',
-                        left: '8px',
-                        fontSize: '9px',
-                        color: 'var(--surface-glass)'
-                      }}>
-                        {new Date(source.created_at).toLocaleDateString()}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* No image fallback - external sources or text-only */}
-                  {!source.image_url && (
-                    <div style={{ padding: '12px', fontSize: '11px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                        {source.logo_url && (
-                          <img 
-                            src={source.logo_url} 
-                            alt={source.source_name || ''} 
-                            style={{ width: '20px', height: '20px', objectFit: 'contain', borderRadius: '2px' }}
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                          />
-                        )}
-                        <span style={{ fontWeight: 700 }}>
-                          {getSourceLabel(source)}
-                        </span>
-                        {source.source_url && (
-                          <a 
-                            href={source.source_url} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            style={{ 
-                              fontSize: '9px', 
-                              color: 'var(--accent)', 
-                              textDecoration: 'none',
-                              marginLeft: 'auto'
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            VIEW SOURCE
-                          </a>
-                        )}
-                      </div>
-                      <div style={{ color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
-                        <span>{new Date(source.created_at).toLocaleDateString()}</span>
-                        <span style={{ color: getConfidenceColor(source.confidence_score), fontWeight: 600 }}>
-                          {source.confidence_score}%
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+          {/* ── Intelligence Section (non-VIN fields) ── */}
+          {!isVinField && intelligence && !intelligence.error && (
+            <IntelligenceSection intel={intelligence} fieldName={fieldName} fieldValue={fieldValue} />
+          )}
+          {!isVinField && intelLoading && (
+            <div style={{
+              padding: '12px', borderBottom: '2px solid var(--border)',
+              background: 'var(--bg)', textAlign: 'center',
+            }}>
+              <span style={{ ...S.label, color: 'var(--text-disabled)' }}>LOADING INTELLIGENCE...</span>
             </div>
           )}
+
+          {/* ── Evidence Section ── */}
+          <div style={{ padding: '12px' }}>
+            <div style={S.sectionLabel}>
+              EVIDENCE{!loading && ` / ${sources.length} SOURCE${sources.length !== 1 ? 'S' : ''}`}
+            </div>
+
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <span style={{ ...S.label, color: 'var(--text-disabled)' }}>LOADING...</span>
+              </div>
+            ) : sources.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <div style={{ ...S.label, color: 'var(--text-disabled)', marginBottom: '8px' }}>
+                  {isVinField
+                    ? 'NO PROOF ARTIFACTS YET (TITLE / REGISTRATION / VIN PLATE)'
+                    : 'NO EVIDENCE YET'}
+                </div>
+                <button
+                  className="button button-primary"
+                  style={{ fontSize: '9px', padding: '4px 12px' }}
+                  onClick={() => {
+                    onClose();
+                    window.dispatchEvent(new CustomEvent('trigger_image_upload', { detail: { vehicleId } }));
+                  }}
+                >
+                  UPLOAD PROOF
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* Validator badges */}
+                {sources.filter(s => s.logo_url || s.source_name).length > 0 && (
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', gap: '6px',
+                    padding: '8px', background: 'var(--bg)', border: '2px solid var(--border)',
+                  }}>
+                    <div style={S.sectionLabel}>VERIFIED BY</div>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      {sources.filter(s => s.logo_url || s.source_name).map((source, idx) => (
+                        <a
+                          key={idx}
+                          href={source.source_url || '#'}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => !source.source_url && e.preventDefault()}
+                          style={{
+                            display: 'flex', flexDirection: 'column', alignItems: 'center',
+                            gap: '3px', textDecoration: 'none',
+                            cursor: source.source_url ? 'pointer' : 'default',
+                          }}
+                          title={source.source_url ? `View on ${source.source_name}` : source.source_name || ''}
+                        >
+                          {/* Square badge — no border-radius, no box-shadow */}
+                          <div style={{
+                            width: '36px', height: '36px',
+                            background: 'var(--surface)',
+                            border: `2px solid ${getConfidenceColor(source.confidence_score)}`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            overflow: 'hidden',
+                          }}>
+                            {source.logo_url ? (
+                              <img
+                                src={source.logo_url}
+                                alt={source.source_name || ''}
+                                style={{ width: '24px', height: '24px', objectFit: 'contain' }}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                  (e.target as HTMLImageElement).parentElement!.innerHTML =
+                                    `<span style="font-size:12px;font-weight:700;font-family:Arial,sans-serif">${(source.source_name || 'V')[0]}</span>`;
+                                }}
+                              />
+                            ) : (
+                              <span style={{ fontSize: '12px', fontWeight: 700, fontFamily: 'Arial, sans-serif', color: 'var(--text)' }}>
+                                {(source.source_name || 'V')[0]}
+                              </span>
+                            )}
+                          </div>
+                          <span style={{
+                            fontFamily: 'Arial, sans-serif', fontSize: '8px',
+                            color: 'var(--text-secondary)', textAlign: 'center',
+                            maxWidth: '56px', overflow: 'hidden',
+                            textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                            {source.source_name || getSourceLabel(source)}
+                          </span>
+                          <span style={{
+                            fontFamily: 'Arial, sans-serif', fontSize: '8px',
+                            color: getConfidenceColor(source.confidence_score), fontWeight: 700,
+                          }}>
+                            {source.confidence_score}%
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Source cards */}
+                {sources.map((source, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      border: '2px solid var(--border)',
+                      overflow: 'hidden',
+                      cursor: source.image_url ? 'pointer' : 'default',
+                    }}
+                    onClick={() => { if (source.image_url) setSelectedImage(source.image_url); }}
+                  >
+                    {/* Document image */}
+                    {source.image_url && (
+                      <div style={{ position: 'relative', height: '160px', overflow: 'hidden', background: 'var(--bg)' }}>
+                        <img
+                          src={source.image_url}
+                          alt="Proof document"
+                          style={{
+                            width: '100%', height: '100%', objectFit: 'contain',
+                            filter: 'blur(6px)', opacity: 0.8,
+                          }}
+                        />
+                        <div style={{
+                          position: 'absolute', top: '8px', left: '8px',
+                          background: 'rgba(0,0,0,0.75)', padding: '3px 6px',
+                          fontFamily: 'Arial, sans-serif', fontSize: '8px',
+                          fontWeight: 700, color: '#fff', letterSpacing: '0.05em',
+                        }}>
+                          {getSourceLabel(source)}
+                        </div>
+                        <div style={{
+                          position: 'absolute', bottom: '8px', right: '8px',
+                          background: 'rgba(0,0,0,0.75)', padding: '3px 6px',
+                          fontFamily: 'Arial, sans-serif', fontSize: '8px',
+                          fontWeight: 700, color: getConfidenceColor(source.confidence_score),
+                        }}>
+                          {source.confidence_score}%
+                        </div>
+                        <div style={{
+                          position: 'absolute', bottom: '8px', left: '8px',
+                          fontFamily: 'Arial, sans-serif', fontSize: '8px',
+                          color: 'rgba(255,255,255,0.6)',
+                        }}>
+                          {new Date(source.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* No image fallback */}
+                    {!source.image_url && (
+                      <div style={{ padding: '10px', fontSize: '10px', fontFamily: 'Arial, sans-serif' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          {source.logo_url && (
+                            <img
+                              src={source.logo_url}
+                              alt={source.source_name || ''}
+                              style={{ width: '18px', height: '18px', objectFit: 'contain' }}
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          )}
+                          <span style={{ fontWeight: 700, fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {getSourceLabel(source)}
+                          </span>
+                          {source.source_url && (
+                            <a
+                              href={source.source_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                fontSize: '8px', color: 'var(--text)', textDecoration: 'underline',
+                                marginLeft: 'auto', fontWeight: 700, letterSpacing: '0.05em',
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              VIEW SOURCE
+                            </a>
+                          )}
+                        </div>
+                        <div style={{ color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', fontSize: '8px' }}>
+                          <span>{new Date(source.created_at).toLocaleDateString()}</span>
+                          <span style={{ color: getConfidenceColor(source.confidence_score), fontWeight: 700 }}>
+                            {source.confidence_score}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Footer with stats */}
-        <div style={{
-          padding: '8px 12px',
-          borderTop: '1px solid var(--border)',
-          background: 'var(--bg)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: '9px'
-        }}>
-          <div style={{ display: 'flex', gap: '12px' }}>
+        {/* ── Footer ── */}
+        <div style={S.footer}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <span>{sources.length} source{sources.length !== 1 ? 's' : ''}</span>
+            <span style={{ color: 'var(--text-disabled)' }}>
+              {uniqueValidators} validator{uniqueValidators !== 1 ? 's' : ''}
+            </span>
             <button
-              onClick={() => setShowValidatorExplainer(true)}
+              onClick={() => setShowConfidenceDetail(!showConfidenceDetail)}
               style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: 0,
-                color: 'var(--text-muted)',
-                textDecoration: 'underline dotted',
-                fontSize: '9px'
-              }}
-            >
-              {uniqueValidators} validator{uniqueValidators !== 1 ? 's' : ''} *
-            </button>
-            <button
-              onClick={() => setShowConfidenceExplainer(true)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: 0,
+                background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
                 color: getConfidenceColor(confidence),
                 textDecoration: 'underline dotted',
-                fontSize: '9px',
-                fontWeight: 700
+                fontSize: '9px', fontWeight: 700, fontFamily: 'Arial, sans-serif',
               }}
             >
-              {confidence}% ⓘ
+              {confidence}%
             </button>
           </div>
           <button
             className="btn-utility"
-            style={{ fontSize: '9px', padding: '2px 8px' }}
+            style={{ fontSize: '8px', padding: '2px 8px', fontFamily: 'Arial, sans-serif', letterSpacing: '0.05em' }}
             onClick={() => {
               onClose();
               window.dispatchEvent(new CustomEvent('trigger_image_upload', { detail: { vehicleId } }));
             }}
           >
-            + proof
+            + PROOF
           </button>
         </div>
-      </div>
 
-      {/* Confidence Explainer Modal */}
-      {showConfidenceExplainer && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
+        {/* ── Confidence Detail (inline expand, replaces modal) ── */}
+        {showConfidenceDetail && (
+          <div style={{
+            padding: '10px 12px',
+            borderTop: '2px solid var(--border)',
             background: 'var(--surface)',
-            padding: '20px',
-            borderRadius: '8px',
-            boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-            maxWidth: '400px',
-            zIndex: 10001
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '12px' }}>
-            How Confidence is Calculated
-          </h3>
-          <div style={{ fontSize: '12px', lineHeight: 1.6, color: 'var(--text)' }}>
-            <div style={{ marginBottom: '8px' }}>
-              <strong>Algorithm:</strong>
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '9px',
+            color: 'var(--text)',
+            lineHeight: 1.5,
+          }}>
+            <div style={{ ...S.sectionLabel, marginBottom: '4px' }}>CONFIDENCE CALCULATION</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '8px' }}>
+              <span>TITLE DOCUMENT: +40% / REGISTRATION: +30% / VIN PLATE: +25%</span>
+              <span>MULTIPLE VALIDATORS: +20% EACH / CROSS-VERIFIED: +15%</span>
+              <span style={{ marginTop: '4px', fontWeight: 700 }}>
+                CURRENT: {confidence}% FROM {sources.length} SOURCE{sources.length !== 1 ? 'S' : ''}
+              </span>
             </div>
-            <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
-              <li>Title document: +40%</li>
-              <li>Registration: +30%</li>
-              <li>VIN plate photo: +25%</li>
-              <li>Multiple validators: +20% each</li>
-              <li>Cross-verified data: +15%</li>
-            </ul>
-            <div style={{ marginTop: '12px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', fontSize: '11px' }}>
-              Your score: <strong>{confidence}%</strong> from {sources.length} source(s)
-            </div>
-          </div>
-          <button
-            className="button button-primary"
-            style={{ width: '100%', marginTop: '12px', fontSize: '11px' }}
-            onClick={() => setShowConfidenceExplainer(false)}
-          >
-            Close
-          </button>
-        </div>
-      )}
-
-      {/* Validator Explainer Modal */}
-      {showValidatorExplainer && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            background: 'var(--surface)',
-            padding: '20px',
-            borderRadius: '8px',
-            boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-            maxWidth: '400px',
-            zIndex: 10001
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '12px' }}>
-            What are Validators?
-          </h3>
-          <div style={{ fontSize: '12px', lineHeight: 1.6, color: 'var(--text)' }}>
-            <p>Validators are sources that independently verify vehicle data:</p>
-            <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
-              <li><strong>External:</strong> Auction houses (BaT, Cars & Bids), dealers, manufacturers</li>
-              <li><strong>User:</strong> Owners uploading matching documents</li>
-              <li><strong>Community:</strong> Cross-referencing public records</li>
-            </ul>
             {uniqueValidators > 0 && (
-              <div style={{ marginTop: '12px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', fontSize: '11px' }}>
-                <strong>Current validators ({uniqueValidators}):</strong>
-                <ul style={{ paddingLeft: '16px', margin: '4px 0 0 0' }}>
-                  {Array.from(new Set(sources.map(s => s.verified_by || s.source_name).filter(Boolean))).map((v, i) => (
-                    <li key={i}>{v}</li>
-                  ))}
-                </ul>
+              <div style={{ marginTop: '6px' }}>
+                <span style={{ fontWeight: 700 }}>VALIDATORS: </span>
+                {Array.from(new Set(sources.map(s => s.verified_by || s.source_name).filter(Boolean))).join(', ')}
               </div>
             )}
-            <div style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', fontSize: '11px' }}>
-              Data becomes <strong>verified</strong> when 2+ validators confirm the same information.
-            </div>
           </div>
-          <button
-            className="button button-primary"
-            style={{ width: '100%', marginTop: '12px', fontSize: '11px' }}
-            onClick={() => setShowValidatorExplainer(false)}
-          >
-            Close
-          </button>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Full Image Viewer */}
+      {/* ── Image Viewer ── */}
       {selectedImage && (
         <div
           style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(0,0,0,0.95)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 10002
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            zIndex: 10002,
           }}
           onClick={() => setSelectedImage(null)}
         >
@@ -937,20 +985,14 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
           <button
             onClick={() => setSelectedImage(null)}
             style={{
-              position: 'absolute',
-              top: '20px',
-              right: '20px',
-              background: 'var(--surface)',
-              border: 'none',
-              borderRadius: '50%',
-              width: '40px',
-              height: '40px',
-              fontSize: '27px',
-              cursor: 'pointer',
-              lineHeight: 1
+              position: 'absolute', top: '20px', right: '20px',
+              background: 'var(--surface)', border: '2px solid var(--border)',
+              width: '36px', height: '36px',
+              fontSize: '18px', cursor: 'pointer', lineHeight: 1,
+              fontFamily: 'Arial, sans-serif', color: 'var(--text)',
             }}
           >
-            ×
+            x
           </button>
         </div>
       )}
@@ -959,4 +1001,3 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
 };
 
 export default ValidationPopupV2;
-
