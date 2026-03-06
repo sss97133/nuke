@@ -1,19 +1,49 @@
-# Handoff — 2026-03-06 ~08:30 PST
+# Handoff — 2026-03-06 Enrichment Campaign
 
 ## What I Was Working On
-Fine-tuning a Nuke domain LLM (Qwen2.5-7B) via QLoRA on Modal A100 — the "Nuke Agent" that knows platform architecture, edge functions, vehicle data schemas, and collector vehicle domain knowledge.
+Massive data enrichment and cleanup campaign across all auction sources. User asked to "clean up and enrich, keep it going" after prior session merged 46,912 duplicate stubs and fixed the `get_enrichment_candidates` RPC + Bonhams extractor.
 
 ## What's Complete
-1. **Training data export** — `scripts/export_nuke_agent_data.py` generates chat-format JSONL from 3 sources (DB schema, edge function code, vehicle domain knowledge). 2,049 train + 108 val examples.
-2. **Modal training script** — `yono/modal_nuke_agent_train.py` with QLoRA config, training, merge/export, and run listing. All version compatibility issues resolved (accelerate 1.0+, transformers 4.57, torch dtype).
-3. **Training run completed** — run_id `20260306_144355` on Modal volume `yono-data`:
-   - Final train loss: 0.286 (averaged), eval loss: 0.071
-   - LoRA adapter at `nuke-agent-runs/20260306_144355/final/adapter_model.safetensors`
-   - Full metadata at `nuke-agent-runs/20260306_144355/metadata.json`
+1. **Bonhams re_enrich**: 1,019 vehicles enriched (queue drained for this 24hr cycle)
+2. **RM Sotheby's extractor**: Added `offset` param for batch pagination, deployed v2. 6 of 14 auctions processed (PA26, AZ26, CC26, MI26, S0226, PA25)
+3. **BaT paywall discovery**: Confirmed that 21K BaT vehicles with missing prices are blocked by "View Result" paywall on ended auctions — extract-bat-core can't get prices from these pages
+4. **DONE.md updated**, scripts committed
+
+## Still Running at Session Close (background tasks)
+- **Barrett-Jackson re_enrich** (task b9izse5yp): 3,626+ enriched, ~1,100 prices + ~2,000 VINs, still going
+- **Mecum re_enrich** (task b0bjfckyk): 3,498+ enriched, ~1,200 VINs, still going
+- **RM Sotheby's batch** (task bjcfvws6i): Processing auction AZ25 (7th of 14)
+
+These background processes may still be running or may have completed/timed out. Check with:
+```bash
+ps aux | grep "backfill" | grep -v grep
+```
 
 ## What's Next
-1. **Merge LoRA → full model**: `modal run yono/modal_nuke_agent_train.py --action merge --run-id 20260306_144355`
-2. **Serve the merged model** — deploy via vLLM on Modal (existing `yono-serve` app pattern) or add to the YONO serving infrastructure
-3. **Evaluate quality** — test the agent on real Nuke platform questions (schema queries, edge function behavior, vehicle domain questions)
-4. **Iterate on training data** — the 2K examples are a good start but more edge function examples and real user queries would improve quality
-5. **Integration** — wire the agent into Claude Code or a chat interface for platform-aware assistance
+1. **Re-run enrichment daily**: Scripts have 24hr cooldowns, re-run tomorrow:
+   ```bash
+   dotenvx run -- bash scripts/backfill-auction-prices.sh all
+   dotenvx run -- bash scripts/backfill-rmsothebys.sh
+   ```
+2. **RM Sotheby's remaining auctions**: If batch script didn't finish, re-run — saveVehicle does upserts so idempotent
+3. **BaT 21K missing prices**: Need BaT API access or logged-in session scraping
+4. **Cars & Bids 11K missing prices**: Requires Firecrawl ($$$), no batch re_enrich exists
+5. **CZ stubs (~70K)**: Dead ends — no discovery_url. Would need cross-referencing by year/make/model
+6. **Remaining gaps by source**:
+   - Mecum: 91K missing prices (re_enrich running, many daily cycles needed)
+   - Barrett-Jackson: 54K missing prices (re_enrich running)
+   - Bonhams: ~18K remaining after this cycle
+   - RM Sotheby's: 15K missing (catalog ingest filling some)
+   - silver-auctions/leake/kruse/auctions-america: 50K+ combined, no extractors
+
+## Key Files Modified This Session
+- `supabase/functions/extract-rmsothebys/index.ts` — added `offset` param
+- `scripts/backfill-rmsothebys.sh` — new batch processor for RM auctions
+- `scripts/backfill-bat-prices.sh` — new (not effective due to paywall)
+- `DONE.md` — updated with session work
+
+## DB State at Session Close
+- 1,281,580 total vehicles (non-deleted)
+- ~770,780+ with prices (climbing with running tasks)
+- ~242,161+ with VINs (climbing fast from BJ/Mecum)
+- 46,912 merged duplicates
