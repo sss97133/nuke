@@ -1091,14 +1091,15 @@ serve(async (req) => {
         candidates = data || [];
       } catch (e: any) {
         console.warn(`[Bonhams] RPC get_enrichment_candidates failed: ${e.message}`);
-        // Fallback: query directly
+        // Fallback: query directly — find vehicles missing key fields (price, description, or year)
         const { data } = await supabase
           .from("vehicles")
           .select("id, discovery_url, vin, color, mileage, description, transmission, body_style, sale_price, enrichment_failures")
           .eq("discovery_source", "bonhams")
-          .is("year", null)
+          .or("year.is.null,sale_price.is.null,description.is.null")
           .or("enrichment_failures.is.null,enrichment_failures.lt.3")
-          .order("created_at", { ascending: false })
+          .not("discovery_url", "is", null)
+          .order("updated_at", { ascending: true })
           .limit(limit);
         candidates = data || [];
       }

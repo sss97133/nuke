@@ -408,7 +408,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { action = 'auctions', auction, url, save_to_db = false, limit } = body;
+    const { action = 'auctions', auction, url, save_to_db = false, limit, offset = 0 } = body;
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -441,7 +441,7 @@ serve(async (req) => {
       const items = await fetchAuctionLots(auction);
       const vehicles = items.map((item) => transformLotItem(item, auction));
 
-      const applied = limit ? vehicles.slice(0, limit) : vehicles;
+      const applied = limit ? vehicles.slice(offset, offset + limit) : vehicles.slice(offset);
 
       return okJson({
         success: true,
@@ -464,7 +464,7 @@ serve(async (req) => {
       const items = await fetchAuctionLots(auction);
       const vehicles = items.map((item) => transformLotItem(item, auction));
 
-      const applied = limit ? vehicles.slice(0, limit) : vehicles;
+      const applied = limit ? vehicles.slice(offset, offset + limit) : vehicles.slice(offset);
 
       if (!save_to_db) {
         return okJson({
