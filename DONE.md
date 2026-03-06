@@ -2,6 +2,14 @@
 
 ## 2026-03-06
 
+[map] Map v6 UX Overhaul — Phase 3A module extraction + type import fix
+  - Extracted mapUtils.ts (353 lines): types, constants, geocoding, hex binning, helpers
+  - Extracted hooks/useMapLayers.ts (1024 lines): all Deck.GL layer construction
+  - UnifiedMap.tsx reduced from 3,036 → 1,656 lines (-45%)
+  - Fixed type-only imports (BizPin, VPin etc.) — Vite strips interfaces, need `import type`
+  - Fixed CollapsibleWidget import in ZipSidebarPanel (named export, not default)
+  - TypeScript clean, Vite build passes
+
 [data-fix] K10/K20 photo contamination — separated two 1984 Chevrolet trucks
   - Created K20 vehicle record (6ff6497c-784c-4cd7-adcf-28925f97d860, VIN 1GCGK24M6EF375994)
   - Moved 419 misassigned K20 photos from K10 to K20 record
