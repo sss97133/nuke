@@ -15,11 +15,13 @@ import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { point as turfPoint } from '@turf/helpers';
 import {
   MAP_FONT, CARTO_DARK, CARTO_LIGHT, SATELLITE_MAP_STYLE,
-  COLOR_PRESETS, type ColorPreset,
-  VPin, ColPin, BizPin, PhotoPin, MarketplacePin, LiveEvent,
+  COLOR_PRESETS,
   pinFromRow, fmtPrice, fmtMiles, thumbUrl,
   RICH_FIELDS, INITIAL_VIEW,
   geo,
+} from './mapUtils';
+import type {
+  ColorPreset, VPin, ColPin, BizPin, PhotoPin, MarketplacePin, LiveEvent,
 } from './mapUtils';
 import { useMapLayers } from './hooks/useMapLayers';
 
