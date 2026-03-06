@@ -2,6 +2,11 @@
 
 ## 2026-03-06
 
+[map] Smooth zoom/pan — Apple Maps-quality interactions
+  - Configured Deck.GL controller: smooth scroll zoom (speed 0.01, smooth: true), inertia (300ms momentum)
+  - Added FlyToInterpolator for animated programmatic view transitions (search results fly-to)
+  - Replaced bare `controller={true}` with full interaction config (touchZoom, doubleClickZoom, keyboard)
+
 [map] Map v6 UX Overhaul — Phase 3A module extraction + type import fix
   - Extracted mapUtils.ts (353 lines): types, constants, geocoding, hex binning, helpers
   - Extracted hooks/useMapLayers.ts (1024 lines): all Deck.GL layer construction

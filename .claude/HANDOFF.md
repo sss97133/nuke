@@ -1,49 +1,44 @@
-# Handoff — Universal Input System (Phase 1 complete)
+# Session Handoff — Map v6 UX Overhaul
 
-## What was done this session
+## What Was Happening
+Map v6 UX overhaul — 5-phase renovation of UnifiedMap based on 18-issue spec.
+Plan: `/Users/skylar/.claude/plans/bright-noodling-umbrella.md`
 
-### K10/K20 Data Fix
-- Previous agent uploaded 419 K20 photos to K10's vehicle record (wrong --vehicle-id)
-- Created K20 vehicle: `6ff6497c-784c-4cd7-adcf-28925f97d860` (VIN 1GCGK24M6EF375994)
-- Moved photos + observations, uploaded correct K10 album (51 photos)
-- Hardened `scripts/iphoto-intake.mjs` with `validateVehicleAlbumMatch()` — year/model check before upload
+This session completed Phase 3A (module extraction) and fixed a Vite runtime error
+where `import type` was needed for TypeScript interfaces (BizPin, VPin, etc.).
 
-### Universal Input System — Phase 1 (COMPLETE)
-Plan file: `.claude/plans/dreamy-imagining-yao.md`
+## What's Complete (16 of 18 tasks)
 
-All committed in `b66bf1a63`:
-- `CommandLineLayout.tsx` — AIDataIngestionSearch replaces SearchBar in header
-- `GlobalDropZone.tsx` (new) — window-level drag-drop → `nuke:global-drop` custom event
-- `AppLayout.tsx` — wrapped with GlobalDropZone
-- `AIDataIngestionSearch.tsx` — listens for `nuke:global-drop`, routes files to handlers
-- `MobileBottomNav.tsx` — Inbox with badge (orphan vehicle_images count)
-- `DomainRoutes.tsx` — `/inbox` → PersonalPhotoLibrary, `/photo-library` alias, `/team-inbox` for TeamInbox
+**Phase 1** (all done): Mode selector, sliders, color presets, layer toggles,
+sidebar navigation (no page nav), smooth zoom, supercluster clustering.
 
-## What's next (from the plan)
+**Phase 2** (all done): ZCTA TopoJSON pipeline, zip_code DB column + matview
+(131K vehicles, 13.4K ZIPs), ZIP polygon layer at z8.5+, county multi-select.
 
-### Phase 1 remaining
-- **Input type indicator** (task #7): badge below input showing detected type (URL/VIN/image/search) before Enter. Uses existing `contentDetector` service.
+**Phase 3** (all done): Module extraction (UnifiedMap 3036→1656 lines),
+ZIP sidebar panel, GPS-only ghost markers.
 
-### Phase 2: Unified Inbox Page
-- Enhance `PersonalPhotoLibrary.tsx` with tab bar: ALL | PHOTOS | URLS | DOCS | EMAILS
-- Add URL inbox items (`url_inbox` table, 190 items) and email inbox (`contact_inbox`, 46 items)
-- Add methods to `personalPhotoLibraryService.ts` for URL and document queries
+**Phase 4** (all done): Timeline auto-thinning + quick-select, photo thumbnails
+at z14+, org sidebar with sparkline.
 
-### Phase 3: Onboarding Wizard
-- Replace `OnboardingSlideshow.tsx` with 4-screen wizard (Welcome → Permissions → First Input → Done)
-- First Input screen uses full-size AIDataIngestionSearch — completing it creates first vehicle
+## What's Next
 
-### Phase 4: Background Processing (deferred)
-- `process-inbox-items` edge function — cron to auto-classify orphan photos via YONO
+**Phase 5: Precision Rendering (P2 — low priority cosmetic)**
+- 5A: Vehicle rectangles at z18+ (top-view proportional to dimensions)
+- 5B: Org building footprints at z16+ (from OSM data)
 
-## Key files to know
-- `AIDataIngestionSearch.tsx` — 1780-line universal input (URLs, VINs, images, text, paste, drag-drop)
-- `PersonalPhotoLibrary.tsx` — photo inbox with AI suggestions and vehicle linking
-- `personalPhotoLibraryService.ts` — service layer with `getUnorganizedPhotos()`, `VehicleSuggestion`
-- Inbox tables: `user_photo_inbox` (2,942), `url_inbox` (190), `contact_inbox` (46)
+## Key Files
+```
+nuke_frontend/src/components/map/
+  UnifiedMap.tsx       (1656 lines — main shell + state + UI)
+  mapUtils.ts          (353 lines — types, constants, geocoding)
+  hooks/useMapLayers.ts (1024 lines — all Deck.GL layers)
+  panels/MapVehicleDetail.tsx (267 lines)
+  panels/MapOrgDetail.tsx     (275 lines)
+  panels/ZipSidebarPanel.tsx  (250 lines)
+```
 
-## On Next Session
-1. `cat PROJECT_STATE.md` — sprint focus
-2. `tail -40 DONE.md` — what exists
-3. `cat .claude/HANDOFF.md` — this file
-4. Register in `.claude/ACTIVE_AGENTS.md`
+## DB Changes
+- `vehicles.zip_code` column with index (backfilled from listing_location regex)
+- `vehicle_zip_stats` materialized view (13.4K ZIPs)
+- Supabase project: qkgaybvrernstplzjaam
