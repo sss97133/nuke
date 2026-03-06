@@ -81,6 +81,11 @@ export interface FeedVehicle {
   listing_status?: string | null;
   listing_url?: string | null;
 
+  // Location (resolved server-side)
+  location?: string | null;
+  city?: string | null;
+  state?: string | null;
+
   // Data quality
   data_completeness_tier?: string | null;
 
