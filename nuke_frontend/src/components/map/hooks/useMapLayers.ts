@@ -4,12 +4,14 @@ import { ScatterplotLayer, TextLayer, GeoJsonLayer, IconLayer } from '@deck.gl/l
 import { HeatmapLayer, HexagonLayer } from '@deck.gl/aggregation-layers';
 import type Supercluster from 'supercluster';
 import {
-  COLOR_PRESETS, ColorPreset, MAP_FONT,
-  VPin, ColPin, BizPin, PhotoPin, MarketplacePin, LiveEvent,
+  COLOR_PRESETS, MAP_FONT,
   hexRadiusForZoom, hexColorRange,
   HEX_FADE_START, HEX_FADE_END, POINTS_FADE_START, POINTS_FADE_END,
   colColor, CAR_SVG_URI, BUILDING_SVG_URI,
   fmtPrice, simpleHash,
+} from '../mapUtils';
+import type {
+  ColorPreset, VPin, ColPin, BizPin, PhotoPin, MarketplacePin, LiveEvent,
 } from '../mapUtils';
 
 export interface UseMapLayersParams {
