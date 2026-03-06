@@ -1,26 +1,35 @@
-# Auto-Checkpoint — 2026-03-06 08:39:52
-*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+# HANDOFF — 2026-03-06
 
-## Recent Commits (last 30 min)
-e6a848bab docs: Tesla market analysis, data quality audit, CLI terminal prompt
-59234c783 feat: feed ranking v3 — quality gates, score transparency, server-side curation
-774848d2e docs: update DONE.md and HANDOFF.md — smooth map zoom/pan complete
-2977836b9 docs: update DONE.md and HANDOFF.md — Map v6 module extraction complete
-240cc299f docs: update DONE.md and HANDOFF.md — Phase 1 Universal Input System complete
-84156a683 feat: enrichment campaign — backfill scripts + RM Sotheby's offset support
-935005014 fix: use type-only imports for interfaces in map module extraction
-c77d522c3 feat: Nuke Agent QLoRA fine-tune — Qwen2.5-7B on Modal A100
+## What I Was Working On
+Planning infrastructure for a Nuke data server at the 707 Yucca property. User has 11 SSDs to consolidate and a 2011-2013 27" iMac with fiber internet at the property.
 
-## Uncommitted Changes
-.claude/HANDOFF.md
-DONE.md
-mcp-server
+## What's Complete
+- **Storage audit**: Mapped current disk usage (13GB nuke, 151GB YONO cache, 113GB Photos, 4TB+2TB externals)
+- **Architecture decision**: Ubuntu Server 24.04 on the iMac, with Tailscale + MinIO + YONO sidecar + Syncthing
+- **Cost analysis**: Replaces Modal (~$20-50/mo), Dropbox/iCloud (~$15-30/mo), reduces Supabase egress
+- **Delivery plan**: Prep an SSD "renovation package" — CLAUDE.md + setup.sh + all configs — so Claude on the iMac can execute the full setup
 
-## Staged
-none
+## What's NOT Built Yet
+- No scripts written, no configs created, no drive prepped
+- This was purely a planning/advisory session
 
-## On Next Session
-1. `cat PROJECT_STATE.md` — sprint focus
-2. `tail -40 DONE.md` — what exists
-3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
-4. Register in `.claude/ACTIVE_AGENTS.md`
+## What's Next
+1. **User decides which drive** to use as the delivery drive (one of the 11 SSDs or the new 10TB)
+2. **Prep the renovation package** on that drive:
+   - `CLAUDE.md` — instructions for Claude on the iMac
+   - `setup.sh` — master post-Ubuntu install script
+   - Systemd service files for: YONO sidecar, MinIO, Tailscale, Syncthing
+   - Caddy/nginx reverse proxy config
+   - YONO ONNX model files (`yono/models/yono_make_v1.onnx` + hierarchical models)
+   - Firewall (ufw) config
+3. **User creates Ubuntu USB boot drive** and installs Ubuntu on the iMac (manual, ~15 min)
+4. **Plug in the prepped drive**, Claude on iMac executes setup
+5. **Configure Tailscale** mesh between M4 Max and iMac
+6. **Migrate YONO sidecar** from Modal to iMac
+7. **Catalog all 11 SSDs** — deduplicate, consolidate Nuke-relevant data to 10TB drive
+
+## Key Context
+- iMac is 2011 or 2013 — needs Ubuntu, can't run modern macOS
+- User's M4 Max is the primary dev/training machine — iMac is storage + services only
+- Fiber internet at Yucca property (Cox)
+- 33M vehicle images in Supabase, 884K labeled for YONO training
