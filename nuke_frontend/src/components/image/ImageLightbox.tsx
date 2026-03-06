@@ -14,7 +14,8 @@ import { ClickablePartModal } from '../parts/ClickablePartModal';
 import { AnnotoriousImageTagger } from './AnnotoriousImageTagger';
 import { ImageInfoPanel } from './ImageInfoPanel';
 import { AdminNotificationService } from '../../services/adminNotificationService';
-import '../../styles/unified-design-system.css';
+import toast from 'react-hot-toast';
+import '../../design-system.css';
 
 interface ImageLightboxProps {
   imageUrl: string;
@@ -565,32 +566,85 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   // Delete image
   const deleteImage = useCallback(async () => {
     if (!imageId) return;
-    
+
     const confirmed = window.confirm('Delete this image? This action cannot be undone.');
     if (!confirmed) return;
-    
+
     try {
+      // Get storage path before deleting DB record
+      const { data: imageRecord } = await supabase
+        .from('vehicle_images')
+        .select('storage_path')
+        .eq('id', imageId)
+        .single();
+
       const { error } = await supabase
         .from('vehicle_images')
         .delete()
         .eq('id', imageId);
-      
+
       if (error) {
         console.error('Error deleting image:', error);
-        alert('Failed to delete image');
+        const reason = error.message || error.code || 'Unknown error';
+        toast.error(`Failed to delete image: ${reason}`);
         return;
       }
-      
+
+      // Clean up storage file
+      if (imageRecord?.storage_path) {
+        const bucket = imageRecord.storage_path.startsWith('vehicles/') ? 'vehicle-data' : 'vehicle-photos';
+        await supabase.storage.from(bucket).remove([imageRecord.storage_path]);
+      }
+
+      toast.success('Image deleted');
+
       // Emit event to refresh gallery
-      window.dispatchEvent(new CustomEvent('vehicle_images_updated', { 
-        detail: { vehicleId } 
+      window.dispatchEvent(new CustomEvent('vehicle_images_updated', {
+        detail: { vehicleId }
       } as any));
-      
+
       // Close lightbox
       onClose();
     } catch (err) {
       console.error('Error deleting image:', err);
-      alert('Failed to delete image');
+      const reason = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to delete image: ${reason}`);
+    }
+  }, [imageId, vehicleId, onClose]);
+
+  // Remove image from vehicle (send back to personal photo library)
+  const removeFromVehicle = useCallback(async () => {
+    if (!imageId || !vehicleId) return;
+
+    try {
+      const { error } = await supabase
+        .from('vehicle_images')
+        .update({
+          vehicle_id: null,
+          organization_status: 'unorganized',
+          organized_at: null,
+          is_primary: false,
+        })
+        .eq('id', imageId);
+
+      if (error) {
+        console.error('Error removing image from vehicle:', error);
+        const reason = error.message || error.code || 'Unknown error';
+        toast.error(`Failed to remove image: ${reason}`);
+        return;
+      }
+
+      toast.success('Image moved to your photo library');
+
+      window.dispatchEvent(new CustomEvent('vehicle_images_updated', {
+        detail: { vehicleId }
+      } as any));
+
+      onClose();
+    } catch (err) {
+      console.error('Error removing image from vehicle:', err);
+      const reason = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to remove image: ${reason}`);
     }
   }, [imageId, vehicleId, onClose]);
 
@@ -920,7 +974,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     async (opts?: { forceReprocess?: boolean }) => {
       if (!imageUrl) return;
 
-      // Without image_id we can't reliably hit caching/persistence.
+      // Without image_id we can’t reliably hit caching/persistence.
       if (!imageId) {
         const msg = 'Missing image ID — cannot run analysis safely.';
         console.warn('[ImageLightbox] Skipping AI analysis:', msg);
@@ -1493,7 +1547,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               Tag Image
             </button>
             <button
-              onClick={() => {
+              onClick={() => { 
                 if (typeof navigator !== 'undefined' && navigator.clipboard) {
                   navigator.clipboard.writeText(imageUrl);
                 }
@@ -1521,6 +1575,17 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             >
               Mark Sensitive
             </button>
+            {vehicleId && (
+              <button
+                onClick={() => {
+                  removeFromVehicle();
+                  setShowContextMenu(false);
+                }}
+                className="w-full py-2 px-3 text-left text-yellow-400 text-[9px] font-bold hover:bg-white/10 border-b border-white/10"
+              >
+                Remove from Vehicle
+              </button>
+            )}
             <button
               onClick={() => {
                 if (confirm('Delete this image? Cannot be undone.')) {
@@ -2784,9 +2849,9 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                           );
                         })}
                       </div>
-                    </div>
-                  )}
-                  
+        </div>
+      )}
+      
 
                   {/* Action Buttons - At bottom of info tab */}
                   {(canEdit || isAdmin) && (
@@ -2805,6 +2870,17 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         {imageMetadata?.is_primary ? 'PRIMARY IMAGE' : 'SET AS PRIMARY'}
                       </button>
 
+                      {vehicleId && (
+                        <button
+                          onClick={removeFromVehicle}
+                          className="w-full py-3 bg-transparent border-2 border-yellow-600/50 text-yellow-400 text-[10px] font-bold uppercase tracking-wide hover:border-yellow-500 hover:bg-yellow-600/10 hover:translate-y-[-2px] transition-all duration-150"
+                          style={{ fontFamily: 'Arial, sans-serif' }}
+                          title="Remove from this vehicle — image returns to your photo library"
+                        >
+                          REMOVE FROM VEHICLE
+                        </button>
+                      )}
+
                       <button
                         onClick={deleteImage}
                         className="w-full py-3 bg-transparent border-2 border-red-600/50 text-red-400 text-[10px] font-bold uppercase tracking-wide hover:border-red-500 hover:bg-red-600/10 hover:translate-y-[-2px] transition-all duration-150"
@@ -2815,8 +2891,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                       </button>
                     </div>
                   )}
-                </div>
-              )}
+        </div>
+      )}
 
               {/* Comments Tab */}
               {activeTab === 'comments' && (
@@ -2872,8 +2948,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                       POST COMMENT
                     </button>
                   </div>
-                </div>
-              )}
+        </div>
+      )}
 
               {/* Tags Tab */}
               {activeTab === 'tags' && (
@@ -2998,7 +3074,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             </div>
 
             <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', marginBottom: '12px' }}>
-              You're claiming <span style={{ color: 'white', fontWeight: 700 }}>@{claimTarget.handle}</span> on{' '}
+              You’re claiming <span style={{ color: 'white', fontWeight: 700 }}>@{claimTarget.handle}</span> on{' '}
               <span style={{ color: 'white', fontWeight: 700 }}>{claimTarget.platform}</span>. Provide proof so we can link it to your N‑Zero profile.
             </div>
 

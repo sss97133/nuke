@@ -58,11 +58,17 @@ const InvoiceManager = React.lazy(() => import('../pages/InvoiceManager'));
 const ImportDataPage = React.lazy(() => import('../pages/ImportDataPage'));
 const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
 
+// Feed v2 (new composable feed)
+const FeedPage = React.lazy(() => import('../feed/components/FeedPage'));
+
 // Acquisition Pipeline
 const AcquisitionPipeline = React.lazy(() => import('../pages/AcquisitionPipeline'));
 
 // Team Inbox
 const TeamInbox = React.lazy(() => import('../pages/TeamInbox'));
+
+// Photo / Unified Inbox
+const PersonalPhotoLibrary = React.lazy(() => import('../pages/PersonalPhotoLibrary').then(m => ({ default: m.PersonalPhotoLibrary })));
 
 // Predictions (betting)
 const BettingPage = React.lazy(() => import('../pages/betting/index'));
@@ -127,6 +133,9 @@ export const DomainRoutes = () => {
         <Route path="/test-contributions" element={<Navigate to="/admin/test-contributions" replace />} />
 
         {/* ── Public pages ─────────────────────────────────────────────── */}
+        {/* Feed v2 — new composable feed (testing route) */}
+        <Route path="/feed-v2" element={<FeedPage />} />
+
         {/* Search + Browse: public */}
         <Route path="/search" element={<Search />} />
         <Route path="/browse" element={<BrowseVehicles />} />
@@ -174,7 +183,9 @@ export const DomainRoutes = () => {
           <Route path="/capsule" element={<Capsule />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/debrief" element={<DailyDebrief />} />
-          <Route path="/inbox" element={<TeamInbox />} />
+          <Route path="/inbox" element={<PersonalPhotoLibrary />} />
+          <Route path="/photo-library" element={<PersonalPhotoLibrary />} />
+          <Route path="/team-inbox" element={<TeamInbox />} />
 
           {/* Content / data management */}
           <Route path="/import" element={<ImportDataPage />} />

@@ -217,15 +217,13 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ vehicle, timelineEven
       const ev = eventMap[ds];
       if (!ev) return;
       setReceiptDate(ds);
-      // Position receipt near the cell
+      // Position receipt using viewport-relative coords (fixed positioning)
       const rect = (e.target as HTMLElement).getBoundingClientRect();
-      const hmRect = heatmapRef.current?.getBoundingClientRect();
-      if (hmRect) {
-        setReceiptPos({
-          x: rect.left - hmRect.left + rect.width + 4,
-          y: rect.top - hmRect.top,
-        });
-      }
+      const POPUP_WIDTH = 290;
+      setReceiptPos({
+        x: Math.min(rect.left + rect.width + 4, window.innerWidth - POPUP_WIDTH - 8),
+        y: rect.top,
+      });
       // Highlight group if multi-day
       if (ev.group) {
         setHighlightGroup(ev.group);

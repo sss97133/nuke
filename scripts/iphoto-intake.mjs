@@ -171,8 +171,12 @@ function findVehicleCached(year, make, model) {
   );
   if (matches.length === 1) return matches[0];
   if (matches.length > 1) {
-    console.log(`  Multiple matches for ${year} ${make} ${model}:`, matches.map(v => v.model).join(', '));
-    return matches[0];
+    console.log(`  ⚠ AMBIGUOUS: ${matches.length} vehicles match "${year} ${make} ${model}":`);
+    for (const m of matches) {
+      console.log(`    - ${m.year} ${m.make} ${m.model} (${m.vin || 'no VIN'}) → ${m.id}`);
+    }
+    console.log(`  Skipping — use --vehicle-id <uuid> to specify which vehicle.`);
+    return null;
   }
   return null;
 }
@@ -192,8 +196,12 @@ async function findVehicle(year, make, model) {
 
   if (exact && exact.length === 1) return exact[0];
   if (exact && exact.length > 1) {
-    console.log(`  Multiple matches for ${year} ${make} ${model}:`, exact.map(v => v.model).join(', '));
-    return exact[0];
+    console.log(`  ⚠ AMBIGUOUS: ${exact.length} vehicles match "${year} ${make} ${model}":`);
+    for (const m of exact) {
+      console.log(`    - ${m.year} ${m.make} ${m.model} (${m.vin || 'no VIN'}) → ${m.id}`);
+    }
+    console.log(`  Skipping — use --vehicle-id <uuid> to specify which vehicle.`);
+    return null;
   }
   return null;
 }
@@ -433,6 +441,47 @@ async function uploadPhotos(vehicleId, jpegDir, metaMap = new Map()) {
   return { uploaded, errors, total: files.length };
 }
 
+// ─── Vehicle/Album mismatch guard ────────────────────────────────────────────
+
+async function validateVehicleAlbumMatch(vehicleId, albumName) {
+  const parsed = parseAlbumName(albumName);
+  if (!parsed) return; // Can't validate unparseable album names
+
+  // Fetch the target vehicle
+  const { data: vehicle, error } = await supabase
+    .from('vehicles')
+    .select('id, year, make, model, vin')
+    .eq('id', vehicleId)
+    .single();
+
+  if (error || !vehicle) {
+    console.error(`  ⚠ Vehicle ${vehicleId} not found in database!`);
+    process.exit(1);
+  }
+
+  // Check year match
+  if (vehicle.year && parsed.year !== vehicle.year) {
+    console.error(`  ⚠ MISMATCH: Album year ${parsed.year} ≠ vehicle year ${vehicle.year}`);
+    console.error(`    Album:   "${albumName}"`);
+    console.error(`    Vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model} (${vehicle.vin || 'no VIN'})`);
+    console.error(`    Pass --force to override this check.`);
+    process.exit(1);
+  }
+
+  // Check model match (first word, case-insensitive)
+  const albumModelFirst = parsed.model.split(' ')[0].toLowerCase();
+  const vehicleModelFirst = (vehicle.model || '').split(' ')[0].toLowerCase();
+  if (vehicleModelFirst && albumModelFirst !== vehicleModelFirst) {
+    console.error(`  ⚠ MISMATCH: Album model "${parsed.model}" ≠ vehicle model "${vehicle.model}"`);
+    console.error(`    Album:   "${albumName}" → ${parsed.year} ${parsed.make} ${parsed.model}`);
+    console.error(`    Vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model} (${vehicle.vin || 'no VIN'})`);
+    console.error(`    These look like different vehicles. Pass --force to override this check.`);
+    process.exit(1);
+  }
+
+  console.log(`  ✓ Album matches vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model} (${vehicle.vin || 'no VIN'})`);
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function processAlbum(albumName, vehicleId = null) {
@@ -452,6 +501,9 @@ async function processAlbum(albumName, vehicleId = null) {
     }
     vehicleId = match.id;
     console.log(`  Matched: ${match.year} ${match.make} ${match.model} (${match.vin || 'no VIN'}) → ${match.id}`);
+  } else if (!flag('--force')) {
+    // Explicit vehicle-id provided — validate it matches the album
+    await validateVehicleAlbumMatch(vehicleId, albumName);
   }
 
   const tmpExport = join(os.tmpdir(), `iphoto_export_${Date.now()}`);
@@ -488,6 +540,8 @@ async function backfillAlbumGps(albumName, vehicleId = null) {
     if (!match) { console.log('  No vehicle match found in DB — skipping'); return 0; }
     vehicleId = match.id;
     console.log(`  Vehicle: ${match.year} ${match.make} ${match.model} → ${match.id}`);
+  } else if (!flag('--force')) {
+    await validateVehicleAlbumMatch(vehicleId, albumName);
   }
 
   // Get existing iphoto images missing GPS
@@ -542,6 +596,8 @@ async function mapOnlyAlbum(albumName, vehicleId = null) {
     if (!match) { console.log('  No vehicle match in DB — skipping'); return 0; }
     vehicleId = match.id;
     console.log(`  Vehicle: ${match.year} ${match.make} ${match.model} → ${match.id}`);
+  } else if (!flag('--force')) {
+    await validateVehicleAlbumMatch(vehicleId, albumName);
   }
 
   const metaMap = queryAlbumMetadata(albumName);
@@ -615,6 +671,8 @@ async function syncAlbum(albumName, vehicleId = null) {
     if (!match) { console.log('  No vehicle match in DB — skipping'); return null; }
     vehicleId = match.id;
     console.log(`  Vehicle: ${match.year} ${match.make} ${match.model} → ${match.id}`);
+  } else if (!flag('--force')) {
+    await validateVehicleAlbumMatch(vehicleId, albumName);
   }
 
   const tmpExport = join(os.tmpdir(), `iphoto_sync_${Date.now()}`);

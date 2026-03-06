@@ -45,6 +45,7 @@ const ProxyBidOperations = React.lazy(() => import('../../../pages/admin/ProxyBi
 const UnifiedScraperDashboard = React.lazy(() => import('../../../pages/admin/UnifiedScraperDashboard'));
 const DataQualityDashboard = React.lazy(() => import('../../../pages/admin/DataQualityDashboard'));
 const TransfersDashboard = React.lazy(() => import('../../../pages/admin/TransfersDashboard'));
+const UserMetrics = React.lazy(() => import('../../../pages/admin/UserMetrics'));
 
 const LazyFallback = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'var(--text-disabled)', fontSize: '12px' }}>
@@ -111,6 +112,7 @@ const AdminModuleRoutes = () => {
           <Route path="unified-scrapers" element={<UnifiedScraperDashboard />} />
           <Route path="data-quality" element={<DataQualityDashboard />} />
           <Route path="transfers" element={<TransfersDashboard />} />
+          <Route path="user-metrics" element={<UserMetrics />} />
         </Route>
         </Route> {/* RequireAdmin */}
       </Routes>

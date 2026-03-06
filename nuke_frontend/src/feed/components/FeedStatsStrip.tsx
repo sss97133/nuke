@@ -1,0 +1,91 @@
+/**
+ * FeedStatsStrip — Sticky stats bar above the feed.
+ *
+ * Shows total vehicles, total value, for-sale count, active auctions,
+ * deals count, and today's additions. Courier New for numbers.
+ */
+
+import type { CSSProperties } from 'react';
+import type { FeedStats } from '../types/feed';
+
+export interface FeedStatsStripProps {
+  stats: FeedStats | null | undefined;
+  isLoading?: boolean;
+}
+
+const labelStyle: CSSProperties = {
+  fontFamily: 'Arial, sans-serif',
+  fontSize: '8px',
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.3px',
+  color: 'var(--text-disabled)',
+  lineHeight: 1,
+};
+
+const valueStyle: CSSProperties = {
+  fontFamily: "'Courier New', monospace",
+  fontSize: '10px',
+  fontWeight: 700,
+  color: 'var(--text)',
+  lineHeight: 1,
+};
+
+function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      <span style={labelStyle}>{label}</span>
+      <span style={{ ...valueStyle, color: color ?? 'var(--text)' }}>{value}</span>
+    </div>
+  );
+}
+
+function formatCompact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`;
+  return n.toLocaleString();
+}
+
+export function FeedStatsStrip({ stats, isLoading }: FeedStatsStripProps) {
+  if (isLoading || !stats) {
+    return (
+      <div style={{
+        height: '32px',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--surface)',
+      }} />
+    );
+  }
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        padding: '0 12px',
+        height: '32px',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--surface)',
+        position: 'sticky',
+        top: 'var(--header-height, 48px)',
+        zIndex: 20,
+        overflow: 'hidden',
+      }}
+    >
+      <Stat label="VEHICLES" value={formatCompact(stats.total_vehicles)} />
+      <Stat label="VALUE" value={`$${formatCompact(stats.total_value)}`} />
+      {stats.vehicles_added_today > 0 && (
+        <Stat
+          label="TODAY"
+          value={`+${stats.vehicles_added_today}`}
+          color="#10b981"
+        />
+      )}
+      <Stat label="FOR SALE" value={formatCompact(stats.for_sale_count)} />
+      {stats.active_auctions > 0 && (
+        <Stat label="LIVE" value={String(stats.active_auctions)} color="#ef4444" />
+      )}
+    </div>
+  );
+}

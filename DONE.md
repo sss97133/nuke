@@ -1,5 +1,26 @@
 # DONE — Completed Work Log
 
+## 2026-03-04 (Wiring Harness Builder — Full Implementation)
+
+[wiring] Complete visual harness builder for vehicle wiring layouts
+  - DB migration: 6 new tables (harness_designs, harness_sections, harness_endpoints, harness_templates, electrical_system_catalog, motec_pin_maps)
+  - Seeded: 46 electrical systems, 104 MoTeC pin maps (M130/PDM30/C125), 1 Barton invoice template
+  - Extended wiring_connections with 13 new columns (from/to endpoint IDs, calculated gauge, voltage drop, fuse rating, etc.)
+  - TypeScript types, AWG resistance table, wire color standards, voltage drop calculations, gauge selection algorithm
+  - SVG canvas with pan/zoom, foreignObject HTML nodes (Win95 design), cubic bezier wire edges
+  - useReducer state management with undo-capable actions
+  - Debounced persistence (800ms canvas state, immediate structural changes)
+  - Right sidebar: node editor (name/type/amps/connector/location) + connection editor (color/gauge/length/fuse)
+  - Bottom load summary bar: total amps, alternator sizing, battery sizing, PDM channels, warnings
+  - Left systems palette: 46 catalog items grouped by category, click-to-add, green/red/grey status indicators
+  - Completeness panel: % score, missing required/optional items, +ADD buttons, build intent filtering
+  - Toolbar: SELECT/WIRE modes, +ENDPOINT, DELETE, zoom controls, CHECK completeness toggle
+  - Keyboard shortcuts: V=select, W=wire, Delete=remove, Escape=deselect
+  - Auto-calculations on wire draw: gauge selection, wire color suggestion, length estimation, fuse rating
+  - WiringPlan.tsx: template picker, lazy-loaded builder, AI assistant tab preserved
+  - Files: harnessTypes.ts, harnessConstants.ts, harnessCalculations.ts, useHarnessState.ts, HarnessCanvas.tsx, HarnessCanvasNode.tsx, HarnessCanvasEdge.tsx, HarnessCanvasSectionGroup.tsx, HarnessToolbar.tsx, HarnessBuilder.tsx, HarnessSidebar.tsx, HarnessLoadSummary.tsx, HarnessSystemsPalette.tsx, HarnessCompletenessPanel.tsx, WiringPlan.tsx
+  - Zero TypeScript errors, zero new npm dependencies
+
 ## 2026-03-02 (session 3 — save-all + enrichment continued)
 
 [data] Collecting Cars: Downloaded 18,037 lots from Typesense API (17,685 sold + 157 live + 195 coming soon)
@@ -2540,3 +2561,19 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
   - Cron job #345: runs every 10 minutes, batch_size=50
   - ~30 VINs backfilled per cron invocation at current rates
   - Estimated: ~30,000+ recoverable VINs from existing snapshot archive
+
+## 2026-03-04 (ConceptCarz Data Forensics & Cleanup)
+
+[data-quality] Full investigation of 374k ConceptCarz auction result rows (29% of all vehicles)
+  - CRITICAL FINDING: 90.7% of sale_price values were fabricated averages, not real hammer prices
+  - Proof: real auction prices are always ÷100 (bid increments); CZ prices like $70,156 are impossible
+  - 265,215 fabricated prices moved from sale_price → cz_estimated_value column, sale_price nulled
+  - 1,962 suspected averages (round but repeated 6+ times) also moved
+  - 18,407 rows retained credible sale_price (11,723 likely_real + 6,483 plausible)
+  - price_confidence column added: fabricated | suspected_average | plausible | likely_real
+  - 25,434 model names cleaned (stripped "Chassis#:..." suffixes)
+  - 8,553 garbage rows deleted (make = auction house name: Rm, Bonhams, Mecum, etc.)
+  - auction_source mapped for 329k rows across 28 distinct houses (was all "conceptcarz")
+  - Top houses: Mecum 92k, Barrett-Jackson 47k, Silver 18k, RM Sotheby's 17k, Bonhams 16k
+  - Investigation doc: /Users/skylar/nuke/conceptcarz_investigation.md
+  - Cleanup script: /Users/skylar/nuke/scripts/fix-conceptcarz-prices.sh

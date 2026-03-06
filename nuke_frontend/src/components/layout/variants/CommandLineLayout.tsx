@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { SearchBar } from '../SearchBar';
+import AIDataIngestionSearch from '../../search/AIDataIngestionSearch';
 import { NavLinks, COMMAND_LINE_NAV } from '../NavLinks';
 import { UserArea } from '../UserArea';
 import GlobalUploadIndicator from '../../GlobalUploadIndicator';
@@ -20,17 +20,11 @@ interface Props {
 
 /**
  * Variant A — Command Line
- * Search takes ~65% width, MARKET + API text links on left
- * grid: [wordmark] [search ~65%] [nav links] [user]
+ * Universal input bar takes ~65% width — accepts URLs, VINs, images, text, drag-drop.
+ * grid: [wordmark] [universal input ~65%] [nav links] [user]
  * Height: 40px
  */
 export const CommandLineLayout: React.FC<Props> = ({
-  query,
-  onQueryChange,
-  onSubmit,
-  onSearchFocus,
-  onSearchBlur,
-  searchInputRef,
   session,
   userProfile,
   unreadCount,
@@ -43,15 +37,7 @@ export const CommandLineLayout: React.FC<Props> = ({
       </Link>
 
       <div className="header-search-zone">
-        <SearchBar
-          value={query}
-          onChange={onQueryChange}
-          onSubmit={onSubmit}
-          onFocus={onSearchFocus}
-          onBlur={onSearchBlur}
-          mode="inline"
-          inputRef={searchInputRef}
-        />
+        <AIDataIngestionSearch />
       </div>
 
       <NavLinks items={COMMAND_LINE_NAV} />

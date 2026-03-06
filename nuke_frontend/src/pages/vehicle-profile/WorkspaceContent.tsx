@@ -82,7 +82,7 @@ export interface WorkspaceContentProps {
   onSetReferenceLibraryRefreshKey: (fn: (v: number) => number) => void;
 }
 
-const DEFAULT_LEFT_PCT = 55;
+const DEFAULT_LEFT_PCT = 30;
 
 const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   vehicle,
@@ -198,12 +198,14 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             readinessSnapshot={readinessSnapshot as any}
           />
 
-          {/* Timeline */}
-          <CollapsibleWidget variant="profile" title="Timeline" defaultCollapsed={false}
-            badge={<span className="widget__count">{timelineEvents.length}</span>}
-          >
-            <VehicleTimelineSection vehicle={vehicle} session={session} permissions={permissions} onAddEventClick={onAddEventClick} />
-          </CollapsibleWidget>
+          {/* Timeline — hide when no events */}
+          {timelineEvents.length > 0 && (
+            <CollapsibleWidget variant="profile" title="Timeline" defaultCollapsed={false}
+              badge={<span className="widget__count">{timelineEvents.length}</span>}
+            >
+              <VehicleTimelineSection vehicle={vehicle} session={session} permissions={permissions} onAddEventClick={onAddEventClick} />
+            </CollapsibleWidget>
+          )}
 
           {/* Engine Bay Analysis */}
           {(vehicle as any)?.origin_metadata?.engine_bay_analysis?.engine_family && (
@@ -249,20 +251,31 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             <ExternalListingCard vehicleId={vehicle.id} />
           </CollapsibleWidget>
 
-          {/* Comments & Bids */}
-          <CollapsibleWidget variant="profile" title="Comments & Bids" defaultCollapsed={false}
-            badge={<span className="widget__count">{totalCommentCount}</span>}
-          >
-            <React.Suspense fallback={null}>
-              <VehicleCommentsSection vehicleId={vehicle.id} />
-            </React.Suspense>
-          </CollapsibleWidget>
+          {/* Comments & Bids — hide when empty */}
+          {totalCommentCount > 0 && (
+            <CollapsibleWidget variant="profile" title="Comments & Bids" defaultCollapsed={false}
+              badge={<span className="widget__count">{totalCommentCount}</span>}
+            >
+              <React.Suspense fallback={null}>
+                <VehicleCommentsSection vehicleId={vehicle.id} />
+              </React.Suspense>
+            </CollapsibleWidget>
+          )}
 
           {/* Owner-only tools */}
           {(isRowOwner || isVerifiedOwner) && (
             <>
-              <CollapsibleWidget variant="profile" title="Wiring Plan" defaultCollapsed={true}>
-                <WiringQueryContextBar vehicleId={vehicle.id} vehicleInfo={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} onQuoteGenerated={() => {}} />
+              <CollapsibleWidget variant="profile" title="Wiring Harness" defaultCollapsed={true}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <a
+                    href={`/vehicle/${vehicle.id}/wiring`}
+                    className="button-win95"
+                    style={{ display: 'inline-block', textAlign: 'center', fontWeight: 700, textDecoration: 'none', color: 'inherit' }}
+                  >
+                    OPEN HARNESS BUILDER
+                  </a>
+                  <WiringQueryContextBar vehicleId={vehicle.id} vehicleInfo={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} onQuoteGenerated={() => {}} />
+                </div>
               </CollapsibleWidget>
               <CollapsibleWidget variant="profile" title="AI Parts Quote Generator" defaultCollapsed={true}>
                 <PartsQuoteGenerator vehicleId={vehicle.id} vehicleInfo={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} />
