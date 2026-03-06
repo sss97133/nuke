@@ -136,6 +136,10 @@ playwright-report/
 # Extraction data dumps (large JSON output from scrapers)
 data/conceptcarz/
 data/sources/*.json
+scripts/data/
+
+# Large geo/map data files
+nuke_frontend/public/data/*.json
 
 # Bot screenshots (auto-generated, not useful in repo)
 screenshots/bot-findings/
