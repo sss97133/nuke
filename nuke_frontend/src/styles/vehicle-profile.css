@@ -28,6 +28,19 @@
   --vp-gulf-orange: #EE7623;
   --vp-martini-red: #C8102E;
   --vp-jps-gold: #C8A951;
+
+  /* Heatmap contrast override — unified-design-system sets #ebedf0, too faint on white */
+  --heat-0: #d4d4d4;
+  --heat-2: #6ee7b7;
+
+  /* Layout */
+  --h-hero: 550px;
+  --vp-col-left: 30%;
+  --vp-col-right: 70%;
+  --vp-h-site: var(--header-height, 48px);
+  --vp-h-sub: 36px;
+  --vp-h-barcode: 10px;
+  --vp-sticky-top: calc(var(--vp-h-site) + var(--vp-h-sub) + var(--vp-h-barcode));
 }
 
 /* Dark mode overrides for vehicle profile tokens */
@@ -43,15 +56,20 @@
   --vp-papaya: #FF8000;
   --vp-live-green: #4ade80;
 
+  /* Heatmap contrast — dark mode */
+  --heat-0: #3a3a3a;
+  --heat-2: #4ade80;
+
   /* Layout Heights */
   --vp-h-site: var(--header-height, 48px);
   --vp-h-sub: 36px;
   --vp-h-barcode: 10px;
   --vp-sticky-top: calc(var(--vp-h-site) + var(--vp-h-sub) + var(--vp-h-barcode));
 
-  /* Columns */
-  --vp-col-left: 55%;
-  --vp-col-right: 45%;
+  /* Layout */
+  --h-hero: 550px;
+  --vp-col-left: 30%;
+  --vp-col-right: 70%;
 }
 
 /* Page-level */
@@ -448,7 +466,7 @@
 .hm-day-labels span {
   height: 11px;
   font-size: 7px;
-  color: var(--vp-text-faint);
+  color: var(--vp-pencil);
   display: flex;
   align-items: center;
   letter-spacing: 0.06em;
@@ -459,13 +477,13 @@
   width: 10px;
   height: 10px;
   margin: 0.5px;
-  background: var(--heat-0, #ebedf0);
+  background: var(--heat-0, #e0e0e0);
   position: relative;
 }
 .hm-c[data-date] { cursor: pointer; }
 .hm-c[data-date]:hover { outline: 1px solid var(--vp-ink); outline-offset: -1px; }
 .hm-c.hl { outline: 2px solid var(--vp-gulf-blue) !important; outline-offset: -1px; }
-.hm-c.l1 { background: var(--heat-2, #a7f3d0); }
+.hm-c.l1 { background: var(--heat-2, #6ee7b7); }
 .hm-c.l2 { background: var(--heat-3, #34d399); }
 .hm-c.l3 { background: var(--heat-4, #059669); }
 .hm-c.l4 { background: var(--heat-5, #047857); }
@@ -479,7 +497,7 @@
 .hm-months span {
   position: absolute;
   font-size: 7px;
-  color: var(--vp-text-faint);
+  color: var(--vp-pencil);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -487,13 +505,15 @@
 
 /* Receipt popup */
 .receipt {
-  position: absolute;
-  z-index: 800;
+  position: fixed;
+  z-index: 1100;
   background: var(--vp-surface);
   border: 1px solid var(--vp-ink);
   padding: 10px 12px;
   min-width: 220px;
   max-width: 280px;
+  max-height: 60vh;
+  overflow-y: auto;
   font-family: var(--vp-font-mono);
   font-size: 8px;
   line-height: 1.6;
@@ -526,7 +546,6 @@
 /* ============ LAYER 4: HERO IMAGE ============ */
 
 .vehicle-profile-page .hero-media-slot > div {
-  max-height: 260px !important;
   background-color: #2a2a2a;
 }
 

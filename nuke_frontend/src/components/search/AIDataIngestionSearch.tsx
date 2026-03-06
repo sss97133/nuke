@@ -455,6 +455,38 @@ export default function AIDataIngestionSearch() {
     return () => window.removeEventListener('paste', handlePaste);
   }, []);
 
+  // Handle global drag-drop from GlobalDropZone
+  useEffect(() => {
+    const handleGlobalDrop = (e: Event) => {
+      const files = (e as CustomEvent).detail?.files as File[];
+      if (!files || files.length === 0) return;
+
+      // Single image: attach to input bar
+      if (files.length === 1 && files[0].type.startsWith('image/')) {
+        handleImageFile(files[0]);
+        return;
+      }
+
+      // Single PDF/doc: treat as document, attach as image for now (SmartInvoiceUploader handles internally)
+      if (files.length === 1) {
+        handleImageFile(files[0]);
+        return;
+      }
+
+      // Multiple files: attach first image, show toast about batch
+      const imageFiles = files.filter(f => f.type.startsWith('image/'));
+      if (imageFiles.length > 0) {
+        handleImageFile(imageFiles[0]);
+        if (imageFiles.length > 1) {
+          showToast(`${imageFiles.length} images dropped — first attached. Use + Capture for batch upload.`, 'info');
+        }
+      }
+    };
+
+    window.addEventListener('nuke:global-drop', handleGlobalDrop);
+    return () => window.removeEventListener('nuke:global-drop', handleGlobalDrop);
+  }, []);
+
   const handleImageFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
       setError('Please select an image file');

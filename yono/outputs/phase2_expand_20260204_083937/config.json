@@ -1,7 +1,0 @@
-{
-  "name": "phase2_expand",
-  "target_images": 30000,
-  "epochs": 15,
-  "batch_size": 32,
-  "lr": 5e-05
-}
