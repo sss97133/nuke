@@ -2,6 +2,21 @@
 
 ## 2026-03-06
 
+[frontend] Vehicle profile page redesign — layout, contrast, timeline fixes
+  - Column widths changed from 55/45 to 30/70 (images-first layout)
+  - Hero image increased from 260px to 550px (removed max-height cap, set --h-hero token)
+  - Heatmap contrast fixed: overrode --heat-0 to #d4d4d4, --heat-2 to #6ee7b7 in light mode
+  - Month/day labels changed from --vp-text-faint (#bbb) to --vp-pencil (#888)
+  - Dark mode heatmap: --heat-0 #3a3a3a, --heat-2 #4ade80
+  - Timeline receipt popup: position:absolute→fixed with viewport-relative coords, no clipping
+  - Receipt clamped to viewport right edge, max-height 60vh with overflow scroll
+  - Empty widgets hidden: Timeline gated on timelineEvents.length, Comments on totalCommentCount
+  - Layout height tokens (--vp-sticky-top etc) added to light mode block (were dark-only)
+  - Files: vehicle-profile.css, WorkspaceContent.tsx, BarcodeTimeline.tsx
+
+[chore] Gitignore scripts/data/ (~1.4GB scraped JSON) and public/data/*.json
+[chore] Multi-agent batch commit: map refactor, feed system, wiring harness builder, YONO checkpoint cleanup
+
 [infra] 707 Yucca server planning — iMac renovation for Nuke data server
   - Audited current storage: 13GB nuke project, 151GB YONO cache, 113GB Photos library, 4TB+2TB external drives
   - Assessed 2011-2013 27" iMac at Yucca property for server conversion (Ubuntu Server 24.04)

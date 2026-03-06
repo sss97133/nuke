@@ -1,35 +1,63 @@
-# HANDOFF — 2026-03-06
+# Handoff — Wiring Harness Builder
 
-## What I Was Working On
-Planning infrastructure for a Nuke data server at the 707 Yucca property. User has 11 SSDs to consolidate and a 2011-2013 27" iMac with fiber internet at the property.
+## What Was Built
 
-## What's Complete
-- **Storage audit**: Mapped current disk usage (13GB nuke, 151GB YONO cache, 113GB Photos, 4TB+2TB externals)
-- **Architecture decision**: Ubuntu Server 24.04 on the iMac, with Tailscale + MinIO + YONO sidecar + Syncthing
-- **Cost analysis**: Replaces Modal (~$20-50/mo), Dropbox/iCloud (~$15-30/mo), reduces Supabase egress
-- **Delivery plan**: Prep an SSD "renovation package" — CLAUDE.md + setup.sh + all configs — so Claude on the iMac can execute the full setup
+Complete visual wiring harness builder for vehicle electrical layouts. Full implementation across 5 sprints:
 
-## What's NOT Built Yet
-- No scripts written, no configs created, no drive prepped
-- This was purely a planning/advisory session
+### Database (applied to production via Supabase migration)
+- 6 new tables: `harness_designs`, `harness_sections`, `harness_endpoints`, `harness_templates`, `electrical_system_catalog`, `motec_pin_maps`
+- Extended `wiring_connections` with 13 new columns (from/to endpoint IDs, calculated gauge, voltage drop, fuse rating)
+- Seeded: 46 electrical systems, 104 MoTeC pin maps (M130 60-pin, PDM30 34-ch, C125 10-pin), 1 Howard Barton invoice template
+- RLS policies on all tables, updated_at triggers
 
-## What's Next
-1. **User decides which drive** to use as the delivery drive (one of the 11 SSDs or the new 10TB)
-2. **Prep the renovation package** on that drive:
-   - `CLAUDE.md` — instructions for Claude on the iMac
-   - `setup.sh` — master post-Ubuntu install script
-   - Systemd service files for: YONO sidecar, MinIO, Tailscale, Syncthing
-   - Caddy/nginx reverse proxy config
-   - YONO ONNX model files (`yono/models/yono_make_v1.onnx` + hierarchical models)
-   - Firewall (ufw) config
-3. **User creates Ubuntu USB boot drive** and installs Ubuntu on the iMac (manual, ~15 min)
-4. **Plug in the prepped drive**, Claude on iMac executes setup
-5. **Configure Tailscale** mesh between M4 Max and iMac
-6. **Migrate YONO sidecar** from Modal to iMac
-7. **Catalog all 11 SSDs** — deduplicate, consolidate Nuke-relevant data to 10TB drive
+### Frontend (14 new files, 1 modified)
+- `harnessTypes.ts` — all TypeScript interfaces
+- `harnessConstants.ts` — AWG resistance table, wire color standards, length estimation
+- `harnessCalculations.ts` — voltage drop, gauge selection (3% max drop), fuse rating, load summary
+- `useHarnessState.ts` — useReducer state management
+- `HarnessCanvas.tsx` — SVG canvas with pan/zoom, dot grid background
+- `HarnessCanvasNode.tsx` — foreignObject HTML nodes in Win95 style
+- `HarnessCanvasEdge.tsx` — cubic bezier wire paths with gauge-proportional stroke
+- `HarnessCanvasSectionGroup.tsx` — dashed section group rectangles
+- `HarnessToolbar.tsx` — mode buttons, actions, zoom, CHECK completeness toggle
+- `HarnessBuilder.tsx` — main orchestrator (persistence, handlers, layout)
+- `HarnessSidebar.tsx` — right panel property editor for nodes and connections
+- `HarnessLoadSummary.tsx` — bottom bar with live load calculations
+- `HarnessSystemsPalette.tsx` — left panel with 46 catalog items grouped by category
+- `HarnessCompletenessPanel.tsx` — floating overlay showing % complete + missing items
+- `WiringPlan.tsx` — rewritten page shell with template picker + lazy-loaded builder
+- `WorkspaceContent.tsx` — added "OPEN HARNESS BUILDER" link in vehicle profile
 
-## Key Context
-- iMac is 2011 or 2013 — needs Ubuntu, can't run modern macOS
-- User's M4 Max is the primary dev/training machine — iMac is storage + services only
-- Fiber internet at Yucca property (Cox)
-- 33M vehicle images in Supabase, 884K labeled for YONO training
+### What Works
+- Template picker: BLANK CANVAS or MOTEC M130 GPR HOT ROD (from Barton invoice)
+- SVG canvas: pan, zoom, drag nodes, draw wires port-to-port
+- Auto-calculations: wire gauge, color, length, fuse rating on wire creation
+- Property editing: full node + connection editors in sidebar
+- Live load summary: total amps, alternator/battery sizing, PDM channels, warnings
+- Systems palette: click catalog items to add with pre-filled defaults
+- Completeness check: % score, missing required/optional items with +ADD
+- Persistence: debounced save to Supabase, immediate structural changes
+- Keyboard shortcuts: V=select, W=wire, Delete=remove
+
+## What's Not Built
+- `seed-harness-from-vehicle` edge function (server-side auto-population from YMM)
+- `compute-harness-loads` edge function (server-side authoritative calculation)
+- Quote generation from harness design (extend existing `generate-wiring-quote`)
+- Section tabs for filtering canvas by harness section
+- Undo/redo (action history exists in reducer but no UI)
+
+## Access
+- Route: `/vehicle/:vehicleId/wiring`
+- Link from vehicle profile: "Wiring Harness" widget -> OPEN HARNESS BUILDER
+- Demo vehicle: 1932 Ford Hi-boy Custom Roadster (`92ed231a-ae66-4590-b2c8-ab44a32d5cc6`)
+- A design was created via Playwright with the MoTeC template (34 endpoints)
+
+## Known Issues
+- User reported wiring page not loading — dev server had died, needed restart
+- Auth required — no anonymous access to wiring page
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file
+4. Register in `.claude/ACTIVE_AGENTS.md`
