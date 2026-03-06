@@ -1,23 +1,50 @@
 # Handoff — 2026-03-06
 
 ## What I Was Working On
-User wanted the UnifiedMap (Deck.GL + MapLibre) to zoom/pan as smoothly as Apple Maps or Google Maps.
+Tesla market analysis from the CLI (ad-hoc queries against Supabase), which led to a data quality audit of the entire vehicles table, which led to a plan to clean up 504K duplicate stub rows.
 
 ## What's Complete
-- **Smooth scroll zoom**: `scrollZoom: { speed: 0.01, smooth: true }` — continuous interpolation instead of discrete jumps
-- **Inertia**: `inertia: 300` — 300ms momentum glide after releasing drag (like iOS)
-- **FlyToInterpolator**: Programmatic view changes (search results) now animate over 1.2s instead of snapping
-- **Full controller config**: touchZoom, doubleClickZoom, keyboard all explicitly enabled
-- Changes are in `nuke_frontend/src/components/map/UnifiedMap.tsx` (lines ~3, ~528, ~807-808)
-- TypeScript compiles clean
+1. **Tesla market analysis** — full breakdown of 309 sold Teslas: by-model, market curve, depreciation, bid velocity, sentiment, late surge analysis. All done via ad-hoc SQL queries.
 
-## What's Next
-- User may want to tune zoom speed (`speed` param) or inertia duration after testing
-- Could add FlyToInterpolator to other programmatic view changes if more are added later
-- The Leaflet-based maps (CollectionsMap, ImageLocationMap) still use default Leaflet zoom — could be improved separately if needed
+2. **Vehicle profile quality audit** — honest metrics established:
+   - 1.29M raw rows → 750K live (after removing 540K junk)
+   - 102K complete profiles (YMM+price+VIN), 280K priced, 678K queryable
+   - 162K "rich" profiles (8+ of 10 key fields filled)
 
-## On Next Session
-1. `cat PROJECT_STATE.md` — sprint focus
-2. `tail -40 DONE.md` — what exists
-3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
-4. Register in `.claude/ACTIVE_AGENTS.md`
+3. **Duplicate root cause identified** — 504K `status='duplicate'` rows are BaT comment-page scrape artifacts. Each comment scrape created a new vehicle row with just year/make/model/sale_price. No VIN, no URL, no description. The 1983 Countach appears 364 times. Zero have `merged_into_vehicle_id`.
+
+4. **Perplexity prompt written** — `prompts/perplexity-cli-data-terminal.md` — comprehensive research prompt for building a Bloomberg-style NL-to-SQL CLI tool. Uses real schema dimensions.
+
+## What's Next — Duplicate Collapse Migration
+
+The big pending task: **collapse 504K duplicate stubs into observation counts, then delete.**
+
+### Designed approach:
+1. **Build temp table** of dupe clusters: GROUP BY (year, make, model, sale_price, auction_source) → find canonical `active` record for each cluster
+2. **Write observation counts** to `vehicle_observations` for each canonical vehicle (e.g., "this vehicle was observed 364 times on BaT")
+3. **Update canonical vehicles** — set `comment_count` or a new `observation_count` field from the cluster size
+4. **Batch-delete** the 504K stubs (1000 at a time with pg_sleep per BATCHED MIGRATION PRINCIPLE)
+
+### Key facts for next agent:
+- 447K of the dupes are from BaT, 445K have sale_price, only 962 have VIN
+- ~40% of clusters have an `active` match already; ~60% don't (the "active" record may have slightly different model text)
+- FK constraints are mostly CASCADE — deleting vehicles auto-deletes child rows
+- The `merged_into_vehicle_id` column exists but is NULL on all 504K dupes
+- This is a PRODUCTION database — follow batched migration principle strictly
+
+### Also pending:
+- User wants to actually **use** the Perplexity prompt to research and then **build** the CLI data terminal
+- The audit revealed 69K "skeleton" rows (no make or year) in live status that should also be addressed
+
+## Uncommitted Changes (from other agents)
+- mcp-server
+- nuke_frontend/src/feed/components/ (FeedLayout, FeedPage, FeedToolbar, VehicleCard, CardRankScore)
+- nuke_frontend/src/feed/hooks/useFeedSearchParams.ts
+- nuke_frontend/src/feed/index.ts, types/feed.ts, utils/feedUrlCodec.ts
+- scripts/fb-scrape-saved.ts
+- supabase/functions/feed-query/index.ts
+
+## Files Changed This Session
+- `DONE.md` — appended 2026-03-06 entries (analysis, data-quality audit, prompt)
+- `prompts/perplexity-cli-data-terminal.md` — NEW, Perplexity research prompt
+- `.claude/HANDOFF.md` — this file

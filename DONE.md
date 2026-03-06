@@ -2,6 +2,38 @@
 
 ## 2026-03-06
 
+[feed] Feed ranking v3 — quality gates + score transparency + server-side curation
+  - Rebuilt `feed_rank_score` formula in MV (v3): 9 components — deal×recency, heat, for-sale price-tier boost, vehicle-type gating (+8 auto / -40 non-auto), non-auto make blocklist (-35), photo boost (+8), source quality (BaT/C&B +10), location (+2), confidence (+3)
+  - Server-side quality gates in `feed-query` edge function: exclude boats/RVs/trailers/motorcycles/farm equipment/aircraft by type AND by make blocklist, $500 minimum price floor
+  - `CardRankScore.tsx` — score badge with hover tooltip showing formula decomposition
+  - SCORES toggle in FeedToolbar — shows rank scores in all view modes
+  - Default sort changed from `newest` → `popular` (feed_rank)
+  - Added `canonical_vehicle_type`, `has_photos`, `location/city/state` to feed types and edge function
+  - Added `has_images` and `excluded_sources` filter support
+  - Deployed and verified: top results are collector vehicles, not trailers/motorhomes
+
+[feed] FB Marketplace saved finds — partial
+  - Inserted 4 user-saved FB Marketplace listings into `marketplace_listings`
+  - `fb-scrape-saved.ts` switched to `fb-session-1` (session expired, needs manual login)
+
+[analysis] Full Tesla USA auction market analysis — 309 sold vehicles with prices
+  - By-model breakdown: Model S (97), Model 3 (102), Model X (53), Model Y (36), Cybertruck (15), Roadster (6)
+  - Market curve by year, depreciation curve by age, price distribution, performance premium (-6.4% inverted)
+  - Bid velocity: 37 auctions with 1,963 comments, 12 with AI sentiment (avg 0.77, 92% positive)
+  - Roadsters dominate engagement (105 comments/auction avg) — becoming collector cars
+  - Late surge analysis: 11 auctions with >50% final-quarter comments (bidding war signal)
+
+[data-quality] Vehicle profile quality audit — corrected metrics for the platform
+  - 1.29M raw rows → 750K live (540K junk: 504K dupes, 31K deleted, 2.5K rejected, 2K merged)
+  - Real tiers: 102K complete (YMM+price+VIN), 280K priced, 678K queryable YMM
+  - 504K "duplicates" are BaT comment-scrape artifacts — one row per comment, not per vehicle
+  - Plan designed: collapse dupe clusters into observation counts on canonical records, then purge stubs
+
+[prompt] Perplexity research prompt for NL-to-SQL CLI data terminal — prompts/perplexity-cli-data-terminal.md
+  - Full real schema: 195 columns, 112 auction sources, 230+ child tables, real row counts
+  - 10 example NL queries with expected SQL patterns
+  - 5 architecture research questions: NL-to-SQL approach, frameworks, safety, presentation, ambiguity
+
 [map] Smooth zoom/pan — Apple Maps-quality interactions
   - Configured Deck.GL controller: smooth scroll zoom (speed 0.01, smooth: true), inertia (300ms momentum)
   - Added FlyToInterpolator for animated programmatic view transitions (search results fly-to)
