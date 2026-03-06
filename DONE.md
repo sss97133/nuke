@@ -2,6 +2,24 @@
 
 ## 2026-03-06
 
+[cwtfo] Full situational brief and data integrity audit
+  - Discovered 1.3M reported vehicles is ~630K distinct URLs + 157K orphans (39% bloat)
+  - BaT: 618K rows → 170K distinct URLs (3.6x duplication, top listing has 445 copies)
+  - Cars & Bids: 41K rows, 34K have no URL at all (6.5x bloat)
+  - Collecting Cars: 9.6x bloat ratio
+  - ConceptCarz: 348K empty shells (0% images/desc/VIN), all created 2026-02-06 in one bulk import with zero provenance
+  - Source name splits: "mecum" vs "Mecum", "bat" vs "Bring a Trailer"
+  - Extraction yield report per source (deduplicated): BaT 74-79%, Mecum 93-98%, B-J only 19%, Bonhams 9-11%
+  - Barrett-Jackson: 69K archived snapshots exist but only 19% of fields extracted — data sitting unprocessed
+  - 593K total successful archived snapshots across all platforms
+  - Agent task status: 22 pending, 0 running (all sessions crashed, no restarts)
+  - Since March 1: only 1 agent task completed, 10+ commits were CSS churn on same page
+
+[cwtfo] Created ConceptCarz investigation prompt for dedicated agent
+  - `.claude/prompts/CONCEPTCARZ_INVESTIGATION.md`
+  - 3-phase approach: investigate source/overlap/memorabilia → recommend strategy → execute with approval
+  - Forces read-only Phase 1 before any data modification
+
 [frontend] Vehicle profile page redesign — layout, contrast, timeline fixes
   - Column widths changed from 55/45 to 30/70 (images-first layout)
   - Hero image increased from 260px to 550px (removed max-height cap, set --h-hero token)
