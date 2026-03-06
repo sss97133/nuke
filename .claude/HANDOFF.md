@@ -1,36 +1,47 @@
-# Handoff — 2026-03-06
+# CWTFO Handoff — 2026-03-06
 
-## What I Was Working On
-Vehicle profile page redesign — fixing layout proportions, contrast, timeline popup clipping, and empty widget visibility.
+## What Was Happening
+Founder asked for status of all concurrent sessions after crashes. Escalated into a full data integrity audit when quality issues surfaced.
 
 ## What's Complete
-All 5 priority fixes are implemented, verified via Playwright, and committed:
+1. **Situational brief** — full platform pulse delivered
+2. **Data integrity audit** — measured by URL (not row count) for the first time. Key finding: 39% of database is duplicate/junk rows. Real vehicle count is ~630K, not 1.3M.
+3. **Source-by-source extraction yield report** — shows exactly what each extractor captures vs what's available
+4. **ConceptCarz investigation prompt** — ready at `.claude/prompts/CONCEPTCARZ_INVESTIGATION.md` for a dedicated agent to investigate and remediate 348K empty shell records
 
-1. **Column widths 30/70** — `--vp-col-left: 30%`, `--vp-col-right: 70%` in both light/dark token blocks + `DEFAULT_LEFT_PCT = 30` in WorkspaceContent.tsx
-2. **Hero image 550px** — `--h-hero: 550px` token, removed `max-height: 260px !important` cap
-3. **Heatmap contrast** — Overrode `--heat-0: #d4d4d4` (light) / `#3a3a3a` (dark) and `--heat-2: #6ee7b7` / `#4ade80` directly in `.vehicle-profile-page` token blocks. Month/day labels switched from `--vp-text-faint` to `--vp-pencil`.
-4. **Receipt popup** — Changed `.receipt` to `position: fixed; z-index: 1100` with `max-height: 60vh; overflow-y: auto`. BarcodeTimeline.tsx `onCellClick` uses viewport-relative coords with right-edge clamping.
-5. **Empty widgets** — Timeline widget gated on `timelineEvents.length > 0`, Comments & Bids gated on `totalCommentCount > 0`.
+## Critical Findings (Do Not Lose)
+- **BaT bloat**: 618K rows → 170K distinct URLs. Top listing duplicated 445 times.
+- **ConceptCarz**: 348K records, all from one bulk import on 2026-02-06, zero provenance, zero images/desc/VIN. Likely auction results aggregator data that should be reference data, not vehicle records.
+- **Barrett-Jackson gap**: 69K archived snapshots exist but only 19% of fields extracted — biggest enrichment opportunity from existing data.
+- **Cars & Bids**: 34K vehicles have no URL — can't trace back to source.
+- **Agent tasks stalled**: 22 pending tasks, 0 running. Crashes killed all agents and nobody restarted them.
+- **CSS churn**: 10+ commits rewriting the same vehicle profile page since Feb 28.
 
-Also: gitignored `scripts/data/` (~1.4GB) and `nuke_frontend/public/data/*.json`.
+## Founder's Direction
+- Wants accountability at ingestion — log what tool, what URL, what was extracted vs available
+- Wants measurement by URL, not vehicle row
+- Wants "look once, extract everything" — not repeated partial passes
+- Wants transparency papers per ingestion run
+- Wants signal merging, not duplicate stacking — 430 copies should merge into 1 record with 430 observations
+- Is frustrated that agents aren't producing visible quality improvements despite volume of work
 
-## Commits
-- `b66bf1a63` — feat: vehicle profile redesign + multi-agent batch (163 files)
-- `4d3a345b9` — chore: gitignore scripts/data/ and large geo JSON
+## What's Next
+1. **Launch ConceptCarz investigation** — give prompt to a new agent, founder will babysit
+2. **BaT deduplication** — merge 618K → 170K, keep richest record per URL
+3. **B-J re-extraction from archives** — 69K snapshots sitting unused, biggest quick win for data quality
+4. **Ingestion reform** — every ingest must: check URL exists first, log fields available vs extracted, normalize source names
+5. **Restart agent tasks** — 22 pending tasks need `nuke-spawn` to dispatch
+6. **Source name normalization** — "mecum"/"Mecum", "bat"/"Bring a Trailer" splits need cleanup
 
-## What's Next (from user's original request, not yet done)
-- **Gallery toolbar buttons broken** — ZONES/GRID/FULL/etc in WorkspaceContent have no onClick handlers. Need to wire to ImageGallery's viewMode state.
-- **Scroll-to-top timeline reveal** — Full timeline auto-reveals at scroll top, collapses when scrolled down.
-- **Tab bar redesign** — Proper tab bar look, + tab button, reveal only at scroll top.
-- **Vehicle-specific map** — Map widget showing only this vehicle's location data.
-- **Remove "minimal view"** from header. Add text size controls (A-/A+).
-- **Move Feed/Garage/Map** to main site header (currently only in HomePage).
-- **Self-fetching widget empty states** — Deal Jacket, Nuke Estimate, Auction History still render shells when empty.
-- **Fix Nuke estimate** — user says it's "wildly wrong".
-- **Image curation** — Default view should showcase best photos prominently.
+## Previous Handoff (Vehicle Profile Redesign)
+The prior session was working on vehicle profile page fixes. See commit `b66bf1a63`. Outstanding frontend work listed in that session's notes:
+- Gallery toolbar buttons broken (no onClick handlers)
+- Scroll-to-top timeline reveal
+- Tab bar redesign
+- Nuke estimate accuracy issues
+- Key files: `vehicle-profile.css`, `WorkspaceContent.tsx`, `BarcodeTimeline.tsx`, `ImageGallery.tsx`
 
-## Key Files
-- `nuke_frontend/src/styles/vehicle-profile.css` — the active CSS (NOT vehicle-profile-redesign.css which is unused)
-- `nuke_frontend/src/pages/vehicle-profile/WorkspaceContent.tsx` — two-column layout, gallery toolbar, widget composition
-- `nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx` — timeline heatmap + receipt popup
-- `nuke_frontend/src/components/images/ImageGallery.tsx` — the real gallery with working viewMode state (3900+ lines)
+## Files Changed This Session
+- `DONE.md` — added audit findings
+- `.claude/HANDOFF.md` — this file
+- `.claude/prompts/CONCEPTCARZ_INVESTIGATION.md` — new, investigation prompt for dedicated agent
