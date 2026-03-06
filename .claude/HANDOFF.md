@@ -1,44 +1,23 @@
-# Session Handoff — Map v6 UX Overhaul
+# Handoff — 2026-03-06
 
-## What Was Happening
-Map v6 UX overhaul — 5-phase renovation of UnifiedMap based on 18-issue spec.
-Plan: `/Users/skylar/.claude/plans/bright-noodling-umbrella.md`
+## What I Was Working On
+User wanted the UnifiedMap (Deck.GL + MapLibre) to zoom/pan as smoothly as Apple Maps or Google Maps.
 
-This session completed Phase 3A (module extraction) and fixed a Vite runtime error
-where `import type` was needed for TypeScript interfaces (BizPin, VPin, etc.).
-
-## What's Complete (16 of 18 tasks)
-
-**Phase 1** (all done): Mode selector, sliders, color presets, layer toggles,
-sidebar navigation (no page nav), smooth zoom, supercluster clustering.
-
-**Phase 2** (all done): ZCTA TopoJSON pipeline, zip_code DB column + matview
-(131K vehicles, 13.4K ZIPs), ZIP polygon layer at z8.5+, county multi-select.
-
-**Phase 3** (all done): Module extraction (UnifiedMap 3036→1656 lines),
-ZIP sidebar panel, GPS-only ghost markers.
-
-**Phase 4** (all done): Timeline auto-thinning + quick-select, photo thumbnails
-at z14+, org sidebar with sparkline.
+## What's Complete
+- **Smooth scroll zoom**: `scrollZoom: { speed: 0.01, smooth: true }` — continuous interpolation instead of discrete jumps
+- **Inertia**: `inertia: 300` — 300ms momentum glide after releasing drag (like iOS)
+- **FlyToInterpolator**: Programmatic view changes (search results) now animate over 1.2s instead of snapping
+- **Full controller config**: touchZoom, doubleClickZoom, keyboard all explicitly enabled
+- Changes are in `nuke_frontend/src/components/map/UnifiedMap.tsx` (lines ~3, ~528, ~807-808)
+- TypeScript compiles clean
 
 ## What's Next
+- User may want to tune zoom speed (`speed` param) or inertia duration after testing
+- Could add FlyToInterpolator to other programmatic view changes if more are added later
+- The Leaflet-based maps (CollectionsMap, ImageLocationMap) still use default Leaflet zoom — could be improved separately if needed
 
-**Phase 5: Precision Rendering (P2 — low priority cosmetic)**
-- 5A: Vehicle rectangles at z18+ (top-view proportional to dimensions)
-- 5B: Org building footprints at z16+ (from OSM data)
-
-## Key Files
-```
-nuke_frontend/src/components/map/
-  UnifiedMap.tsx       (1656 lines — main shell + state + UI)
-  mapUtils.ts          (353 lines — types, constants, geocoding)
-  hooks/useMapLayers.ts (1024 lines — all Deck.GL layers)
-  panels/MapVehicleDetail.tsx (267 lines)
-  panels/MapOrgDetail.tsx     (275 lines)
-  panels/ZipSidebarPanel.tsx  (250 lines)
-```
-
-## DB Changes
-- `vehicles.zip_code` column with index (backfilled from listing_location regex)
-- `vehicle_zip_stats` materialized view (13.4K ZIPs)
-- Supabase project: qkgaybvrernstplzjaam
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
