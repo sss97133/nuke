@@ -2,6 +2,15 @@
 
 ## 2026-03-06
 
+[infra] 707 Yucca server planning — iMac renovation for Nuke data server
+  - Audited current storage: 13GB nuke project, 151GB YONO cache, 113GB Photos library, 4TB+2TB external drives
+  - Assessed 2011-2013 27" iMac at Yucca property for server conversion (Ubuntu Server 24.04)
+  - Architecture decided: Ubuntu + Tailscale + MinIO + YONO sidecar + Syncthing on iMac
+  - Replaces Modal (YONO sidecar), reduces Supabase egress, centralizes 11 SSD contents
+  - Plan: prep "renovation package" HD with CLAUDE.md + setup.sh + configs for Claude-on-iMac to execute
+  - M4 Max stays training/dev machine; iMac is storage + always-on services
+  - NOT YET BUILT — planning session only, next step is prepping the drive
+
 [feed] Feed ranking v3 — quality gates + score transparency + server-side curation
   - Rebuilt `feed_rank_score` formula in MV (v3): 9 components — deal×recency, heat, for-sale price-tier boost, vehicle-type gating (+8 auto / -40 non-auto), non-auto make blocklist (-35), photo boost (+8), source quality (BaT/C&B +10), location (+2), confidence (+3)
   - Server-side quality gates in `feed-query` edge function: exclude boats/RVs/trailers/motorcycles/farm equipment/aircraft by type AND by make blocklist, $500 minimum price floor
