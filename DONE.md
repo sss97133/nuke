@@ -1,5 +1,117 @@
 # DONE — Completed Work Log
 
+## 2026-03-06
+
+[data-fix] K10/K20 photo contamination — separated two 1984 Chevrolet trucks
+  - Created K20 vehicle record (6ff6497c-784c-4cd7-adcf-28925f97d860, VIN 1GCGK24M6EF375994)
+  - Moved 419 misassigned K20 photos from K10 to K20 record
+  - Uploaded correct 51 K10 photos from "1984 Chevrolet K10 SWB" album
+  - Updated K10 with SPID label data (Scottsdale trim, Frost White, etc.)
+  - Hardened iphoto-intake.mjs: added validateVehicleAlbumMatch() — checks year/model match before upload, --force to override
+
+[frontend] Phase 1 — Universal Input System (plan: dreamy-imagining-yao.md)
+  - Promoted AIDataIngestionSearch to header (CommandLineLayout.tsx) — replaces plain SearchBar
+  - Created GlobalDropZone.tsx — full-page drag-drop overlay, dispatches nuke:global-drop event
+  - Wired GlobalDropZone into AppLayout.tsx
+  - Added nuke:global-drop listener in AIDataIngestionSearch.tsx (single image → handleImageFile, multi → toast)
+  - MobileBottomNav: replaced Market with Inbox, added badge count (orphan vehicle_images query)
+  - DomainRoutes: /inbox → PersonalPhotoLibrary, added /photo-library alias, TeamInbox → /team-inbox
+  - Build passes clean (TypeScript + Vite)
+
+[yono] Nuke Agent QLoRA fine-tune — Qwen2.5-7B on Modal A100
+  - Built training data export script `scripts/export_nuke_agent_data.py`
+    - 3 data sources: Supabase schema introspection, edge function code, vehicle domain knowledge
+    - Exports chat-format JSONL (system/user/assistant) for instruction tuning
+    - 2,049 train + 108 val examples generated
+  - Built Modal training script `yono/modal_nuke_agent_train.py`
+    - QLoRA (4-bit NF4) on Qwen/Qwen2.5-7B-Instruct
+    - LoRA rank=64, alpha=128, 161M trainable params (3.58% of 4.3B)
+    - 3 epochs, batch=4, grad_accum=8, cosine LR schedule
+    - Includes merge_and_export + list_agent_runs functions
+  - Uploaded training data to Modal volume `yono-data`
+  - Fixed version compatibility issues:
+    - accelerate 0.35 doesn't exist (jumped to 1.0) — removed <1.0 cap
+    - transformers 4.57 needs accelerate 1.0+ (keep_torch_compile kwarg)
+    - torch_dtype deprecated → dtype
+    - Fixed import json ordering bug in main()
+  - Training completed: run_id=20260306_144355
+    - Loss: 4.35 → 0.07 (rapid convergence), eval_loss=0.0707
+    - Runtime: 97 min on A100-SXM4-40GB
+    - LoRA adapter saved to volume: nuke-agent-runs/20260306_144355/final/
+
+[data-quality] Massive enrichment campaign — 5 sources running in parallel
+  - Barrett-Jackson re_enrich: 3,626+ vehicles enriched, ~1,100 prices + ~2,000 VINs + engine types
+  - Bonhams re_enrich: 1,019 vehicles enriched (queue drained), 99.7% success rate
+  - Mecum re_enrich: 3,498+ vehicles enriched, ~1,200 VINs added
+  - RM Sotheby's: deployed extractor, added offset param, processing 14 auctions
+    - PA26 (66 updated), AZ26 (50), CC26 (34), MI26 (20 created + 50 updated), S0226 (6), PA25+ in progress
+    - High error rate from memorabilia items (luggage, children's cars) — expected
+  - BaT backfill attempted but blocked by "View Result" paywall on ended auctions (21K priceless)
+  - Net: +1,000+ prices, +3,000+ VINs (BJ/Mecum still running at session close)
+
+[data-quality] extract-rmsothebys offset support
+  - Added `offset` parameter to `process` and `list` actions for batch pagination
+  - Allows processing large auctions (190+ lots) within edge function 150s timeout
+  - Deployed v2
+
+[scripts] Created scripts/backfill-rmsothebys.sh
+  - Processes all 14 known RM auctions in batches of 40
+  - Handles offset pagination automatically
+
+[scripts] Created scripts/backfill-bat-prices.sh
+  - Feeds BaT URLs to extract-bat-core sequentially
+  - NOT effective: BaT paywalls ended auction prices behind "View Result"
+
+[admin] User Metrics Dashboard — /admin/user-metrics
+  - New edge function `user-metrics-stats` — 11 parallel SQL queries across bat_user_profiles (504K), bat_users (1.2K), ghost_users (156), fb_marketplace_sellers (127), external_identities (509K), profiles (6)
+  - New admin page with stat cards, linkage progress bars, BaT comment distribution chart (Recharts), top 25 users table, ghost/FB/platform breakdowns
+  - Route registered at /admin/user-metrics, nav link in Operations section of AdminShell
+  - Edge function deployed and live
+
+## 2026-03-05 (Data Source Landscape & Gap Filling)
+
+[data-quality] Deep research on ConceptCarz business model & pricing methodology
+  - Proved CZ is an ad-supported content farm (~3 person operation since 1998)
+  - "Estimated Sale Value" = trimmed mean of all auctions for a model, NOT a transaction price
+  - "Condition tiers" (Fair/Good/Excellent/Perfect) are just price quartiles, not real condition assessments
+  - Positioned like KBB/Hagerty but without the rigor — no physical inspections, no defined criteria
+  - Full investigation documented in conceptcarz_investigation.md
+
+[data-quality] Comprehensive auction data source landscape analysis
+  - Mapped 30+ sources across 5 tiers: Primary Auctions, Aggregators, Expert Valuations, Marketplaces, Wholesale
+  - Defined trust tier taxonomy: transaction > aggregated_transaction > expert_valuation > asking_price > computed_estimate
+  - Identified Classic.com, Glenmarch, Sports Car Market, Hagerty API as priority ingestion targets
+  - Assessed every source for data quality, accessibility, coverage, and known issues
+
+[data-quality] Merged 46,912 duplicate vehicle stubs
+  - Found ~45K rows where listing_url matched another vehicle's discovery_url (same car, two records)
+  - 98.8% of duplicates had price already on the canonical vehicle
+  - BaT: 23,712 merged | BJ: 21,079 | C&B: 50 | Others: 71
+  - Used status='merged' + merged_into_vehicle_id to preserve lineage
+
+[data-quality] Barrett-Jackson VIN backfill via re_enrich
+  - Backfilled discovery_url for ~760 BJ rows (enabling extractor to find them)
+  - Ran re_enrich: 2,397 BJ vehicles enriched, 4,895 VINs added (+33%)
+  - Confirmed prices being extracted ($140K Auburn, $2.4M Mercedes 540K, etc.)
+
+[data-quality] Fixed get_enrichment_candidates RPC
+  - Was missing sale_price IS NULL from enrichment criteria
+  - Bonhams, Gooding, etc. couldn't find price-missing vehicles
+  - Updated to include sale_price in enrichment eligibility
+
+[data-quality] Bonhams extractor re_enrich query fix
+  - Fallback query had .is("year", null) — filtered out all records that already had year
+  - Changed to .or("year.is.null,sale_price.is.null,description.is.null")
+  - Deployed extract-bonhams with fix
+
+[scripts] Created backfill-auction-prices.sh
+  - Loops re_enrich calls for BJ/Bonhams/Mecum extractors
+  - Configurable batch size, concurrency, sleep between rounds
+
+[scripts] Created merge-duplicate-stubs.sh
+  - Identifies and merges duplicate vehicle stubs across all auction sources
+  - Uses SET session_replication_role = replica to bypass triggers
+
 ## 2026-03-04 (Wiring Harness Builder — Full Implementation)
 
 [wiring] Complete visual harness builder for vehicle wiring layouts

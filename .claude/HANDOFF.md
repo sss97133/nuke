@@ -1,45 +1,19 @@
-# Auto-Checkpoint — 2026-03-05 21:54:11
-*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+# Handoff — 2026-03-06 ~08:30 PST
 
-## Recent Commits (last 30 min)
-none
+## What I Was Working On
+Fine-tuning a Nuke domain LLM (Qwen2.5-7B) via QLoRA on Modal A100 — the "Nuke Agent" that knows platform architecture, edge functions, vehicle data schemas, and collector vehicle domain knowledge.
 
-## Uncommitted Changes
-.claude/HANDOFF.md
-.claude/settings.local.json
-DONE.md
-mcp-server
-nuke_frontend/package-lock.json
-nuke_frontend/package.json
-nuke_frontend/src/components/admin/AdminShell.tsx
-nuke_frontend/src/components/image/ImageLightbox.tsx
-nuke_frontend/src/components/layout/AppLayout.tsx
-nuke_frontend/src/components/layout/MobileBottomNav.tsx
-nuke_frontend/src/components/layout/variants/CommandLineLayout.tsx
-nuke_frontend/src/components/map/UnifiedMap.tsx
-nuke_frontend/src/components/search/AIDataIngestionSearch.tsx
-nuke_frontend/src/pages/WiringPlan.tsx
-nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
-nuke_frontend/src/pages/vehicle-profile/WorkspaceContent.tsx
-nuke_frontend/src/routes/DomainRoutes.tsx
-nuke_frontend/src/routes/modules/admin/routes.tsx
-nuke_frontend/src/styles/vehicle-profile.css
-scripts/iphoto-intake.mjs
+## What's Complete
+1. **Training data export** — `scripts/export_nuke_agent_data.py` generates chat-format JSONL from 3 sources (DB schema, edge function code, vehicle domain knowledge). 2,049 train + 108 val examples.
+2. **Modal training script** — `yono/modal_nuke_agent_train.py` with QLoRA config, training, merge/export, and run listing. All version compatibility issues resolved (accelerate 1.0+, transformers 4.57, torch dtype).
+3. **Training run completed** — run_id `20260306_144355` on Modal volume `yono-data`:
+   - Final train loss: 0.286 (averaged), eval loss: 0.071
+   - LoRA adapter at `nuke-agent-runs/20260306_144355/final/adapter_model.safetensors`
+   - Full metadata at `nuke-agent-runs/20260306_144355/metadata.json`
 
-## Staged
-.claude/HANDOFF.md
-.claude/settings.local.json
-DONE.md
-nuke_frontend/package-lock.json
-nuke_frontend/package.json
-nuke_frontend/src/components/admin/AdminShell.tsx
-nuke_frontend/src/components/image/ImageLightbox.tsx
-nuke_frontend/src/components/layout/AppLayout.tsx
-nuke_frontend/src/components/layout/MobileBottomNav.tsx
-nuke_frontend/src/components/layout/variants/CommandLineLayout.tsx
-
-## On Next Session
-1. `cat PROJECT_STATE.md` — sprint focus
-2. `tail -40 DONE.md` — what exists
-3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
-4. Register in `.claude/ACTIVE_AGENTS.md`
+## What's Next
+1. **Merge LoRA → full model**: `modal run yono/modal_nuke_agent_train.py --action merge --run-id 20260306_144355`
+2. **Serve the merged model** — deploy via vLLM on Modal (existing `yono-serve` app pattern) or add to the YONO serving infrastructure
+3. **Evaluate quality** — test the agent on real Nuke platform questions (schema queries, edge function behavior, vehicle domain questions)
+4. **Iterate on training data** — the 2K examples are a good start but more edge function examples and real user queries would improve quality
+5. **Integration** — wire the agent into Claude Code or a chat interface for platform-aware assistance
