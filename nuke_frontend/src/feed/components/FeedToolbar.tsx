@@ -14,11 +14,13 @@ export interface FeedToolbarProps {
   viewMode: ViewMode;
   cardsPerRow: number;
   fontSize: number;
+  showScores: boolean;
   onSortChange: (sort: SortBy) => void;
   onDirectionChange: (dir: SortDirection) => void;
   onViewModeChange: (mode: ViewMode) => void;
   onCardsPerRowChange: (n: number) => void;
   onFontSizeChange: (n: number) => void;
+  onToggleScores: () => void;
 }
 
 const SORT_OPTIONS: { value: SortBy; label: string }[] = [
@@ -66,11 +68,13 @@ export function FeedToolbar({
   viewMode,
   cardsPerRow,
   fontSize,
+  showScores,
   onSortChange,
   onDirectionChange,
   onViewModeChange,
   onCardsPerRowChange,
   onFontSizeChange,
+  onToggleScores,
 }: FeedToolbarProps) {
   return (
     <div
@@ -152,6 +156,16 @@ export function FeedToolbar({
           />
         </div>
       )}
+
+      {/* Score transparency toggle */}
+      <button
+        type="button"
+        onClick={onToggleScores}
+        style={showScores ? { ...chipActive, fontSize: '7px' } : { ...chipBase, fontSize: '7px' }}
+        title="Show rank score breakdown on cards"
+      >
+        {showScores ? 'SCORES ON' : 'SCORES'}
+      </button>
 
       {/* View mode toggles */}
       <div style={{ display: 'flex', gap: '2px' }}>

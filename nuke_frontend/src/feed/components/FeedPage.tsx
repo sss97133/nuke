@@ -38,6 +38,7 @@ export default function FeedPage() {
   // Local display settings (not URL-persisted)
   const [fontSize, setFontSize] = useState(10);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  const [showScores, setShowScores] = useState(false);
 
   const feedQuery = useFeedQuery({ filters, sortBy, sortDirection, searchText });
 
@@ -55,9 +56,10 @@ export default function FeedPage() {
         vehicle={vehicle}
         viewMode={viewMode}
         compact={viewMode === 'grid' && cardsPerRow > 8}
+        showScores={showScores}
       />
     ),
-    [viewMode, cardsPerRow],
+    [viewMode, cardsPerRow, showScores],
   );
 
   // CSS custom property for font size control
@@ -85,11 +87,13 @@ export default function FeedPage() {
             viewMode={viewMode}
             cardsPerRow={cardsPerRow}
             fontSize={fontSize}
+            showScores={showScores}
             onSortChange={setSortBy}
             onDirectionChange={setSortDirection}
             onViewModeChange={setViewMode}
             onCardsPerRowChange={setCardsPerRow}
             onFontSizeChange={setFontSize}
+            onToggleScores={() => setShowScores(!showScores)}
           />
         </div>
 
@@ -149,6 +153,7 @@ export default function FeedPage() {
                 vehicles={vehicles}
                 viewMode={viewMode}
                 cardsPerRow={cardsPerRow}
+                showScores={showScores}
                 hasNextPage={feedQuery.hasNextPage ?? false}
                 isFetchingNextPage={feedQuery.isFetchingNextPage}
                 fetchNextPage={() => feedQuery.fetchNextPage()}

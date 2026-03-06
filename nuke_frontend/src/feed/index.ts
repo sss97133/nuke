@@ -38,6 +38,7 @@ export { CardSource } from './components/card/CardSource';
 export { CardAuctionTimer } from './components/card/CardAuctionTimer';
 export { CardActions } from './components/card/CardActions';
 export { CardTier } from './components/card/CardTier';
+export { CardRankScore } from './components/card/CardRankScore';
 
 // Page & layout components
 export { FeedLayout } from './components/FeedLayout';

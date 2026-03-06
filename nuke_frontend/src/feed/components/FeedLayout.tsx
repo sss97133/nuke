@@ -13,6 +13,7 @@ export interface FeedLayoutProps {
   vehicles: FeedVehicle[];
   viewMode: FeedViewConfig['viewMode'];
   cardsPerRow: number;
+  showScores?: boolean;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   fetchNextPage?: () => void;
@@ -26,16 +27,19 @@ const ROW_HEIGHTS: Record<string, number> = {
 };
 
 const TABLE_GRID = '42px 44px 90px 1fr 70px 80px 70px 50px minmax(60px, auto) minmax(60px, auto) 70px';
+const TABLE_GRID_SCORES = '42px 44px 90px 1fr 70px 80px 70px 50px minmax(60px, auto) minmax(60px, auto) 70px 50px';
 
 export function FeedLayout({
   vehicles,
   viewMode,
   cardsPerRow,
+  showScores = false,
   hasNextPage = false,
   isFetchingNextPage = false,
   fetchNextPage,
   renderCard,
 }: FeedLayoutProps) {
+  const tableGrid = showScores ? TABLE_GRID_SCORES : TABLE_GRID;
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const cols = viewMode === 'grid' ? cardsPerRow : 1;
@@ -70,7 +74,7 @@ export function FeedLayout({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: TABLE_GRID,
+            gridTemplateColumns: tableGrid,
             gap: '0 4px',
             padding: '4px 8px',
             borderBottom: '2px solid var(--border)',
@@ -99,6 +103,7 @@ export function FeedLayout({
           <span>DEAL</span>
           <span>HEAT</span>
           <span style={{ textAlign: 'right' }}>TIME</span>
+          {showScores && <span style={{ textAlign: 'right' }}>RANK</span>}
         </div>
 
         {/* Virtualized rows */}
@@ -138,7 +143,7 @@ export function FeedLayout({
                   position: 'absolute', top: 0, left: 0, width: '100%',
                   transform: `translateY(${vRow.start}px)`,
                   display: 'grid',
-                  gridTemplateColumns: TABLE_GRID,
+                  gridTemplateColumns: tableGrid,
                   gap: '0 4px',
                   alignItems: 'center',
                   height: '32px',

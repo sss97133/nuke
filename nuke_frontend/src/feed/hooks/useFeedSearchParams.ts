@@ -136,7 +136,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
       filters.zipCode !== '' ||
       filters.showPending !== d.showPending ||
       searchText !== '' ||
-      sortBy !== 'newest' ||
+      (sortBy !== 'popular' && sortBy !== 'newest') ||
       sortDirection !== 'desc'
     );
   }, [filters, searchText, sortBy, sortDirection]);
@@ -218,7 +218,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
   const resetAll = useCallback(() => {
     pushState({
       filters: DEFAULT_FILTERS,
-      sortBy: 'newest',
+      sortBy: 'popular',
       sortDirection: 'desc',
       searchText: '',
       viewMode: 'grid',

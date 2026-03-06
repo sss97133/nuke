@@ -28,7 +28,7 @@ export interface FeedUrlState {
   cardsPerRow: number;
 }
 
-const DEFAULT_SORT_BY: SortBy = 'newest';
+const DEFAULT_SORT_BY: SortBy = 'popular';
 const DEFAULT_SORT_DIR: SortDirection = 'desc';
 const DEFAULT_VIEW_MODE: ViewMode = 'grid';
 const DEFAULT_CARDS_PER_ROW = 6;

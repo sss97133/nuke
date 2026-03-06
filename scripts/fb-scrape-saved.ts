@@ -15,7 +15,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROFILE_DIR = path.join(__dirname, "../fb-session-2");
+const PROFILE_DIR = path.join(__dirname, "../fb-session-1");
 const ENRICH_ONLY = process.argv.includes("--enrich-only");
 
 const supabase = createClient(

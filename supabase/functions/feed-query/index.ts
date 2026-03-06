@@ -7,7 +7,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  * Queries the `vehicle_valuation_feed` materialized view with server-side
  * filtering, keyset pagination, pre-resolved thumbnails, and auction state.
  *
- * Replaces the client-side filter-everything approach in CursorHomepage.tsx.
+ * Default sort (feed_rank) now boosts for-sale listings +50 points,
+ * putting live inventory at the top of the feed.
  */
 
 const corsHeaders = {
@@ -48,6 +49,11 @@ interface FeedRequest {
   limit?: number;
   zip?: string;
   radius_miles?: number;
+  user_state?: string;
+  // Quality controls — default ON, user can opt out
+  include_non_auto?: boolean;   // false = hide boats/RVs/trailers/motorcycles
+  include_no_photos?: boolean;  // false = hide items without photos
+  min_price?: number;           // quality floor (default 500)
 }
 
 // Valid sort fields mapped to MV columns
@@ -83,7 +89,8 @@ serve(async (req) => {
       req.method === "POST" ? await req.json().catch(() => ({})) : {};
 
     const limit = Math.min(Math.max(body.limit ?? 50, 1), 200);
-    const sortKey = body.sort && SORT_MAP[body.sort] ? body.sort : "newest";
+    // Default to feed_rank (which now boosts for-sale listings)
+    const sortKey = body.sort && SORT_MAP[body.sort] ? body.sort : "feed_rank";
     const sortDef = SORT_MAP[sortKey];
     const direction = body.direction === "asc" || body.direction === "desc"
       ? body.direction
@@ -101,6 +108,8 @@ serve(async (req) => {
         is_for_sale, sale_status, sale_date,
         created_at, updated_at,
         discovery_url, discovery_source, profile_origin, origin_organization_id,
+        city, state, listing_location,
+        canonical_vehicle_type, has_photos,
         display_price, price_source, is_sold,
         asking_price, sale_price, current_value,
         nuke_estimate, nuke_estimate_low, nuke_estimate_high, nuke_estimate_confidence,
@@ -114,7 +123,37 @@ serve(async (req) => {
       // Secondary sort by vehicle_id for stable keyset pagination
       .order("vehicle_id", { ascending: true });
 
-    // ----- Filters -----
+    // ----- QUALITY GATES (default ON — curated experience) -----
+
+    // Exclude non-automobile vehicle types unless explicitly requested
+    if (body.include_non_auto !== true) {
+      // Only show CAR, TRUCK, SUV, VAN, MINIVAN, or unclassified that aren't known junk makes
+      // This OR filter: must be an auto type OR null type with a non-junk make
+      query = query.or(
+        "canonical_vehicle_type.in.(CAR,TRUCK,SUV,VAN,MINIVAN)," +
+        "canonical_vehicle_type.is.null"
+      );
+      // For null types, exclude known non-auto makes at the DB level
+      // (The MV already penalizes these in ranking, but we don't even want them in results)
+      query = query.not("make", "in",
+        "(YAMAHA,HARLEY-DAVIDSON,KAWASAKI,SUZUKI,DUCATI,KTM,TRIUMPH,INDIAN," +
+        "POLARIS,ARCTIC CAT,CAN-AM,SEA-DOO,SEA RAY,BAYLINER,BOSTON WHALER,GRUMMAN," +
+        "FLEETWOOD,WINNEBAGO,AIRSTREAM,COACHMEN,JAYCO,KEYSTONE,FOREST RIVER,THOR," +
+        "JOHN DEERE,KUBOTA,CATERPILLAR,BOBCAT," +
+        "EZGO,CLUB CAR,CESSNA,PIPER,BEECHCRAFT,FEATHERLITE,FLAGSTAFF,COLEMAN,STARCRAFT," +
+        "Yamaha,Kawasaki,Suzuki,Ducati,Polaris,Arctic,Fleetwood,Winnebago,Airstream," +
+        "Coachmen,Flagstaff,Coleman,Glastron,Skeeter,Sea,Skidoo,Seadoo,Bayliner," +
+        "Grumman,Cessna,Ezgo,Club,Starcraft,Tracker,KTM,Triumph,Harley-Davidson)"
+      );
+    }
+
+    // Quality floor: skip scam-price listings (default $500 minimum)
+    const qualityMinPrice = body.min_price ?? 500;
+    if (qualityMinPrice > 0 && body.price_min === undefined) {
+      query = query.or(`display_price.gte.${qualityMinPrice},display_price.is.null`);
+    }
+
+    // ----- User Filters -----
 
     // Year range
     if (typeof body.year_min === "number" && Number.isFinite(body.year_min)) {
@@ -126,14 +165,12 @@ serve(async (req) => {
 
     // Make (case-insensitive)
     if (body.makes && body.makes.length > 0 && body.makes.length <= 20) {
-      // Upper-case the input to match MV convention (PORSCHE, BMW, etc.)
       const uppercased = body.makes.map((m) => m.toUpperCase().replace(/[%_'"\\]/g, ""));
       query = query.in("make", uppercased);
     }
 
     // Model (ilike substring for flexibility)
     if (body.models && body.models.length > 0 && body.models.length <= 10) {
-      // Use OR filter for multiple models
       const modelFilters = body.models
         .map((m) => `model.ilike.%${m.replace(/[%_]/g, "")}%`)
         .join(",");
@@ -175,14 +212,27 @@ serve(async (req) => {
       query = query.or("is_sold.is.null,is_sold.eq.false");
     }
 
+    // Has images
+    if (body.has_images === true) {
+      query = query.eq("has_photos", true);
+    }
+
+    // Excluded sources
+    if (body.excluded_sources && body.excluded_sources.length > 0) {
+      for (const src of body.excluded_sources) {
+        const safe = src.replace(/[%_'"\\]/g, "");
+        if (safe) {
+          query = query.neq("discovery_source", safe === "dealer_sites" ? "dealer_site" : safe === "dealer_listings" ? "dealer_listing" : safe);
+        }
+      }
+    }
+
     // ----- Full-text search -----
     if (body.q && body.q.trim()) {
-      // Split into terms and require all to match (AND logic)
       const terms = body.q.trim().split(/\s+/).filter(Boolean);
       for (const term of terms) {
         const safe = term.replace(/[%_'"\\]/g, "");
         if (!safe) continue;
-        // Search across make, model, series, vin
         query = query.or(
           `make.ilike.%${safe}%,model.ilike.%${safe}%,series.ilike.%${safe}%,vin.ilike.%${safe}%`,
         );
@@ -190,14 +240,9 @@ serve(async (req) => {
     }
 
     // ----- Keyset pagination -----
-    // Cursor format: "sortValue::vehicleId"
     if (body.cursor) {
       const [cursorVal, cursorId] = body.cursor.split("::");
       if (cursorVal && cursorId) {
-        // For descending: get rows where sort < cursor OR (sort = cursor AND id > cursorId)
-        // For ascending: get rows where sort > cursor OR (sort = cursor AND id > cursorId)
-        // PostgREST doesn't support compound keyset natively, so we use a range filter
-        // as an approximation and rely on the secondary sort for determinism.
         if (ascending) {
           query = query.or(
             `${sortDef.column}.gt.${cursorVal},and(${sortDef.column}.eq.${cursorVal},vehicle_id.gt.${cursorId})`,
@@ -229,7 +274,6 @@ serve(async (req) => {
     const vehicleIds = items.map((r: any) => r.vehicle_id);
 
     const [thumbResult, auctionResult] = await Promise.all([
-      // Thumbnails: primary image per vehicle
       vehicleIds.length > 0
         ? supabase
             .from("vehicle_images")
@@ -238,7 +282,6 @@ serve(async (req) => {
             .eq("is_primary", true)
             .limit(vehicleIds.length)
         : { data: [], error: null },
-      // Live auction state from external_listings
       vehicleIds.length > 0
         ? supabase
             .from("external_listings")
@@ -252,7 +295,6 @@ serve(async (req) => {
         : { data: [], error: null },
     ]);
 
-    // Build lookup maps
     const thumbMap = new Map<string, any>();
     for (const img of thumbResult.data ?? []) {
       if (!thumbMap.has(img.vehicle_id)) {
@@ -272,7 +314,6 @@ serve(async (req) => {
       const thumb = thumbMap.get(row.vehicle_id);
       const auction = auctionMap.get(row.vehicle_id);
 
-      // Resolve thumbnail URL (priority: thumbnail > medium > variants > image_url)
       let thumbnail_url: string | null = null;
       if (thumb) {
         thumbnail_url =
@@ -282,6 +323,16 @@ serve(async (req) => {
           thumb.variants?.medium ||
           thumb.image_url ||
           null;
+      }
+
+      // Build location string
+      let location: string | null = null;
+      if (row.city && row.state) {
+        location = `${row.city}, ${row.state}`;
+      } else if (row.state) {
+        location = row.state;
+      } else if (row.listing_location) {
+        location = row.listing_location;
       }
 
       return {
@@ -322,6 +373,11 @@ serve(async (req) => {
         profile_origin: row.profile_origin,
         origin_organization_id: row.origin_organization_id,
 
+        // Location
+        location,
+        city: row.city,
+        state: row.state,
+
         // Auction state (from external_listings)
         auction_end_date: auction?.end_date ?? null,
         current_bid: auction?.current_bid ?? null,
@@ -342,8 +398,7 @@ serve(async (req) => {
       next_cursor = `${sortVal}::${lastItem.vehicle_id}`;
     }
 
-    // ----- Stats (approximate for speed) -----
-    // Use portfolio_stats_cache for unfiltered, or estimate for filtered
+    // ----- Stats -----
     let stats = {
       total_vehicles: feedItems.length,
       total_value: 0,

@@ -19,12 +19,14 @@ import { CardSource } from './card/CardSource';
 import { CardAuctionTimer } from './card/CardAuctionTimer';
 import { CardActions } from './card/CardActions';
 import { CardTier } from './card/CardTier';
+import { CardRankScore } from './card/CardRankScore';
 
 export interface VehicleCardProps {
   vehicle: FeedVehicle;
   viewMode: FeedViewConfig['viewMode'];
   compact?: boolean;
   showActions?: boolean;
+  showScores?: boolean;
   isFollowing?: boolean;
   isFollowLoading?: boolean;
   onToggleFollow?: () => void;
@@ -38,6 +40,7 @@ export function VehicleCard({
   viewMode,
   compact = false,
   showActions = false,
+  showScores = false,
   isFollowing = false,
   isFollowLoading = false,
   onToggleFollow,
@@ -135,6 +138,18 @@ export function VehicleCard({
         }}>
           {timeLabel || '—'}
         </span>
+        {/* Rank score column (only when showScores is on) */}
+        {showScores && (
+          <span style={{
+            fontFamily: "'Courier New', monospace", fontSize: 'var(--feed-font-size-sm, 8px)',
+            fontWeight: 700, textAlign: 'right',
+            color: (vehicle.feed_rank_score ?? 0) > 60 ? '#16825d'
+              : (vehicle.feed_rank_score ?? 0) > 30 ? '#b05a00'
+              : 'var(--text-disabled)',
+          }}>
+            {vehicle.feed_rank_score != null ? Math.round(vehicle.feed_rank_score) : '—'}
+          </span>
+        )}
       </CardShell>
     );
   }
@@ -161,14 +176,24 @@ export function VehicleCard({
               trim={vehicle.trim}
               compact
             />
-            <span style={{
-              fontFamily: "'Courier New', monospace",
-              fontSize: 'var(--feed-font-size, 11px)',
-              fontWeight: 700,
-              color: 'var(--text)',
-              flexShrink: 0,
-            }}>
-              {price.formatted}
+            <span style={{ display: 'flex', alignItems: 'baseline', gap: '4px', flexShrink: 0 }}>
+              {vehicle.is_for_sale && (
+                <span style={{
+                  fontFamily: 'Arial, sans-serif', fontSize: 'var(--feed-font-size-xs, 7px)',
+                  fontWeight: 800, textTransform: 'uppercase',
+                  color: '#3b82f6', letterSpacing: '0.3px',
+                }}>
+                  FOR SALE
+                </span>
+              )}
+              <span style={{
+                fontFamily: "'Courier New', monospace",
+                fontSize: 'var(--feed-font-size, 11px)',
+                fontWeight: 700,
+                color: 'var(--text)',
+              }}>
+                {price.formatted}
+              </span>
             </span>
           </div>
           {/* Row 2: meta + chips + deal + time */}
@@ -191,6 +216,14 @@ export function VehicleCard({
                 {vehicle.canonical_body_style || vehicle.body_style}
               </span>
             )}
+            {vehicle.location && (
+              <span style={{
+                fontFamily: 'Arial, sans-serif', fontSize: 'var(--feed-font-size-xs, 7px)', fontWeight: 700,
+                color: 'var(--text-disabled)', whiteSpace: 'nowrap',
+              }}>
+                {vehicle.location}
+              </span>
+            )}
             {vehicle.deal_score_label && vehicle.deal_score_label !== 'fair' && (
               <CardDealScore dealScoreLabel={vehicle.deal_score_label} heatScoreLabel={vehicle.heat_score_label} />
             )}
@@ -203,6 +236,18 @@ export function VehicleCard({
                   : 'var(--text-disabled)',
               }}>
                 {timeLabel}
+              </span>
+            )}
+            {showScores && vehicle.feed_rank_score != null && (
+              <span style={{
+                fontFamily: "'Courier New', monospace", fontSize: 'var(--feed-font-size-xs, 7px)',
+                fontWeight: 700,
+                color: vehicle.feed_rank_score > 60 ? '#16825d' : vehicle.feed_rank_score > 30 ? '#b05a00' : 'var(--text-disabled)',
+                padding: '0 3px',
+                background: 'var(--surface-hover)',
+                border: '1px solid var(--border)',
+              }}>
+                {Math.round(vehicle.feed_rank_score)}R
               </span>
             )}
           </div>
@@ -221,6 +266,7 @@ export function VehicleCard({
       style={style}
     >
       <CardImage thumbnailUrl={vehicle.thumbnail_url} alt={alt} viewMode="grid" noImageData={noImageData}>
+        {showScores && <CardRankScore vehicle={vehicle} compact={compact} />}
         <CardPrice price={price} compact={compact} />
         {price.isLive && vehicle.auction_end_date && (
           <CardAuctionTimer endDate={vehicle.auction_end_date} isLive />
