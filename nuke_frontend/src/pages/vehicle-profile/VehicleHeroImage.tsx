@@ -4,7 +4,7 @@ import MobileImageGallery from '../../components/image/MobileImageGallery';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overlayNode, heroMeta }) => {
-  const [fitMode, setFitMode] = useState<'width' | 'cover'>('width');
+  const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
   const [showGallery, setShowGallery] = useState(false);
   const isMobile = useIsMobile();
 
@@ -72,7 +72,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
             <div
               style={{
                 width: '100%',
-                ...(fitMode === 'cover' ? { height: 'var(--h-hero, 420px)' } : {}),
+                height: 'var(--h-hero, 420px)',
                 position: 'relative',
                 overflow: 'hidden',
                 backgroundColor: '#2a2a2a',
@@ -80,36 +80,39 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
               }}
               onClick={() => isMobile && setShowGallery(true)}
             >
-              {fitMode === 'width' ? (
-                /* Width-fit: image fills full width, natural height */
-                <img
-                  src={renderUrl || src}
-                  alt=""
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    height: 'auto',
-                    maxHeight: '80vh',
-                  }}
-                  onError={(e) => {
-                    if (renderUrl && (e.target as HTMLImageElement).src !== src) {
-                      (e.target as HTMLImageElement).src = src;
-                    }
-                  }}
-                />
-              ) : (
-                /* Cover: fixed height, crops to fill */
+              {/* Blurred backdrop in contain mode */}
+              {fitMode === 'contain' && (
                 <div
                   style={{
                     position: 'absolute',
-                    inset: 0,
-                    backgroundImage: renderUrl ? `url(${renderUrl}), url(${src})` : `url(${src})`,
+                    inset: '-30px',
+                    backgroundImage: `url(${imgUrl})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',
+                    filter: 'blur(28px) brightness(0.45)',
                   }}
                 />
               )}
+
+              {/* Image — fixed frame, toggle between contain and cover */}
+              <img
+                src={renderUrl || src}
+                alt=""
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: fitMode,
+                  objectPosition: 'center',
+                }}
+                onError={(e) => {
+                  if (renderUrl && (e.target as HTMLImageElement).src !== src) {
+                    (e.target as HTMLImageElement).src = src;
+                  }
+                }}
+              />
 
               {/* Overlay (auction banners etc) */}
               {overlayNode && (
@@ -118,7 +121,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
 
               {/* Fit / Fill toggle */}
               <button
-                onClick={e => { e.stopPropagation(); setFitMode(m => m === 'cover' ? 'width' : 'cover'); }}
+                onClick={e => { e.stopPropagation(); setFitMode(m => m === 'cover' ? 'contain' : 'cover'); }}
                 style={{
                   position: 'absolute',
                   bottom: '10px',

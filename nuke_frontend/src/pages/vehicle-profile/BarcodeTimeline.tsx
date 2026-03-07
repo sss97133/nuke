@@ -181,21 +181,26 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ vehicle, timelineEven
     }
   }, [expanded]);
 
-  // Collapse on scroll past timeline
+  // Collapse on page scroll
   useEffect(() => {
-    if (!expanded || !stripRef.current) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) {
-          setExpanded(false);
-          setReceiptDate(null);
-          setHighlightGroup(null);
-        }
-      },
-      { threshold: 0, rootMargin: '-60px 0px 0px 0px' }
-    );
-    observer.observe(stripRef.current);
-    return () => observer.disconnect();
+    if (!expanded) return;
+    let scrolled = false;
+    const onScroll = () => {
+      if (!scrolled) {
+        scrolled = true;
+        setExpanded(false);
+        setReceiptDate(null);
+        setHighlightGroup(null);
+      }
+    };
+    // Defer attaching so the expand click's own scroll doesn't immediately collapse
+    const raf = requestAnimationFrame(() => {
+      window.addEventListener('scroll', onScroll, { once: true, passive: true });
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', onScroll);
+    };
   }, [expanded]);
 
   // Escape to close
