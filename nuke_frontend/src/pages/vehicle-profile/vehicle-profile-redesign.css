@@ -898,14 +898,12 @@ div[style*="border:2px solid var(--warning)"],
   width: 100% !important;
 }
 
-/* Hero img: edge to edge, never cropped */
+/* Hero img: edge to edge, natural aspect ratio, never warped */
 .hero-media-slot img {
   display: block !important;
   width: 100% !important;
   height: auto !important;
   max-height: 80vh !important;
-  object-fit: contain !important;
-  object-position: center !important;
 }
 
 /* Fit/Fill toggle button — square, no border-radius */
