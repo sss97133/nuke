@@ -1307,6 +1307,38 @@ const VehicleProfile: React.FC = () => {
         return;
       }
 
+      // If no timeline_events, synthesize from vehicle_images photo dates
+      if (!events?.length && vehicleId) {
+        try {
+          const { data: photos } = await supabase
+            .from('vehicle_images')
+            .select('taken_at, source, image_category, category')
+            .eq('vehicle_id', vehicleId)
+            .not('taken_at', 'is', null)
+            .order('taken_at', { ascending: true });
+
+          if (photos?.length) {
+            // Group photos by date into synthetic timeline events
+            const byDate: Record<string, number> = {};
+            for (const p of photos) {
+              const d = new Date(p.taken_at).toISOString().slice(0, 10);
+              byDate[d] = (byDate[d] || 0) + 1;
+            }
+            const synthetic = Object.entries(byDate).map(([date, count]) => ({
+              event_date: date,
+              event_type: 'photo_session',
+              title: `${count} photo${count > 1 ? 's' : ''} documented`,
+              category: 'documentation',
+              created_at: date,
+            }));
+            setTimelineEvents(synthetic);
+            return;
+          }
+        } catch {
+          // Fallback: no synthetic events
+        }
+      }
+
       setTimelineEvents(events || []);
     } catch (error) {
       console.error('Error loading timeline events:', error);

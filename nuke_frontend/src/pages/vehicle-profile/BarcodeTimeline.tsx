@@ -44,13 +44,14 @@ const BARCODE_COLORS: Record<number, string> = {
 const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
 const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ vehicle, timelineEvents }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [receiptDate, setReceiptDate] = useState<string | null>(null);
   const [receiptPos, setReceiptPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [tooltipContent, setTooltipContent] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [highlightGroup, setHighlightGroup] = useState<string | null>(null);
   const heatmapRef = useRef<HTMLDivElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
 
   // Build event data map from timelineEvents
   const { eventMap, startDate, endDate, weeks, sortedDates } = useMemo(() => {
@@ -180,6 +181,23 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ vehicle, timelineEven
     }
   }, [expanded]);
 
+  // Collapse on scroll past timeline
+  useEffect(() => {
+    if (!expanded || !stripRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) {
+          setExpanded(false);
+          setReceiptDate(null);
+          setHighlightGroup(null);
+        }
+      },
+      { threshold: 0, rootMargin: '-60px 0px 0px 0px' }
+    );
+    observer.observe(stripRef.current);
+    return () => observer.disconnect();
+  }, [expanded]);
+
   // Escape to close
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -256,6 +274,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ vehicle, timelineEven
   return (
     <>
       <div
+        ref={stripRef}
         className={`barcode-strip ${expanded ? 'barcode-strip--expanded' : 'barcode-strip--collapsed'}`}
       >
         {/* Collapsed bar */}
