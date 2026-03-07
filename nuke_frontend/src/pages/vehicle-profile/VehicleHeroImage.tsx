@@ -4,7 +4,7 @@ import MobileImageGallery from '../../components/image/MobileImageGallery';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overlayNode, heroMeta }) => {
-  const [fitMode, setFitMode] = useState<'cover' | 'contain'>('cover');
+  const [fitMode, setFitMode] = useState<'cover' | 'contain'>('contain');
   const [showGallery, setShowGallery] = useState(false);
   const isMobile = useIsMobile();
 
