@@ -86,12 +86,8 @@ function relationshipAccent(rel: RelationshipType): { bg: string; border: string
     case 'PREVIOUSLY OWNED':
       return { bg: 'var(--bg, #f5f5f5)', border: 'var(--text-secondary, #666666)', color: 'var(--text-secondary, #666666)' };
     case 'CONTRIBUTOR':
-      return { bg: 'var(--bg, #f5f5f5)', border: 'var(--text-secondary, #666666)', color: 'var(--text-secondary, #666666)' };
-    case 'UPLOADER':
-      return { bg: 'var(--bg, #f5f5f5)', border: 'var(--border, #bdbdbd)', color: 'var(--text-secondary, #666666)' };
-    case 'WATCHING':
     default:
-      return { bg: 'var(--bg, #f5f5f5)', border: 'var(--border, #bdbdbd)', color: 'var(--text-secondary, #666666)' };
+      return { bg: 'var(--bg, #f5f5f5)', border: 'var(--text-secondary, #666666)', color: 'var(--text-secondary, #666666)' };
   }
 }
 
@@ -219,7 +215,7 @@ function HealthBar({ score }: { score: number | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// Quick-assign chips for UPLOADER vehicles
+// Quick-assign chips for CONTRIBUTOR vehicles (upgrade relationship)
 // ---------------------------------------------------------------------------
 
 const QUICK_ASSIGN_CHIPS = [
@@ -227,8 +223,6 @@ const QUICK_ASSIGN_CHIPS = [
   { label: 'CO-OWN', table: 'vehicle_user_permissions', role: 'co_owner' },
   { label: 'PREV OWNER', table: 'discovered_vehicles', type: 'previously_owned' },
   { label: 'WORKED ON', table: 'vehicle_contributors', role: 'contributor' },
-  { label: 'WATCHING', table: 'discovered_vehicles', type: 'interested' },
-  { label: 'DISMISS', table: 'discovered_vehicles', type: 'discovered', dismiss: true },
 ] as const;
 
 function QuickAssignStrip({
@@ -420,7 +414,7 @@ function ActionStrip({
 function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: () => void }) {
   const [hovered, setHovered] = useState(false);
   const title = formatVehicleTitle(vehicle);
-  const isUploader = vehicle.relationship_type === 'UPLOADER';
+  const showQuickAssign = vehicle.relationship_type === 'CONTRIBUTOR';
 
   return (
     <Link
@@ -576,7 +570,7 @@ function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
         </div>
 
         {/* Action strip or quick-assign for uploaders */}
-        {isUploader ? (
+        {showQuickAssign ? (
           <QuickAssignStrip vehicleId={vehicle.id} onRefresh={onRefresh} />
         ) : (
           <ActionStrip vehicle={vehicle} />
@@ -593,7 +587,7 @@ function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
 function ListCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: () => void }) {
   const [hovered, setHovered] = useState(false);
   const title = formatVehicleTitle(vehicle);
-  const isUploader = vehicle.relationship_type === 'UPLOADER';
+  const showQuickAssign = vehicle.relationship_type === 'CONTRIBUTOR';
 
   return (
     <Link
@@ -673,7 +667,7 @@ function ListCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
         </div>
 
         {/* Right strip */}
-        {isUploader ? (
+        {showQuickAssign ? (
           <div style={{ borderLeft: '2px solid var(--border, #bdbdbd)', padding: '8px', display: 'flex', alignItems: 'center' }}
                onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
             <span style={{ ...LABEL, fontSize: '8px', color: 'var(--warning, #b05a00)' }}>CATEGORIZE</span>
