@@ -19,8 +19,12 @@ out/
 .vscode/
 .idea/
 .cursor/
+.husky/
 *.swp
 *.swo
+
+# Dead backends
+nuke_backend/
 
 # Claude Code internals (keep CLAUDE.md, ignore everything else)
 .claude/agents/
