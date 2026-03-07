@@ -874,8 +874,8 @@ div[style*="border:2px solid var(--warning)"],
    ============================================================ */
 
 /*
- * VehicleHeroImage renders with aspect-ratio: 16/9 and maxHeight: 360px
- * via inline styles. We must match v3: height 260px, dark bg.
+ * Hero image: full-width, natural aspect ratio.
+ * Image fills left edge to right edge, height follows the photo.
  */
 
 .hero,
@@ -884,27 +884,28 @@ div[style*="border:2px solid var(--warning)"],
 [class*="VehicleHeroImage"],
 #vehicle-hero > div > div > div {
   width: 100% !important;
-  height: var(--h-hero) !important;
-  min-height: var(--h-hero) !important;
-  max-height: var(--h-hero) !important;
   background: #2a2a2a !important;
   position: relative !important;
   overflow: hidden !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
 }
 
-/* Override the aspect-ratio based inline style */
+/* Let image drive the height — no forced dimensions */
 .hero-media-slot > div,
 #vehicle-hero > div > div,
 #vehicle-hero [style*="aspectRatio"],
 #vehicle-hero [style*="aspect-ratio"] {
   aspect-ratio: unset !important;
   width: 100% !important;
-  height: var(--h-hero) !important;
-  max-height: var(--h-hero) !important;
-  min-height: var(--h-hero) !important;
+}
+
+/* Hero img: edge to edge, never cropped */
+.hero-media-slot img {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  max-height: 80vh !important;
+  object-fit: contain !important;
+  object-position: center !important;
 }
 
 /* Fit/Fill toggle button — square, no border-radius */
@@ -2484,12 +2485,8 @@ label {
 
   .col-divider { display: none !important; }
 
-  .hero,
-  .hero-media-slot,
-  #vehicle-hero > div > div > div {
-    height: 280px !important;
-    min-height: 280px !important;
-    max-height: 280px !important;
+  .hero-media-slot img {
+    max-height: 50vh !important;
   }
 
   /* Hide tooltips on mobile (no hover) */
