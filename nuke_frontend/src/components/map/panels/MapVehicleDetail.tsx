@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { getPlatformDisplayName } from '../../../services/platformNomenclature';
 
 const MAP_FONT = 'Arial, Helvetica, sans-serif';
 
@@ -41,6 +42,11 @@ interface VehicleData {
   listing_location: string | null;
   description: string | null;
   source: string | null;
+  listing_source: string | null;
+  discovery_source: string | null;
+  auction_source: string | null;
+  listing_url: string | null;
+  discovery_url: string | null;
   primary_image_url: string | null;
   status: string | null;
   images: { id: string; url: string }[];
@@ -56,7 +62,7 @@ export default function MapVehicleDetail({ vehicleId, onBack, onNavigate }: Prop
       setLoading(true);
       const { data: v } = await supabase
         .from('vehicles')
-        .select('id, year, make, model, trim, vin, body_style, sale_price, asking_price, current_value, nuke_estimate, mileage, color, interior_color, engine_type, engine_size, horsepower, transmission, drivetrain, condition_rating, deal_score, heat_score, listing_location, description, source, primary_image_url, status')
+        .select('id, year, make, model, trim, vin, body_style, sale_price, asking_price, current_value, nuke_estimate, mileage, color, interior_color, engine_type, engine_size, horsepower, transmission, drivetrain, condition_rating, deal_score, heat_score, listing_location, description, source, listing_source, discovery_source, auction_source, listing_url, discovery_url, primary_image_url, status')
         .eq('id', vehicleId)
         .single();
 
@@ -100,6 +106,30 @@ export default function MapVehicleDetail({ vehicleId, onBack, onNavigate }: Prop
   const title = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
   const price = vehicle.sale_price || vehicle.asking_price || vehicle.current_value || vehicle.nuke_estimate;
   const specs = [vehicle.color, vehicle.engine_type, vehicle.horsepower ? `${vehicle.horsepower}hp` : null, vehicle.transmission, vehicle.drivetrain].filter(Boolean);
+
+  // Smart source resolution — same chain as VehicleBasicInfo
+  const sourceLabel = useMemo(() => {
+    const raw = (vehicle.listing_source || vehicle.discovery_source || vehicle.auction_source || '').toString().trim();
+    const internalMarkers = ['auction_extractor', 'live_auction_extractor', 'intelligent_extractor', 'url_scraper', 'comment_extraction', 'auto_import'];
+    const isInternal = internalMarkers.some(m => raw.toLowerCase().includes(m));
+
+    let key = raw;
+    if (isInternal || !raw) {
+      // Fall back to hostname from URL
+      try {
+        const url = vehicle.listing_url || vehicle.discovery_url || '';
+        if (url) {
+          const host = new URL(url).hostname;
+          key = host.startsWith('www.') ? host.slice(4) : host;
+        }
+      } catch { /* ignore */ }
+    }
+
+    if (!key) return null;
+    const label = getPlatformDisplayName(key);
+    if (label === 'Unknown') return null;
+    return label;
+  }, [vehicle.listing_source, vehicle.discovery_source, vehicle.auction_source, vehicle.listing_url, vehicle.discovery_url]);
 
   return (
     <div style={{ fontFamily: MAP_FONT, fontSize: 11 }}>
@@ -190,9 +220,9 @@ export default function MapVehicleDetail({ vehicleId, onBack, onNavigate }: Prop
         )}
 
         {/* Source */}
-        {vehicle.source && (
+        {sourceLabel && (
           <div style={{ fontSize: 8, color: 'var(--text-disabled)', textTransform: 'uppercase' as const, letterSpacing: '0.5px', marginBottom: 12 }}>
-            SOURCE: {vehicle.source}
+            {sourceLabel}
           </div>
         )}
 
