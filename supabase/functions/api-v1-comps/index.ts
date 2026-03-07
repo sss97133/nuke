@@ -17,7 +17,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-api-key",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 function jsonResponse(data: unknown, status = 200) {
@@ -58,7 +58,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  if (req.method !== "GET") {
+  if (req.method !== "GET" && req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
@@ -73,16 +73,22 @@ serve(async (req) => {
     // but we allow anonymous access through regardless.
     await authenticateRequest(req, supabase);
 
-    // --- Parse params ---
+    // --- Parse params (GET query string or POST JSON body) ---
     const url = new URL(req.url);
-    const vehicleId = url.searchParams.get("vehicle_id");
-    const vin = url.searchParams.get("vin");
-    const makeParam = url.searchParams.get("make");
-    const modelParam = url.searchParams.get("model");
-    const yearParam = url.searchParams.get("year");
-    const yearRange = parseInt(url.searchParams.get("year_range") || "2", 10);
-    const minPrice = url.searchParams.get("min_price");
-    const maxPrice = url.searchParams.get("max_price");
+    let body: Record<string, any> = {};
+    if (req.method === "POST") {
+      try { body = await req.json(); } catch { /* empty body ok */ }
+    }
+    const p = (key: string) => url.searchParams.get(key) ?? body[key]?.toString() ?? null;
+
+    const vehicleId = p("vehicle_id");
+    const vin = p("vin");
+    const makeParam = p("make");
+    const modelParam = p("model");
+    const yearParam = p("year");
+    const yearRange = parseInt(p("year_range") || "2", 10);
+    const minPrice = p("min_price");
+    const maxPrice = p("max_price");
     const rawLimit = parseInt(url.searchParams.get("limit") || "20", 10);
     const limit = Math.max(1, Math.min(isNaN(rawLimit) ? 20 : rawLimit, 100));
 
