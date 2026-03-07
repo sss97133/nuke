@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { supabase } from '../lib/supabase';
 import type { UniversalSearchResult } from '../services/universalSearchService';
+import { parseMarketQuery } from '../lib/search/marketQueryParser';
 
 /* ------------------------------------------------------------------ */
 /*  Styles                                                             */
@@ -187,25 +188,121 @@ function Code({ children }: { children: string }) {
   );
 }
 
+interface CompsData {
+  summary: { count: number; avg_price: number; median_price: number; min_price: number; max_price: number; auction_event_count: number } | null;
+  query: { make: string; model: string | null; year: number | null; year_range: number };
+  data: { platform: string | null }[];
+}
+
+function formatPrice(n: number): string {
+  if (n >= 1000) return '$' + Math.round(n / 1000).toLocaleString() + 'K';
+  return '$' + n.toLocaleString();
+}
+
+function MarketAnswer({ comps }: { comps: CompsData }) {
+  const { summary, query: q, data } = comps;
+  if (!summary || summary.count === 0) return null;
+
+  const label = [q.make, q.model].filter(Boolean).join(' ');
+  const yearLabel = q.year
+    ? `(${q.year - q.year_range}–${q.year + q.year_range})`
+    : '';
+
+  // Count by platform
+  const platforms: Record<string, number> = {};
+  for (const d of data) {
+    const p = d.platform || 'Other';
+    platforms[p] = (platforms[p] || 0) + 1;
+  }
+  const sourceList = Object.entries(platforms)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([name, count]) => `${name} (${count})`)
+    .join('  ');
+
+  return (
+    <div style={{ border: '2px solid var(--border-medium)', background: 'var(--white)', marginBottom: 'var(--space-3)' }}>
+      <div style={{ padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--border-light)' }}>
+        <div style={s.label}>MARKET DATA</div>
+        <div style={{ fontWeight: 'bold' }}>
+          {summary.count} comparable sale{summary.count !== 1 ? 's' : ''}
+          {label && <span style={{ fontWeight: 'normal', color: 'var(--text-muted)' }}> &middot; {label} {yearLabel}</span>}
+        </div>
+      </div>
+      <div style={{ padding: 'var(--space-2) var(--space-3)', fontFamily: '"Courier New", monospace', fontSize: '11px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+          <span style={{ color: 'var(--text-muted)' }}>avg</span>
+          <span>{formatPrice(summary.avg_price)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+          <span style={{ color: 'var(--text-muted)' }}>median</span>
+          <span>{formatPrice(summary.median_price)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+          <span style={{ color: 'var(--text-muted)' }}>range</span>
+          <span>{formatPrice(summary.min_price)} – {formatPrice(summary.max_price)}</span>
+        </div>
+      </div>
+      {sourceList && (
+        <div style={{
+          padding: 'var(--space-2) var(--space-3)', borderTop: '1px solid var(--border-light)',
+          color: 'var(--text-muted)', fontSize: '11px',
+        }}>
+          {sourceList}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LiveSearch() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UniversalSearchResult[]>([]);
+  const [comps, setComps] = useState<CompsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [ms, setMs] = useState<number | null>(null);
   const [total, setTotal] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const search = useCallback(async (q: string) => {
-    if (!q.trim()) { setResults([]); setMs(null); setTotal(0); return; }
+    if (!q.trim()) { setResults([]); setComps(null); setMs(null); setTotal(0); return; }
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('universal-search', {
+      const parsed = parseMarketQuery(q);
+
+      // Always search entities
+      const searchPromise = supabase.functions.invoke('universal-search', {
         body: { query: q.trim(), limit: 6, includeAI: false },
       });
+
+      // If market query with a parseable make, also fetch comps
+      let compsPromise: Promise<any> | null = null;
+      if (parsed.isMarket && parsed.make) {
+        const compsBody: Record<string, any> = { make: parsed.make, limit: 20 };
+        if (parsed.model) compsBody.model = parsed.model;
+        if (parsed.yearMin) compsBody.year = parsed.yearMin;
+        if (parsed.yearMin && parsed.yearMax && parsed.yearMax !== parsed.yearMin) {
+          compsBody.year_range = Math.max(2, Math.ceil((parsed.yearMax - parsed.yearMin) / 2));
+        }
+        compsPromise = supabase.functions.invoke('api-v1-comps', { body: compsBody });
+      }
+
+      const [searchRes, compsRes] = await Promise.all([
+        searchPromise,
+        compsPromise ?? Promise.resolve(null),
+      ]);
+
+      const { data, error } = searchRes;
       if (!error && data) {
         setResults(data.results ?? []);
         setMs(data.search_time_ms ?? null);
         setTotal(data.total_count ?? 0);
+      }
+
+      if (compsRes?.data && !compsRes.error) {
+        setComps(compsRes.data);
+      } else {
+        setComps(null);
       }
     } catch { /* */ } finally { setLoading(false); }
   }, []);
@@ -218,12 +315,15 @@ function LiveSearch() {
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
+  const hasComps = comps?.summary && comps.summary.count > 0;
+  const hasResults = results.length > 0;
+
   return (
     <>
       <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
         <input
           type="text"
-          placeholder="1973 Porsche 911, WBS4M9C5, Shelby Cobra..."
+          placeholder="1973 Porsche 911, Shelby Cobra, how many Mustangs sold..."
           value={query}
           onChange={(e) => onInput(e.target.value)}
           style={s.searchInput}
@@ -235,7 +335,8 @@ function LiveSearch() {
           }}>...</span>
         )}
       </div>
-      {results.length > 0 && (
+      {hasComps && <MarketAnswer comps={comps!} />}
+      {hasResults && (
         <div style={{ border: '2px solid var(--border-medium)', background: 'var(--white)' }}>
           {results.map((r) => (
             <div key={r.id} style={s.searchResult}>
@@ -259,7 +360,7 @@ function LiveSearch() {
           </div>
         </div>
       )}
-      {query.trim() && !loading && results.length === 0 && (
+      {query.trim() && !loading && !hasComps && !hasResults && (
         <div style={{ color: 'var(--text-muted)', padding: 'var(--space-3)' }}>
           No results.
         </div>
