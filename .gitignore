@@ -177,6 +177,12 @@ nuke_frontend/test-screenshots/
 
 # Ephemeral agent coordination files
 AGENT_COORDINATION.md
+CLAUDE.md
+TOOLS.md
+DONE.md
+PROJECT_STATE.md
+.mcp.json
+.env.supabase.example
 
 # Analysis reports (generated per session)
 DATA_ANALYSIS_REPORT.md
