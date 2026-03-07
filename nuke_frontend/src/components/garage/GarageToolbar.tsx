@@ -165,7 +165,7 @@ export function GarageToolbar({
 
       {/* Filter */}
       <SegmentedControl<FilterMode>
-        options={['ALL', 'OWNED', 'WATCHING', 'UPLOADED']}
+        options={['ALL', 'OWNED', 'CONTRIBUTED']}
         value={filterMode}
         onChange={onFilterChange}
       />

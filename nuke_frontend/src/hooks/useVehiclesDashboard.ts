@@ -18,13 +18,11 @@ export type RelationshipType =
   | 'CO-OWNER'
   | 'PREVIOUSLY OWNED'
   | 'CONSIGNED'
-  | 'CONTRIBUTOR'
-  | 'UPLOADER'
-  | 'WATCHING';
+  | 'CONTRIBUTOR';
 
 export type ViewMode = 'GRID' | 'LIST' | 'COMPACT';
 export type SortMode = 'RECENT' | 'VALUE' | 'HEALTH' | 'NAME';
-export type FilterMode = 'ALL' | 'OWNED' | 'WATCHING' | 'UPLOADED';
+export type FilterMode = 'ALL' | 'OWNED' | 'CONTRIBUTED';
 
 export interface GarageVehicle {
   id: string;
@@ -75,8 +73,6 @@ export interface VehiclesDashboardState {
 // ---------------------------------------------------------------------------
 
 const RELATIONSHIP_PRIORITY: RelationshipType[] = [
-  'WATCHING',
-  'UPLOADER',
   'CONTRIBUTOR',
   'PREVIOUSLY OWNED',
   'CONSIGNED',
@@ -97,12 +93,6 @@ function permissionRoleToRelationship(role: string): RelationshipType {
   return 'CONTRIBUTOR';
 }
 
-function discoveredTypeToRelationship(type: string): RelationshipType | null {
-  if (type === 'previously_owned') return 'PREVIOUSLY OWNED';
-  if (type === 'consigned') return 'CONSIGNED';
-  if (type === 'interested' || type === 'discovered' || type === 'curated') return 'WATCHING';
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // Filter / Sort / Section helpers
@@ -111,8 +101,7 @@ function discoveredTypeToRelationship(type: string): RelationshipType | null {
 function matchesFilter(v: GarageVehicle, filter: FilterMode): boolean {
   if (filter === 'ALL') return true;
   if (filter === 'OWNED') return ['VERIFIED OWNER', 'OWNER', 'CO-OWNER', 'PREVIOUSLY OWNED', 'CONSIGNED'].includes(v.relationship_type);
-  if (filter === 'WATCHING') return v.relationship_type === 'WATCHING';
-  if (filter === 'UPLOADED') return v.relationship_type === 'UPLOADER';
+  if (filter === 'CONTRIBUTED') return v.relationship_type === 'CONTRIBUTOR';
   return true;
 }
 
@@ -235,7 +224,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
     async function fetchAll() {
       try {
         // Fire all 5 relationship queries in parallel
-        const [verifiedRes, permRes, contribRes, discoveredRes, uploadedRes] = await Promise.all([
+        const [verifiedRes, permRes, contribRes, prevOwnedRes, personalImagesRes] = await Promise.all([
           // Q1: ownership_verifications (approved)
           supabase
             .from('ownership_verifications')
@@ -256,17 +245,16 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
             .select('vehicle_id, role, created_at, status')
             .eq('user_id', userId),
 
-          // Q4: discovered_vehicles (all, including dismissed)
+          // Q4: previously owned vehicles
           supabase
             .from('discovered_vehicles')
-            .select('vehicle_id, relationship_type, created_at, is_active')
-            .eq('user_id', userId),
+            .select('vehicle_id, relationship_type, created_at')
+            .eq('user_id', userId)
+            .eq('relationship_type', 'previously_owned')
+            .eq('is_active', true),
 
-          // Q5: vehicles uploaded by this user
-          supabase
-            .from('vehicles')
-            .select(VEHICLE_SELECT)
-            .eq('uploaded_by', userId),
+          // Q5: vehicles with personal image data (boots-on-the-ground sources)
+          supabase.rpc('get_vehicles_with_personal_images'),
         ]);
 
         if (cancelled) return;
@@ -308,44 +296,31 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
           }
         }
 
-        // Q4: discovered vehicles — track dismissed set
-        const dismissedSet = new Set<string>();
-        if (discoveredRes.data) {
-          for (const row of discoveredRes.data) {
-            if (row.is_active === false) {
-              dismissedSet.add(row.vehicle_id);
-              continue;
-            }
-            const rel = discoveredTypeToRelationship(row.relationship_type);
-            if (rel) {
-              setRel(row.vehicle_id, rel, 'discovered');
+        // Q4: previously owned
+        if (prevOwnedRes.data) {
+          for (const row of prevOwnedRes.data) {
+            setRel(row.vehicle_id, 'PREVIOUSLY OWNED', 'discovered');
+          }
+        }
+
+        // Q5: personal-image vehicles — boots-on-the-ground, skip if already has higher relationship
+        if (personalImagesRes.data) {
+          for (const row of personalImagesRes.data as { vehicle_id: string }[]) {
+            if (!relMap.has(row.vehicle_id)) {
+              relMap.set(row.vehicle_id, { type: 'CONTRIBUTOR', source: 'uploaded_by' });
             }
           }
         }
 
-        // Q5: uploaded_by — lowest priority, skip if already has relationship or dismissed
-        const uploadedRows = (uploadedRes.data ?? []) as VehicleRow[];
-        const uploadedIds = new Set<string>();
-        for (const row of uploadedRows) {
-          uploadedIds.add(row.id);
-          if (!relMap.has(row.id) && !dismissedSet.has(row.id)) {
-            relMap.set(row.id, { type: 'UPLOADER', source: 'uploaded_by' });
-          }
-        }
+        // Hydrate all vehicle IDs in the relationship map
+        const idsToFetch = Array.from(relMap.keys());
 
-        // Hydrate vehicle IDs that aren't already in uploaded set
-        const idsToFetch = new Set<string>();
-        for (const id of relMap.keys()) {
-          if (!uploadedIds.has(id)) idsToFetch.add(id);
-        }
-
-        let extraRows: VehicleRow[] = [];
-        if (idsToFetch.size > 0) {
-          const idArray = Array.from(idsToFetch);
+        let allRows = new Map<string, VehicleRow>();
+        if (idsToFetch.length > 0) {
           // Batch in chunks of 100
           const chunks: string[][] = [];
-          for (let i = 0; i < idArray.length; i += 100) {
-            chunks.push(idArray.slice(i, i + 100));
+          for (let i = 0; i < idsToFetch.length; i += 100) {
+            chunks.push(idsToFetch.slice(i, i + 100));
           }
           const chunkResults = await Promise.all(
             chunks.map(chunk =>
@@ -353,17 +328,15 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
             )
           );
           for (const res of chunkResults) {
-            if (res.data) extraRows.push(...(res.data as VehicleRow[]));
+            if (res.data) {
+              for (const v of res.data as VehicleRow[]) {
+                allRows.set(v.id, v);
+              }
+            }
           }
         }
 
         if (cancelled) return;
-
-        // Merge all rows, deduplicate by id
-        const allRows = new Map<string, VehicleRow>();
-        for (const v of [...uploadedRows, ...extraRows]) {
-          allRows.set(v.id, v);
-        }
 
         // Build GarageVehicle array
         const garage: GarageVehicle[] = [];
