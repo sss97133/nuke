@@ -147,11 +147,11 @@ async function reExtractImages(listingUrl) {
       return { success: false, error: data?.error || 'Extraction failed' };
     }
     
-    // The extraction function stores images in the database, so we need to check external_listings metadata
+    // The extraction function stores images in the database, so we need to check vehicle_events metadata
     // or wait a moment and then check the vehicle's origin_metadata for images
     console.log(`   📊 Extraction result: ${data.vehicles_extracted || 0} extracted, ${data.vehicles_created || 0} created, ${data.vehicles_updated || 0} updated`);
     
-    // Try to get images from external_listings metadata if available
+    // Try to get images from vehicle_events metadata if available
     // For now, return success if extraction succeeded - images should be in DB
     return { success: true, images: [], note: 'Images stored in database' };
   } catch (error) {
@@ -178,18 +178,18 @@ async function fixListing(problematic) {
   // Wait a moment for images to be stored
   await new Promise(resolve => setTimeout(resolve, 2000));
   
-  // Get images from external_listings metadata
-  const { data: externalListing } = await supabase
-    .from('external_listings')
+  // Get images from vehicle_events metadata
+  const { data: vehicleEvent } = await supabase
+    .from('vehicle_events')
     .select('metadata')
     .eq('vehicle_id', vehicle.id)
-    .eq('platform', 'carsandbids')
+    .eq('source_platform', 'carsandbids')
     .maybeSingle();
-  
-  const fullResImages = externalListing?.metadata?.images || externalListing?.metadata?.image_urls || [];
-  
+
+  const fullResImages = vehicleEvent?.metadata?.images || vehicleEvent?.metadata?.image_urls || [];
+
   if (fullResImages.length === 0) {
-    console.log(`   ⚠️  No images found in external_listings metadata`);
+    console.log(`   ⚠️  No images found in vehicle_events metadata`);
     return { success: false, error: 'No images extracted' };
   }
   

@@ -145,12 +145,12 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
       let buyerUsername: string | null = null;
       let buyerProfileUrl: string | null = null;
 
-      // 1. Check external_listings metadata
+      // 1. Check vehicle_events metadata
       const { data: listing } = await supabase
-        .from('external_listings')
+        .from('vehicle_events')
         .select('metadata')
         .eq('vehicle_id', vehicle.id)
-        .eq('platform', 'bat')
+        .eq('source_platform', 'bat')
         .order('sold_at', { ascending: false, nullsLast: true })
         .limit(1)
         .maybeSingle();

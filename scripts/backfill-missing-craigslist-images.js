@@ -4,7 +4,7 @@
  * 
  * This script:
  * 1. Finds vehicles imported from Craigslist that have no images
- * 2. Gets their original listing URL from discovery_url or external_listings
+ * 2. Gets their original listing URL from discovery_url or vehicle_events
  * 3. Re-scrapes the listing to get image URLs
  * 4. Downloads and imports images using the same logic as the scraper
  */
@@ -37,15 +37,15 @@ const DRY_RUN = false; // Set to true to see what would be done without actually
  * Get listing URL from vehicle metadata
  */
 async function getListingUrl(vehicleId) {
-  // Try external_listings first
+  // Try vehicle_events first
   const { data: external } = await supabase
-    .from('external_listings')
-    .select('listing_url')
+    .from('vehicle_events')
+    .select('source_url')
     .eq('vehicle_id', vehicleId)
     .maybeSingle();
-  
-  if (external?.listing_url) {
-    return external.listing_url;
+
+  if (external?.source_url) {
+    return external.source_url;
   }
   
   // Try timeline_events metadata

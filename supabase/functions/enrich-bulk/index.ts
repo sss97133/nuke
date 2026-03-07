@@ -5,7 +5,7 @@
  *
  *   vin_decode       — NHTSA batch VIN decode (body_style, engine, transmission, fuel, HP, doors)
  *   mine_descriptions — Regex extraction from existing descriptions (VIN, mileage, color, engine, trans)
- *   cross_reference   — Pull sale_price from bat_listings + external_listings
+ *   cross_reference   — Pull sale_price from vehicle_events
  *   derive_fields     — Compute decade, country_of_origin, body_style from make/model
  *   stats             — Show enrichment gaps across all sources
  *
@@ -327,12 +327,13 @@ async function handleCrossReference(
   const limit = Math.min(Number(body.limit) || 200, 500);
   const results = { sale_price_from_bat: 0, sale_price_from_ext: 0, total: 0 };
 
-  // 1. Get bat_listings with sale_price that aren't on the vehicle yet
+  // 1. Get vehicle_events (bat) with final_price that aren't on the vehicle yet
   const { data: batListings } = await supabase
-    .from("bat_listings")
-    .select("vehicle_id, sale_price")
-    .not("sale_price", "is", null)
-    .gt("sale_price", 0)
+    .from("vehicle_events")
+    .select("vehicle_id, final_price")
+    .eq("source_platform", "bat")
+    .not("final_price", "is", null)
+    .gt("final_price", 0)
     .not("vehicle_id", "is", null)
     .limit(limit);
 
@@ -352,8 +353,8 @@ async function handleCrossReference(
       for (let i = 0; i < updates.length; i += 20) {
         const chunk = updates.slice(i, i + 20);
         await Promise.all(
-          chunk.map(({ vehicle_id, sale_price }) =>
-            supabase.from("vehicles").update({ sale_price }).eq("id", vehicle_id)
+          chunk.map(({ vehicle_id, final_price }: any) =>
+            supabase.from("vehicles").update({ sale_price: final_price }).eq("id", vehicle_id)
           )
         );
       }
@@ -361,9 +362,9 @@ async function handleCrossReference(
     }
   }
 
-  // 2. Get external_listings with final_price
+  // 2. Get vehicle_events with final_price (non-bat platforms)
   const { data: extListings } = await supabase
-    .from("external_listings")
+    .from("vehicle_events")
     .select("vehicle_id, final_price")
     .not("final_price", "is", null)
     .gt("final_price", 0)

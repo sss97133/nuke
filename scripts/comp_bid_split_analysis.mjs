@@ -23,11 +23,11 @@ const rows = await q(`
          d.comp_median::float as comp,
          d.comp_count::int as cc,
          d.multiplier_used::float as mult,
-         el.watcher_count::int as watchers,
-         el.view_count::int as views,
-         el.bid_count::int as bid_count
+         ve.watcher_count::int as watchers,
+         ve.view_count::int as views,
+         ve.bid_count::int as bid_count
   FROM backtest_run_details d
-  JOIN external_listings el ON el.vehicle_id = d.vehicle_id
+  JOIN vehicle_events ve ON ve.vehicle_id = d.vehicle_id
   WHERE d.run_id = (SELECT id FROM backtest_runs ORDER BY created_at DESC LIMIT 1)
     AND d.actual_hammer > 0 AND d.bid_at_window > 0
     AND d.comp_median > 0 AND d.comp_count >= 1

@@ -226,7 +226,7 @@ export function VehiclePricingValueCard(props: {
 
           {/* Debug / provenance hint */}
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            Tip: click the main price in the header to view provenance. Live bid is sourced from `external_listings` and cached to `vehicles.high_bid`.
+            Tip: click the main price in the header to view provenance. Live bid is sourced from `vehicle_events` and cached to `vehicles.high_bid`.
           </div>
         </div>
       </CollapsibleWidget>

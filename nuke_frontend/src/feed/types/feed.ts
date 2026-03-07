@@ -74,7 +74,7 @@ export interface FeedVehicle {
   profile_origin?: string | null;
   origin_organization_id?: string | null;
 
-  // Auction state (resolved server-side from external_listings)
+  // Auction state (resolved server-side from vehicle_events)
   auction_end_date?: string | null;
   current_bid?: number | null;
   bid_count?: number | null;

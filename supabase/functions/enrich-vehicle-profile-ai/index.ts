@@ -376,11 +376,11 @@ serve(async (req) => {
     } else if (body.vehicle_ids && Array.isArray(body.vehicle_ids)) {
       vehicleIds = body.vehicle_ids.map(String);
     } else if (body.business_id) {
-      // Get all vehicles for this business via external_listings
+      // Get all vehicles for this business via vehicle_events
       const { data: listings } = await supabase
-        .from("external_listings")
+        .from("vehicle_events")
         .select("vehicle_id")
-        .eq("organization_id", body.business_id);
+        .eq("source_organization_id", body.business_id);
       vehicleIds = (listings || []).map((l: any) => String(l.vehicle_id)).filter(Boolean);
     } else {
       return new Response(JSON.stringify({ error: "Provide vehicle_id, vehicle_ids[], or business_id" }), {

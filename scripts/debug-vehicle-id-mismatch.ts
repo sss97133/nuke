@@ -14,23 +14,23 @@ const supabase = createClient(
 async function main() {
   console.log('=== DEBUG VEHICLE ID MISMATCH ===\n');
 
-  // Get a sample listing with price
+  // Get a sample event with price
   const { data: listing } = await supabase
-    .from('external_listings')
-    .select('id, vehicle_id, final_price, listing_url')
+    .from('vehicle_events')
+    .select('id, vehicle_id, final_price, source_url')
     .not('final_price', 'is', null)
     .not('vehicle_id', 'is', null)
     .limit(1)
     .single();
 
   if (!listing) {
-    console.log('No listing found');
+    console.log('No event found');
     return;
   }
 
-  console.log('External listing:');
+  console.log('Vehicle event:');
   console.log(`  vehicle_id: ${listing.vehicle_id}`);
-  console.log(`  listing_url: ${listing.listing_url}`);
+  console.log(`  source_url: ${listing.source_url}`);
   console.log(`  final_price: ${listing.final_price}`);
 
   // Check if this vehicle exists
@@ -62,7 +62,7 @@ async function main() {
 
   // Get sample vehicle_ids from each table
   const { data: listingIds } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('vehicle_id')
     .not('vehicle_id', 'is', null)
     .limit(10);
@@ -73,7 +73,7 @@ async function main() {
     .not('vehicle_id', 'is', null)
     .limit(10);
 
-  console.log('External listing vehicle_ids:');
+  console.log('Vehicle event vehicle_ids:');
   listingIds?.forEach(l => console.log(`  ${l.vehicle_id}`));
 
   console.log('\nAuction event vehicle_ids:');
@@ -88,7 +88,7 @@ async function main() {
 
   // Bigger sample
   const { data: allListingIds } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('vehicle_id')
     .not('vehicle_id', 'is', null)
     .limit(3000);

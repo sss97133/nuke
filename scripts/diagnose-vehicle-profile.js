@@ -76,7 +76,7 @@ async function diagnoseVehicle(vehicleId) {
     supabase.from('timeline_events').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
     supabase.from('vehicle_comments').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
     supabase.from('vehicle_documents').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
-    supabase.from('external_listings').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
+    supabase.from('vehicle_events').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
   ]);
 
   console.log('\n📦 RELATED DATA:');
@@ -84,7 +84,7 @@ async function diagnoseVehicle(vehicleId) {
   console.log(`  Timeline Events: ${events.count || 0}`);
   console.log(`  Comments: ${comments.count || 0}`);
   console.log(`  Documents: ${docs.count || 0}`);
-  console.log(`  External Listings: ${listings.count || 0}`);
+  console.log(`  Vehicle Events: ${listings.count || 0}`);
 
   // Check for contamination
   console.log('\n🧹 DATA QUALITY:');

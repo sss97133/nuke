@@ -30,25 +30,25 @@ async function check() {
     }
   }
   
-  // Get platforms count from external_listings
+  // Get platforms count from vehicle_events
   const { data: platformCounts } = await supabase
-    .from('external_listings')
-    .select('platform');
-  
+    .from('vehicle_events')
+    .select('source_platform');
+
   if (platformCounts) {
     const counts: Record<string, number> = {};
     for (const l of platformCounts) {
-      counts[l.platform] = (counts[l.platform] || 0) + 1;
+      counts[l.source_platform] = (counts[l.source_platform] || 0) + 1;
     }
-    console.log('\n=== Existing external_listings by platform ===');
+    console.log('\n=== Existing vehicle_events by source_platform ===');
     for (const [k, v] of Object.entries(counts).sort((a, b) => b[1] - a[1])) {
       console.log(`  ${k}: ${v}`);
     }
   }
-  
+
   // Check total count
-  const { count } = await supabase.from('external_listings').select('*', { count: 'exact', head: true });
-  console.log(`\nTotal external_listings: ${count}`);
+  const { count } = await supabase.from('vehicle_events').select('*', { count: 'exact', head: true });
+  console.log(`\nTotal vehicle_events: ${count}`);
 }
 
 check().catch(console.error);

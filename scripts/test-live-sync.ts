@@ -16,16 +16,16 @@ async function testLiveSync() {
 
   // Get current state
   const { data: before } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('*')
     .eq('id', externalListingId)
     .single();
 
   console.log('\n--- BEFORE SYNC ---');
-  console.log(`  Current Bid: $${before?.current_bid?.toLocaleString()}`);
+  console.log(`  Current Bid: $${before?.current_price?.toLocaleString()}`);
   console.log(`  Bid Count: ${before?.bid_count}`);
   console.log(`  Watchers: ${before?.watcher_count}`);
-  console.log(`  Status: ${before?.listing_status}`);
+  console.log(`  Status: ${before?.event_status}`);
   console.log(`  Last Synced: ${before?.last_synced_at}`);
 
   // Trigger sync
@@ -48,22 +48,22 @@ async function testLiveSync() {
 
   // Get updated state
   const { data: after } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('*')
     .eq('id', externalListingId)
     .single();
 
   console.log('\n--- AFTER SYNC ---');
-  console.log(`  Current Bid: $${after?.current_bid?.toLocaleString()}`);
+  console.log(`  Current Bid: $${after?.current_price?.toLocaleString()}`);
   console.log(`  Bid Count: ${after?.bid_count}`);
   console.log(`  Watchers: ${after?.watcher_count}`);
-  console.log(`  Status: ${after?.listing_status}`);
+  console.log(`  Status: ${after?.event_status}`);
   console.log(`  Last Synced: ${after?.last_synced_at}`);
 
   // Show changes
   console.log('\n--- CHANGES ---');
-  if (before?.current_bid !== after?.current_bid) {
-    console.log(`  Bid: $${before?.current_bid?.toLocaleString()} → $${after?.current_bid?.toLocaleString()}`);
+  if (before?.current_price !== after?.current_price) {
+    console.log(`  Bid: $${before?.current_price?.toLocaleString()} → $${after?.current_price?.toLocaleString()}`);
   }
   if (before?.bid_count !== after?.bid_count) {
     console.log(`  Bid Count: ${before?.bid_count} → ${after?.bid_count}`);

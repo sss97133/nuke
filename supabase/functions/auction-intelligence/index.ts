@@ -97,12 +97,12 @@ async function dashboard(supabase: ReturnType<typeof createClient>) {
         GROUP BY vehicle_id
       )
       SELECT
-        el.vehicle_id,
+        ve.vehicle_id,
         v.year, v.make, v.model,
-        el.current_bid::int as bid,
-        el.listing_url,
-        to_char(el.end_date, 'YYYY-MM-DD"T"HH24:MI"Z"') as end_date,
-        ROUND(EXTRACT(EPOCH FROM (el.end_date - NOW())) / 3600, 1) as hours_left,
+        ve.current_price::int as bid,
+        ve.source_url,
+        to_char(ve.ended_at, 'YYYY-MM-DD"T"HH24:MI"Z"') as end_date,
+        ROUND(EXTRACT(EPOCH FROM (ve.ended_at - NOW())) / 3600, 1) as hours_left,
         lp.predicted_hammer::int as predicted_hammer,
         lp.comp_median::int as comp_median,
         lp.comp_count,
@@ -113,20 +113,20 @@ async function dashboard(supabase: ReturnType<typeof createClient>) {
         bv.bid_count_24h,
         bv.bid_momentum_pct,
         -- Value signals
-        CASE WHEN lp.predicted_hammer IS NOT NULL AND el.current_bid > 0
-          THEN ROUND(((lp.predicted_hammer - el.current_bid)::float / el.current_bid * 100)::numeric, 1)
+        CASE WHEN lp.predicted_hammer IS NOT NULL AND ve.current_price > 0
+          THEN ROUND(((lp.predicted_hammer - ve.current_price)::float / ve.current_price * 100)::numeric, 1)
           ELSE NULL
         END as upside_pct,
-        CASE WHEN lp.comp_median IS NOT NULL AND el.current_bid > 0
-          THEN ROUND(((lp.comp_median - el.current_bid)::float / el.current_bid * 100)::numeric, 1)
+        CASE WHEN lp.comp_median IS NOT NULL AND ve.current_price > 0
+          THEN ROUND(((lp.comp_median - ve.current_price)::float / ve.current_price * 100)::numeric, 1)
           ELSE NULL
         END as comp_upside_pct,
         -- Deal score: composite of upside, confidence, comp quality
-        CASE WHEN lp.predicted_hammer IS NOT NULL AND el.current_bid > 0 AND lp.comp_count > 0
+        CASE WHEN lp.predicted_hammer IS NOT NULL AND ve.current_price > 0 AND lp.comp_count > 0
           THEN ROUND((
             -- Upside component (0-40 points)
             LEAST(40, GREATEST(0,
-              ((lp.predicted_hammer - el.current_bid)::float / NULLIF(el.current_bid, 0) * 100)
+              ((lp.predicted_hammer - ve.current_price)::float / NULLIF(ve.current_price, 0) * 100)
             )) +
             -- Confidence component (0-30 points)
             LEAST(30, COALESCE(lp.confidence_score, 0) * 0.3) +
@@ -135,17 +135,17 @@ async function dashboard(supabase: ReturnType<typeof createClient>) {
           )::numeric, 0)
           ELSE NULL
         END as deal_score
-      FROM external_listings el
-      JOIN vehicles v ON v.id = el.vehicle_id
-      LEFT JOIN latest_pred lp ON lp.vehicle_id = el.vehicle_id
-      LEFT JOIN bid_velocity bv ON bv.vehicle_id = el.vehicle_id
-      WHERE el.platform = 'bat'
-        AND el.listing_status = 'active'
-        AND el.end_date > NOW()
-        AND el.current_bid > 0
+      FROM vehicle_events ve
+      JOIN vehicles v ON v.id = ve.vehicle_id
+      LEFT JOIN latest_pred lp ON lp.vehicle_id = ve.vehicle_id
+      LEFT JOIN bid_velocity bv ON bv.vehicle_id = ve.vehicle_id
+      WHERE ve.source_platform = 'bat'
+        AND ve.event_status = 'active'
+        AND ve.ended_at > NOW()
+        AND ve.current_price > 0
       ORDER BY
         CASE WHEN lp.predicted_hammer IS NOT NULL
-          THEN ((lp.predicted_hammer - el.current_bid)::float / NULLIF(el.current_bid, 0))
+          THEN ((lp.predicted_hammer - ve.current_price)::float / NULLIF(ve.current_price, 0))
           ELSE -1
         END DESC
     `,
@@ -262,13 +262,13 @@ async function vehicleDeepDive(supabase: ReturnType<typeof createClient>, vehicl
   const { data: vehicle } = await supabase.rpc("execute_sql", {
     query: `
       SELECT v.year, v.make, v.model, v.vin,
-        el.current_bid::int as bid, el.listing_url,
-        to_char(el.end_date, 'YYYY-MM-DD"T"HH24:MI"Z"') as end_date,
-        el.listing_status
+        ve.current_price::int as bid, ve.source_url,
+        to_char(ve.ended_at, 'YYYY-MM-DD"T"HH24:MI"Z"') as end_date,
+        ve.event_status
       FROM vehicles v
-      JOIN external_listings el ON el.vehicle_id = v.id AND el.platform = 'bat'
+      JOIN vehicle_events ve ON ve.vehicle_id = v.id AND ve.source_platform = 'bat'
       WHERE v.id = '${vehicleId}'
-      ORDER BY el.end_date DESC
+      ORDER BY ve.ended_at DESC
       LIMIT 1
     `,
   });
@@ -334,27 +334,27 @@ async function dealAlerts(supabase: ReturnType<typeof createClient>) {
         ORDER BY vehicle_id, predicted_at DESC
       )
       SELECT
-        el.vehicle_id,
+        ve.vehicle_id,
         v.year, v.make, v.model,
-        el.current_bid::int as bid,
-        el.listing_url,
-        ROUND(EXTRACT(EPOCH FROM (el.end_date - NOW())) / 3600, 1) as hours_left,
+        ve.current_price::int as bid,
+        ve.source_url,
+        ROUND(EXTRACT(EPOCH FROM (ve.ended_at - NOW())) / 3600, 1) as hours_left,
         lp.predicted_hammer::int as predicted,
         lp.comp_median::int as comp_med,
         lp.comp_count,
         lp.confidence_score,
-        ROUND(((lp.predicted_hammer - el.current_bid)::float / NULLIF(el.current_bid, 0) * 100)::numeric, 1) as upside_pct
-      FROM external_listings el
-      JOIN vehicles v ON v.id = el.vehicle_id
-      JOIN latest_pred lp ON lp.vehicle_id = el.vehicle_id
-      WHERE el.platform = 'bat'
-        AND el.listing_status = 'active'
-        AND el.end_date > NOW()
-        AND el.current_bid > 0
-        AND lp.predicted_hammer > el.current_bid * 1.15
+        ROUND(((lp.predicted_hammer - ve.current_price)::float / NULLIF(ve.current_price, 0) * 100)::numeric, 1) as upside_pct
+      FROM vehicle_events ve
+      JOIN vehicles v ON v.id = ve.vehicle_id
+      JOIN latest_pred lp ON lp.vehicle_id = ve.vehicle_id
+      WHERE ve.source_platform = 'bat'
+        AND ve.event_status = 'active'
+        AND ve.ended_at > NOW()
+        AND ve.current_price > 0
+        AND lp.predicted_hammer > ve.current_price * 1.15
         AND lp.comp_count >= 1
       ORDER BY
-        ((lp.predicted_hammer - el.current_bid)::float / NULLIF(el.current_bid, 0)) DESC
+        ((lp.predicted_hammer - ve.current_price)::float / NULLIF(ve.current_price, 0)) DESC
     `,
   });
 
@@ -422,12 +422,12 @@ async function paperPortfolio(supabase: ReturnType<typeof createClient>) {
         lp.bid, lp.predicted, lp.comp_med, lp.comp_count,
         lp.confidence_score,
         ROUND(((lp.predicted - lp.bid)::float / NULLIF(lp.bid, 0) * 100)::numeric, 1) as upside_pct,
-        el.listing_url,
-        ROUND(EXTRACT(EPOCH FROM (el.end_date - NOW())) / 3600, 1) as hours_left
+        ve.source_url,
+        ROUND(EXTRACT(EPOCH FROM (ve.ended_at - NOW())) / 3600, 1) as hours_left
       FROM latest_pred lp
       JOIN vehicles v ON v.id = lp.vehicle_id
-      JOIN external_listings el ON el.vehicle_id = lp.vehicle_id AND el.platform = 'bat'
-      WHERE el.listing_status = 'active' AND el.end_date > NOW()
+      JOIN vehicle_events ve ON ve.vehicle_id = lp.vehicle_id AND ve.source_platform = 'bat'
+      WHERE ve.event_status = 'active' AND ve.ended_at > NOW()
       ORDER BY upside_pct DESC
     `,
   });
@@ -588,12 +588,12 @@ async function warRoom(supabase: ReturnType<typeof createClient>) {
         WHERE closed_at IS NULL
       )
       SELECT
-        el.vehicle_id,
+        ve.vehicle_id,
         v.year, v.make, v.model,
-        el.current_bid::int as bid,
-        el.listing_url,
-        to_char(el.end_date, 'HH24:MI') as closes_at,
-        ROUND(EXTRACT(EPOCH FROM (el.end_date - NOW())) / 60) as minutes_left,
+        ve.current_price::int as bid,
+        ve.source_url,
+        to_char(ve.ended_at, 'HH24:MI') as closes_at,
+        ROUND(EXTRACT(EPOCH FROM (ve.ended_at - NOW())) / 60) as minutes_left,
         lp.predicted_hammer::int as predicted,
         lp.comp_median::int as comp_med,
         lp.comp_count,
@@ -604,20 +604,20 @@ async function warRoom(supabase: ReturnType<typeof createClient>) {
         ba.unique_bidders_1h,
         pp.entry as paper_entry,
         pp.pt_predicted as paper_predicted,
-        CASE WHEN lp.predicted_hammer IS NOT NULL AND el.current_bid > 0
-          THEN ROUND(((lp.predicted_hammer - el.current_bid)::float / el.current_bid * 100)::numeric, 1)
+        CASE WHEN lp.predicted_hammer IS NOT NULL AND ve.current_price > 0
+          THEN ROUND(((lp.predicted_hammer - ve.current_price)::float / ve.current_price * 100)::numeric, 1)
         END as upside_pct
-      FROM external_listings el
-      JOIN vehicles v ON v.id = el.vehicle_id
-      LEFT JOIN latest_pred lp ON lp.vehicle_id = el.vehicle_id
-      LEFT JOIN bid_activity ba ON ba.vehicle_id = el.vehicle_id
-      LEFT JOIN paper_pos pp ON pp.vehicle_id = el.vehicle_id
-      WHERE el.platform = 'bat'
-        AND el.listing_status = 'active'
-        AND el.end_date > NOW()
-        AND el.end_date < NOW() + INTERVAL '6 hours'
-        AND el.current_bid > 0
-      ORDER BY el.end_date ASC
+      FROM vehicle_events ve
+      JOIN vehicles v ON v.id = ve.vehicle_id
+      LEFT JOIN latest_pred lp ON lp.vehicle_id = ve.vehicle_id
+      LEFT JOIN bid_activity ba ON ba.vehicle_id = ve.vehicle_id
+      LEFT JOIN paper_pos pp ON pp.vehicle_id = ve.vehicle_id
+      WHERE ve.source_platform = 'bat'
+        AND ve.event_status = 'active'
+        AND ve.ended_at > NOW()
+        AND ve.ended_at < NOW() + INTERVAL '6 hours'
+        AND ve.current_price > 0
+      ORDER BY ve.ended_at ASC
     `,
   });
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 /**
- * Backfill organization_vehicles from bat_listings (seller + auction_platform).
+ * Backfill organization_vehicles from vehicle_events (source_platform='bat', seller + auction_platform).
  * Uses id-range batching to avoid timeouts. Run until inserted_seller + inserted_platform is 0.
  *
  * Usage: dotenvx run -- npx tsx scripts/backfill-vehicle-org-claims.ts
@@ -35,10 +35,10 @@ async function main() {
   } catch (_) {}
   let n = 0;
 
-  console.log(`Backfilling vehicle-org claims from bat_listings (batch size ${BATCH_SIZE})${lastId ? ` resuming after ${lastId.slice(0, 8)}...` : '...'}`);
+  console.log(`Backfilling vehicle-org claims from vehicle_events (batch size ${BATCH_SIZE})${lastId ? ` resuming after ${lastId.slice(0, 8)}...` : '...'}`);
 
   while (true) {
-    const { data, error } = await supabase.rpc('backfill_vehicle_org_claims_from_bat_listings', {
+    const { data, error } = await supabase.rpc('backfill_vehicle_org_claims_from_vehicle_events', {
       p_batch_size: BATCH_SIZE,
       p_after_id: lastId,
     });

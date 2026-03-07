@@ -65,9 +65,10 @@ export default function BaTMembers() {
 
             // Get listing count (as seller)
             const { count: listingCount } = await supabase
-              .from('bat_listings')
+              .from('vehicle_events')
               .select('*', { count: 'exact', head: true })
-              .eq('seller_external_identity_id', member.id);
+              .eq('seller_external_identity_id', member.id)
+              .eq('source_platform', 'bat');
 
             actualCommentsCount = commentCount || 0;
             actualListingsCount = listingCount || 0;

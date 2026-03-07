@@ -2,7 +2,7 @@
 /**
  * Cleanup a contaminated vehicle profile:
  * - Detach external listing URL(s) (e.g., Bring a Trailer) from `vehicles`
- * - Optionally remove external_listings rows pointing at that URL
+ * - Optionally remove vehicle_events rows pointing at that URL
  * - Mark duplicate `vehicle_images` rows as duplicates (by file_hash/storage_path/image_url)
  *
  * Usage:
@@ -88,28 +88,28 @@ async function main() {
     if (updErr) throw updErr;
   }
 
-  // 3) Optionally remove wrong external_listings row(s)
+  // 3) Optionally remove wrong vehicle_events row(s)
   if (discoveryUrl) {
     const { data: listings, error: listErr } = await supabase
-      .from('external_listings')
-      .select('id, platform, listing_url')
+      .from('vehicle_events')
+      .select('id, source_platform, source_url')
       .eq('vehicle_id', vehicleId);
     if (listErr) {
-      console.warn('[cleanup] external_listings read failed (continuing):', listErr.message);
+      console.warn('[cleanup] vehicle_events read failed (continuing):', listErr.message);
     } else {
       const toRemove = (listings || []).filter((l) => {
-        if (isBat) return (l.listing_url || '').toLowerCase().includes('bringatrailer.com') || l.platform === 'bat';
-        return l.listing_url === discoveryUrl;
+        if (isBat) return (l.source_url || '').toLowerCase().includes('bringatrailer.com') || l.source_platform === 'bat';
+        return l.source_url === discoveryUrl;
       });
       if (toRemove.length) {
-        console.log(`[cleanup] external_listings to remove: ${toRemove.length}`);
+        console.log(`[cleanup] vehicle_events to remove: ${toRemove.length}`);
         if (!dryRun) {
           const ids = toRemove.map((l) => l.id);
-          const { error: delErr } = await supabase.from('external_listings').delete().in('id', ids);
+          const { error: delErr } = await supabase.from('vehicle_events').delete().in('id', ids);
           if (delErr) throw delErr;
         }
       } else {
-        console.log('[cleanup] no matching external_listings rows to remove');
+        console.log('[cleanup] no matching vehicle_events rows to remove');
       }
     }
   }

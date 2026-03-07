@@ -134,15 +134,16 @@ async function processMonitor(
     }
 
     // Step 2: Check which ones we already have
-    // Check bat_listings by URL
+    // Check vehicle_events by URL
     const { data: existingListings } = await supabase
-      .from('bat_listings')
-      .select('bat_listing_url, vehicle_id, buyer_username')
-      .in('bat_listing_url', winUrls);
+      .from('vehicle_events')
+      .select('source_url, vehicle_id, metadata')
+      .eq('source_platform', 'bat')
+      .in('source_url', winUrls);
 
     const existingByUrl = new Map<string, { vehicle_id: string; buyer_username: string | null }>();
     existingListings?.forEach((l: any) => {
-      existingByUrl.set(l.bat_listing_url, { vehicle_id: l.vehicle_id, buyer_username: l.buyer_username });
+      existingByUrl.set(l.source_url, { vehicle_id: l.vehicle_id, buyer_username: l.metadata?.buyer_username || null });
     });
 
     // Also check vehicles by bat_auction_url
@@ -235,11 +236,12 @@ async function processMonitor(
           .update({ bat_buyer: monitor.buyer_username })
           .eq('id', vehicle_id);
 
-        // Also update bat_listings if exists
+        // Also update vehicle_events if exists
         await supabase
-          .from('bat_listings')
-          .update({ buyer_username: monitor.buyer_username })
-          .eq('vehicle_id', vehicle_id);
+          .from('vehicle_events')
+          .update({ metadata: { buyer_username: monitor.buyer_username } })
+          .eq('vehicle_id', vehicle_id)
+          .eq('source_platform', 'bat');
 
         result.attribution_fixed++;
       } catch (err: any) {

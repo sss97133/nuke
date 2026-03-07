@@ -315,7 +315,7 @@ curl -sS "${VITE_SUPABASE_URL}/functions/v1/db-stats" -H "Authorization: Bearer 
 ```
 Returns:
 - `total_vehicles`, `total_comments`, `vehicles_with_comments`
-- `bat_top500_extracted/pending` - extraction progress for high-comment listings
+- `bat_top500_extracted/pending` - extraction progress for high-comment events
 - `comment_discoveries`, `description_discoveries` - AI analysis counts
 
 **This shows the REAL data distribution** - don't trust naive COUNT queries.
@@ -326,7 +326,7 @@ Returns:
 |-------|---------|-------------|
 | `vehicles` | Core entities (~18k) | id, year, make, model, vin, sale_price |
 | `auction_comments` | Extracted comments (~364k) | vehicle_id, comment_text, posted_at |
-| `bat_listings` | BaT source data (~4.4k) | vehicle_id, comment_count, comments_extracted_at |
+| `vehicle_events` | Auction/listing events (~170k) | vehicle_id, source_platform, source_url, event_type |
 | `vehicle_images` | All images (1M+) | vehicle_id, url |
 | `auction_events` | Auction instances | vehicle_id, platform |
 | `comment_discoveries` | AI sentiment analysis | vehicle_id, overall_sentiment, sentiment_score |
@@ -334,12 +334,14 @@ Returns:
 
 ### Data Flow: BaT Comments
 ```
-bat_listings (has comment_count)
+vehicle_events (has comment_count, filtered by source_platform='bat')
     → extract-auction-comments (scrapes BaT page)
     → auction_comments (normalized rows)
     → discover-comment-data (AI analysis)
     → comment_discoveries (sentiment/themes)
 ```
+
+**Helper views:** `vehicle_latest_event` (most recent event per vehicle) and `vehicle_event_summary` (aggregated event stats per vehicle).
 
 ### Tracking Extraction Progress
 ```bash
@@ -352,7 +354,7 @@ curl -sS -X POST "${VITE_SUPABASE_URL}/functions/v1/backfill-comments" -H "Autho
 
 ### Common Pitfalls
 - **Don't count distinct vehicle_id with LIMIT** - you'll get wrong numbers
-- **bat_listings.comment_count** = expected comments, not extracted
+- **vehicle_events.comment_count** (where source_platform='bat') = expected comments, not extracted
 - **auction_comments** may have comments for only some vehicles
 - **Check `comments_extracted_at`** to know if extraction ran
 

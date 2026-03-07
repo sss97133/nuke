@@ -228,18 +228,19 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Also check existing bat_listings for this user (in case scraping missed them)
+    // Also check existing vehicle_events for this user (in case scraping missed them)
     const { data: existingListings } = await supabase
-      .from('bat_listings')
-      .select('bat_listing_url, vehicle_id, seller_username')
-      .eq('seller_username', batUsername);
+      .from('vehicle_events')
+      .select('source_url, vehicle_id, metadata')
+      .eq('source_platform', 'bat')
+      .filter('metadata->>seller_username', 'eq', batUsername);
 
-    const existingListingUrls = new Set(existingListings?.map(l => l.bat_listing_url) || []);
+    const existingListingUrls = new Set(existingListings?.map((l: any) => l.source_url) || []);
 
     // Add any existing listings that weren't found by scraping
-    existingListings?.forEach(listing => {
-      if (listing.bat_listing_url && !listingUrls.has(listing.bat_listing_url)) {
-        listingUrlsArray.push(listing.bat_listing_url);
+    existingListings?.forEach((listing: any) => {
+      if (listing.source_url && !listingUrls.has(listing.source_url)) {
+        listingUrlsArray.push(listing.source_url);
       }
     });
 
@@ -424,16 +425,17 @@ Deno.serve(async (req: Request) => {
 
             const justCreated = vehicle && new Date(vehicle.created_at).getTime() > Date.now() - 60000;
 
-            // Link the vehicle to the BaT user via bat_listings
+            // Link the vehicle to the BaT user via vehicle_events
             const { data: batListing } = await supabase
-              .from('bat_listings')
+              .from('vehicle_events')
               .select('id, seller_external_identity_id')
-              .eq('bat_listing_url', listingUrl)
+              .eq('source_platform', 'bat')
+              .eq('source_url', listingUrl)
               .maybeSingle();
 
             if (batListing && !batListing.seller_external_identity_id) {
               await supabase
-                .from('bat_listings')
+                .from('vehicle_events')
                 .update({ seller_external_identity_id: externalIdentityId })
                 .eq('id', batListing.id);
             }

@@ -146,26 +146,26 @@ async function getFullInventory(orgId) {
 async function getUpcomingAuctions(orgId) {
   console.log('\n📅 Analyzing Upcoming Auctions...');
   
-  // Check external_listings for upcoming auctions (using correct column names)
+  // Check vehicle_events for upcoming auctions (using correct column names)
   const { data: listings, error } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select(`
       id,
       vehicle_id,
-      platform,
-      listing_url,
-      listing_status,
-      start_date,
-      end_date,
-      current_bid,
+      source_platform,
+      source_url,
+      event_status,
+      started_at,
+      ended_at,
+      current_price,
       reserve_price,
       final_price,
       vehicles!inner(origin_organization_id)
     `)
     .eq('vehicles.origin_organization_id', orgId)
-    .eq('platform', 'broadarrow')
-    .in('listing_status', ['pending', 'active'])
-    .order('start_date', { ascending: true });
+    .eq('source_platform', 'broadarrow')
+    .in('event_status', ['pending', 'active'])
+    .order('started_at', { ascending: true });
   
   if (error) {
     console.warn(`  ⚠️  Error fetching upcoming auctions: ${error.message}`);
@@ -185,11 +185,11 @@ async function getUpcomingAuctions(orgId) {
   // Group by auction event (from end_date or start_date)
   const auctions = new Map();
   
-  // Process external_listings
+  // Process vehicle_events
   for (const listing of listings || []) {
-    const auctionDate = listing.end_date 
-      ? new Date(listing.end_date).toISOString().split('T')[0]
-      : (listing.start_date ? new Date(listing.start_date).toISOString().split('T')[0] : 'unknown');
+    const auctionDate = listing.ended_at
+      ? new Date(listing.ended_at).toISOString().split('T')[0]
+      : (listing.started_at ? new Date(listing.started_at).toISOString().split('T')[0] : 'unknown');
     
     if (!auctions.has(auctionDate)) {
       auctions.set(auctionDate, {
@@ -201,9 +201,9 @@ async function getUpcomingAuctions(orgId) {
     
     const auction = auctions.get(auctionDate);
     auction.listings.push({
-      url: listing.listing_url,
-      status: listing.listing_status,
-      currentBid: listing.current_bid,
+      url: listing.source_url,
+      status: listing.event_status,
+      currentBid: listing.current_price,
       reservePrice: listing.reserve_price,
     });
     auction.totalLots++;

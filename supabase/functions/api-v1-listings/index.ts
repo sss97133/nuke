@@ -70,9 +70,9 @@ serve(async (req) => {
 
     // Build query
     let query = supabase
-      .from("external_listings")
+      .from("vehicle_events")
       .select(
-        "id, vehicle_id, platform, listing_url, listing_id, listing_status, start_date, end_date, current_bid, reserve_price, buy_now_price, bid_count, view_count, watcher_count, final_price, sold_at, created_at, updated_at",
+        "id, vehicle_id, source_platform, source_url, source_listing_id, event_status, started_at, ended_at, current_price, reserve_price, buy_now_price, bid_count, view_count, watcher_count, final_price, sold_at, created_at, updated_at",
         { count: "estimated" }
       );
 
@@ -81,7 +81,7 @@ serve(async (req) => {
     }
 
     if (platform) {
-      query = query.eq("platform", platform);
+      query = query.eq("source_platform", platform);
     }
 
     if (status) {

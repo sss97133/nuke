@@ -82,23 +82,23 @@ async function fetchFinalPrices(supabase: ReturnType<typeof createClient>): Prom
   // marked the listing sold but never set final_price (e.g. stale data or missed run).
   const { data: unscored } = await supabase.rpc("execute_sql", {
     query: `
-      SELECT DISTINCT ON (el.vehicle_id)
-        el.vehicle_id,
-        el.id as listing_id,
-        el.listing_url,
-        el.end_date,
-        el.listing_status
-      FROM external_listings el
-      WHERE el.platform = 'bat'
-        AND el.end_date < NOW() - INTERVAL '30 minutes'
-        AND el.end_date > NOW() - INTERVAL '7 days'
-        AND el.final_price IS NULL
+      SELECT DISTINCT ON (ve.vehicle_id)
+        ve.vehicle_id,
+        ve.id as listing_id,
+        ve.source_url as listing_url,
+        ve.ended_at,
+        ve.event_status
+      FROM vehicle_events ve
+      WHERE ve.source_platform = 'bat'
+        AND ve.ended_at < NOW() - INTERVAL '30 minutes'
+        AND ve.ended_at > NOW() - INTERVAL '7 days'
+        AND ve.final_price IS NULL
         AND (
-          el.listing_status IN ('active', 'ended')
-          OR (el.listing_status = 'sold')
+          ve.event_status IN ('active', 'ended')
+          OR (ve.event_status = 'sold')
         )
-        AND el.listing_url IS NOT NULL
-      ORDER BY el.vehicle_id, el.end_date DESC
+        AND ve.source_url IS NOT NULL
+      ORDER BY ve.vehicle_id, ve.ended_at DESC
       LIMIT 40
     `,
   });
@@ -116,7 +116,7 @@ async function fetchFinalPrices(supabase: ReturnType<typeof createClient>): Prom
       break;
     }
 
-    const batch = (unscored as Array<{ vehicle_id: string; listing_id: string; listing_url: string; listing_status?: string }>).slice(i, i + PARALLEL_BATCH);
+    const batch = (unscored as Array<{ vehicle_id: string; listing_id: string; listing_url: string; event_status?: string }>).slice(i, i + PARALLEL_BATCH);
     const results = await Promise.allSettled(batch.map(async (row) => {
       const resp = await fetch(row.listing_url, {
         headers: { "User-Agent": "Mozilla/5.0 (compatible; NukeBot/1.0)" },
@@ -130,8 +130,8 @@ async function fetchFinalPrices(supabase: ReturnType<typeof createClient>): Prom
       const bidToMatch = html.match(/Bid\s+to\s+\$([\d,]+)/i);
       if (reserveNotMet || bidToMatch) {
         await supabase
-          .from("external_listings")
-          .update({ listing_status: "unsold", updated_at: new Date().toISOString() })
+          .from("vehicle_events")
+          .update({ event_status: "unsold", updated_at: new Date().toISOString() })
           .eq("id", row.listing_id);
         const highBid = bidToMatch?.[1] || html.match(/High\s+Bid[^$]*\$([\d,]+)/)?.[1] || "unknown";
         console.log(`[score] ${row.listing_url}: reserve not met (high bid $${highBid})`);
@@ -163,12 +163,12 @@ async function fetchFinalPrices(supabase: ReturnType<typeof createClient>): Prom
         return null;
       }
 
-      // Update external_listings
+      // Update vehicle_events
       await supabase
-        .from("external_listings")
+        .from("vehicle_events")
         .update({
           final_price: hammerPrice,
-          listing_status: "sold",
+          event_status: "sold",
           updated_at: new Date().toISOString(),
         })
         .eq("id", row.listing_id);
@@ -182,9 +182,9 @@ async function fetchFinalPrices(supabase: ReturnType<typeof createClient>): Prom
         })
         .eq("id", row.vehicle_id);
 
-      // When listing was already "sold" (e.g. backfill final_price), the external_listings
+      // When listing was already "sold" (e.g. backfill final_price), the vehicle_events
       // trigger won't fire (no status change). Create timeline event so the profile shows the auction result.
-      const wasAlreadySold = String(row.listing_status || "").toLowerCase() === "sold";
+      const wasAlreadySold = String(row.event_status || "").toLowerCase() === "sold";
       if (wasAlreadySold) {
         await supabase.rpc("create_auction_timeline_event", {
           p_vehicle_id: row.vehicle_id,

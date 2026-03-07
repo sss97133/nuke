@@ -74,7 +74,7 @@ serve(async (req) => {
         entries.map(async ([key, config]) => {
           if (key === "bat") {
             const [extractedRes, pendingRes] = await Promise.all([
-              supabase.from("bat_listings").select("id", { count: "exact", head: true }),
+              supabase.from("vehicle_events").select("id", { count: "exact", head: true }).eq("source_platform", "bat"),
               supabase.from("import_queue").select("id", { count: "exact", head: true }).ilike("listing_url", config.url_pattern).eq("status", "pending"),
             ]);
             return {
@@ -125,7 +125,7 @@ serve(async (req) => {
     const [key, config] = entry;
     if (key === "bat") {
       const [batListingsRes, queueRes] = await Promise.all([
-        supabase.from("bat_listings").select("id", { count: "exact", head: true }),
+        supabase.from("vehicle_events").select("id", { count: "exact", head: true }).eq("source_platform", "bat"),
         supabase.from("import_queue").select("id", { count: "exact", head: true }).ilike("listing_url", config.url_pattern).eq("status", "pending"),
       ]);
       return new Response(

@@ -579,18 +579,18 @@ const VehicleTimeline: React.FC<{
         const todayYmd = new Date().toISOString().slice(0, 10);
         const todayActivity = activityDateMap.get(todayYmd) || 0;
         if (!autoOpenedTodayRef.current && todayActivity > 0 && Array.isArray(auctionData) && auctionData.length > 0) {
-          // Determine if auction is live using external_listings end_date when available (more reliable than joins).
+          // Determine if auction is live using vehicle_events ended_at when available (more reliable than joins).
           let isLiveAuction = true;
           try {
             const { data: listing } = await supabase
-              .from('external_listings')
-              .select('end_date, listing_status, updated_at')
+              .from('vehicle_events')
+              .select('ended_at, event_status, updated_at')
               .eq('vehicle_id', vehicleId)
               .order('updated_at', { ascending: false })
               .limit(1)
               .maybeSingle();
-            const status = String((listing as any)?.listing_status || '').toLowerCase();
-            const end = (listing as any)?.end_date ? new Date((listing as any).end_date).getTime() : NaN;
+            const status = String((listing as any)?.event_status || '').toLowerCase();
+            const end = (listing as any)?.ended_at ? new Date((listing as any).ended_at).getTime() : NaN;
             if (status === 'ended' || status === 'sold') isLiveAuction = false;
             if (Number.isFinite(end)) isLiveAuction = end > Date.now();
           } catch {
@@ -646,21 +646,21 @@ const VehicleTimeline: React.FC<{
         // Query all listings for this vehicle - we'll filter for future dates on frontend
         // Don't filter by status since listings can be incorrectly marked as 'ended'
         const { data: futureListings } = await supabase
-          .from('external_listings')
-          .select('id, platform, listing_url, start_date, end_date, listing_status, metadata')
+          .from('vehicle_events')
+          .select('id, source_platform, source_url, started_at, ended_at, event_status, metadata')
           .eq('vehicle_id', vehicleId)
-          .order('start_date', { ascending: true, nullsFirst: false })
+          .order('started_at', { ascending: true, nullsFirst: false })
           .limit(10);
 
         const nowMs = Date.now();
-        
+
         // Convert future auctions to timeline event format
         futureAuctionEvents = (futureListings || [])
           .filter((listing: any) => {
-            // Use start_date/end_date from columns, or fallback to metadata.sale_date
-            const startDate = listing.start_date ? new Date(listing.start_date).getTime() : 
+            // Use started_at/ended_at from columns, or fallback to metadata.sale_date
+            const startDate = listing.started_at ? new Date(listing.started_at).getTime() :
                               listing.metadata?.sale_date ? new Date(listing.metadata.sale_date).getTime() : null;
-            const endDate = listing.end_date ? new Date(listing.end_date).getTime() : 
+            const endDate = listing.ended_at ? new Date(listing.ended_at).getTime() :
                             listing.metadata?.sale_date ? new Date(listing.metadata.sale_date).getTime() : null;
             return (startDate && startDate > nowMs) || (endDate && endDate > nowMs);
           })
@@ -669,14 +669,14 @@ const VehicleTimeline: React.FC<{
             const location = listing.metadata?.location;
             const eventName = listing.metadata?.event_name || 
                               listing.metadata?.auction_name || 
-                              (location ? `${listing.platform ? listing.platform.charAt(0).toUpperCase() + listing.platform.slice(1) : ''} ${location}`.trim() : null) ||
-                              `${listing.platform ? listing.platform.charAt(0).toUpperCase() + listing.platform.slice(1) : 'Upcoming'} Auction`;
+                              (location ? `${listing.source_platform ? listing.source_platform.charAt(0).toUpperCase() + listing.source_platform.slice(1) : ''} ${location}`.trim() : null) ||
+                              `${listing.source_platform ? listing.source_platform.charAt(0).toUpperCase() + listing.source_platform.slice(1) : 'Upcoming'} Auction`;
             const lotNumber = listing.metadata?.lot_number;
             const estimateLow = listing.metadata?.estimate_low;
             const estimateHigh = listing.metadata?.estimate_high;
             
             // Get auction date from columns or fallback to metadata
-            const auctionDate = listing.start_date || listing.end_date || listing.metadata?.sale_date;
+            const auctionDate = listing.started_at || listing.ended_at || listing.metadata?.sale_date;
             
             return {
               id: `future-auction-${listing.id}`,
@@ -688,8 +688,8 @@ const VehicleTimeline: React.FC<{
                 ? `Lot #${lotNumber}${estimateLow || estimateHigh ? ` | Est: $${(estimateLow || 0).toLocaleString()} - $${(estimateHigh || 0).toLocaleString()}` : ''}`
                 : 'Upcoming auction',
               metadata: {
-                platform: listing.platform,
-                listing_url: listing.listing_url,
+                platform: listing.source_platform,
+                listing_url: listing.source_url,
                 is_future: true,
                 lot_number: lotNumber,
                 estimate_low: estimateLow,

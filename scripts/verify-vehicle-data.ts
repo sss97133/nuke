@@ -9,39 +9,39 @@ const supabase = createClient(
 
 async function verify() {
   // Get 5 recently extracted vehicles
-  const { data: listings } = await supabase
-    .from('external_listings')
-    .select('listing_url, vehicle_id, metadata')
-    .eq('platform', 'cars_and_bids')
+  const { data: events } = await supabase
+    .from('vehicle_events')
+    .select('source_url, vehicle_id, metadata')
+    .eq('source_platform', 'cars_and_bids')
     .eq('metadata->>source', 'cab_backfill_v4')
     .order('updated_at', { ascending: false })
     .limit(5);
 
-  if (!listings) {
+  if (!events) {
     console.log('No v4 extractions found');
     return;
   }
 
   console.log('═══ VERIFICATION OF 5 RECENT EXTRACTIONS ═══\n');
 
-  for (const listing of listings) {
-    const m = listing.metadata;
+  for (const event of events) {
+    const m = event.metadata;
 
     // Get actual counts from DB
     const { count: commentCount } = await supabase
       .from('auction_comments')
       .select('id', { count: 'exact', head: true })
-      .eq('vehicle_id', listing.vehicle_id);
+      .eq('vehicle_id', event.vehicle_id);
 
     const { count: imageCount } = await supabase
       .from('vehicle_images')
       .select('id', { count: 'exact', head: true })
-      .eq('vehicle_id', listing.vehicle_id);
+      .eq('vehicle_id', event.vehicle_id);
 
     const commentsOk = commentCount === m.comment_count;
     const imagesOk = imageCount === m.image_count;
 
-    console.log(`${listing.listing_url.split('/').pop()}`);
+    console.log(`${event.source_url.split('/').pop()}`);
     console.log(`  Comments: ${commentCount}/${m.comment_count} ${commentsOk ? 'OK' : 'MISMATCH'}`);
     console.log(`  Images: ${imageCount}/${m.image_count} ${imagesOk ? 'OK' : 'MISMATCH'}`);
     console.log(`  Video: ${m.video_url ? 'YES' : 'NO'}`);

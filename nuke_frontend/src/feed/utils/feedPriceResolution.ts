@@ -43,7 +43,7 @@ function formatCurrency(amount: number | null, fallback = '\u2014'): string {
  *
  * Replicates the exact priority order from VehicleCardDense.tsx:
  * 1. Sale price (executed transaction)
- * 2. Live bid (active auction from external_listings)
+ * 2. Live bid (active auction from vehicle_events)
  * 3. Winning bid (sold auction result)
  * 4. High bid (ended / RNM auctions)
  * 5. Current bid (legacy vehicle field fallback)
@@ -64,13 +64,13 @@ export function resolveVehiclePrice(vehicle: Record<string, any>): ResolvedPrice
   const purchasePrice = parseMoneyNumber(v.purchase_price);
   const msrp = parseMoneyNumber(v.msrp);
 
-  // --- Live bid from external_listings ---
-  const externalListing = v.external_listings?.[0];
-  const listingLiveBid = parseMoneyNumber(externalListing?.current_bid);
-  const listingEndDate = externalListing?.end_date
-    ? new Date(externalListing.end_date).getTime()
+  // --- Live bid from vehicle_events ---
+  const externalListing = v.vehicle_events?.[0] ?? v.external_listings?.[0];
+  const listingLiveBid = parseMoneyNumber(externalListing?.current_price ?? externalListing?.current_bid);
+  const listingEndDate = (externalListing?.ended_at || externalListing?.end_date)
+    ? new Date(externalListing.ended_at || externalListing.end_date).getTime()
     : 0;
-  const statusStr = String(externalListing?.listing_status || '').toLowerCase();
+  const statusStr = String(externalListing?.event_status || externalListing?.listing_status || '').toLowerCase();
   const hasLiveStatus = statusStr === 'active' || statusStr === 'live';
   const isLive =
     (Number.isFinite(listingEndDate) && listingEndDate > Date.now()) ||

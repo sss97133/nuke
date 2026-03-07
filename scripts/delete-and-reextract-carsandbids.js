@@ -65,13 +65,13 @@ async function deleteAndReextract(listingUrl) {
     if (eventsError) console.warn('⚠️  Error deleting auction_events:', eventsError.message);
     else console.log('✅ Deleted auction_events');
     
-    // 3. Delete external_listings
+    // 3. Delete vehicle_events
     const { error: listingsError } = await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .delete()
       .eq('vehicle_id', vehicleId);
-    if (listingsError) console.warn('⚠️  Error deleting external_listings:', listingsError.message);
-    else console.log('✅ Deleted external_listings');
+    if (listingsError) console.warn('⚠️  Error deleting vehicle_events:', listingsError.message);
+    else console.log('✅ Deleted vehicle_events');
     
     // 4. Delete vehicle_images
     const { error: imagesError } = await supabase

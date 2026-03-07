@@ -70,16 +70,17 @@ async function createJaguar() {
 
   console.log('✅ Linked to Viva organization');
 
-  // Step 3: Create external listing
+  // Step 3: Create vehicle event
   const { data: listing, error: lError } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .upsert({
       vehicle_id: vehicle.id,
-      organization_id: VIVA_ORG_ID,
-      platform: 'bat',
-      listing_url: JAGUAR_BAT_URL,
-      listing_id: '1964-jaguar-xke-series-1-roadster-5',
-      listing_status: 'active',
+      source_organization_id: VIVA_ORG_ID,
+      source_platform: 'bat',
+      event_type: 'auction',
+      source_url: JAGUAR_BAT_URL,
+      source_listing_id: '1964-jaguar-xke-series-1-roadster-5',
+      event_status: 'active',
       sync_enabled: true,
       metadata: {
         seller: 'VivaLasVegasAutos',
@@ -87,18 +88,18 @@ async function createJaguar() {
         discovered_via: 'manual_import'
       }
     }, {
-      onConflict: 'vehicle_id,platform,listing_id'
+      onConflict: 'vehicle_id,source_platform,source_listing_id'
     })
-    .select('id, listing_status, sync_enabled')
+    .select('id, event_status, sync_enabled')
     .single();
 
   if (lError) {
-    console.error('❌ Error creating external listing:', lError);
+    console.error('❌ Error creating vehicle event:', lError);
     throw lError;
   }
 
-  console.log(`✅ Created external listing: ${listing.id}`);
-  console.log(`   Status: ${listing.listing_status}`);
+  console.log(`✅ Created vehicle event: ${listing.id}`);
+  console.log(`   Status: ${listing.event_status}`);
   console.log(`   Sync Enabled: ${listing.sync_enabled}`);
 
   // Step 4: Sync immediately to get current bid data

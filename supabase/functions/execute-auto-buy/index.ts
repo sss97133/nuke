@@ -45,7 +45,7 @@ Deno.serve(async (req: Request) => {
         *,
         vehicle_watchlist!inner(*),
         vehicles(*),
-        external_listings(*)
+        vehicle_events(*)
       `)
       .eq('id', executionId)
       .maybeSingle();
@@ -56,7 +56,7 @@ Deno.serve(async (req: Request) => {
 
     const watchlist = execution.vehicle_watchlist;
     const vehicle = execution.vehicles;
-    const listing = execution.external_listings;
+    const event = execution.vehicle_events;
 
     // Check if requires confirmation
     if (execution.requires_confirmation && !userConfirmed && !execution.user_confirmed) {
@@ -99,7 +99,7 @@ Deno.serve(async (req: Request) => {
           supabase,
           execution,
           vehicle,
-          listing,
+          event,
           watchlist
         );
         break;
@@ -110,7 +110,7 @@ Deno.serve(async (req: Request) => {
           supabase,
           execution,
           vehicle,
-          listing,
+          event,
           watchlist
         );
         break;
@@ -121,7 +121,7 @@ Deno.serve(async (req: Request) => {
           supabase,
           execution,
           vehicle,
-          listing,
+          event,
           watchlist
         );
         break;
@@ -132,7 +132,7 @@ Deno.serve(async (req: Request) => {
           supabase,
           execution,
           vehicle,
-          listing,
+          event,
           watchlist
         );
         break;
@@ -180,11 +180,11 @@ async function placeAuctionBid(
   supabase: any,
   execution: any,
   vehicle: any,
-  listing: any,
+  event: any,
   watchlist: any
 ) {
   // Calculate bid amount
-  const currentBid = listing.current_bid || 0;
+  const currentBid = event.current_price || 0;
   const bidIncrement = watchlist.auto_buy_bid_increment || 100;
   const maxBid = watchlist.auto_buy_max_bid || execution.target_price;
   const bidAmount = Math.min(currentBid + bidIncrement, maxBid);
@@ -234,10 +234,10 @@ async function executeBuyNow(
   supabase: any,
   execution: any,
   vehicle: any,
-  listing: any,
+  event: any,
   watchlist: any
 ) {
-  const buyNowPrice = listing.buy_now_price || execution.target_price;
+  const buyNowPrice = event.buy_now_price || execution.target_price;
 
   // Process payment
   // This would integrate with Stripe or your payment processor
@@ -248,7 +248,7 @@ async function executeBuyNow(
     .insert({
       vehicle_id: vehicle.id,
       buyer_id: watchlist.user_id,
-      seller_id: listing.organization_id,
+      seller_id: event.source_organization_id,
       amount: buyNowPrice,
       transaction_type: 'buy_now',
       status: 'pending',
@@ -283,11 +283,11 @@ async function placeReserveMetBid(
   supabase: any,
   execution: any,
   vehicle: any,
-  listing: any,
+  event: any,
   watchlist: any
 ) {
   // Similar to placeAuctionBid but triggered when reserve is met
-  return await placeAuctionBid(supabase, execution, vehicle, listing, watchlist);
+  return await placeAuctionBid(supabase, execution, vehicle, event, watchlist);
 }
 
 // Execute buy when price drops to target
@@ -295,10 +295,10 @@ async function executePriceDropBuy(
   supabase: any,
   execution: any,
   vehicle: any,
-  listing: any,
+  event: any,
   watchlist: any
 ) {
   // Similar to executeBuyNow but triggered by price drop
-  return await executeBuyNow(supabase, execution, vehicle, listing, watchlist);
+  return await executeBuyNow(supabase, execution, vehicle, event, watchlist);
 }
 

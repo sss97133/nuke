@@ -377,13 +377,13 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
           });
         }
         
-        // Also try to get from external_listings if we have vehicle_id
+        // Also try to get from vehicle_events if we have vehicle_id
         if (wo.vehicle_id) {
           const { data: listing } = await supabase
-            .from('external_listings')
+            .from('vehicle_events')
             .select('metadata, final_price')
             .eq('vehicle_id', wo.vehicle_id)
-            .eq('platform', 'bat')
+            .eq('source_platform', 'bat')
             .order('sold_at', { ascending: false, nullsLast: true })
             .limit(1)
             .maybeSingle();

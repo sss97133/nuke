@@ -9,16 +9,16 @@ const supabase = createClient(
 
 async function show() {
   // Get a recently extracted vehicle with lots of comments
-  const { data: listing } = await supabase
-    .from('external_listings')
+  const { data: event } = await supabase
+    .from('vehicle_events')
     .select('*, vehicle_id')
-    .eq('platform', 'cars_and_bids')
+    .eq('source_platform', 'cars_and_bids')
     .eq('metadata->>source', 'cab_backfill_v4')
     .order('updated_at', { ascending: false })
     .limit(1)
     .single();
 
-  if (!listing) {
+  if (!event) {
     console.log('No v4 extraction found');
     return;
   }
@@ -27,13 +27,13 @@ async function show() {
   console.log('  FULL EXTRACTION VERIFICATION');
   console.log('═══════════════════════════════════════════════════════════════════\n');
 
-  console.log('URL:', listing.listing_url);
-  console.log('Vehicle ID:', listing.vehicle_id);
-  console.log('Status:', listing.listing_status);
-  console.log('Current Bid:', listing.current_bid);
+  console.log('URL:', event.source_url);
+  console.log('Vehicle ID:', event.vehicle_id);
+  console.log('Status:', event.event_status);
+  console.log('Current Price:', event.current_price);
   console.log('\n--- METADATA ---');
 
-  const m = listing.metadata;
+  const m = event.metadata;
   console.log('Source:', m.source);
   console.log('Page Title:', m.page_title);
   console.log('Seller:', m.seller_username);
@@ -53,7 +53,7 @@ async function show() {
   const { data: comments, count: commentCount } = await supabase
     .from('auction_comments')
     .select('*', { count: 'exact' })
-    .eq('vehicle_id', listing.vehicle_id)
+    .eq('vehicle_id', event.vehicle_id)
     .order('sequence_number', { ascending: true });
 
   console.log('\n--- COMMENTS ---');
@@ -77,7 +77,7 @@ async function show() {
   const { data: images, count: imageCount } = await supabase
     .from('vehicle_images')
     .select('*', { count: 'exact' })
-    .eq('vehicle_id', listing.vehicle_id);
+    .eq('vehicle_id', event.vehicle_id);
 
   console.log('\n--- IMAGES ---');
   console.log('Total in DB:', imageCount);

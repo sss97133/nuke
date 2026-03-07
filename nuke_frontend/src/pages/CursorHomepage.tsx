@@ -1098,49 +1098,60 @@ const CursorHomepage: React.FC = () => {
         return;
       }
 
-      // Batch-load live auction bids (fixes: BaT cards showing EST/— instead of current bid).
-      // Best-effort only: if RLS blocks external_listings for anon, we keep the old behavior.
-      // Group by vehicle_id to support multiple listings per vehicle (VehicleCardDense uses external_listings[0]).
-      // IMPORTANT: Filter for active/live listings to ensure badges show correctly on homepage.
-      const externalListingsByVehicleId = new Map<string, any[]>();
+      // Batch-load live auction bids (fixes: BaT cards showing EST/--- instead of current bid).
+      // Best-effort only: if RLS blocks vehicle_events for anon, we keep the old behavior.
+      // Group by vehicle_id to support multiple events per vehicle (VehicleCardDense uses vehicle_events[0]).
+      // IMPORTANT: Filter for active/live events to ensure badges show correctly on homepage.
+      const vehicleEventsByVehicleId = new Map<string, any[]>();
       const auctionByVehicleId = new Map<string, any>(); // Keep for backward compatibility (display price logic)
       try {
         const ids = Array.from(new Set((vehicles || []).map((v: any) => String(v?.id || '')).filter(Boolean)));
         if (ids.length > 0) {
-          const { data: listings, error: listErr } = await supabase
-            .from('external_listings')
-            .select('vehicle_id, platform, listing_status, current_bid, final_price, start_date, end_date, bid_count, updated_at, listing_url')
+          const { data: events, error: listErr } = await supabase
+            .from('vehicle_events')
+            .select('vehicle_id, source_platform, event_status, current_price, final_price, started_at, ended_at, bid_count, updated_at, source_url')
             .in('vehicle_id', ids)
-            // Fetch ALL listings with future end dates (not just 'active'/'live' status)
+            // Fetch ALL events with future end dates (not just 'active'/'live' status)
             // Some scrapers use different status values ('pending', 'scheduled', etc.) for live auctions
-            .gt('end_date', new Date().toISOString())
+            .gt('ended_at', new Date().toISOString())
             .order('updated_at', { ascending: false })
             .limit(2000);
-          if (!listErr && Array.isArray(listings)) {
-            // Group all listings by vehicle_id and filter for truly active ones (future end_date)
-            for (const row of listings as any[]) {
+          if (!listErr && Array.isArray(events)) {
+            // Group all events by vehicle_id and filter for truly active ones (future ended_at)
+            for (const row of events as any[]) {
               const vid = String(row?.vehicle_id || '');
               if (!vid) continue;
-              
-              // Double-check end_date is actually in the future (belt and suspenders)
-              const endDate = row.end_date ? new Date(row.end_date).getTime() : 0;
+
+              // Double-check ended_at is actually in the future (belt and suspenders)
+              const endDate = row.ended_at ? new Date(row.ended_at).getTime() : 0;
               if (!Number.isFinite(endDate) || endDate <= Date.now()) continue;
-              
+
+              // Normalize vehicle_events columns to legacy shape for VehicleCardDense compatibility
+              const normalized = {
+                ...row,
+                platform: row.source_platform,
+                listing_status: row.event_status,
+                current_bid: row.current_price,
+                start_date: row.started_at,
+                end_date: row.ended_at,
+                listing_url: row.source_url,
+              };
+
               // Add to grouped array (for VehicleCardDense)
-              if (!externalListingsByVehicleId.has(vid)) {
-                externalListingsByVehicleId.set(vid, []);
+              if (!vehicleEventsByVehicleId.has(vid)) {
+                vehicleEventsByVehicleId.set(vid, []);
               }
-              externalListingsByVehicleId.get(vid)!.push(row);
-              
-              // Keep first listing for backward compatibility (display price logic)
+              vehicleEventsByVehicleId.get(vid)!.push(normalized);
+
+              // Keep first event for backward compatibility (display price logic)
               if (!auctionByVehicleId.has(vid)) {
-                auctionByVehicleId.set(vid, row);
+                auctionByVehicleId.set(vid, normalized);
               }
             }
-            
-            // Sort each vehicle's listings array by updated_at (most recent first)
-            for (const [vid, listingsArray] of externalListingsByVehicleId.entries()) {
-              listingsArray.sort((a, b) => {
+
+            // Sort each vehicle's events array by updated_at (most recent first)
+            for (const [vid, eventsArray] of vehicleEventsByVehicleId.entries()) {
+              eventsArray.sort((a: any, b: any) => {
                 return (new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
               });
             }
@@ -1250,7 +1261,7 @@ const CursorHomepage: React.FC = () => {
         // 1. Sale price (actual sold price)
         // 2. Winning bid (auction result)
         // 3. High bid (RNM auctions)
-        // 4. Live bid from external_listings
+        // 4. Live bid from vehicle_events
         // 5. Final price from listing
         // 6. Asking price (only if actually for sale)
         // 7. DO NOT fall back to current_value - only show if explicitly set as asking
@@ -1307,8 +1318,8 @@ const CursorHomepage: React.FC = () => {
           hypeReason = 'NEW';
         }
 
-        // Attach external_listings array for VehicleCardDense auction badge detection
-        const externalListings = externalListingsByVehicleId.get(vehicleId) || [];
+        // Attach vehicle_events array for VehicleCardDense auction badge detection
+        const externalListings = vehicleEventsByVehicleId.get(vehicleId) || [];
         
         // Derive deal/heat labels client-side from numeric scores
         const dealScore = v.deal_score != null ? Number(v.deal_score) : null;
@@ -1335,8 +1346,10 @@ const CursorHomepage: React.FC = () => {
             large: normalizedPrimary || mediumUrl || optimalImageUrl || undefined,
           },
           all_images: allImages || (optimalImageUrl ? [{ id: `fallback-${v.id}-0`, url: optimalImageUrl, is_primary: true }] : []),
-          // Attach external_listings for auction badge detection (VehicleCardDense expects external_listings[0])
-          external_listings: externalListings.length > 0 ? externalListings : undefined,
+          // Attach vehicle_events for auction badge detection (VehicleCardDense checks vehicle_events[0] ?? external_listings[0])
+          // Normalized to legacy shape for backward compatibility
+          vehicle_events: externalListings.length > 0 ? externalListings : undefined,
+          external_listings: externalListings.length > 0 ? externalListings : undefined, // backward compat alias
           deal_score_label: dealLabel,
           heat_score_label: heatLabel,
         };
@@ -1356,8 +1369,8 @@ const CursorHomepage: React.FC = () => {
       // This ensures active/buyable vehicles appear first without breaking user-chosen sort order
       if (!append && pageNum === 0 && sortBy === 'newest') {
         dedupedSorted.sort((a: any, b: any) => {
-          const aHasLiveAuction = externalListingsByVehicleId.has(String(a?.id || ''));
-          const bHasLiveAuction = externalListingsByVehicleId.has(String(b?.id || ''));
+          const aHasLiveAuction = vehicleEventsByVehicleId.has(String(a?.id || ''));
+          const bHasLiveAuction = vehicleEventsByVehicleId.has(String(b?.id || ''));
           // Live auctions first, then by existing order (created_at DESC from DB)
           if (aHasLiveAuction && !bHasLiveAuction) return -1;
           if (!aHasLiveAuction && bHasLiveAuction) return 1;

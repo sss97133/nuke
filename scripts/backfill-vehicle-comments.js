@@ -75,28 +75,28 @@ async function backfillComments() {
       console.log(`✅ Found existing auction_event: ${auctionEventId}`);
     } else {
       // Create new auction_event
-      const { data: externalListing } = await supabase
-        .from('external_listings')
-        .select('final_price, current_bid, listing_status, end_date')
+      const { data: vehicleEvent } = await supabase
+        .from('vehicle_events')
+        .select('final_price, current_price, event_status, ended_at')
         .eq('vehicle_id', vehicleId)
         .maybeSingle();
 
-      const outcome = vehicle.sale_price ? 'sold' : 
-                     (externalListing?.listing_status === 'ended' ? 'ended' : 'active');
+      const outcome = vehicle.sale_price ? 'sold' :
+                     (vehicleEvent?.event_status === 'ended' ? 'ended' : 'active');
 
       const eventData = {
         source: platform,
         source_url: listingUrl,
         vehicle_id: vehicleId,
         outcome: outcome,
-        high_bid: vehicle.winning_bid || externalListing?.current_bid || null,
+        high_bid: vehicle.winning_bid || vehicleEvent?.current_price || null,
         reserve_price: null,
         comments_count: comments.length,
       };
 
       // Only add date fields if they exist
-      if (externalListing?.end_date) {
-        eventData.auction_end_date = externalListing.end_date;
+      if (vehicleEvent?.ended_at) {
+        eventData.auction_end_date = vehicleEvent.ended_at;
       }
 
       // Try to find existing event first

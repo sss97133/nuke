@@ -4,10 +4,10 @@
  * Run: dotenvx run -- npx tsx scripts/backfill-all-org-vehicle-links.ts
  *
  * Sources:
- * - bat_listings → seller (sold_by) + BAT org (auction_platform) [existing RPC]
+ * - vehicle_events (source_platform='bat') → seller (sold_by) + BAT org (auction_platform) [existing RPC]
  * - build_threads → forum org (work_location) where business_name = forum_sources.slug
  * - vehicles.origin_organization_id → sold_by
- * - external_listings → seller (sold_by) + platform (auction_platform)
+ * - vehicle_events → seller (sold_by) + platform (auction_platform)
  * - timeline_events → organization_id + vehicle_id (work_location)
  *
  * Then refreshes businesses.total_vehicles.
@@ -29,13 +29,13 @@ async function main() {
   console.log('=== Backfill all org–vehicle links (batch size', BATCH, ') ===\n');
 
   // 1) BAT: seller + platform (existing RPC, returns inserted_seller, inserted_platform, last_id)
-  console.log('1. BAT listings (seller + auction_platform)...');
+  console.log('1. BAT vehicle events (seller + auction_platform)...');
   let lastId: string | null = null;
   let batSeller = 0;
   let batPlatform = 0;
   let batBatches = 0;
   while (true) {
-    const { data, error } = await supabase.rpc('backfill_vehicle_org_claims_from_bat_listings', {
+    const { data, error } = await supabase.rpc('backfill_vehicle_org_claims_from_vehicle_events', {
       p_batch_size: BATCH,
       p_after_id: lastId,
     });
@@ -91,16 +91,16 @@ async function main() {
   }
   console.log(`   Origin org done: ${originTotal} links.`);
 
-  // 4) external_listings
-  console.log('4. External listings (seller + platform)...');
+  // 4) vehicle_events
+  console.log('4. Vehicle events (seller + platform)...');
   let extSeller = 0;
   let extPlatform = 0;
   while (true) {
-    const { data, error } = await supabase.rpc('backfill_org_vehicles_from_external_listings', {
+    const { data, error } = await supabase.rpc('backfill_org_vehicles_from_vehicle_events', {
       p_batch_size: BATCH,
     });
     if (error) {
-      console.error('External listings error:', error.message);
+      console.error('Vehicle events error:', error.message);
       break;
     }
     const row = Array.isArray(data) ? data[0] : data;
@@ -111,7 +111,7 @@ async function main() {
     if (s + p === 0) break;
     process.stdout.write(`   seller +${extSeller} platform +${extPlatform}\r`);
   }
-  console.log(`   External listings done: seller ${extSeller}, platform ${extPlatform}.`);
+  console.log(`   Vehicle events done: seller ${extSeller}, platform ${extPlatform}.`);
 
   // 5) timeline_events
   console.log('5. Timeline events...');

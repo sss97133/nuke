@@ -7,7 +7,7 @@
  * - trailing slashes
  * - querystring/hash variants
  *
- * This should match the DB-side normalization used for external_listings.listing_url_key.
+ * This should match the DB-side normalization used for vehicle_events.source_listing_id.
  */
 
 export function normalizeListingUrlKey(raw: string | null | undefined): string | null {

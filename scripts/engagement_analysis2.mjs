@@ -15,13 +15,13 @@ async function q(sql) {
 // Build materialized data with LIMIT to avoid timeout
 const rows = await q(`
   WITH base AS (
-    SELECT el.vehicle_id, el.final_price, el.watcher_count, el.view_count,
-      (SELECT MAX(bb.bid_amount) FROM bat_bids bb WHERE bb.vehicle_id = el.vehicle_id AND bb.bid_amount > 0) as max_bid,
-      (SELECT COUNT(DISTINCT bb.bidder_username) FROM bat_bids bb WHERE bb.vehicle_id = el.vehicle_id AND bb.bid_amount > 0) as unique_bidders
-    FROM external_listings el
-    WHERE el.platform = 'bat' AND el.listing_status = 'sold'
-      AND el.final_price > 0 AND el.end_date >= NOW() - INTERVAL '90 days'
-      AND el.watcher_count > 0
+    SELECT ve.vehicle_id, ve.final_price, ve.watcher_count, ve.view_count,
+      (SELECT MAX(bb.bid_amount) FROM bat_bids bb WHERE bb.vehicle_id = ve.vehicle_id AND bb.bid_amount > 0) as max_bid,
+      (SELECT COUNT(DISTINCT bb.bidder_username) FROM bat_bids bb WHERE bb.vehicle_id = ve.vehicle_id AND bb.bid_amount > 0) as unique_bidders
+    FROM vehicle_events ve
+    WHERE ve.source_platform = 'bat' AND ve.event_status = 'sold'
+      AND ve.final_price > 0 AND ve.ended_at >= NOW() - INTERVAL '90 days'
+      AND ve.watcher_count > 0
     LIMIT 500
   )
   SELECT *, final_price::float / NULLIF(max_bid::float, 0) as hb_ratio

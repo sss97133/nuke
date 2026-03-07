@@ -61,16 +61,16 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
   // If no claimed identities, return empty arrays but still return profile
   // This allows users to see their profile even if they haven't claimed identities yet
 
-  // Get listings (BaT listings where user is seller)
+  // Get listings (vehicle_events where user is seller, BaT platform)
   const { data: listings } = identityIds.length > 0 ? await supabase
-    .from('bat_listings')
+    .from('vehicle_events')
     .select(`
       *,
-      vehicle:vehicles(*),
-      seller_identity:external_identities!bat_listings_seller_external_identity_id_fkey(*)
+      vehicle:vehicles(*)
     `)
     .in('seller_external_identity_id', identityIds)
-    .order('auction_end_date', { ascending: false })
+    .eq('source_platform', 'bat')
+    .order('ended_at', { ascending: false })
     .limit(100) : { data: [] };
 
   // Get bids (auction bids + BaT listings where user is buyer)
@@ -85,17 +85,18 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     .limit(100);
 
   const { data: batBids } = identityIds.length > 0 ? await supabase
-    .from('bat_listings')
+    .from('vehicle_events')
     .select(`
       *,
-      vehicle:vehicles(*),
-      buyer_identity:external_identities!bat_listings_buyer_external_identity_id_fkey(*)
+      vehicle:vehicles(*)
     `)
     .in('buyer_external_identity_id', identityIds)
-    .order('auction_end_date', { ascending: false })
+    .eq('source_platform', 'bat')
+    .order('ended_at', { ascending: false })
     .limit(100) : { data: [] };
 
   // Get comments (BaT comments + auction comments) - EXCLUDE bids
+  // NOTE: bat_comments still joins to bat_listings via FK (bat_listing_id) — keep until bat_comments migrated
   const { data: batComments } = identityIds.length > 0 ? await supabase
     .from('bat_comments')
     .select(`
@@ -120,14 +121,15 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
 
   // Get auction wins
   const { data: auctionWins } = identityIds.length > 0 ? await supabase
-    .from('bat_listings')
+    .from('vehicle_events')
     .select(`
       *,
       vehicle:vehicles(*)
     `)
     .in('buyer_external_identity_id', identityIds)
-    .eq('listing_status', 'sold')
-    .order('auction_end_date', { ascending: false })
+    .eq('event_status', 'sold')
+    .eq('source_platform', 'bat')
+    .order('ended_at', { ascending: false })
     .limit(50) : { data: [] };
 
   // Get success stories
@@ -142,6 +144,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     .limit(20);
 
   // Get comments of note (highly liked/engaged comments)
+  // NOTE: bat_comments still joins to bat_listings via FK (bat_listing_id) — keep until bat_comments migrated
   const { data: commentsOfNote } = identityIds.length > 0 ? await supabase
     .from('bat_comments')
     .select(`
@@ -209,29 +212,30 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
 
   // Get listings where this identity is seller
   const { data: listings } = await supabase
-    .from('bat_listings')
+    .from('vehicle_events')
     .select(`
       *,
-      vehicle:vehicles(*),
-      seller_identity:external_identities!bat_listings_seller_external_identity_id_fkey(*)
+      vehicle:vehicles(*)
     `)
     .eq('seller_external_identity_id', externalIdentity.id)
-    .order('auction_end_date', { ascending: false })
+    .eq('source_platform', 'bat')
+    .order('ended_at', { ascending: false })
     .limit(100);
 
   // Get listings where this identity is buyer
   const { data: batBids } = await supabase
-    .from('bat_listings')
+    .from('vehicle_events')
     .select(`
       *,
-      vehicle:vehicles(*),
-      buyer_identity:external_identities!bat_listings_buyer_external_identity_id_fkey(*)
+      vehicle:vehicles(*)
     `)
     .eq('buyer_external_identity_id', externalIdentity.id)
-    .order('auction_end_date', { ascending: false })
+    .eq('source_platform', 'bat')
+    .order('ended_at', { ascending: false })
     .limit(100);
 
   // Get comments - EXCLUDE bids
+  // NOTE: bat_comments still joins to bat_listings via FK (bat_listing_id) — keep until bat_comments migrated
   const { data: batComments } = await supabase
     .from('bat_comments')
     .select(`
@@ -256,14 +260,15 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
 
   // Get auction wins
   const { data: auctionWins } = await supabase
-    .from('bat_listings')
+    .from('vehicle_events')
     .select(`
       *,
       vehicle:vehicles(*)
     `)
     .eq('buyer_external_identity_id', externalIdentity.id)
-    .eq('listing_status', 'sold')
-    .order('auction_end_date', { ascending: false })
+    .eq('event_status', 'sold')
+    .eq('source_platform', 'bat')
+    .order('ended_at', { ascending: false })
     .limit(50);
 
   // Calculate stats
@@ -301,15 +306,16 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
 
   if (orgError) throw orgError;
 
-  // Get listings (BaT listings + auction events)
-  const { data: batListings } = await supabase
-    .from('bat_listings')
+  // Get listings (vehicle_events for BaT + auction events)
+  const { data: batEvents } = await supabase
+    .from('vehicle_events')
     .select(`
       *,
       vehicle:vehicles(*)
     `)
-    .eq('organization_id', orgId)
-    .order('auction_end_date', { ascending: false })
+    .eq('source_organization_id', orgId)
+    .eq('source_platform', 'bat')
+    .order('ended_at', { ascending: false })
     .limit(100);
 
   // auction_events doesn't have organization_id - need to join through vehicles
@@ -394,6 +400,7 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     const identityIds = externalIdentities?.map(ei => ei.id) || [];
     
     if (identityIds.length > 0) {
+      // NOTE: bat_comments still joins to bat_listings via FK (bat_listing_id) — keep until bat_comments migrated
       const { data: batComments } = await supabase
         .from('bat_comments')
         .select(`
@@ -403,21 +410,22 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
         .in('external_identity_id', identityIds)
         .order('comment_timestamp', { ascending: false })
         .limit(100);
-      
+
       comments = batComments || [];
     }
   }
 
   // Get auction wins
   const { data: auctionWins } = await supabase
-    .from('bat_listings')
+    .from('vehicle_events')
     .select(`
       *,
       vehicle:vehicles(*)
     `)
-    .eq('organization_id', orgId)
-    .eq('listing_status', 'sold')
-    .order('auction_end_date', { ascending: false })
+    .eq('source_organization_id', orgId)
+    .eq('event_status', 'sold')
+    .eq('source_platform', 'bat')
+    .order('ended_at', { ascending: false })
     .limit(50);
 
   // Get success stories
@@ -448,7 +456,7 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
 
   // Calculate stats
   const stats: ProfileStats = {
-    total_listings: organization.total_listings || ((batListings?.length || 0) + (auctionListings?.length || 0)),
+    total_listings: organization.total_listings || ((batEvents?.length || 0) + (auctionListings?.length || 0)),
     total_bids: organization.total_bids || (bids?.length || 0),
     total_comments: organization.total_comments || (comments?.length || 0),
     total_auction_wins: organization.total_auction_wins || (auctionWins?.length || 0),
@@ -459,7 +467,7 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
   return {
     organization,
     stats,
-    listings: [...(batListings || []), ...auctionListings],
+    listings: [...(batEvents || []), ...auctionListings],
     bids: bids || [],
     comments: comments || [],
     auction_wins: auctionWins || [],

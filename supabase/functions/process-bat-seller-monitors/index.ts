@@ -12,7 +12,7 @@ const corsHeaders = {
  *
  * Iterates over active bat_seller_monitors that are due for checking,
  * scrapes each seller's BaT profile via Firecrawl to discover listing URLs,
- * creates vehicles + external_listings for new ones, and updates monitor stats.
+ * creates vehicles + vehicle_events for new ones, and updates monitor stats.
  *
  * Modes:
  *   - Default: process all due monitors
@@ -143,13 +143,13 @@ async function processMonitor(
     }
 
     // Step 2: Check which URLs we already know about
-    // Check external_listings
+    // Check vehicle_events
     const { data: existingExternal } = await supabase
-      .from('external_listings')
-      .select('listing_url')
-      .eq('platform', 'bat')
-      .in('listing_url', listingUrls);
-    const knownUrls = new Set(existingExternal?.map((l: any) => l.listing_url) || []);
+      .from('vehicle_events')
+      .select('source_url')
+      .eq('source_platform', 'bat')
+      .in('source_url', listingUrls);
+    const knownUrls = new Set(existingExternal?.map((l: any) => l.source_url) || []);
 
     // Also check vehicles.bat_auction_url
     const { data: existingVehicles } = await supabase
@@ -181,7 +181,7 @@ async function processMonitor(
       return result;
     }
 
-    // Step 3: Process new listings - create vehicles + external_listings
+    // Step 3: Process new listings - create vehicles + vehicle_events
     for (const listingUrl of newUrls) {
       try {
         await processNewListing(listingUrl, monitor, supabase, firecrawlApiKey, result);
@@ -422,29 +422,29 @@ async function processNewListing(
       onConflict: 'organization_id,vehicle_id',
     });
 
-  // Create external_listing record
-  // Unique constraint is (vehicle_id, platform, listing_id)
+  // Create vehicle_event record
   const { error: listingError } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .upsert({
       vehicle_id: vehicleId,
-      organization_id: monitor.organization_id,
-      platform: 'bat',
-      listing_url: listingUrl,
-      listing_id: listingId,
-      listing_status: 'pending',
+      source_organization_id: monitor.organization_id,
+      source_platform: 'bat',
+      event_type: 'auction',
+      source_url: listingUrl,
+      source_listing_id: listingId,
+      event_status: 'pending',
       metadata: {
         seller: monitor.seller_username,
         discovered_via: 'seller_monitor',
         discovered_at: new Date().toISOString(),
       },
     }, {
-      onConflict: 'vehicle_id,platform,listing_id',
+      onConflict: 'source_platform,source_listing_id',
       ignoreDuplicates: false,
     });
 
   if (listingError) {
-    console.warn(`  External listing upsert warning: ${listingError.message}`);
+    console.warn(`  Vehicle event upsert warning: ${listingError.message}`);
   }
 
   // Queue for full extraction (fills in VIN, price, specs, images, etc.)

@@ -618,26 +618,26 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
   const fetchPage = React.useCallback(async (pageIndex: number, append: boolean) => {
     const from = pageIndex * PAGE_SIZE;
 
-    // 1) Live auctions from external_listings (BaT, CC, C&B when they have rows here)
+    // 1) Live auctions from vehicle_events (BaT, CC, C&B when they have rows here)
     const { data: extListings, error: extErr } = await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .select(`
         id,
         vehicle_id,
-        platform,
-        listing_url,
-        listing_status,
-        current_bid,
+        source_platform,
+        source_url,
+        event_status,
+        current_price,
         bid_count,
         watcher_count,
         view_count,
-        end_date,
-        start_date,
+        ended_at,
+        started_at,
         updated_at
       `)
-      .eq('listing_status', 'active')
-      .gt('end_date', nowIso)
-      .order('end_date', { ascending: true })
+      .eq('event_status', 'active')
+      .gt('ended_at', nowIso)
+      .order('ended_at', { ascending: true })
       .limit(10000);
 
     if (extErr) throw extErr;
@@ -654,9 +654,20 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
 
     if (vErr) throw vErr;
 
-    const fromExt = (extListings || []).map((l) => ({
-      ...l,
-      _source: 'external_listings' as const,
+    const fromExt = (extListings || []).map((l: any) => ({
+      id: l.id,
+      vehicle_id: l.vehicle_id,
+      platform: l.source_platform,
+      listing_url: l.source_url,
+      listing_status: l.event_status,
+      current_bid: l.current_price,
+      bid_count: l.bid_count,
+      watcher_count: l.watcher_count,
+      view_count: l.view_count,
+      end_date: l.ended_at,
+      start_date: l.started_at,
+      updated_at: l.updated_at,
+      _source: 'vehicle_events' as const,
     }));
     const fromVehicles = (liveVehicles || []).map((v) => ({
       id: `v-${v.id}`,

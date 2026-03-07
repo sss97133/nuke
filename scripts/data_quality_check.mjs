@@ -23,14 +23,14 @@ const worst = await q(`
          d.comp_median::float as comp,
          d.comp_count::int as cc,
          d.multiplier_used::float as mult,
-         el.listing_url,
+         el.source_url,
          el.make, el.model, el.year,
          el.final_price::float as el_final_price,
          el.bid_count::int as bid_count,
-         el.watcher_count::int as watchers,
-         el.listing_status
+         el.view_count::int as watchers,
+         el.event_status
   FROM backtest_run_details d
-  JOIN external_listings el ON el.vehicle_id = d.vehicle_id
+  JOIN vehicle_events el ON el.vehicle_id = d.vehicle_id
   WHERE d.run_id = (SELECT id FROM backtest_runs ORDER BY created_at DESC LIMIT 1)
     AND d.time_window = '2h'
     AND d.actual_hammer > 0 AND d.bid_at_window > 0
@@ -48,13 +48,13 @@ for (const w of worst) {
   if (w.actual / w.bid < 0.95) flags.push("HAMMER_BELOW_BID");
   if (w.comp && w.comp / w.bid > 5) flags.push("EXTREME_COMP_RATIO");
   if (w.el_final_price && Math.abs(w.el_final_price - w.actual) / w.actual > 0.1) flags.push("PRICE_MISMATCH");
-  if (!w.listing_url) flags.push("NO_URL");
+  if (!w.source_url) flags.push("NO_URL");
   if (w.bid < 1000) flags.push("MICRO_BID");
   if (w.bid_count < 3) flags.push("LOW_BIDS");
 
   console.log(`${w.error_pct > 0 ? '+' : ''}${w.error_pct.toFixed(0)}% err | ${w.year || '?'} ${w.make} ${w.model}`);
   console.log(`  bid=$${Math.round(w.bid).toLocaleString()} actual=$${Math.round(w.actual).toLocaleString()} H/B=${hb} comp=$${w.comp ? Math.round(w.comp).toLocaleString() : 'n/a'} comp/bid=${cr} cc=${w.cc ?? 0}`);
-  console.log(`  bids=${w.bid_count ?? '?'} watchers=${w.watchers ?? '?'} tier=${w.price_tier} status=${w.listing_status}`);
+  console.log(`  bids=${w.bid_count ?? '?'} watchers=${w.watchers ?? '?'} tier=${w.price_tier} status=${w.event_status}`);
   if (flags.length) console.log(`  FLAGS: ${flags.join(', ')}`);
   console.log();
 }
@@ -67,7 +67,7 @@ const all2h = await q(`
          d.comp_count::int as cc,
          el.final_price::float as el_final_price
   FROM backtest_run_details d
-  JOIN external_listings el ON el.vehicle_id = d.vehicle_id
+  JOIN vehicle_events el ON el.vehicle_id = d.vehicle_id
   WHERE d.run_id = (SELECT id FROM backtest_runs ORDER BY created_at DESC LIMIT 1)
     AND d.time_window = '2h'
     AND d.actual_hammer > 0 AND d.bid_at_window > 0
@@ -96,10 +96,10 @@ console.log("\n=== EXTREME H/B AUCTION DETAILS ===");
 const extremeDetails = await q(`
   SELECT d.vehicle_id,
          d.bid_at_window::float as bid, d.actual_hammer::float as actual,
-         el.final_price::float as el_price, el.listing_url, el.make, el.model, el.year,
-         el.bid_count, el.listing_status
+         el.final_price::float as el_price, el.source_url, el.make, el.model, el.year,
+         el.bid_count, el.event_status
   FROM backtest_run_details d
-  JOIN external_listings el ON el.vehicle_id = d.vehicle_id
+  JOIN vehicle_events el ON el.vehicle_id = d.vehicle_id
   WHERE d.run_id = (SELECT id FROM backtest_runs ORDER BY created_at DESC LIMIT 1)
     AND d.time_window = '2h'
     AND d.actual_hammer > 0 AND d.bid_at_window > 0
@@ -108,5 +108,5 @@ const extremeDetails = await q(`
 `);
 for (const e of extremeDetails) {
   const hb = (e.actual / e.bid).toFixed(2);
-  console.log(`  ${e.year || '?'} ${e.make} ${e.model}: bid=$${Math.round(e.bid).toLocaleString()} actual=$${Math.round(e.actual).toLocaleString()} H/B=${hb} el_price=$${e.el_price ? Math.round(e.el_price).toLocaleString() : '?'} bids=${e.bid_count ?? '?'} status=${e.listing_status}`);
+  console.log(`  ${e.year || '?'} ${e.make} ${e.model}: bid=$${Math.round(e.bid).toLocaleString()} actual=$${Math.round(e.actual).toLocaleString()} H/B=${hb} el_price=$${e.el_price ? Math.round(e.el_price).toLocaleString() : '?'} bids=${e.bid_count ?? '?'} status=${e.event_status}`);
 }

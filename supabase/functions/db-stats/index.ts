@@ -84,15 +84,15 @@ async function getQueueStats(): Promise<Record<string, number>> {
 }
 
 interface ExtractionReality {
-  bat_listings_total: number;
-  external_listings_by_platform: Record<string, number>;
+  vehicle_events_bat_total: number;
+  vehicle_events_by_platform: Record<string, number>;
   vehicles_by_source: Array<{ source: string; total: number; with_description: number; description_pct: number }>;
   snapshots_by_platform: Array<{ platform: string; total: number; successful: number; success_pct: number }>;
 }
 
 /**
  * Query actual extraction tables for real numbers instead of stale source_target_coverage view.
- * Queries: bat_listings, external_listings, vehicles (by source), listing_page_snapshots.
+ * Queries: vehicle_events, vehicles (by source), listing_page_snapshots.
  */
 async function getExtractionReality(): Promise<ExtractionReality | null> {
   const dbUrl = Deno.env.get("NUKE_DB_POOL_URL") || Deno.env.get("SUPABASE_DB_URL");
@@ -104,12 +104,12 @@ async function getExtractionReality(): Promise<ExtractionReality | null> {
     const conn = await pool.connect();
     try {
       // Run all queries in parallel on the same connection
-      const [batCount, extListings, vehicleSources, snapshotStats] = await Promise.all([
-        conn.queryObject<{ cnt: number }>`SELECT COUNT(*)::bigint as cnt FROM bat_listings`,
-        conn.queryObject<{ platform: string; cnt: number }>`
-          SELECT platform, COUNT(*)::bigint as cnt
-          FROM external_listings
-          GROUP BY platform
+      const [batCount, eventsByPlatform, vehicleSources, snapshotStats] = await Promise.all([
+        conn.queryObject<{ cnt: number }>`SELECT COUNT(*)::bigint as cnt FROM vehicle_events WHERE source_platform = 'bat'`,
+        conn.queryObject<{ source_platform: string; cnt: number }>`
+          SELECT source_platform, COUNT(*)::bigint as cnt
+          FROM vehicle_events
+          GROUP BY source_platform
           ORDER BY cnt DESC
         `,
         conn.queryObject<{ source: string; total: number; with_desc: number }>`
@@ -132,14 +132,14 @@ async function getExtractionReality(): Promise<ExtractionReality | null> {
         `,
       ]);
 
-      const extByPlatform: Record<string, number> = {};
-      for (const row of extListings.rows) {
-        extByPlatform[row.platform] = Number(row.cnt);
+      const eventsByPlatformMap: Record<string, number> = {};
+      for (const row of eventsByPlatform.rows) {
+        eventsByPlatformMap[row.source_platform] = Number(row.cnt);
       }
 
       return {
-        bat_listings_total: Number(batCount.rows[0]?.cnt ?? 0),
-        external_listings_by_platform: extByPlatform,
+        vehicle_events_bat_total: Number(batCount.rows[0]?.cnt ?? 0),
+        vehicle_events_by_platform: eventsByPlatformMap,
         vehicles_by_source: vehicleSources.rows.map(r => ({
           source: r.source,
           total: Number(r.total),
@@ -184,8 +184,8 @@ serve(async (req) => {
       bigCounts,
       queueStats,
       extractionReality,
-      batListingsRes,
-      batWithCommentsRes,
+      batEventsRes,
+      batEventsWithCommentsRes,
       commentDiscRes,
       descDiscRes,
       orgsRes,
@@ -200,8 +200,8 @@ serve(async (req) => {
       getBigCounts(),
       getQueueStats(),
       getExtractionReality(),
-      supabase.from("bat_listings").select("id", { count: "exact", head: true }),
-      supabase.from("bat_listings").select("id", { count: "exact", head: true }).gt("comment_count", 0),
+      supabase.from("vehicle_events").select("id", { count: "exact", head: true }).eq("source_platform", "bat"),
+      supabase.from("vehicle_events").select("id", { count: "exact", head: true }).eq("source_platform", "bat").gt("comment_count", 0),
       supabase.from("comment_discoveries").select("id", { count: "exact", head: true }),
       supabase.from("description_discoveries").select("id", { count: "exact", head: true }),
       supabase.from("businesses").select("id", { count: "exact", head: true }),
@@ -261,9 +261,9 @@ serve(async (req) => {
           pending_verifications: pendingVerificationsRes.count || 0,
         },
 
-        bat_listings: {
-          total: batListingsRes.count || 0,
-          with_comments: batWithCommentsRes.count || 0,
+        bat_events: {
+          total: batEventsRes.count || 0,
+          with_comments: batEventsWithCommentsRes.count || 0,
         },
 
         ai_analysis: {
@@ -276,31 +276,25 @@ serve(async (req) => {
           // Build accurate extraction counts from actual tables
           const reality = extractionReality;
           if (reality) {
-            const batTotal = reality.bat_listings_total;
-            const extTotals = Object.entries(reality.external_listings_by_platform);
+            const batTotal = reality.vehicle_events_bat_total;
+            const eventTotals = Object.entries(reality.vehicle_events_by_platform);
 
-            // Merge bat_listings + external_listings counts per platform
-            // bat_listings is the canonical BaT count; external_listings.bat tracks linked listings
+            // Build counts per platform from vehicle_events
             const mergedCounts: Record<string, { extracted: number; note: string }> = {};
 
-            // bat_listings is the primary BaT extraction table
-            mergedCounts["bat"] = {
-              extracted: batTotal,
-              note: "from bat_listings (actual count)",
-            };
+            for (const [platform, count] of eventTotals) {
+              mergedCounts[platform] = {
+                extracted: count,
+                note: "from vehicle_events (actual count)",
+              };
+            }
 
-            // Add external_listings platforms, merging bat into the existing entry
-            for (const [platform, count] of extTotals) {
-              if (platform === "bat") {
-                // bat external_listings are linked listing records, not separate extractions
-                mergedCounts["bat"].note = `from bat_listings (${batTotal}) + external_listings (${count})`;
-                // Don't double-count; bat_listings is the canonical number
-              } else {
-                mergedCounts[platform] = {
-                  extracted: count,
-                  note: "from external_listings (actual count)",
-                };
-              }
+            // Ensure bat is represented even if not in eventTotals
+            if (!mergedCounts["bat"]) {
+              mergedCounts["bat"] = {
+                extracted: batTotal,
+                note: "from vehicle_events where source_platform='bat' (actual count)",
+              };
             }
 
             const totalExtracted = Object.values(mergedCounts).reduce((s, v) => s + v.extracted, 0);

@@ -150,21 +150,22 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
         }))
         .filter((r: any) => r.text && r.text.trim().length > 0);
 
-      // Also check for BaT listing data
-      const { data: batListing } = await supabase
-        .from('bat_listings')
-        .select('id, bat_listing_title, bat_listing_url, raw_data, created_at')
+      // Also check for BaT event data (vehicle_events)
+      const { data: batEvent } = await supabase
+        .from('vehicle_events')
+        .select('id, source_url, metadata, created_at')
         .eq('vehicle_id', vehicleId)
+        .eq('source_platform', 'bat')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      // Add BaT listing as a source if it exists and has description data
-      if (batListing) {
-        const batDescription = (batListing.raw_data as any)?.description || 
-                              (batListing.raw_data as any)?.post_excerpt ||
-                              batListing.bat_listing_title;
-        
+      // Add BaT event as a source if it exists and has description data
+      if (batEvent) {
+        const batDescription = (batEvent.metadata as any)?.description ||
+                              (batEvent.metadata as any)?.post_excerpt ||
+                              (batEvent.metadata as any)?.title || (batEvent.metadata as any)?.bat_listing_title;
+
         if (batDescription && batDescription.trim().length > 0) {
           const batText = batDescription.toString();
           // Only add if not already present (check if any existing entry has same text)
@@ -173,14 +174,14 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
             const batStart = batText.trim().substring(0, 200);
             return entryStart === batStart || entry.text.trim() === batText.trim();
           });
-          
+
           if (!isDuplicate) {
             mapped.unshift({
               text: batText,
-              extracted_at: batListing.created_at ? String(batListing.created_at) : null,
-              source_url: batListing.bat_listing_url || null,
+              extracted_at: batEvent.created_at ? String(batEvent.created_at) : null,
+              source_url: batEvent.source_url || null,
               event_date: (() => {
-                const u = normalizeUrlLoose(batListing.bat_listing_url || '');
+                const u = normalizeUrlLoose(batEvent.source_url || '');
                 return u ? (endDateByUrl.get(u) || null) : null;
               })()
             });

@@ -16,23 +16,23 @@ const supabase = createClient(
 async function main() {
   console.log('=== BACKFILL AUCTION PRICES V2 ===\n');
 
-  // Get external_listings with prices and vehicle_ids
+  // Get vehicle_events with prices and vehicle_ids
   const { data: listingsWithPrices } = await supabase
-    .from('external_listings')
-    .select('id, vehicle_id, final_price, current_bid, listing_url')
+    .from('vehicle_events')
+    .select('id, vehicle_id, final_price, current_price, source_url')
     .not('vehicle_id', 'is', null)
-    .or('final_price.not.is.null,current_bid.not.is.null')
+    .or('final_price.not.is.null,current_price.not.is.null')
     .limit(5000);
 
-  console.log(`Found ${listingsWithPrices?.length || 0} external_listings with prices`);
+  console.log(`Found ${listingsWithPrices?.length || 0} vehicle_events with prices`);
 
   let updated = 0;
   let alreadySet = 0;
   let noMatch = 0;
 
   for (const listing of listingsWithPrices || []) {
-    // Get the price (prefer final_price, fall back to current_bid)
-    const price = listing.final_price || listing.current_bid;
+    // Get the price (prefer final_price, fall back to current_price)
+    const price = listing.final_price || listing.current_price;
     if (!price) continue;
 
     // Find matching auction_event

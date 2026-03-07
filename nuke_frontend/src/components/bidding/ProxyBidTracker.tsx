@@ -23,10 +23,10 @@ export interface ProxyBid {
     model: string;
     primary_image_url?: string;
   };
-  external_listing?: {
-    end_date: string;
-    current_bid: number;
-    listing_status: string;
+  vehicle_event?: {
+    ended_at: string;
+    current_price: number;
+    event_status: string;
   };
 }
 
@@ -45,7 +45,7 @@ export function useProxyBids() {
       .select(`
         *,
         vehicle:vehicles(year, make, model, primary_image_url),
-        external_listing:external_listings(end_date, current_bid, listing_status)
+        vehicle_event:vehicle_events(ended_at, current_price, event_status)
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });

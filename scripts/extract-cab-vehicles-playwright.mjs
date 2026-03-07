@@ -2,7 +2,7 @@
  * extract-cab-vehicles-playwright.mjs
  *
  * Full C&B vehicle extractor using Playwright (replaces Firecrawl-based extract-cars-and-bids-core).
- * Processes import_queue URLs → creates vehicles, images, external_listings, auction_events, bids.
+ * Processes import_queue URLs → creates vehicles, images, vehicle_events, auction_events, bids.
  *
  * Usage:
  *   dotenvx run -- node scripts/extract-cab-vehicles-playwright.mjs --queue --limit 500
@@ -515,15 +515,16 @@ async function processUrl(page, url, queueItemId) {
     }
   }
 
-  // ── Upsert external_listing ──
+  // ── Upsert vehicle_event ──
   if (vehicleId) {
-    const listingData = {
-      platform: 'cars_and_bids',
-      listing_url: canonical,
+    const eventData = {
+      source_platform: 'cars_and_bids',
+      event_type: 'auction',
+      source_url: canonical,
       vehicle_id: vehicleId,
-      current_bid: vd.currentBid || undefined,
-      listing_status: vd.auctionStatus || 'active',
-      end_date: vd.endDate || undefined,
+      current_price: vd.currentBid || undefined,
+      event_status: vd.auctionStatus || 'active',
+      ended_at: vd.endDate || undefined,
       bid_count: vd.bidCount || undefined,
       metadata: {
         title: vd.title,
@@ -533,12 +534,12 @@ async function processUrl(page, url, queueItemId) {
         comment_count: vd.commentCount,
       },
     };
-    Object.keys(listingData).forEach(k => { if (listingData[k] === undefined) delete listingData[k]; });
+    Object.keys(eventData).forEach(k => { if (eventData[k] === undefined) delete eventData[k]; });
 
-    // Unique constraint is on (vehicle_id, platform, listing_id) — use lot as listing_id
-    listingData.listing_id = lot || canonical;
-    const { error } = await supabase.from('external_listings').upsert(listingData, { onConflict: 'vehicle_id,platform,listing_id' });
-    if (error) console.log(`  Listing upsert error: ${error.message?.slice(0, 50)}`);
+    // Unique constraint — use lot as source_listing_id
+    eventData.source_listing_id = lot || canonical;
+    const { error } = await supabase.from('vehicle_events').upsert(eventData, { onConflict: 'vehicle_id,source_platform,source_listing_id' });
+    if (error) console.log(`  Event upsert error: ${error.message?.slice(0, 50)}`);
   }
 
   // ── Upsert auction_event ──

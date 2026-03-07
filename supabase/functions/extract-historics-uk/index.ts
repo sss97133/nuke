@@ -729,19 +729,19 @@ async function saveToDatabase(
     }
   }
 
-  // Create external_listings record
+  // Create vehicle_events record
   const listingUrlKey = normalizeListingUrlKey(extracted.url);
   const { error: listingError } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .upsert({
       vehicle_id: vehicleId,
-      platform: 'historics',
-      listing_url: extracted.url,
-      listing_url_key: listingUrlKey,
-      listing_id: extracted.lot_number || listingUrlKey,
-      listing_status: extracted.auction_status === 'sold' ? 'sold' :
+      source_platform: 'historics',
+      event_type: 'auction',
+      source_url: extracted.url,
+      source_listing_id: listingUrlKey || extracted.lot_number,
+      event_status: extracted.auction_status === 'sold' ? 'sold' :
                      extracted.auction_status === 'upcoming' ? 'active' : 'ended',
-      end_date: extracted.auction_date,
+      ended_at: extracted.auction_date,
       final_price: extracted.sold_price_usd,
       sold_at: extracted.auction_status === 'sold' ? extracted.auction_date : null,
       metadata: {

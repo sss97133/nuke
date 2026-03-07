@@ -86,14 +86,15 @@ async function markPageScraped(supabase: any, crawlType: string, page: number, u
 async function getExistingUrls(supabase: any): Promise<Set<string>> {
   const existing = new Set<string>();
 
-  // Get from bat_listings
+  // Get from vehicle_events
   const { data: batListings } = await supabase
-    .from("bat_listings")
-    .select("bat_listing_url");
+    .from("vehicle_events")
+    .select("source_url")
+    .eq("source_platform", "bat");
 
   for (const row of batListings || []) {
-    if (row.bat_listing_url) {
-      existing.add(row.bat_listing_url.replace(/\/$/, ""));
+    if (row.source_url) {
+      existing.add(row.source_url.replace(/\/$/, ""));
     }
   }
 
@@ -183,8 +184,9 @@ Deno.serve(async (req) => {
         .eq("status", "complete");
 
       const { count: batListings } = await supabase
-        .from("bat_listings")
-        .select("*", { count: "estimated", head: true });
+        .from("vehicle_events")
+        .select("*", { count: "estimated", head: true })
+        .eq("source_platform", "bat");
 
       return okJson({
         success: true,

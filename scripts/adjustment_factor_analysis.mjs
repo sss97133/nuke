@@ -25,11 +25,11 @@ const rows = await q(`
          d.abs_error_pct::float as abs_error,
          d.error_pct::float as error_pct,
          d.multiplier_used::float as mult,
-         el.watcher_count::int as watchers,
-         el.view_count::int as views,
-         el.bid_count::int as bids
+         ve.watcher_count::int as watchers,
+         ve.view_count::int as views,
+         ve.bid_count::int as bids
   FROM backtest_run_details d
-  JOIN external_listings el ON el.vehicle_id = d.vehicle_id
+  JOIN vehicle_events ve ON ve.vehicle_id = d.vehicle_id
   WHERE d.run_id = (SELECT id FROM backtest_runs ORDER BY created_at DESC LIMIT 1)
     AND d.actual_hammer > 0 AND d.bid_at_window > 0
     AND d.time_window = '6h'
@@ -39,20 +39,20 @@ console.log(`Loaded ${rows.length} 6h predictions\n`);
 
 // Get comment counts for these auctions
 const commentCounts = await q(`
-  SELECT el.vehicle_id, COUNT(*) as comment_count
-  FROM external_listings el
-  JOIN auction_comments ac ON ac.vehicle_id = el.vehicle_id
-  WHERE el.vehicle_id IN (
+  SELECT ve.vehicle_id, COUNT(*) as comment_count
+  FROM vehicle_events ve
+  JOIN auction_comments ac ON ac.vehicle_id = ve.vehicle_id
+  WHERE ve.vehicle_id IN (
     SELECT DISTINCT vehicle_id FROM backtest_run_details
     WHERE run_id = (SELECT id FROM backtest_runs ORDER BY created_at DESC LIMIT 1)
   )
-  GROUP BY el.vehicle_id
+  GROUP BY ve.vehicle_id
 `);
 const ccMap = {};
 for (const c of commentCounts) ccMap[c.vehicle_id] = parseInt(c.comment_count);
 
-// Get unique bidder counts from bat_bids (use final counts from external_listings instead)
-// Actually, external_listings has bid_count but not unique_bidders
+// Get unique bidder counts from bat_bids (use final counts from vehicle_events instead)
+// Actually, vehicle_events has bid_count but not unique_bidders
 // And we can't easily get unique_bidders from bat_bids for all auctions (too slow)
 // Let's use what we have: bid_count as a proxy
 

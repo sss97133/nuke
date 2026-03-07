@@ -191,12 +191,12 @@ async function resolveVehicleIdByUrlCandidates(args: {
     .maybeSingle();
   if (ev?.vehicle_id) return String(ev.vehicle_id);
 
-  // 2) external_listings → vehicle_id
+  // 2) vehicle_events → vehicle_id
   const { data: ext } = await supabase
-    .from("external_listings")
+    .from("vehicle_events")
     .select("vehicle_id")
-    .eq("platform", "bat")
-    .in("listing_url", urlCandidates)
+    .eq("source_platform", "bat")
+    .in("source_url", urlCandidates)
     .limit(1)
     .maybeSingle();
   if (ext?.vehicle_id) return String(ext.vehicle_id);

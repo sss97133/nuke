@@ -1047,12 +1047,13 @@ async function saveListing(listing: SBXListingData): Promise<{ vehicleId: string
     await supabase.from('vehicles').update(updateData).eq('id', vehicleId);
   }
 
-  // Save to external_listings with full metadata
-  await supabase.from('external_listings').upsert({
+  // Save to vehicle_events with full metadata
+  await supabase.from('vehicle_events').upsert({
     vehicle_id: vehicleId,
-    source: 'sbx_cars',
-    listing_url: listing.url,
-    external_id: listing.lotNumber.toString(),
+    source_platform: 'sbx_cars',
+    event_type: 'auction',
+    source_url: listing.url,
+    source_listing_id: listing.lotNumber.toString(),
     metadata: {
       listingId: listing.listingId,
       auctionKey: listing.auctionKey,

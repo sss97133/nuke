@@ -8,7 +8,7 @@
  * - Extract clean title/year/make/model (avoid SEO chrome like "for sale on BaT Auctions")
  * - Extract BaT Essentials (seller/location/lot + key specs)
  * - Extract description + images
- * - Upsert vehicles + vehicle_images + external_listings + auction_events
+ * - Upsert vehicles + vehicle_images + vehicle_events + auction_events
  *
  * Comments/bids are handled separately by extract-auction-comments and stored in auction_comments.
  */
@@ -1416,7 +1416,7 @@ serve(async (req) => {
 
       // BaT fields / essentials (fill if missing)
       // NOTE: `vehicles.bat_*` is a "latest auction summary" cache. Older auctions are stored in
-      // `auction_events` + `external_listings` and should not overwrite the vehicle row.
+      // `auction_events` + `vehicle_events` and should not overwrite the vehicle row.
       const extractedEndYmd = essentials.auction_end_date ? String(essentials.auction_end_date).slice(0, 10) : null;
       const existingLatestYmd = (() => {
         const sd = existing?.sale_date ? String(existing.sale_date).slice(0, 10) : "";
@@ -1538,7 +1538,7 @@ serve(async (req) => {
           updatePayload.high_bid = extractedSalePrice;
         }
 
-        // Make the vehicle row consistent (some UIs fall back to vehicles.* if external_listings is blocked by RLS).
+        // Make the vehicle row consistent (some UIs fall back to vehicles.* if vehicle_events is blocked by RLS).
         updatePayload.sale_status = "sold";
         updatePayload.auction_outcome = "sold";
         if (extractedEndDate) updatePayload.sale_date = extractedEndDate;
@@ -1903,17 +1903,17 @@ serve(async (req) => {
       }
     }
 
-    // external_listings (platform tracking)
+    // vehicle_events (platform tracking)
     if (vehicleId) {
       const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
       const endAtIso = essentials.auction_end_at ||
         (essentials.auction_end_date ? new Date(`${essentials.auction_end_date}T00:00:00Z`).toISOString() : null);
       const endMs = endAtIso ? new Date(endAtIso).getTime() : NaN;
-      const listingStatus = hasSale
+      const eventStatus = hasSale
         ? "sold"
         : (endAtIso && Number.isFinite(endMs) && endMs > Date.now() ? "active" : "ended");
       const listingUrlKey = normalizeListingUrlKey(listingUrlCanonical);
-      const currentBidValue = listingStatus === "sold" ? essentials.sale_price : (essentials.high_bid || null);
+      const currentPriceValue = eventStatus === "sold" ? essentials.sale_price : (essentials.high_bid || null);
       const listingImageUrls = (() => {
         const out: string[] = [];
         const seen = new Set<string>();
@@ -1929,25 +1929,25 @@ serve(async (req) => {
       })();
 
       // IMPORTANT:
-      // `external_listings` has a *partial* unique index:
-      //   uq_external_listings_platform_url_key ON (platform, listing_url_key) WHERE listing_url_key IS NOT NULL
+      // `vehicle_events` has a *partial* unique index:
+      //   uq_vehicle_events_platform_url_key ON (source_platform, source_listing_id) WHERE source_listing_id IS NOT NULL
       // Postgres requires `ON CONFLICT ... WHERE ...` to target a partial index, but PostgREST/supabase-js
       // can't express that predicate via the upsert API.
       //
       // So we implement a safe "manual upsert":
-      // - update-by-(platform, listing_url_key)
+      // - update-by-(source_platform, source_listing_id)
       // - if 0 rows updated, insert
       // - if insert hits unique violation (race), retry update
-      const listingPayload: any = {
+      const eventPayload: any = {
         vehicle_id: vehicleId,
-        platform: "bat",
-        listing_url: listingUrlCanonical,
-        listing_url_key: listingUrlKey,
-        listing_id: essentials.lot_number || listingUrlCanonical,
-        listing_status: listingStatus,
-        end_date: endAtIso,
+        source_platform: "bat",
+        event_type: "auction",
+        source_url: listingUrlCanonical,
+        source_listing_id: listingUrlKey || essentials.lot_number || listingUrlCanonical,
+        event_status: eventStatus,
+        ended_at: endAtIso,
         sold_at: hasSale ? endAtIso : null,
-        current_bid: currentBidValue,
+        current_price: currentPriceValue,
         final_price: hasSale ? essentials.sale_price : null,
         bid_count: essentials.bid_count,
         view_count: essentials.view_count,
@@ -1971,15 +1971,15 @@ serve(async (req) => {
 
         if (listingUrlKey) {
           const { data: updatedRows, error: updErr } = await supabase
-            .from("external_listings")
-            .update(listingPayload)
-            .eq("platform", "bat")
-            .eq("listing_url_key", listingUrlKey)
+            .from("vehicle_events")
+            .update(eventPayload)
+            .eq("source_platform", "bat")
+            .eq("source_listing_id", listingUrlKey)
             .select("id")
             .limit(1);
 
           if (updErr) {
-            console.warn(`external_listings update failed (non-fatal): ${updErr.message}`);
+            console.warn(`vehicle_events update failed (non-fatal): ${updErr.message}`);
           } else if (Array.isArray(updatedRows) && updatedRows.length > 0) {
             didUpdate = true;
           }
@@ -1987,31 +1987,31 @@ serve(async (req) => {
 
         if (!didUpdate) {
           const { error: insErr } = await supabase
-            .from("external_listings")
-            .insert(listingPayload);
+            .from("vehicle_events")
+            .insert(eventPayload);
 
           if (insErr) {
             const code = String((insErr as any)?.code || "");
             const msg = String((insErr as any)?.message || "");
             const isDup =
               code === "23505" ||
-              msg.includes("uq_external_listings_platform_url_key") ||
-              msg.includes("external_listings_platform_url_key");
+              msg.includes("uq_vehicle_events_platform_url_key") ||
+              msg.includes("vehicle_events_platform_url_key");
 
             if (isDup && listingUrlKey) {
               const { error: retryErr } = await supabase
-                .from("external_listings")
-                .update(listingPayload)
-                .eq("platform", "bat")
-                .eq("listing_url_key", listingUrlKey);
-              if (retryErr) console.warn(`external_listings retry update failed (non-fatal): ${retryErr.message}`);
+                .from("vehicle_events")
+                .update(eventPayload)
+                .eq("source_platform", "bat")
+                .eq("source_listing_id", listingUrlKey);
+              if (retryErr) console.warn(`vehicle_events retry update failed (non-fatal): ${retryErr.message}`);
             } else {
-              console.warn(`external_listings insert failed (non-fatal): ${insErr.message}`);
+              console.warn(`vehicle_events insert failed (non-fatal): ${insErr.message}`);
             }
           }
         }
       } catch (e: any) {
-        console.warn(`external_listings write failed (non-fatal): ${e?.message || String(e)}`);
+        console.warn(`vehicle_events write failed (non-fatal): ${e?.message || String(e)}`);
       }
     }
 
@@ -2064,66 +2064,9 @@ serve(async (req) => {
       if (error) console.warn(`auction_events upsert failed (non-fatal): ${error?.message || error}`);
     }
 
-    // bat_listings (BaT-specific auction data table)
-    if (vehicleId) {
-      const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
-      const endAtIso = essentials.auction_end_at ||
-        (essentials.auction_end_date ? new Date(`${essentials.auction_end_date}T00:00:00Z`).toISOString() : null);
-      const batListingPayload: any = {
-        vehicle_id: vehicleId,
-        bat_listing_url: canonicalUrl(listingUrlCanonical),
-        bat_lot_number: essentials.lot_number || null,
-        bat_listing_title: identity.title || null,
-        auction_end_date: essentials.auction_end_date || null,
-        sale_date: hasSale ? essentials.auction_end_date : null,
-        sale_price: hasSale ? essentials.sale_price : null,
-        final_bid: hasSale ? essentials.sale_price : (essentials.high_bid || null),
-        seller_username: essentials.seller_username || null,
-        buyer_username: hasSale ? (essentials.buyer_username || null) : null,
-        comment_count: essentials.comment_count || 0,
-        bid_count: essentials.bid_count || 0,
-        view_count: essentials.view_count || 0,
-        watcher_count: essentials.watcher_count || 0,
-        listing_status: hasSale ? 'sold' : (essentials.reserve_status === 'reserve_not_met' ? 'ended' : 'active'),
-        updated_at: new Date().toISOString(),
-      };
-
-      try {
-        // Check if bat_listings record exists for this URL (with or without trailing slash)
-        const urlWithSlash = listingUrlCanonical.endsWith('/') ? listingUrlCanonical : `${listingUrlCanonical}/`;
-        const urlWithoutSlash = listingUrlCanonical.endsWith('/') ? listingUrlCanonical.slice(0, -1) : listingUrlCanonical;
-
-        const { data: existingBatListing } = await supabase
-          .from("bat_listings")
-          .select("id")
-          .in("bat_listing_url", [urlWithSlash, urlWithoutSlash])
-          .limit(1)
-          .maybeSingle();
-
-        if (existingBatListing?.id) {
-          // Update existing
-          const { error: batUpdateErr } = await supabase
-            .from("bat_listings")
-            .update(batListingPayload)
-            .eq("id", existingBatListing.id);
-          if (batUpdateErr) console.warn(`bat_listings update failed (non-fatal): ${batUpdateErr.message}`);
-        } else {
-          // Insert new
-          const { error: batInsertErr } = await supabase
-            .from("bat_listings")
-            .insert(batListingPayload);
-          if (batInsertErr) {
-            const code = String((batInsertErr as any)?.code || "");
-            // Ignore duplicate key violations (race condition with parallel extractors)
-            if (code !== "23505") {
-              console.warn(`bat_listings insert failed (non-fatal): ${batInsertErr.message}`);
-            }
-          }
-        }
-      } catch (e: any) {
-        console.warn(`bat_listings write failed (non-fatal): ${e?.message || String(e)}`);
-      }
-    }
+    // vehicle_events BaT-specific auction record (consolidated from bat_listings)
+    // NOTE: This is now handled by the vehicle_events upsert above with source_platform='bat'.
+    // The bat_listings table has been consolidated into vehicle_events.
 
     // Save raw listing description history (for Description Entries UI)
     if (vehicleId && descriptionRaw) {

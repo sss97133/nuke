@@ -905,32 +905,35 @@ serve(async (req) => {
       }
     }
 
-    // Upsert external_listing
-    const externalListingData: Record<string, any> = {
-      platform: "carsandbids",
-      listing_url: listingUrlCanonical,
+    // Upsert vehicle_event
+    const vehicleEventData: Record<string, any> = {
+      source_platform: "carsandbids",
+      event_type: "auction",
+      source_url: listingUrlCanonical,
       vehicle_id: vehicleId,
-      title: extracted.title,
-      current_bid: extracted.currentBid,
-      listing_status: extracted.auctionStatus || "active",
-      seller_id: extracted.sellerId,
-      seller_name: extracted.sellerName,
-      location: extracted.location,
-      end_date: extracted.endDate,
+      current_price: extracted.currentBid,
+      event_status: extracted.auctionStatus || "active",
+      ended_at: extracted.endDate,
+      metadata: {
+        title: extracted.title,
+        seller_id: extracted.sellerId,
+        seller_name: extracted.sellerName,
+        location: extracted.location,
+      },
     };
 
-    Object.keys(externalListingData).forEach(key => {
-      if (externalListingData[key] === null || externalListingData[key] === undefined) {
-        delete externalListingData[key];
+    Object.keys(vehicleEventData).forEach(key => {
+      if (vehicleEventData[key] === null || vehicleEventData[key] === undefined) {
+        delete vehicleEventData[key];
       }
     });
 
     const { error: listingError } = await supabase
-      .from("external_listings")
-      .upsert(externalListingData, { onConflict: "platform,listing_url" });
+      .from("vehicle_events")
+      .upsert(vehicleEventData, { onConflict: "source_platform,source_url" });
 
     if (listingError) {
-      console.warn(`⚠️ C&B: External listing upsert failed: ${listingError.message}`);
+      console.warn(`⚠️ C&B: Vehicle event upsert failed: ${listingError.message}`);
     }
 
     // Link to Cars & Bids organization

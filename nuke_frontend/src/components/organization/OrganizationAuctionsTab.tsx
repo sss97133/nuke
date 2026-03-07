@@ -144,21 +144,20 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
         const now = Date.now();
 
         // Canonical source for *all* auction platforms (BaT, Cars & Bids, Mecum, etc.)
-        // NOTE: We keep bat_listings as an ingestion/detail table, but UI should prefer external_listings.
         const extRes = await supabase
-          .from('external_listings')
+          .from('vehicle_events')
           .select(
-            'id, vehicle_id, platform, listing_url, listing_status, end_date, current_bid, final_price, bid_count, view_count, watcher_count, reserve_price'
+            'id, vehicle_id, source_platform, source_url, event_status, ended_at, current_price, final_price, bid_count, view_count, watcher_count, reserve_price'
           )
-          .eq('organization_id', organizationId)
-          .order('end_date', { ascending: false })
+          .eq('source_organization_id', organizationId)
+          .order('ended_at', { ascending: false })
           .limit(600);
 
         const extRows: AuctionRow[] =
           ((extRes as any)?.data || []).map((r: any) => {
-            const endTime = typeof r.end_date === 'string' ? r.end_date : null;
+            const endTime = typeof r.ended_at === 'string' ? r.ended_at : null;
             const currentBidCents =
-              typeof r.current_bid === 'number' ? Math.round(r.current_bid * 100) : null;
+              typeof r.current_price === 'number' ? Math.round(r.current_price * 100) : null;
             const finalPriceCents =
               typeof r.final_price === 'number' ? Math.round(r.final_price * 100) : null;
             const reserveCents =
@@ -166,11 +165,11 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
             return {
               id: r.id,
               source: 'external',
-              platform: typeof r.platform === 'string' ? r.platform : null,
+              platform: typeof r.source_platform === 'string' ? r.source_platform : null,
               vehicle_id: r.vehicle_id || null,
               title: null,
-              url: r.listing_url || null,
-              listing_status: r.listing_status || null,
+              url: r.source_url || null,
+              listing_status: r.event_status || null,
               end_time: endTime,
               bid_count: Number(r.bid_count || 0),
               comment_count: 0,

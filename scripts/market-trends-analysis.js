@@ -161,8 +161,8 @@ async function getPlatformComparison() {
   console.log('\n\n=== PLATFORM DATA COVERAGE ===\n');
 
   // Get counts from different sources
-  const [batListings, cabVehicles, commentsRes, discoveriesRes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/bat_listings?select=id`, {
+  const [batEvents, cabVehicles, commentsRes, discoveriesRes] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/vehicle_events?source_platform=eq.bat&select=id`, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'count=exact' }
     }),
     fetch(`${SUPABASE_URL}/rest/v1/vehicles?discovery_source=eq.carsandbids&select=id`, {
@@ -176,9 +176,9 @@ async function getPlatformComparison() {
     })
   ]);
 
-  console.log('Platform           | Listings  | Comments  | AI Analyzed');
+  console.log('Platform           | Events    | Comments  | AI Analyzed');
   console.log('-'.repeat(55));
-  console.log(`Bring a Trailer    | ${(batListings.headers.get('content-range')?.split('/')[1] || '0').padEnd(9)} | TBD       | ${discoveriesRes.headers.get('content-range')?.split('/')[1] || '0'}`);
+  console.log(`Bring a Trailer    | ${(batEvents.headers.get('content-range')?.split('/')[1] || '0').padEnd(9)} | TBD       | ${discoveriesRes.headers.get('content-range')?.split('/')[1] || '0'}`);
   console.log(`Cars & Bids        | ${(cabVehicles.headers.get('content-range')?.split('/')[1] || '0').padEnd(9)} | Pending   | Pending`);
   console.log(`Total Comments     | -         | ${(commentsRes.headers.get('content-range')?.split('/')[1] || '0').padEnd(9)} | -`);
 }

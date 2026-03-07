@@ -1,5 +1,5 @@
 /**
- * Backfill external_listings for a specific Cars & Bids vehicle
+ * Backfill vehicle_events for a specific Cars & Bids vehicle
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -13,7 +13,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function backfillCarsAndBidsListing(vehicleId: string) {
-  console.log(`🔍 Backfilling external_listings for vehicle ${vehicleId}...\n`);
+  console.log(`🔍 Backfilling vehicle_events for vehicle ${vehicleId}...\n`);
 
   // Get vehicle data
   const { data: vehicle, error: vehicleError } = await supabase
@@ -72,35 +72,36 @@ async function backfillCarsAndBidsListing(vehicleId: string) {
     listingStatus = 'ended';
   }
 
-  // Create external_listings record
+  // Create vehicle_events record
   const { error: insertError } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .upsert({
       vehicle_id: vehicle.id,
-      organization_id: orgId,
-      platform: 'cars_and_bids',
-      listing_url: vehicle.discovery_url,
-      listing_id: listingId,
-      listing_status: listingStatus,
-      current_bid: vehicle.sale_price && vehicle.sale_status === 'available' ? vehicle.sale_price : null,
+      source_organization_id: orgId,
+      source_platform: 'cars_and_bids',
+      event_type: 'auction',
+      source_url: vehicle.discovery_url,
+      source_listing_id: listingId,
+      event_status: listingStatus,
+      current_price: vehicle.sale_price && vehicle.sale_status === 'available' ? vehicle.sale_price : null,
       final_price: vehicle.sale_status === 'sold' ? vehicle.sale_price : null,
       sold_at: vehicle.sale_status === 'sold' && vehicle.sale_price ? new Date().toISOString() : null,
-      end_date: vehicle.auction_end_date ? new Date(vehicle.auction_end_date).toISOString() : null,
+      ended_at: vehicle.auction_end_date ? new Date(vehicle.auction_end_date).toISOString() : null,
       metadata: {
         source: 'backfill_script',
         listing_id: listingId,
       },
       updated_at: new Date().toISOString(),
     }, {
-      onConflict: 'vehicle_id,platform,listing_id',
+      onConflict: 'vehicle_id,source_platform,source_listing_id',
     });
 
   if (insertError) {
-    console.error('❌ Error creating listing:', insertError.message);
+    console.error('❌ Error creating vehicle event:', insertError.message);
     return;
   }
 
-  console.log('✅ External listing created successfully!');
+  console.log('✅ Vehicle event created successfully!');
   console.log(`   Platform: cars_and_bids`);
   console.log(`   Listing ID: ${listingId}`);
   console.log(`   Status: ${listingStatus}`);

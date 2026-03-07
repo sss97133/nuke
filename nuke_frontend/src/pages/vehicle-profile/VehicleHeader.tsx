@@ -192,7 +192,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     // 1. sale_price (actual sold price)
     // 2. winning_bid (auction result)
     // 3. high_bid (RNM auctions)
-    // 4. Live bid (from external_listings/auctionPulse for active auctions)
+    // 4. Live bid (from vehicle_events/auctionPulse for active auctions)
     // 5. Current bid (from vehicle, if no external listing)
     // 6. Asking price (only if for sale)
     
@@ -224,7 +224,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       return { amount: v.high_bid, label: 'High Bid' };
     }
     
-    // 4. Live bid from auction telemetry (external_listings pulse)
+    // 4. Live bid from auction telemetry (vehicle_events pulse)
     try {
       // First check auctionPulse (most up-to-date)
       if (auctionPulse?.listing_url) {
@@ -242,9 +242,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         }
       }
       
-      // Fallback: check external_listings directly from vehicle data
+      // Fallback: check vehicle_events directly from vehicle data
       const v: any = vehicle as any;
-      const externalListing = v?.external_listings?.[0];
+      const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
       if (externalListing) {
         // Treat listing as live if either:
         // - end_date is in the future, OR
@@ -481,13 +481,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   };
 
   // Live auction timer (header should feel alive)
-  // Check for end_date from auctionPulse OR external_listings OR vehicle-level data
+  // Check for end_date from auctionPulse OR vehicle_events OR vehicle-level data
   const auctionEndDateForTimer = useMemo(() => {
     // Priority 1: auctionPulse (most up-to-date telemetry)
     if (auctionPulse?.end_date) return auctionPulse.end_date;
-    // Priority 2: external_listings (if available in vehicle data)
+    // Priority 2: vehicle_events (if available in vehicle data)
     const v: any = vehicle as any;
-    const externalListing = v?.external_listings?.[0];
+    const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
     if (externalListing?.end_date) return externalListing.end_date;
     // Priority 3: vehicle-level auction_end_date
     return v?.auction_end_date || v?.origin_metadata?.auction_times?.auction_end_date || null;
@@ -525,11 +525,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
   const isAuctionLive = useMemo(() => {
     const v: any = vehicle as any;
-    const externalListing = v?.external_listings?.[0];
+    const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
     const activeListing = auctionPulse || externalListing;
-    
+
     if (!activeListing?.listing_url && !activeListing) return false;
-    
+
     // CRITICAL: Trust end_date over status field (scrapers use inconsistent status values)
     const endDate = activeListing.end_date || timerEndDate;
     
@@ -921,8 +921,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const explicit = v?.sale_date || v?.bat_sale_date || ((auctionPulse as any)?.sold_at ?? null);
     if (explicit) return explicit;
 
-    const externalListing = v?.external_listings?.[0];
-    const activeListing: any = auctionPulse || externalListing;
+    const vehicleEvent = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
+    const activeListing: any = auctionPulse || vehicleEvent;
     const end = activeListing?.end_date || v?.auction_end_date || v?.origin_metadata?.auction_times?.auction_end_date || null;
     if (!end) return null;
     try {
@@ -970,14 +970,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
     // Fall back to reserve_status (vehicle + external listing metadata).
     const reserve = String((vehicle as any)?.reserve_status || '').toLowerCase();
-    const extReserve = String(((vehicle as any)?.external_listings?.[0]?.metadata?.reserve_status) || '').toLowerCase();
+    const extReserve = String(((vehicle as any)?.vehicle_events?.[0]?.metadata?.reserve_status ?? (vehicle as any)?.external_listings?.[0]?.metadata?.reserve_status) || '').toLowerCase();
     const hasRNMFlag = reserve === 'reserve_not_met' || extReserve === 'reserve_not_met';
     if (!hasRNMFlag) return false;
 
     // Only show RNM once the auction has ended (avoid misleading RNM during a live auction).
     const v: any = vehicle as any;
-    const externalListing = v?.external_listings?.[0];
-    const activeListing: any = auctionPulse || externalListing;
+    const vehicleEvent = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
+    const activeListing: any = auctionPulse || vehicleEvent;
     const endDate = activeListing?.end_date || v?.auction_end_date || null;
     if (endDate) {
       const end = new Date(endDate).getTime();
@@ -1001,9 +1001,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
     
     // If we have external auction telemetry, reflect it directly in the header.
-    // Check both auctionPulse and external_listings for the most up-to-date data
+    // Check both auctionPulse and vehicle_events for the most up-to-date data
     const v: any = vehicle as any;
-    const externalListing = v?.external_listings?.[0];
+    const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
     const activeListing = auctionPulse || externalListing;
     
     if (activeListing?.listing_url || activeListing) {
@@ -1132,7 +1132,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const rawOutcome = String((vehicle as any)?.auction_outcome || '').toLowerCase();
     const saleStatus = String((vehicle as any)?.sale_status || '').toLowerCase();
     const reserveStatus = String((vehicle as any)?.reserve_status || '').toLowerCase();
-    const extReserveStatus = String(((vehicle as any)?.external_listings?.[0]?.metadata?.reserve_status) || '').toLowerCase();
+    const extReserveStatus = String(((vehicle as any)?.vehicle_events?.[0]?.metadata?.reserve_status ?? (vehicle as any)?.external_listings?.[0]?.metadata?.reserve_status) || '').toLowerCase();
     const batUrl = (vehicle as any)?.bat_auction_url || ((vehicle as any)?.discovery_url?.includes('bringatrailer') ? (vehicle as any)?.discovery_url : null);
     const kslUrl = (vehicle as any)?.discovery_url?.includes('ksl.com') ? (vehicle as any)?.discovery_url : null;
     const sourceUrl = batUrl || kslUrl || (vehicle as any)?.discovery_url;
@@ -1184,9 +1184,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
       // Prefer live telemetry when available.
       const v: any = vehicle as any;
-      const externalListing = v?.external_listings?.[0];
-      const activeListing = auctionPulse || externalListing;
-      
+      const vehicleEvent = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
+      const activeListing = auctionPulse || vehicleEvent;
+
       if (activeListing?.listing_url || activeListing) {
         const status = String(activeListing.listing_status || '').toLowerCase();
         if (status === 'reserve_not_met' || status === 'ended' || status === 'sold') return true;

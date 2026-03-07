@@ -192,17 +192,17 @@ async function processListing(listingUrl, index, total) {
         resolvedVehicleId = existingVehicle.id;
         console.log(`   ✅ Found existing vehicle: ${resolvedVehicleId}`);
       } else {
-        // Also try by checking external_listings
-        const { data: extListing } = await supabase
-          .from('external_listings')
+        // Also try by checking vehicle_events
+        const { data: extEvent } = await supabase
+          .from('vehicle_events')
           .select('vehicle_id')
-          .eq('platform', 'bat')
-          .in('listing_url', urlCandidates)
+          .eq('source_platform', 'bat')
+          .in('source_url', urlCandidates)
           .maybeSingle();
-        
-        if (extListing?.vehicle_id) {
-          resolvedVehicleId = extListing.vehicle_id;
-          console.log(`   ✅ Found via external_listings: ${resolvedVehicleId}`);
+
+        if (extEvent?.vehicle_id) {
+          resolvedVehicleId = extEvent.vehicle_id;
+          console.log(`   ✅ Found via vehicle_events: ${resolvedVehicleId}`);
         }
       }
     }

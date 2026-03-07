@@ -284,12 +284,12 @@ serve(async (req) => {
         : { data: [], error: null },
       vehicleIds.length > 0
         ? supabase
-            .from("external_listings")
+            .from("vehicle_events")
             .select(
-              "vehicle_id, current_bid, bid_count, listing_status, end_date, listing_url",
+              "vehicle_id, current_price, bid_count, event_status, ended_at, source_url",
             )
             .in("vehicle_id", vehicleIds)
-            .gt("end_date", new Date().toISOString())
+            .gt("ended_at", new Date().toISOString())
             .order("updated_at", { ascending: false })
             .limit(vehicleIds.length * 2)
         : { data: [], error: null },
@@ -378,12 +378,12 @@ serve(async (req) => {
         city: row.city,
         state: row.state,
 
-        // Auction state (from external_listings)
-        auction_end_date: auction?.end_date ?? null,
-        current_bid: auction?.current_bid ?? null,
+        // Auction state (from vehicle_events)
+        auction_end_date: auction?.ended_at ?? null,
+        current_bid: auction?.current_price ?? null,
         bid_count: auction?.bid_count ?? null,
-        listing_status: auction?.listing_status ?? null,
-        listing_url: auction?.listing_url ?? null,
+        listing_status: auction?.event_status ?? null,
+        listing_url: auction?.source_url ?? null,
 
         created_at: row.created_at,
         updated_at: row.updated_at,

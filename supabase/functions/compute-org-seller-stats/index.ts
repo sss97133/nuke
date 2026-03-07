@@ -35,13 +35,13 @@ async function computeStatsForOrg(
   supabase: ReturnType<typeof createClient>,
   orgId: string
 ): Promise<Record<string, unknown>> {
-  // 1. Get all external listings for this org
+  // 1. Get all vehicle events for this org
   const { data: listings, error: listErr } = await supabase
-    .from("external_listings")
+    .from("vehicle_events")
     .select(
-      "id, vehicle_id, listing_status, final_price, bid_count, start_date, end_date, view_count, watcher_count, platform"
+      "id, vehicle_id, event_status, final_price, bid_count, started_at, ended_at, view_count, watcher_count, source_platform"
     )
-    .eq("organization_id", orgId);
+    .eq("source_organization_id", orgId);
 
   if (listErr) throw new Error(`Listings query failed: ${listErr.message}`);
   if (!listings || listings.length === 0) {
@@ -97,12 +97,12 @@ async function computeStatsForOrg(
 
   // === Compute metrics ===
 
-  const sold = listings.filter((l) => l.listing_status === "sold");
+  const sold = listings.filter((l) => l.event_status === "sold");
   const unsold = listings.filter(
-    (l) => l.listing_status === "ended" || l.listing_status === "cancelled"
+    (l) => l.event_status === "ended" || l.event_status === "cancelled"
   );
   const active = listings.filter(
-    (l) => l.listing_status === "active" || l.listing_status === "pending"
+    (l) => l.event_status === "active" || l.event_status === "pending"
   );
 
   // Sale prices
@@ -132,7 +132,7 @@ async function computeStatsForOrg(
 
   // Timeline
   const dates = listings
-    .map((l) => l.start_date || l.end_date)
+    .map((l) => l.started_at || l.ended_at)
     .filter(Boolean)
     .map((d) => new Date(d).getTime())
     .sort((a, b) => a - b);
@@ -274,13 +274,13 @@ serve(async (req: Request) => {
     } else if (business_ids && Array.isArray(business_ids)) {
       orgIds = business_ids.slice(0, 50);
     } else if (computeAll) {
-      // Find all orgs that have external listings
+      // Find all orgs that have vehicle events
       const { data: orgs } = await supabase
-        .from("external_listings")
-        .select("organization_id")
+        .from("vehicle_events")
+        .select("source_organization_id")
         .limit(1000);
 
-      orgIds = [...new Set((orgs || []).map((o: any) => o.organization_id))];
+      orgIds = [...new Set((orgs || []).map((o: any) => o.source_organization_id))];
     } else {
       return new Response(
         JSON.stringify({

@@ -3,9 +3,9 @@
  * Backfill Missing External Listings
  * 
  * Finds vehicles that have discovery_urls from auction platforms but are missing
- * external_listings records. Creates the external_listings records, then syncs them
+ * vehicle_events records. Creates the vehicle_events records, then syncs them
  * to get current status (sold/ended/active).
- * 
+ *
  * Usage:
  *   node scripts/backfill-missing-external-listings.js [vehicle_id]
  *   node scripts/backfill-missing-external-listings.js --all
@@ -73,12 +73,12 @@ async function createExternalListing(vehicle) {
     return { success: false, error: 'Unsupported platform' };
   }
 
-  // Check if listing already exists
+  // Check if event already exists
   const { data: existing } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('id')
     .eq('vehicle_id', vehicle.id)
-    .eq('platform', platform)
+    .eq('source_platform', platform)
     .limit(1)
     .maybeSingle();
 
@@ -86,18 +86,19 @@ async function createExternalListing(vehicle) {
     return { success: true, listingId: existing.id };
   }
 
-  // Create new external_listings record
+  // Create new vehicle_events record
   // Note: There may be a trigger error about create_auction_timeline_event,
-  // but the insert should still succeed. We'll check for the listing after.
-  const { data: newListing, error } = await supabase
-    .from('external_listings')
+  // but the insert should still succeed. We'll check for the event after.
+  const { data: newEvent, error } = await supabase
+    .from('vehicle_events')
     .insert({
       vehicle_id: vehicle.id,
-      platform: platform,
-      listing_url: vehicle.discovery_url,
-      listing_id: listingId,
-      listing_status: 'active', // Will be updated by sync
-      organization_id: null, // Can be linked later if needed
+      source_platform: platform,
+      event_type: 'auction',
+      source_url: vehicle.discovery_url,
+      source_listing_id: listingId,
+      event_status: 'active', // Will be updated by sync
+      source_organization_id: null, // Can be linked later if needed
       metadata: {
         source: 'backfill_script',
         created_at: new Date().toISOString(),
@@ -106,19 +107,19 @@ async function createExternalListing(vehicle) {
     .select('id')
     .single();
 
-  // If insert failed, check if it's because listing already exists (conflict)
+  // If insert failed, check if it's because event already exists (conflict)
   if (error) {
-    // Check if listing was actually created despite the error
+    // Check if event was actually created despite the error
     const { data: existing } = await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .select('id')
       .eq('vehicle_id', vehicle.id)
-      .eq('platform', platform)
+      .eq('source_platform', platform)
       .limit(1)
       .maybeSingle();
 
     if (existing) {
-      // Listing exists, trigger error was non-fatal
+      // Event exists, trigger error was non-fatal
       return { success: true, listingId: existing.id };
     }
 
@@ -126,7 +127,7 @@ async function createExternalListing(vehicle) {
     return { success: false, error: error.message };
   }
 
-  return { success: true, listingId: newListing.id };
+  return { success: true, listingId: newEvent.id };
 }
 
 async function syncListing(listingId, platform) {
@@ -177,19 +178,19 @@ async function processVehicle(vehicleId) {
   console.log(`  URL: ${vehicle.discovery_url}`);
   console.log(`  Current status: ${vehicle.sale_status || 'null'}`);
 
-  // Create external_listings if missing
+  // Create vehicle_events if missing
   const createResult = await createExternalListing(vehicle);
   if (!createResult.success) {
-    console.error(`  ❌ Failed to create listing: ${createResult.error}`);
+    console.error(`  ❌ Failed to create event: ${createResult.error}`);
     return;
   }
 
   if (!createResult.listingId) {
-    console.log(`  ⏭️  Listing already exists`);
+    console.log(`  ⏭️  Event already exists`);
     return;
   }
 
-  console.log(`  ✅ Created external_listings: ${createResult.listingId}`);
+  console.log(`  ✅ Created vehicle_event: ${createResult.listingId}`);
 
   // Sync the listing to get current status
   const { platform } = detectPlatform(vehicle.discovery_url || '');
@@ -220,7 +221,7 @@ async function processVehicle(vehicleId) {
 }
 
 async function processAll(platformFilter) {
-  console.log('Finding vehicles missing external_listings...\n');
+  console.log('Finding vehicles missing vehicle_events...\n');
 
   let query = supabase
     .from('vehicles')
@@ -255,17 +256,17 @@ async function processAll(platformFilter) {
 
   console.log(`Found ${vehicles.length} vehicles to process\n`);
 
-  // Check which ones are missing external_listings
+  // Check which ones are missing vehicle_events
   const vehiclesToProcess = [];
   for (const vehicle of vehicles) {
     const { platform } = detectPlatform(vehicle.discovery_url || '');
     if (!platform) continue;
 
     const { data: existing } = await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .select('id')
       .eq('vehicle_id', vehicle.id)
-      .eq('platform', platform)
+      .eq('source_platform', platform)
       .limit(1)
       .maybeSingle();
 
@@ -274,7 +275,7 @@ async function processAll(platformFilter) {
     }
   }
 
-  console.log(`${vehiclesToProcess.length} vehicles need external_listings created\n`);
+  console.log(`${vehiclesToProcess.length} vehicles need vehicle_events created\n`);
 
   // Process in batches
   const batchSize = 10;

@@ -72,8 +72,8 @@ async function main() {
   }
   console.log(`\nUpdated ${updatedFromHighBid} from high_bid`);
 
-  // Now try to get prices from external_listings for remaining
-  console.log('\nChecking external_listings for additional prices...');
+  // Now try to get prices from vehicle_events for remaining
+  console.log('\nChecking vehicle_events for additional prices...');
 
   const { data: eventsStillNeedingPrice } = await supabase
     .from('auction_events')
@@ -84,17 +84,17 @@ async function main() {
 
   let updatedFromListings = 0;
   for (const event of eventsStillNeedingPrice || []) {
-    // Find matching external_listing
+    // Find matching vehicle_event
     const { data: listing } = await supabase
-      .from('external_listings')
-      .select('final_price, current_bid')
+      .from('vehicle_events')
+      .select('final_price, current_price')
       .eq('vehicle_id', event.vehicle_id)
-      .or('final_price.not.is.null,current_bid.not.is.null')
+      .or('final_price.not.is.null,current_price.not.is.null')
       .limit(1)
       .maybeSingle();
 
     if (listing) {
-      const price = listing.final_price || listing.current_bid;
+      const price = listing.final_price || listing.current_price;
       if (price) {
         const { error } = await supabase
           .from('auction_events')
@@ -106,10 +106,10 @@ async function main() {
     }
 
     if (updatedFromListings % 50 === 0 && updatedFromListings > 0) {
-      process.stdout.write(`\rUpdated ${updatedFromListings} from external_listings...`);
+      process.stdout.write(`\rUpdated ${updatedFromListings} from vehicle_events...`);
     }
   }
-  console.log(`\nUpdated ${updatedFromListings} from external_listings`);
+  console.log(`\nUpdated ${updatedFromListings} from vehicle_events`);
 
   // Final count
   const { count: eventsWithPrice } = await supabase

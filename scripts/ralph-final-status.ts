@@ -74,10 +74,10 @@ async function main() {
   console.log(`   With winning_bid: ${(withWinningBid || 0).toLocaleString()} (${((withWinningBid || 0) / (totalEvents || 1) * 100).toFixed(0)}%)`);
   console.log(`   With high_bid: ${(withHighBid || 0).toLocaleString()} (${((withHighBid || 0) / (totalEvents || 1) * 100).toFixed(0)}%)`);
 
-  // External listings
-  console.log('\n🔗 EXTERNAL LISTINGS:');
-  const { count: totalListings } = await supabase.from('external_listings').select('*', { count: 'exact', head: true });
-  const { count: withFinalPrice } = await supabase.from('external_listings').select('*', { count: 'exact', head: true }).not('final_price', 'is', null);
+  // Vehicle events
+  console.log('\n🔗 VEHICLE EVENTS:');
+  const { count: totalListings } = await supabase.from('vehicle_events').select('*', { count: 'exact', head: true });
+  const { count: withFinalPrice } = await supabase.from('vehicle_events').select('*', { count: 'exact', head: true }).not('final_price', 'is', null);
   console.log(`   Total: ${(totalListings || 0).toLocaleString()}`);
   console.log(`   With final_price: ${(withFinalPrice || 0).toLocaleString()} (${((withFinalPrice || 0) / (totalListings || 1) * 100).toFixed(0)}%)`);
 

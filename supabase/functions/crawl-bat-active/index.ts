@@ -193,7 +193,7 @@ serve(async (req) => {
     const {
       extract = true,        // Also run extraction
       max_extractions = 200, // Limit concurrent extractions
-      skip_known = true,     // Skip URLs already in external_listings
+      skip_known = true,     // Skip URLs already in vehicle_events
     } = body;
 
     // Collect URLs from all sources in parallel
@@ -214,12 +214,12 @@ serve(async (req) => {
     let urlsToProcess = allUrls;
     if (skip_known && allUrls.length > 0) {
       const { data: existing } = await supabase
-        .from('external_listings')
-        .select('listing_url')
-        .eq('platform', 'bat')
-        .in('listing_url', allUrls.slice(0, 1000)); // Supabase IN limit
+        .from('vehicle_events')
+        .select('source_url')
+        .eq('source_platform', 'bat')
+        .in('source_url', allUrls.slice(0, 1000)); // Supabase IN limit
 
-      const existingUrls = new Set((existing || []).map((e: any) => e.listing_url.toLowerCase()));
+      const existingUrls = new Set((existing || []).map((e: any) => e.source_url.toLowerCase()));
       urlsToProcess = allUrls.filter(url => !existingUrls.has(url));
       console.log(`[bat-crawl] New URLs to process: ${urlsToProcess.length}`);
     }

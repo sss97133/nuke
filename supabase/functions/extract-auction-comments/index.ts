@@ -141,10 +141,10 @@ serve(async (req) => {
     }
     if (!vehicleId && platformGuess === 'bat') {
       const { data: ext } = await supabase
-        .from('external_listings')
+        .from('vehicle_events')
         .select('vehicle_id')
-        .eq('platform', 'bat')
-        .in('listing_url', urlCandidates)
+        .eq('source_platform', 'bat')
+        .in('source_url', urlCandidates)
         .limit(1)
         .maybeSingle()
       if (ext?.vehicle_id) vehicleId = String(ext.vehicle_id)
@@ -167,7 +167,7 @@ serve(async (req) => {
         .maybeSingle()
       if (v2?.id) vehicleId = String(v2.id)
     }
-    if (!vehicleId) throw new Error('Missing vehicle_id (and could not resolve by auction_event_id, external_listings, or vehicles URLs)')
+    if (!vehicleId) throw new Error('Missing vehicle_id (and could not resolve by auction_event_id, vehicle_events, or vehicles URLs)')
 
     // ⚠️ FREE MODE: Direct HTML fetch (no Firecrawl due to budget constraints)
     // BaT comments may be in HTML or require JS rendering - try direct fetch first
@@ -381,7 +381,7 @@ serve(async (req) => {
         comments.push({
           auction_event_id: eventId,
           vehicle_id: vehicleId,
-          // Canonical platform key used across the DB is 'bat' (matches external_listings.platform, auction_events.source).
+          // Canonical platform key used across the DB is 'bat' (matches vehicle_events.source_platform, auction_events.source).
           platform: platformGuess,
           source_url: String(auctionUrlNorm),
           content_hash,
@@ -644,10 +644,10 @@ serve(async (req) => {
     try {
       const nowIso = new Date().toISOString()
       const { data: extListing } = await supabase
-        .from('external_listings')
-        .select('id, final_price, current_bid, listing_status, end_date, sold_at, listing_id, metadata')
+        .from('vehicle_events')
+        .select('id, final_price, current_price, event_status, ended_at, sold_at, source_listing_id, metadata')
         .eq('vehicle_id', vehicleId)
-        .eq('platform', 'bat')
+        .eq('source_platform', 'bat')
         .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -691,7 +691,7 @@ serve(async (req) => {
           : (inferredSoldPriceFromComment || null)
 
       const inferredSaleDate = (() => {
-        const t = extListing?.sold_at || extListing?.end_date || null
+        const t = extListing?.sold_at || extListing?.ended_at || null
         if (!t) return null
         const d = new Date(t)
         if (!Number.isFinite(d.getTime())) return null
@@ -699,7 +699,7 @@ serve(async (req) => {
       })()
 
       const inferredStatus = (() => {
-        const s = String(extListing?.listing_status || '').toLowerCase()
+        const s = String(extListing?.event_status || '').toLowerCase()
         if (s === 'sold') return 'sold'
         if (s === 'active' || s === 'live') return 'active'
         if (s === 'ended' || s === 'complete' || s === 'completed') return 'ended'
@@ -708,15 +708,15 @@ serve(async (req) => {
         return null
       })()
 
-      // If we inferred SOLD (either from the system comment or from an existing external_listings.final_price),
-      // persist it back into external_listings so the rest of the system (auctionPulse, header owner guess, etc.)
-      // becomes consistent. Also ensure `current_bid` matches `final_price` for sold listings.
+      // If we inferred SOLD (either from the system comment or from an existing vehicle_events.final_price),
+      // persist it back into vehicle_events so the rest of the system (auctionPulse, header owner guess, etc.)
+      // becomes consistent. Also ensure `current_price` matches `final_price` for sold listings.
       //
       // CRITICAL: Do NOT override extract-bat-core's determination. If the core extractor already
       // set the listing status (especially "ended" for Reserve Not Met), don't downgrade to "sold"
       // based on comment-inferred prices which can be polluted by user speculation.
       const coreExtractorAlreadyRan = (extListing as any)?.metadata?.source === 'extract-bat-core'
-      const existingStatusFromCore = String(extListing?.listing_status || '').toLowerCase()
+      const existingStatusFromCore = String(extListing?.event_status || '').toLowerCase()
       const coreSetEnded = coreExtractorAlreadyRan && existingStatusFromCore === 'ended'
 
       if (extListing?.id && inferredFinalPrice && inferredFinalPrice > 0 && !coreSetEnded) {
@@ -726,8 +726,8 @@ serve(async (req) => {
             ? Math.floor(extListing.final_price)
             : null
         const existingCurrent =
-          (typeof extListing?.current_bid === 'number' && Number.isFinite(extListing.current_bid) && extListing.current_bid > 0)
-            ? Math.floor(extListing.current_bid)
+          (typeof extListing?.current_price === 'number' && Number.isFinite(extListing.current_price) && extListing.current_price > 0)
+            ? Math.floor(extListing.current_price)
             : null
 
         const needsSync =
@@ -743,12 +743,12 @@ serve(async (req) => {
             html.includes('no-reserve') || /\bNo Reserve\b/i.test(html) ? 'no_reserve' : null
 
           await supabase
-            .from('external_listings')
+            .from('vehicle_events')
             .update({
-              listing_status: 'sold',
+              event_status: 'sold',
               final_price: inferredFinalPrice,
-              current_bid: inferredFinalPrice,
-              sold_at: extListing?.sold_at || extListing?.end_date || nowIso,
+              current_price: inferredFinalPrice,
+              sold_at: extListing?.sold_at || extListing?.ended_at || nowIso,
               metadata: {
                 ...existingMeta,
                 ...(inferredBuyerFromComment ? { buyer_username: inferredBuyerFromComment } : {}),
@@ -761,33 +761,35 @@ serve(async (req) => {
         }
       }
 
-      const listingPayload: any = {
+      const vehicleEventPayload: any = {
         vehicle_id: vehicleId,
-        bat_listing_url: String(auctionUrlNorm),
-        bat_lot_number: extListing?.listing_id ? String(extListing.listing_id) : null,
-        listing_status: inferredStatus || undefined,
+        source_platform: 'bat',
+        event_type: 'auction',
+        source_url: String(auctionUrlNorm),
+        source_listing_id: extListing?.source_listing_id ? String(extListing.source_listing_id) : null,
+        event_status: inferredStatus || undefined,
         comment_count: commentsWithIdentities.length,
         bid_count: commentsWithIdentities.filter((c: any) => typeof c?.bid_amount === 'number' && Number.isFinite(c.bid_amount) && c.bid_amount > 0).length,
-        sale_price: inferredFinalPrice,
-        final_bid: inferredFinalPrice || (inferredHighBid > 0 ? Math.floor(inferredHighBid) : null),
-        sale_date: inferredFinalPrice ? inferredSaleDate : null,
-        auction_end_date: inferredSaleDate || undefined,
-        last_updated_at: nowIso,
+        final_price: inferredFinalPrice,
+        current_price: inferredFinalPrice || (inferredHighBid > 0 ? Math.floor(inferredHighBid) : null),
+        sold_at: inferredFinalPrice ? inferredSaleDate : null,
+        ended_at: inferredSaleDate || undefined,
+        extracted_at: nowIso,
         updated_at: nowIso,
-        raw_data: {
+        metadata: {
           source: 'extract-auction-comments',
           auction_event_id: eventId,
           last_extracted_at: nowIso,
         }
       }
 
-      const { data: upsertedListing, error: upsertListingErr } = await supabase
-        .from('bat_listings')
-        .upsert(listingPayload, { onConflict: 'bat_listing_url' })
+      const { data: upsertedEvent, error: upsertEventErr } = await supabase
+        .from('vehicle_events')
+        .upsert(vehicleEventPayload, { onConflict: 'source_url' })
         .select('id')
         .maybeSingle()
-      if (!upsertListingErr && upsertedListing?.id) {
-        batListingId = String(upsertedListing.id)
+      if (!upsertEventErr && upsertedEvent?.id) {
+        batListingId = String(upsertedEvent.id)
       }
 
       if (batListingId) {
@@ -850,15 +852,15 @@ serve(async (req) => {
             .reduce((acc: number, n: number) => (n > acc ? n : acc), 0)
 
           await supabase
-            .from('bat_listings')
+            .from('vehicle_events')
             .update({
               comment_count: batCommentRows.length,
               bid_count: bidRows.length,
-              final_bid: inferredFinalPrice || (maxBid > 0 ? Math.floor(maxBid) : null),
-              sale_price: inferredFinalPrice,
-              sale_date: inferredFinalPrice ? inferredSaleDate : null,
-              listing_status: inferredStatus || undefined,
-              last_updated_at: nowIso,
+              current_price: inferredFinalPrice || (maxBid > 0 ? Math.floor(maxBid) : null),
+              final_price: inferredFinalPrice,
+              sold_at: inferredFinalPrice ? inferredSaleDate : null,
+              event_status: inferredStatus || undefined,
+              extracted_at: nowIso,
               updated_at: nowIso,
             })
             .eq('id', batListingId)

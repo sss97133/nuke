@@ -119,13 +119,13 @@ async function predictAll(supabase: ReturnType<typeof createClient>, body: { lim
 
   // Get all active BaT auctions
   const { data: activeListings, error: listErr } = await supabase
-    .from("external_listings")
-    .select("id, vehicle_id, current_bid, bid_count, view_count, watcher_count, end_date")
-    .eq("platform", "bat")
-    .eq("listing_status", "active")
-    .gt("current_bid", 0)
-    .gt("end_date", new Date().toISOString())
-    .order("end_date", { ascending: true })
+    .from("vehicle_events")
+    .select("id, vehicle_id, current_price, bid_count, view_count, watcher_count, ended_at")
+    .eq("source_platform", "bat")
+    .eq("event_status", "active")
+    .gt("current_price", 0)
+    .gt("ended_at", new Date().toISOString())
+    .order("ended_at", { ascending: true })
     .limit(limit);
 
   if (listErr) throw listErr;
@@ -135,7 +135,7 @@ async function predictAll(supabase: ReturnType<typeof createClient>, body: { lim
 
   // Filter to <=maxHours before ending, before loading coefficients
   const eligible = activeListings.filter(l => {
-    const hoursLeft = Math.max(0, (new Date(l.end_date).getTime() - Date.now()) / (1000 * 60 * 60));
+    const hoursLeft = Math.max(0, (new Date(l.ended_at).getTime() - Date.now()) / (1000 * 60 * 60));
     return hoursLeft <= maxHours;
   });
   const skippedTooEarly = activeListings.length - eligible.length;
@@ -309,15 +309,15 @@ async function dashboard(supabase: ReturnType<typeof createClient>) {
         hp.hours_remaining, hp.price_tier, hp.actual_hammer, hp.prediction_error_pct,
         hp.predicted_at, hp.scored_at, hp.unique_bidders,
         v.year, v.make, v.model,
-        el.listing_status, el.end_date, el.current_bid as live_bid, el.final_price
+        ve.event_status, ve.ended_at, ve.current_price as live_bid, ve.final_price
       FROM hammer_predictions hp
       JOIN vehicles v ON v.id = hp.vehicle_id
       LEFT JOIN LATERAL (
-        SELECT el2.listing_status, el2.end_date, el2.current_bid, el2.final_price
-        FROM external_listings el2
-        WHERE el2.vehicle_id = hp.vehicle_id AND el2.platform = 'bat'
-        ORDER BY el2.end_date DESC NULLS LAST LIMIT 1
-      ) el ON true
+        SELECT ve2.event_status, ve2.ended_at, ve2.current_price, ve2.final_price
+        FROM vehicle_events ve2
+        WHERE ve2.vehicle_id = hp.vehicle_id AND ve2.source_platform = 'bat'
+        ORDER BY ve2.ended_at DESC NULLS LAST LIMIT 1
+      ) ve ON true
       ORDER BY hp.predicted_at DESC
       LIMIT 50
     `,
@@ -516,11 +516,11 @@ async function gatherPredictionInput(
   let listing = listingData;
   if (!listing) {
     const { data: el, error: elErr } = await supabase
-      .from("external_listings")
-      .select("id, current_bid, bid_count, view_count, watcher_count, end_date")
+      .from("vehicle_events")
+      .select("id, current_price, bid_count, view_count, watcher_count, ended_at")
       .eq("vehicle_id", vehicleId)
-      .eq("platform", "bat")
-      .eq("listing_status", "active")
+      .eq("source_platform", "bat")
+      .eq("event_status", "active")
       .single();
     if (elErr || !el) throw new Error(`No active listing for vehicle ${vehicleId}`);
     listing = el;
@@ -603,17 +603,17 @@ async function gatherPredictionInput(
   const { data: comps, error: compErr } = await supabase.rpc("execute_sql", {
     query: `
       WITH specific_comps AS (
-        SELECT el.final_price
-        FROM external_listings el
-        JOIN vehicles v ON v.id = el.vehicle_id
+        SELECT ve.final_price
+        FROM vehicle_events ve
+        JOIN vehicles v ON v.id = ve.vehicle_id
         WHERE UPPER(v.make) = UPPER('${safeMake}')
           AND v.model ILIKE '%${modelMatch}%'
           AND v.year BETWEEN ${yearMin} AND ${yearMax}
           AND v.is_public = true
-          AND el.platform = 'bat'
-          AND el.listing_status = 'sold'
-          AND el.final_price > 0
-          AND el.end_date >= NOW() - INTERVAL '12 months'
+          AND ve.source_platform = 'bat'
+          AND ve.event_status = 'sold'
+          AND ve.final_price > 0
+          AND ve.ended_at >= NOW() - INTERVAL '12 months'
           AND LOWER(COALESCE(v.model, '')) NOT SIMILAR TO '%(parts|engine|seats|wheels|door|hood|trunk|bumper|fender|transmission)%'
       )
       SELECT
@@ -636,17 +636,17 @@ async function gatherPredictionInput(
       query: `
         SELECT
           COUNT(*) as comp_count,
-          PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY el.final_price) as comp_median
-        FROM external_listings el
-        JOIN vehicles v ON v.id = el.vehicle_id
+          PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ve.final_price) as comp_median
+        FROM vehicle_events ve
+        JOIN vehicles v ON v.id = ve.vehicle_id
         WHERE UPPER(v.make) = UPPER('${safeMake}')
           AND v.model ILIKE '%${modelWords[0] || ""}%'
           AND v.year BETWEEN ${yearMin} AND ${yearMax}
           AND v.is_public = true
-          AND el.platform = 'bat'
-          AND el.listing_status = 'sold'
-          AND el.final_price > 0
-          AND el.end_date >= NOW() - INTERVAL '12 months'
+          AND ve.source_platform = 'bat'
+          AND ve.event_status = 'sold'
+          AND ve.final_price > 0
+          AND ve.ended_at >= NOW() - INTERVAL '12 months'
           AND LOWER(COALESCE(v.model, '')) NOT SIMILAR TO '%(parts|engine|seats|wheels|door|hood|trunk|bumper|fender|transmission)%'
       `,
     });
@@ -661,8 +661,8 @@ async function gatherPredictionInput(
 
   return {
     vehicle_id: vehicleId,
-    external_listing_id: listing.id,
-    current_bid: Number(listing.current_bid),
+    vehicle_event_id: listing.id,
+    current_bid: Number(listing.current_price || listing.current_bid),
     bid_count: Number(listing.bid_count) || 0,
     view_count: Number(listing.view_count) || 0,
     watcher_count: Number(listing.watcher_count) || 0,
@@ -692,7 +692,7 @@ async function storePrediction(
     .from("hammer_predictions")
     .insert({
       vehicle_id: input.vehicle_id,
-      external_listing_id: input.external_listing_id,
+      vehicle_event_id: input.vehicle_event_id,
       current_bid: input.current_bid,
       bid_count: input.bid_count,
       view_count: input.view_count,

@@ -28,12 +28,12 @@ export function usePlatformPerformance(
       return { platform: platform || '', bid_count: null, view_count: null, watcher_count: null, platform_sell_through_pct: null, platform_avg_price: null };
     }
 
-    // Get this vehicle's external listing stats
+    // Get this vehicle's event stats
     const { data: listing } = await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .select('bid_count, view_count, watcher_count')
       .eq('vehicle_id', vehicleId)
-      .ilike('platform', `%${platform}%`)
+      .ilike('source_platform', `%${platform}%`)
       .limit(1)
       .maybeSingle();
 

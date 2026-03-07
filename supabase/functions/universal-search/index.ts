@@ -117,6 +117,32 @@ serve(async (req) => {
     const rlHeaders = rateLimitHeaders(rl, RATE_LIMIT_CONFIG.maxRequests);
     // ──────────────────────────────────────────────────────────────────────────
 
+    // ── Extract authenticated user's vehicle IDs for boosting ────────────────
+    let userVehicleIds: Set<string> = new Set();
+    const authHeader = req.headers.get('authorization') || '';
+    if (authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      // Decode JWT payload (middle segment) to get user ID
+      try {
+        // Convert base64url to base64 for atob compatibility
+        let b64 = token.split('.')[1];
+        b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+        while (b64.length % 4) b64 += '=';
+        const payload = JSON.parse(atob(b64));
+        const userId = payload.sub;
+        if (userId) {
+          const { data: links } = await supabase
+            .from('user_vehicle_links')
+            .select('vehicle_id')
+            .eq('user_id', userId);
+          if (links?.length) {
+            userVehicleIds = new Set(links.map((l: any) => l.vehicle_id));
+          }
+        }
+      } catch { /* anonymous/invalid token — no boost */ }
+    }
+    // ──────────────────────────────────────────────────────────────────────────
+
     // Support both GET (?query=...) and POST (JSON body)
     const url = new URL(req.url);
     const urlParams = url.searchParams;
@@ -149,13 +175,14 @@ serve(async (req) => {
     const results: SearchResult[] = [];
 
     // Shared rich vehicle SELECT — includes all fields needed for tier calculation and UI display
-    const VEHICLE_SELECT = 'id, year, make, model, vin, status, sale_price, current_value, asking_price, primary_image_url, seller_name, bat_seller, data_quality_score, view_count, bat_view_count, profile_origin, ownership_verified, comment_count, image_count, mileage, transmission, engine_size';
+    const VEHICLE_SELECT = 'id, year, make, model, vin, color, status, sale_price, current_value, asking_price, primary_image_url, seller_name, bat_seller, data_quality_score, view_count, bat_view_count, profile_origin, ownership_verified, comment_count, mileage, transmission, engine_size';
 
     // Build a rich metadata object from a vehicle row
     const buildVehicleMetadata = (v: any) => ({
       year: v.year,
       make: v.make,
       model: v.model,
+      color: v.color,
       vin: v.vin,
       owner: v.seller_name || v.bat_seller || undefined,
       sale_price: v.sale_price,
@@ -168,8 +195,7 @@ serve(async (req) => {
       ownership_verified: v.ownership_verified || false,
       // comment_count is a solid engagement proxy (BaT comments, auction comments)
       event_count: v.comment_count || 0,
-      // Use actual image_count from DB (aggregated count from vehicle_images table)
-      image_count: v.image_count || (v.primary_image_url ? 1 : 0),
+      image_count: v.primary_image_url ? 1 : 0,
       mileage: v.mileage,
       transmission: v.transmission,
       engine_size: v.engine_size,
@@ -358,7 +384,7 @@ serve(async (req) => {
             const rest = escapeIlike(escapePostgrestValue(yearMatch[2].toLowerCase()));
             ilikeQuery = ilikeQuery
               .eq('year', year)
-              .or(`make.ilike.%${rest}%,model.ilike.%${rest}%`);
+              .or(`make.ilike.%${rest}%,model.ilike.%${rest}%,color.ilike.%${rest}%`);
           } else if (tokens.length >= 2) {
             // Build filter: first token assumed to be make, rest is model — AND also try all
             // tokens against model independently (catches "Porsche 997 GT3" → model ILIKE '%997%')
@@ -375,18 +401,26 @@ serve(async (req) => {
               `and(make.ilike.%${t0}%,model.ilike.%${tRest}%),` +
               // Reverse: model=token[0], make contains rest
               `and(model.ilike.%${t0}%,make.ilike.%${tRest}%),` +
+              // Color + model/make: "white bronco" → color=white, model=bronco
+              `and(color.ilike.%${t0}%,model.ilike.%${tRest}%),` +
+              `and(color.ilike.%${t0}%,make.ilike.%${tRest}%),` +
+              `and(model.ilike.%${t0}%,color.ilike.%${tRest}%),` +
               // Broad: make matches any token (e.g. "gt3" alone won't match but "porsche" will)
               `and(make.ilike.%${t0}%,${tokenClauses.split(',')[1] || tokenClauses})`
             );
           } else {
-            // Single token: search both make and model
+            // Single token: search both make, model, and color
             const t = escapePostgrestValue(searchPattern);
-            ilikeQuery = ilikeQuery.or(`make.ilike.${t},model.ilike.${t}`);
+            ilikeQuery = ilikeQuery.or(`make.ilike.${t},model.ilike.${t},color.ilike.${t}`);
           }
 
-          const { data: ilikeResults } = await ilikeQuery
+          const { data: ilikeResults, error: ilikeError } = await ilikeQuery
             .order('sale_price', { ascending: false, nullsFirst: false })
             .limit(vehicleLimit);
+
+          if (ilikeError) {
+            console.error('ILIKE query error:', ilikeError.message);
+          }
 
           if (ilikeResults?.length) {
             if (!vehicles.length) {
@@ -430,6 +464,9 @@ serve(async (req) => {
             // Boost if ALL search terms appear in the title
             else if (tsqueryTerms.every(t => titleLower.includes(t.toLowerCase()))) score = Math.max(score, 0.8);
 
+            // Boost user's own vehicles to the top of results
+            if (userVehicleIds.has(v.id)) score = Math.max(score, 1.5);
+
             const price = v.sale_price || v.current_value || v.asking_price;
             results.push({
               id: v.id,
@@ -441,6 +478,49 @@ serve(async (req) => {
               metadata: buildVehicleMetadata(v),
             });
           }
+        }
+      })());
+    }
+
+    // --- USER'S OWN VEHICLES (parallel search for authenticated users) ---
+    if (allowedTypes.includes('vehicle') && userVehicleIds.size > 0) {
+      searches.push((async () => {
+        // Fetch ALL user's vehicles, then client-side match against query
+        // This avoids complex PostgREST filter issues and is fast (small set: <50 vehicles per user)
+        const { data: userVehicles, error: uvError } = await supabase
+          .from('vehicles')
+          .select(VEHICLE_SELECT)
+          .in('id', [...userVehicleIds]);
+
+        if (!userVehicles?.length) return;
+
+        const queryLower = trimmedQuery.toLowerCase();
+        const queryTokens = tokenizeQuery(trimmedQuery);
+
+        for (const v of userVehicles) {
+          // Check if this vehicle matches the search query (client-side)
+          const fields = [
+            v.year?.toString(),
+            v.make,
+            v.model,
+            v.color,
+            v.vin,
+          ].filter(Boolean).map((s: string) => s.toLowerCase());
+          const allText = fields.join(' ');
+
+          const matches = queryTokens.every(t => allText.includes(t));
+          if (!matches) continue;
+
+          const price = v.sale_price || v.current_value || v.asking_price;
+          results.push({
+            id: v.id,
+            type: 'vehicle' as const,
+            title: `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'Vehicle',
+            subtitle: price ? `$${price.toLocaleString()}` : v.vin ? `VIN: ${v.vin.slice(-6)}` : undefined,
+            image_url: v.primary_image_url,
+            relevance_score: 1.5, // Always boost user's own vehicles to top
+            metadata: buildVehicleMetadata(v),
+          });
         }
       })());
     }

@@ -83,7 +83,7 @@ Predict: Owner type (collector, flipper, builder, driver)
 - **25.5M images** with vehicle context
 - **10.8M comments** with sentiment
 - **287K vehicles** with outcomes
-- **130K BAT listings** with full metadata
+- **170K vehicle events** with full metadata (BaT + other platforms)
 
 ## Extraction Query
 
@@ -100,7 +100,7 @@ SELECT jsonb_build_object(
     'mileage', v.mileage
   ),
   'behavioral_signals', jsonb_build_object(
-    'comment_count', bl.comment_count
+    'comment_count', ve.comment_count
   ),
   'outcome', jsonb_build_object(
     'sale_price', v.sale_price,
@@ -109,7 +109,7 @@ SELECT jsonb_build_object(
 )
 FROM vehicle_images vi
 JOIN vehicles v ON v.id = vi.vehicle_id
-LEFT JOIN bat_listings bl ON bl.vehicle_id = v.id
+LEFT JOIN vehicle_events ve ON ve.vehicle_id = v.id
 WHERE v.sale_price > 0
 LIMIT 1000;
 ```

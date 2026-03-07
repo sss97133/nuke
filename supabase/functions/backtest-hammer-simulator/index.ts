@@ -190,20 +190,20 @@ async function fetchBacktestData(
     query: `
       WITH auction_pool AS (
         SELECT
-          el.vehicle_id, el.final_price, el.end_date as close_time,
-          el.view_count, el.watcher_count, el.bid_count,
+          ve.vehicle_id, ve.final_price, ve.ended_at as close_time,
+          ve.view_count, ve.watcher_count, ve.bid_count,
           v.year, v.make, v.model
-        FROM external_listings el
-        JOIN vehicles v ON v.id = el.vehicle_id
-        WHERE el.platform = 'bat'
-          AND el.listing_status = 'sold'
-          AND el.final_price > 0
-          AND el.end_date IS NOT NULL
-          AND el.end_date >= NOW() - INTERVAL '${lookbackDays} days'
+        FROM vehicle_events ve
+        JOIN vehicles v ON v.id = ve.vehicle_id
+        WHERE ve.source_platform = 'bat'
+          AND ve.event_status = 'sold'
+          AND ve.final_price > 0
+          AND ve.ended_at IS NOT NULL
+          AND ve.ended_at >= NOW() - INTERVAL '${lookbackDays} days'
           -- Filter non-vehicle items (signs, parts, memorabilia)
           AND UPPER(v.make) NOT IN ('ILLUMINATED', 'HALF-SCALE', 'NEON', 'ORIGINAL')
           AND LOWER(COALESCE(v.model, '')) NOT SIMILAR TO '%(sign|signs|poster|seats|engine only|wheels only|parts lot)%'
-        ORDER BY el.end_date DESC
+        ORDER BY ve.ended_at DESC
         LIMIT ${limit}
       ),
       -- Use CROSS JOIN with time offsets to get bid snapshots at all windows in one pass
@@ -321,17 +321,17 @@ async function fetchBacktestData(
             )
             SELECT t.make_model_key,
               COUNT(*) as comp_count,
-              PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY el.final_price) as comp_median
+              PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ve.final_price) as comp_median
             FROM targets t
             JOIN vehicles v ON lower(v.make) = t.make_lower
               AND lower(v.model) LIKE t.model_pattern
               AND v.year BETWEEN t.year_min AND t.year_max
               AND v.is_public = true
-            JOIN external_listings el ON el.vehicle_id = v.id
-              AND el.platform = 'bat'
-              AND el.listing_status = 'sold'
-              AND el.final_price > 0
-              AND el.end_date >= NOW() - INTERVAL '12 months'
+            JOIN vehicle_events ve ON ve.vehicle_id = v.id
+              AND ve.source_platform = 'bat'
+              AND ve.event_status = 'sold'
+              AND ve.final_price > 0
+              AND ve.ended_at >= NOW() - INTERVAL '12 months'
             WHERE lower(v.model) NOT SIMILAR TO '%(parts|engine|seats|wheels|door|hood|trunk|bumper|fender|transmission)%'
             GROUP BY t.make_model_key
           `,

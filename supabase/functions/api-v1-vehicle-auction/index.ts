@@ -63,12 +63,12 @@ serve(async (req) => {
 
     // Run parallel queries
     const [listingsResult, commentCountResult, recentCommentsResult, sentimentResult] = await Promise.all([
-      // External listings
+      // Vehicle events (auction/listing records)
       supabase
-        .from("external_listings")
+        .from("vehicle_events")
         .select(`
-          id, platform, listing_url, listing_id, listing_status,
-          start_date, end_date, current_bid, reserve_price, buy_now_price,
+          id, source_platform, source_url, source_listing_id, event_status,
+          started_at, ended_at, current_price, reserve_price, buy_now_price,
           bid_count, view_count, watcher_count, final_price, sold_at,
           created_at, updated_at
         `)

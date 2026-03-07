@@ -115,10 +115,10 @@ async function extractBidsForUrl(page, url) {
 
   if (!vehicleId) {
     const { data: el } = await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .select('vehicle_id')
-      .eq('platform', 'carsandbids')
-      .eq('listing_url', url)
+      .eq('source_platform', 'carsandbids')
+      .eq('source_url', url)
       .limit(1)
       .maybeSingle();
     if (el?.vehicle_id) vehicleId = el.vehicle_id;

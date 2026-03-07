@@ -106,15 +106,16 @@ async function scrapeBatResultsPage(page: number): Promise<string[]> {
 async function getExistingUrls(supabase: any): Promise<Set<string>> {
   const existing = new Set<string>();
 
-  // Get from bat_listings
+  // Get from vehicle_events
   const { data: batListings } = await supabase
-    .from("bat_listings")
-    .select("bat_listing_url")
-    .not("bat_listing_url", "is", null);
+    .from("vehicle_events")
+    .select("source_url")
+    .eq("source_platform", "bat")
+    .not("source_url", "is", null);
 
   for (const row of batListings || []) {
-    if (row.bat_listing_url) {
-      existing.add(row.bat_listing_url.replace(/\/$/, ""));
+    if (row.source_url) {
+      existing.add(row.source_url.replace(/\/$/, ""));
     }
   }
 

@@ -38,9 +38,9 @@ async function checkSchema() {
   console.log('\n--- Sample Backfilled Metadata ---\n');
 
   const { data: sample } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('id, metadata')
-    .eq('platform', 'cars_and_bids')
+    .eq('source_platform', 'cars_and_bids')
     .not('metadata->>source', 'is', null)
     .order('updated_at', { ascending: false })
     .limit(1)

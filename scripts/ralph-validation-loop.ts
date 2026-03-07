@@ -115,7 +115,7 @@ async function validateSupabase(): Promise<ValidationResult[]> {
   });
 
   // Check key tables exist
-  const tables = ['vehicles', 'scrape_sources', 'external_listings', 'auction_events'];
+  const tables = ['vehicles', 'scrape_sources', 'vehicle_events', 'auction_events'];
   for (const table of tables) {
     const { error: tableErr } = await supabase.from(table).select('id').limit(1);
     results.push({

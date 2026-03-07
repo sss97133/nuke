@@ -783,17 +783,17 @@ serve(async (req) => {
           }
         }
 
-        // Create external_listings record
+        // Create vehicle_events record
         if (vehicleId) {
           const listingUrlKey = normalizeListingUrlKey(extracted.url);
-          await supabase.from('external_listings').upsert({
+          await supabase.from('vehicle_events').upsert({
             vehicle_id: vehicleId,
-            platform: 'bh_auction',
-            listing_url: extracted.url,
-            listing_url_key: listingUrlKey,
-            listing_id: extracted.lot_number || listingUrlKey,
-            listing_status: extracted.auction_status === 'sold' ? 'sold' : extracted.auction_status === 'upcoming' ? 'active' : 'ended',
-            end_date: extracted.auction_date,
+            source_platform: 'bh_auction',
+            event_type: 'auction',
+            source_url: extracted.url,
+            source_listing_id: listingUrlKey || extracted.lot_number,
+            event_status: extracted.auction_status === 'sold' ? 'sold' : extracted.auction_status === 'upcoming' ? 'active' : 'ended',
+            ended_at: extracted.auction_date,
             final_price: extracted.price_usd,
             sold_at: extracted.auction_status === 'sold' ? extracted.auction_date : null,
             metadata: {
@@ -804,9 +804,9 @@ serve(async (req) => {
               estimate_high_jpy: extracted.estimate_high_jpy,
             },
           }, {
-            onConflict: 'platform,listing_url_key',
+            onConflict: 'source_platform,source_listing_id',
           });
-          console.log(`[BH Auction] Created/updated external_listings record`);
+          console.log(`[BH Auction] Created/updated vehicle_events record`);
         }
       }
 

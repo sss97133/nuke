@@ -244,23 +244,23 @@ Return JSON only (no markdown):
           null
 
         await supabase
-          .from('external_listings')
+          .from('vehicle_events')
           .upsert(
             {
               vehicle_id: args.vehicle_id,
-              organization_id: null,
-              platform: 'craigslist',
-              listing_url: args.listing_url,
-              listing_url_key: listingUrlKey,
-              listing_id: listingId || listingUrlKey,
-              listing_status: args.listing_status,
+              source_organization_id: null,
+              source_platform: 'craigslist',
+              source_url: args.listing_url,
+              source_listing_id: listingUrlKey || listingId,
+              event_type: 'listing',
+              event_status: args.listing_status,
               metadata: args.metadata ?? {},
               updated_at: new Date().toISOString(),
             } as any,
-            { onConflict: 'platform,listing_url_key' }
+            { onConflict: 'source_platform,source_listing_id' }
           )
       } catch (e) {
-        console.warn('external_listings upsert failed (non-fatal):', (e as any)?.message || e)
+        console.warn('vehicle_events upsert failed (non-fatal):', (e as any)?.message || e)
       }
     }
 

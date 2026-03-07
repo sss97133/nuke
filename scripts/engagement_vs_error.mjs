@@ -23,27 +23,26 @@ const rows = await q(`
          d.comp_median::float as comp,
          d.comp_count::int as cc,
          d.multiplier_used::float as mult,
-         el.watcher_count::int as watchers,
-         el.view_count::int as views,
-         el.final_price::float as final_price
+         ve.view_count::int as views,
+         ve.final_price::float as final_price
   FROM backtest_run_details d
-  JOIN external_listings el ON el.vehicle_id = d.vehicle_id
+  JOIN vehicle_events ve ON ve.vehicle_id = d.vehicle_id AND ve.source_platform = 'bat'
   WHERE d.run_id = (SELECT id FROM backtest_runs ORDER BY created_at DESC LIMIT 1)
     AND d.actual_hammer > 0 AND d.bid_at_window > 0
-    AND el.watcher_count > 0
+    AND ve.view_count > 0
 `);
 console.log(`Loaded ${rows.length} predictions with engagement data\n`);
 
-// === 1. Watcher count vs absolute error ===
-console.log("=== WATCHER COUNT vs PREDICTION ERROR (at 2h window) ===");
+// === 1. View count vs absolute error ===
+console.log("=== VIEW COUNT vs PREDICTION ERROR (at 2h window) ===");
 const tw2h = rows.filter(r => r.time_window === '2h');
-const watchBuckets = { "low (<300)": [], "mid (300-600)": [], "high (600-1200)": [], "very_high (>1200)": [] };
+const viewBuckets = { "low (<300)": [], "mid (300-600)": [], "high (600-1200)": [], "very_high (>1200)": [] };
 for (const r of tw2h) {
-  const w = r.watchers;
+  const w = r.views;
   const k = w < 300 ? "low (<300)" : w < 600 ? "mid (300-600)" : w < 1200 ? "high (600-1200)" : "very_high (>1200)";
-  watchBuckets[k].push(r);
+  viewBuckets[k].push(r);
 }
-for (const [name, group] of Object.entries(watchBuckets)) {
+for (const [name, group] of Object.entries(viewBuckets)) {
   if (group.length === 0) continue;
   const errs = group.map(g => g.abs_error);
   const avg = errs.reduce((s, v) => s + v, 0) / errs.length;
@@ -52,13 +51,12 @@ for (const [name, group] of Object.entries(watchBuckets)) {
   console.log(`${name.padEnd(20)} n=${String(group.length).padStart(3)} MAPE=${avg.toFixed(1)}% median=${med.toFixed(1)}% bias=${bias.toFixed(1)}%`);
 }
 
-// === 2. View/Watcher ratio vs error ===
-console.log("\n=== VIEW/WATCHER RATIO vs ERROR (at 2h) ===");
-const vwBuckets = { "engaged (<4)": [], "moderate (4-7)": [], "passive (7-12)": [], "v_passive (>12)": [] };
+// === 2. View count buckets vs error ===
+console.log("\n=== VIEW COUNT BUCKETS vs ERROR (at 2h) ===");
+const vwBuckets = { "low (<100)": [], "moderate (100-500)": [], "high (500-2000)": [], "very_high (>2000)": [] };
 for (const r of tw2h) {
-  if (!r.views || !r.watchers) continue;
-  const ratio = r.views / r.watchers;
-  const k = ratio < 4 ? "engaged (<4)" : ratio < 7 ? "moderate (4-7)" : ratio < 12 ? "passive (7-12)" : "v_passive (>12)";
+  if (!r.views) continue;
+  const k = r.views < 100 ? "low (<100)" : r.views < 500 ? "moderate (100-500)" : r.views < 2000 ? "high (500-2000)" : "very_high (>2000)";
   vwBuckets[k].push(r);
 }
 for (const [name, group] of Object.entries(vwBuckets)) {
@@ -99,9 +97,9 @@ for (const [name, group] of Object.entries(crBuckets)) {
   console.log(`${name.padEnd(12)} n=${String(group.length).padStart(3)} MAPE=${avg.toFixed(1)}% bias=${bias.toFixed(1)}%`);
 }
 
-// === 5. H/B ratio distribution by watcher count ===
-console.log("\n=== H/B RATIO DISTRIBUTION BY WATCHERS (at 2h) ===");
-for (const [name, group] of Object.entries(watchBuckets)) {
+// === 5. H/B ratio distribution by view count ===
+console.log("\n=== H/B RATIO DISTRIBUTION BY VIEWS (at 2h) ===");
+for (const [name, group] of Object.entries(viewBuckets)) {
   if (group.length === 0) continue;
   const hbs = group.map(g => g.actual / g.bid).sort((a, b) => a - b);
   const p10 = hbs[Math.floor(hbs.length * 0.1)];
@@ -118,16 +116,16 @@ const worst = tw2h.sort((a, b) => b.abs_error - a.abs_error).slice(0, 20);
 for (const w of worst) {
   const hb = (w.actual / w.bid).toFixed(2);
   const cr = w.comp && w.bid ? (w.comp / w.bid).toFixed(2) : 'n/a';
-  console.log(`  err=${w.error_pct.toFixed(0).padStart(4)}% bid=$${Math.round(w.bid).toLocaleString().padStart(8)} actual=$${Math.round(w.actual).toLocaleString().padStart(8)} H/B=${hb} comp/bid=${cr} cc=${w.cc ?? 0} watchers=${w.watchers}`);
+  console.log(`  err=${w.error_pct.toFixed(0).padStart(4)}% bid=$${Math.round(w.bid).toLocaleString().padStart(8)} actual=$${Math.round(w.actual).toLocaleString().padStart(8)} H/B=${hb} comp/bid=${cr} cc=${w.cc ?? 0} views=${w.views}`);
 }
 
 // === 7. Stall vs growth auctions by engagement ===
 console.log("\n=== STALL (H/B<=1.05) vs GROWTH BY ENGAGEMENT (at 2m) ===");
 const tw2m = rows.filter(r => r.time_window === '2m');
 for (const threshold of [300, 600, 1000]) {
-  const low = tw2m.filter(r => r.watchers < threshold);
-  const high = tw2m.filter(r => r.watchers >= threshold);
+  const low = tw2m.filter(r => r.views < threshold);
+  const high = tw2m.filter(r => r.views >= threshold);
   const lowStall = low.filter(r => r.actual / r.bid <= 1.05).length;
   const highStall = high.filter(r => r.actual / r.bid <= 1.05).length;
-  console.log(`  watchers<${threshold}: ${lowStall}/${low.length} stall (${(lowStall/low.length*100).toFixed(0)}%) | watchers>=${threshold}: ${highStall}/${high.length} stall (${(highStall/high.length*100).toFixed(0)}%)`);
+  console.log(`  views<${threshold}: ${lowStall}/${low.length} stall (${(lowStall/low.length*100).toFixed(0)}%) | views>=${threshold}: ${highStall}/${high.length} stall (${(highStall/high.length*100).toFixed(0)}%)`);
 }

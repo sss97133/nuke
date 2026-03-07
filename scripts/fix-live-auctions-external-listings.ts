@@ -1,9 +1,9 @@
 /**
- * Fix Live Auctions - Bulk Update external_listings for vehicles with live auctions
- * 
+ * Fix Live Auctions - Bulk Update vehicle_events for vehicles with live auctions
+ *
  * This script:
  * 1. Finds vehicles with live auctions (future auction_end_date or auction platform URLs)
- * 2. Creates/updates external_listings records with correct status and end_date
+ * 2. Creates/updates vehicle_events records with correct status and ended_at
  * 3. Handles Cars & Bids, BaT, and other auction platforms
  */
 
@@ -28,27 +28,27 @@ interface VehicleWithAuction {
   origin_organization_id: string | null;
 }
 
-function detectPlatform(url: string | null): { platform: string | null; listingId: string | null } {
-  if (!url) return { platform: null, listingId: null };
+function detectPlatform(url: string | null): { platform: string | null; sourceListingId: string | null } {
+  if (!url) return { platform: null, sourceListingId: null };
   
   const lowerUrl = url.toLowerCase();
   
   if (lowerUrl.includes('carsandbids.com/auctions/')) {
     const match = url.match(/\/auctions\/([^\/]+)/);
-    return { platform: 'cars_and_bids', listingId: match ? match[1] : null };
+    return { platform: 'cars_and_bids', sourceListingId: match ? match[1] : null };
   }
-  
+
   if (lowerUrl.includes('bringatrailer.com/listing/')) {
     const match = url.match(/\/listing\/([^\/]+)/);
-    return { platform: 'bat', listingId: match ? match[1] : null };
+    return { platform: 'bat', sourceListingId: match ? match[1] : null };
   }
-  
+
   if (lowerUrl.includes('mecum.com')) {
     const match = url.match(/\/lots\/(\d+)/);
-    return { platform: 'mecum', listingId: match ? match[1] : null };
+    return { platform: 'mecum', sourceListingId: match ? match[1] : null };
   }
-  
-  return { platform: null, listingId: null };
+
+  return { platform: null, sourceListingId: null };
 }
 
 async function fixVehicleAuctionListing(vehicle: VehicleWithAuction): Promise<{ fixed: boolean; error?: string; reason?: string }> {
@@ -70,73 +70,74 @@ async function fixVehicleAuctionListing(vehicle: VehicleWithAuction): Promise<{ 
     }
     
     // Detect platform from URL
-    const { platform, listingId } = detectPlatform(vehicle.discovery_url);
-    
+    const { platform, sourceListingId } = detectPlatform(vehicle.discovery_url);
+
     if (!platform || !vehicle.discovery_url) {
       // Can't determine platform, skip
       return { fixed: false, reason: 'Cannot determine platform from URL' };
     }
-    
-    // Check if external_listings already exists (check by vehicle_id and platform, or any listing for this vehicle)
-    const { data: existingListings } = await supabase
-      .from('external_listings')
-      .select('id, listing_status, end_date, platform')
+
+    // Check if vehicle_events already exists (check by vehicle_id and platform, or any event for this vehicle)
+    const { data: existingEvents } = await supabase
+      .from('vehicle_events')
+      .select('id, event_status, ended_at, source_platform')
       .eq('vehicle_id', vehicle.id);
-    
-    const existing = existingListings?.find(el => el.platform === platform) || existingListings?.[0];
-    
-    // Determine listing status - prioritize live status if auction_end_date is in future
-    let listingStatus = 'active';
+
+    const existing = existingEvents?.find(ve => ve.source_platform === platform) || existingEvents?.[0];
+
+    // Determine event status - prioritize live status if auction_end_date is in future
+    let eventStatus = 'active';
     if (isSold) {
-      listingStatus = 'sold';
+      eventStatus = 'sold';
     } else if (isLive) {
       // If auction_end_date is in future, it's active
-      listingStatus = 'active';
+      eventStatus = 'active';
     } else if (!isLive && endDate && endDate <= now) {
-      listingStatus = 'ended';
+      eventStatus = 'ended';
     }
-    
+
     // Prepare update/insert data
-    const listingData: any = {
+    const eventData: any = {
       vehicle_id: vehicle.id,
-      organization_id: vehicle.origin_organization_id || null,
-      platform: platform,
-      listing_url: vehicle.discovery_url,
-      listing_id: listingId,
-      listing_status: listingStatus,
-      end_date: endDate ? endDate.toISOString() : null,
+      source_organization_id: vehicle.origin_organization_id || null,
+      source_platform: platform,
+      source_url: vehicle.discovery_url,
+      source_listing_id: sourceListingId,
+      event_status: eventStatus,
+      event_type: 'auction',
+      ended_at: endDate ? endDate.toISOString() : null,
       updated_at: new Date().toISOString(),
     };
     
     if (existing) {
-      // Update existing listing - always update if status is wrong or if it's live
-      const existingEndDate = existing.end_date ? new Date(existing.end_date).toISOString() : null;
-      const newEndDate = listingData.end_date;
-      
-      const statusWrong = existing.listing_status !== listingStatus;
+      // Update existing event - always update if status is wrong or if it's live
+      const existingEndDate = existing.ended_at ? new Date(existing.ended_at).toISOString() : null;
+      const newEndDate = eventData.ended_at;
+
+      const statusWrong = existing.event_status !== eventStatus;
       const endDateWrong = existingEndDate !== newEndDate && newEndDate;
-      const platformWrong = existing.platform !== platform;
-      
-      // If it's live, always ensure status is 'active' and end_date is set
+      const platformWrong = existing.source_platform !== platform;
+
+      // If it's live, always ensure status is 'active' and ended_at is set
       if (isLive && (statusWrong || endDateWrong || platformWrong)) {
         const updateData: any = {
-          listing_status: 'active', // Force active for live auctions
-          end_date: listingData.end_date,
-          updated_at: listingData.updated_at,
+          event_status: 'active', // Force active for live auctions
+          ended_at: eventData.ended_at,
+          updated_at: eventData.updated_at,
         };
-        
+
         // If platform changed, update that too
         if (platformWrong) {
-          updateData.platform = platform;
-          updateData.listing_id = listingId;
-          updateData.listing_url = vehicle.discovery_url;
+          updateData.source_platform = platform;
+          updateData.source_listing_id = sourceListingId;
+          updateData.source_url = vehicle.discovery_url;
         }
-        
+
         const { error } = await supabase
-          .from('external_listings')
+          .from('vehicle_events')
           .update(updateData)
           .eq('id', existing.id);
-        
+
         if (error) {
           // Ignore trigger errors about missing functions (non-critical)
           if (error.message.includes('create_auction_timeline_event')) {
@@ -147,16 +148,16 @@ async function fixVehicleAuctionListing(vehicle: VehicleWithAuction): Promise<{ 
         }
         return { fixed: true };
       } else if (statusWrong || endDateWrong) {
-        // Update if status or end_date is wrong
+        // Update if status or ended_at is wrong
         const { error } = await supabase
-          .from('external_listings')
+          .from('vehicle_events')
           .update({
-            listing_status: listingStatus,
-            end_date: listingData.end_date,
-            updated_at: listingData.updated_at,
+            event_status: eventStatus,
+            ended_at: eventData.ended_at,
+            updated_at: eventData.updated_at,
           })
           .eq('id', existing.id);
-        
+
         if (error) {
           // Ignore trigger errors about missing functions (non-critical)
           if (error.message.includes('create_auction_timeline_event')) {
@@ -169,35 +170,35 @@ async function fixVehicleAuctionListing(vehicle: VehicleWithAuction): Promise<{ 
       }
       return { fixed: false, reason: 'No update needed' };
     } else {
-      // Create new listing
+      // Create new event
       const { error } = await supabase
-        .from('external_listings')
-        .upsert(listingData, {
-          onConflict: 'vehicle_id,platform,listing_id',
+        .from('vehicle_events')
+        .upsert(eventData, {
+          onConflict: 'vehicle_id,source_platform,source_listing_id',
         });
-      
+
       if (error) {
         // If conflict error, try updating by vehicle_id only
         if (error.message.includes('duplicate') || error.message.includes('unique')) {
-          const { data: conflictListing } = await supabase
-            .from('external_listings')
+          const { data: conflictEvent } = await supabase
+            .from('vehicle_events')
             .select('id')
             .eq('vehicle_id', vehicle.id)
             .maybeSingle();
-          
-          if (conflictListing) {
+
+          if (conflictEvent) {
             const { error: updateError } = await supabase
-              .from('external_listings')
+              .from('vehicle_events')
               .update({
-                platform: platform,
-                listing_id: listingId,
-                listing_url: vehicle.discovery_url,
-                listing_status: listingStatus,
-                end_date: listingData.end_date,
-                updated_at: listingData.updated_at,
+                source_platform: platform,
+                source_listing_id: sourceListingId,
+                source_url: vehicle.discovery_url,
+                event_status: eventStatus,
+                ended_at: eventData.ended_at,
+                updated_at: eventData.updated_at,
               })
-              .eq('id', conflictListing.id);
-            
+              .eq('id', conflictEvent.id);
+
             if (updateError) {
               return { fixed: false, error: updateError.message };
             }

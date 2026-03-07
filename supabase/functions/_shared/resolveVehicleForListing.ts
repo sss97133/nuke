@@ -1,8 +1,8 @@
 /**
  * Resolve existing vehicle before insert to avoid duplicate discovery_url.
- * Use this in all listing/auction extractors that write to vehicles + external_listings.
+ * Use this in all listing/auction extractors that write to vehicles + vehicle_events.
  *
- * Order: (1) external_listings by platform + listing_url_key
+ * Order: (1) vehicle_events by source_platform + source_listing_id
  *        (2) vehicles by discovery_url exact
  *        (3) vehicles by discovery_url ILIKE pattern (same listing, different URL format)
  *
@@ -25,16 +25,16 @@ export async function resolveExistingVehicleId(
   const { url, platform, discoveryUrlIlikePattern } = options;
   const listingUrlKey = normalizeListingUrlKey(url);
 
-  // 1. By external_listings (platform + listing_url_key)
+  // 1. By vehicle_events (source_platform + source_listing_id)
   if (listingUrlKey) {
-    const { data: listing } = await supabase
-      .from('external_listings')
+    const { data: event } = await supabase
+      .from('vehicle_events')
       .select('vehicle_id')
-      .eq('platform', platform)
-      .eq('listing_url_key', listingUrlKey)
+      .eq('source_platform', platform)
+      .eq('source_listing_id', listingUrlKey)
       .maybeSingle();
-    if (listing?.vehicle_id) {
-      return { vehicleId: listing.vehicle_id };
+    if (event?.vehicle_id) {
+      return { vehicleId: event.vehicle_id };
     }
   }
 

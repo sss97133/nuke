@@ -194,13 +194,13 @@ async function main() {
   collectUrls(vehicle.import_metadata, urls);
   collectUrls(vehicle.origin_metadata, urls);
 
-  const { data: externalListings } = await supabase
-    .from('external_listings')
-    .select('listing_url, metadata')
+  const { data: vehicleEvents } = await supabase
+    .from('vehicle_events')
+    .select('source_url, metadata')
     .eq('vehicle_id', vehicle.id)
     .limit(200);
-  for (const row of externalListings || []) {
-    collectUrls(row?.listing_url, urls);
+  for (const row of vehicleEvents || []) {
+    collectUrls(row?.source_url, urls);
     collectUrls(row?.metadata, urls);
   }
 

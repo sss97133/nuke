@@ -459,21 +459,24 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
         });
       }
 
-      // 3. BaT auction data
-      const { data: batListing } = await supabase
-        .from('bat_listings')
-        .select('id, listing_url, sale_price, sale_date, vin, created_at')
+      // 3. BaT auction data (from vehicle_events)
+      const { data: batEvent } = await supabase
+        .from('vehicle_events')
+        .select('id, source_url, final_price, sold_at, created_at, metadata')
         .eq('vehicle_id', vehicleId)
+        .eq('source_platform', 'bat')
+        .order('ended_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (batListing) {
+      if (batEvent) {
         allSources.push({
           source_type: 'bat_auction',
           document_type: 'auction_listing',
           confidence_score: 90,
-          created_at: batListing.created_at || batListing.sale_date || new Date().toISOString(),
+          created_at: batEvent.created_at || batEvent.sold_at || new Date().toISOString(),
           source_name: 'Bring a Trailer',
-          source_url: batListing.listing_url,
+          source_url: batEvent.source_url,
           logo_url: '/vendor/bat/favicon.ico',
           verified_by: 'BaT'
         });
@@ -508,7 +511,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
         .eq('id', vehicleId)
         .maybeSingle();
 
-      if (vehicleOrigin?.bat_auction_url && !batListing) {
+      if (vehicleOrigin?.bat_auction_url && !batEvent) {
         allSources.push({
           source_type: 'bat_auction',
           document_type: 'auction_listing',

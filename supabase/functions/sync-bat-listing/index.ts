@@ -24,10 +24,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { externalListingId } = await req.json();
-    
-    if (!externalListingId) {
-      return new Response(JSON.stringify({ success: false, error: 'Missing externalListingId' }), {
+    const { vehicleEventId, externalListingId } = await req.json();
+    const eventId = vehicleEventId || externalListingId; // support legacy callers
+
+    if (!eventId) {
+      return new Response(JSON.stringify({ success: false, error: 'Missing vehicleEventId' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -38,38 +39,38 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get the external listing
+    // Get the vehicle event
     const { data: listing, error: listingError } = await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .select('*')
-      .eq('id', externalListingId)
+      .eq('id', eventId)
       .single();
 
     if (listingError || !listing) {
-      throw new Error('Listing not found');
+      throw new Error('Vehicle event not found');
     }
 
-    console.log(`Syncing BaT listing: ${listing.listing_url}`);
+    console.log(`Syncing BaT listing: ${listing.source_url}`);
 
     // COST CONTROL: For live polling, try direct fetch first without Firecrawl fallback
     // This is called frequently, so we want to minimize costs
-    let fetchResult = await fetchBatPage(listing.listing_url, { skipFirecrawlFallback: true });
-    
+    let fetchResult = await fetchBatPage(listing.source_url, { skipFirecrawlFallback: true });
+
     // If direct fetch failed and auction is ending soon (< 10 min), it's worth paying for Firecrawl
-    if (!fetchResult.html && shouldUseFirecrawlForLivePolling(listing.end_date, true)) {
+    if (!fetchResult.html && shouldUseFirecrawlForLivePolling(listing.ended_at, true)) {
       console.log(`[sync-bat-listing] Auction ending soon - trying Firecrawl fallback`);
-      fetchResult = await fetchBatPage(listing.listing_url, { forceFirecrawl: true });
-      await logFetchCost(supabase, 'sync-bat-listing', listing.listing_url, fetchResult);
+      fetchResult = await fetchBatPage(listing.source_url, { forceFirecrawl: true });
+      await logFetchCost(supabase, 'sync-bat-listing', listing.source_url, fetchResult);
     }
-    
+
     if (!fetchResult.html) {
       // Log the failure but don't crash - we'll try again next poll
-      console.warn(`[sync-bat-listing] Failed to fetch ${listing.listing_url}: ${fetchResult.error}`);
+      console.warn(`[sync-bat-listing] Failed to fetch ${listing.source_url}: ${fetchResult.error}`);
       return new Response(
         JSON.stringify({
           success: false,
           error: fetchResult.error || 'Failed to fetch listing',
-          listing_id: externalListingId,
+          event_id: eventId,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -77,12 +78,12 @@ Deno.serve(async (req: Request) => {
     
     const html = fetchResult.html;
 
-    // Determine ended/sold state early to avoid writing bogus end_date values on completed auctions.
+    // Determine ended/sold state early to avoid writing bogus ended_at values on completed auctions.
     const isEndedText = /Auction Ended/i.test(html);
     const soldInTitle = html.match(/sold\s+for\s+\$([\d,]+)/i);
 
     // Extract current bid - multiple patterns to handle different HTML structures
-    let currentBid = listing.current_bid;
+    let currentBid = listing.current_price;
     const bidPatterns = [
       /Current Bid[^>]*>.*?USD\s*\$?([\d,]+)/i,
       /<strong[^>]*class="info-value"[^>]*>USD\s*\$?([\d,]+)<\/strong>/i,
@@ -181,96 +182,38 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Update the listing
+    // Update the vehicle event
     const { error: updateError } = await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .update({
-        current_bid: currentBid,
+        current_price: currentBid,
         bid_count: bidCount,
         watcher_count: watcherCount,
         view_count: viewCount,
-        listing_status: newStatus,
-        end_date: endDateIso,
+        event_status: newStatus,
+        ended_at: endDateIso,
         final_price: finalPrice,
         sold_at: finalPrice ? new Date().toISOString() : null,
         last_synced_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq('id', externalListingId);
+      .eq('id', eventId);
 
     if (updateError) throw updateError;
 
-    // Also update bat_listings table if a corresponding row exists
-    // Match by bat_listing_url (normalize URL for matching - try both with and without trailing slash)
-    const normalizedBatUrl = listing.listing_url.replace(/\/$/, ''); // Remove trailing slash
-    const normalizedBatUrlWithSlash = normalizedBatUrl + '/';
-    
-    // Try to find matching bat_listings row
-    let batListing: any = null;
-    const { data: batListing1 } = await supabase
-      .from('bat_listings')
-      .select('id, comment_count')
-      .eq('bat_listing_url', normalizedBatUrl)
-      .maybeSingle();
-    
-    if (batListing1) {
-      batListing = batListing1;
-    } else {
-      const { data: batListing2 } = await supabase
-        .from('bat_listings')
-        .select('id, comment_count')
-        .eq('bat_listing_url', normalizedBatUrlWithSlash)
-        .maybeSingle();
-      if (batListing2) {
-        batListing = batListing2;
-      }
-    }
-
-    if (batListing) {
-      // Map listing_status to bat_listings status format
-      const batStatus = newStatus === 'sold' ? 'sold' : 
-                       newStatus === 'ended' ? 'ended' : 
-                       newStatus === 'active' ? 'active' : 
-                       batListing.comment_count ? 'ended' : 'active'; // Keep existing if no new status
-
-      // Determine final_bid (use final_price if sold, otherwise current_bid)
-      const finalBid = finalPrice || currentBid || null;
-
-      // Update bat_listings with synced data
-      const { error: batUpdateError } = await supabase
-        .from('bat_listings')
-        .update({
-          bid_count: bidCount || 0,
-          final_bid: finalBid,
-          view_count: viewCount || 0,
-          listing_status: batStatus,
-          sale_price: finalPrice || null,
-          sale_date: finalPrice ? (new Date().toISOString().split('T')[0]) : null,
-          auction_end_date: endDateIso ? (new Date(endDateIso).toISOString().split('T')[0]) : null,
-          last_updated_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', batListing.id);
-
-      if (batUpdateError) {
-        console.warn(`Failed to update bat_listings for ${batListing.id}:`, batUpdateError);
-        // Don't throw - bat_listings update failure shouldn't fail the entire sync
-      } else {
-        console.log(`✅ Updated bat_listings ${batListing.id} with bid_count=${bidCount}, final_bid=${finalBid}, status=${batStatus}`);
-      }
-    } else {
-      console.log(`ℹ️ No bat_listings row found for URL: ${normalizedBatUrl}`);
-    }
+    // NOTE: bat_listings table has been consolidated into vehicle_events.
+    // All BaT data is now written to vehicle_events with source_platform='bat'.
+    // No separate bat_listings sync needed.
 
     // Extract comments for active auctions (with cost control - only if auction ending soon or bid increased)
     // This ensures comment_count stays updated without excessive Firecrawl costs
     const shouldExtractComments = 
       newStatus === 'active' && 
-      listing.end_date && 
+      listing.ended_at && 
       (
         // Extract comments if auction ending in < 24 hours OR bid increased significantly
-        (new Date(listing.end_date).getTime() - Date.now() < 24 * 60 * 60 * 1000) ||
-        (listing.current_bid && currentBid && currentBid > listing.current_bid && (currentBid - listing.current_bid) >= 5000)
+        (new Date(listing.ended_at).getTime() - Date.now() < 24 * 60 * 60 * 1000) ||
+        (listing.current_price && currentBid && currentBid > listing.current_price && (currentBid - listing.current_price) >= 5000)
       );
 
     if (shouldExtractComments && listing.vehicle_id) {
@@ -289,7 +232,7 @@ Deno.serve(async (req: Request) => {
             'Authorization': `Bearer ${serviceRoleKey}`,
           },
           body: JSON.stringify({
-            auction_url: listing.listing_url,
+            auction_url: listing.source_url,
             vehicle_id: listing.vehicle_id,
             auction_event_id: null, // Will be resolved by extract-auction-comments
           })
@@ -297,15 +240,15 @@ Deno.serve(async (req: Request) => {
           console.warn(`Failed to trigger comment extraction (non-fatal):`, err);
         });
         
-        console.log(`✅ Triggered async comment extraction for ${listing.listing_url}`);
+        console.log(`✅ Triggered async comment extraction for ${listing.source_url}`);
       } catch (err) {
         console.warn(`Comment extraction trigger failed (non-fatal):`, err);
       }
     }
 
     // If bid increased significantly, create timeline event and notification
-    if (listing.current_bid && currentBid && currentBid > listing.current_bid) {
-      const bidIncrease = currentBid - listing.current_bid;
+    if (listing.current_price && currentBid && currentBid > listing.current_price) {
+      const bidIncrease = currentBid - listing.current_price;
       // Create timeline event for significant bid increases (every $5k or milestone)
       const isMilestone = bidIncrease >= 5000 || (currentBid % 10000) < bidIncrease;
       
@@ -319,7 +262,7 @@ Deno.serve(async (req: Request) => {
             p_metadata: {
               bid_amount: currentBid,
               bid_count: bidCount,
-              previous_bid: listing.current_bid,
+              previous_bid: listing.current_price,
               increase: bidIncrease,
               watcher_count: watcherCount,
               view_count: viewCount
@@ -345,17 +288,17 @@ Deno.serve(async (req: Request) => {
           entity_id: listing.vehicle_id,
           metadata: {
             platform: 'bat',
-            old_bid: listing.current_bid,
+            old_bid: listing.current_price,
             new_bid: currentBid,
             bid_increase: bidIncrease,
-            listing_url: listing.listing_url
+            listing_url: listing.source_url
           }
         });
     }
 
     // If auction ending soon (< 24h), create notification
-    if (listing.end_date && newStatus === 'active') {
-      const hoursRemaining = (new Date(listing.end_date).getTime() - Date.now()) / (1000 * 60 * 60);
+    if (listing.ended_at && newStatus === 'active') {
+      const hoursRemaining = (new Date(listing.ended_at).getTime() - Date.now()) / (1000 * 60 * 60);
       if (hoursRemaining > 0 && hoursRemaining <= 24) {
         await supabase
           .from('notification_events')
@@ -367,7 +310,7 @@ Deno.serve(async (req: Request) => {
               platform: 'bat',
               hours_remaining: Math.round(hoursRemaining),
               current_bid: currentBid,
-              listing_url: listing.listing_url
+              listing_url: listing.source_url
             }
           });
       }
@@ -376,8 +319,8 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        listing: {
-          id: externalListingId,
+        event: {
+          id: eventId,
           currentBid,
           bidCount,
           watcherCount,

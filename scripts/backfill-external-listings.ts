@@ -51,28 +51,29 @@ async function backfillExternalListings() {
     let skipped = 0;
 
     for (const v of vehicles) {
-      // Check if external_listing exists
+      // Check if vehicle_event exists
       const { count } = await supabase
-        .from('external_listings')
+        .from('vehicle_events')
         .select('*', { count: 'exact', head: true })
         .eq('vehicle_id', v.id)
-        .eq('platform', platform);
+        .eq('source_platform', platform);
 
       if ((count || 0) > 0) {
         skipped++;
         continue;
       }
 
-      // Create external_listing
-      const { error } = await supabase.from('external_listings').insert({
+      // Create vehicle_event
+      const { error } = await supabase.from('vehicle_events').insert({
         vehicle_id: v.id,
-        organization_id: orgId,
-        platform: platform,
-        listing_url: v.listing_url,
-        listing_status: 'active',
-        current_bid: v.high_bid,
+        source_organization_id: orgId,
+        source_platform: platform,
+        event_type: 'auction',
+        source_url: v.listing_url,
+        event_status: 'active',
+        current_price: v.high_bid,
         bid_count: v.bid_count || 0,
-        end_date: v.auction_end_date,
+        ended_at: v.auction_end_date,
         metadata: {
           source: 'backfill',
           title: v.listing_title,
@@ -95,7 +96,7 @@ async function backfillExternalListings() {
   console.log('\n=== VERIFICATION ===');
   const platforms = ['bat', 'cars_and_bids', 'pcarmarket', 'collecting_cars', 'broad_arrow', 'rmsothebys', 'gooding', 'sbx'];
   for (const p of platforms) {
-    const { count } = await supabase.from('external_listings').select('*', { count: 'exact', head: true }).eq('platform', p).eq('listing_status', 'active');
+    const { count } = await supabase.from('vehicle_events').select('*', { count: 'exact', head: true }).eq('source_platform', p).eq('event_status', 'active');
     console.log(`${p.padEnd(20)} Active: ${count || 0}`);
   }
 }

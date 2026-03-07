@@ -1543,7 +1543,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
         return [];
       }
 
-      // Search in external_listings (BAT, etc.) for auction listings
+      // Search in vehicle_events (BAT, etc.) for auction listings
       // First get vehicles matching the search term
       const { data: matchingVehicles } = await supabase
         .from('vehicles')
@@ -1556,14 +1556,14 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
       }
 
       const vehicleIds = matchingVehicles.map(v => v.id);
-      
+
       const { data: listings, error } = await supabase
-        .from('external_listings')
+        .from('vehicle_events')
         .select(`
           id,
-          listing_url,
-          listing_status,
-          current_bid,
+          source_url,
+          event_status,
+          current_price,
           bid_count,
           created_at,
           vehicle_id,
@@ -1574,7 +1574,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
             model
           )
         `)
-        .eq('listing_status', 'active')
+        .eq('event_status', 'active')
         .in('vehicle_id', vehicleIds)
         .limit(25);
 

@@ -23,15 +23,15 @@ This is the approved BaT extraction function, explicitly referenced by `complete
 
 | Function | Purpose | LOC | Uses AI? | Uses Firecrawl? | Complete? | Tables Written | Recommendation |
 |----------|---------|-----|----------|-----------------|-----------|----------------|----------------|
-| **extract-bat-core** | Core BaT extractor (HTML → vehicle) | 2016 | No | No | **YES** | vehicles, vehicle_images, external_listings, auction_events, timeline_events, listing_page_snapshots, extraction_metadata | **KEEP - CANONICAL** |
-| bat-simple-extract | Older BaT extractor | 1129 | No | Optional | Yes | vehicles, vehicle_images, external_listings, timeline_events, organization_vehicles | **DEPRECATE** (duplicate of extract-bat-core) |
-| bat-extract | Mid-generation extractor with versioning | 1052 | No | Optional | Yes | vehicles, vehicle_images, external_listings, auction_events, timeline_events, organization_vehicles | **DEPRECATE** (duplicate of extract-bat-core) |
+| **extract-bat-core** | Core BaT extractor (HTML → vehicle) | 2016 | No | No | **YES** | vehicles, vehicle_images, vehicle_events, auction_events, timeline_events, listing_page_snapshots, extraction_metadata | **KEEP - CANONICAL** |
+| bat-simple-extract | Older BaT extractor | 1129 | No | Optional | Yes | vehicles, vehicle_images, vehicle_events, timeline_events, organization_vehicles | **DEPRECATE** (duplicate of extract-bat-core) |
+| bat-extract | Mid-generation extractor with versioning | 1052 | No | Optional | Yes | vehicles, vehicle_images, vehicle_events, auction_events, timeline_events, organization_vehicles | **DEPRECATE** (duplicate of extract-bat-core) |
 | bat-queue-worker | Production queue processor | 206 | No | No | Helper | Calls other extractors | **KEEP** (queue infrastructure) |
 | bat-url-discovery | Scrapes BaT results pages for URLs | 296 | No | No | Helper | import_queue | **KEEP** (URL discovery) |
 | bat-year-crawler | Crawls all BaT completed auctions | 334 | No | No | Helper | import_queue | **KEEP** (discovery/backfill) |
 | crawl-bat-active | Discovers active BaT auctions (RSS + Firecrawl) | 302 | No | Yes | Helper | import_queue | **CONSOLIDATE** (merge with bat-url-discovery) |
 | complete-bat-import | Orchestrator: calls extract-bat-core + comments | 189 | No | No | Orchestrator | None (calls other functions) | **KEEP** (official entry point) |
-| sync-bat-listing | Live polling for bid/watcher count updates | 404 | No | Optional | Helper | external_listings | **KEEP** (live sync for active auctions) |
+| sync-bat-listing | Live polling for bid/watcher count updates | 404 | No | Optional | Helper | vehicle_events | **KEEP** (live sync for active auctions) |
 | auto-fix-bat-prices | Detects and fixes price mismatches | 428 | No | No | Helper | vehicles, timeline_events | **KEEP** (data quality) |
 | bat-multisignal-postprocess | Creates auction_event_links and timeline repairs | 479 | No | No | Helper | auction_events, auction_event_links, timeline_events | **KEEP** (post-processing for resales) |
 | extract-bat-parts-brands | AI extraction of parts/brands from description | 283 | **Yes (OpenAI)** | No | Helper | vehicle_parts, brands, part_mentions | **EVALUATE** (specialized use case) |
@@ -57,7 +57,7 @@ This is the approved BaT extraction function, explicitly referenced by `complete
   - Extracts clean title/year/make/model (removes SEO cruft)
   - Extracts BaT Essentials (seller/location/lot)
   - Extracts description + images
-  - Creates `vehicles`, `vehicle_images`, `external_listings`, `auction_events`
+  - Creates `vehicles`, `vehicle_images`, `vehicle_events`, `auction_events`
   - Creates `timeline_events` for auction dates
   - Creates `extraction_metadata` for provenance tracking
   - No Firecrawl (free, direct HTML fetch)
@@ -143,7 +143,7 @@ This is the approved BaT extraction function, explicitly referenced by `complete
 #### sync-bat-listing ✅ KEEP
 - **Purpose:** Live polling for bid count, watcher count, current bid
 - **Method:** Hybrid (direct or Firecrawl for live data)
-- **Writes:** `external_listings`
+- **Writes:** `vehicle_events`
 - **Recommendation:** **KEEP** - Essential for tracking active auctions
 
 ---

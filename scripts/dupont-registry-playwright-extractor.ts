@@ -452,18 +452,19 @@ async function saveToDatabase(data: DupontFullData): Promise<string | null> {
       vehicleId = newV.id;
     }
 
-    // Save to external_listings
-    const listingStatus = data.listingType === 'auction' ?
+    // Save to vehicle_events
+    const eventStatus = data.listingType === 'auction' ?
       (data.auctionStatus || 'active') : 'active';
 
-    const externalListingData: any = {
+    const vehicleEventData: any = {
       vehicle_id: vehicleId,
-      organization_id: DUPONT_ORG_ID,
-      platform: 'dupont_registry',
-      listing_url: data.url,
-      listing_id: data.listingId,
-      listing_status: listingStatus,
-      current_bid: data.currentBid || data.price,
+      source_organization_id: DUPONT_ORG_ID,
+      source_platform: 'dupont_registry',
+      event_type: data.listingType === 'auction' ? 'auction' : 'listing',
+      source_url: data.url,
+      source_listing_id: data.listingId,
+      event_status: eventStatus,
+      current_price: data.currentBid || data.price,
       bid_count: data.bidCount,
       final_price: null, // Only set when sold
       metadata: {
@@ -485,18 +486,18 @@ async function saveToDatabase(data: DupontFullData): Promise<string | null> {
       updated_at: new Date().toISOString(),
     };
 
-    const { data: existingListing } = await supabase
-      .from('external_listings')
+    const { data: existingEvent } = await supabase
+      .from('vehicle_events')
       .select('id')
       .eq('vehicle_id', vehicleId)
-      .eq('platform', 'dupont_registry')
+      .eq('source_platform', 'dupont_registry')
       .single();
 
-    if (existingListing) {
-      await supabase.from('external_listings').update(externalListingData).eq('id', existingListing.id);
+    if (existingEvent) {
+      await supabase.from('vehicle_events').update(vehicleEventData).eq('id', existingEvent.id);
     } else {
-      externalListingData.created_at = new Date().toISOString();
-      await supabase.from('external_listings').insert(externalListingData);
+      vehicleEventData.created_at = new Date().toISOString();
+      await supabase.from('vehicle_events').insert(vehicleEventData);
     }
 
     // Save images

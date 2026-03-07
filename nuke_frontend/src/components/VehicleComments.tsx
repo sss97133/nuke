@@ -505,14 +505,14 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
             .gt('auction_end_time', new Date().toISOString())
             .maybeSingle();
 
-          // Also check external_listings for BAT auctions
+          // Also check vehicle_events for BAT auctions
           const { data: externalListing } = await supabase
-            .from('external_listings')
-            .select('id, listing_status, end_date')
+            .from('vehicle_events')
+            .select('id, event_status, ended_at')
             .eq('vehicle_id', vehicleId)
-            .eq('platform', 'bat')
-            .eq('listing_status', 'active')
-            .gt('end_date', new Date().toISOString())
+            .eq('source_platform', 'bat')
+            .eq('event_status', 'active')
+            .gt('ended_at', new Date().toISOString())
             .maybeSingle();
 
           const isActiveAuction = activeListing || externalListing;
@@ -576,7 +576,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
               metadata: {
                 source: 'bat_import',
                 bat_url: batUrl,
-                bat_listing_title: scrapedData.title,
+                bat_event_title: scrapedData.title,
                 seller: scrapedData.seller,
                 auction_start_date: auctionStartDate,
                 auction_end_date: scrapedData.sale_date || scrapedData.auction_end_date,
@@ -604,7 +604,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
                 metadata: {
                   source: 'bat_import',
                   bat_url: batUrl,
-                  bat_listing_title: scrapedData.title,
+                  bat_event_title: scrapedData.title,
                   buyer: scrapedData.buyer,
                   sale_date: scrapedData.sale_date,
                   auction_start_date: auctionStartDate,
@@ -660,7 +660,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
                 transferData.metadata = {
                   ...(scrapedData.buyer && { buyer_name: scrapedData.buyer }),
                   ...(scrapedData.seller && { seller_name: scrapedData.seller }),
-                  bat_listing_title: scrapedData.title,
+                  bat_event_title: scrapedData.title,
                   lot_number: scrapedData.lot_number || null
                 };
               }
@@ -816,10 +816,10 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
           vehicle_id: vehicleId,
           image_url: imageUrl,
           user_id: session.user.id,
-          category: 'bat_listing',
+          category: 'bat_auction',
           is_primary: i === 0,
           position: i,
-          source: 'bat_listing',
+          source: 'bat_auction',
           source_url: batUrl,
           // Store BAT metadata in ai_scan_metadata since metadata column doesn't exist
           ai_scan_metadata: {

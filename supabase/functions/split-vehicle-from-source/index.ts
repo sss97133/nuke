@@ -387,30 +387,25 @@ serve(async (req) => {
         .eq("platform", "bat")
         .in("source_url", [canonicalSourceUrl, `${canonicalSourceUrl}/`]);
 
-      // external_listings drives UI "listings" panels; move it too.
+      // vehicle_events drives UI "listings" panels; move it too.
       await admin
-        .from("external_listings")
+        .from("vehicle_events")
         .update({ vehicle_id: newVehicle.id } as any)
         .eq("vehicle_id", vehicleId)
-        .eq("platform", "bat")
-        .in("listing_url", [canonicalSourceUrl, `${canonicalSourceUrl}/`]);
+        .eq("source_platform", "bat")
+        .in("source_url", [canonicalSourceUrl, `${canonicalSourceUrl}/`]);
 
-      // Legacy BaT tables (still queried by the UI)
+      // Get vehicle_event IDs for related bat_comments migration
       const { data: batListingRows } = await admin
-        .from("bat_listings")
+        .from("vehicle_events")
         .select("id")
         .eq("vehicle_id", vehicleId)
-        .in("bat_listing_url", [canonicalSourceUrl, `${canonicalSourceUrl}/`]);
+        .eq("source_platform", "bat")
+        .in("source_url", [canonicalSourceUrl, `${canonicalSourceUrl}/`]);
 
       const batListingIds = (Array.isArray(batListingRows) ? batListingRows : [])
         .map((r: any) => r?.id)
         .filter(Boolean);
-
-      await admin
-        .from("bat_listings")
-        .update({ vehicle_id: newVehicle.id } as any)
-        .eq("vehicle_id", vehicleId)
-        .in("bat_listing_url", [canonicalSourceUrl, `${canonicalSourceUrl}/`]);
 
       if (batListingIds.length > 0) {
         await admin

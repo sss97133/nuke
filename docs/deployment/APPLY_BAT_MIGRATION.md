@@ -30,7 +30,7 @@ node scripts/import-bat-comments-to-db.js
 
 This will:
 - Create BaT user records for all commenters
-- Create bat_listings records for each listing
+- Create vehicle_events records for each listing (source_platform='bat')
 - Create bat_comments records for each comment
 - Link comments to vehicles when matched
 - Update vehicles with BaT listing URLs and sale data
@@ -41,11 +41,11 @@ Check that data was imported:
 
 ```sql
 -- Count imported data
-SELECT 
+SELECT
   (SELECT COUNT(*) FROM bat_users) as users,
-  (SELECT COUNT(*) FROM bat_listings) as listings,
+  (SELECT COUNT(*) FROM vehicle_events WHERE source_platform = 'bat') as listings,
   (SELECT COUNT(*) FROM bat_comments) as comments,
-  (SELECT COUNT(*) FROM bat_listings WHERE vehicle_id IS NOT NULL) as linked_listings,
+  (SELECT COUNT(*) FROM vehicle_events WHERE source_platform = 'bat' AND vehicle_id IS NOT NULL) as linked_listings,
   (SELECT COUNT(*) FROM bat_comments WHERE vehicle_id IS NOT NULL) as linked_comments;
 
 -- View comments for a specific vehicle

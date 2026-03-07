@@ -374,10 +374,10 @@ export function useFutureAuctionListing(vehicleId: string | undefined) {
       }
       try {
         const { data, error } = await supabase
-          .from('external_listings')
-          .select('id, platform, listing_url, listing_status, start_date, end_date, metadata')
+          .from('vehicle_events')
+          .select('id, source_platform, source_url, event_status, started_at, ended_at, metadata')
           .eq('vehicle_id', vehicleId)
-          .order('start_date', { ascending: true, nullsFirst: false })
+          .order('started_at', { ascending: true, nullsFirst: false })
           .limit(10);
 
         if (error) {
@@ -388,12 +388,12 @@ export function useFutureAuctionListing(vehicleId: string | undefined) {
 
         const futureListing = (data || []).find((listing: any) => {
           const nowMs = Date.now();
-          if (listing.start_date) {
-            const startDate = new Date(listing.start_date).getTime();
+          if (listing.started_at) {
+            const startDate = new Date(listing.started_at).getTime();
             if (Number.isFinite(startDate) && startDate > nowMs) return true;
           }
-          if (listing.end_date) {
-            const endDate = new Date(listing.end_date).getTime();
+          if (listing.ended_at) {
+            const endDate = new Date(listing.ended_at).getTime();
             if (Number.isFinite(endDate) && endDate > nowMs) return true;
           }
           if (listing.metadata?.sale_date) {
@@ -843,7 +843,7 @@ export function useAuctionCurrency(vehicle: Vehicle | null, auctionPulse: Vehicl
   const auctionCurrency = useMemo(() => {
     const v: any = vehicle as any;
     if (!v) return null;
-    const externalListing = v?.external_listings?.[0];
+    const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
     const pulseMeta = (auctionPulse as any)?.metadata;
     return resolveCurrencyCode(
       pulseMeta?.currency,

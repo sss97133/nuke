@@ -494,7 +494,7 @@ export default function Organizations() {
 function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: OrgExtractionCoverage | null; onClick: () => void }) {
   const signalScore = org.data_signal_score || 0;
   const signalTier = getSignalTier(signalScore);
-  // Prefer extraction coverage count when we have it (e.g. BAT from bat_listings), else org total
+  // Prefer extraction coverage count when we have it (e.g. BAT from vehicle_events), else org total
   const vehicles = (coverage?.extracted != null ? coverage.extracted : org.total_vehicles) || 0;
   const gmv = org.gmv || 0;
   const revenue = org.total_revenue || 0;

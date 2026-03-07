@@ -2,7 +2,7 @@
  * Backfill auction_events with final_price
  *
  * BaT extraction captures sold prices but they may not be in auction_events.
- * Check external_listings and vehicles for price data to backfill.
+ * Check vehicle_events and vehicles for price data to backfill.
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -24,24 +24,24 @@ async function main() {
   console.log(`Auction events: ${(totalEvents || 0).toLocaleString()}`);
   console.log(`With final_price: ${(eventsWithPrice || 0).toLocaleString()}`);
 
-  // 2. Check external_listings for price data
+  // 2. Check vehicle_events for price data
   const { count: listingsWithPrice } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('*', { count: 'exact', head: true })
     .not('final_price', 'is', null);
 
-  console.log(`\nExternal listings with final_price: ${(listingsWithPrice || 0).toLocaleString()}`);
+  console.log(`\nVehicle events with final_price: ${(listingsWithPrice || 0).toLocaleString()}`);
 
-  // 3. Check if we can link external_listings to auction_events
+  // 3. Check if we can link vehicle_events to auction_events
   const { data: sampleListings } = await supabase
-    .from('external_listings')
-    .select('id, vehicle_id, listing_url, final_price, current_bid, platform')
+    .from('vehicle_events')
+    .select('id, vehicle_id, source_url, final_price, current_price, source_platform')
     .not('final_price', 'is', null)
     .limit(10);
 
-  console.log('\nSample listings with prices:');
+  console.log('\nSample events with prices:');
   for (const listing of sampleListings || []) {
-    console.log(`  ${listing.platform}: $${listing.final_price?.toLocaleString()} | ${listing.listing_url?.substring(0, 50)}...`);
+    console.log(`  ${listing.source_platform}: $${listing.final_price?.toLocaleString()} | ${listing.source_url?.substring(0, 50)}...`);
   }
 
   // 4. Check auction_events to see what data they have
@@ -55,13 +55,13 @@ async function main() {
     console.log(`  ${event.source}: ${event.sale_status || 'unknown'} | $${event.final_price || 0} | ${event.auction_url?.substring(0, 50)}...`);
   }
 
-  // 5. Try to backfill from external_listings
-  console.log('\n=== BACKFILLING FROM EXTERNAL_LISTINGS ===');
+  // 5. Try to backfill from vehicle_events
+  console.log('\n=== BACKFILLING FROM VEHICLE_EVENTS ===');
 
-  // Get external_listings with prices that have vehicle_ids
+  // Get vehicle_events with prices that have vehicle_ids
   const { data: listingsToBackfill } = await supabase
-    .from('external_listings')
-    .select('id, vehicle_id, listing_url, final_price')
+    .from('vehicle_events')
+    .select('id, vehicle_id, source_url, final_price')
     .not('final_price', 'is', null)
     .not('vehicle_id', 'is', null)
     .limit(1000);
@@ -93,7 +93,7 @@ async function main() {
     }
   }
 
-  console.log(`Updated ${updated} auction_events with prices from external_listings`);
+  console.log(`Updated ${updated} auction_events with prices from vehicle_events`);
 
   // 6. Check vehicles table for price data in origin_metadata
   console.log('\n=== CHECKING ORIGIN_METADATA FOR PRICES ===');

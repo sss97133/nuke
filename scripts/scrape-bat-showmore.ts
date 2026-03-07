@@ -139,10 +139,11 @@ async function main() {
 
   const existingSet = new Set((existing || []).map(e => e.listing_url?.replace(/\/$/, '')));
 
-  const { data: batListings } = await supabase
-    .from('bat_listings')
-    .select('bat_listing_url');
-  (batListings || []).forEach(b => { if (b.bat_listing_url) existingSet.add(b.bat_listing_url.replace(/\/$/, '')); });
+  const { data: batEvents } = await supabase
+    .from('vehicle_events')
+    .select('source_url')
+    .eq('source_platform', 'bat');
+  (batEvents || []).forEach(b => { if (b.source_url) existingSet.add(b.source_url.replace(/\/$/, '')); });
 
   const { data: vehicles } = await supabase
     .from('vehicles')

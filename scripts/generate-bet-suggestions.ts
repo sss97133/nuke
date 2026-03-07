@@ -173,22 +173,23 @@ async function analyzeCommentSentiment(): Promise<BetSuggestion[]> {
 
   // Get vehicles with high comment counts and sentiment analysis
   const { data: hotVehicles } = await supabase
-    .from('bat_listings')
+    .from('vehicle_events')
     .select(`
       vehicle_id,
       comment_count,
       vehicles!inner(make, model, year, sale_price),
       comment_discoveries(overall_sentiment, sentiment_score)
     `)
+    .eq('source_platform', 'bat')
     .gt('comment_count', 100)
     .is('vehicles.sale_price', null) // Still active
     .order('comment_count', { ascending: false })
     .limit(10);
 
   if (hotVehicles?.length) {
-    for (const listing of hotVehicles) {
-      const vehicle = (listing as any).vehicles;
-      const discovery = (listing as any).comment_discoveries?.[0];
+    for (const event of hotVehicles) {
+      const vehicle = (event as any).vehicles;
+      const discovery = (event as any).comment_discoveries?.[0];
 
       if (vehicle && discovery?.sentiment_score) {
         const sentiment = discovery.sentiment_score;
@@ -196,14 +197,14 @@ async function analyzeCommentSentiment(): Promise<BetSuggestion[]> {
 
         suggestions.push({
           title: `Will the ${vehicle.year} ${vehicle.make} ${vehicle.model} sell for over $${threshold / 1000}k?`,
-          description: `${listing.comment_count} comments, sentiment score: ${(sentiment * 100).toFixed(0)}%`,
+          description: `${event.comment_count} comments, sentiment score: ${(sentiment * 100).toFixed(0)}%`,
           source_type: 'market_sentiment',
           source_query: {
-            vehicle_id: listing.vehicle_id,
-            comment_count: listing.comment_count,
+            vehicle_id: event.vehicle_id,
+            comment_count: event.comment_count,
             sentiment_score: sentiment,
           },
-          confidence: Math.min(0.9, 0.5 + listing.comment_count / 500),
+          confidence: Math.min(0.9, 0.5 + event.comment_count / 500),
           category: 'automotive',
           expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         });

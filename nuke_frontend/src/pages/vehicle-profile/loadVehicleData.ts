@@ -250,7 +250,8 @@ export async function loadVehicleImpl({
         timeline_events: rpcData.timeline_events,
         latest_valuation: rpcData.latest_valuation,
         price_signal: rpcData.price_signal,
-        external_listings: rpcData.external_listings,
+        vehicle_events: rpcData.external_listings,
+        external_listings: rpcData.external_listings, // backward compat alias
         comments: rpcData.comments
       };
 
@@ -279,19 +280,19 @@ export async function loadVehicleImpl({
       setLeadImageUrl(primaryImg);
     }
 
-      // Derive auction pulse for header (prefer external_listings over stale vehicles.* fields)
+      // Derive auction pulse for header (prefer vehicle_events over stale vehicles.* fields)
     try {
       const rpcCache = (window as any).__vehicleProfileRpcData;
       const listings =
-        rpcCache && rpcCache.vehicle_id === vehicleData.id ? rpcCache.external_listings : null;
+        rpcCache && rpcCache.vehicle_id === vehicleData.id ? (rpcCache.vehicle_events || rpcCache.external_listings) : null;
       let arr = Array.isArray(listings) ? listings : [];
 
       // If RPC didn't include listings (or returned empty due to env/RLS quirks), do a direct fetch.
       if (arr.length === 0) {
         try {
           const { data } = await supabase
-            .from('external_listings')
-            .select('id, platform, listing_url, listing_status, end_date, current_bid, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+            .from('vehicle_events')
+            .select('id, source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
             .eq('vehicle_id', vehicleData.id)
             .order('updated_at', { ascending: false })
             .limit(10);
@@ -307,14 +308,14 @@ export async function loadVehicleImpl({
       const vehicleIsSold = vSaleStatus === 'sold' || vOutcome === 'sold';
       if (vehicleIsSold) {
         arr = arr.filter((r: any) => {
-          const status = String(r.listing_status || '').toLowerCase();
+          const status = String(r.event_status || r.listing_status || '').toLowerCase();
           return status !== 'active' && status !== 'live';
         });
       }
 
       const best = buildAuctionPulseFromExternalListings(arr, vehicleData.id);
 
-      // Fallback: if we can't access external_listings due to RLS, still treat BaT-discovered vehicles as "auction mode"
+      // Fallback: if we can't access vehicle_events due to RLS, still treat BaT-discovered vehicles as "auction mode"
       // so we hide Claim/Set-price and show a link to the listing.
       const fallbackListingUrl =
         (vehicleData as any)?.bat_auction_url ||
@@ -477,8 +478,8 @@ export async function loadVehicleImpl({
               .then(async () => {
                 // Refresh latest listing rows and re-derive pulse.
                 const { data } = await supabase
-                  .from('external_listings')
-                  .select('id, platform, listing_url, listing_status, end_date, current_bid, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+                  .from('vehicle_events')
+                  .select('id, source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
                   .eq('vehicle_id', vehicleData.id)
                   .order('updated_at', { ascending: false })
                   .limit(10);

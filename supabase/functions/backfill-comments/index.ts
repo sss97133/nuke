@@ -1,6 +1,6 @@
 /**
  * BACKFILL COMMENTS (Self-Continuing)
- * Extract comments for vehicles that have bat_auction_url but no comments yet
+ * Extract comments for vehicles that have BaT vehicle_events but no comments yet
  *
  * Automatically continues processing until all listings are done.
  * Uses Supabase background invocation to chain batches.
@@ -58,54 +58,55 @@ serve(async (req) => {
 
     console.log(`=== BATCH ${batchNumber} ===`);
 
-    // Get bat_listings with comments that haven't been extracted yet
-    // Use pagination to work through all listings, not just top 200
+    // Get vehicle_events (BaT auctions) with comments that haven't been extracted yet
+    // Use pagination to work through all events, not just top 200
     const pageSize = 500;
     const offset = ((batchNumber - 1) % 10) * pageSize; // Cycle through pages
 
-    const { data: batListings } = await supabase
-      .from("bat_listings")
-      .select("id, vehicle_id, bat_listing_url, bat_listing_title, comment_count, sale_price, raw_data")
+    const { data: vehicleEvents } = await supabase
+      .from("vehicle_events")
+      .select("id, vehicle_id, source_url, metadata, comment_count, final_price")
+      .eq("source_platform", "bat")
       .gt("comment_count", 10)
       .not("vehicle_id", "is", null)
       .order("comment_count", { ascending: false })
       .range(offset, offset + pageSize - 1);
 
-    if (!batListings || batListings.length === 0) {
+    if (!vehicleEvents || vehicleEvents.length === 0) {
       return new Response(JSON.stringify({
         success: true,
-        message: "No bat_listings with comments found",
+        message: "No vehicle_events with comments found",
         processed: 0,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Filter to listings that haven't been processed (no comments_extracted_at in raw_data)
-    const listingsToProcess = batListings
-      .filter((bl: any) => {
-        const rawData = bl.raw_data || {};
-        return !rawData.comments_extracted_at;
+    // Filter to events that haven't been processed (no comments_extracted_at in metadata)
+    const eventsToProcess = vehicleEvents
+      .filter((ve: any) => {
+        const meta = ve.metadata || {};
+        return !meta.comments_extracted_at;
       })
       .slice(0, batchSize);
 
-    const alreadyDone = batListings.length - listingsToProcess.length;
-    console.log(`[Batch ${batchNumber}] Page ${Math.floor(offset/pageSize)+1}: ${batListings.length} listings checked, ${listingsToProcess.length} to process, ${alreadyDone} already done`);
+    const alreadyDone = vehicleEvents.length - eventsToProcess.length;
+    console.log(`[Batch ${batchNumber}] Page ${Math.floor(offset/pageSize)+1}: ${vehicleEvents.length} events checked, ${eventsToProcess.length} to process, ${alreadyDone} already done`);
 
-    // Convert to vehicle format for processing, keeping bat_listing_id for marking as done
-    const vehiclesToProcess = listingsToProcess.map((bl: any) => ({
-      id: bl.vehicle_id,
-      bat_listing_id: bl.id,
-      bat_auction_url: bl.bat_listing_url,
+    // Convert to vehicle format for processing, keeping event_id for marking as done
+    const vehiclesToProcess = eventsToProcess.map((ve: any) => ({
+      id: ve.vehicle_id,
+      event_id: ve.id,
+      bat_auction_url: ve.source_url,
       year: null,
       make: null,
-      model: bl.bat_listing_title,
-      sale_price: bl.sale_price,
-      raw_data: bl.raw_data || {},
+      model: (ve.metadata || {}).title || null,
+      sale_price: ve.final_price,
+      metadata: ve.metadata || {},
     }));
 
     if (vehiclesToProcess.length === 0) {
       // Check if there are more pages to scan
       const currentPage = Math.floor(offset / pageSize);
-      if (currentPage < 9 && batListings.length === pageSize) {
+      if (currentPage < 9 && vehicleEvents.length === pageSize) {
         // More pages exist, continue to next page
         console.log(`Page ${currentPage + 1} fully extracted, moving to next page...`);
 
@@ -141,10 +142,10 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({
         success: true,
-        message: "✅ BACKFILL COMPLETE - All listings have comments extracted",
+        message: "BACKFILL COMPLETE - All events have comments extracted",
         processed: 0,
         batch_number: batchNumber,
-        listings_checked: batListings.length,
+        events_checked: vehicleEvents.length,
         already_extracted: alreadyDone,
         continuing: false,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -189,17 +190,17 @@ serve(async (req) => {
         if (result.success) {
           results.success++;
 
-          // Mark bat_listing as processed
+          // Mark vehicle_event as processed
           await supabase
-            .from("bat_listings")
+            .from("vehicle_events")
             .update({
-              raw_data: {
-                ...vehicle.raw_data,
+              metadata: {
+                ...vehicle.metadata,
                 comments_extracted_at: new Date().toISOString(),
                 comments_extracted_count: result.comments_extracted,
               },
             })
-            .eq("id", vehicle.bat_listing_id);
+            .eq("id", vehicle.event_id);
 
           if (results.samples.length < 3) {
             results.samples.push({
@@ -226,9 +227,9 @@ serve(async (req) => {
     }
 
     // Calculate remaining work
-    const totalRemaining = batListings.filter((bl: any) => {
-      const rawData = bl.raw_data || {};
-      return !rawData.comments_extracted_at;
+    const totalRemaining = vehicleEvents.filter((ve: any) => {
+      const meta = ve.metadata || {};
+      return !meta.comments_extracted_at;
     }).length - results.processed;
 
     const hasMoreWork = totalRemaining > 0;
@@ -261,7 +262,7 @@ serve(async (req) => {
       success: true,
       ...results,
       batch_number: batchNumber,
-      listings_checked: batListings.length,
+      events_checked: vehicleEvents.length,
       already_extracted: alreadyDone,
       remaining_estimate: totalRemaining,
       continuing: hasMoreWork && results.success > 0,

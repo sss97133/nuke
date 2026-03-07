@@ -84,15 +84,15 @@ async function getExistingUrls(supabase: any): Promise<Set<string>> {
     }
   }
 
-  // Also check external_listings
+  // Also check vehicle_events
   const { data: external } = await supabase
-    .from("external_listings")
-    .select("listing_url")
-    .eq("platform", "carsandbids");
+    .from("vehicle_events")
+    .select("source_url")
+    .eq("source_platform", "carsandbids");
 
   for (const row of external || []) {
-    if (row.listing_url) {
-      existing.add(row.listing_url.replace(/\/$/, ""));
+    if (row.source_url) {
+      existing.add(row.source_url.replace(/\/$/, ""));
     }
   }
 
