@@ -4,7 +4,7 @@ import MobileImageGallery from '../../components/image/MobileImageGallery';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overlayNode, heroMeta }) => {
-  const [fitMode, setFitMode] = useState<'cover' | 'contain'>('contain');
+  const [fitMode, setFitMode] = useState<'width' | 'cover'>('width');
   const [showGallery, setShowGallery] = useState(false);
   const isMobile = useIsMobile();
 
@@ -72,7 +72,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
             <div
               style={{
                 width: '100%',
-                height: 'var(--h-hero, 420px)',
+                ...(fitMode === 'cover' ? { height: 'var(--h-hero, 420px)' } : {}),
                 position: 'relative',
                 overflow: 'hidden',
                 backgroundColor: '#2a2a2a',
@@ -80,41 +80,45 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
               }}
               onClick={() => isMobile && setShowGallery(true)}
             >
-              {/* Blurred backdrop -- only shown in fit mode, fills empty sides */}
-              {fitMode === 'contain' && (
+              {fitMode === 'width' ? (
+                /* Width-fit: image fills full width, natural height */
+                <img
+                  src={renderUrl || src}
+                  alt=""
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    height: 'auto',
+                    maxHeight: '80vh',
+                  }}
+                  onError={(e) => {
+                    if (renderUrl && (e.target as HTMLImageElement).src !== src) {
+                      (e.target as HTMLImageElement).src = src;
+                    }
+                  }}
+                />
+              ) : (
+                /* Cover: fixed height, crops to fill */
                 <div
                   style={{
                     position: 'absolute',
-                    inset: '-30px', // extend past edges to hide blur fringe
-                    backgroundImage: `url(${imgUrl})`,
+                    inset: 0,
+                    backgroundImage: renderUrl ? `url(${renderUrl}), url(${src})` : `url(${src})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',
-                    filter: 'blur(28px) brightness(0.45)',
                   }}
                 />
               )}
 
-              {/* Main image */}
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  backgroundImage: renderUrl ? `url(${renderUrl}), url(${src})` : `url(${src})`,
-                  backgroundSize: fitMode,
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat',
-                }}
-              />
-
               {/* Overlay (auction banners etc) */}
               {overlayNode && (
-                <div style={{ position: 'relative', zIndex: 1 }}>{overlayNode}</div>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1 }}>{overlayNode}</div>
               )}
 
               {/* Fit / Fill toggle */}
               <button
-                onClick={e => { e.stopPropagation(); setFitMode(m => m === 'cover' ? 'contain' : 'cover'); }}
+                onClick={e => { e.stopPropagation(); setFitMode(m => m === 'cover' ? 'width' : 'cover'); }}
                 style={{
                   position: 'absolute',
                   bottom: '10px',
