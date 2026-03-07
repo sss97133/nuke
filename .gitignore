@@ -15,11 +15,40 @@ build/
 .next/
 out/
 
-# IDE files
+# IDE / editor / AI tooling
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
+
+# Claude Code internals (keep CLAUDE.md, ignore everything else)
+.claude/agents/
+.claude/screenshots/
+.claude/directives/
+.claude/prompts/
+.claude/hooks/
+.claude/*.json
+.claude/*.mjs
+.claude/*.cjs
+.claude/*.png
+.claude/*.py
+.claude/*_STATUS*.md
+.claude/*_REPORT*.md
+.claude/*_BRIEF*.md
+.claude/*_RESEARCH*.md
+.claude/*_AUDIT*.md
+.claude/*_FIX*.md
+.claude/*_LOG*.md
+.claude/*_PLAN*.md
+.claude/*_OVERHAUL*.md
+.claude/*_ARCHITECTURE*.md
+.claude/*_CHECKLIST*.md
+.claude/HANDOFF.md
+.claude/NEXT_SESSION.md
+.claude/TELEGRAM.md
+.claude/agent-sessions.json
+.claude/settings.local.json
 
 # OS files
 .DS_Store
@@ -155,3 +184,66 @@ NukePhotoSync.app/
 yono/outputs/
 yono/models/*.safetensors
 yono/models/*.pt
+
+# Root-level report/status dumps (generated, not source code)
+*_REPORT.md
+*_STATUS.md
+*_AUDIT.md
+*_FIX_MAP.md
+EXTRACTION_*.md
+INTEGRATION_*.md
+INFRASTRUCTURE_*.md
+CODEBASE_MAP.md
+SPECIALTY_BUILDER_*.md
+QUICKSTART_*.md
+RESULTS_*.md
+WATCHDOG_*.md
+SYSTEM_STATUS_*.md
+API_V1_SCHEMA_FIX.md
+PROMPT.md
+@AGENT.md
+@fix_plan.md
+
+# Scraping session artifacts
+fb-*.json
+fb-*.html
+fb-*.csv
+fb-*.png
+fb-*.js
+fb-session-*/
+craigslist_*.json
+mecum_*.json
+conceptcarz_investigation.md
+facebook-marketplace-extraction.md
+FB_MARKETPLACE_FLEET_STATUS.md
+
+# Temp scripts and broken filenames
+tmp-*.ts
+25.5%.
+35.2%.
+EXIT_CODE:*
+
+# HTML reports
+hd-*.html
+
+# Stale directories
+dealerscan/
+mcp/
+mcp-server/
+nuke-local/
+extraction-comparison-results/
+site-inspections/
+specs_ralph/
+typescript/
+Projects/
+prompts/
+priv/
+ops/
+audit/
+
+# Misc generated
+overnight-batch.log
+osxphotos_crash.log
+deno.lock
+Dockerfile.ksl-scraper
+fly.toml

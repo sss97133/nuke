@@ -1,3 +1,0 @@
-psql:/tmp/q1.sql:30: ERROR:  canceling statement due to statement timeout
-psql:/tmp/q2.sql:14: ERROR:  canceling statement due to statement timeout
-psql:/tmp/q3.sql:6: ERROR:  canceling statement due to statement timeout
