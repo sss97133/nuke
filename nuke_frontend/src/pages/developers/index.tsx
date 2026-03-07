@@ -286,7 +286,7 @@ const SECTIONS = [
   { id: 'search', label: 'Search', group: 'REST API' },
   { id: 'batch', label: 'Batch Import', group: 'REST API' },
   { id: 'observations', label: 'Observations', group: 'REST API' },
-  { id: 'extraction', label: 'Extraction', group: 'REST API' },
+  { id: 'extraction', label: 'Structuring', group: 'REST API' },
   { id: 'valuations', label: 'Valuations', group: 'REST API' },
   { id: 'business', label: 'Business Data', group: 'REST API' },
   { id: 'mcp', label: 'MCP Server', group: 'Integrations' },
@@ -332,26 +332,9 @@ function OverviewSection() {
     <div>
       <h1 style={s.h1}>Nuke Developer Documentation</h1>
       <p style={s.p}>
-        Nuke is a vehicle intelligence platform. Every data point has provenance tracking
-        and confidence scores. Build apps that search, analyze, value, and extract vehicle
-        data from 34+ source platforms.
+        Send raw data — photos, URLs, text descriptions. Get structured, queryable vehicle
+        intelligence back. Every value has provenance and confidence scoring.
       </p>
-
-      {statRows && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-5)' }}>
-          {statRows.map((stat) => (
-            <div key={stat.label} style={{
-              background: 'var(--grey-100)',
-              border: '1px solid var(--border-light)',
-              padding: 'var(--space-3)',
-              textAlign: 'center',
-            }}>
-              <div style={{ fontSize: '13px', fontWeight: 'bold', fontFamily: 'monospace' }}>{stat.value}</div>
-              <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>{stat.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
 
       <h2 style={s.h2}>API Surface</h2>
       <table style={s.table}>
@@ -372,10 +355,9 @@ function OverviewSection() {
             { path: '/api-v1-vehicles', purpose: 'CRUD operations on vehicles', auth: 'Required' },
             { path: '/api-v1-batch', purpose: 'Bulk import up to 1,000 vehicles', auth: 'Required' },
             { path: '/api-v1-observations', purpose: 'Query and submit observation events', auth: 'Required' },
-            { path: '/extract-vehicle-data-ai', purpose: 'AI extraction from any listing URL', auth: 'Optional' },
-            { path: '/compute-vehicle-valuation', purpose: 'AI-powered vehicle valuation', auth: 'Required' },
+            { path: '/extract-vehicle-data-ai', purpose: 'Structure any listing URL into vehicle data', auth: 'Optional' },
+            { path: '/compute-vehicle-valuation', purpose: 'Confidence-scored vehicle valuation', auth: 'Required' },
             { path: '/api-v1-business-data', purpose: 'Business/shop dashboard data', auth: 'Required' },
-            { path: '/db-stats', purpose: 'Database overview statistics', auth: 'None' },
           ].map((ep) => (
             <tr key={ep.path}>
               <td style={{ ...s.td, fontFamily: 'monospace' }}>{ep.path}</td>
@@ -458,7 +440,7 @@ function QuickstartSection() {
 }`}
       />
 
-      <h3 style={s.h3}>4. Extract from a Listing URL</h3>
+      <h3 style={s.h3}>4. Structure a Listing URL</h3>
       <CodeBlock
         title="Request"
         code={`curl -X POST "${API_BASE}/extract-vehicle-data-ai" \\
@@ -482,8 +464,7 @@ function QuickstartSection() {
     "image_urls": ["https://...", "https://..."]
   },
   "confidence": 0.94,
-  "source": "bringatrailer.com",
-  "extractionMethod": "dedicated_extractor"
+  "source": "bringatrailer.com"
 }`}
       />
 
@@ -520,7 +501,7 @@ function QuickstartSection() {
         "What's a 1967 Shelby GT500 worth?"<br />
         "Identify the car in this photo"<br />
         "Find all Porsche 911s sold above $200K"<br />
-        "Extract the listing at bringatrailer.com/listing/..."
+        "What's in this listing? bringatrailer.com/listing/..."
       </div>
 
       <h2 style={s.h2}>Option C: TypeScript SDK</h2>
@@ -1495,24 +1476,12 @@ function ObservationsSection() {
         />
       </div>
 
-      <h2 style={s.h2}>Observation Pipeline</h2>
-      <CodeBlock
-        code={`[Any Source]           BaT, Cars & Bids, RM Sotheby's, Forums, Owner Input, Shop Records
-       |
-       v
-ingest-observation     Normalize, deduplicate, link to vehicle profile
-       |
-       v
-vehicle_observations   Immutable event store (625K+ observations)
-       |
-       v
-discover-from-         AI analysis: sentiment, price signals, mechanical
-  observations         insights, ownership changes, comparables
-       |
-       v
-observation_           Structured discoveries with confidence scores
-  discoveries`}
-      />
+      <h2 style={s.h2}>How It Works</h2>
+      <p style={s.p}>
+        Every data point about a vehicle — sale prices, service records, ownership changes,
+        condition assessments — is stored as a queryable timeline with source attribution
+        and confidence scoring. Multiple sources confirming the same fact increases confidence automatically.
+      </p>
     </div>
   );
 }
@@ -1520,11 +1489,10 @@ observation_           Structured discoveries with confidence scores
 function ExtractionSection() {
   return (
     <div>
-      <h1 style={s.h1}>AI Extraction</h1>
+      <h1 style={s.h1}>Structuring</h1>
       <p style={s.p}>
-        Point the extraction endpoint at any car listing URL. It scrapes the page, identifies vehicle data,
-        and returns structured fields. Dedicated extractors exist for major platforms (BaT, Cars & Bids, Mecum, etc.),
-        with an AI fallback for unknown sources.
+        Send any car listing URL. Get structured vehicle data back — year, make, model,
+        specs, price, images, location. Works with any car listing on the internet.
       </p>
 
       <div style={s.endpoint}>
@@ -1534,11 +1502,10 @@ function ExtractionSection() {
         </div>
 
         <ParamTable params={[
-          { name: 'url', type: 'string', required: true, description: 'The listing URL to extract from' },
-          { name: 'html', type: 'string', description: 'Pre-fetched HTML (skips scraping)' },
+          { name: 'url', type: 'string', required: true, description: 'The listing URL to structure' },
+          { name: 'html', type: 'string', description: 'Pre-fetched HTML (skips fetch)' },
           { name: 'textContent', type: 'string', description: 'Pre-extracted text content' },
           { name: 'save_to_db', type: 'boolean', description: 'Auto-save to vehicles table (default: false)' },
-          { name: 'max_vehicles', type: 'number', description: 'Max vehicles to extract from page (default: 1)' },
         ]} />
 
         <CodeBlock
@@ -1578,36 +1545,10 @@ function ExtractionSection() {
   },
   "confidence": 0.96,
   "source": "carsandbids.com",
-  "extractionMethod": "dedicated_extractor",
   "vehicle_id": "uuid-created",
   "images_saved": 24
 }`}
         />
-
-        <h3 style={s.h3}>Supported Platforms</h3>
-        <p style={s.p}>
-          Dedicated extractors exist for these platforms (highest accuracy). All other URLs use AI extraction.
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-          {[
-            'Bring a Trailer', 'Cars & Bids', 'RM Sotheby\'s', 'Mecum', 'Gooding & Co.',
-            'Bonhams', 'PCarMarket', 'Collecting Cars', 'Hagerty Marketplace',
-            'GAA Classic Cars', 'Barrett-Jackson', 'eBay Motors',
-          ].map((name) => (
-            <div key={name} style={{
-              padding: 'var(--space-2)',
-              background: 'var(--grey-50)',
-              border: '1px solid var(--border-light)',
-              textAlign: 'center',
-            }}>
-              {name}
-            </div>
-          ))}
-        </div>
-        <div style={s.note}>
-          For platforms without a dedicated extractor, the AI extraction pipeline uses Firecrawl for
-          JavaScript-rendered pages and OpenAI GPT-4 for data extraction. Accuracy is typically 85-95%.
-        </div>
       </div>
     </div>
   );
@@ -1916,7 +1857,7 @@ function McpSection() {
         },
         {
           name: 'extract_listing',
-          desc: 'Extract structured vehicle data from any listing URL. Supports 12+ platforms with dedicated extractors.',
+          desc: 'Send any car listing URL. Returns structured vehicle data — year, make, model, specs, price, images.',
           input: '{ url: "https://bringatrailer.com/listing/..." }',
           output: '{ year: 1988, make: "Porsche", model: "911 Turbo", price: 165000, ... }',
         },
@@ -1942,7 +1883,7 @@ function McpSection() {
           name: 'list_vehicles',
           desc: 'List vehicles with pagination. Filter to your own or browse all public vehicles.',
           input: '{ limit: 20, offset: 0 }',
-          output: '{ vehicles: [...], total: 810000 }',
+          output: '{ vehicles: [...], total: 1200000 }',
         },
       ].map((tool) => (
         <div key={tool.name} style={s.endpoint}>
@@ -1969,9 +1910,9 @@ function McpSection() {
       <div style={s.note}>
         "What's a 1967 Shelby GT500 worth?"<br />
         "Identify the car in this photo" (paste image)<br />
-        "Extract the listing at bringatrailer.com/listing/..."<br />
+        "What's in this listing? bringatrailer.com/listing/..."<br />
         "Find all air-cooled Porsches sold above $200K"<br />
-        "Show me the observation timeline for VIN WBS4M9C5..."<br />
+        "Show me the price history for this 911"<br />
         "Add this vehicle to my garage: 1974 Corvette, red, 350ci"
       </div>
     </div>
