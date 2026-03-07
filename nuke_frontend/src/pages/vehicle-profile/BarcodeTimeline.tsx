@@ -181,21 +181,21 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ vehicle, timelineEven
     }
   }, [expanded]);
 
-  // Collapse on page scroll
+  // Collapse on scroll down, re-expand when scrolled back to top
   useEffect(() => {
-    if (!expanded) return;
-    let scrolled = false;
     const onScroll = () => {
-      if (!scrolled) {
-        scrolled = true;
+      const atTop = window.scrollY <= 10;
+      if (atTop && !expanded) {
+        setExpanded(true);
+      } else if (!atTop && expanded) {
         setExpanded(false);
         setReceiptDate(null);
         setHighlightGroup(null);
       }
     };
-    // Defer attaching so the expand click's own scroll doesn't immediately collapse
+    // Defer so the expand click's own scroll doesn't immediately collapse
     const raf = requestAnimationFrame(() => {
-      window.addEventListener('scroll', onScroll, { once: true, passive: true });
+      window.addEventListener('scroll', onScroll, { passive: true });
     });
     return () => {
       cancelAnimationFrame(raf);
