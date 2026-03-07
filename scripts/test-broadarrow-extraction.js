@@ -111,18 +111,18 @@ async function testExtraction() {
             console.log(`   First image: ${images[0].image_url}`);
           }
 
-          // Check external_listings
+          // Check vehicle_events
           const { data: listings } = await supabase
-            .from('external_listings')
-            .select('id, platform, listing_url, listing_status, final_price, bid_count')
+            .from('vehicle_events')
+            .select('id, source_platform, source_url, event_status, final_price, bid_count')
             .eq('vehicle_id', vehicleId)
             .limit(5);
 
-          console.log(`\n📋 External Listings: ${listings?.length || 0}`);
-          
+          console.log(`\n📋 Vehicle Events: ${listings?.length || 0}`);
+
           if (listings && listings.length > 0) {
             listings.forEach((listing, idx) => {
-              console.log(`   ${idx + 1}. Platform: ${listing.platform}, Status: ${listing.listing_status}`);
+              console.log(`   ${idx + 1}. Platform: ${listing.source_platform}, Status: ${listing.event_status}`);
               console.log(`      URL: ${listing.listing_url}`);
               if (listing.final_price) {
                 console.log(`      Final Price: $${(listing.final_price / 100).toLocaleString()}`);

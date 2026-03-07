@@ -286,9 +286,10 @@ async function generateSpecificAuctionMarket(vehicleId: string): Promise<Market 
 
   // Get comment count for this listing
   const { data: listing } = await supabase
-    .from('bat_listings')
+    .from('vehicle_events')
     .select('comment_count')
     .eq('vehicle_id', vehicleId)
+    .eq('source_platform', 'bat')
     .single();
 
   if (listing?.comment_count) {

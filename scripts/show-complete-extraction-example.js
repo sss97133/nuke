@@ -54,10 +54,10 @@ async function showCompleteExtraction() {
   
   // Get external listing
   const { data: listing } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('*')
     .eq('vehicle_id', vehicleId)
-    .eq('platform', 'bat')
+    .eq('source_platform', 'bat')
     .maybeSingle();
   
   console.log('\n🔗 AUCTION LISTING DATA:\n');

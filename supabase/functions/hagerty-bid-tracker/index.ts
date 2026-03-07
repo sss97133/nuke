@@ -2,13 +2,13 @@
  * HAGERTY BID TRACKER
  *
  * Scheduled function to track bid progression on active Hagerty auctions.
- * Runs periodically to capture current_bid, bid_count changes over time.
+ * Runs periodically to capture current_price, bid_count changes over time.
  *
  * Usage:
  * - Call manually: POST /functions/v1/hagerty-bid-tracker
  * - Schedule via cron: Every hour during active auctions
  *
- * Stores snapshots in external_listings.metadata.bid_history[]
+ * Stores snapshots in vehicle_events.metadata.bid_history[]
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -59,14 +59,14 @@ serve(async (req) => {
 
     console.log(`[hagerty-bid-tracker] Starting bid tracking run (limit: ${limit})`);
 
-    // Find active Hagerty listings
-    // Active = listing_status is 'active' and end_date is in the future (or null)
+    // Find active Hagerty events
+    // Active = event_status is 'active' and ended_at is in the future (or null)
     const now = new Date().toISOString();
     const { data: activeListings, error: listingsError } = await supabase
-      .from('external_listings')
-      .select('id, vehicle_id, listing_url, listing_id, current_bid, bid_count, view_count, listing_status, metadata')
-      .eq('platform', 'hagerty')
-      .in('listing_status', ['active', 'live'])
+      .from('vehicle_events')
+      .select('id, vehicle_id, source_url, source_listing_id, current_price, bid_count, view_count, event_status, metadata')
+      .eq('source_platform', 'hagerty')
+      .in('event_status', ['active', 'live'])
       .order('updated_at', { ascending: true }) // Oldest first, so we refresh stale ones
       .limit(limit);
 
@@ -109,7 +109,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            url: listing.listing_url,
+            url: listing.source_url,
             // Don't save to DB - we just want the current bid info
           }),
         });
@@ -125,8 +125,8 @@ serve(async (req) => {
         }
 
         const extracted = extractResult.extracted;
-        const previousBid = listing.current_bid;
-        const currentBid = extracted.current_bid;
+        const previousBid = listing.current_price;
+        const currentBid = extracted.current_bid; // extracted still uses old field names from Hagerty page
         const bidChange = (currentBid || 0) - (previousBid || 0);
 
         // Create bid snapshot
@@ -143,7 +143,7 @@ serve(async (req) => {
         const bidHistory = existingMetadata.bid_history || [];
 
         // Only add snapshot if bid changed or first snapshot
-        if (bidHistory.length === 0 || bidChange !== 0 || extracted.status !== listing.listing_status) {
+        if (bidHistory.length === 0 || bidChange !== 0 || extracted.status !== listing.event_status) {
           bidHistory.push(snapshot);
 
           // Keep only last 100 snapshots to prevent bloat
@@ -152,20 +152,20 @@ serve(async (req) => {
           }
         }
 
-        // Update external_listing with current bid info
+        // Update vehicle_event with current bid info
         // Build update object conditionally to avoid overwriting with null
         const updateFields: Record<string, any> = {
-            current_bid: currentBid,
+            current_price: currentBid,
             bid_count: extracted.bid_count,
             view_count: extracted.view_count,
             comment_count: extracted.comment_count,
-            listing_status: extracted.status,
+            event_status: extracted.status,
             final_price: extracted.status === 'sold' ? extracted.sale_price : null,
             updated_at: now,
         };
-        // Update end_date with full timestamp if available (fixes countdown timer)
+        // Update ended_at with full timestamp if available (fixes countdown timer)
         if (extracted.auction_end) {
-            updateFields.end_date = extracted.auction_end;
+            updateFields.ended_at = extracted.auction_end;
         }
         updateFields.metadata = {
               ...existingMetadata,
@@ -180,7 +180,7 @@ serve(async (req) => {
         };
 
         const { error: updateError } = await supabase
-          .from('external_listings')
+          .from('vehicle_events')
           .update(updateFields)
           .eq('id', listing.id);
 
@@ -211,7 +211,7 @@ serve(async (req) => {
           listing_id: listing.id,
           vehicle_id: listing.vehicle_id,
           title,
-          previous_bid: listing.current_bid,
+          previous_bid: listing.current_price,
           current_bid: null,
           bid_change: 0,
           status: 'error',

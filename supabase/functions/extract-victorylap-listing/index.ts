@@ -1,7 +1,7 @@
 /**
  * Victory Lap Classics (victorylapclassics.net) listing extractor.
  * Wix-based dealer site: product pages have title, price, and description.
- * Writes to vehicles, external_listings, extraction_metadata (raw_listing_description).
+ * Writes to vehicles, vehicle_events, extraction_metadata (raw_listing_description).
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -165,7 +165,7 @@ serve(async (req) => {
     const listingUrlKey = normalizeListingUrlKey(normalized);
     const pattern = discoveryUrlIlikePattern(normalized);
 
-    // 1) Resolve by external_listings or discovery_url
+    // 1) Resolve by vehicle_events or discovery_url
     let { vehicleId } = await resolveExistingVehicleId(supabase, {
       url: normalized,
       platform: PLATFORM,
@@ -218,16 +218,15 @@ serve(async (req) => {
     }
 
     await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .upsert(
         {
           vehicle_id: vehicleId,
-          organization_id: null,
-          platform: PLATFORM,
-          listing_url: normalized,
-          listing_url_key: listingUrlKey,
-          listing_id: listingUrlKey,
-          listing_status: 'active',
+          source_platform: PLATFORM,
+          event_type: 'listing',
+          source_url: normalized,
+          source_listing_id: listingUrlKey,
+          event_status: 'active',
           metadata: { title: extracted.title, price: extracted.sale_price },
           updated_at: now,
         } as any,

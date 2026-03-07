@@ -113,14 +113,15 @@ async function scrapeCategory(category: { name: string; baseUrl: string }): Prom
 async function getExistingUrls(): Promise<Set<string>> {
   const existing = new Set<string>();
 
-  // Get from bat_listings
-  const { data: batListings } = await supabase
-    .from('bat_listings')
-    .select('bat_listing_url');
+  // Get from vehicle_events (BaT)
+  const { data: batEvents } = await supabase
+    .from('vehicle_events')
+    .select('source_url')
+    .eq('source_platform', 'bat');
 
-  for (const row of batListings || []) {
-    if (row.bat_listing_url) {
-      existing.add(row.bat_listing_url.replace(/\/$/, ''));
+  for (const row of batEvents || []) {
+    if (row.source_url) {
+      existing.add(row.source_url.replace(/\/$/, ''));
     }
   }
 

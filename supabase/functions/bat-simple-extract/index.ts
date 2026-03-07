@@ -980,7 +980,7 @@ serve(async (req) => {
         }
       }
       
-      // Create/update external_listings record for platform tracking
+      // Create/update vehicle_events record for platform tracking
       if (extracted.vehicle_id) {
         const listingUrlKey = normalizeListingUrlKey(extracted.url);
         const listingIdFallback = (() => {
@@ -988,15 +988,15 @@ serve(async (req) => {
           return trimmed.split('/').filter(Boolean).pop() || null;
         })();
         const { error: listingError } = await supabase
-          .from('external_listings')
+          .from('vehicle_events')
           .upsert({
             vehicle_id: extracted.vehicle_id,
-            platform: 'bat',
-            listing_url: extracted.url,
-            listing_url_key: listingUrlKey,
-            listing_id: extracted.lot_number || listingIdFallback || listingUrlKey,
-            listing_status: extracted.sale_price ? 'sold' : 'ended',
-            end_date: extracted.auction_end_date,
+            source_platform: 'bat',
+            event_type: 'auction',
+            source_url: extracted.url,
+            source_listing_id: listingUrlKey || extracted.lot_number || listingIdFallback,
+            event_status: extracted.sale_price ? 'sold' : 'ended',
+            ended_at: extracted.auction_end_date,
             final_price: extracted.sale_price,
             bid_count: extracted.bid_count,
             view_count: extracted.view_count,
@@ -1009,13 +1009,13 @@ serve(async (req) => {
               reserve_status: extracted.reserve_status,
             },
           }, {
-            onConflict: 'platform,listing_url_key'
+            onConflict: 'source_platform,source_listing_id'
           });
-      
+
         if (listingError) {
-          console.error('External listing save error:', listingError);
+          console.error('Vehicle event save error:', listingError);
         } else {
-          console.log(`Created/updated external_listings record`);
+          console.log(`Created/updated vehicle_events record`);
         }
       }
       

@@ -22,9 +22,9 @@ interface ProxyBidRequest {
     model: string;
     primary_image_url: string | null;
   } | null;
-  external_listing: {
-    end_date: string | null;
-    current_bid: number | null;
+  vehicle_event: {
+    ended_at: string | null;
+    current_price: number | null;
   } | null;
   assignment: {
     id: string;
@@ -75,8 +75,8 @@ export default function ProxyBidOperations() {
           vehicle:vehicles (
             id, year, make, model, primary_image_url
           ),
-          external_listing:external_listings (
-            end_date, current_bid
+          vehicle_event:vehicle_events (
+            ended_at, current_price
           ),
           assignment:proxy_bid_assignments (
             id, status, assigned_operator_id
@@ -176,7 +176,7 @@ export default function ProxyBidOperations() {
             assigned_operator_id: user.id,
             status: 'assigned',
             assigned_at: new Date().toISOString(),
-            auction_end_time: bid.external_listing?.end_date || null,
+            auction_end_time: bid.vehicle_event?.ended_at || null,
           });
       }
       loadBids();
@@ -394,12 +394,12 @@ export default function ProxyBidOperations() {
                             </div>
                             <div>
                               <span style={{ color: 'var(--text-muted)' }}>Current:</span>{' '}
-                              <strong>{formatCurrency(bid.current_bid_cents || bid.external_listing?.current_bid ? (bid.external_listing?.current_bid || 0) * 100 : null)}</strong>
+                              <strong>{formatCurrency(bid.current_bid_cents || bid.vehicle_event?.current_price ? (bid.vehicle_event?.current_price || 0) * 100 : null)}</strong>
                             </div>
                             <div>
                               <span style={{ color: 'var(--text-muted)' }}>Ends:</span>{' '}
-                              <strong style={{ color: bid.external_listing?.end_date && new Date(bid.external_listing.end_date).getTime() - Date.now() < 60 * 60 * 1000 ? 'var(--error)' : 'inherit' }}>
-                                {formatTimeUntil(bid.external_listing?.end_date || null)}
+                              <strong style={{ color: bid.vehicle_event?.ended_at && new Date(bid.vehicle_event.ended_at).getTime() - Date.now() < 60 * 60 * 1000 ? 'var(--error)' : 'inherit' }}>
+                                {formatTimeUntil(bid.vehicle_event?.ended_at || null)}
                               </strong>
                             </div>
                             <div>

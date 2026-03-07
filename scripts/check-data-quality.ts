@@ -50,16 +50,16 @@ async function main() {
 
   // Count by platform
   const { data: platforms } = await supabase
-    .from('external_listings')
-    .select('platform')
-    .eq('listing_status', 'active');
+    .from('vehicle_events')
+    .select('source_platform')
+    .eq('event_status', 'active');
 
   const platformCounts: Record<string, number> = {};
   for (const p of platforms || []) {
-    platformCounts[p.platform] = (platformCounts[p.platform] || 0) + 1;
+    platformCounts[p.source_platform] = (platformCounts[p.source_platform] || 0) + 1;
   }
 
-  console.log('\n=== ACTIVE LISTINGS BY PLATFORM ===');
+  console.log('\n=== ACTIVE EVENTS BY PLATFORM ===');
   const sorted = Object.entries(platformCounts).sort((a, b) => b[1] - a[1]);
   for (const [platform, count] of sorted) {
     console.log(`  ${platform}: ${count}`);

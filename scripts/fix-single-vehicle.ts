@@ -217,20 +217,20 @@ async function main() {
   // Save to database
   console.log('\nSaving to database...');
 
-  // Get listing ID
-  const { data: listing } = await supabase
-    .from('external_listings')
+  // Get event ID
+  const { data: vehicleEvent } = await supabase
+    .from('vehicle_events')
     .select('id')
     .eq('vehicle_id', VEHICLE_ID)
     .single();
 
-  if (!listing) {
-    console.log('ERROR: No listing found');
+  if (!vehicleEvent) {
+    console.log('ERROR: No vehicle event found');
     await browser.close();
     return;
   }
 
-  // Update listing metadata
+  // Update event metadata
   const metadata = {
     source: 'cab_backfill_fix',
     extracted_at: new Date().toISOString(),
@@ -243,13 +243,13 @@ async function main() {
   };
 
   await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .update({
-      current_bid: data.soldPrice,
+      current_price: data.soldPrice,
       metadata,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', listing.id);
+    .eq('id', vehicleEvent.id);
 
   // Extract winner from system comment
   let winner = null;
@@ -263,14 +263,14 @@ async function main() {
     }
   }
 
-  // Update listing with winner info
+  // Update event with winner info
   if (winner) {
     await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .update({
         metadata: { ...metadata, winner_username: winner },
       })
-      .eq('id', listing.id);
+      .eq('id', vehicleEvent.id);
   }
 
   // Save comments
@@ -280,7 +280,7 @@ async function main() {
       vehicle_id: VEHICLE_ID,
       platform: 'cars_and_bids',
       source_url: CAB_URL,
-      content_hash: `cab_${listing.id}_${c.commentId || idx}`,
+      content_hash: `cab_${vehicleEvent.id}_${c.commentId || idx}`,
       sequence_number: idx + 1,
       author_username: c.username,
       is_seller: c.isSeller,

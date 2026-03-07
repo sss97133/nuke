@@ -7,7 +7,7 @@
  * POST /functions/v1/migrate-to-observations
  * {
  *   "batch_size": 1000,
- *   "source_table": "auction_comments",  // or "bat_listings", etc.
+ *   "source_table": "auction_comments",  // or "vehicle_events", etc.
  *   "max_batches": 100
  * }
  */

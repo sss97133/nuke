@@ -2,7 +2,7 @@
  * Platform nomenclature helpers
  *
  * Canonical platform keys are stored in DB fields like:
- * - external_listings.platform
+ * - vehicle_events.source_platform
  * - auction_events.source
  *
  * Keep this list strict and normalized so UI + ingestion stay aligned.

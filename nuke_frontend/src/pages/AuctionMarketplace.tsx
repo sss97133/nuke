@@ -119,7 +119,7 @@ export default function AuctionMarketplace() {
         {
           event: '*',
           schema: 'public',
-          table: 'external_listings',
+          table: 'vehicle_events',
         },
         scheduleReload,
       )
@@ -428,16 +428,16 @@ export default function AuctionMarketplace() {
 
       const runExternalQuery = (selectFields: string) =>
         supabase
-          .from('external_listings')
+          .from('vehicle_events')
           .select(`
             *,
             vehicle:vehicles (
               ${selectFields}
             )
           `)
-          // Do not exclude rows with missing/stale end_date; treat 'active' status as primary signal.
-          // Show rows that are explicitly active OR have a future end_date.
-          .or(`listing_status.eq.active,end_date.gt.${nowIso}`);
+          // Do not exclude rows with missing/stale ended_at; treat 'active' status as primary signal.
+          // Show rows that are explicitly active OR have a future ended_at.
+          .or(`event_status.eq.active,ended_at.gt.${nowIso}`);
 
       // 1. Load native vehicle_listings (Nuke auctions)
       const { data: nativeListings, error: nativeError } = await runWithVehicleFallback(runNativeQuery);
@@ -507,12 +507,12 @@ export default function AuctionMarketplace() {
         }
       }
 
-      // 2. Load external_listings (BaT, Cars & Bids, eBay Motors, etc.)
+      // 2. Load vehicle_events (BaT, Cars & Bids, eBay Motors, etc.)
       const { data: externalListings, error: externalError } = await runWithVehicleFallback(runExternalQuery);
 
       if (!externalError && externalListings) {
         for (const listing of externalListings) {
-          const currentHighBidCents = listing.current_bid ? Math.round(Number(listing.current_bid) * 100) : null;
+          const currentHighBidCents = (listing.current_price ?? listing.current_bid) ? Math.round(Number(listing.current_price ?? listing.current_bid) * 100) : null;
 
           // Always hide sold/ended external listings regardless of status.
           if (isExternalSoldListing(listing)) {
@@ -532,9 +532,9 @@ export default function AuctionMarketplace() {
           // We do NOT hard-filter external auctions by end_date here.
           // Many sources (especially live auctions) can have stale/missing end_date while still being active.
           const { endTime: effectiveEndDate, isStale: telemetryStale } = normalizeEndTime({
-            raw: listing.end_date,
+            raw: listing.ended_at ?? listing.end_date,
             source: 'external',
-            status: listing.listing_status,
+            status: listing.event_status ?? listing.listing_status,
             updatedAt: listing.updated_at,
           });
 
@@ -553,15 +553,15 @@ export default function AuctionMarketplace() {
             id: listing.id,
             vehicle_id: listing.vehicle_id,
             source: 'external',
-            platform: listing.platform,
-            listing_url: listing.listing_url,
+            platform: listing.source_platform ?? listing.platform,
+            listing_url: listing.source_url ?? listing.listing_url,
             lead_image_url: vehicle.primary_image_url || null,
             current_high_bid_cents: currentHighBidCents,
             reserve_price_cents: listing.reserve_price ? Math.round(Number(listing.reserve_price) * 100) : null,
             currency_code: resolveListingCurrency(listing),
             bid_count: listing.bid_count || 0,
             auction_end_time: effectiveEndDate,
-            status: listing.listing_status,
+            status: listing.event_status ?? listing.listing_status,
             created_at: listing.created_at,
             updated_at: listing.updated_at,
             telemetry_stale: telemetryStale,

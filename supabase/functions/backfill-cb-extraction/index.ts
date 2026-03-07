@@ -2,7 +2,7 @@
  * BACKFILL: Cars & Bids Comment & Bid Extraction
  *
  * For all C&B vehicles created in the last 7 days:
- * - Ensure external_listings record exists with listing_url
+ * - Ensure vehicle_events record exists with source_url
  * - Trigger comment extraction
  * - Trigger bid extraction
  */

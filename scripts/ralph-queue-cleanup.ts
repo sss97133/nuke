@@ -48,22 +48,9 @@ async function cleanupQueue() {
   // Now apply cleanup
   console.log('\n\n=== APPLYING CLEANUPS ===\n');
 
-  // 1. Skip KSL (always blocked)
-  const { count: kslCount } = await supabase
-    .from('import_queue')
-    .select('*', { count: 'exact', head: true })
-    .ilike('listing_url', '%ksl.com%')
-    .in('status', ['failed', 'pending']);
-
-  if (kslCount && kslCount > 0) {
-    const { error: kslError } = await supabase
-      .from('import_queue')
-      .update({ status: 'skipped', error_message: 'KSL blocks scrapers - permanent skip' })
-      .ilike('listing_url', '%ksl.com%')
-      .in('status', ['failed', 'pending']);
-
-    console.log(`✅ Skipped ${kslCount} KSL items${kslError ? ' (error: ' + kslError.message + ')' : ''}`);
-  }
+  // 1. KSL — no longer skipped, extract-ksl-listing handles these
+  // KSL pages serve fine (Next.js HTML with structured data)
+  console.log('ℹ️  KSL items: not skipping (extract-ksl-listing handles these)');
 
   // 2. Skip 404/410 errors
   const { count: deadLinkCount } = await supabase

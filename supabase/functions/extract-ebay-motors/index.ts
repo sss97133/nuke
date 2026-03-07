@@ -938,20 +938,20 @@ serve(async (req) => {
         }
       }
 
-      // Create external_listings record
+      // Create vehicle_events record
       if (vehicle_id) {
         const listingUrlKey = normalizeListingUrlKey(extracted.url);
 
         const { error: listingError } = await supabase
-          .from('external_listings')
+          .from('vehicle_events')
           .upsert({
             vehicle_id,
-            platform: 'ebay-motors',
-            listing_url: extracted.url,
-            listing_url_key: listingUrlKey,
-            listing_id: extracted.item_id || listingUrlKey,
-            listing_status: extracted.listing_type === 'buy_it_now' ? 'active' : (extracted.bid_count > 0 ? 'active' : 'unknown'),
-            end_date: extracted.end_date,
+            source_platform: 'ebay-motors',
+            event_type: 'listing',
+            source_url: extracted.url,
+            source_listing_id: listingUrlKey || extracted.item_id,
+            event_status: extracted.listing_type === 'buy_it_now' ? 'active' : (extracted.bid_count > 0 ? 'active' : 'unknown'),
+            ended_at: extracted.end_date,
             final_price: extracted.price,
             bid_count: extracted.bid_count,
             metadata: {
@@ -966,13 +966,13 @@ serve(async (req) => {
               quality_flags: extracted.quality_flags,
             },
           }, {
-            onConflict: 'platform,listing_url_key'
+            onConflict: 'source_platform,source_listing_id'
           });
 
         if (listingError) {
-          console.error('External listing save error:', listingError);
+          console.error('Vehicle event save error:', listingError);
         } else {
-          console.log(`Created/updated external_listings record`);
+          console.log(`Created/updated vehicle_events record`);
         }
       }
 

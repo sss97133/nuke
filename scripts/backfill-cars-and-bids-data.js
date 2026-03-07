@@ -33,7 +33,7 @@ const COMMENTS_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/extract-cars-and-bid
 async function findProfilesWithMissingData(limit = 50, prioritizeActive = true) {
   console.log(`\n🔍 Finding Cars & Bids profiles with missing data...\n`);
   
-  // Use LEFT JOIN (no !inner) to include all vehicles, even without external_listings
+  // Use LEFT JOIN (no !inner) to include all vehicles, even without vehicle_events
   const { data: vehicles, error } = await supabase
     .from('vehicles')
     .select(`
@@ -47,7 +47,7 @@ async function findProfilesWithMissingData(limit = 50, prioritizeActive = true) 
       transmission,
       engine_size,
       drivetrain,
-      external_listings(listing_status, end_date)
+      vehicle_events(event_status, ended_at)
     `)
     .or('discovery_url.ilike.%carsandbids.com%,origin_metadata->>source.ilike.%cars%bid%')
     .limit(500); // Get enough to filter and sort
@@ -85,13 +85,13 @@ async function findProfilesWithMissingData(limit = 50, prioritizeActive = true) 
       const hasMissingFields = !v.mileage || !v.color || !v.transmission || !v.engine_size || !v.drivetrain;
       const hasLowImages = imageCount < 30; // Cars & Bids typically has 40-100+ images
       
-      // Get listing info from joined external_listings (could be array or single or null)
-      const listings = Array.isArray(v.external_listings) 
-        ? v.external_listings.filter(Boolean)
-        : (v.external_listings ? [v.external_listings] : []);
-      const listing = listings.find(l => l && (l.listing_status || l.end_date)) || listings[0] || null;
-      const listingStatus = listing?.listing_status || null;
-      const endDate = listing?.end_date || null;
+      // Get listing info from joined vehicle_events (could be array or single or null)
+      const listings = Array.isArray(v.vehicle_events)
+        ? v.vehicle_events.filter(Boolean)
+        : (v.vehicle_events ? [v.vehicle_events] : []);
+      const listing = listings.find(l => l && (l.event_status || l.ended_at)) || listings[0] || null;
+      const listingStatus = listing?.event_status || null;
+      const endDate = listing?.ended_at || null;
       const isActive = listingStatus === 'active';
       const isRecent = endDate ? new Date(endDate) > new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) : false;
       

@@ -8,19 +8,19 @@ const supabase = createClient(
 );
 
 async function main() {
-  console.log('=== EXTERNAL LISTINGS CHECK ===\n');
+  console.log('=== VEHICLE EVENTS CHECK ===\n');
 
-  // Get active external listings
+  // Get active vehicle events
   const { data: listings, error } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select(`
       id,
-      platform,
-      listing_status,
-      current_bid,
+      source_platform,
+      event_status,
+      current_price,
       bid_count,
-      end_date,
-      listing_url,
+      ended_at,
+      source_url,
       vehicle:vehicles (
         id,
         year,
@@ -30,8 +30,8 @@ async function main() {
         primary_image_url
       )
     `)
-    .eq('listing_status', 'active')
-    .order('current_bid', { ascending: false, nullsFirst: false })
+    .eq('event_status', 'active')
+    .order('current_price', { ascending: false, nullsFirst: false })
     .limit(20);
 
   if (error) {
@@ -46,14 +46,14 @@ async function main() {
   const byPlatform: Record<string, number> = {};
 
   for (const l of listings || []) {
-    byPlatform[l.platform] = (byPlatform[l.platform] || 0) + 1;
+    byPlatform[l.source_platform] = (byPlatform[l.source_platform] || 0) + 1;
 
     const v = l.vehicle as any;
     const title = v?.listing_title?.substring(0, 50) || `${v?.year} ${v?.make} ${v?.model}`;
-    const bid = l.current_bid ? `$${Number(l.current_bid).toLocaleString()}` : 'No bid';
-    const endDate = l.end_date ? new Date(l.end_date).toLocaleString() : 'No end date';
+    const bid = l.current_price ? `$${Number(l.current_price).toLocaleString()}` : 'No bid';
+    const endDate = l.ended_at ? new Date(l.ended_at).toLocaleString() : 'No end date';
 
-    console.log(`[${l.platform}] ${title}`);
+    console.log(`[${l.source_platform}] ${title}`);
     console.log(`  Bid: ${bid} | Bids: ${l.bid_count || 0} | Ends: ${endDate}`);
     console.log(`  Vehicle ID: ${v?.id || 'none'}`);
     console.log(`  Has Image: ${v?.primary_image_url ? 'Yes' : 'No'}`);
@@ -67,11 +67,11 @@ async function main() {
 
   // Check total active
   const { count } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('*', { count: 'exact', head: true })
-    .eq('listing_status', 'active');
+    .eq('event_status', 'active');
 
-  console.log(`\nTotal active external_listings: ${count}`);
+  console.log(`\nTotal active vehicle_events: ${count}`);
 }
 
 main().catch(console.error);

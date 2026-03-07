@@ -157,9 +157,9 @@ serve(async (req) => {
       // Try URL match (for listings we've seen before)
       if (!vehicleId && hints.url) {
         const { data: urlMatch } = await supabase
-          .from("external_listings")
+          .from("vehicle_events")
           .select("vehicle_id")
-          .eq("listing_url", hints.url)
+          .eq("source_url", hints.url)
           .not("vehicle_id", "is", null)
           .maybeSingle();
 
@@ -242,6 +242,17 @@ serve(async (req) => {
         error: "Failed to insert observation",
         details: insertError.message
       }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Fire-and-forget: trigger analysis engine for this vehicle+observation kind
+    if (vehicleId && input.kind) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+      fetch(`${supabaseUrl}/functions/v1/analysis-engine-coordinator`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+        body: JSON.stringify({ action: "observation_trigger", vehicle_id: vehicleId, observation_kind: input.kind }),
+      }).catch(() => {}); // intentionally fire-and-forget
     }
 
     return new Response(JSON.stringify({

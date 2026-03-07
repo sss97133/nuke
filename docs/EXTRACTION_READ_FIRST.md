@@ -11,7 +11,7 @@ There’s a lot of work in the extraction department. Read the docs and successf
 | **`docs/archive/internal-20260128/EXTRACTION-PLAYBOOK.md`** | Proven extractors, routing table, commands that work. BaT, Mecum, C&B, PCarMarket, Hagerty, Hemmings – which is working vs blocked. |
 | **`docs/ACCURATE_EXTRACTION.md`** | Never promote queue → vehicles from URL slugs only. Real lot data (price, VIN, etc.) from the right scraper per source. |
 | **`EXTRACTION_STATUS.md`** (repo root) | Current state: BaT target, pending by source, blockers (Firecrawl), what’s running. |
-| **`supabase/functions/_shared/EXTRACTOR_QUALITY_CHECKLIST.md`** | Resolve existing vehicle before insert (external_listings → discovery_url → URL pattern → insert). Chassis/VIN, listing metadata. |
+| **`supabase/functions/_shared/EXTRACTOR_QUALITY_CHECKLIST.md`** | Resolve existing vehicle before insert (vehicle_events → discovery_url → URL pattern → insert). Chassis/VIN, listing metadata. |
 | **`docs/EXTRACTION_POLICY.md`** | No sloppy Firecrawl; check targets before turning on tools; prefer Playwright for import_queue. |
 | **`docs/EXTRACTION_TARGETS.md`** | What we’re aiming at (BaT 222k, etc.). Run `npm run status:targets` before long runs. |
 | **`.claude/HEMMINGS_CRAWLER_RESEARCH.md`** | Hemmings: Cloudflare, discovery → extraction pattern, scripts that work when CF isn’t blocking. |
@@ -39,7 +39,7 @@ Don’t promise “all” until we’ve actually run discovery + extraction for 
 ## Before you change extraction (checklist)
 
 1. **Read** the playbook and ACCURATE_EXTRACTION so you know which extractor and flow per source.
-2. **Resolve before insert** – use EXTRACTOR_QUALITY_CHECKLIST: external_listings → discovery_url → URL pattern → then insert. No duplicate vehicles.
+2. **Resolve before insert** – use EXTRACTOR_QUALITY_CHECKLIST: vehicle_events → discovery_url → URL pattern → then insert. No duplicate vehicles.
 3. **Don’t mark queue complete** without real page data (price, VIN, or other real fields). No URL-slug-only promotion.
 4. **Check targets** – `npm run status:targets`. Don’t spin up long runs with no pending work or no plan to hit the target.
 5. **Prefer Playwright** for import_queue when the source can be scraped with it; save Firecrawl for when it’s actually required (and rate-limit).

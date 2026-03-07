@@ -14,21 +14,21 @@ const supabase = createClient(
 async function main() {
   console.log('=== DEBUG AUCTION PRICE LINKING ===\n');
 
-  // 1. Check a sample external_listing with price
+  // 1. Check a sample vehicle_event with price
   const { data: sampleListing } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('*')
     .not('final_price', 'is', null)
     .limit(1)
     .single();
 
   if (sampleListing) {
-    console.log('Sample external_listing with price:');
+    console.log('Sample vehicle_event with price:');
     console.log(`  ID: ${sampleListing.id}`);
     console.log(`  vehicle_id: ${sampleListing.vehicle_id}`);
-    console.log(`  listing_url: ${sampleListing.listing_url}`);
+    console.log(`  source_url: ${sampleListing.source_url}`);
     console.log(`  final_price: $${sampleListing.final_price?.toLocaleString()}`);
-    console.log(`  platform: ${sampleListing.platform}`);
+    console.log(`  source_platform: ${sampleListing.source_platform}`);
 
     // Check if this vehicle has an auction_event
     if (sampleListing.vehicle_id) {
@@ -70,10 +70,10 @@ async function main() {
   // 3. Try to match by URL instead of vehicle_id
   console.log('\n\n=== MATCHING BY URL ===');
 
-  // Get external_listings with prices
+  // Get vehicle_events with prices
   const { data: listingsWithPrices } = await supabase
-    .from('external_listings')
-    .select('id, listing_url, final_price, vehicle_id')
+    .from('vehicle_events')
+    .select('id, source_url, final_price, vehicle_id')
     .not('final_price', 'is', null)
     .limit(100);
 
@@ -85,7 +85,7 @@ async function main() {
     const { data: urlMatch } = await supabase
       .from('auction_events')
       .select('id')
-      .or(`auction_url.eq.${listing.listing_url},source_url.eq.${listing.listing_url}`)
+      .or(`auction_url.eq.${listing.source_url},source_url.eq.${listing.source_url}`)
       .maybeSingle();
 
     if (urlMatch) urlMatches++;
@@ -115,15 +115,15 @@ async function main() {
 
   console.log(`\nAuction events with vehicle_id: ${eventsWithVehicle} / ${totalEvents}`);
 
-  // 5. Check external_listings with vehicle_ids
+  // 5. Check vehicle_events with vehicle_ids
   const { count: listingsWithVehicle } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('*', { count: 'exact', head: true })
     .not('vehicle_id', 'is', null);
 
-  const { count: totalListings } = await supabase.from('external_listings').select('*', { count: 'exact', head: true });
+  const { count: totalListings } = await supabase.from('vehicle_events').select('*', { count: 'exact', head: true });
 
-  console.log(`External listings with vehicle_id: ${listingsWithVehicle} / ${totalListings}`);
+  console.log(`Vehicle events with vehicle_id: ${listingsWithVehicle} / ${totalListings}`);
 }
 
 main().catch(console.error);

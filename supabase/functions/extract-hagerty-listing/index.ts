@@ -895,21 +895,21 @@ serve(async (req) => {
         }
       }
 
-      // Create/update external_listings record
+      // Create/update vehicle_events record
       if (targetVehicleId) {
         const listingUrlKey = normalizeListingUrlKey(extracted.url);
-        console.log(`[hagerty] Creating external_listing with url_key: ${listingUrlKey}`);
+        console.log(`[hagerty] Creating vehicle_event with source_listing_id: ${listingUrlKey}`);
 
         const { data: listingData, error: listingError } = await supabase
-          .from('external_listings')
+          .from('vehicle_events')
           .upsert({
             vehicle_id: targetVehicleId,
-            platform: 'hagerty',
-            listing_url: extracted.url,
-            listing_url_key: listingUrlKey,
-            listing_id: extracted.listing_uuid,
-            listing_status: extracted.status,
-            end_date: extracted.auction_end || null,  // Keep full ISO timestamp for countdown timer
+            source_platform: 'hagerty',
+            event_type: 'auction',
+            source_url: extracted.url,
+            source_listing_id: listingUrlKey || extracted.listing_uuid,
+            event_status: extracted.status,
+            ended_at: extracted.auction_end || null,  // Keep full ISO timestamp for countdown timer
             final_price: extracted.sale_price,
             bid_count: extracted.bid_count,
             comment_count: extracted.comment_count,
@@ -929,16 +929,16 @@ serve(async (req) => {
               video_urls: extracted.video_urls,
               websocket_channel: extracted.websocket_channel,
             },
-          }, { onConflict: 'platform,listing_url_key' })
+          }, { onConflict: 'source_platform,source_listing_id' })
           .select()
           .maybeSingle();
 
         if (listingError) {
-          console.error('[hagerty] External listing save error:', JSON.stringify(listingError));
-          dbErrors.push(`external_listing: ${listingError.message || JSON.stringify(listingError)}`);
+          console.error('[hagerty] Vehicle event save error:', JSON.stringify(listingError));
+          dbErrors.push(`vehicle_event: ${listingError.message || JSON.stringify(listingError)}`);
         } else {
           externalListingSaved = true;
-          console.log(`[hagerty] Created external_listings record: ${listingData?.id}`);
+          console.log(`[hagerty] Created vehicle_events record: ${listingData?.id}`);
         }
       }
 
@@ -1060,7 +1060,7 @@ serve(async (req) => {
       _db: (save_to_db || vehicle_id) ? {
         vehicle_saved: !!extracted.vehicle_id,
         images_saved: imagesSaved,
-        external_listing_saved: externalListingSaved,
+        vehicle_event_saved: externalListingSaved,
         identities_saved: identitiesSaved || [],
         errors: dbErrors,
       } : null,

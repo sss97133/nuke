@@ -273,7 +273,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   }, [navigate, vehicle.id]);
   const listingCurrency = React.useMemo(() => {
     const v: any = vehicle as any;
-    const externalListing = v?.external_listings?.[0];
+    const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
     return resolveCurrencyCode(
       externalListing?.currency,
       externalListing?.currency_code,
@@ -342,8 +342,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   // Auction timer - updates every second for live auctions
   const auctionEndDate = React.useMemo(() => {
     const v: any = vehicle as any;
-    // Check external_listings first (most up-to-date for live auctions)
-    const externalListing = v?.external_listings?.[0];
+    // Check vehicle_events first (most up-to-date for live auctions)
+    const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
     if (externalListing?.end_date) {
       return externalListing.end_date;
     }
@@ -354,7 +354,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const isAuctionLiveStatus = React.useMemo(() => {
     const v: any = vehicle as any;
     const saleStatus = String(v?.sale_status || '').toLowerCase();
-    const externalStatus = String(v?.external_listings?.[0]?.listing_status || '').toLowerCase();
+    const externalStatus = String((v?.vehicle_events?.[0] ?? v?.external_listings?.[0])?.listing_status || (v?.vehicle_events?.[0])?.event_status || '').toLowerCase();
     return saleStatus === 'auction_live' || externalStatus === 'active' || externalStatus === 'live';
   }, [vehicle]);
 
@@ -401,8 +401,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     const winningBid = parseMoneyNumber(v.winning_bid);
     const highBid = parseMoneyNumber(v.high_bid);
     
-    // Live bid from external_listings (already in vehicle data from homepage query)
-    const externalListing = (v as any)?.external_listings?.[0];
+    // Live bid from vehicle_events (already in vehicle data from homepage query)
+    const externalListing = (v as any)?.vehicle_events?.[0] ?? (v as any)?.external_listings?.[0];
     const listingLiveBid = parseMoneyNumber(externalListing?.current_bid);
     // Treat listing as live if end_date is in the future OR status indicates active/live when end_date is missing
     const listingEndDate = externalListing?.end_date ? new Date(externalListing.end_date).getTime() : 0;
@@ -424,7 +424,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
     // PRIORITY ORDER (pro semantics):
     // 1. Sale price (executed transaction)
-    // 2. Live bid (active auction, from external_listings — freshest signal)
+    // 2. Live bid (active auction, from vehicle_events — freshest signal)
     // 3. Winning bid (sold auction result) [fallback if sale_price missing]
     // 4. High bid (ended / RNM auctions)
     // 5. Current bid (legacy vehicle field fallback)
@@ -541,8 +541,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     // Check if vehicle is from Mecum
     const discoveryUrl = String(v?.discovery_url || '').toLowerCase();
     const discoverySource = String(v?.discovery_source || '').toLowerCase();
-    const externalListing = v?.external_listings?.[0];
-    const platform = String(externalListing?.platform || '').toLowerCase();
+    const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
+    const platform = String(externalListing?.source_platform || externalListing?.platform || '').toLowerCase();
     
     const isMecum = 
       discoveryUrl.includes('mecum.com') ||
@@ -553,7 +553,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       return null;
     }
     
-    // Extract lot data from external_listings metadata or vehicle fields
+    // Extract lot data from vehicle_events metadata or vehicle fields
     const metadata = externalListing?.metadata || {};
     
     // Extract lot number from URL if not in metadata: /lots/1154350/... -> 1154350
@@ -826,13 +826,13 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return max - (max - min) * auctionProgress01;
   }, [isAuctionSource, auctionProgress01]);
 
-  // Get current bid for active auctions - prioritize external_listings (live data)
+  // Get current bid for active auctions - prioritize vehicle_events (live data)
   const auctionHighBidText = React.useMemo(() => {
     const v: any = vehicle as any;
-    
-    // For active auctions, prioritize external_listings[0].current_bid (live BaT data)
+
+    // For active auctions, prioritize vehicle_events[0].current_price (live data)
     if (isActiveAuction) {
-      const externalListing = v?.external_listings?.[0];
+      const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
       if (externalListing) {
         // Check current_bid first (most up-to-date for live auctions)
         const listingLiveBid = parseMoneyNumber(externalListing.current_bid);
@@ -970,8 +970,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     const v: any = vehicle as any;
     const outcome = String(v?.auction_outcome || '').toLowerCase();
     const saleStatus = String(v?.sale_status || '').toLowerCase();
-    const externalListing = v?.external_listings?.[0];
-    const externalStatus = externalListing ? String(externalListing?.listing_status || '').toLowerCase() : '';
+    const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
+    const externalStatus = externalListing ? String(externalListing?.event_status || externalListing?.listing_status || '').toLowerCase() : '';
     const hasFinalPrice = externalListing?.final_price || null;
     const hasSoldAt = externalListing?.sold_at || null;
     const isSoldLike =
@@ -1065,8 +1065,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   // Check if SOLD badge should be shown (time-based: hide after 30 days)
   const shouldShowSoldBadge = React.useMemo(() => {
     const v: any = vehicle as any;
-    const saleDate = v.sale_date || 
-                     (v.external_listings?.[0]?.sold_at) ||
+    const saleDate = v.sale_date ||
+                     (v.vehicle_events?.[0]?.sold_at ?? v.external_listings?.[0]?.sold_at) ||
                      null;
     
     if (!saleDate) return true; // Show if no sale date (let other logic decide)
@@ -1084,13 +1084,13 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     const v: any = vehicle as any;
     const outcome = String(v.auction_outcome || '').toLowerCase();
     const saleStatus = String(v.sale_status || '').toLowerCase();
-    const externalListing = v?.external_listings?.[0];
-    const externalStatus = externalListing ? String(externalListing.listing_status || '').toLowerCase() : '';
+    const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
+    const externalStatus = externalListing ? String(externalListing.event_status || externalListing.listing_status || '').toLowerCase() : '';
     const hasFinalPrice = externalListing?.final_price || null;
     const hasSoldAt = externalListing?.sold_at || null;
-    
-    return outcome === 'sold' || 
-           saleStatus === 'sold' || 
+
+    return outcome === 'sold' ||
+           saleStatus === 'sold' ||
            (externalStatus === 'sold' && (hasFinalPrice || hasSoldAt)) ||
            (typeof v.sale_price === 'number' && v.sale_price > 0 && saleStatus === 'sold');
   }, [vehicle]);
@@ -1102,9 +1102,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     // Extract status fields at the beginning
     const outcome = String(v.auction_outcome || '').toLowerCase();
     const saleStatus = String(v.sale_status || '').toLowerCase();
-    const externalListing = v?.external_listings?.[0];
-    const externalStatus = externalListing ? String(externalListing.listing_status || '').toLowerCase() : '';
-    
+    const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
+    const externalStatus = externalListing ? String(externalListing.event_status || externalListing.listing_status || '').toLowerCase() : '';
+
     // PRIORITY 1: ACTIVE TRANSACTION STATE (what's happening NOW)
     if (isActiveAuction) {
       // Live auction - show bid amount (badge will add "BID" label separately)
@@ -1737,12 +1737,13 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         )}
                         {(() => {
                           const v: any = vehicle as any;
-                          // Prioritize bid_count from external_listings (live data), fallback to vehicle
-                          const externalBidCount = typeof v?.external_listings?.[0]?.bid_count === 'number' 
-                            ? v.external_listings[0].bid_count 
+                          // Prioritize bid_count from vehicle_events (live data), fallback to vehicle
+                          const ve = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
+                          const externalBidCount = typeof ve?.bid_count === 'number'
+                            ? ve.bid_count
                             : null;
-                          const vehicleBidCount = typeof v.bid_count === 'number' && Number.isFinite(v.bid_count) && v.bid_count > 0 
-                            ? v.bid_count 
+                          const vehicleBidCount = typeof v.bid_count === 'number' && Number.isFinite(v.bid_count) && v.bid_count > 0
+                            ? v.bid_count
                             : null;
                           const bidCount = externalBidCount ?? vehicleBidCount;
                           return bidCount ? (
@@ -2015,11 +2016,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               onClose={() => setShowOwnershipPopup(false)}
               salePrice={(() => {
                 const v: any = vehicle as any;
-                return v.sale_price || v.external_listings?.[0]?.final_price || null;
+                return v.sale_price || (v.vehicle_events?.[0] ?? v.external_listings?.[0])?.final_price || null;
               })()}
               saleDate={(() => {
                 const v: any = vehicle as any;
-                return v.sale_date || v.external_listings?.[0]?.sold_at || null;
+                return v.sale_date || (v.vehicle_events?.[0] ?? v.external_listings?.[0])?.sold_at || null;
               })()}
             />
           )}
@@ -2447,12 +2448,13 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         )}
                         {(() => {
                           const v: any = vehicle as any;
-                          // Prioritize bid_count from external_listings (live data), fallback to vehicle
-                          const externalBidCount = typeof v?.external_listings?.[0]?.bid_count === 'number' 
-                            ? v.external_listings[0].bid_count 
+                          // Prioritize bid_count from vehicle_events (live data), fallback to vehicle
+                          const ve = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
+                          const externalBidCount = typeof ve?.bid_count === 'number'
+                            ? ve.bid_count
                             : null;
-                          const vehicleBidCount = typeof v.bid_count === 'number' && Number.isFinite(v.bid_count) && v.bid_count > 0 
-                            ? v.bid_count 
+                          const vehicleBidCount = typeof v.bid_count === 'number' && Number.isFinite(v.bid_count) && v.bid_count > 0
+                            ? v.bid_count
                             : null;
                           const bidCount = externalBidCount ?? vehicleBidCount;
                           return bidCount ? (
@@ -3170,11 +3172,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           onClose={() => setShowOwnershipPopup(false)}
           salePrice={(() => {
             const v: any = vehicle as any;
-            return v.sale_price || v.external_listings?.[0]?.final_price || null;
+            return v.sale_price || (v.vehicle_events?.[0] ?? v.external_listings?.[0])?.final_price || null;
           })()}
           saleDate={(() => {
             const v: any = vehicle as any;
-            return v.sale_date || v.external_listings?.[0]?.sold_at || null;
+            return v.sale_date || (v.vehicle_events?.[0] ?? v.external_listings?.[0])?.sold_at || null;
           })()}
         />
       )}

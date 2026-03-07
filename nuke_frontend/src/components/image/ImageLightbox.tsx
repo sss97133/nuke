@@ -821,36 +821,38 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
         }
       }
 
-      // 2.5. For auction images, infer the *origin* (seller) from listing data when available.
+      // 2.5. For auction images, infer the *origin* (seller) from vehicle_events data when available.
       // This is distinct from the ingestion action (import/scrape) and helps preserve provenance.
       let sellerInfo: any = null;
-      // If the vehicle has a BaT listing, treat the seller as the default origin for auction photos.
+      // If the vehicle has a BaT event, treat the seller as the default origin for auction photos.
       if (vehicleId) {
         try {
-          const { data: listing } = await supabase
-            .from('bat_listings')
+          const { data: batEvent } = await supabase
+            .from('vehicle_events')
             .select(`
-              bat_listing_url,
-              seller_username,
-              seller_external_identity_id,
-              seller_identity:external_identities!bat_listings_seller_external_identity_id_fkey (
-                id,
-                platform,
-                handle,
-                profile_url,
-                display_name,
-                claimed_by_user_id,
-                claim_confidence
-              )
+              source_url,
+              seller_identifier,
+              seller_external_identity_id
             `)
             .eq('vehicle_id', vehicleId)
-            .order('auction_end_date', { ascending: false })
+            .eq('source_platform', 'bat')
+            .order('ended_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          const handle = listing?.seller_username || (listing as any)?.seller_identity?.handle || null;
+          // If we have a seller_external_identity_id, look up the identity details separately
+          let sellerIdentity: any = null;
+          if (batEvent?.seller_external_identity_id) {
+            const { data: identity } = await supabase
+              .from('external_identities')
+              .select('id, platform, handle, profile_url, display_name, claimed_by_user_id, claim_confidence')
+              .eq('id', batEvent.seller_external_identity_id)
+              .maybeSingle();
+            sellerIdentity = identity;
+          }
+
+          const handle = batEvent?.seller_identifier || sellerIdentity?.handle || null;
           if (handle) {
-            const sellerIdentity = (listing as any)?.seller_identity || null;
             sellerInfo = {
               platform: 'bat',
               handle,
@@ -858,7 +860,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               profileUrl: sellerIdentity?.profile_url || `https://bringatrailer.com/member/${handle}/`,
               claimedByUserId: sellerIdentity?.claimed_by_user_id || null,
               claimConfidence: sellerIdentity?.claim_confidence || null,
-              listingUrl: listing?.bat_listing_url || null
+              listingUrl: batEvent?.source_url || null
             };
           }
         } catch (err) {

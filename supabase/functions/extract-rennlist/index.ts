@@ -412,17 +412,17 @@ async function saveListing(supabase: any, listing: RennlistListing): Promise<{ v
     }
   }
 
-  // Create external_listings record
+  // Create vehicle_events record
   if (data.id) {
     await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .upsert({
         vehicle_id: data.id,
-        platform: 'rennlist',
-        listing_url: listing.url,
-        listing_url_key: listing.listing_id,
-        listing_id: listing.listing_id,
-        listing_status: listing.listing_status,
+        source_platform: 'rennlist',
+        event_type: 'listing',
+        source_url: listing.url,
+        source_listing_id: listing.listing_id,
+        event_status: listing.listing_status,
         final_price: listing.price,
         metadata: {
           seller_username: listing.seller_username,
@@ -430,7 +430,7 @@ async function saveListing(supabase: any, listing: RennlistListing): Promise<{ v
           price_obo: listing.price_obo,
         },
       }, {
-        onConflict: 'platform,listing_url_key'
+        onConflict: 'source_platform,source_listing_id'
       });
   }
 

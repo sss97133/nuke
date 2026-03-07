@@ -512,16 +512,17 @@ async function saveToDatabase(data: BonhamsFullData): Promise<string | null> {
       vehicleId = newV.id;
     }
 
-    // Save to external_listings
-    const externalListingData: any = {
+    // Save to vehicle_events
+    const vehicleEventData: any = {
       vehicle_id: vehicleId,
-      organization_id: BONHAMS_ORG_ID,
-      platform: 'bonhams',
-      listing_url: data.url,
-      listing_id: data.listingId,
-      listing_status: data.auctionStatus === 'sold' ? 'sold' :
+      source_organization_id: BONHAMS_ORG_ID,
+      source_platform: 'bonhams',
+      event_type: 'auction',
+      source_url: data.url,
+      source_listing_id: data.listingId,
+      event_status: data.auctionStatus === 'sold' ? 'sold' :
                      data.auctionStatus === 'unsold' ? 'ended' : 'active',
-      current_bid: data.soldPrice,
+      current_price: data.soldPrice,
       final_price: data.auctionStatus === 'sold' ? data.soldPrice : null,
       metadata: {
         source: 'bonhams_playwright_extractor',
@@ -548,18 +549,18 @@ async function saveToDatabase(data: BonhamsFullData): Promise<string | null> {
       updated_at: new Date().toISOString(),
     };
 
-    const { data: existingListing } = await supabase
-      .from('external_listings')
+    const { data: existingEvent } = await supabase
+      .from('vehicle_events')
       .select('id')
       .eq('vehicle_id', vehicleId)
-      .eq('platform', 'bonhams')
+      .eq('source_platform', 'bonhams')
       .single();
 
-    if (existingListing) {
-      await supabase.from('external_listings').update(externalListingData).eq('id', existingListing.id);
+    if (existingEvent) {
+      await supabase.from('vehicle_events').update(vehicleEventData).eq('id', existingEvent.id);
     } else {
-      externalListingData.created_at = new Date().toISOString();
-      await supabase.from('external_listings').insert(externalListingData);
+      vehicleEventData.created_at = new Date().toISOString();
+      await supabase.from('vehicle_events').insert(vehicleEventData);
     }
 
     // Save images

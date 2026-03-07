@@ -2,7 +2,7 @@
 
 /**
  * Backfill auction activity into business_timeline_events for auction houses.
- * Creates monthly summary events based on external_listings end_date.
+ * Creates monthly summary events based on vehicle_events ended_at.
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -57,16 +57,16 @@ async function loadTargetOrgs() {
 
 async function backfillOrg(org) {
   const { data: listings } = await supabase
-    .from('external_listings')
-    .select('id, platform, end_date')
-    .eq('organization_id', org.id)
-    .not('end_date', 'is', null);
+    .from('vehicle_events')
+    .select('id, source_platform, ended_at')
+    .eq('source_organization_id', org.id)
+    .not('ended_at', 'is', null);
 
   if (!listings || listings.length === 0) return;
 
   const grouped = new Map();
   for (const l of listings) {
-    const key = monthKey(l.end_date);
+    const key = monthKey(l.ended_at);
     if (!key) continue;
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push(l);
@@ -87,7 +87,7 @@ async function backfillOrg(org) {
     }
 
     const platformCounts = rows.reduce((acc, r) => {
-      const p = (r.platform || 'unknown').toLowerCase();
+      const p = (r.source_platform || 'unknown').toLowerCase();
       acc[p] = (acc[p] || 0) + 1;
       return acc;
     }, {});

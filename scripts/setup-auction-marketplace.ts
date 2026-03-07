@@ -2,8 +2,8 @@
  * Setup Auction Marketplace
  * 
  * 1. Creates missing auction platform organizations
- * 2. Adds missing platforms to external_listings constraint
- * 3. Creates external_listings for our extracted auction data
+ * 2. Adds missing platforms to vehicle_events constraint
+ * 3. Creates vehicle_events for our extracted auction data
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -83,7 +83,7 @@ async function ensureOrganizations() {
 }
 
 async function createExternalListings() {
-  console.log('\n=== Creating external_listings for auction vehicles ===\n');
+  console.log('\n=== Creating vehicle_events for auction vehicles ===\n');
   
   // Get all vehicles from our auction extractor
   const { data: vehicles, error } = await supabase
@@ -118,23 +118,24 @@ async function createExternalListings() {
       continue;
     }
     
-    // Check if external_listing exists
+    // Check if vehicle_event exists
     const { data: existing } = await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .select('id')
       .eq('vehicle_id', vehicle.id)
-      .eq('platform', platform)
+      .eq('source_platform', platform)
       .limit(1);
-    
-    const listingData = {
+
+    const eventData = {
       vehicle_id: vehicle.id,
-      organization_id: orgConfig.orgId,
-      platform: platform,
-      listing_url: vehicle.listing_url,
-      listing_status: 'active' as const,
-      current_bid: vehicle.high_bid,
+      source_organization_id: orgConfig.orgId,
+      source_platform: platform,
+      event_type: 'auction' as const,
+      source_url: vehicle.listing_url,
+      event_status: 'active' as const,
+      current_price: vehicle.high_bid,
       bid_count: vehicle.bid_count || 0,
-      end_date: vehicle.auction_end_date,
+      ended_at: vehicle.auction_end_date,
       metadata: {
         source: 'auction_extractor',
         reserve_status: vehicle.reserve_status,
@@ -143,23 +144,23 @@ async function createExternalListings() {
       },
       updated_at: new Date().toISOString(),
     };
-    
+
     try {
       if (existing && existing.length > 0) {
         // Update
         const { error: updateErr } = await supabase
-          .from('external_listings')
-          .update(listingData)
+          .from('vehicle_events')
+          .update(eventData)
           .eq('id', existing[0].id);
-        
+
         if (updateErr) throw updateErr;
         updated++;
       } else {
         // Insert
         const { error: insertErr } = await supabase
-          .from('external_listings')
-          .insert(listingData);
-        
+          .from('vehicle_events')
+          .insert(eventData);
+
         if (insertErr) throw insertErr;
         created++;
       }
@@ -185,12 +186,12 @@ async function main() {
   
   // Show summary
   const { count } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('*', { count: 'exact', head: true })
-    .eq('listing_status', 'active');
-  
+    .eq('event_status', 'active');
+
   console.log('\n' + '='.repeat(60));
-  console.log(`Total active external_listings: ${count}`);
+  console.log(`Total active vehicle_events: ${count}`);
   console.log('='.repeat(60));
 }
 

@@ -9,9 +9,9 @@ const supabase = createClient(
 
 async function verify() {
   const { data } = await supabase
-    .from('external_listings')
-    .select('listing_url, metadata')
-    .eq('platform', 'cars_and_bids')
+    .from('vehicle_events')
+    .select('source_url, metadata')
+    .eq('source_platform', 'cars_and_bids')
     .eq('metadata->>source', 'cab_backfill_v4')
     .limit(3);
 
@@ -22,10 +22,10 @@ async function verify() {
 
   console.log('=== V4 EXTRACTION VERIFICATION ===\n');
 
-  for (const listing of data) {
-    console.log('URL:', listing.listing_url);
+  for (const event of data) {
+    console.log('URL:', event.source_url);
     console.log('---');
-    const m = listing.metadata;
+    const m = event.metadata;
     console.log('Seller:', m.seller_username || 'NOT FOUND');
     console.log('Winner:', m.winner_username || 'N/A');
     console.log('Location:', m.location || 'NOT FOUND');

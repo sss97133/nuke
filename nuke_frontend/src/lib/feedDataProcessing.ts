@@ -70,7 +70,7 @@ export function getDedupeKey(row: any): string | null {
   if (!row) return null;
   const direct = normalizeListingKey(row.discovery_url);
   if (direct) return direct;
-  const fromListing = normalizeListingKey(row?.external_listings?.[0]?.listing_url);
+  const fromListing = normalizeListingKey(row?.vehicle_events?.[0]?.source_url ?? row?.external_listings?.[0]?.listing_url);
   if (fromListing) return fromListing;
   return null;
 }
@@ -84,7 +84,7 @@ function scoreForDedupe(row: any): number {
   if (row.model) score += 2;
   if (row.title) score += 1;
   if (row.sale_price || row.winning_bid || row.high_bid || row.asking_price || row.display_price) score += 3;
-  if (Array.isArray(row.external_listings) && row.external_listings.length > 0) score += 2;
+  if ((Array.isArray(row.vehicle_events) && row.vehicle_events.length > 0) || (Array.isArray(row.external_listings) && row.external_listings.length > 0)) score += 2;
   if (row.primary_image_url || row.image_url) score += 1;
   try {
     const ts = row.updated_at ? new Date(row.updated_at).getTime() : 0;

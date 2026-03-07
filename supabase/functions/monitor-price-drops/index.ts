@@ -23,12 +23,12 @@ Deno.serve(async (req: Request) => {
 
     console.log('🔍 Monitoring price drops for auto-buy triggers...');
 
-    // Get all active external listings with prices
+    // Get all active vehicle events with prices
     const { data: listings, error: listingsError } = await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .select('*, vehicles(*)')
-      .eq('listing_status', 'active')
-      .not('current_bid', 'is', null);
+      .eq('event_status', 'active')
+      .not('current_price', 'is', null);
 
     if (listingsError) throw listingsError;
 
@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
 
     // Check each listing for auto-buy triggers
     for (const listing of listings || []) {
-      const currentPrice = listing.current_bid || listing.buy_now_price;
+      const currentPrice = listing.current_price || listing.buy_now_price;
       if (!currentPrice) continue;
 
       const vehicle = listing.vehicles;
@@ -88,7 +88,7 @@ Deno.serve(async (req: Request) => {
             .insert({
               watchlist_id: trigger.watchlist_id,
               vehicle_id: vehicle.id,
-              external_listing_id: listing.id,
+              vehicle_event_id: listing.id,
               execution_type: trigger.execution_type,
               target_price: trigger.target_price,
               executed_price: currentPrice,
@@ -116,7 +116,7 @@ Deno.serve(async (req: Request) => {
             .from('price_monitoring')
             .upsert({
               vehicle_id: vehicle.id,
-              external_listing_id: listing.id,
+              vehicle_event_id: listing.id,
               current_price: currentPrice,
               monitor_type: 'watchlist_auto_buy',
               target_price: trigger.target_price,
@@ -125,7 +125,7 @@ Deno.serve(async (req: Request) => {
               triggered: true,
               triggered_at: new Date().toISOString()
             }, {
-              onConflict: 'vehicle_id,external_listing_id,watchlist_id'
+              onConflict: 'vehicle_id,vehicle_event_id,watchlist_id'
             });
 
           // If auto-buy doesn't require confirmation, execute immediately

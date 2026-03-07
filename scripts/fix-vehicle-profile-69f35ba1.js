@@ -103,17 +103,17 @@ async function fixVehicleProfile() {
       }
     }
 
-    // Also check external_listings
+    // Also check vehicle_events
     if (!location) {
-      const { data: externalListing } = await supabase
-        .from('external_listings')
+      const { data: vehicleEvent } = await supabase
+        .from('vehicle_events')
         .select('metadata')
         .eq('vehicle_id', vehicleId)
         .maybeSingle();
-      
-      if (externalListing?.metadata?.location) {
-        location = externalListing.metadata.location;
-        console.log(`   Found location in external_listing: ${location}`);
+
+      if (vehicleEvent?.metadata?.location) {
+        location = vehicleEvent.metadata.location;
+        console.log(`   Found location in vehicle_event: ${location}`);
       }
     }
 
@@ -144,21 +144,21 @@ async function fixVehicleProfile() {
 
     if (priceError) throw priceError;
 
-    const { data: externalListing } = await supabase
-      .from('external_listings')
-      .select('current_bid, final_price, listing_status')
+    const { data: vehicleEvent } = await supabase
+      .from('vehicle_events')
+      .select('current_price, final_price, event_status')
       .eq('vehicle_id', vehicleId)
       .maybeSingle();
 
     console.log(`   Vehicle sale_price: ${vehiclePrice.sale_price || 'null'}`);
     console.log(`   Vehicle winning_bid: ${vehiclePrice.winning_bid || 'null'}`);
     console.log(`   Vehicle asking_price: ${vehiclePrice.asking_price || 'null'}`);
-    if (externalListing) {
-      console.log(`   External listing current_bid: ${externalListing.current_bid || 'null'}`);
-      console.log(`   External listing final_price: ${externalListing.final_price || 'null'}`);
-      console.log(`   External listing status: ${externalListing.listing_status || 'null'}`);
+    if (vehicleEvent) {
+      console.log(`   Vehicle event current_price: ${vehicleEvent.current_price || 'null'}`);
+      console.log(`   Vehicle event final_price: ${vehicleEvent.final_price || 'null'}`);
+      console.log(`   Vehicle event status: ${vehicleEvent.event_status || 'null'}`);
     } else {
-      console.log(`   ⚠️  No external_listing found`);
+      console.log(`   ⚠️  No vehicle_event found`);
     }
 
     // Step 4: Verify final state

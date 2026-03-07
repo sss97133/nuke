@@ -4,7 +4,7 @@
  *
  * Orchestrates:
  * 1) Source discovery (auction scrape_sources)
- * 2) Live auction health audit (external_listings + vehicle_listings)
+ * 2) Live auction health audit (vehicle_events + vehicle_listings)
  * 3) AI source preparation (source-preparation-agent)
  * 4) Quality validation (audit-extraction-accuracy)
  * 5) Extraction trigger (scrape-multi-source + process-import-queue)
@@ -155,22 +155,22 @@ async function auditLiveListings(supabase: any, staleHours: number) {
   };
 
   const { data: external, error: externalErr } = await supabase
-    .from('external_listings')
-    .select('id, platform, listing_url, listing_status, end_date, updated_at, current_bid, bid_count, vehicle_id')
-    .in('listing_status', ['active', 'live'])
+    .from('vehicle_events')
+    .select('id, source_platform, source_url, event_status, ended_at, updated_at, current_price, bid_count, vehicle_id')
+    .in('event_status', ['active', 'live'])
     .limit(5000);
 
-  if (externalErr) throw new Error(`Failed to read external_listings: ${externalErr.message}`);
+  if (externalErr) throw new Error(`Failed to read vehicle_events: ${externalErr.message}`);
 
   for (const row of external || []) {
     const updatedAt = row.updated_at ? new Date(row.updated_at).getTime() : null;
-    const endDate = row.end_date ? new Date(row.end_date).getTime() : null;
-    if (!row.listing_url) issues.missing_url.push(row);
+    const endDate = row.ended_at ? new Date(row.ended_at).getTime() : null;
+    if (!row.source_url) issues.missing_url.push(row);
     if (!row.vehicle_id) issues.missing_vehicle.push(row);
-    if (!row.end_date) issues.missing_end_date.push(row);
+    if (!row.ended_at) issues.missing_end_date.push(row);
     if (updatedAt && now - updatedAt > staleMs) issues.stale.push(row);
     if (endDate && endDate < now) issues.ended_but_active.push(row);
-    if (row.bid_count && row.bid_count > 250 && (!row.current_bid || Number(row.current_bid) <= 0)) {
+    if (row.bid_count && row.bid_count > 250 && (!row.current_price || Number(row.current_price) <= 0)) {
       issues.suspicious_bids.push(row);
     }
   }

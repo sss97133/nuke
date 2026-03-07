@@ -3,7 +3,7 @@
  * 
  * Finds sold price data in unmapped sources and maps it to vehicles.sale_price:
  * 
- * 1. external_listings.final_price → vehicles.sale_price
+ * 1. vehicle_events.final_price → vehicles.sale_price
  * 2. vehicles.sold_price → vehicles.sale_price (if different field)
  * 3. vehicles.winning_bid → vehicles.sale_price
  * 4. vehicles.high_bid → vehicles.sale_price (if vehicle is sold)
@@ -45,24 +45,24 @@ interface MappingResult {
 }
 
 /**
- * Map final_price from external_listings to vehicles.sale_price
+ * Map final_price from vehicle_events to vehicles.sale_price
  */
 async function mapExternalListings(): Promise<MappingResult[]> {
-  console.log('🔍 Mapping external_listings.final_price → vehicles.sale_price...\n');
+  console.log('🔍 Mapping vehicle_events.final_price → vehicles.sale_price...\n');
 
   const { data: listings, error } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select(`
       vehicle_id,
       final_price,
       sold_at,
-      listing_status
+      event_status
     `)
-    .eq('listing_status', 'sold')
+    .eq('event_status', 'sold')
     .not('final_price', 'is', null);
 
   if (error) {
-    console.error('Error fetching external_listings:', error);
+    console.error('Error fetching vehicle_events:', error);
     return [];
   }
 
@@ -87,7 +87,7 @@ async function mapExternalListings(): Promise<MappingResult[]> {
   const vehicleMap = new Map((vehicles || []).map(v => [v.id, v]));
 
   if (error) {
-    console.error('Error fetching external_listings:', error);
+    console.error('Error fetching vehicle_events:', error);
     return [];
   }
 
@@ -137,7 +137,7 @@ async function mapExternalListings(): Promise<MappingResult[]> {
 
       if (updateError) {
         results.push({
-          source: 'external_listings',
+          source: 'vehicle_events',
           vehicleId: vehicle.id,
           year: vehicle.year,
           make: vehicle.make,
@@ -149,7 +149,7 @@ async function mapExternalListings(): Promise<MappingResult[]> {
         });
       } else {
         results.push({
-          source: 'external_listings',
+          source: 'vehicle_events',
           vehicleId: vehicle.id,
           year: vehicle.year,
           make: vehicle.make,
@@ -161,7 +161,7 @@ async function mapExternalListings(): Promise<MappingResult[]> {
       }
     } catch (error: any) {
       results.push({
-        source: 'external_listings',
+        source: 'vehicle_events',
         vehicleId: vehicle.id,
         year: vehicle.year,
         make: vehicle.make,
@@ -384,7 +384,7 @@ async function main() {
 
   const allResults: MappingResult[] = [];
 
-  // Map external_listings
+  // Map vehicle_events
   const externalResults = await mapExternalListings();
   allResults.push(...externalResults);
 

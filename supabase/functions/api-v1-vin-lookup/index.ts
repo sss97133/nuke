@@ -76,9 +76,9 @@ serve(async (req) => {
         .eq("vehicle_id", vehicle.id)
         .maybeSingle(),
 
-      // Listing count (external_listings)
+      // Listing count (vehicle_events)
       supabase
-        .from("external_listings")
+        .from("vehicle_events")
         .select("id", { count: "exact", head: true })
         .eq("vehicle_id", vehicle.id),
 

@@ -159,9 +159,9 @@ export function useStatsPanelData({ statsPanel, runVehiclesQueryWithListingKindF
         if (statsPanel === 'auctions') {
           try {
             const { data: listings, error: listErr } = await supabase
-              .from('external_listings')
-              .select('vehicle_id, platform, listing_status, current_bid, end_date, updated_at, listing_url')
-              .gt('end_date', nowIso)
+              .from('vehicle_events')
+              .select('vehicle_id, source_platform, event_status, current_price, ended_at, updated_at, source_url')
+              .gt('ended_at', nowIso)
               .order('updated_at', { ascending: false })
               .limit(2000);
 
@@ -191,7 +191,7 @@ export function useStatsPanelData({ statsPanel, runVehiclesQueryWithListingKindF
 
               if (cancelled) return;
               setStatsPanelRows(rows);
-              setStatsPanelMeta({ listing_source: 'external_listings' });
+              setStatsPanelMeta({ listing_source: 'vehicle_events' });
               return;
             }
           } catch {

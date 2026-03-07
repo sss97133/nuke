@@ -9,22 +9,22 @@ const supabase = createClient(
 
 async function main() {
   console.log('Applying platform constraint migration...');
-  
+
   const { error } = await supabase.rpc('exec_sql', {
     sql: `
       DO $$
       BEGIN
-        IF to_regclass('public.external_listings') IS NULL THEN
+        IF to_regclass('public.vehicle_events') IS NULL THEN
           RETURN;
         END IF;
 
-        ALTER TABLE public.external_listings
-          DROP CONSTRAINT IF EXISTS external_listings_platform_check;
+        ALTER TABLE public.vehicle_events
+          DROP CONSTRAINT IF EXISTS vehicle_events_source_platform_check;
 
-        ALTER TABLE public.external_listings
-          ADD CONSTRAINT external_listings_platform_check
+        ALTER TABLE public.vehicle_events
+          ADD CONSTRAINT vehicle_events_source_platform_check
           CHECK (
-            platform = ANY (ARRAY[
+            source_platform = ANY (ARRAY[
               'bat'::text,
               'cars_and_bids'::text,
               'mecum'::text,
@@ -51,7 +51,7 @@ async function main() {
       $$;
     `
   });
-  
+
   if (error) {
     // Try direct SQL if RPC doesn't exist
     console.log('RPC not available, constraint may already exist or need CLI migration');

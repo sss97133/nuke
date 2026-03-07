@@ -52,22 +52,22 @@ export class UnifiedPricingService {
     updated_at?: string | null;
   } | null> {
     try {
-      // 1) external_listings (BaT/C&B/etc) - canonical live feed for current_bid
+      // 1) vehicle_events (BaT/C&B/etc) - canonical live feed for current_price
       const { data: ext } = await supabase
-        .from('external_listings')
-        .select('platform, listing_url, listing_status, current_bid, updated_at')
+        .from('vehicle_events')
+        .select('source_platform, source_url, event_status, current_price, updated_at')
         .eq('vehicle_id', vehicleId)
-        .in('listing_status', ['active', 'live'])
+        .in('event_status', ['active', 'live'])
         .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      const extBid = typeof (ext as any)?.current_bid === 'number' ? (ext as any).current_bid : Number((ext as any)?.current_bid || 0);
+      const extBid = typeof (ext as any)?.current_price === 'number' ? (ext as any).current_price : Number((ext as any)?.current_price || 0);
       if (Number.isFinite(extBid) && extBid > 0) {
         return {
           bid: extBid,
-          platform: (ext as any)?.platform || undefined,
-          url: (ext as any)?.listing_url || undefined,
+          platform: (ext as any)?.source_platform || undefined,
+          url: (ext as any)?.source_url || undefined,
           updated_at: (ext as any)?.updated_at || null,
         };
       }

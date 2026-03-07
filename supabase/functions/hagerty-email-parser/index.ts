@@ -224,12 +224,12 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Find the external_listing
+    // Find the vehicle_event
     const { data: listing, error: listingError } = await supabase
-      .from('external_listings')
-      .select('id, vehicle_id, current_bid, bid_count')
-      .eq('platform', 'hagerty')
-      .or(`listing_url.ilike."%${escapePostgrestValue(auctionUuid)}%",listing_id.eq."${escapePostgrestValue(auctionUuid)}"`)
+      .from('vehicle_events')
+      .select('id, vehicle_id, current_price, bid_count')
+      .eq('source_platform', 'hagerty')
+      .or(`source_url.ilike."%${escapePostgrestValue(auctionUuid)}%",source_listing_id.eq."${escapePostgrestValue(auctionUuid)}"`)
 
       .limit(1)
       .maybeSingle();
@@ -267,7 +267,7 @@ serve(async (req) => {
     const { data: bid, error: bidError } = await supabase
       .from('external_auction_bids')
       .upsert({
-        external_listing_id: listing?.id || null,
+        vehicle_event_id: listing?.id || null,
         vehicle_id: listing?.vehicle_id || null,
         platform: 'hagerty',
         bid_amount: bidAmount,
@@ -286,7 +286,7 @@ serve(async (req) => {
           email_type: emailType,
         },
       }, {
-        onConflict: 'external_listing_id,bid_amount,bidder_username,bid_timestamp',
+        onConflict: 'vehicle_event_id,bid_amount,bidder_username,bid_timestamp',
         ignoreDuplicates: true
       })
       .select('id')
@@ -299,20 +299,20 @@ serve(async (req) => {
       console.log(`[hagerty-email] Saved bid: ${bid?.id}`);
     }
 
-    // Update external_listing with new bid info
-    if (listing && bidAmount > (listing.current_bid || 0)) {
+    // Update vehicle_event with new bid info
+    if (listing && bidAmount > (listing.current_price || 0)) {
       await supabase
-        .from('external_listings')
+        .from('vehicle_events')
         .update({
-          current_bid: bidAmount,
+          current_price: bidAmount,
           bid_count: (listing.bid_count || 0) + 1,
-          listing_status: emailType.isEnded ? 'sold' : 'active',
+          event_status: emailType.isEnded ? 'sold' : 'active',
           final_price: emailType.isEnded ? bidAmount : null,
           updated_at: receivedAt,
         })
         .eq('id', listing.id);
 
-      console.log(`[hagerty-email] Updated listing current_bid to $${bidAmount}`);
+      console.log(`[hagerty-email] Updated vehicle_event current_price to $${bidAmount}`);
     }
 
     return new Response(JSON.stringify({

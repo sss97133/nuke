@@ -79,23 +79,23 @@ async function getPipelineState() {
   console.log(`  Processed: ${iqProcessed.count.toLocaleString()}`);
   console.log(`  Failed:    ${iqFailed.count.toLocaleString()}`);
 
-  // Check bat_listings (discovered BaT URLs)
+  // Check vehicle_events for BaT (discovered BaT URLs)
   console.log('\n' + '═'.repeat(60));
-  console.log('BAT DISCOVERY STATUS:');
-  const batListings = await query('bat_listings?select=id&limit=1');
-  const batWithVehicle = await query('bat_listings?vehicle_id=not.is.null&select=id&limit=1');
-  const batWithComments = await query('bat_listings?comments_extracted_at=not.is.null&select=id&limit=1');
+  console.log('BAT EVENTS STATUS:');
+  const batEvents = await query('vehicle_events?source_platform=eq.bat&select=id&limit=1');
+  const batWithVehicle = await query('vehicle_events?source_platform=eq.bat&vehicle_id=not.is.null&select=id&limit=1');
+  const batWithComments = await query('vehicle_events?source_platform=eq.bat&comments_extracted_at=not.is.null&select=id&limit=1');
 
-  console.log(`  Discovered URLs:    ${batListings.count.toLocaleString()}`);
+  console.log(`  BaT Events:         ${batEvents.count.toLocaleString()}`);
   console.log(`  Linked to Vehicle:  ${batWithVehicle.count.toLocaleString()}`);
   console.log(`  Comments Extracted: ${batWithComments.count.toLocaleString()}`);
-  console.log(`  Unlinked:          ${(batListings.count - batWithVehicle.count).toLocaleString()}`);
+  console.log(`  Unlinked:          ${(batEvents.count - batWithVehicle.count).toLocaleString()}`);
 
-  // Check external_listings
+  // Check vehicle_events total
   console.log('\n' + '═'.repeat(60));
-  console.log('EXTERNAL LISTINGS:');
-  const extTotal = await query('external_listings?select=id&limit=1');
-  console.log(`  Total: ${extTotal.count.toLocaleString()}`);
+  console.log('VEHICLE EVENTS:');
+  const eventsTotal = await query('vehicle_events?select=id&limit=1');
+  console.log(`  Total: ${eventsTotal.count.toLocaleString()}`);
 
   // Summary
   console.log('\n' + '═'.repeat(60));
@@ -119,7 +119,7 @@ async function getPipelineState() {
     }
   }
 
-  const unlinkedBat = batListings.count - batWithVehicle.count;
+  const unlinkedBat = batEvents.count - batWithVehicle.count;
   if (unlinkedBat > 0) {
     console.log(`  - BaT: ${unlinkedBat.toLocaleString()} discovered URLs not linked to vehicles`);
   }

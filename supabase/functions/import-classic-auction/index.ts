@@ -298,18 +298,18 @@ serve(async (req) => {
     const listingId = extractListingId(u);
     const listingUrlKey = normalizeListingUrlKey(url);
     const { data: ext, error: extErr } = await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .upsert(
         {
           vehicle_id: vehicleId,
-          organization_id: organizationId,
-          platform: 'classic_com',
-          listing_url: url,
-          listing_url_key: listingUrlKey,
-          listing_id: listingId,
-          listing_status: listingStatus,
-          end_date: endDateIso,
-          current_bid: currentBid,
+          source_organization_id: organizationId,
+          source_platform: 'classic_com',
+          event_type: 'auction',
+          source_url: url,
+          source_listing_id: listingUrlKey || listingId,
+          event_status: listingStatus,
+          ended_at: endDateIso,
+          current_price: currentBid,
           bid_count: bidCount,
           metadata: {
             source: 'import-classic-auction',
@@ -318,7 +318,7 @@ serve(async (req) => {
           },
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'vehicle_id,platform,listing_id' },
+        { onConflict: 'source_platform,source_listing_id' },
       )
       .select('id')
       .maybeSingle();
@@ -399,7 +399,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         vehicle_id: vehicleId,
-        external_listing_id: ext?.id,
+        vehicle_event_id: ext?.id,
         platform: 'classic_com',
         source_id: sourceId,
         listing_status: listingStatus,

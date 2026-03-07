@@ -345,17 +345,17 @@ async function saveVehicle(
       });
   }
 
-  // Create external_listings record
+  // Create vehicle_events record
   await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .upsert(
       {
         vehicle_id: vehicleId,
-        platform: 'rmsothebys',
-        listing_url: vehicle.url,
-        listing_url_key: listingUrlKey,
-        listing_id: vehicle.lot_number,
-        listing_status: vehicle.sold ? 'sold' : (vehicle.is_still_for_sale ? 'active' : 'ended'),
+        source_platform: 'rmsothebys',
+        event_type: 'auction',
+        source_url: vehicle.url,
+        source_listing_id: listingUrlKey || vehicle.lot_number,
+        event_status: vehicle.sold ? 'sold' : (vehicle.is_still_for_sale ? 'active' : 'ended'),
         final_price: vehicle.sold_price,
         sold_at: vehicle.sold ? new Date().toISOString() : null,
         metadata: {

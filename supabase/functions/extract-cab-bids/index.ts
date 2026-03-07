@@ -160,12 +160,12 @@ async function extractBidsForUrl(
   }
 
   if (!vehicleId) {
-    // Try external_listings
+    // Try vehicle_events
     const { data: el } = await supabase
-      .from("external_listings")
+      .from("vehicle_events")
       .select("vehicle_id")
-      .eq("platform", "carsandbids")
-      .eq("listing_url", url)
+      .eq("source_platform", "carsandbids")
+      .eq("source_url", url)
       .limit(1)
       .maybeSingle();
     if (el?.vehicle_id) vehicleId = el.vehicle_id;
@@ -272,7 +272,7 @@ async function extractBidsForUrl(
   // Insert bids into external_auction_bids
   const rows = bids.map((b) => ({
     vehicle_id: vehicleId,
-    external_listing_id: null,
+    vehicle_event_id: null,
     platform: "cars_and_bids",
     bid_amount: b.bid_amount,
     bid_timestamp: null, // C&B doesn't show individual bid timestamps

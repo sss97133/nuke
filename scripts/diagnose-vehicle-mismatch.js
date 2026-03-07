@@ -134,23 +134,23 @@ async function diagnoseVehicle() {
     }
   }
 
-  // 4. Check external listings
-  console.log('\n4️⃣  EXTERNAL LISTINGS:');
+  // 4. Check vehicle events
+  console.log('\n4️⃣  VEHICLE EVENTS:');
   const { data: listings, error: listingsError } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('*')
     .eq('vehicle_id', VEHICLE_ID)
     .order('created_at', { ascending: false });
 
   if (listingsError) {
-    console.error('❌ Error fetching listings:', listingsError);
+    console.error('❌ Error fetching events:', listingsError);
   } else {
-    console.log(`   Total listings: ${listings?.length || 0}`);
+    console.log(`   Total events: ${listings?.length || 0}`);
     if (listings && listings.length > 0) {
       listings.forEach((listing, idx) => {
-        console.log(`   ${idx + 1}. ${listing.platform} - ${listing.listing_status}`);
-        console.log(`      URL: ${listing.listing_url || 'N/A'}`);
-        console.log(`      Current Bid: ${listing.current_bid ? `$${listing.current_bid.toLocaleString()}` : 'N/A'}`);
+        console.log(`   ${idx + 1}. ${listing.source_platform} - ${listing.event_status}`);
+        console.log(`      URL: ${listing.source_url || 'N/A'}`);
+        console.log(`      Current Price: ${listing.current_price ? `$${listing.current_price.toLocaleString()}` : 'N/A'}`);
         console.log(`      Final Price: ${listing.final_price ? `$${listing.final_price.toLocaleString()}` : 'N/A'}`);
       });
     }

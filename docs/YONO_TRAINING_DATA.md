@@ -8,7 +8,7 @@
 | `auction_comments` | 9.3M | Text discussions, Q&A, expert opinions |
 | `vehicles` | 255K | Year/make/model, VIN, specs, descriptions |
 | `vehicle_observations` | 623K | Event store: repairs, inspections, parts |
-| `bat_listings` | 112K | Full auction descriptions |
+| `vehicle_events` | 170K | Auction/listing events (descriptions, prices, source metadata) |
 
 ## Training Data Types
 
@@ -68,10 +68,10 @@ GROUP BY vehicle_id
 SELECT
   ac.comment_text,
   v.year, v.make, v.model,
-  bl.description
+  ve.description
 FROM auction_comments ac
 JOIN vehicles v ON v.id = ac.vehicle_id
-JOIN bat_listings bl ON bl.vehicle_id = ac.vehicle_id
+JOIN vehicle_events ve ON ve.vehicle_id = ac.vehicle_id
 WHERE length(ac.comment_text) > 100
 ```
 

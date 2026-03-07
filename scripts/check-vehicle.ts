@@ -22,19 +22,19 @@ async function check() {
   console.log('Vehicle:', vehicle?.year, vehicle?.make, vehicle?.model);
   console.log('VIN:', vehicle?.vin);
 
-  // Get external listing
+  // Get vehicle event
   const { data: listing } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('*')
     .eq('vehicle_id', VEHICLE_ID)
     .single();
 
   if (listing) {
-    console.log('\n--- External Listing ---');
-    console.log('Platform:', listing.platform);
-    console.log('URL:', listing.listing_url);
-    console.log('Status:', listing.listing_status);
-    console.log('Current bid:', listing.current_bid);
+    console.log('\n--- Vehicle Event ---');
+    console.log('Platform:', listing.source_platform);
+    console.log('URL:', listing.source_url);
+    console.log('Status:', listing.event_status);
+    console.log('Current price:', listing.current_price);
     console.log('Metadata source:', listing.metadata?.source);
     console.log('Comment count in metadata:', listing.metadata?.comment_count);
   }

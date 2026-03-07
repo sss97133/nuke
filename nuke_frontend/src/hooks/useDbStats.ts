@@ -144,13 +144,13 @@ export function useDbStats({ runVehiclesQueryWithListingKindFallback }: UseDbSta
 
         const baseStats = computeVehicleStats(allVehicles || [], totalCount || (allVehicles || []).length);
 
-        // Prefer external_listings for a true "live auctions" count (end_date in the future).
+        // Prefer vehicle_events for a true "live auctions" count (ended_at in the future).
         let activeAuctionsLive = baseStats.activeAuctions;
         try {
           const { data: liveListings, error: liveErr } = await supabase
-            .from('external_listings')
-            .select('vehicle_id, end_date, listing_status')
-            .gt('end_date', new Date().toISOString())
+            .from('vehicle_events')
+            .select('vehicle_id, ended_at, event_status')
+            .gt('ended_at', new Date().toISOString())
             .order('updated_at', { ascending: false })
             .limit(5000);
           if (!liveErr && Array.isArray(liveListings) && liveListings.length > 0) {

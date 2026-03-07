@@ -231,15 +231,16 @@ serve(async (req) => {
     // Select candidates
     let listingUrls: string[] = listingUrlsInput;
     if (listingUrls.length === 0) {
-      // Prefer bat_listings if present; fall back to vehicles.bat_auction_url.
+      // Prefer vehicle_events if present; fall back to vehicles.bat_auction_url.
       const { data: batRows, error: batErr } = await supabase
-        .from('bat_listings')
-        .select('bat_listing_url')
-        .order('last_updated_at', { ascending: false })
+        .from('vehicle_events')
+        .select('source_url')
+        .eq('source_platform', 'bat')
+        .order('updated_at', { ascending: false })
         .limit(limit);
 
       if (!batErr && Array.isArray(batRows) && batRows.length > 0) {
-        listingUrls = batRows.map((r: any) => String(r.bat_listing_url)).filter(Boolean);
+        listingUrls = batRows.map((r: any) => String(r.source_url)).filter(Boolean);
       } else {
         const { data: vehRows } = await supabase
           .from('vehicles')

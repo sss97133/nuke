@@ -140,8 +140,8 @@ async function findSuspiciousPrices(): Promise<Array<{
   model: string;
   sale_price: number;
   bat_auction_url: string | null;
-  external_listing_id: string | null;
-  external_final_price: number | null;
+  vehicle_event_id: string | null;
+  vehicle_event_final_price: number | null;
 }>> {
   console.log('🔍 Finding vehicles with suspiciously low prices...\n');
 
@@ -162,17 +162,17 @@ async function findSuspiciousPrices(): Promise<Array<{
     return [];
   }
 
-  // Also check external_listings
+  // Also check vehicle_events
   const { data: listings, error: listingsError } = await supabase
-    .from('external_listings')
-    .select('vehicle_id, final_price, listing_url')
+    .from('vehicle_events')
+    .select('vehicle_id, final_price, source_url')
     .not('final_price', 'is', null)
     .lt('final_price', 1000)
     .gt('final_price', 0)
-    .eq('listing_status', 'sold');
+    .eq('event_status', 'sold');
 
   if (listingsError) {
-    console.error('Error fetching external_listings:', listingsError);
+    console.error('Error fetching vehicle_events:', listingsError);
   }
 
   // Combine and deduplicate
@@ -187,8 +187,8 @@ async function findSuspiciousPrices(): Promise<Array<{
         model: vehicle.model,
         sale_price: vehicle.sale_price,
         bat_auction_url: vehicle.bat_auction_url,
-        external_listing_id: null,
-        external_final_price: null
+        vehicle_event_id: null,
+        vehicle_event_final_price: null
       });
     }
   }
@@ -197,8 +197,8 @@ async function findSuspiciousPrices(): Promise<Array<{
     if (!listing.vehicle_id) continue;
     
     if (suspicious.has(listing.vehicle_id)) {
-      suspicious.get(listing.vehicle_id).external_final_price = listing.final_price;
-      suspicious.get(listing.vehicle_id).external_listing_id = listing.id;
+      suspicious.get(listing.vehicle_id).vehicle_event_final_price = listing.final_price;
+      suspicious.get(listing.vehicle_id).vehicle_event_id = listing.id;
     } else {
       // Get vehicle info
       const { data: vehicle } = await supabase
@@ -214,9 +214,9 @@ async function findSuspiciousPrices(): Promise<Array<{
           make: vehicle.make,
           model: vehicle.model,
           sale_price: vehicle.sale_price,
-          bat_auction_url: vehicle.bat_auction_url || listing.listing_url,
-          external_listing_id: listing.id,
-          external_final_price: listing.final_price
+          bat_auction_url: vehicle.bat_auction_url || listing.source_url,
+          vehicle_event_id: listing.id,
+          vehicle_event_final_price: listing.final_price
         });
       }
     }
@@ -234,7 +234,7 @@ async function fixPrice(vehicle: any): Promise<PriceFix> {
     year: vehicle.year,
     make: vehicle.make,
     model: vehicle.model,
-    currentPrice: vehicle.sale_price || vehicle.external_final_price || 0,
+    currentPrice: vehicle.sale_price || vehicle.vehicle_event_final_price || 0,
     correctPrice: null,
     batUrl: vehicle.bat_auction_url,
     success: false
@@ -285,15 +285,15 @@ async function fixPrice(vehicle: any): Promise<PriceFix> {
       return result;
     }
 
-    // Update external_listing if it exists
-    if (vehicle.external_listing_id) {
+    // Update vehicle_event if it exists
+    if (vehicle.vehicle_event_id) {
       await supabase
-        .from('external_listings')
+        .from('vehicle_events')
         .update({
           final_price: scraped.price,
           updated_at: new Date().toISOString()
         })
-        .eq('id', vehicle.external_listing_id);
+        .eq('id', vehicle.vehicle_event_id);
     }
 
     result.success = true;
@@ -318,7 +318,7 @@ async function main() {
 
   // Show first 10
   suspicious.slice(0, 10).forEach((v, i) => {
-    console.log(`  ${i + 1}. ${v.year || '?'} ${v.make} ${v.model}: $${v.sale_price || v.external_final_price}`);
+    console.log(`  ${i + 1}. ${v.year || '?'} ${v.make} ${v.model}: $${v.sale_price || v.vehicle_event_final_price}`);
     console.log(`     URL: ${v.bat_auction_url || 'N/A'}\n`);
   });
 

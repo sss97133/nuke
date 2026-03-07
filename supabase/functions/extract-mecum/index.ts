@@ -697,27 +697,27 @@ async function saveVehicle(
     }
   }
 
-  // Create external_listing (for tracking)
+  // Create vehicle_event (for tracking)
   const { data: existingListing } = await supabase
-    .from("external_listings")
+    .from("vehicle_events")
     .select("id")
     .eq("vehicle_id", vehicleId)
-    .eq("platform", "mecum")
-    .eq("url", vehicle.url)
+    .eq("source_platform", "mecum")
+    .eq("source_url", vehicle.url)
     .limit(1)
     .maybeSingle();
 
   if (!existingListing) {
     try {
-      await supabase.from("external_listings").insert({
+      await supabase.from("vehicle_events").insert({
         vehicle_id: vehicleId,
-        platform: "mecum",
-        url: vehicle.url,
-        title: vehicle.title,
-        listing_type: "auction",
-        lot_number: vehicle.lot_number,
-        sale_price: vehicle.sale_price,
-        status: vehicle.status || "listed",
+        source_platform: "mecum",
+        event_type: "auction",
+        source_url: vehicle.url,
+        source_listing_id: vehicle.lot_number || null,
+        final_price: vehicle.sale_price,
+        event_status: vehicle.status || "listed",
+        metadata: { title: vehicle.title },
       });
     } catch { /* non-fatal */ }
   }

@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
-interface ExternalListing {
+interface VehicleEvent {
   id: string;
-  platform: string;
-  listing_url: string;
-  listing_status: string;
-  current_bid?: number;
+  source_platform: string;
+  source_url: string;
+  event_status: string;
+  current_price?: number;
   final_price?: number;
   bid_count?: number;
   view_count?: number;
   watcher_count?: number;
-  end_date?: string;
+  ended_at?: string;
   sold_at?: string;
   updated_at?: string;
   metadata?: any;
@@ -41,7 +41,7 @@ const platformColors: Record<string, string> = {
 };
 
 const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
-  const [listings, setListings] = useState<ExternalListing[]>([]);
+  const [listings, setListings] = useState<VehicleEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   const parseTs = (v: any): number => {
@@ -79,30 +79,30 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
     }
   };
 
-  const normalizeAndSortListings = (rows: any[]): ExternalListing[] => {
-    const arr: ExternalListing[] = (Array.isArray(rows) ? rows : [])
+  const normalizeAndSortListings = (rows: any[]): VehicleEvent[] => {
+    const arr: VehicleEvent[] = (Array.isArray(rows) ? rows : [])
       .filter(Boolean)
       .map((r: any) => ({
         ...r,
-        platform: String(r?.platform || '').trim(),
-        listing_url: String(r?.listing_url || '').trim(),
-        listing_status: String(r?.listing_status || '').trim(),
+        source_platform: String(r?.source_platform || '').trim(),
+        source_url: String(r?.source_url || '').trim(),
+        event_status: String(r?.event_status || '').trim(),
       }))
-      .filter((r: any) => r.platform && r.listing_url);
+      .filter((r: any) => r.source_platform && r.source_url);
 
     // Dedupe by normalized URL (old pipelines could insert duplicates).
-    const byKey = new Map<string, ExternalListing>();
+    const byKey = new Map<string, VehicleEvent>();
     for (const row of arr) {
-      const key = normalizeListingUrlKey(row.listing_url);
+      const key = normalizeListingUrlKey(row.source_url);
       if (!key) continue;
 
-      const rowTs = parseTs(row.sold_at || row.end_date || (row as any).updated_at || row.created_at);
+      const rowTs = parseTs(row.sold_at || row.ended_at || (row as any).updated_at || row.created_at);
       const existing = byKey.get(key);
       if (!existing) {
         byKey.set(key, row);
         continue;
       }
-      const existingTs = parseTs(existing.sold_at || existing.end_date || (existing as any).updated_at || existing.created_at);
+      const existingTs = parseTs(existing.sold_at || existing.ended_at || (existing as any).updated_at || existing.created_at);
       const keepNew = Number.isFinite(rowTs) && (!Number.isFinite(existingTs) || rowTs >= existingTs);
       const merged = keepNew
         ? { ...existing, ...row, metadata: { ...(existing as any).metadata, ...(row as any).metadata } }
@@ -112,8 +112,8 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
 
     const out = Array.from(byKey.values());
     out.sort((a, b) => {
-      const at = parseTs(a.sold_at || a.end_date || (a as any).updated_at || a.created_at);
-      const bt = parseTs(b.sold_at || b.end_date || (b as any).updated_at || b.created_at);
+      const at = parseTs(a.sold_at || a.ended_at || (a as any).updated_at || a.created_at);
+      const bt = parseTs(b.sold_at || b.ended_at || (b as any).updated_at || b.created_at);
       if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return bt - at;
       return 0;
     });
@@ -121,23 +121,23 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
   };
 
   useEffect(() => {
-    loadExternalListings();
+    loadVehicleEvents();
   }, [vehicleId]);
 
-  const loadExternalListings = async () => {
+  const loadVehicleEvents = async () => {
     try {
       // Use RPC data if available (eliminates duplicate query)
       const rpcData = (window as any).__vehicleProfileRpcData;
       const rpcMatchesThisVehicle = rpcData && rpcData.vehicle_id === vehicleId;
-      if (rpcMatchesThisVehicle && rpcData?.external_listings) {
-        setListings(normalizeAndSortListings(rpcData.external_listings));
+      if (rpcMatchesThisVehicle && rpcData?.vehicle_events) {
+        setListings(normalizeAndSortListings(rpcData.vehicle_events));
         setLoading(false);
         return; // Skip fetch if provided
       }
-      
+
       // Fallback: fetch if not in RPC data
       const { data, error } = await supabase
-        .from('external_listings')
+        .from('vehicle_events')
         .select('*')
         .eq('vehicle_id', vehicleId)
         .order('updated_at', { ascending: false })
@@ -147,7 +147,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
 
       setListings(normalizeAndSortListings(data || []));
     } catch (error) {
-      console.error('Error loading external listings:', error);
+      console.error('Error loading vehicle events:', error);
     } finally {
       setLoading(false);
     }
@@ -156,7 +156,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
   if (loading) {
     return (
       <div style={{ padding: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
-        Loading external listings...
+        Loading auction history...
       </div>
     );
   }
@@ -170,9 +170,9 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
       <div className="card-header">Auction history</div>
       <div className="card-body">
         {listings.map(listing => {
-          const platformName = platformNames[listing.platform] || listing.platform;
-          const platformColor = platformColors[listing.platform] || 'var(--accent)';
-          const statusStr = String(listing.listing_status || '').toLowerCase();
+          const platformName = platformNames[listing.source_platform] || listing.source_platform;
+          const platformColor = platformColors[listing.source_platform] || 'var(--accent)';
+          const statusStr = String(listing.event_status || '').toLowerCase();
           const isActive = statusStr === 'active' || statusStr === 'live';
           const isSold = statusStr === 'sold';
           const reserveStatus = String(listing.metadata?.reserve_status || '').toLowerCase();
@@ -185,7 +185,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
             String(listing.metadata?.seller_username || listing.metadata?.seller || '').trim() || null;
           const buyer =
             String(listing.metadata?.buyer_username || listing.metadata?.buyer || '').trim() || null;
-          const endIso = (listing.sold_at || listing.end_date || null) as string | null;
+          const endIso = (listing.sold_at || listing.ended_at || null) as string | null;
           const endLabel = isSold ? 'Sold' : (isActive ? 'Ends' : 'Ended');
 
           return (
@@ -220,7 +220,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                     fontSize: '11px',
                     fontWeight: 700
                   }}>
-                    {listing.listing_status.toUpperCase().replace('_', ' ')}
+                    {listing.event_status.toUpperCase().replace('_', ' ')}
                   </div>
                   {reserveNotMet && (
                     <div style={{
@@ -236,7 +236,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                   )}
                 </div>
                 <a
-                  href={listing.listing_url}
+                  href={listing.source_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="button button-small"
@@ -264,13 +264,13 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
 
               {/* Stats */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px', marginBottom: '8px' }}>
-                {listing.current_bid !== null && listing.current_bid !== undefined && (
+                {listing.current_price !== null && listing.current_price !== undefined && (
                   <div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
                       {reserveNotMet ? 'High Bid' : 'Current Bid'}
                     </div>
                     <div style={{ fontSize: '15px', fontWeight: 700 }}>
-                      ${listing.current_bid.toLocaleString()}
+                      ${listing.current_price.toLocaleString()}
                     </div>
                   </div>
                 )}

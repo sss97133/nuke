@@ -78,53 +78,53 @@ serve(async (req) => {
       tierListingsRes,
     ] = await Promise.all([
       supabase
-        .from("external_listings")
-        .select("platform, bid_count, current_bid")
-        .eq("listing_status", "active")
-        .not("platform", "is", null),
+        .from("vehicle_events")
+        .select("source_platform, bid_count, current_price")
+        .eq("event_status", "active")
+        .not("source_platform", "is", null),
       supabase
-        .from("external_listings")
-        .select("platform, created_at")
-        .not("platform", "is", null)
+        .from("vehicle_events")
+        .select("source_platform, created_at")
+        .not("source_platform", "is", null)
         .gte("created_at", cutoffDays.toISOString())
         .limit(10000),
       supabase
-        .from("external_listings")
+        .from("vehicle_events")
         .select("bid_count")
-        .lte("end_date", now)
-        .gte("end_date", cutoff7d.toISOString())
+        .lte("ended_at", now)
+        .gte("ended_at", cutoff7d.toISOString())
         .not("bid_count", "is", null),
       supabase
-        .from("external_listings")
+        .from("vehicle_events")
         .select("bid_count")
-        .lte("end_date", cutoff30d.toISOString())
-        .gte("end_date", cutoff90d.toISOString())
+        .lte("ended_at", cutoff30d.toISOString())
+        .gte("ended_at", cutoff90d.toISOString())
         .not("bid_count", "is", null)
         .limit(5000),
       supabase
-        .from("external_listings")
-        .select("listing_status")
-        .gte("end_date", cutoff30d.toISOString())
-        .in("listing_status", ["sold", "ended", "unsold"]),
+        .from("vehicle_events")
+        .select("event_status")
+        .gte("ended_at", cutoff30d.toISOString())
+        .in("event_status", ["sold", "ended", "unsold"]),
       supabase
-        .from("external_listings")
-        .select("end_date, final_price")
-        .eq("listing_status", "sold")
-        .gte("end_date", cutoffDays.toISOString())
+        .from("vehicle_events")
+        .select("ended_at, final_price")
+        .eq("event_status", "sold")
+        .gte("ended_at", cutoffDays.toISOString())
         .not("final_price", "is", null)
         .limit(5000),
       supabase
-        .from("external_listings")
-        .select("end_date")
-        .lte("end_date", now)
-        .gte("end_date", cutoffDays.toISOString())
-        .not("end_date", "is", null)
+        .from("vehicle_events")
+        .select("ended_at")
+        .lte("ended_at", now)
+        .gte("ended_at", cutoffDays.toISOString())
+        .not("ended_at", "is", null)
         .limit(10000),
       supabase
-        .from("external_listings")
+        .from("vehicle_events")
         .select("vehicle_id, bid_count, final_price")
-        .gte("end_date", cutoff30d.toISOString())
-        .in("listing_status", ["sold", "ended"])
+        .gte("ended_at", cutoff30d.toISOString())
+        .in("event_status", ["sold", "ended"])
         .not("vehicle_id", "is", null)
         .limit(5000),
     ]);
@@ -132,7 +132,7 @@ serve(async (req) => {
     // Process source leaderboard
     const platformMap: Record<string, { count: number; totalBids: number; totalPrice: number; bidRecords: number; priceRecords: number }> = {};
     for (const row of activeListingsRes.data || []) {
-      const platform = row.platform;
+      const platform = row.source_platform;
       if (!platform) continue;
       if (!platformMap[platform]) {
         platformMap[platform] = { count: 0, totalBids: 0, totalPrice: 0, bidRecords: 0, priceRecords: 0 };
@@ -142,8 +142,8 @@ serve(async (req) => {
         platformMap[platform].totalBids += row.bid_count;
         platformMap[platform].bidRecords++;
       }
-      if (row.current_bid != null) {
-        platformMap[platform].totalPrice += Number(row.current_bid);
+      if (row.current_price != null) {
+        platformMap[platform].totalPrice += Number(row.current_price);
         platformMap[platform].priceRecords++;
       }
     }
@@ -152,7 +152,7 @@ serve(async (req) => {
         platform,
         active_auctions: stats.count,
         avg_bids: stats.bidRecords > 0 ? Number((stats.totalBids / stats.bidRecords).toFixed(1)) : 0,
-        avg_current_bid: stats.priceRecords > 0 ? Math.round(stats.totalPrice / stats.priceRecords) : 0,
+        avg_current_price: stats.priceRecords > 0 ? Math.round(stats.totalPrice / stats.priceRecords) : 0,
       }))
       .sort((a, b) => b.active_auctions - a.active_auctions);
 
@@ -160,7 +160,7 @@ serve(async (req) => {
     const dailyMap: Record<string, Record<string, number>> = {};
     for (const row of recentCreatedRes.data || []) {
       const day = row.created_at?.slice(0, 10);
-      const platform = row.platform;
+      const platform = row.source_platform;
       if (!day || !platform) continue;
       if (!dailyMap[platform]) dailyMap[platform] = {};
       dailyMap[platform][day] = (dailyMap[platform][day] || 0) + 1;
@@ -189,9 +189,9 @@ serve(async (req) => {
     let endedCount = 0;
     let unsoldCount = 0;
     for (const row of completedRes.data || []) {
-      if (row.listing_status === "sold") soldCount++;
-      else if (row.listing_status === "ended") endedCount++;
-      else if (row.listing_status === "unsold") unsoldCount++;
+      if (row.event_status === "sold") soldCount++;
+      else if (row.event_status === "ended") endedCount++;
+      else if (row.event_status === "unsold") unsoldCount++;
     }
     const totalCompleted = soldCount + endedCount + unsoldCount;
     const sellThroughRate = totalCompleted > 0 ? soldCount / totalCompleted : 0;
@@ -199,8 +199,8 @@ serve(async (req) => {
     // Calculate weekly price trends
     const weekMap: Record<string, { total: number; count: number }> = {};
     for (const row of soldListingsRes.data || []) {
-      if (!row.end_date || row.final_price == null || Number(row.final_price) <= 0) continue;
-      const date = new Date(row.end_date);
+      if (!row.ended_at || row.final_price == null || Number(row.final_price) <= 0) continue;
+      const date = new Date(row.ended_at);
       const startOfWeek = new Date(date);
       startOfWeek.setDate(date.getDate() - date.getDay());
       const weekKey = startOfWeek.toISOString().slice(0, 10);
@@ -229,8 +229,8 @@ serve(async (req) => {
     const hourMap: Record<number, number> = {};
     for (let h = 0; h < 24; h++) hourMap[h] = 0;
     for (const row of endedListingsRes.data || []) {
-      if (!row.end_date) continue;
-      const hour = new Date(row.end_date).getUTCHours();
+      if (!row.ended_at) continue;
+      const hour = new Date(row.ended_at).getUTCHours();
       hourMap[hour]++;
     }
     const hourlyDistribution = Array.from({ length: 24 }, (_, hour) => ({

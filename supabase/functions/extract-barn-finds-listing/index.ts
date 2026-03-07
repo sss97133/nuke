@@ -187,17 +187,17 @@ serve(async (req) => {
       finalVehicleId = inserted.id;
     }
 
-    await supabase.from("external_listings").upsert(
+    await supabase.from("vehicle_events").upsert(
       {
         vehicle_id: finalVehicleId,
-        platform,
-        listing_url: url,
-        listing_url_key: listingUrlKey,
-        listing_id: slug,
-        listing_status: "active",
+        source_platform: platform,
+        event_type: "listing",
+        source_url: url,
+        source_listing_id: listingUrlKey || slug,
+        event_status: "active",
         metadata: { seller: parsed.seller, location: parsed.location, source: "extract-barn-finds-listing" },
       },
-      { onConflict: "platform,listing_url_key" }
+      { onConflict: "source_platform,source_listing_id" }
     );
 
     return new Response(JSON.stringify({ success: true, vehicle_id: finalVehicleId }), {

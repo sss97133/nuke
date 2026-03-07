@@ -108,7 +108,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
     };
   }, [vehicleId]);
 
-  // Auction pulse (external_listings + last bid/comment timestamps) to make the price card actionable during live auctions.
+  // Auction pulse (vehicle_events + last bid/comment timestamps) to make the price card actionable during live auctions.
   useEffect(() => {
     if (!vehicleId) return;
     let cancelled = false;
@@ -116,13 +116,13 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
     const pickBestListing = (arr: any[]): any | null => {
       const now = Date.now();
       const sorted = (arr || []).slice().sort((a: any, b: any) => {
-        const aStatus = String(a?.listing_status || '').toLowerCase();
-        const bStatus = String(b?.listing_status || '').toLowerCase();
+        const aStatus = String(a?.event_status || a?.listing_status || '').toLowerCase();
+        const bStatus = String(b?.event_status || b?.listing_status || '').toLowerCase();
         const aActive = aStatus === 'active' || aStatus === 'live';
         const bActive = bStatus === 'active' || bStatus === 'live';
         if (aActive !== bActive) return aActive ? -1 : 1;
-        const ae = a?.end_date ? new Date(a.end_date).getTime() : 0;
-        const be = b?.end_date ? new Date(b.end_date).getTime() : 0;
+        const ae = (a?.ended_at || a?.end_date) ? new Date(a.ended_at || a.end_date).getTime() : 0;
+        const be = (b?.ended_at || b?.end_date) ? new Date(b.ended_at || b.end_date).getTime() : 0;
         const aFuture = ae > now;
         const bFuture = be > now;
         if (aFuture !== bFuture) return aFuture ? -1 : 1;
@@ -139,19 +139,19 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
         // Prefer RPC snapshot if present to avoid duplicate reads
         const rpcCache = (window as any).__vehicleProfileRpcData;
         const rpcListings =
-          rpcCache && rpcCache.vehicle_id === vehicleId ? rpcCache.external_listings : null;
+          rpcCache && rpcCache.vehicle_id === vehicleId ? rpcCache.vehicle_events : null;
         const fromRpc = Array.isArray(rpcListings) ? pickBestListing(rpcListings) : null;
 
         // Always try to refresh from DB for live accuracy (best-effort)
         const { data: listings } = await supabase
-          .from('external_listings')
-          .select('platform, listing_url, listing_status, end_date, current_bid, bid_count, watcher_count, view_count, metadata, updated_at')
+          .from('vehicle_events')
+          .select('source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, metadata, updated_at')
           .eq('vehicle_id', vehicleId)
           .order('updated_at', { ascending: false })
           .limit(10);
 
         const best = pickBestListing((listings && listings.length > 0) ? listings : (fromRpc ? [fromRpc] : []));
-        if (!best?.listing_url || !best?.platform) {
+        if (!(best?.source_url || best?.listing_url) || !(best?.source_platform || best?.platform)) {
           if (!cancelled) setAuctionPulse(null);
           return;
         }
@@ -211,11 +211,11 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
 
         if (!cancelled) {
           setAuctionPulse({
-            platform: String(best.platform),
-            listing_url: String(best.listing_url),
-            listing_status: String(best.listing_status || ''),
-            end_date: best.end_date || null,
-            current_bid: typeof best.current_bid === 'number' ? best.current_bid : null,
+            platform: String(best.source_platform || best.platform),
+            listing_url: String(best.source_url || best.listing_url),
+            listing_status: String(best.event_status || best.listing_status || ''),
+            end_date: best.ended_at || best.end_date || null,
+            current_bid: typeof (best.current_price ?? best.current_bid) === 'number' ? (best.current_price ?? best.current_bid) : null,
             bid_count: bidCount, // Use separated bid count
             watcher_count: typeof best.watcher_count === 'number' ? best.watcher_count : null,
             view_count: typeof best.view_count === 'number' ? best.view_count : null,

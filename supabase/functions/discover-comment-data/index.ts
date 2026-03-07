@@ -267,7 +267,7 @@ serve(async (req) => {
         .maybeSingle();
       if (vehicle) vehiclesToProcess = [vehicle];
     } else if (source === "auction_comments") {
-      // USE bat_listings to find vehicles with comments (has comment_count metadata)
+      // USE vehicle_events to find vehicles with comments (has comment_count metadata)
       // Then verify they have extracted comments in auction_comments
 
       // Get already discovered vehicle_ids first
@@ -277,11 +277,12 @@ serve(async (req) => {
       const discoveredIds = new Set((alreadyDiscovered || []).map((d: any) => d.vehicle_id));
       console.log(`Already discovered: ${discoveredIds.size}`);
 
-      // Get bat_listings with comments, with pagination support
+      // Get vehicle_events with comments, with pagination support
       // Use offset to get different batches of vehicles
       const { data: batListings } = await supabase
-        .from("bat_listings")
+        .from("vehicle_events")
         .select("vehicle_id, comment_count")
+        .eq("source_platform", "bat")
         .gt("comment_count", minComments)
         .not("vehicle_id", "is", null)
         .order("comment_count", { ascending: false })
@@ -292,7 +293,7 @@ serve(async (req) => {
         const undiscoveredListings = batListings.filter(
           (bl: any) => bl.vehicle_id && !discoveredIds.has(bl.vehicle_id)
         );
-        console.log(`bat_listings with ${minComments}+ comments: ${batListings.length}`);
+        console.log(`vehicle_events (bat) with ${minComments}+ comments: ${batListings.length}`);
         console.log(`Undiscovered: ${undiscoveredListings.length}`);
 
         // Take batch and verify they have actual comments in auction_comments

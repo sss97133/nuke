@@ -28,7 +28,7 @@ interface SoldVehicle {
   proof_type?: string | null;
   proof_confidence?: number | null;
   bat_auction_url?: string | null;
-  external_listing_id?: string | null;
+  vehicle_event_id?: string | null;
   timeline_event_id?: string | null;
   timeline_bat_url?: string | null;
 }
@@ -123,20 +123,18 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
 
       const proofMap = new Map((proofData || []).map((p: any) => [p.vehicle_id, p]));
 
-      // Fetch external listing data (BaT, etc) in one shot
-      const { data: externalListings } = await supabase
-        .from('external_listings')
-        .select('vehicle_id, platform, listing_url, final_price, sold_at, listing_status')
+      // Fetch vehicle event data (BaT, C&B, etc) in one shot
+      const { data: vehicleEvents } = await supabase
+        .from('vehicle_events')
+        .select('vehicle_id, source_platform, source_url, final_price, sold_at, event_status, current_price, metadata')
         .in('vehicle_id', vehicleIds);
-      const externalMap = new Map((externalListings || []).map((l: any) => [l.vehicle_id, l]));
-
-      // Fetch BaT listings data to supplement missing vehicle fields
-      const { data: batListings } = await supabase
-        .from('bat_listings')
-        .select('vehicle_id, sale_price, final_bid, sale_date, bat_listing_url, bat_listing_title, raw_data')
-        .in('vehicle_id', vehicleIds)
-        .eq('listing_status', 'sold');
-      const batMap = new Map((batListings || []).map((bl: any) => [bl.vehicle_id, bl]));
+      // Build maps: one for non-BaT events, one for BaT events (which have richer metadata)
+      const eventMap = new Map((vehicleEvents || []).map((e: any) => [e.vehicle_id, e]));
+      const batEventMap = new Map(
+        (vehicleEvents || [])
+          .filter((e: any) => e.source_platform === 'bat' && e.event_status === 'sold')
+          .map((e: any) => [e.vehicle_id, e])
+      );
 
       // Fetch images in one shot and build:
       // - primary image per vehicle (primary first, newest first)
@@ -167,27 +165,27 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
           if (!orgVehicle) return null;
 
           const proof = proofMap.get(v.id);
-          const externalListing = externalMap.get(v.id);
-          const batListing = batMap.get(v.id);
+          const vehicleEvent = eventMap.get(v.id);
+          const batEvent = batEventMap.get(v.id);
 
           const saleStatus = String(v.sale_status || '').toLowerCase();
-          const listingStatus = String(orgVehicle.listing_status || externalListing?.listing_status || '').toLowerCase();
+          const listingStatus = String(orgVehicle.listing_status || vehicleEvent?.event_status || '').toLowerCase();
 
           const ovSalePriceNum = orgVehicle.sale_price ? Number(orgVehicle.sale_price) : 0;
           const vSalePriceNum = v.sale_price ? Number(v.sale_price) : 0;
-          const extFinalPriceNum = externalListing?.final_price ? Number(externalListing.final_price) : 0;
-          const batPriceNum = batListing?.sale_price || batListing?.final_bid ? Number(batListing.sale_price || batListing.final_bid) : 0;
+          const extFinalPriceNum = vehicleEvent?.final_price ? Number(vehicleEvent.final_price) : 0;
+          const batPriceNum = batEvent?.final_price || batEvent?.current_price ? Number(batEvent.final_price || batEvent.current_price) : 0;
 
           const isSold =
             listingStatus === 'sold' ||
             saleStatus === 'sold' ||
             Boolean(orgVehicle.sale_date) ||
             Boolean(v.sale_date) ||
-            Boolean(batListing?.sale_date) ||
+            Boolean(batEvent?.sold_at) ||
             ovSalePriceNum > 0 ||
             vSalePriceNum > 0 ||
             batPriceNum > 0 ||
-            Boolean(externalListing?.sold_at) ||
+            Boolean(vehicleEvent?.sold_at) ||
             extFinalPriceNum > 0;
 
           const isCompletedService =
@@ -202,16 +200,16 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
             if (!isSold) return null;
           }
 
-          const saleDate = orgVehicle.sale_date || v.sale_date || batListing?.sale_date || externalListing?.sold_at || null;
+          const saleDate = orgVehicle.sale_date || v.sale_date || batEvent?.sold_at || vehicleEvent?.sold_at || null;
           const salePrice =
             (orgVehicle.sale_price ? Number(orgVehicle.sale_price) : null) ||
             (v.sale_price ? Number(v.sale_price) : null) ||
-            (batListing?.sale_price ? Number(batListing.sale_price) : null) ||
-            (batListing?.final_bid ? Number(batListing.final_bid) : null) ||
+            (batEvent?.final_price ? Number(batEvent.final_price) : null) ||
+            (batEvent?.current_price ? Number(batEvent.current_price) : null) ||
             null;
 
-          // Extract data from BaT raw_data if vehicle fields are missing
-          const rawData = batListing?.raw_data || {};
+          // Extract data from BaT metadata if vehicle fields are missing
+          const rawData = batEvent?.metadata || {};
           const batYear = rawData?.year ? parseInt(rawData.year) : null;
           const batMake = rawData?.make || null;
           const batModel = rawData?.model || null;
@@ -235,10 +233,10 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
             mileage: v.mileage || batMileage,
             sale_price: salePrice,
             sale_date: saleDate,
-            platform: proof?.proof_platform || externalListing?.platform || (batListing ? 'bat' : null),
-            listing_url: proof?.proof_url || externalListing?.listing_url || batListing?.bat_listing_url,
-            final_price: externalListing?.final_price || (batListing?.sale_price || batListing?.final_bid ? Number(batListing.sale_price || batListing.final_bid) : null),
-            sold_at: externalListing?.sold_at || batListing?.sale_date,
+            platform: proof?.proof_platform || vehicleEvent?.source_platform || (batEvent ? 'bat' : null),
+            listing_url: proof?.proof_url || vehicleEvent?.source_url || batEvent?.source_url,
+            final_price: vehicleEvent?.final_price || (batEvent?.final_price || batEvent?.current_price ? Number(batEvent.final_price || batEvent.current_price) : null),
+            sold_at: vehicleEvent?.sold_at || batEvent?.sold_at,
             primary_image: primaryImageByVehicle.get(v.id) || null,
             image_count: imageCountByVehicle.get(v.id) || 0,
             // Proof data
@@ -247,7 +245,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
             proof_type: proof?.proof_type,
             proof_confidence: proof?.proof_confidence,
             bat_auction_url: proof?.bat_auction_url,
-            external_listing_id: proof?.external_listing_id,
+            vehicle_event_id: proof?.vehicle_event_id || proof?.external_listing_id,
             timeline_event_id: proof?.timeline_event_id,
             timeline_bat_url: proof?.timeline_bat_url
           } as SoldVehicle;
@@ -936,14 +934,14 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
               </div>
 
               {/* Proof Source Details */}
-              {selectedProof.external_listing_id && (
-                <div style={{ 
-                  padding: '8px', 
-                  background: 'var(--success-dim)', 
+              {selectedProof.vehicle_event_id && (
+                <div style={{
+                  padding: '8px',
+                  background: 'var(--success-dim)',
                   borderRadius: '4px',
                   fontSize: '11px'
                 }}>
-                  <strong>External Listing Record:</strong> Verified sale through external_listings table (ID: {selectedProof.external_listing_id})
+                  <strong>Vehicle Event Record:</strong> Verified sale through vehicle_events table (ID: {selectedProof.vehicle_event_id})
                 </div>
               )}
 

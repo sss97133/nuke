@@ -364,20 +364,20 @@ const ImageGallery = ({
     (async () => {
       try {
         if (!vehicleId) { setAuctionStartDate(null); return; }
-        // Check external_listings for auction start date
+        // Check vehicle_events for auction start date
         const { data: listing } = await supabase
-          .from('external_listings')
-          .select('start_date, end_date')
+          .from('vehicle_events')
+          .select('started_at, ended_at')
           .eq('vehicle_id', vehicleId)
-          .eq('platform', 'bat')
-          .order('end_date', { ascending: false, nullsFirst: false })
+          .eq('source_platform', 'bat')
+          .order('ended_at', { ascending: false, nullsFirst: false })
           .maybeSingle();
         
-        if (listing?.start_date) {
-          setAuctionStartDate(listing.start_date);
-        } else if (listing?.end_date) {
-          // Calculate start date as end_date - 7 days (typical BaT auction duration)
-          const endDate = new Date(listing.end_date);
+        if (listing?.started_at) {
+          setAuctionStartDate(listing.started_at);
+        } else if (listing?.ended_at) {
+          // Calculate start date as ended_at - 7 days (typical BaT auction duration)
+          const endDate = new Date(listing.ended_at);
           const startDate = new Date(endDate);
           startDate.setDate(startDate.getDate() - 7);
           setAuctionStartDate(startDate.toISOString().split('T')[0]);
@@ -459,20 +459,20 @@ const ImageGallery = ({
       try {
         if (!vehicleId) { setBatListingMetaByUrl({}); return; }
         const { data: rows } = await supabase
-          .from('external_listings')
-          .select('listing_url, end_date, sold_at, metadata')
+          .from('vehicle_events')
+          .select('source_url, ended_at, sold_at, metadata')
           .eq('vehicle_id', vehicleId)
-          .eq('platform', 'bat')
-          .order('end_date', { ascending: false, nullsFirst: false })
+          .eq('source_platform', 'bat')
+          .order('ended_at', { ascending: false, nullsFirst: false })
           .limit(20);
 
         const next: Record<string, { end_date: string | null; sold_at: string | null; lot_number: string | null }> = {};
         for (const r of (rows || [])) {
-          const k = normalizeListingUrlForKey((r as any)?.listing_url);
+          const k = normalizeListingUrlForKey((r as any)?.source_url);
           if (!k) continue;
           const lot = (r as any)?.metadata?.lot_number ? String((r as any).metadata.lot_number) : null;
           next[k] = {
-            end_date: (r as any)?.end_date ? String((r as any).end_date) : null,
+            end_date: (r as any)?.ended_at ? String((r as any).ended_at) : null,
             sold_at: (r as any)?.sold_at ? String((r as any).sold_at) : null,
             lot_number: lot,
           };

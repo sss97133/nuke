@@ -66,29 +66,29 @@ async function fixVideoUrls() {
     }
   }
   
-  // Also fix external_listings
-  console.log('\n🔍 Fixing external_listings with /video URLs...\n');
+  // Also fix vehicle_events
+  console.log('\n🔍 Fixing vehicle_events with /video URLs...\n');
   const { data: listings, error: listingsError } = await supabase
-    .from('external_listings')
-    .select('id, listing_url, platform, vehicle_id')
-    .eq('platform', 'carsandbids')
-    .ilike('listing_url', '%/video%')
+    .from('vehicle_events')
+    .select('id, source_url, source_platform, vehicle_id')
+    .eq('source_platform', 'carsandbids')
+    .ilike('source_url', '%/video%')
     .limit(1000);
-  
+
   if (!listingsError && listings) {
-    console.log(`📊 Found ${listings.length} external_listings with /video URLs\n`);
-    
+    console.log(`📊 Found ${listings.length} vehicle_events with /video URLs\n`);
+
     for (const listing of listings) {
-      const cleanUrl = listing.listing_url.replace(/\/video\/?$/, '');
+      const cleanUrl = listing.source_url.replace(/\/video\/?$/, '');
       const { error: updateError } = await supabase
-        .from('external_listings')
-        .update({ listing_url: cleanUrl })
+        .from('vehicle_events')
+        .update({ source_url: cleanUrl })
         .eq('id', listing.id);
-      
+
       if (updateError) {
-        console.error(`❌ Failed to fix listing ${listing.id}:`, updateError.message);
+        console.error(`❌ Failed to fix event ${listing.id}:`, updateError.message);
       } else {
-        console.log(`✅ Fixed external_listing ${listing.id}: ${cleanUrl}`);
+        console.log(`✅ Fixed vehicle_event ${listing.id}: ${cleanUrl}`);
       }
     }
   }

@@ -43,7 +43,7 @@ async function main() {
 
   // 2) Check vehicle and listing
   const { data: vehicle } = await supabase.from('vehicles').select('sale_price, winning_bid, high_bid').eq('id', VEHICLE_ID).single();
-  const { data: listings } = await supabase.from('external_listings').select('id, final_price, listing_status').eq('vehicle_id', VEHICLE_ID).eq('platform', 'bat');
+  const { data: listings } = await supabase.from('vehicle_events').select('id, final_price, event_status').eq('vehicle_id', VEHICLE_ID).eq('source_platform', 'bat');
 
   const currentSale = vehicle?.sale_price != null ? Number(vehicle.sale_price) : null;
   const listing = listings?.[0];
@@ -57,15 +57,15 @@ async function main() {
 
   if (listing?.id) {
     const { error: e1 } = await supabase
-      .from('external_listings')
+      .from('vehicle_events')
       .update({
         final_price: CORRECT_HAMMER,
-        listing_status: 'sold',
+        event_status: 'sold',
         updated_at: new Date().toISOString(),
       })
       .eq('id', listing.id);
-    if (e1) console.error('external_listings update error:', e1.message);
-    else console.log('external_listings updated to $31,000 sold');
+    if (e1) console.error('vehicle_events update error:', e1.message);
+    else console.log('vehicle_events updated to $31,000 sold');
   }
 
   const { error: e2 } = await supabase

@@ -1158,10 +1158,10 @@ async function processBarnFindsListingURL(url: string, supabase: any) {
   u.hash = '';
   const listingUrlKey = (u.hostname.replace(/^www\./i, '') + (u.pathname || '').replace(/\/+$/, '')).toLowerCase();
   const { data: existingEl } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('vehicle_id')
-    .eq('platform', 'barnfinds')
-    .eq('listing_url_key', listingUrlKey)
+    .eq('source_platform', 'barnfinds')
+    .eq('source_listing_id', listingUrlKey)
     .maybeSingle();
   if (existingEl?.vehicle_id) {
     return { entityData: { listing_url: url }, entityId: existingEl.vehicle_id };

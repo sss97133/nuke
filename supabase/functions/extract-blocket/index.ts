@@ -600,13 +600,13 @@ async function saveExternalListing(
 ): Promise<boolean> {
   const listingUrlKey = normalizeListingUrlKey(listing.url);
 
-  const listingData = {
+  const eventData = {
     vehicle_id: vehicleId,
-    platform: 'blocket',
-    listing_url: listing.url,
-    listing_url_key: listingUrlKey,
-    listing_id: listing.listing_id,
-    listing_status: listing.listing_status,
+    source_platform: 'blocket',
+    event_type: 'listing',
+    source_url: listing.url,
+    source_listing_id: listingUrlKey || listing.listing_id,
+    event_status: listing.listing_status,
     final_price: listing.price_sek,  // Store original SEK price
     metadata: {
       price_sek: listing.price_sek,
@@ -626,32 +626,32 @@ async function saveExternalListing(
 
   // Check if exists first
   const { data: existing } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('id')
-    .eq('platform', 'blocket')
-    .eq('listing_url_key', listingUrlKey)
+    .eq('source_platform', 'blocket')
+    .eq('source_listing_id', listingUrlKey || listing.listing_id)
     .limit(1)
     .maybeSingle();
 
   if (existing) {
     // Update existing
     const { error } = await supabase
-      .from('external_listings')
-      .update(listingData)
+      .from('vehicle_events')
+      .update(eventData)
       .eq('id', existing.id);
 
     if (error) {
-      console.error('[blocket] External listing update error:', error);
+      console.error('[blocket] Vehicle event update error:', error);
       return false;
     }
   } else {
     // Insert new
     const { error } = await supabase
-      .from('external_listings')
-      .insert(listingData);
+      .from('vehicle_events')
+      .insert(eventData);
 
     if (error) {
-      console.error('[blocket] External listing insert error:', error);
+      console.error('[blocket] Vehicle event insert error:', error);
       return false;
     }
   }
@@ -770,7 +770,7 @@ serve(async (req) => {
         dbResults = {
           vehicle_id: targetVehicleId,
           images_saved: imagesSaved,
-          external_listing_saved: true,
+          vehicle_event_saved: true,
         };
 
       } else if (result.type === 'search' && result.search_results && extract_details) {

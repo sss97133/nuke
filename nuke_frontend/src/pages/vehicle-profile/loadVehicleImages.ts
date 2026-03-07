@@ -324,12 +324,12 @@ export async function loadVehicleImagesImpl({
         }
       }
 
-      // Fallback: If all DB images were filtered out (e.g., all were import_queue), try URLs from external_listings for ALL platforms
+      // Fallback: If all DB images were filtered out (e.g., all were import_queue), try URLs from vehicle_events for ALL platforms
       if (images.length === 0) {
         try {
           const { data: externalListing } = await supabase
-            .from('external_listings')
-            .select('metadata, listing_url, platform')
+            .from('vehicle_events')
+            .select('metadata, source_url, source_platform')
             .eq('vehicle_id', vehicle.id)
             .order('updated_at', { ascending: false })
             .limit(1)
@@ -337,7 +337,7 @@ export async function loadVehicleImagesImpl({
 
           if (externalListing?.metadata) {
             const metadata = externalListing.metadata as any;
-            const platform = externalListing.platform || 'unknown';
+            const platform = externalListing.source_platform || 'unknown';
             const metadataImages = metadata.images || metadata.image_urls || [];
             if (Array.isArray(metadataImages) && metadataImages.length > 0) {
               // cleanImageUrl imported from imageFilterUtils
@@ -386,7 +386,7 @@ export async function loadVehicleImagesImpl({
             }
           }
         } catch (err) {
-          console.warn('Error loading URLs from external_listings (fallback):', err);
+          console.warn('Error loading URLs from vehicle_events (fallback):', err);
         }
       }
 
@@ -430,14 +430,14 @@ export async function loadVehicleImagesImpl({
         // ignore
       }
 
-      // If still no images, try BaT URLs from external_listings metadata
+      // If still no images, try BaT URLs from vehicle_events metadata
       if (images.length === 0) {
         try {
           const { data: externalListing } = await supabase
-            .from('external_listings')
-            .select('metadata, listing_url')
+            .from('vehicle_events')
+            .select('metadata, source_url')
             .eq('vehicle_id', vehicle.id)
-            .eq('platform', 'bat')
+            .eq('source_platform', 'bat')
             .order('updated_at', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -478,7 +478,7 @@ export async function loadVehicleImagesImpl({
             }
           }
         } catch (err) {
-          console.warn('Error loading BaT URLs from external_listings:', err);
+          console.warn('Error loading BaT URLs from vehicle_events:', err);
         }
       }
 

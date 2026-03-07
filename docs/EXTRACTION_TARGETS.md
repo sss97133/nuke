@@ -6,7 +6,7 @@
 
 | Source        | Metric           | Target    | Where defined                          |
 |---------------|------------------|-----------|----------------------------------------|
-| **BaT**       | bat_listings     | **222,000** | `supabase/functions/org-extraction-coverage/index.ts` |
+| **BaT**       | vehicle_events (source_platform='bat') | **222,000** | `supabase/functions/org-extraction-coverage/index.ts` |
 | **BaT**       | queue pending    | **0** (clear backlog) | EXTRACTION_STATUS.md intent            |
 | **C&B**       | —                | *none*    | org-extraction-coverage has `target: null` |
 | **PCarMarket**| —                | *none*    | same                                    |
@@ -22,12 +22,12 @@
 ## How to check before running tools
 
 1. **Current vs target (BaT):**
-   - `bat_listings` count vs 222,000
+   - `vehicle_events` count (where `source_platform='bat'`) vs 222,000
    - `import_queue` pending for `%bringatrailer%` vs 0
 2. **Run the status script** that compares to these targets (see below).
 3. **Decide what to run:**
    - If BaT pending is high → verified extraction (Playwright) is on-target.
-   - If BaT pending is 0 and bat_listings &lt; 222k → need discovery + extraction, not just “run for N hours.”
+   - If BaT pending is 0 and vehicle_events (bat) &lt; 222k → need discovery + extraction, not just “run for N hours.”
    - If only C&B/PCarMarket/Collecting Cars pending → those need Firecrawl or Playwright; don’t burn Firecrawl without a clear target.
 
 ## Script: print current vs targets
@@ -40,4 +40,4 @@ npm run status:targets
 ./scripts/status-targets.sh
 ```
 
-This should output: BaT extracted (bat_listings), BaT pending, target 222k, and optionally other sources’ pending so we’re not “just turning on tools” without looking.
+This should output: BaT extracted (vehicle_events where source_platform=’bat’), BaT pending, target 222k, and optionally other sources’ pending so we’re not “just turning on tools” without looking.

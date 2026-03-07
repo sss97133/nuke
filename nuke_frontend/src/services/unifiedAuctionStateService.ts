@@ -2,7 +2,7 @@
  * Unified Auction State Service
  * 
  * Treats auction states (timer, live, future) as TEMPORARY MODES, not permanent vehicle properties.
- * All auction types are handled uniformly through external_listings.
+ * All auction types are handled uniformly through vehicle_events (formerly external_listings).
  * 
  * Key concept: A vehicle can be "in auction mode" temporarily, then return to normal state.
  */
@@ -40,12 +40,12 @@ export interface AuctionStateInfo {
 export function getAuctionMode(vehicle: any): AuctionMode {
   const now = Date.now();
   
-  // Priority 1: Check external_listings (most reliable, platform-agnostic)
-  const externalListing = vehicle?.external_listings?.[0];
+  // Priority 1: Check vehicle_events (most reliable, platform-agnostic)
+  const externalListing = vehicle?.vehicle_events?.[0] ?? vehicle?.external_listings?.[0];
   if (externalListing) {
-    const status = String(externalListing.listing_status || '').toLowerCase();
-    const endDate = externalListing.end_date;
-    const startDate = externalListing.start_date;
+    const status = String(externalListing.event_status || externalListing.listing_status || '').toLowerCase();
+    const endDate = externalListing.ended_at || externalListing.end_date;
+    const startDate = externalListing.started_at || externalListing.start_date;
     
     // Check if scheduled (future start date)
     if (startDate) {
@@ -180,16 +180,16 @@ export function getAuctionMode(vehicle: any): AuctionMode {
  */
 export function getAuctionStateInfo(vehicle: any): AuctionStateInfo {
   const mode = getAuctionMode(vehicle);
-  const externalListing = vehicle?.external_listings?.[0];
-  
+  const externalListing = vehicle?.vehicle_events?.[0] ?? vehicle?.external_listings?.[0];
+
   return {
     mode,
-    platform: externalListing?.platform || null,
-    currentBid: externalListing?.current_bid || vehicle?.current_bid || null,
-    endDate: externalListing?.end_date || vehicle?.auction_end_date || null,
-    startDate: externalListing?.start_date || vehicle?.origin_metadata?.auction_times?.auction_start_date || null,
-    listingUrl: externalListing?.listing_url || vehicle?.discovery_url || null,
-    listingId: externalListing?.listing_id || null,
+    platform: externalListing?.source_platform || externalListing?.platform || null,
+    currentBid: externalListing?.current_price || externalListing?.current_bid || vehicle?.current_bid || null,
+    endDate: externalListing?.ended_at || externalListing?.end_date || vehicle?.auction_end_date || null,
+    startDate: externalListing?.started_at || externalListing?.start_date || vehicle?.origin_metadata?.auction_times?.auction_start_date || null,
+    listingUrl: externalListing?.source_url || externalListing?.listing_url || vehicle?.discovery_url || null,
+    listingId: externalListing?.source_listing_id || externalListing?.listing_id || null,
     bidCount: externalListing?.bid_count || vehicle?.bid_count || null,
     reservePrice: externalListing?.reserve_price || null,
     finalPrice: externalListing?.final_price || vehicle?.sale_price || null,

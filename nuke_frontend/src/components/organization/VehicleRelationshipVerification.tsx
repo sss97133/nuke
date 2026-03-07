@@ -71,19 +71,20 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
 
       if (insertError) throw insertError;
 
-      // If BAT URL provided, try to link it to external_listings
+      // If BAT URL provided, try to link it to vehicle_events
       if (verificationType === 'sale' && proofType === 'bat_url' && proofUrl) {
         const batMatch = proofUrl.match(/bringatrailer\.com\/listing\/([^\/]+)/);
         if (batMatch) {
           await supabase
-            .from('external_listings')
+            .from('vehicle_events')
             .upsert({
               vehicle_id: vehicleId,
-              platform: 'bat',
-              listing_url: proofUrl,
+              source_platform: 'bat',
+              source_url: proofUrl,
+              event_type: 'auction',
               sold_at: new Date().toISOString()
             }, {
-              onConflict: 'vehicle_id,platform'
+              onConflict: 'vehicle_id,source_platform'
             });
         }
       }

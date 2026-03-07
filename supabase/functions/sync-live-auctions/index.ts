@@ -625,7 +625,7 @@ async function syncToDatabase(
 
   // Skip ended-auction detection during regular sync cycles. The 355k+ stale "active"
   // vehicles can't be processed in a single edge function call. Ended detection is
-  // handled separately by the extraction pipeline (external_listings.listing_status).
+  // handled separately by the extraction pipeline (vehicle_events.event_status).
 
   // Batch upsert current live auctions
   // Split into updates (existing URLs) and inserts (new URLs), process in batches
@@ -753,32 +753,33 @@ async function recordBidSnapshots(
   const auctionByUrl = new Map<string, LiveAuction>();
   for (const a of biddable) auctionByUrl.set(a.url, a);
 
-  // Query ALL active BaT external_listings (small set ~50), then match in memory
+  // Query ALL active BaT vehicle_events (small set ~50), then match in memory
   const { data: extListings } = await supabase
-    .from("external_listings")
-    .select("vehicle_id, listing_url")
-    .eq("platform", "bat")
-    .eq("listing_status", "active");
+    .from("vehicle_events")
+    .select("vehicle_id, source_url")
+    .eq("source_platform", "bat")
+    .eq("event_status", "active");
 
   if (!extListings || extListings.length === 0) return 0;
 
   // Filter to only those with matching sync URLs
-  const matched = extListings.filter(el => el.listing_url && auctionByUrl.has(el.listing_url));
+  const matched = extListings.filter(el => el.source_url && auctionByUrl.has(el.source_url));
   if (matched.length === 0) return 0;
 
   const vehicleIds = matched.map(el => el.vehicle_id);
 
-  // Get bat_listing_ids for these vehicles
-  const { data: batListings } = await supabase
-    .from("bat_listings")
+  // Get vehicle_event IDs for these vehicles (BaT events)
+  const { data: batEvents } = await supabase
+    .from("vehicle_events")
     .select("id, vehicle_id")
+    .eq("source_platform", "bat")
     .in("vehicle_id", vehicleIds);
 
-  if (!batListings || batListings.length === 0) return 0;
+  if (!batEvents || batEvents.length === 0) return 0;
 
-  const vehicleToBatListing = new Map<string, string>();
-  for (const bl of batListings) {
-    vehicleToBatListing.set(bl.vehicle_id, bl.id);
+  const vehicleToBatEvent = new Map<string, string>();
+  for (const ve of batEvents) {
+    vehicleToBatEvent.set(ve.vehicle_id, ve.id);
   }
 
   // Build batch of bid rows to insert
@@ -794,14 +795,14 @@ async function recordBidSnapshots(
   }> = [];
 
   for (const el of matched) {
-    const auction = auctionByUrl.get(el.listing_url || "");
+    const auction = auctionByUrl.get(el.source_url || "");
     if (!auction || !auction.current_bid) continue;
 
-    const batListingId = vehicleToBatListing.get(el.vehicle_id);
-    if (!batListingId) continue;
+    const batEventId = vehicleToBatEvent.get(el.vehicle_id);
+    if (!batEventId) continue;
 
     bidRows.push({
-      bat_listing_id: batListingId,
+      bat_listing_id: batEventId, // points to vehicle_events.id now
       vehicle_id: el.vehicle_id,
       bat_username: "bid_snapshot",
       bid_amount: auction.current_bid,
@@ -826,11 +827,11 @@ async function recordBidSnapshots(
 }
 
 /**
- * Updates external_listings with fresh bid data from the BaT sync.
- * The prediction engine reads current_bid from external_listings, so keeping
+ * Updates vehicle_events with fresh bid data from the BaT sync.
+ * The prediction engine reads current_price from vehicle_events, so keeping
  * this fresh is critical for accuracy. Only ~48 active BaT rows — very fast.
  */
-async function updateExternalListings(
+async function updateVehicleEvents(
   supabase: ReturnType<typeof createClient>,
   auctions: LiveAuction[]
 ): Promise<number> {
@@ -840,32 +841,32 @@ async function updateExternalListings(
   const auctionByUrl = new Map<string, LiveAuction>();
   for (const a of biddable) auctionByUrl.set(a.url, a);
 
-  // Get all active BaT external_listings (small set ~48 rows)
-  const { data: extListings } = await supabase
-    .from("external_listings")
-    .select("id, listing_url")
-    .eq("platform", "bat")
-    .eq("listing_status", "active");
+  // Get all active BaT vehicle_events (small set ~48 rows)
+  const { data: events } = await supabase
+    .from("vehicle_events")
+    .select("id, source_url")
+    .eq("source_platform", "bat")
+    .eq("event_status", "active");
 
-  if (!extListings || extListings.length === 0) return 0;
+  if (!events || events.length === 0) return 0;
 
   let updated = 0;
   const now = new Date().toISOString();
 
-  for (const el of extListings) {
-    const auction = el.listing_url ? auctionByUrl.get(el.listing_url) : null;
+  for (const ve of events) {
+    const auction = ve.source_url ? auctionByUrl.get(ve.source_url) : null;
     if (!auction) continue;
 
     const updateData: Record<string, unknown> = {
-      current_bid: auction.current_bid,
+      current_price: auction.current_bid,
       updated_at: now,
     };
     if (auction.bid_count !== null) updateData.bid_count = auction.bid_count;
 
     const { error } = await supabase
-      .from("external_listings")
+      .from("vehicle_events")
       .update(updateData)
-      .eq("id", el.id);
+      .eq("id", ve.id);
 
     if (!error) updated++;
   }
@@ -1075,7 +1076,7 @@ Deno.serve(async (req) => {
 
         const normalizedPlatform = platformAliases[platform] || platform;
 
-        // Record bid snapshots + update external_listings FIRST (fast, critical for predictions)
+        // Record bid snapshots + update vehicle_events FIRST (fast, critical for predictions)
         if (normalizedPlatform === "bringatrailer" && !syncResult.error && syncResult.auctions.length > 0) {
           try {
             const bidCount = await recordBidSnapshots(supabase, syncResult.auctions);
@@ -1084,10 +1085,10 @@ Deno.serve(async (req) => {
             console.error("[sync-live-auctions] Bid snapshot error (non-fatal):", e);
           }
           try {
-            const elUpdated = await updateExternalListings(supabase, syncResult.auctions);
-            console.log(`[sync-live-auctions] Updated ${elUpdated} external_listings rows`);
+            const veUpdated = await updateVehicleEvents(supabase, syncResult.auctions);
+            console.log(`[sync-live-auctions] Updated ${veUpdated} vehicle_events rows`);
           } catch (e) {
-            console.error("[sync-live-auctions] External listings update error (non-fatal):", e);
+            console.error("[sync-live-auctions] Vehicle events update error (non-fatal):", e);
           }
         }
 

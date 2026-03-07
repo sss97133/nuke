@@ -1033,23 +1033,24 @@ async function saveVehicle(
     }
   }
 
-  // Create external_listing record (non-fatal)
+  // Create vehicle_event record (non-fatal)
   try {
     const { data: existingListing } = await supabase
-      .from("external_listings")
+      .from("vehicle_events")
       .select("id")
       .eq("vehicle_id", vehicleId)
-      .eq("platform", "barrettjackson")
-      .eq("listing_url", vehicle.url)
+      .eq("source_platform", "barrettjackson")
+      .eq("source_url", vehicle.url)
       .limit(1)
       .maybeSingle();
 
     if (!existingListing) {
-      await supabase.from("external_listings").insert({
+      await supabase.from("vehicle_events").insert({
         vehicle_id: vehicleId,
-        platform: "barrettjackson",
-        listing_url: vehicle.url,
-        listing_status: vehicle.status?.toLowerCase() === "sold" ? "sold" :
+        source_platform: "barrettjackson",
+        event_type: "auction",
+        source_url: vehicle.url,
+        event_status: vehicle.status?.toLowerCase() === "sold" ? "sold" :
                         vehicle.status?.toLowerCase() === "not sold" ? "unsold" :
                         vehicle.status?.toLowerCase() === "withdrawn" ? "cancelled" :
                         "ended",

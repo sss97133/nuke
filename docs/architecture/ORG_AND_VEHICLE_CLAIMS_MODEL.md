@@ -44,21 +44,19 @@ So the same vehicle shows up in multiple org profiles, with **different relation
   - No `buyer` (purchaser org).  
   - So auction-house and buyer claims aren’t modeled.
 
-- **bat_listings**  
-  Has `organization_id` (seller org) and `vehicle_id`.  
-  - That does **not** automatically create `organization_vehicles` rows.  
-  - So seller orgs from BaT often have **no** rows in `organization_vehicles` → their `total_vehicles` stays 0 or wrong.  
+- **vehicle_events**
+  Unified event table (formerly `bat_listings` + `external_listings`). Has `organization_id` (seller org) and `vehicle_id`.
+  - That does **not** automatically create `organization_vehicles` rows.
+  - So seller orgs from BaT often have **no** rows in `organization_vehicles` → their `total_vehicles` stays 0 or wrong.
   - BaT-as-platform also never gets a row (no `auction_platform` type).
-
-- **external_listings**  
-  Same idea: `organization_id` exists but isn’t necessarily mirrored into `organization_vehicles`.
+  - **Helper views:** `vehicle_latest_event` (most recent event per vehicle) and `vehicle_event_summary` (aggregated stats).
 
 So: **the missing piece is not really “a missing table like businesses.”** The table is `organization_vehicles` (and `businesses` as the org table). What’s missing is:
 
 1. **Relationship types** that cover all claims: e.g. add `auction_platform`, `buyer` (and keep `sold_by` / `consigner` for seller/dealer).
 2. **Consistent writes** from every source of truth into `organization_vehicles`:  
    - When we have a listing (BaT, external, etc.), insert the right rows: e.g. seller org + `sold_by` or `consigner`; platform org + `auction_platform` if we want platform counts.
-3. **Backfill** so existing `bat_listings` / `external_listings` create the corresponding `organization_vehicles` rows (and, if desired, platform rows).  
+3. **Backfill** so existing `vehicle_events` create the corresponding `organization_vehicles` rows (and, if desired, platform rows).  
 Then `total_vehicles` (and any role-specific counts) will reflect reality.
 
 ---
@@ -66,7 +64,7 @@ Then `total_vehicles` (and any role-specific counts) will reflect reality.
 ## Why org vehicle counts are wrong
 
 - **Only `organization_vehicles` drives `total_vehicles`.**  
-  So any org whose “claims” exist only in `bat_listings.organization_id` or `external_listings.organization_id` (and not in `organization_vehicles`) will show 0 or an undercount.
+  So any org whose “claims” exist only in `vehicle_events.organization_id` (and not in `organization_vehicles`) will show 0 or an undercount.
 - **Multiple claims per vehicle aren’t fully modeled.**  
   Auction platform and buyer aren’t in the CHECK; so even if we wanted to, we can’t yet record “BaT ran this sale” or “this org bought it” in `organization_vehicles`.
 - **No automatic sync** from listings → `organization_vehicles`.  
@@ -84,33 +82,32 @@ Fixing this means: extend relationship types, add sync (trigger or job) from lis
   Missing: role set doesn’t include auction_platform/buyer; and listing tables don’t consistently write into `organization_vehicles`, so counts are wrong.
 - **Implemented (Feb 2025):**  
   1. Added `auction_platform` and `buyer` to `organization_vehicles.relationship_type` CHECK.  
-  2. Trigger `trg_sync_bat_listing_to_org_vehicles`: on INSERT/UPDATE of `bat_listings`, inserts seller (`sold_by`) and BaT org (`auction_platform`) into `organization_vehicles`.  
-  3. Trigger `trg_sync_external_listing_to_org_vehicles`: same for `external_listings` (seller + platform when mapped to an observation_source).  
-  4. Function `backfill_vehicle_org_claims_from_bat_listings(p_batch_size)` for batched backfill; run until it returns 0.  
+  2. Trigger `trg_sync_vehicle_event_to_org_vehicles`: on INSERT/UPDATE of `vehicle_events`, inserts seller (`sold_by`) and platform org (`auction_platform`) into `organization_vehicles`.
+  3. Function `backfill_vehicle_org_claims_from_vehicle_events(p_batch_size)` for batched backfill; run until it returns 0.  
   5. Function `refresh_org_total_vehicles()` to recalc `businesses.total_vehicles` from `organization_vehicles`.  
 
 - **Run the backfill (one-off):**  
   - **All sources (recommended):**  
     - **Via psql (no timeout):** `dotenvx run -- bash scripts/backfill-all-org-vehicle-links-psql.sh`  
     - Via TS (may hit API timeout on large DBs): `dotenvx run -- npx tsx scripts/backfill-all-org-vehicle-links.ts`  
-    Runs in order: BAT (seller + auction_platform), build_threads (forum → org), vehicles.origin_organization_id, external_listings (seller + platform), timeline_events, then `refresh_org_total_vehicles()`.  
+    Runs in order: BAT (seller + auction_platform), build_threads (forum → org), vehicles.origin_organization_id, vehicle_events (seller + platform), timeline_events, then `refresh_org_total_vehicles()`.  
   - **BAT only (canonical org must show all BAT vehicles):**  
     `observation_sources` for `slug = 'bat'` points to canonical BAT org `d2bd6370-11d1-4af0-8dd2-3de2c3899166`. Run:  
     `dotenvx run -- bash scripts/backfill-bat-platform-to-canonical-org.sh`  
-    to link every `bat_listings.vehicle_id` to that org as `auction_platform`. Then the BAT profile shows full vehicle count.  
+    to link every `vehicle_events.vehicle_id` to that org as `auction_platform`. Then the BAT profile shows full vehicle count.  
   - BAT only (may hit API statement timeout on large DBs):  
     `dotenvx run -- npx tsx scripts/backfill-vehicle-org-claims.ts`  
   - Or via direct psql (no statement timeout):  
     ```bash
     # In a loop until (inserted_seller, inserted_platform) = (0,0); use last_id from previous run.
-    SELECT * FROM backfill_vehicle_org_claims_from_bat_listings(5000, NULL);  -- then pass last_id
+    SELECT * FROM backfill_vehicle_org_claims_from_vehicle_events(5000, NULL);  -- then pass last_id
     SELECT refresh_org_total_vehicles();
     ```
 
 - **Backfill functions (all sources):**  
-  - `backfill_vehicle_org_claims_from_bat_listings(p_batch_size, p_after_id)` – BAT seller + platform.  
+  - `backfill_vehicle_org_claims_from_vehicle_events(p_batch_size, p_after_id)` – BAT seller + platform.  
   - `backfill_org_vehicles_from_build_threads(p_batch_size)` – Forum orgs (business_name = forum_sources.slug).  
   - `backfill_org_vehicles_from_origin_org(p_batch_size)` – vehicles.origin_organization_id → sold_by.  
-  - `backfill_org_vehicles_from_external_listings(p_batch_size)` – external_listings seller + platform.  
+  - `backfill_org_vehicles_from_vehicle_events(p_batch_size)` – vehicle_events seller + platform.  
   - `backfill_org_vehicles_from_timeline_events(p_batch_size)` – timeline_events (vehicle_id, organization_id) → work_location.  
   Run each in a loop until inserted = 0, then `SELECT refresh_org_total_vehicles();`.

@@ -158,7 +158,7 @@ export class MyAuctionsService {
         }
       }
 
-      // 2. External listings (from external_listings table)
+      // 2. External listings (from vehicle_events table)
       // IMPORTANT: Do not infer "personal profit" just because user is affiliated with an org.
       // We split external listings into:
       // - personal: listings tied to vehicles the user owns in-app
@@ -173,18 +173,18 @@ export class MyAuctionsService {
       const externalSelect = `
         id,
         vehicle_id,
-        organization_id,
-        platform,
-        listing_status,
-        current_bid,
+        source_organization_id,
+        source_platform,
+        event_status,
+        current_price,
         reserve_price,
         bid_count,
         view_count,
         watcher_count,
-        end_date,
+        ended_at,
         sold_at,
         final_price,
-        listing_url,
+        source_url,
         metadata,
         created_at,
         updated_at,
@@ -200,10 +200,10 @@ export class MyAuctionsService {
       // 2a) Personal external listings (vehicle belongs to user)
       if (userVehicleIds.size > 0) {
         const { data: personalExternal, error: personalExternalError } = await supabase
-          .from('external_listings')
+          .from('vehicle_events')
           .select(externalSelect)
           .in('vehicle_id', Array.from(userVehicleIds))
-          .in('listing_status', ['active', 'ended', 'sold']);
+          .in('event_status', ['active', 'ended', 'sold']);
 
         if (!personalExternalError && personalExternal) {
           for (const listing of personalExternal as any[]) {
@@ -212,22 +212,22 @@ export class MyAuctionsService {
               listing_id: listing.id,
               vehicle_id: listing.vehicle_id,
               user_id: user.id,
-              platform: listing.platform,
-              listing_status: listing.listing_status,
+              platform: listing.source_platform,
+              listing_status: listing.event_status,
               scope: 'personal',
-              organization_id: listing.organization_id || undefined,
-              organization_name: listing.organization_id ? orgNameById.get(listing.organization_id) : undefined,
-              access_role: listing.organization_id ? orgRoleById.get(listing.organization_id) : undefined,
+              organization_id: listing.source_organization_id || undefined,
+              organization_name: listing.source_organization_id ? orgNameById.get(listing.source_organization_id) : undefined,
+              access_role: listing.source_organization_id ? orgRoleById.get(listing.source_organization_id) : undefined,
               metadata: listing.metadata || {},
-              current_bid: listing.current_bid ? Number(listing.current_bid) : undefined,
+              current_bid: listing.current_price ? Number(listing.current_price) : undefined,
               reserve_price: listing.reserve_price ? Number(listing.reserve_price) : undefined,
               bid_count: listing.bid_count || 0,
               view_count: listing.view_count || 0,
               watcher_count: listing.watcher_count || 0,
-              end_date: listing.end_date,
+              end_date: listing.ended_at,
               sold_at: listing.sold_at,
               final_price: listing.final_price ? Number(listing.final_price) : undefined,
-              external_url: listing.listing_url,
+              external_url: listing.source_url,
               listed_at: listing.created_at,
               last_updated: listing.updated_at,
               vehicle: listing.vehicles ? {
@@ -246,10 +246,10 @@ export class MyAuctionsService {
       const orgIds = orgMemberships.map(m => m.organization_id).filter(Boolean);
       if (orgIds.length > 0) {
         const { data: orgExternal, error: orgExternalError } = await supabase
-          .from('external_listings')
+          .from('vehicle_events')
           .select(externalSelect)
-          .in('organization_id', orgIds)
-          .in('listing_status', ['active', 'ended', 'sold']);
+          .in('source_organization_id', orgIds)
+          .in('event_status', ['active', 'ended', 'sold']);
 
         if (!orgExternalError && orgExternal) {
           for (const listing of orgExternal as any[]) {
@@ -262,22 +262,22 @@ export class MyAuctionsService {
               listing_id: listing.id,
               vehicle_id: listing.vehicle_id,
               user_id: user.id,
-              platform: listing.platform,
-              listing_status: listing.listing_status,
+              platform: listing.source_platform,
+              listing_status: listing.event_status,
               scope: 'organization',
-              organization_id: listing.organization_id || undefined,
-              organization_name: listing.organization_id ? orgNameById.get(listing.organization_id) : undefined,
-              access_role: listing.organization_id ? orgRoleById.get(listing.organization_id) : undefined,
+              organization_id: listing.source_organization_id || undefined,
+              organization_name: listing.source_organization_id ? orgNameById.get(listing.source_organization_id) : undefined,
+              access_role: listing.source_organization_id ? orgRoleById.get(listing.source_organization_id) : undefined,
               metadata: listing.metadata || {},
-              current_bid: listing.current_bid ? Number(listing.current_bid) : undefined,
+              current_bid: listing.current_price ? Number(listing.current_price) : undefined,
               reserve_price: listing.reserve_price ? Number(listing.reserve_price) : undefined,
               bid_count: listing.bid_count || 0,
               view_count: listing.view_count || 0,
               watcher_count: listing.watcher_count || 0,
-              end_date: listing.end_date,
+              end_date: listing.ended_at,
               sold_at: listing.sold_at,
               final_price: listing.final_price ? Number(listing.final_price) : undefined,
-              external_url: listing.listing_url,
+              external_url: listing.source_url,
               listed_at: listing.created_at,
               last_updated: listing.updated_at,
               vehicle: listing.vehicles ? {
@@ -332,7 +332,7 @@ export class MyAuctionsService {
               // Prefer canonical listing URL
               l.external_url = l.external_url || ev.source_url || undefined;
 
-              // Prefer auction_events metrics when external_listings didn't have them yet
+              // Prefer auction_events metrics when vehicle_events didn't have them yet
               if ((l.bid_count || 0) === 0 && typeof ev.total_bids === 'number') l.bid_count = ev.total_bids;
               if ((l.view_count || 0) === 0 && typeof ev.page_views === 'number') l.view_count = ev.page_views;
               if ((l.watcher_count || 0) === 0 && typeof ev.watchers === 'number') l.watcher_count = ev.watchers;
@@ -480,7 +480,7 @@ export class MyAuctionsService {
       // For BaT, call the sync edge function
       if (platform === 'bat' && listingSource === 'external') {
         const { data, error } = await supabase.functions.invoke('sync-bat-listing', {
-          body: { externalListingId: listingId },
+          body: { vehicleEventId: listingId },
         });
 
         if (error) throw error;
@@ -618,14 +618,15 @@ export class MyAuctionsService {
       }
 
       const { data, error } = await supabase
-        .from('external_listings')
+        .from('vehicle_events')
         .insert({
           vehicle_id: params.vehicle_id,
-          organization_id: organizationId,
-          platform: params.platform,
-          listing_url: params.listing_url,
-          listing_id: params.listing_id,
-          listing_status: 'active',
+          source_organization_id: organizationId,
+          source_platform: params.platform,
+          source_url: params.listing_url,
+          source_listing_id: params.listing_id,
+          event_status: 'active',
+          event_type: 'auction',
         })
         .select()
         .single();
@@ -656,14 +657,14 @@ export class MyAuctionsService {
       if (listingSource === 'native') {
         tableName = 'vehicle_listings';
       } else if (listingSource === 'external') {
-        tableName = 'external_listings';
+        tableName = 'vehicle_events';
       } else {
         tableName = 'listing_exports';
       }
 
       const updateData: any = { ...updates };
       if (listingSource === 'external') {
-        updateData.listing_status = status;
+        updateData.event_status = status;
       } else if (listingSource === 'export') {
         updateData.status = status;
       } else {

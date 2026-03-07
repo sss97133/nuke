@@ -135,7 +135,7 @@ const VehicleProfile: React.FC = () => {
   // walkAroundImages state removed
   const auctionCurrency = React.useMemo(() => {
     const v: any = vehicle as any;
-    const externalListing = v?.external_listings?.[0];
+    const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
     const pulseMeta = (auctionPulse as any)?.metadata;
     return resolveCurrencyCode(
       pulseMeta?.currency,
@@ -296,14 +296,14 @@ const VehicleProfile: React.FC = () => {
           // ignore cache parse errors
         }
 
-        // Cars & Bids: do NOT scrape (bot-protected). Use images already stored in external_listings metadata.
+        // Cars & Bids: do NOT scrape (bot-protected). Use images already stored in vehicle_events metadata.
         if (isCarsAndBids) {
           try {
             const { data: listings } = await supabase
-              .from('external_listings')
+              .from('vehicle_events')
               .select('metadata')
               .eq('vehicle_id', vehicle.id)
-              .eq('listing_url', listingUrl)
+              .eq('source_url', listingUrl)
               .order('updated_at', { ascending: false })
               .limit(5);
 
@@ -362,7 +362,7 @@ const VehicleProfile: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle?.id, (vehicle as any)?.profile_origin, (vehicle as any)?.discovery_url, auctionPulse?.listing_url, vehicleImages.length]);
 
-  // buildAuctionPulseFromExternalListings extracted to ./vehicle-profile/buildAuctionPulse.ts
+  // buildAuctionPulseFromExternalListings extracted to ./vehicle-profile/buildAuctionPulse.ts (uses vehicle_events now)
 
   // MOBILE DETECTION
   useEffect(() => {
@@ -816,26 +816,39 @@ const VehicleProfile: React.FC = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'external_listings',
+          table: 'vehicle_events',
           filter: `vehicle_id=eq.${vehicleIdForFilter}`,
         },
         (payload) => {
           const row = (payload as any)?.new as any;
           if (!row) return;
-          // If we already have a specific listing_url, ignore other listings for this vehicle.
-          if (auctionPulse?.listing_url && row.listing_url && row.listing_url !== auctionPulse.listing_url) return;
+          // If we already have a specific source_url, ignore other events for this vehicle.
+          if (auctionPulse?.listing_url && row.source_url && row.source_url !== auctionPulse.listing_url) return;
 
-          // IMPORTANT: multiple pipelines can create duplicate rows with the same listing_url.
+          // IMPORTANT: multiple pipelines can create duplicate rows with the same source_url.
           // Recompute from the DB snapshot and merge, so "active" wins over stale "sold" duplicates.
           (async () => {
             try {
               const { data } = await supabase
-                .from('external_listings')
-                .select('platform, listing_url, listing_status, end_date, current_bid, bid_count, watcher_count, view_count, metadata, updated_at')
+                .from('vehicle_events')
+                .select('source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, metadata, updated_at')
                 .eq('vehicle_id', vehicleIdForFilter)
                 .order('updated_at', { ascending: false })
                 .limit(20);
-              const merged = buildAuctionPulseFromExternalListings(Array.isArray(data) ? data : [], vehicleIdForFilter);
+              // Normalize vehicle_events columns to legacy shape for buildAuctionPulseFromExternalListings
+              const normalized = (Array.isArray(data) ? data : []).map((r: any) => ({
+                platform: r.source_platform,
+                listing_url: r.source_url,
+                listing_status: r.event_status,
+                end_date: r.ended_at,
+                current_bid: r.current_price,
+                bid_count: r.bid_count,
+                watcher_count: r.watcher_count,
+                view_count: r.view_count,
+                metadata: r.metadata,
+                updated_at: r.updated_at,
+              }));
+              const merged = buildAuctionPulseFromExternalListings(normalized, vehicleIdForFilter);
               if (merged) {
                 setAuctionPulse((prev: any) => ({ ...(prev || {}), ...merged }));
               }
@@ -894,16 +907,29 @@ const VehicleProfile: React.FC = () => {
 
     const refreshAuctionPulse = async () => {
       try {
-        // Re-read listing records and merge duplicates for the same URL.
-        const { data: listings } = await supabase
-          .from('external_listings')
-          .select('platform, listing_url, listing_status, end_date, current_bid, bid_count, watcher_count, view_count, metadata, updated_at')
+        // Re-read event records and merge duplicates for the same URL.
+        const { data: events } = await supabase
+          .from('vehicle_events')
+          .select('source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, metadata, updated_at')
           .eq('vehicle_id', vehicle.id)
-          .eq('listing_url', auctionPulse?.listing_url || '')
+          .eq('source_url', auctionPulse?.listing_url || '')
           .order('updated_at', { ascending: false })
           .limit(20);
 
-        const merged = buildAuctionPulseFromExternalListings(Array.isArray(listings) ? listings : [], vehicle.id);
+        // Normalize vehicle_events columns to legacy shape for buildAuctionPulseFromExternalListings
+        const normalized = (Array.isArray(events) ? events : []).map((r: any) => ({
+          platform: r.source_platform,
+          listing_url: r.source_url,
+          listing_status: r.event_status,
+          end_date: r.ended_at,
+          current_bid: r.current_price,
+          bid_count: r.bid_count,
+          watcher_count: r.watcher_count,
+          view_count: r.view_count,
+          metadata: r.metadata,
+          updated_at: r.updated_at,
+        }));
+        const merged = buildAuctionPulseFromExternalListings(normalized, vehicle.id);
         const platform = String((merged as any)?.platform || auctionPulse?.platform || '');
         const listingUrl = String((merged as any)?.listing_url || auctionPulse?.listing_url || '');
 

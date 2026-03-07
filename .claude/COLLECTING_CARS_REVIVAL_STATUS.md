@@ -15,9 +15,9 @@ The archived `monitor-collecting-cars-listings` function **cannot be revived** i
 - **Location:** `/Users/skylar/nuke/supabase/functions/_archived/monitor-collecting-cars-listings/`
 
 ### Database State
-- **Total listings:** 71 collecting_cars entries in `external_listings`
+- **Total listings:** 71 collecting_cars entries in `vehicle_events`
 - **Active listings:** 52 with status `active`, `live`, or `upcoming`
-- **Table used:** `external_listings` (still exists and has data)
+- **Table used:** `vehicle_events` (still exists and has data)
 
 ### Dependencies Analysis
 
@@ -47,9 +47,9 @@ $ curl -s 'https://collectingcars.com/...'
 ## Function Design
 
 ### What It Does
-1. **Single listing mode:** Monitor one listing by `listing_id` or `listing_url`
+1. **Single listing mode:** Monitor one event by `listing_id` or `source_url`
 2. **Batch mode:** Monitor up to 50 active listings (default batch_size=50)
-3. Updates `external_listings` table with:
+3. Updates `vehicle_events` table with:
    - `current_bid`, `bid_count`, `watcher_count`
    - `end_date`, `listing_status`, `final_price`, `sold_at`
 4. Also updates linked `vehicles` table with auction data
@@ -155,7 +155,7 @@ If monitoring Collecting Cars listings is required:
 
 - **Archived function:** `/Users/skylar/nuke/supabase/functions/_archived/monitor-collecting-cars-listings/index.ts`
 - **Debug script:** `/Users/skylar/nuke/scripts/debug-collecting-cars.js`
-- **Database table:** `external_listings` (71 entries, 52 active)
+- **Database table:** `vehicle_events` (71 entries, 52 active)
 
 ## Conclusion
 

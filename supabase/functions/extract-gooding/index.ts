@@ -761,20 +761,20 @@ async function saveToDatabase(
     }
   }
 
-  // Update/insert external_listings
+  // Update/insert vehicle_events
   const { error: listingError } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .upsert({
       vehicle_id: vehicleId,
-      platform: 'gooding',
-      listing_url: extracted.url,
-      listing_url_key: listingUrlKey,
-      listing_id: extracted.slug,
-      listing_status: extracted.status === 'upcoming' ? 'pending' :
+      source_platform: 'gooding',
+      event_type: 'auction',
+      source_url: extracted.url,
+      source_listing_id: listingUrlKey || extracted.slug,
+      event_status: extracted.status === 'upcoming' ? 'pending' :
                       extracted.status === 'active' ? 'active' :
                       extracted.status === 'sold' ? 'sold' :
                       extracted.status === 'unsold' ? 'unsold' : 'ended',
-      end_date: extracted.auction_date ? new Date(extracted.auction_date).toISOString() : null,
+      ended_at: extracted.auction_date ? new Date(extracted.auction_date).toISOString() : null,
       final_price: extracted.sale_price,
       sold_at: extracted.status === 'sold' && extracted.auction_date
         ? new Date(extracted.auction_date).toISOString()
@@ -797,10 +797,10 @@ async function saveToDatabase(
         salesforce_id: extracted.salesforce_id,
         contentful_id: extracted.contentful_id,
       },
-    }, { onConflict: 'platform,listing_url_key' });
+    }, { onConflict: 'source_platform,source_listing_id' });
 
   if (listingError) {
-    console.error(`[gooding] Failed to upsert external_listing: ${listingError.message}`);
+    console.error(`[gooding] Failed to upsert vehicle_event: ${listingError.message}`);
   }
 
   // Save images
@@ -1125,15 +1125,15 @@ serve(async (req) => {
       }).maybeSingle();
 
       const { count: listingCount } = await supabase
-        .from('external_listings')
+        .from('vehicle_events')
         .select('*', { count: 'exact', head: true })
-        .eq('platform', 'gooding');
+        .eq('source_platform', 'gooding');
 
       return new Response(
         JSON.stringify({
           success: true,
           vehicles_in_db: stats?.count || 0,
-          external_listings: listingCount || 0,
+          vehicle_events: listingCount || 0,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

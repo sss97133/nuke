@@ -94,13 +94,13 @@ async function syncJaguarBid() {
 
   // Update the listing
   const { error: updateError } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .update({
-      current_bid: currentBid,
+      current_price: currentBid,
       bid_count: bidCount,
       watcher_count: watcherCount,
       view_count: viewCount,
-      listing_status: newStatus,
+      event_status: newStatus,
       final_price: finalPrice,
       sold_at: finalPrice ? new Date().toISOString() : null,
       last_synced_at: new Date().toISOString()

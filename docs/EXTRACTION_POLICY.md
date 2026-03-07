@@ -4,7 +4,7 @@
 
 Don't start long-running extraction or cron without looking at **what we're targeting** and current state.
 
-- **Targets:** See **`docs/EXTRACTION_TARGETS.md`**. Only BaT has a numeric target in code (222k bat_listings); others are backlog-clear (pending → 0).
+- **Targets:** See **`docs/EXTRACTION_TARGETS.md`**. Only BaT has a numeric target in code (222k vehicle_events where source_platform='bat'); others are backlog-clear (pending → 0).
 - **Before running:** `npm run status:targets` (or `./scripts/status-targets.sh`) to print extracted vs pending vs target per source.
 - **Then decide:** If BaT pending is high → verified extraction is on-target. If pending is 0 and we're below target → need discovery + extraction, not just "run for N hours."
 
@@ -69,5 +69,5 @@ When Firecrawl credits are available and we want to "hog down" these sources:
 
 - **Prefer** discovery/extraction paths that use direct fetch or Playwright first; use Firecrawl only as fallback or for JS-heavy pages that block Playwright.
 - **Rate-limit:** don’t run Firecrawl-based extractors in unbounded loops; use small batches and delays (e.g. 1–2 req/s) and check `status:targets` between runs.
-- **Validate:** before calling Firecrawl, ensure the URL isn’t already in `vehicles` / `external_listings`; after extraction, validate required fields (year/make/model or VIN) so we don’t mark bad rows complete.
+- **Validate:** before calling Firecrawl, ensure the URL isn’t already in `vehicles` / `vehicle_events`; after extraction, validate required fields (year/make/model or VIN) so we don’t mark bad rows complete.
 - **Where it’s used today:** C&B/PCarMarket/Hemmings appear in sync-live-auctions, import-pcarmarket-listing, extract-cars-and-bids-core, and similar edge functions that may call Firecrawl when direct fetch fails. For bulk backfill, prefer adding Playwright paths or running Firecrawl only in a dedicated, rate-limited script with clear targets (see EXTRACTION_TARGETS.md).

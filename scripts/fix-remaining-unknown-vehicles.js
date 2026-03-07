@@ -196,7 +196,7 @@ async function fixUnknownVehicles() {
     console.log('');
     console.log('ℹ️  Note: Vehicles that couldn\'t be fixed need manual review.');
     console.log('   They may have valuable data (images, price, etc.) even without make/model.');
-    console.log('   Consider extracting from external_listings or marking for deletion.');
+    console.log('   Consider extracting from vehicle_events or marking for deletion.');
   }
 }
 

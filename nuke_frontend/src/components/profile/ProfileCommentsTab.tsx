@@ -16,7 +16,7 @@ interface Comment {
   likes_count?: number;
   bid_amount?: number;
   contains_bid?: boolean;
-  listing?: any;  // bat_listings
+  listing?: any;  // vehicle_events (bat)
   auction?: any;  // auction_events
   vehicle?: any;
   platform?: string;
@@ -112,7 +112,7 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
         
         const vehicleName = vehicle
           ? `${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim()
-          : comment.listing?.bat_listing_title || 'Unknown Vehicle';
+          : comment.listing?.metadata?.title || comment.listing?.metadata?.bat_listing_title || 'Unknown Vehicle';
 
         const commentText = comment.comment_text || '';
         const isLongComment = commentText.length > 200;
@@ -134,7 +134,7 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
         if (isBid) return null;
 
         // Get link to original auction/listing
-        const externalUrl = comment.listing?.bat_listing_url || 
+        const externalUrl = comment.listing?.source_url ||
                            comment.auction?.listing_url ||
                            null;
 

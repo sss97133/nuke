@@ -66,20 +66,20 @@ async function run() {
   const compSummaryQuery = `
     SELECT
       COUNT(*) AS comp_count,
-      ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY el.final_price)::numeric, 0) AS comp_median,
-      ROUND(AVG(el.final_price)::numeric, 0) AS comp_avg,
-      ROUND(MIN(el.final_price)::numeric, 0) AS comp_min,
-      ROUND(MAX(el.final_price)::numeric, 0) AS comp_max
-    FROM external_listings el
-    JOIN vehicles v ON v.id = el.vehicle_id
+      ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ve.final_price)::numeric, 0) AS comp_median,
+      ROUND(AVG(ve.final_price)::numeric, 0) AS comp_avg,
+      ROUND(MIN(ve.final_price)::numeric, 0) AS comp_min,
+      ROUND(MAX(ve.final_price)::numeric, 0) AS comp_max
+    FROM vehicle_events ve
+    JOIN vehicles v ON v.id = ve.vehicle_id
     WHERE UPPER(v.make) = 'GMC'
       AND (v.model ILIKE '%C2500%' OR v.model ILIKE '%C/K%' OR v.model ILIKE '%K2500%' OR v.model ILIKE '%Sierra%' OR v.model ILIKE '%K10%' OR v.model ILIKE '%K20%')
       AND v.year BETWEEN 1978 AND 1988
       AND v.is_public = true
-      AND el.platform = 'bat'
-      AND el.listing_status = 'sold'
-      AND el.final_price > 0
-      AND el.end_date >= NOW() - INTERVAL '12 months'
+      AND ve.source_platform = 'bat'
+      AND ve.event_status = 'sold'
+      AND ve.final_price > 0
+      AND ve.ended_at >= NOW() - INTERVAL '12 months'
       AND LOWER(COALESCE(v.model, '')) NOT SIMILAR TO '%(parts|engine|seats|wheels|door|hood|trunk|bumper|fender|transmission)%'
   `;
   const { data: compSummary, error: e3 } = await supabase.rpc('execute_sql', { query: compSummaryQuery });
@@ -99,18 +99,18 @@ async function run() {
 
   // 4) List recent comp sales
   const compListQuery = `
-    SELECT v.year, v.make, v.model, el.final_price, el.end_date::date
-    FROM external_listings el
-    JOIN vehicles v ON v.id = el.vehicle_id
+    SELECT v.year, v.make, v.model, ve.final_price, ve.ended_at::date
+    FROM vehicle_events ve
+    JOIN vehicles v ON v.id = ve.vehicle_id
     WHERE UPPER(v.make) = 'GMC'
       AND (v.model ILIKE '%C2500%' OR v.model ILIKE '%C/K%' OR v.model ILIKE '%K2500%' OR v.model ILIKE '%Sierra%' OR v.model ILIKE '%K10%' OR v.model ILIKE '%K20%')
       AND v.year BETWEEN 1978 AND 1988
       AND v.is_public = true
-      AND el.platform = 'bat'
-      AND el.listing_status = 'sold'
-      AND el.final_price > 0
-      AND el.end_date >= NOW() - INTERVAL '12 months'
-    ORDER BY el.end_date DESC
+      AND ve.source_platform = 'bat'
+      AND ve.event_status = 'sold'
+      AND ve.final_price > 0
+      AND ve.ended_at >= NOW() - INTERVAL '12 months'
+    ORDER BY ve.ended_at DESC
     LIMIT 20
   `;
   const { data: compList, error: e4 } = await supabase.rpc('execute_sql', { query: compListQuery });
@@ -121,7 +121,7 @@ async function run() {
   } else if (list?.length) {
     console.log('4) Recent GMC truck comp sales:');
     list.forEach((row, i) => {
-      console.log(`   ${row.year} ${row.make} ${row.model} — $${row.final_price} (${row.end_date})`);
+      console.log(`   ${row.year} ${row.make} ${row.model} — $${row.final_price} (${row.ended_at})`);
     });
   } else {
     console.log('4) No comp sales in range.');

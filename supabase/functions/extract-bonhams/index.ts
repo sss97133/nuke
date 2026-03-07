@@ -9,7 +9,7 @@
  *   3. Enrich from HTML/markdown (description sections, images, specs)
  *   4. cleanVehicleFields() — strip HTML, reject polluted values
  *   5. qualityGate() — score and decide upsert/flag/reject
- *   6. Upsert to vehicles + external_listings
+ *   6. Upsert to vehicles + vehicle_events
  *
  * Modes:
  *   - { url, save_to_db? } — single lot extraction
@@ -1021,17 +1021,17 @@ async function saveVehicle(
     console.warn(`[Bonhams] Image save failed (non-fatal): ${e.message}`);
   }
 
-  // Create external_listings record (non-fatal)
+  // Create vehicle_events record (non-fatal)
   try {
     const listingUrlKey = normalizeListingUrlKey(extracted.url);
-    const { error: listErr } = await supabase.from("external_listings").upsert({
+    const { error: listErr } = await supabase.from("vehicle_events").upsert({
       vehicle_id: targetId,
-      platform: "bonhams",
-      listing_url: extracted.url,
-      listing_url_key: listingUrlKey,
-      listing_id: extracted.lot_number || extracted.sale_id || listingUrlKey,
-      listing_status: extracted.auction_status === "sold" ? "sold" : (extracted.auction_status === "upcoming" ? "active" : "ended"),
-      end_date: extracted.sale_date,
+      source_platform: "bonhams",
+      event_type: "auction",
+      source_url: extracted.url,
+      source_listing_id: listingUrlKey || extracted.lot_number || extracted.sale_id,
+      event_status: extracted.auction_status === "sold" ? "sold" : (extracted.auction_status === "upcoming" ? "active" : "ended"),
+      ended_at: extracted.sale_date,
       final_price: extracted.sale_price,
       sold_at: extracted.auction_status === "sold" ? extracted.sale_date : null,
       metadata: {
@@ -1045,12 +1045,12 @@ async function saveVehicle(
         chassis_number: extracted.chassis_number,
         quality_score: gateResult.score,
       },
-    }, { onConflict: "vehicle_id,platform,listing_id" });
+    }, { onConflict: "source_platform,source_listing_id" });
 
-    if (listErr) console.warn(`[Bonhams] External listing save error (non-fatal): ${listErr.message}`);
-    else console.log("[Bonhams] Created/updated external_listings record");
+    if (listErr) console.warn(`[Bonhams] Vehicle event save error (non-fatal): ${listErr.message}`);
+    else console.log("[Bonhams] Created/updated vehicle_events record");
   } catch (e: any) {
-    console.warn(`[Bonhams] External listing creation failed (non-fatal): ${e.message}`);
+    console.warn(`[Bonhams] Vehicle event creation failed (non-fatal): ${e.message}`);
   }
 
   return { vehicleId: targetId, action, qualityScore: gateResult.score, issues: gateResult.issues };
@@ -1237,17 +1237,17 @@ serve(async (req) => {
               const newId = newVehicle?.id;
               lotResults.push({ lot: lot.lotNumber, url: lot.url, vehicle_id: newId, action: "created" });
 
-              // Create external_listings (non-fatal)
+              // Create vehicle_events (non-fatal)
               if (newId) {
                 try {
-                  await supabase.from("external_listings").upsert({
+                  await supabase.from("vehicle_events").upsert({
                     vehicle_id: newId,
-                    platform: "bonhams",
-                    listing_url: lot.url,
-                    listing_url_key: listingUrlKey,
-                    listing_id: lot.lotNumber || catalog.auctionId,
-                    listing_status: lot.availability?.includes("OutOfStock") ? "sold" : "active",
-                    end_date: catalog.auctionDate,
+                    source_platform: "bonhams",
+                    event_type: "auction",
+                    source_url: lot.url,
+                    source_listing_id: listingUrlKey || lot.lotNumber || catalog.auctionId,
+                    event_status: lot.availability?.includes("OutOfStock") ? "sold" : "active",
+                    ended_at: catalog.auctionDate,
                     final_price: lot.price,
                     sold_at: lot.availability?.includes("OutOfStock") ? catalog.auctionDate : null,
                     metadata: {
@@ -1256,9 +1256,9 @@ serve(async (req) => {
                       sale_name: catalog.auctionName,
                       price_currency: lot.priceCurrency,
                     },
-                  }, { onConflict: "vehicle_id,platform,listing_id" });
+                  }, { onConflict: "source_platform,source_listing_id" });
                 } catch (e: any) {
-                  console.warn(`[Bonhams] external_listings error (non-fatal): ${e.message}`);
+                  console.warn(`[Bonhams] vehicle_events error (non-fatal): ${e.message}`);
                 }
               }
             }

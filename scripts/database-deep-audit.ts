@@ -46,7 +46,7 @@ async function analyzeSchema() {
   const majorTables = [
     'vehicles', 'vehicle_images', 'vehicle_status_metadata', 'vehicle_mailboxes',
     'vehicle_documents', 'vehicle_reference_links', 'vehicle_observations',
-    'auction_comments', 'auction_events', 'bat_bids', 'bat_listings', 'bat_user_profiles',
+    'auction_comments', 'auction_events', 'bat_bids', 'vehicle_events', 'bat_user_profiles',
     'businesses', 'profiles', 'external_identities',
     'timeline_events', 'system_logs', 'import_queue',
   ];
@@ -266,13 +266,13 @@ async function analyzeAuctions() {
   const { count: bids } = await supabase.from('bat_bids').select('*', { count: 'exact', head: true });
   addFinding('Auctions', 'info', `BaT bids: ${bids?.toLocaleString()}`);
 
-  const { count: listings } = await supabase.from('bat_listings').select('*', { count: 'exact', head: true });
-  addFinding('Auctions', 'info', `BaT listings: ${listings?.toLocaleString()}`);
+  const { count: listings } = await supabase.from('vehicle_events').select('*', { count: 'exact', head: true }).eq('source_platform', 'bat');
+  addFinding('Auctions', 'info', `BaT vehicle events: ${listings?.toLocaleString()}`);
 
   // Comments per vehicle
   if (comments && listings) {
     const avgComments = (comments / listings).toFixed(1);
-    addFinding('Auctions', 'info', `Avg comments per BaT listing: ${avgComments}`);
+    addFinding('Auctions', 'info', `Avg comments per BaT vehicle event: ${avgComments}`);
   }
 }
 

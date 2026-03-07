@@ -255,7 +255,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         .eq('status', 'accepted')
         .order('created_at', { ascending: false });
       
-      // Check external_listings and auction_events for auction-derived price context (sold or bid-to)
+      // Check vehicle_events and auction_events for auction-derived price context (sold or bid-to)
       let auctionInfo: any = null;
       let auctionMetrics: { buyer_name?: string; seller_username?: string; seller_profile_url?: string; bid_count?: number; view_count?: number; watcher_count?: number } = {};
       let auctionHistory: AuctionSource[] = [];
@@ -305,19 +305,19 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           .order('created_at', { ascending: false })
           .limit(20);
 
-        // Load ALL external listings for this vehicle/platform
+        // Load ALL vehicle events for this vehicle/platform
         const { data: listings } = await supabase
-          .from('external_listings')
-          .select('platform, sold_at, end_date, metadata, bid_count, view_count, watcher_count, listing_url')
+          .from('vehicle_events')
+          .select('source_platform, sold_at, ended_at, metadata, bid_count, view_count, watcher_count, source_url')
           .eq('vehicle_id', vehicleId)
-          .eq('platform', platform)
+          .eq('source_platform', platform)
           .order('sold_at', { ascending: false, nullsFirst: false })
-          .order('end_date', { ascending: false, nullsFirst: false })
+          .order('ended_at', { ascending: false, nullsFirst: false })
           .limit(20);
 
         const listingByUrl = new Map<string, any>();
         for (const l of (listings || [])) {
-          const k = normalizeUrlLoose(l?.listing_url);
+          const k = normalizeUrlLoose(l?.source_url);
           if (k) listingByUrl.set(k, l);
         }
 

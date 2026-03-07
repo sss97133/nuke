@@ -997,7 +997,7 @@ function parseModel(title: string, make: string | null): string | null {
   return model.length > 1 ? model : null;
 }
 
-// Platform mapping for external_listings
+// Platform mapping for vehicle_events
 const SOURCE_TO_PLATFORM: Record<string, string> = {
   'Bring a Trailer': 'bat',
   'Cars & Bids': 'cars_and_bids',
@@ -1053,7 +1053,7 @@ function parseEndDate(timeRemaining: string | null): Date | null {
   return new Date(now.getTime() + totalMinutes * 60 * 1000);
 }
 
-// Save profile to database + external_listings
+// Save profile to database + vehicle_events
 // Returns vehicleId if successful, null if failed
 async function saveProfile(profile: AuctionProfile): Promise<string | null> {
   const year = parseYear(profile.title);
@@ -1103,28 +1103,29 @@ async function saveProfile(profile: AuctionProfile): Promise<string | null> {
     vehicleId = created.id;
   }
 
-  // Also create/update external_listing for marketplace
+  // Also create/update vehicle_event for marketplace
   const platform = SOURCE_TO_PLATFORM[profile.source];
   const orgId = platform ? PLATFORM_ORG_IDS[platform] : null;
 
   if (platform && orgId && vehicleId) {
     try {
-      const { data: existingListing } = await supabase
-        .from('external_listings')
+      const { data: existingEvent } = await supabase
+        .from('vehicle_events')
         .select('id')
         .eq('vehicle_id', vehicleId)
-        .eq('platform', platform)
+        .eq('source_platform', platform)
         .limit(1);
 
-      const listingData = {
+      const eventData = {
         vehicle_id: vehicleId,
-        organization_id: orgId,
-        platform: platform,
-        listing_url: profile.url,
-        listing_status: 'active' as const,
-        current_bid: profile.current_bid,
+        source_organization_id: orgId,
+        source_platform: platform,
+        source_url: profile.url,
+        event_status: 'active' as const,
+        event_type: 'auction',
+        current_price: profile.current_bid,
         bid_count: profile.bid_count || 0,
-        end_date: endDate?.toISOString() || null,
+        ended_at: endDate?.toISOString() || null,
         metadata: {
           source: 'auction_extractor',
           reserve_status: profile.reserve_status,
@@ -1135,15 +1136,15 @@ async function saveProfile(profile: AuctionProfile): Promise<string | null> {
         updated_at: new Date().toISOString(),
       };
 
-      if (existingListing && existingListing.length > 0) {
+      if (existingEvent && existingEvent.length > 0) {
         await supabase
-          .from('external_listings')
-          .update(listingData)
-          .eq('id', existingListing[0].id);
+          .from('vehicle_events')
+          .update(eventData)
+          .eq('id', existingEvent[0].id);
       } else {
         await supabase
-          .from('external_listings')
-          .insert(listingData);
+          .from('vehicle_events')
+          .insert(eventData);
       }
     } catch (e) {
       // Non-fatal - platform may not be in constraint yet

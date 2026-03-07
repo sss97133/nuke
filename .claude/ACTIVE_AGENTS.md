@@ -634,3 +634,15 @@ Automated Labor Estimation Pipeline — all 7 phases built, deployed, and commit
 - **Task**: Implementing V3 Bloomberg Terminal aesthetic for vehicle profile page
 - **Files**: vehicle-profile.css, VehicleProfile.tsx, WorkspaceContent.tsx, new BarcodeTimeline.tsx, new VehicleBadgeBar.tsx
 - **Status**: Active
+
+
+
+## Agent: vehicle_events rename — 2026-03-07 ~10:00 UTC
+- **Task**: Rename bat_listings + external_listings → vehicle_events across entire codebase
+- **Files**: ALL priorities (edge functions, frontend, scripts, docs)
+- **DO NOT TOUCH**: migrations/, archive/
+
+### Agent: bat_listings/external_listings → vehicle_events rename (2026-03-07 ~10:00 UTC)
+- **Task**: Rename all remaining bat_listings/external_listings references to vehicle_events in 60 edge functions
+- **Files**: supabase/functions/*/index.ts (60 files listed)
+- **Status**: Starting

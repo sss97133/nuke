@@ -806,19 +806,19 @@ async function saveToDatabase(
     console.log(`[broad-arrow] Created vehicle: ${vehicleId}`);
   }
 
-  // Upsert external_listings record
+  // Upsert vehicle_events record
   const { error: listingError } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .upsert({
       vehicle_id: vehicleId,
-      platform: 'broad_arrow',
-      listing_url: extracted.url,
-      listing_url_key: listingUrlKey,
-      listing_id: extracted.lot_number || listingUrlKey,
-      listing_status: extracted.auction_status === 'sold' ? 'sold' :
+      source_platform: 'broad_arrow',
+      event_type: 'auction',
+      source_url: extracted.url,
+      source_listing_id: listingUrlKey || extracted.lot_number,
+      event_status: extracted.auction_status === 'sold' ? 'sold' :
                       extracted.auction_status === 'upcoming' ? 'active' :
                       extracted.auction_status === 'not_sold' ? 'unsold' : 'ended',
-      end_date: extracted.auction_date ? new Date(extracted.auction_date).toISOString() : null,
+      ended_at: extracted.auction_date ? new Date(extracted.auction_date).toISOString() : null,
       final_price: extracted.sale_price,
       sold_at: extracted.auction_status === 'sold' && extracted.auction_date
         ? new Date(extracted.auction_date).toISOString()
@@ -830,7 +830,7 @@ async function saveToDatabase(
         estimate_high: extracted.estimate_high,
         chassis_number: extracted.chassis_number,
       },
-    }, { onConflict: 'platform,listing_url_key' });
+    }, { onConflict: 'source_platform,source_listing_id' });
 
   if (listingError) {
     console.error(`[broad-arrow] External listing upsert error: ${listingError.message}`);
@@ -1170,9 +1170,9 @@ serve(async (req) => {
         .eq('discovery_source', 'broad_arrow');
 
       const { count: listingCount } = await supabase
-        .from('external_listings')
+        .from('vehicle_events')
         .select('*', { count: 'exact', head: true })
-        .eq('platform', 'broad_arrow');
+        .eq('source_platform', 'broad_arrow');
 
       return okJson({
         success: true,
@@ -1183,7 +1183,7 @@ serve(async (req) => {
             failed: failedCount || 0,
           },
           vehicles_in_db: vehicleCount || 0,
-          external_listings: listingCount || 0,
+          vehicle_events: listingCount || 0,
         },
       });
     }

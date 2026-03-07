@@ -12,7 +12,7 @@
 🟢 **Schema**: vehicle_reference_links: 199,862 rows
 🟢 **Schema**: vehicle_observations: 622,913 rows
 🟢 **Schema**: auction_events: 46,571 rows
-🟢 **Schema**: bat_listings: 99,325 rows
+🟢 **Schema**: vehicle_events: ~170,000 rows (formerly bat_listings + external_listings)
 🟢 **Schema**: bat_user_profiles: 437,688 rows
 🟢 **Schema**: businesses: 2,230 rows
 🟢 **Schema**: profiles: 5 rows
@@ -45,7 +45,7 @@
 🟢 **Users**: BaT user profiles: 437,688
 🟢 **Auctions**: Auction comments: 8,269,084
 🟢 **Auctions**: BaT bids: 2,681,864
-🟢 **Auctions**: BaT listings: 99,325
-🟢 **Auctions**: Avg comments per BaT listing: 83.3
+🟢 **Auctions**: Vehicle events (all platforms): ~170,000
+🟢 **Auctions**: Avg comments per BaT vehicle event: 83.3
 🟡 **Queues**: Import queue - Pending: 19,641, Failed: 11,346
 🟢 **Queues**: User profile queue: 861,689

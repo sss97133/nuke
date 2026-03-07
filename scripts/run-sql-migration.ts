@@ -12,36 +12,37 @@ async function main() {
   
   // First, let's check what constraint exists
   const { data: constraints } = await supabase
-    .from('external_listings')
-    .select('platform')
+    .from('vehicle_events')
+    .select('source_platform')
     .limit(0);
-  
+
   console.log('Table accessible:', constraints !== null);
-  
+
   // Try inserting with a test platform to see the constraint
   const { error: testError } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .insert({
       vehicle_id: '00000000-0000-0000-0000-000000000000', // Will fail foreign key
-      organization_id: '00000000-0000-0000-0000-000000000000',
-      platform: 'gooding',
-      listing_url: 'test',
-      listing_status: 'active',
+      source_organization_id: '00000000-0000-0000-0000-000000000000',
+      source_platform: 'gooding',
+      source_url: 'test',
+      event_status: 'active',
+      event_type: 'auction',
     });
-  
+
   console.log('Test insert error:', testError?.message || 'none');
-  
-  if (testError?.message?.includes('platform_check')) {
+
+  if (testError?.message?.includes('platform_check') || testError?.message?.includes('source_platform')) {
     console.log('\nPlatform constraint needs to be updated.');
     console.log('Please run this SQL in the Supabase dashboard SQL editor:\n');
     console.log(`
-ALTER TABLE public.external_listings
-  DROP CONSTRAINT IF EXISTS external_listings_platform_check;
+ALTER TABLE public.vehicle_events
+  DROP CONSTRAINT IF EXISTS vehicle_events_source_platform_check;
 
-ALTER TABLE public.external_listings
-  ADD CONSTRAINT external_listings_platform_check
+ALTER TABLE public.vehicle_events
+  ADD CONSTRAINT vehicle_events_source_platform_check
   CHECK (
-    platform = ANY (ARRAY[
+    source_platform = ANY (ARRAY[
       'bat', 'cars_and_bids', 'mecum', 'barrettjackson', 'russoandsteele',
       'pcarmarket', 'sbx', 'bonhams', 'rmsothebys',
       'collecting_cars', 'broad_arrow', 'gooding',

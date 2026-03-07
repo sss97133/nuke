@@ -421,14 +421,15 @@ async function analyze(supabase: any, body: any) {
   // Get candidate vehicles (same logic as batch-comment-discovery)
   const { data: candidates, error: cErr } = await supabase.rpc("execute_sql", {
     query: `
-      SELECT bl.vehicle_id, bl.comment_count,
+      SELECT ve.vehicle_id, ve.comment_count,
              v.year, v.make, v.model,
              COALESCE(v.sale_price, v.winning_bid, v.high_bid, v.bat_sold_price) AS sale_price
-      FROM bat_listings bl
-      JOIN vehicles v ON v.id = bl.vehicle_id AND v.deleted_at IS NULL
-      WHERE bl.vehicle_id IS NOT NULL
-        AND bl.comment_count >= ${minComments}
-        AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = bl.vehicle_id)
+      FROM vehicle_events ve
+      JOIN vehicles v ON v.id = ve.vehicle_id AND v.deleted_at IS NULL
+      WHERE ve.source_platform = 'bat'
+        AND ve.vehicle_id IS NOT NULL
+        AND ve.comment_count >= ${minComments}
+        AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = ve.vehicle_id)
       ORDER BY random()
       LIMIT ${batchSize}
     `,
@@ -471,10 +472,11 @@ async function analyze(supabase: any, body: any) {
   const { data: remData } = await supabase.rpc("execute_sql", {
     query: `
       SELECT count(*) AS remaining
-      FROM bat_listings bl
-      WHERE bl.vehicle_id IS NOT NULL
-        AND bl.comment_count >= ${minComments}
-        AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = bl.vehicle_id)
+      FROM vehicle_events ve
+      WHERE ve.source_platform = 'bat'
+        AND ve.vehicle_id IS NOT NULL
+        AND ve.comment_count >= ${minComments}
+        AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = ve.vehicle_id)
     `,
   });
   const remaining = Number(remData?.[0]?.remaining ?? 0);
@@ -1103,9 +1105,9 @@ async function validate(supabase: any, body: any) {
              cd.sentiment_score AS ai_score,
              cd.raw_extraction->'condition_signals'->>'overall_impression' AS ai_condition,
              cd.raw_extraction->'market_signals'->>'demand' AS ai_demand,
-             bl.comment_count
+             ve.comment_count
       FROM comment_discoveries cd
-      JOIN bat_listings bl ON bl.vehicle_id = cd.vehicle_id
+      JOIN vehicle_events ve ON ve.vehicle_id = cd.vehicle_id AND ve.source_platform = 'bat'
       WHERE cd.model_used IS NULL OR cd.model_used != 'programmatic-v1'
       ORDER BY cd.sentiment_score DESC NULLS LAST
       LIMIT ${limit}

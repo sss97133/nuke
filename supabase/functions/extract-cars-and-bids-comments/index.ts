@@ -184,10 +184,10 @@ serve(async (req) => {
     }
     if (!vehicleId && platformGuess) {
       const { data: ext } = await supabase
-        .from('external_listings')
+        .from('vehicle_events')
         .select('vehicle_id')
-        .eq('platform', 'cars_and_bids')
-        .in('listing_url', urlCandidates)
+        .eq('source_platform', 'cars_and_bids')
+        .in('source_url', urlCandidates)
         .limit(1)
         .maybeSingle()
       if (ext?.vehicle_id) vehicleId = String(ext.vehicle_id)

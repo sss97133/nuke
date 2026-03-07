@@ -86,17 +86,17 @@ async function main() {
     console.log('  Comments:', cmtCount);
   }
 
-  // Check external_listings metadata
+  // Check vehicle_events metadata
   if (recent) {
-    const { data: listing } = await supabase
-      .from('external_listings')
+    const { data: vehicleEvent } = await supabase
+      .from('vehicle_events')
       .select('metadata')
       .eq('vehicle_id', recent.id)
       .maybeSingle();
 
-    if (listing?.metadata) {
-      const m = listing.metadata as any;
-      console.log('\nMETADATA (in external_listings):');
+    if (vehicleEvent?.metadata) {
+      const m = vehicleEvent.metadata as any;
+      console.log('\nMETADATA (in vehicle_events):');
       console.log('  Carfax:', m.carfax_url ? 'Yes' : 'No');
       console.log('  Video:', m.video_url ? 'Yes' : 'No');
       console.log('  Doug\'s Take:', m.dougs_take ? 'Yes (' + m.dougs_take.length + ' chars)' : 'No');

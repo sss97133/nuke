@@ -108,10 +108,10 @@ serve(async (req) => {
     const maxCommentChars = body.max_comment_chars ?? 12000;
     const shouldContinue = body.continue ?? false;
 
-    // Phase 1: Use bat_listings (pre-aggregated comment counts, fast)
+    // Phase 1: Use vehicle_events (pre-aggregated comment counts, fast)
     // Phase 2: Fall back to auction_comments direct scan for non-BaT vehicles
     const { data: candidates, error: cErr } = await supabase.rpc("execute_sql", {
-      query: `SELECT bl.vehicle_id, bl.comment_count, v.year, v.make, v.model, COALESCE(v.sale_price, v.winning_bid, v.high_bid, v.bat_sold_price) AS sale_price FROM bat_listings bl JOIN vehicles v ON v.id = bl.vehicle_id AND v.deleted_at IS NULL WHERE bl.vehicle_id IS NOT NULL AND bl.comment_count >= ${minComments} AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = bl.vehicle_id) ORDER BY bl.comment_count DESC LIMIT ${batchSize}`
+      query: `SELECT ve.vehicle_id, ve.comment_count, v.year, v.make, v.model, COALESCE(v.sale_price, v.winning_bid, v.high_bid, v.bat_sold_price) AS sale_price FROM vehicle_events ve JOIN vehicles v ON v.id = ve.vehicle_id AND v.deleted_at IS NULL WHERE ve.source_platform = 'bat' AND ve.vehicle_id IS NOT NULL AND ve.comment_count >= ${minComments} AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = ve.vehicle_id) ORDER BY ve.comment_count DESC LIMIT ${batchSize}`
     });
 
     if (cErr) throw new Error(`Candidate query failed: ${JSON.stringify(cErr)}`);
@@ -160,9 +160,9 @@ serve(async (req) => {
       }
     }
 
-    // Get remaining count (fast — bat_listings is small)
+    // Get remaining count (fast — vehicle_events is indexed)
     const { data: remainingData } = await supabase.rpc("execute_sql", {
-      query: `SELECT count(*) AS remaining FROM bat_listings bl WHERE bl.vehicle_id IS NOT NULL AND bl.comment_count >= ${minComments} AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = bl.vehicle_id)`
+      query: `SELECT count(*) AS remaining FROM vehicle_events ve WHERE ve.source_platform = 'bat' AND ve.vehicle_id IS NOT NULL AND ve.comment_count >= ${minComments} AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = ve.vehicle_id)`
     });
     const remaining = Array.isArray(remainingData) ? Number(remainingData[0]?.remaining || 0) : 0;
 

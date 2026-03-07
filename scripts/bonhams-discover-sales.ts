@@ -290,14 +290,14 @@ async function saveLots(
           created++;
           const listingUrlKey = lot.url.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
           await retryableSupabaseOp(() =>
-            supabase.from('external_listings').upsert({
+            supabase.from('vehicle_events').upsert({
               vehicle_id: newVehicle.id,
-              platform: 'bonhams',
-              listing_url: lot.url,
-              listing_url_key: listingUrlKey,
-              listing_id: lot.lotNumber || saleId,
-              listing_status: lot.availability?.includes('OutOfStock') ? 'sold' : 'active',
-              end_date: auctionDate,
+              source_platform: 'bonhams',
+              event_type: 'auction',
+              source_url: lot.url,
+              source_listing_id: lot.lotNumber || saleId,
+              event_status: lot.availability?.includes('OutOfStock') ? 'sold' : 'active',
+              ended_at: auctionDate,
               final_price: lot.price,
               sold_at: lot.availability?.includes('OutOfStock') ? auctionDate : null,
               metadata: {
@@ -305,8 +305,9 @@ async function saveLots(
                 sale_id: saleId,
                 sale_name: auctionName,
                 price_currency: lot.priceCurrency,
+                listing_url_key: listingUrlKey,
               },
-            }, { onConflict: 'platform,listing_url_key' })
+            }, { onConflict: 'source_platform,source_url' })
           );
         }
       }

@@ -12,15 +12,15 @@ const VEHICLE_ID = '81a73e63-2f73-4c1c-b4e9-00dde3857045';
 async function check() {
   console.log('Checking vehicle:', VEHICLE_ID, '\n');
 
-  // Get listing
+  // Get event
   const { data: listing } = await supabase
-    .from('external_listings')
+    .from('vehicle_events')
     .select('*')
     .eq('vehicle_id', VEHICLE_ID)
     .single();
 
   if (listing) {
-    console.log('URL:', listing.listing_url);
+    console.log('URL:', listing.source_url);
     console.log('Metadata source:', listing.metadata?.source);
     console.log('Metadata image_count:', listing.metadata?.image_count);
     console.log('Metadata comment_count:', listing.metadata?.comment_count);

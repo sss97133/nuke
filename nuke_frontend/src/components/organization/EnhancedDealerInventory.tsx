@@ -284,7 +284,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
   // IMPORTANT: Only mark as "sold" if there's proof (BAT URL, sale_date, approved verification, etc.)
   const getDisplayCategory = (v: DealerVehicle): string => {
     // Sold vehicles - ONLY if there's proof AND status is 'sold'
-    // Check for: sale_date, BAT listing (external_listings), or approved sale verification
+    // Check for: sale_date, BAT listing (vehicle_events), or approved sale verification
     const hasSaleProof = v.sale_date || 
                         (v.vehicles.sale_status === 'sold' && v.sale_price) ||
                         (v.status === 'sold' && (v.sale_date || v.sale_price)); // Only if status is explicitly set with proof
