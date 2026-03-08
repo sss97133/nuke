@@ -2,7 +2,7 @@
 
 Official TypeScript SDK for the [Nuke Vehicle Data API](https://nuke.ag).
 
-33M+ vehicle records. Free image classification. Deal scoring. Comp data.
+1.29M vehicles. 35M images. Free image classification. Deal scoring. Comp data.
 Zero-setup access to the collector vehicle market.
 
 [![npm version](https://img.shields.io/npm/v/@nuke1/sdk)](https://www.npmjs.com/package/@nuke1/sdk)
@@ -43,7 +43,7 @@ Get an API key at [nuke.ag/settings/api-keys](https://nuke.ag/settings/api-keys)
 ```typescript
 // Search vehicles
 const results = await nuke.search.query({ q: 'porsche 911 turbo', limit: 10 });
-// → { data: [...], total_count: 42, query_type: 'fulltext' }
+// → { data: [...], pagination: { page: 1, limit: 10, total_count: 42, total_pages: 5 }, search_time_ms: 12 }
 
 // Get a vehicle by VIN (includes valuation + images)
 const profile = await nuke.vinLookup.get('WP0AB0916KS121279');
@@ -175,7 +175,7 @@ const vehicle = await nuke.vehicles.retrieve('uuid-here');
 // Update
 const updated = await nuke.vehicles.update('uuid-here', {
   mileage: 50000,
-  exterior_color: 'Guards Red',
+  color: 'Guards Red',
 });
 
 // Archive (soft delete)
@@ -203,10 +203,10 @@ for await (const vehicle of nuke.vehicles.listAll({ mine: true })) {
 | `model` | `string` | Model name |
 | `vin` | `string` | 17-character VIN |
 | `mileage` | `number` | Odometer reading in miles |
-| `exterior_color` | `string` | Exterior paint color |
+| `color` | `string` | Exterior paint color |
 | `interior_color` | `string` | Interior color |
 | `transmission` | `string` | `'manual'`, `'automatic'`, etc. |
-| `engine` | `string` | Engine description |
+| `engine_type` | `string` | Engine description |
 | `drivetrain` | `string` | `'rwd'`, `'awd'`, `'4wd'`, etc. |
 | `body_style` | `string` | `'coupe'`, `'sedan'`, `'suv'`, etc. |
 | `sale_price` | `number` | Sale/asking price in USD |
@@ -366,12 +366,11 @@ Full-text search across vehicles, organizations, and users.
 ```typescript
 const results = await nuke.search.query({
   q: 'porsche 911 turbo 1989',
-  types: ['vehicle'],   // filter by entity type (optional)
   limit: 10,
 });
 
 for (const item of results.data) {
-  console.log(item.type, item.title, item.relevance_score);
+  console.log(item.year, item.make, item.model, item.sale_price);
 }
 ```
 
@@ -477,7 +476,7 @@ const listings = await nuke.listings.list({
 });
 
 for (const listing of listings.data) {
-  console.log(listing.platform, listing.final_price, listing.listing_url);
+  console.log(listing.source_platform, listing.final_price, listing.source_url);
 }
 ```
 
@@ -491,9 +490,9 @@ Immutable data points about a vehicle from any source.
 // Create an observation
 const obs = await nuke.observations.create({
   vehicle_id: 'uuid-here',
-  source_type: 'manual',
-  observation_kind: 'mileage_reading',
-  data: { mileage: 45000, date: '2024-01-15' },
+  source_id: 'manual-source-uuid',
+  kind: 'mileage_reading',
+  structured_data: { mileage: 45000, date: '2024-01-15' },
   confidence: 0.95,
 });
 
@@ -735,7 +734,7 @@ import type {
 
 See [CHANGELOG.md](./CHANGELOG.md) for version history.
 
-**Current version: 1.5.0** — YONO Vision v3 with zone detection, condition scoring, damage/modification flags. Signal Score. Free inference for all vision endpoints.
+**Current version: 2.0.0** — YONO Vision v3 with zone detection, condition scoring, damage/modification flags. Signal Score. Analysis. Market Trends. Breaking type changes aligned to actual API responses.
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "@nuke1/sdk",
-  "version": "1.6.0",
+  "version": "2.0.0",
   "description": "Official TypeScript SDK for the Nuke Vehicle Data API",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

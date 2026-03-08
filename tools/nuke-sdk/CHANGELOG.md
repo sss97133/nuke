@@ -7,6 +7,57 @@ Versioning: [Semantic Versioning](https://semver.org/)
 
 ---
 
+## [2.0.0] — 2026-03-07
+
+**SDK v2.0.0 — Type accuracy overhaul. All 15 resource namespaces live.**
+
+Major version bump due to breaking type changes. Every SDK type now matches the actual API response shapes, verified by a full handshake audit against all 19 API endpoints.
+
+### BREAKING CHANGES
+
+- **`Vehicle` type:** `exterior_color` renamed to `color`. `engine` renamed to `engine_type`. Added `trim`, `series`, `engine_displacement`, `primary_image_url`, `purchase_price`, `discovery_url`.
+- **`VehicleCreateParams` / `VehicleUpdateParams`:** `exterior_color` renamed to `color`. `engine` renamed to `engine_type`. Added `purchase_price`.
+- **`Observation` type:** `source_type` renamed to `source_id`. `observation_kind` renamed to `kind`. `data` renamed to `structured_data`. Removed `provenance` wrapper.
+- **`ObservationCreateParams`:** `source_type` renamed to `source_id`. `observation_kind` renamed to `kind`. `data` renamed to `structured_data`.
+- **`ExternalListing` type:** All field names aligned to `vehicle_events` table — `platform` → `source_platform`, `listing_url` → `source_url`, `listing_id` → `source_listing_id`, `listing_status` → `event_status`, `start_date` → `started_at`, `end_date` → `ended_at`, `current_bid` → `current_price`.
+- **`Comparable` type:** Removed `condition_rating`, `transmission`. Added `listing_url`, `platform`, `platform_raw`, `sold_date`, `source_type`.
+- **`SearchResponse`:** Now uses `pagination` object with `total_count` and `total_pages` instead of flat `total_count` / `query_type`.
+- **`SearchResult`:** Rewritten to match API — now returns vehicle fields (`id`, `vin`, `year`, `make`, `model`, `trim`, `sale_price`, etc.) with `valuation` and `data_density` objects, instead of generic `type` / `title` / `relevance_score`.
+
+### Added
+
+- **`nuke.analysis.*`** namespace — proactive deal health signals: `get()`, `signal()`, `refresh()`, `history()`, `acknowledge()`, `dismiss()`.
+- **`CompsSummary.auction_event_count`** field.
+- **`CompsResponse.query.excluded_vehicle_id`** field.
+- **`SignalScore.computed_on_demand`** optional field.
+- **`VehicleAuctionResponse.listings`** now typed with correct `vehicle_events` column names.
+- **`vehicles.list()`** now handles API's `{ vehicles: [...] }` response key mapping to `{ data: [...] }`.
+
+### Fixed
+
+- `comps.ts` JSDoc typo: `nuke.agps.get()` → `nuke.comps.get()`.
+- `search.ts` JSDoc referenced non-existent `total_count` and `query_type` fields.
+- `listings.ts` JSDoc referenced non-existent `listing_url` field.
+- `index.ts` JSDoc used old observation field names.
+- README search example referenced `query_type` and `relevance_score`.
+- README observation example used `source_type` / `observation_kind` / `data` instead of `source_id` / `kind` / `structured_data`.
+- README vehicle params table listed `exterior_color` and `engine` instead of `color` and `engine_type`.
+- README version string updated from 1.5.0 to 2.0.0.
+- README data stats updated to current numbers (1.29M vehicles, 35M images).
+
+---
+
+## [1.6.0] — 2026-03-04
+
+**SDK v1.6.0 — Analysis namespace, type fixes from handshake audit.**
+
+### Added
+
+- **`nuke.analysis.*`** namespace — proactive deal health signals.
+- Type fixes from SDK-API handshake audit (preparatory, types not yet aligned with API).
+
+---
+
 ## [1.5.0] — 2026-02-28
 
 **SDK v1.5.0 — Vision types aligned with live API, health endpoint, smart auth.**
