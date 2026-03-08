@@ -13,6 +13,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, getSupabaseFunctionsUrl } from '../lib/supabase';
+import { ingestVehicle } from '../services/aiDataIngestion';
 import { readCachedSession } from '../utils/cachedSession';
 
 interface FileUpload {
@@ -164,24 +165,16 @@ export default function ImportDataPage() {
 
     setUrlProcessing(true);
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const result = await ingestVehicle({ url: urlInput.trim(), enrich: true });
 
-      // Call the URL drop processor
-      const response = await fetch(`${getSupabaseFunctionsUrl()}/process-url-drop`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: urlInput.trim() }),
-      });
+      if (result.status === 'error') {
+        throw new Error(result.error || 'Ingestion failed');
+      }
 
-      const result = await response.json();
-
-      if (result.success && result.data) {
-        setExtractedVehicles(prev => [...prev, result.data]);
-        setActiveTab('results');
-        setUrlInput('');
+      if (result.vehicle_id) {
+        // Navigate directly to the created/matched vehicle
+        navigate(`/vehicle/${result.vehicle_id}`);
+        return;
       }
     } catch (error: any) {
       console.error('URL processing error:', error);
@@ -193,31 +186,27 @@ export default function ImportDataPage() {
 
   const createVehicle = async (vehicle: ExtractedVehicle, index: number) => {
     try {
-      const { data, error } = await supabase
-        .from('vehicles')
-        .insert({
-          year: vehicle.year,
-          make: vehicle.make,
-          model: vehicle.model,
-          vin: vehicle.vin,
-          mileage: vehicle.mileage,
-          sale_price: vehicle.price,
-          exterior_color: vehicle.color,
-          description: vehicle.description,
-          owner_id: session?.user?.id,
-          is_public: false,
-        })
-        .select()
-        .single();
+      const result = await ingestVehicle({
+        year: vehicle.year,
+        make: vehicle.make,
+        model: vehicle.model,
+        vin: vehicle.vin,
+        mileage: vehicle.mileage,
+        price: vehicle.price,
+        color: vehicle.color,
+        description: vehicle.description,
+      });
 
-      if (error) throw error;
+      if (result.status === 'error') {
+        throw new Error(result.error || 'Failed to create vehicle');
+      }
 
       // Remove from extracted list
       setExtractedVehicles(prev => prev.filter((_, i) => i !== index));
 
       // Navigate to the new vehicle
-      if (data?.id) {
-        navigate(`/vehicle/${data.id}`);
+      if (result.vehicle_id) {
+        navigate(`/vehicle/${result.vehicle_id}`);
       }
     } catch (error: any) {
       console.error('Create vehicle error:', error);
