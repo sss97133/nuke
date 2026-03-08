@@ -174,8 +174,9 @@ export const filterBatNoise = (urls: string[], v: any): string[] => {
       f.includes('merch') ||
       f.includes('dec-merch') ||
       f.includes('podcast-graphic') ||
-      // Generic editorial "Web-#####-" images
-      /\/web-\d{3,}-/i.test(f) ||
+      // Generic editorial images (but NOT actual listing images like "Web-40065-68-Porsche-911-1.jpg")
+      // BaT listing images use "Web-NNNNN-YY-Make-Model" format — only filter if no vehicle pattern follows
+      (/\/web-\d{3,}-/i.test(f) && !/\/web-\d+-\d{2,4}-[a-z]/i.test(f)) ||
       // Homepage/featured content that appears on listing pages
       f.includes('site-post-') ||
       f.includes('thumbnail-template') ||
@@ -352,9 +353,14 @@ export const isMismatchedVehicleImage = (value?: string | null, expectedId?: str
   return Boolean(candidate && candidate.toLowerCase() !== target);
 };
 
-export const filterProfileImages = (urls: string[], v: any): string[] => {
+export const filterProfileImages = (urls: string[], v: any, opts?: { skipMismatchCheck?: boolean }): string[] => {
   const normalized = (Array.isArray(urls) ? urls : []).map(normalizeUrl).filter(Boolean);
-  const withoutMismatched = normalized.filter((u: string) => !isMismatchedVehicleImage(u, v?.id));
+  // When images come from a DB query filtered by vehicle_id FK, the FK is the source of truth.
+  // Skip the URL-path-based UUID mismatch check to avoid filtering images stored under a different
+  // vehicle's directory (e.g. after reassignment/merge). Only apply for external/origin images.
+  const withoutMismatched = opts?.skipMismatchCheck
+    ? normalized
+    : normalized.filter((u: string) => !isMismatchedVehicleImage(u, v?.id));
   // Exclude organization/dealer logos and import_queue images from profile display
   const withoutOrgLogos = withoutMismatched.filter((u: string) => {
     const urlLower = String(u || '').toLowerCase();
@@ -583,7 +589,7 @@ export const isValidForPrimary = (r: any, vehicle: any): boolean => {
       urlLower.includes('invoice') || urlLower.includes('title')) {
     return false;
   }
-  return filterProfileImages([url], vehicle).length > 0;
+  return filterProfileImages([url], vehicle, { skipMismatchCheck: true }).length > 0;
 };
 
 /** Clean an image URL: remove resize params for ALL platforms */

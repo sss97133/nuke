@@ -672,8 +672,10 @@ const ImageGallery = ({
       );
     };
 
-    const noMismatched = noFileUrls.filter((img: any) => !isMismatchedVehicleAsset(img));
-    if (noMismatched.length === 0) return [];
+    // NOTE: isMismatchedVehicleAsset check REMOVED. Images are already queried by vehicle_id FK
+    // which is the source of truth. Storage paths may contain a different vehicle's UUID after
+    // reassignment/merge, and the old check was incorrectly hiding ALL images for those vehicles.
+    const noMismatched = noFileUrls;
 
     const noLogos = noMismatched.filter((img: any) => !isOrgLogoPath(img));
     if (noLogos.length === 0) return [];

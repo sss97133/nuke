@@ -78,7 +78,7 @@ export default function StorefrontVehicleDetail({ organization }: Props) {
       // Fetch images
       const { data: imgs } = await supabase
         .from('vehicle_images')
-        .select('id, url, source_url, is_primary')
+        .select('id, image_url, source_url, is_primary')
         .eq('vehicle_id', vehicleId)
         .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")')
         .order('is_primary', { ascending: false })
@@ -116,7 +116,7 @@ export default function StorefrontVehicleDetail({ organization }: Props) {
 
   const title = [vehicle.year, vehicle.make, vehicle.model, vehicle.trim].filter(Boolean).join(' ');
   const price = vehicle.sale_price || vehicle.asking_price || vehicle.current_value;
-  const heroImage = images[activeImage]?.url || vehicle.primary_image_url || vehicle.image_url;
+  const heroImage = images[activeImage]?.image_url || vehicle.primary_image_url || vehicle.image_url;
 
   const specs: { label: string; value: string }[] = [
     vehicle.engine && { label: 'Engine', value: vehicle.engine },
@@ -172,7 +172,7 @@ export default function StorefrontVehicleDetail({ organization }: Props) {
                     cursor: 'pointer',
                   }}
                 >
-                  <img src={img.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={img.image_url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               ))}
             </div>
