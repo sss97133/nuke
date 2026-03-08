@@ -307,7 +307,7 @@ const FeedGrid: React.FC<FeedGridProps> = ({
               padding: '6px 16px',
               fontSize: '12px',
               cursor: 'pointer',
-              fontFamily: '"MS Sans Serif", sans-serif',
+              fontFamily: 'Arial, sans-serif',
             }}
           >
             Refresh
@@ -342,7 +342,7 @@ const FeedGrid: React.FC<FeedGridProps> = ({
                 padding: '8px 16px',
                 fontSize: '12px',
                 cursor: 'pointer',
-                fontFamily: '"MS Sans Serif", sans-serif',
+                fontFamily: 'Arial, sans-serif',
               }}
             >
               Add Your First Vehicle

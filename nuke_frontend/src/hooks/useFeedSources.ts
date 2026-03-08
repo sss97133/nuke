@@ -293,7 +293,7 @@ export function useFeedSources({ filters, isMissingListingKindColumn, listingKin
   const domainGradient = useCallback((domain: string) => {
     const h1 = domainHue(domain);
     const h2 = (h1 + 42) % 360;
-    return `linear-gradient(135deg, hsla(${h1}, 92%, 60%, 0.38), hsla(${h2}, 92%, 56%, 0.16))`;
+    return `hsla(${h1}, 92%, 60%, 0.28)`;
   }, [domainHue]);
 
   return {

@@ -82,7 +82,8 @@ export default function Search() {
       .limit(24)
       .then(({ data }) => {
         if (data) setFeaturedVehicles(data);
-      });
+      })
+      .catch(() => {});
   }, [searchQuery]);
 
   // VIN search state
@@ -686,7 +687,7 @@ export default function Search() {
             background: showVinSearch ? 'var(--text)' : 'transparent',
             color: showVinSearch ? 'var(--surface)' : 'var(--text-secondary)',
             cursor: 'pointer',
-            borderRadius: '2px',
+            borderRadius: '0px',
           }}
         >
           {showVinSearch ? 'Close VIN Lookup' : 'VIN Lookup'}
@@ -1102,7 +1103,7 @@ export default function Search() {
               background: 'transparent',
               color: 'var(--text-secondary)',
               cursor: 'pointer',
-              borderRadius: '2px',
+              borderRadius: '0px',
             }}
           >
             {showWorkstation ? 'Hide quick links' : 'Quick links & workspace'}
