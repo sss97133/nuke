@@ -175,7 +175,7 @@ serve(async (req) => {
     const results: SearchResult[] = [];
 
     // Shared rich vehicle SELECT — includes all fields needed for tier calculation and UI display
-    const VEHICLE_SELECT = 'id, year, make, model, vin, color, status, sale_price, current_value, asking_price, primary_image_url, seller_name, bat_seller, data_quality_score, view_count, bat_view_count, profile_origin, ownership_verified, comment_count, mileage, transmission, engine_size, canonical_vehicle_type, canonical_body_style, image_count, observation_count';
+    const VEHICLE_SELECT = 'id, year, make, model, vin, color, status, sale_price, current_value, asking_price, primary_image_url, seller_name, bat_seller, data_quality_score, view_count, bat_view_count, profile_origin, ownership_verified, comment_count, mileage, transmission, engine_size, canonical_vehicle_type, canonical_body_style, image_count, observation_count, updated_at';
 
     // Exclude non-automobile types from all search results
     const NON_AUTO_TYPES = new Set(['MOTORCYCLE', 'BOAT', 'TRAILER', 'ATV', 'BUS', 'RV', 'SNOWMOBILE', 'OTHER', 'EQUIPMENT']);
@@ -210,6 +210,7 @@ serve(async (req) => {
       mileage: v.mileage,
       transmission: v.transmission,
       engine_size: v.engine_size,
+      updated_at: v.updated_at,
     });
 
     // ============================================

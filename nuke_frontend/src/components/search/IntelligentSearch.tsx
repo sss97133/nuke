@@ -7,6 +7,7 @@ import { UnifiedImageImportService } from '../../services/unifiedImageImportServ
 import { FaviconIcon } from '../common/FaviconIcon';
 import { extractAndCacheFavicon, detectSourceType } from '../../services/sourceFaviconService';
 import { useKeyboardShortcut } from '../../hooks/useKeyboardShortcut';
+import { applyNonAutoFilters } from '../../lib/nonAutoExclusion';
 import type { SearchResult } from '../../types/search';
 import '../../styles/unified-design-system.css';
 
@@ -123,14 +124,14 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
             // Only search vehicles if it doesn't look like a username
             // Filter stubs (no year/make/model) from autocomplete suggestions
             !looksLikeUsername
-              ? supabase
+              ? applyNonAutoFilters(supabase
                   .from('vehicles')
-                  .select('id, year, make, model')
+                  .select('id, year, make, model, canonical_vehicle_type')
                   .eq('is_public', true)
                   .not('year', 'is', null)
                   .not('make', 'is', null)
                   .not('model', 'is', null)
-                  .or(`make.ilike.%${querySafe}%,model.ilike.%${querySafe}%`)
+                  .or(`make.ilike.%${querySafe}%,model.ilike.%${querySafe}%`))
                   .limit(3)
               : Promise.resolve({ data: [], error: null }),
             supabase
@@ -704,7 +705,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
             image_url: r.image_url,
             relevance_score: r.relevance_score ?? 0,
             metadata: r.metadata ?? {},
-            created_at: r.metadata?.created_at || '',
+            created_at: r.metadata?.updated_at || r.metadata?.created_at || '',
           }));
           const total = (edgeData as any).total_count ?? edgeResults.length;
           const edgeSummary = `Found ${total} result${total !== 1 ? 's' : ''} for "${searchQuery.trim()}".`;
@@ -1901,13 +1902,13 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
               setSelectedSuggestionIndex(-1);
             }}
             onKeyDown={handleKeyDown}
-            onFocus={(e) => { setShowSuggestions(true); e.currentTarget.style.borderColor = '#3b82f6'; }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = '#000'; setShowSuggestions(false); }}
+            onFocus={(e) => { setShowSuggestions(true); e.currentTarget.style.borderColor = 'var(--accent)'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; setShowSuggestions(false); }}
             style={{
               fontSize: '13px',
               padding: queryIsUrl ? '10px 68px 10px 28px' : '10px 68px 10px 14px',
               background: 'var(--surface)',
-              border: '2px solid #000',
+              border: '2px solid var(--text)',
               borderRadius: '0px',
               fontFamily: 'system-ui, -apple-system, sans-serif',
               transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
@@ -1959,15 +1960,15 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
               fontSize: '11px',
               fontWeight: 700,
               border: 'none',
-              borderLeft: '2px solid #000',
-              background: isSearching ? '#333' : '#000',
+              borderLeft: '2px solid var(--text)',
+              background: isSearching ? 'var(--text-secondary)' : 'var(--text)',
               color: 'var(--bg)',
               cursor: isSearching ? 'not-allowed' : 'pointer',
               letterSpacing: '0.5px',
               transition: 'background 180ms cubic-bezier(0.16, 1, 0.3, 1)',
             }}
-            onMouseEnter={(e) => { if (!isSearching) e.currentTarget.style.background = '#222'; }}
-            onMouseLeave={(e) => { if (!isSearching) e.currentTarget.style.background = '#000'; }}
+            onMouseEnter={(e) => { if (!isSearching) e.currentTarget.style.background = 'var(--surface-hover)'; }}
+            onMouseLeave={(e) => { if (!isSearching) e.currentTarget.style.background = 'var(--text)'; }}
           >
             {isSearching ? '...' : 'Search'}
           </button>
@@ -1982,7 +1983,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
           left: 0,
           right: 0,
           background: 'var(--surface)',
-          border: '2px solid #000',
+          border: '2px solid var(--text)',
           borderRadius: '0px',
           marginTop: '4px',
           zIndex: 1000,
@@ -2016,7 +2017,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
                     padding: '8px 16px',
                     cursor: 'pointer',
                     fontSize: '12px',
-                    borderBottom: '1px solid #e5e7eb',
+                    borderBottom: '1px solid var(--border)',
                     background: selectedSuggestionIndex === index ? 'var(--bg)' : 'var(--surface)',
                     display: 'flex',
                     alignItems: 'center',
@@ -2048,7 +2049,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
 
           {/* Suggestions */}
           {suggestions.length > 0 && (
-            <div style={{ padding: '8px 0', borderTop: autocompleteResults.length > 0 ? '1px solid #e5e7eb' : 'none' }}>
+            <div style={{ padding: '8px 0', borderTop: autocompleteResults.length > 0 ? '1px solid var(--border)' : 'none' }}>
               <div style={{ padding: '4px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase' }}>
                 Suggestions
               </div>
@@ -2061,7 +2062,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
                     padding: '8px 16px',
                     cursor: 'pointer',
                     fontSize: '12px',
-                    borderBottom: '1px solid #e5e7eb'
+                    borderBottom: '1px solid var(--border)'
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg)'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'var(--surface)'}
@@ -2074,7 +2075,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
 
           {/* Recent Searches */}
           {searchHistory.length > 0 && (
-            <div style={{ padding: '8px 0', borderTop: (autocompleteResults.length > 0 || suggestions.length > 0) ? '1px solid #e5e7eb' : 'none' }}>
+            <div style={{ padding: '8px 0', borderTop: (autocompleteResults.length > 0 || suggestions.length > 0) ? '1px solid var(--border)' : 'none' }}>
               <div style={{ padding: '4px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase' }}>
                 Recent Searches
               </div>

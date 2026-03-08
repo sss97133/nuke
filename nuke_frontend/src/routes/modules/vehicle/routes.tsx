@@ -11,7 +11,7 @@ const EditVehicle = React.lazy(() => import('../../../pages/EditVehicle'));
 const VehicleMailbox = React.lazy(() => import('../../../components/VehicleMailbox/VehicleMailbox'));
 const VehicleJobs = React.lazy(() => import('../../../pages/VehicleJobs'));
 const WiringPlan = React.lazy(() => import('../../../pages/WiringPlan'));
-const InvestorDealPortal = React.lazy(() => import('../../../pages/InvestorDealPortal'));
+
 const VehiclePortfolio = React.lazy(() => import('../../../pages/VehiclePortfolio'));
 
 const VehicleModuleRoutes = () => {
@@ -29,7 +29,7 @@ const VehicleModuleRoutes = () => {
           <Route path="/add" element={<AddVehicle />} />
           <Route path="/:vehicleId/edit" element={<EditVehicle />} />
           <Route path="/:vehicleId/mailbox" element={<VehicleMailbox />} />
-          <Route path="/:vehicleId/invest" element={<InvestorDealPortal />} />
+          {/* InvestorDealPortal removed — page deleted */}
           <Route path="/:vehicleId/portfolio" element={<VehiclePortfolio />} />
           <Route path="/:vehicleId/wiring" element={<WiringPlan />} />
           <Route path="/:vehicleId/work" element={<VehicleJobs />} />

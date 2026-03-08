@@ -39,6 +39,7 @@ const corsHeaders = {
 
 const SIDECAR_URL =
   Deno.env.get("YONO_SIDECAR_URL") || "http://127.0.0.1:8472";
+const SIDECAR_TOKEN = Deno.env.get("MODAL_SIDECAR_TOKEN") || "";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -61,7 +62,11 @@ serve(async (req) => {
   // ── 1. Check sidecar health ──────────────────────────────────────────────
   let sidecarAvailable = false;
   try {
+    const sidecarHeaders = SIDECAR_TOKEN
+      ? { "Authorization": `Bearer ${SIDECAR_TOKEN}` }
+      : {};
     const h = await fetch(`${SIDECAR_URL}/health`, {
+      headers: sidecarHeaders,
       signal: AbortSignal.timeout(3000),
     });
     sidecarAvailable = h.ok;
@@ -91,8 +96,7 @@ serve(async (req) => {
   let query = supabase
     .from("vehicle_images")
     .select("id, image_url, vehicle_id, ai_scan_metadata")
-    .is("image_url", "not.null" as any)
-    .in("ai_processing_status", ["pending", "new"])
+    .eq("ai_processing_status", "pending")
     .not("image_url", "is", null)
     .order("created_at", { ascending: true })
     .limit(batchSize);
@@ -113,11 +117,8 @@ serve(async (req) => {
     );
   }
 
-  // ── 3. Get rough remaining count ─────────────────────────────────────────
-  const { count: remainingCount } = await supabase
-    .from("vehicle_images")
-    .select("*", { count: "exact", head: true })
-    .in("ai_processing_status", ["pending", "new"]);
+  // ── 3. Skip remaining count for general queries (34M rows too slow) ─────
+  const remainingCount = -1; // Use pipeline report for accurate counts
 
   // ── 4. Classify each image ───────────────────────────────────────────────
   let processed = 0;
@@ -126,9 +127,11 @@ serve(async (req) => {
 
   const classifyPromises = images.map(async (img) => {
     try {
+      const classifyHeaders: Record<string, string> = { "Content-Type": "application/json" };
+      if (SIDECAR_TOKEN) classifyHeaders["Authorization"] = `Bearer ${SIDECAR_TOKEN}`;
       const resp = await fetch(`${SIDECAR_URL}/classify`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: classifyHeaders,
         body: JSON.stringify({ image_url: img.image_url, top_k: 5 }),
         signal: AbortSignal.timeout(15000),
       });
@@ -160,7 +163,7 @@ serve(async (req) => {
         await supabase
           .from("vehicle_images")
           .update({
-            ai_processing_status: "yono_complete",
+            ai_processing_status: "completed",
             ai_scan_metadata: { ...existingMeta, yono: yonoMeta },
           })
           .eq("id", img.id);
