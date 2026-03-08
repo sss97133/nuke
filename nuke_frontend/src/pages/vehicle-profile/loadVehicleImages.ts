@@ -45,12 +45,12 @@ export async function loadVehicleImagesImpl({
   const rpcMatchesThisVehicle = rpcData && rpcData.vehicle_id === vehicle.id;
   if (rpcMatchesThisVehicle && rpcData?.images && Array.isArray(rpcData.images) && rpcData.images.length > 0) {
     const imagesRaw = rpcData.images.map((img: any) => img.image_url).filter(Boolean);
-    const images = filterProfileImages(imagesRaw, vehicle);
+    const images = filterProfileImages(imagesRaw, vehicle, { skipMismatchCheck: true });
     setVehicleImages(images);
     // Pick lead image from the filtered list to avoid BaT homepage noise becoming the hero.
     const leadFromRpc = rpcData.images.find((img: any) => img.is_primary) || rpcData.images[0];
     const leadCandidate = resolveDbImageUrl(leadFromRpc) || leadFromRpc?.image_url;
-    const leadOk = leadCandidate && filterProfileImages([leadCandidate], vehicle).length > 0;
+    const leadOk = leadCandidate && filterProfileImages([leadCandidate], vehicle, { skipMismatchCheck: true }).length > 0;
     const lead = leadOk ? leadCandidate : (images[0] || null);
     if (lead) {
       setLeadImageUrl(lead as any);
@@ -87,22 +87,21 @@ export async function loadVehicleImagesImpl({
       const isClassicScrape = origin === 'url_scraper' && discoveryUrl.includes('classic.com/veh/');
       const isBat = origin === 'bat_import' || discoveryUrl.includes('bringatrailer.com/listing/');
 
-      const isMismatchedStoragePath = (row: any): boolean => {
-        return isMismatchedVehicleImage(row?.storage_path || row?.image_url, vehicle.id);
-      };
+      // NOTE: isMismatchedVehicleImage check REMOVED for DB-sourced images.
+      // The vehicle_id FK from the DB query is the source of truth. Images may be stored
+      // under a different vehicle's storage directory (e.g. after reassignment/merge) and
+      // the URL-path UUID check was incorrectly filtering ALL images for those vehicles.
 
       const primaryRow = imageRecords.find((r: any) => r?.is_primary === true) || null;
       const primaryCandidate = primaryRow ? (resolveDbImageUrl(primaryRow) || null) : null;
       // Exclude import_queue images and organization logos from primary selection
       const primaryIsImportQueue = primaryRow && isImportedStoragePath(primaryRow?.storage_path);
       const primaryIsOrgLogo = primaryCandidate && isOrganizationLogo(primaryCandidate);
-      const primaryIsMismatch = primaryRow && isMismatchedStoragePath(primaryRow);
-      const primaryOk = primaryCandidate && !primaryIsImportQueue && !primaryIsOrgLogo && !primaryIsMismatch && filterProfileImages([primaryCandidate], vehicle).length > 0;
+      const primaryOk = primaryCandidate && !primaryIsImportQueue && !primaryIsOrgLogo && filterProfileImages([primaryCandidate], vehicle, { skipMismatchCheck: true }).length > 0;
 
       // Build fallback pool, excluding import_queue images and organization logos
       const fallbackPool = imageRecords
         .filter((r: any) => {
-          if (isMismatchedStoragePath(r)) return false;
           // Exclude import_queue images
           if (isImportedStoragePath(r?.storage_path)) return false;
           // Exclude organization/dealer logos
@@ -125,7 +124,7 @@ export async function loadVehicleImagesImpl({
         // External origin images only as last resort (may fail, but better than nothing)
         ...(fallbackPool.length === 0 && supabaseHostedOriginImages.length === 0 ? externalOriginImages : [])
       ];
-      const filteredPool = filterProfileImages(poolForFiltering, vehicle);
+      const filteredPool = filterProfileImages(poolForFiltering, vehicle, { skipMismatchCheck: true });
 
       // Score all filtered images and pick the best "money shot" (scoreMoneyShot imported from imageFilterUtils)
       const scoredImages = filteredPool.map((url, idx) => {
@@ -273,7 +272,7 @@ export async function loadVehicleImagesImpl({
         return true;
       });
 
-      images = filterProfileImages(preFiltered.length > 0 ? preFiltered : raw, vehicle);
+      images = filterProfileImages(preFiltered.length > 0 ? preFiltered : raw, vehicle, { skipMismatchCheck: true });
 
       // If this is a Classic.com scraped vehicle, prefer Supabase-hosted origin_metadata gallery over contaminated imports.
       // Keep any non-imported images (e.g., manual uploads) in front.
@@ -286,7 +285,7 @@ export async function loadVehicleImagesImpl({
           .filter(Boolean) as string[];
 
         const merged = Array.from(new Set([...manual, ...classicSupabaseHostedOriginImages]));
-        const mergedFiltered = filterProfileImages(merged, vehicle);
+        const mergedFiltered = filterProfileImages(merged, vehicle, { skipMismatchCheck: true });
 
         // If DB images look significantly larger than the source gallery, assume contamination and override display set.
         const dbCount = images.length;
@@ -314,7 +313,7 @@ export async function loadVehicleImagesImpl({
 
         // Combine: Supabase-hosted origin_metadata images first (certified BaT source, no API calls), then user uploads
         const combined = Array.from(new Set([...batSupabaseHostedOriginImages, ...userUploaded]));
-        const batFiltered = filterProfileImages(combined, vehicle);
+        const batFiltered = filterProfileImages(combined, vehicle, { skipMismatchCheck: true });
 
         if (batFiltered.length > 0) {
           images = batFiltered;
@@ -410,7 +409,7 @@ export async function loadVehicleImagesImpl({
       if (images.length > 0) {
         const leadStr = String(lead || '').toLowerCase();
         const leadIsImportQueue = leadStr.includes('import_queue');
-        const leadStillOk = lead && !leadIsImportQueue && filterProfileImages([String(lead)], vehicle).length > 0;
+        const leadStillOk = lead && !leadIsImportQueue && filterProfileImages([String(lead)], vehicle, { skipMismatchCheck: true }).length > 0;
         if (!leadStillOk) setLeadImageUrl(images[0]);
       }
 
@@ -553,7 +552,7 @@ export async function loadVehicleImagesImpl({
     primaryUrlLower.includes('import_queue') ||
     primaryUrlLower.includes('organization-logos/') ||
     primaryUrlLower.includes('organization_logos/');
-  const primaryOk = primaryUrl && typeof primaryUrl === 'string' && !primaryLooksWrong && filterProfileImages([primaryUrl], vehicle).length > 0;
+  const primaryOk = primaryUrl && typeof primaryUrl === 'string' && !primaryLooksWrong && filterProfileImages([primaryUrl], vehicle, { skipMismatchCheck: true }).length > 0;
   if (primaryOk && typeof primaryUrl === 'string' && !images.includes(primaryUrl)) {
     images = [primaryUrl, ...images];
     // Fallback for lead image - ensure it's set from primary
