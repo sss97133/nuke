@@ -270,41 +270,36 @@ function LiveSearch() {
     try {
       const parsed = parseMarketQuery(q);
 
-      // Always search entities
-      const searchPromise = supabase.functions.invoke('universal-search', {
-        body: { query: q.trim(), limit: 6, includeAI: false },
-      });
-
-      // If market query with a parseable make, also fetch comps
-      let compsPromise: Promise<any> | null = null;
       if (parsed.isMarket && parsed.make) {
+        // Market query → call comps endpoint
         const compsBody: Record<string, any> = { make: parsed.make, limit: 20 };
         if (parsed.model) compsBody.model = parsed.model;
         if (parsed.yearMin) compsBody.year = parsed.yearMin;
         if (parsed.yearMin && parsed.yearMax && parsed.yearMax !== parsed.yearMin) {
           compsBody.year_range = Math.max(2, Math.ceil((parsed.yearMax - parsed.yearMin) / 2));
         }
-        compsPromise = supabase.functions.invoke('api-v1-comps', { body: compsBody });
-      }
-
-      const [searchRes, compsRes] = await Promise.all([
-        searchPromise,
-        compsPromise ?? Promise.resolve(null),
-      ]);
-
-      const { data, error } = searchRes;
-      if (!error && data) {
-        setResults(data.results ?? []);
-        setMs(data.search_time_ms ?? null);
-        setTotal(data.total_count ?? 0);
-      }
-
-      if (compsRes?.data && !compsRes.error) {
-        setComps(compsRes.data);
+        const { data, error } = await supabase.functions.invoke('api-v1-comps', { body: compsBody });
+        if (!error && data?.summary) {
+          setComps(data);
+        } else {
+          setComps(null);
+        }
+        setResults([]);
+        setMs(null);
+        setTotal(0);
       } else {
+        // Entity query → call universal-search
+        const { data, error } = await supabase.functions.invoke('universal-search', {
+          body: { query: q.trim(), limit: 6, includeAI: false },
+        });
+        if (!error && data) {
+          setResults(data.results ?? []);
+          setMs(data.search_time_ms ?? null);
+          setTotal(data.total_count ?? 0);
+        }
         setComps(null);
       }
-    } catch { /* */ } finally { setLoading(false); }
+    } catch (err) { console.error('[LiveSearch]', err); } finally { setLoading(false); }
   }, []);
 
   const onInput = (v: string) => {

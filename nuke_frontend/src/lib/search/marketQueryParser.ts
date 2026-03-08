@@ -36,7 +36,7 @@ export function stripQuestionScaffolding(query: string): string {
 
   // Remove trailing question scaffolding
   q = q.replace(/\s+(sold|selling|traded|listed|auctioned|fetching|going\s+for|worth|valued)\s*(in\s+\d{4})?\s*\??$/i, ' $2');
-  q = q.replace(/\s+(market\s+consensus|market\s+data|comps?|comparables?|pricing|valuation|sales\s+data)\s*\??$/i, '');
+  q = q.replace(/\s+(market\s+consensus|market\s+data|comps?|comparables?|pricing|prices?|valuation|sales\s+data|market|trend|trends|value|worth)\s*\??$/i, '');
   q = q.replace(/\s+so\s+far\s*(in\s+\d{4})?\s*\??$/i, ' $1');
   q = q.replace(/\?$/, '');
 
