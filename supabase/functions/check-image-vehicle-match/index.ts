@@ -1,11 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders } from "../_shared/cors.ts";
 
 interface CheckRequest {
   vehicle_id?: string;
@@ -129,20 +124,22 @@ Deno.serve(async (req: Request) => {
     let images: { id: string; image_url: string; vehicle_id: string }[] = [];
 
     if (body.image_ids?.length) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("vehicle_images")
         .select("id, image_url, vehicle_id")
         .in("id", body.image_ids)
         .not("vehicle_id", "is", null)
         .limit(batchSize);
+      if (error) throw new Error(`Image query failed: ${error.message} (${error.code})`);
       images = data || [];
     } else if (body.vehicle_id) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("vehicle_images")
         .select("id, image_url, vehicle_id")
         .eq("vehicle_id", body.vehicle_id)
         .is("image_vehicle_match_status", null)
         .limit(batchSize);
+      if (error) throw new Error(`Image query failed: ${error.message} (${error.code})`);
       images = data || [];
     } else {
       // Auto-pick from high-risk dealer sources
@@ -154,13 +151,14 @@ Deno.serve(async (req: Request) => {
             "cargurus", "hemmings",
           ];
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("vehicle_images")
         .select("id, image_url, vehicle_id")
         .is("image_vehicle_match_status", null)
         .not("vehicle_id", "is", null)
         .in("source", sources)
         .limit(batchSize);
+      if (error) throw new Error(`Image query failed: ${error.message} (${error.code})`);
       images = data || [];
     }
 
@@ -173,11 +171,27 @@ Deno.serve(async (req: Request) => {
 
     // --- Get parent vehicles ---
     const vehicleIds = [...new Set(images.map((i) => i.vehicle_id))];
-    const { data: vehicles } = await supabase
+    const { data: vehicles, error: vehicleError } = await supabase
       .from("vehicles")
       .select("id, year, make, model")
       .in("id", vehicleIds);
-    const vehicleMap = new Map((vehicles || []).map((v: any) => [v.id, v]));
+
+    // If vehicle lookup fails entirely, abort — don't mark everything as orphaned
+    if (vehicleError) {
+      throw new Error(`Vehicle lookup failed: ${vehicleError.message} (code: ${vehicleError.code})`);
+    }
+    if (!vehicles || vehicles.length === 0) {
+      // If we got images with vehicle_ids but zero vehicles found, the DB is likely unhealthy
+      throw new Error(
+        `Vehicle lookup returned 0 results for ${vehicleIds.length} vehicle_ids. ` +
+        `PostgREST may be unhealthy. Aborting to prevent false orphan marking.`
+      );
+    }
+
+    const vehicleMap = new Map(vehicles.map((v: any) => [v.id, v]));
+
+    // Only mark as orphan if we successfully loaded MOST vehicles (a few missing = real orphans)
+    const lookupRate = vehicles.length / vehicleIds.length;
 
     // --- Process each image ---
     const results: MatchResult[] = [];
@@ -186,7 +200,15 @@ Deno.serve(async (req: Request) => {
     for (const img of images) {
       const vehicle = vehicleMap.get(img.vehicle_id);
       if (!vehicle) {
-        // Orphaned image — parent vehicle deleted/merged. Mark so we skip next time.
+        // Only mark orphan if we successfully loaded most vehicles in this batch
+        // If lookup rate is low, something is wrong — skip instead of marking
+        if (lookupRate < 0.5) {
+          errors.push({
+            image_id: img.id,
+            error: `Skipped: vehicle ${img.vehicle_id} not found but lookup rate too low (${(lookupRate * 100).toFixed(0)}%)`,
+          });
+          continue;
+        }
         if (!dryRun) {
           await supabase.from("vehicle_images")
             .update({ image_vehicle_match_status: "unrelated" })
@@ -200,6 +222,22 @@ Deno.serve(async (req: Request) => {
       }
 
       const url = (img.image_url || "").trim();
+
+      // Fast rejection: URLs that Claude vision can't fetch (expired CDN tokens, etc.)
+      if (url.includes("fbcdn.net") || url.includes("facebook.com/photo")) {
+        const r: MatchResult = {
+          image_id: img.id, image_url: url, status: "ambiguous",
+          ai_detected_vehicle: null, confidence: 0,
+          reason: "Facebook CDN URL — signed tokens likely expired, cannot verify via API",
+        };
+        results.push(r);
+        if (!dryRun) {
+          await supabase.from("vehicle_images")
+            .update({ image_vehicle_match_status: "ambiguous" })
+            .eq("id", img.id);
+        }
+        continue;
+      }
 
       // Fast rejection: placeholder/noise URLs
       if (!url || url.includes("placeholder.nuke.app") || isNoiseUrl(url)) {
@@ -262,10 +300,14 @@ Deno.serve(async (req: Request) => {
             .update(update).eq("id", img.id);
         }
       } catch (err) {
-        errors.push({
-          image_id: img.id,
-          error: `Vision error: ${(err as Error).message}`,
-        });
+        const errMsg = (err as Error).message;
+        errors.push({ image_id: img.id, error: `Vision error: ${errMsg}` });
+        // Mark failed images as ambiguous so they don't loop forever
+        if (!dryRun) {
+          await supabase.from("vehicle_images")
+            .update({ image_vehicle_match_status: "ambiguous" })
+            .eq("id", img.id);
+        }
       }
     }
 

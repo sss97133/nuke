@@ -71,6 +71,8 @@ export async function loadVehicleImagesImpl({
       .not('is_document', 'is', true) // Filter out documents - they belong in a separate section
       // Quarantine/duplicate rows should never appear in standard galleries
       .or('is_duplicate.is.null,is_duplicate.eq.false')
+      // Hide AI-detected mismatched/unrelated images (wrong vehicle or not a vehicle photo)
+      .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")')
       .order('is_primary', { ascending: false })
         // IMPORTANT: NULL positions should sort LAST (older backfills didn't set position).
         .order('position', { ascending: true, nullsFirst: false })

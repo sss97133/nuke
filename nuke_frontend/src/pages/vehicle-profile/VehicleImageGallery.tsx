@@ -86,7 +86,8 @@ const VehicleImageGallery: React.FC<VehicleImageGalleryProps> = ({
           .select('vehicle_zone')
           .eq('vehicle_id', vehicle.id)
           .or('is_duplicate.is.null,is_duplicate.eq.false')
-          .not('is_document', 'is', true);
+          .not('is_document', 'is', true)
+          .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")');
 
         if (!cancelled && !error && data) {
           const counts: Record<string, number> = {};
@@ -139,6 +140,7 @@ const VehicleImageGallery: React.FC<VehicleImageGalleryProps> = ({
         .not('longitude', 'is', null)
         .or('is_duplicate.is.null,is_duplicate.eq.false')
         .not('is_document', 'is', true)
+        .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")')
         .order('created_at', { ascending: true })
         .limit(500);
 
