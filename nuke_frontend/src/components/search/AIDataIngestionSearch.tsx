@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase, getCurrentUserId } from '../../lib/supabase';
-import { aiDataIngestion, type ExtractionResult } from '../../services/aiDataIngestion';
+import { aiDataIngestion, type ExtractionResult, ingestVehicle } from '../../services/aiDataIngestion';
 import { dataRouter, type DatabaseOperationPlan } from '../../services/dataRouter';
 import { universalSearchService, type UniversalSearchResult } from '../../services/universalSearchService';
 import { useToast } from '../../hooks/useToast';
@@ -99,6 +99,12 @@ function isLikelyOrgWebsiteUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Detect a 17-character VIN (excludes I, O, Q per FMVSS standard). */
+function isVIN(text: string): boolean {
+  const cleaned = text.trim().replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  return /^[A-HJ-NPR-Z0-9]{17}$/.test(cleaned) && !/[IOQ]/.test(cleaned);
 }
 
 interface ExtractionPreview {
@@ -598,41 +604,85 @@ export default function AIDataIngestionSearch() {
         return;
       }
 
-      // Fast-path: Mecum lot URLs should instantly create/update a profile and navigate.
-      // This bypasses the "preview/operation plan" flow and matches the desired share-a-link UX.
-      if (!attachedImage && normalizedUrl && isMecumLotUrl(normalizedUrl)) {
-        const { data, error: fnError } = await supabase.functions.invoke('extract-premium-auction', {
-          body: {
-            url: normalizedUrl,
-            max_vehicles: 1,
+      // ── INGEST FAST-PATH: URLs and VINs ──────────────────────────────
+      // Route vehicle listing URLs and VINs through the `ingest` edge
+      // function. It handles source detection, dedup, vehicle matching/
+      // creation, image attachment, enrichment via dedicated extractors
+      // (BaT, C&B, Hagerty), and user discovery linking — all in one call.
+      // This replaces the old flow of extract-vehicle-data-ai -> preview
+      // -> manual confirm -> dataRouter.
+
+      if (!attachedImage && normalizedUrl && !isLikelyOrgWebsiteUrl(normalizedUrl) && !isProbablyAssetOrDocumentUrl(normalizedUrl)) {
+        try {
+          const result = await ingestVehicle({ url: normalizedUrl, enrich: true });
+
+          if (result.status === 'error') {
+            throw new Error(result.error || 'Ingestion failed');
           }
-        });
 
-        if (fnError) throw fnError;
+          if (!result.vehicle_id) {
+            throw new Error('Ingestion succeeded but no vehicle_id was returned');
+          }
 
-        const vehicleId =
-          (data as any)?.created_vehicle_ids?.[0] ||
-          (data as any)?.updated_vehicle_ids?.[0] ||
-          null;
+          // Clear UI state and navigate to the vehicle profile
+          setInput('');
+          setShowPreview(false);
+          setExtractionPreview(null);
+          setActionsOpen(false);
+          setAttachedImage(null);
+          setImagePreview(null);
+          setError(null);
+          setIsProcessing(false);
 
-        if (!vehicleId) {
-          throw new Error((data as any)?.error || 'Import succeeded but no vehicle_id was returned');
+          const verb = result.status === 'created' ? 'Vehicle created'
+            : result.status === 'duplicate' ? 'Vehicle already tracked'
+            : 'Vehicle matched';
+          const sourceLabel = result.source && result.source !== 'unknown' && result.source !== 'manual'
+            ? ` (${result.source.replace(/_/g, ' ')})`
+            : '';
+          showToast(`${verb}${sourceLabel}`, result.status === 'created' ? 'success' : 'info');
+          navigate(`/vehicle/${result.vehicle_id}`);
+          return;
+        } catch (ingestErr: any) {
+          // If ingest fails, fall through to the legacy extraction flow
+          // so the user still gets some result.
+          console.warn('Ingest fast-path failed, falling back to legacy extraction:', ingestErr.message);
         }
-
-        // Clear UI state and navigate to the new profile
-        setInput('');
-        setShowPreview(false);
-        setExtractionPreview(null);
-        setActionsOpen(false);
-        setAttachedImage(null);
-        setImagePreview(null);
-        setError(null);
-        setIsProcessing(false);
-
-        showToast('Mecum lot imported → profile ready', 'success');
-        navigate(`/vehicle/${vehicleId}`);
-        return;
       }
+
+      // VIN fast-path: route through `ingest` for vehicle creation
+      if (!attachedImage && !normalizedUrl && isVIN(effectiveText)) {
+        try {
+          const cleanedVin = effectiveText.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+          const result = await ingestVehicle({ vin: cleanedVin });
+
+          if (result.status === 'error') {
+            throw new Error(result.error || 'VIN ingestion failed');
+          }
+
+          if (!result.vehicle_id) {
+            throw new Error('VIN ingestion succeeded but no vehicle_id was returned');
+          }
+
+          setInput('');
+          setShowPreview(false);
+          setExtractionPreview(null);
+          setActionsOpen(false);
+          setAttachedImage(null);
+          setImagePreview(null);
+          setError(null);
+          setIsProcessing(false);
+
+          const verb = result.is_new_vehicle ? 'Vehicle created from VIN' : 'Vehicle found by VIN';
+          showToast(verb, result.is_new_vehicle ? 'success' : 'info');
+          navigate(`/vehicle/${result.vehicle_id}`);
+          return;
+        } catch (vinErr: any) {
+          console.warn('VIN ingest fast-path failed, falling back to legacy flow:', vinErr.message);
+        }
+      }
+
+      // ── END INGEST FAST-PATH ──────────────────────────────────────────
 
       // Extract data - combine image and text if both provided
       let extractionResult: ExtractionResult;
@@ -1145,6 +1195,35 @@ export default function AIDataIngestionSearch() {
             // If it's an org website URL, auto-create immediately (no extra click/enter).
             if (!attachedImage && !showPreview && isLikelyOrgWebsiteUrl(normalized)) {
               void createOrgFromUrlAndNavigate(normalized);
+            }
+            // If it's a vehicle listing URL, auto-ingest immediately (no extra Enter).
+            // Call ingestVehicle directly since processInput() captures stale state.
+            else if (!attachedImage && !showPreview && !isLikelyOrgWebsiteUrl(normalized) && !isProbablyAssetOrDocumentUrl(normalized)) {
+              void (async () => {
+                setIsProcessing(true);
+                setError(null);
+                try {
+                  const result = await ingestVehicle({ url: normalized, enrich: true });
+                  if (result.status === 'error' || !result.vehicle_id) {
+                    // Fall through — user can press Enter to retry via legacy flow
+                    setIsProcessing(false);
+                    return;
+                  }
+                  setInput('');
+                  setShowPreview(false);
+                  setExtractionPreview(null);
+                  setActionsOpen(false);
+                  setIsProcessing(false);
+
+                  const verb = result.status === 'created' ? 'Vehicle created'
+                    : result.status === 'duplicate' ? 'Vehicle already tracked'
+                    : 'Vehicle matched';
+                  showToast(verb, result.status === 'created' ? 'success' : 'info');
+                  navigate(`/vehicle/${result.vehicle_id}`);
+                } catch {
+                  setIsProcessing(false);
+                }
+              })();
             }
           }}
           onKeyDown={handleKeyDown}

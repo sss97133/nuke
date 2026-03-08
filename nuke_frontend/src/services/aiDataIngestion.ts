@@ -656,3 +656,56 @@ class AIDataIngestionService {
 
 export const aiDataIngestion = new AIDataIngestionService();
 
+// ── Ingest Service ─────────────────────────────────────────────────
+// Direct caller for the `ingest` edge function — the universal backend
+// for URL, VIN, text, and structured vehicle ingestion. Handles source
+// detection, dedup, vehicle matching/creation, image attachment, and
+// user discovery linking. All three channels (web, CLI, MCP) should
+// route through this.
+
+export interface IngestInput {
+  url?: string;
+  text?: string;
+  year?: number;
+  make?: string;
+  model?: string;
+  vin?: string;
+  price?: number;
+  location?: string;
+  seller_name?: string;
+  notes?: string;
+  tags?: string[];
+  image_url?: string;
+  image_urls?: string[];
+  description?: string;
+  mileage?: number;
+  engine?: string;
+  transmission?: string;
+  color?: string;
+  condition?: string;
+  title_status?: string;
+  enrich?: boolean;
+}
+
+export interface IngestResult {
+  status: 'created' | 'matched' | 'duplicate' | 'error';
+  vehicle_id?: string;
+  discovery_id?: string;
+  is_new_vehicle?: boolean;
+  source?: string;
+  external_id?: string;
+  error?: string;
+}
+
+export async function ingestVehicle(input: IngestInput): Promise<IngestResult> {
+  const { data, error } = await supabase.functions.invoke('ingest', {
+    body: input,
+  });
+
+  if (error) {
+    return { status: 'error', error: error.message || 'Ingest call failed' };
+  }
+
+  return data as IngestResult;
+}
+
