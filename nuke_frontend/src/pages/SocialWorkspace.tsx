@@ -213,6 +213,7 @@ export default function SocialWorkspace() {
           .from('vehicle_images')
           .select('id, image_url, vehicle_id, category')
           .in('vehicle_id', vehicleIds)
+          .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")')
           .order('created_at', { ascending: false });
 
         allImages = images || [];

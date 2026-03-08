@@ -144,7 +144,8 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
           .from('vehicle_images')
           .select('vehicle_id, thumbnail_url, medium_url, image_url, variants')
           .in('vehicle_id', chunk)
-          .eq('is_primary', true);
+          .eq('is_primary', true)
+          .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")');
         if (imgErr) {
           // Non-fatal: we can still render without thumbnails.
           console.warn('Failed to fetch thumbnail chunk:', imgErr);
@@ -179,6 +180,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             .in('vehicle_id', missing)
             .not('is_document', 'is', true)
             .not('is_duplicate', 'is', true)
+            .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")')
             .order('is_primary', { ascending: false })
             .order('created_at', { ascending: false })
             .limit(Math.min(500, missing.length * 4));
