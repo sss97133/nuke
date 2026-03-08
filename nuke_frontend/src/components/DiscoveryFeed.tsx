@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { applyNonAutoFilters } from '../lib/nonAutoExclusion';
 import SearchFilters from './feed/SearchFilters';
 import ContentCard from './feed/ContentCard';
 import '../styles/unified-design-system.css';
@@ -127,7 +128,7 @@ const DiscoveryFeed = ({ viewMode: propViewMode = 'gallery', denseMode = false, 
 
       // Fetch recent vehicles
       if (filters.contentTypes.includes('all') || filters.contentTypes.includes('vehicle')) {
-        const { data: vehicles, error: vehiclesError } = await supabase
+        let vq = supabase
           .from('vehicles')
           .select(`
             id,
@@ -148,7 +149,9 @@ const DiscoveryFeed = ({ viewMode: propViewMode = 'gallery', denseMode = false, 
               image_url,
               is_primary
             )
-          `)
+          `);
+        vq = applyNonAutoFilters(vq);
+        const { data: vehicles, error: vehiclesError } = await vq
           .order('created_at', { ascending: false })
           .range(Math.floor(offset/3), Math.floor(offset/3) + Math.floor(limit/3) - 1);
 

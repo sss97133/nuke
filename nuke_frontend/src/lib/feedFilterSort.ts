@@ -4,6 +4,7 @@ import { classifySource } from './sourceClassification';
 import { getCanonicalBodyStyle } from '../services/bodyStyleTaxonomy';
 import { parseMoneyNumber } from './auctionUtils';
 import { VehicleSearchService } from '../services/vehicleSearchService';
+import { isAutoVehicle } from './nonAutoExclusion';
 
 const getDisplayPriceValue = (vehicle: HypeVehicle | null | undefined): number | null => {
   if (!vehicle) return null;
@@ -95,11 +96,8 @@ export function filterAndSortVehicles({
       return canon ? selectedCanon.includes(canon) : false;
     });
   } else {
-    // Default: keep motorcycles out unless explicitly selected
-    result = result.filter((v: any) => {
-      const canon = getCanonicalBodyStyle((v as any).canonical_body_style || (v as any).body_style);
-      return canon !== 'MOTORCYCLE';
-    });
+    // Default: keep ALL non-auto vehicles out unless explicitly selected
+    result = result.filter((v: any) => isAutoVehicle(v));
   }
 
   // 4x4/4WD/AWD filter

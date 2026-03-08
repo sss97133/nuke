@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { useVehiclesDashboard } from '../hooks/useVehiclesDashboard';
 import { useAppLayoutContext } from '../components/layout/AppLayoutContext';
 import { GarageToolbar } from '../components/garage/GarageToolbar';
+import { applyNonAutoFilters } from '../lib/nonAutoExclusion';
 
 /** Simple stats loader for the public landing page — no auth or complex fallbacks needed. */
 function useLandingStats() {
@@ -60,10 +61,13 @@ function useLiveShowcase() {
 
   const load = useCallback(async () => {
     try {
-      const { data, error: err } = await supabase
+      let q = supabase
         .from('vehicles')
         .select('id, year, make, model, primary_image_url, sale_price, asking_price')
-        .not('primary_image_url', 'is', null)
+        .not('primary_image_url', 'is', null);
+      q = applyNonAutoFilters(q);
+      q = q.is('origin_organization_id', null);
+      const { data, error: err } = await q
         .order('created_at', { ascending: false })
         .limit(8);
       if (err) throw err;
@@ -119,6 +123,7 @@ function useSearchPreview(query: string) {
         let builder = supabase
           .from('vehicles')
           .select('id, year, make, model, sale_price, asking_price');
+        builder = applyNonAutoFilters(builder);
 
         // Apply ilike for each word across make+model concatenation
         for (const word of words) {
