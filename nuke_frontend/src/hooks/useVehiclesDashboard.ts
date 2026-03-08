@@ -230,8 +230,8 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
 
     async function fetchAll() {
       try {
-        // Fire all 5 relationship queries in parallel
-        const [verifiedRes, permRes, contribRes, prevOwnedRes, personalImagesRes] = await Promise.all([
+        // Fire 4 relationship queries in parallel (explicit relationships only)
+        const [verifiedRes, permRes, contribRes, prevOwnedRes] = await Promise.all([
           // Q1: ownership_verifications (approved)
           supabase
             .from('ownership_verifications')
@@ -259,9 +259,6 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
             .eq('user_id', userId)
             .eq('relationship_type', 'previously_owned')
             .eq('is_active', true),
-
-          // Q5: vehicles with personal image data (boots-on-the-ground sources)
-          supabase.rpc('get_vehicles_with_personal_images'),
         ]);
 
         if (cancelled) return;
@@ -307,15 +304,6 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
         if (prevOwnedRes.data) {
           for (const row of prevOwnedRes.data) {
             setRel(row.vehicle_id, 'PREVIOUSLY OWNED', 'discovered');
-          }
-        }
-
-        // Q5: personal-image vehicles — boots-on-the-ground, skip if already has higher relationship
-        if (personalImagesRes.data) {
-          for (const row of personalImagesRes.data as { vehicle_id: string }[]) {
-            if (!relMap.has(row.vehicle_id)) {
-              relMap.set(row.vehicle_id, { type: 'CONTRIBUTOR', source: 'uploaded_by' });
-            }
           }
         }
 
