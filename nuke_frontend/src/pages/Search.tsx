@@ -7,16 +7,8 @@ import { aiGateway } from '../lib/aiGateway';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import type { SearchResult } from '../types/search';
+import { applyNonAutoFilters } from '../lib/nonAutoExclusion';
 import '../styles/unified-design-system.css';
-
-interface VehicleEnrichment {
-  sale_price: number | null;
-  mileage: number | null;
-  transmission: string | null;
-  is_for_sale: boolean | null;
-  city: string | null;
-  state: string | null;
-}
 
 interface VehicleFilters {
   make: string;
@@ -57,15 +49,13 @@ export default function Search() {
   >('all');
   const resultsRef = useRef<HTMLDivElement | null>(null);
 
-  // Vehicle enrichment: price, mileage, transmission, for-sale status, location
-  const [vehicleEnrichment, setVehicleEnrichment] = useState<Map<string, VehicleEnrichment>>(new Map());
   const [vFilters, setVFilters] = useState<VehicleFilters>(DEFAULT_FILTERS);
 
   const [answer, setAnswer] = useState<string>('');
   const [answerLoading, setAnswerLoading] = useState(false);
   const [answerError, setAnswerError] = useState<string | null>(null);
   const [answerSources, setAnswerSources] = useState<Array<{ title: string; href?: string }>>([]);
-  const [answerRequestId, setAnswerRequestId] = useState(0);
+  const answerRequestIdRef = useRef(0);
   const [showWorkstation, setShowWorkstation] = useState(false);
 
   // Featured vehicles for empty state
@@ -80,13 +70,15 @@ export default function Search() {
 
   useEffect(() => {
     if (searchQuery) return;
-    supabase
+    let q = supabase
       .from('vehicles')
       .select('id,year,make,model,primary_image_url,sale_price')
       .eq('is_public', true)
       .not('primary_image_url', 'is', null)
-      .not('year', 'is', null)
-      .order('sale_price', { ascending: false, nullsFirst: false })
+      .not('year', 'is', null);
+    q = applyNonAutoFilters(q);
+    q = q.is('origin_organization_id', null);
+    q.order('sale_price', { ascending: false, nullsFirst: false })
       .limit(24)
       .then(({ data }) => {
         if (data) setFeaturedVehicles(data);
@@ -393,8 +385,8 @@ export default function Search() {
     const trimmed = (q || '').trim();
     if (!trimmed) return;
 
-    const nextRequestId = answerRequestId + 1;
-    setAnswerRequestId(nextRequestId);
+    answerRequestIdRef.current += 1;
+    const myRequestId = answerRequestIdRef.current;
     setAnswerLoading(true);
     setAnswerError(null);
     setAnswer('');
@@ -448,9 +440,7 @@ export default function Search() {
       });
 
       const content: string | undefined = gatewayResult?.choices?.[0]?.message?.content;
-      if (nextRequestId !== answerRequestId + 1) {
-        return;
-      }
+      if (myRequestId !== answerRequestIdRef.current) return;
       if (!content) {
         setAnswerError('No answer returned');
         return;
@@ -458,12 +448,10 @@ export default function Search() {
 
       setAnswer(String(content).trim());
     } catch (e: any) {
-      if (nextRequestId !== answerRequestId + 1) {
-        return;
-      }
+      if (myRequestId !== answerRequestIdRef.current) return;
       setAnswerError(e?.message || 'Failed to generate answer');
     } finally {
-      if (nextRequestId === answerRequestId + 1) {
+      if (myRequestId === answerRequestIdRef.current) {
         setAnswerLoading(false);
       }
     }
@@ -519,60 +507,9 @@ export default function Search() {
     }
   }, [searchQuery]);
 
-  // Fetch enrichment data (price, mileage, transmission, for-sale, location) for vehicle results
-  useEffect(() => {
-    const vehicleIds = results
-      .filter(r => r.type === 'vehicle')
-      .map(r => r.id);
-    if (vehicleIds.length === 0) {
-      setVehicleEnrichment(new Map());
-      return;
-    }
-    let cancelled = false;
-    supabase
-      .from('vehicles')
-      .select('id, sale_price, mileage, transmission, is_for_sale, city, state')
-      .in('id', vehicleIds)
-      .then(({ data }) => {
-        if (cancelled || !data) return;
-        const map = new Map<string, VehicleEnrichment>();
-        for (const row of data) {
-          map.set(row.id, {
-            sale_price: row.sale_price ?? null,
-            mileage: row.mileage ?? null,
-            transmission: row.transmission ?? null,
-            is_for_sale: row.is_for_sale ?? null,
-            city: row.city ?? null,
-            state: row.state ?? null,
-          });
-        }
-        setVehicleEnrichment(map);
-      });
-    return () => { cancelled = true; };
-  }, [results]);
-
-  // Merge enrichment into results and apply vehicle filters
+  // Apply vehicle filters to results
   const displayResults = useMemo(() => {
-    // Merge enrichment into vehicle result metadata — enrichment fills gaps, doesn't overwrite
-    const enriched = results.map(r => {
-      if (r.type !== 'vehicle') return r;
-      const e = vehicleEnrichment.get(r.id);
-      if (!e) return r;
-      const meta = (r.metadata || {}) as any;
-      return {
-        ...r,
-        metadata: {
-          ...meta,
-          // Only use enrichment values if the search result didn't already have them
-          sale_price: meta.sale_price ?? e.sale_price,
-          mileage: meta.mileage ?? e.mileage,
-          transmission: meta.transmission ?? e.transmission,
-          is_for_sale: meta.is_for_sale ?? e.is_for_sale,
-          city: meta.city ?? e.city,
-          state: meta.state ?? e.state,
-        }
-      } as SearchResult;
-    });
+    const enriched = results;
 
     // Apply vehicle filters
     const anyFilterActive =
@@ -625,7 +562,7 @@ export default function Search() {
       }
       return true;
     });
-  }, [results, vehicleEnrichment, vFilters]);
+  }, [results, vFilters]);
 
   const activeFilterCount = [
     vFilters.make,
