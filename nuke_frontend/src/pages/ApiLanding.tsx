@@ -260,46 +260,52 @@ function LiveSearch() {
   const [results, setResults] = useState<UniversalSearchResult[]>([]);
   const [comps, setComps] = useState<CompsData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [ms, setMs] = useState<number | null>(null);
   const [total, setTotal] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const search = useCallback(async (q: string) => {
-    if (!q.trim()) { setResults([]); setComps(null); setMs(null); setTotal(0); return; }
+    if (!q.trim()) { setResults([]); setComps(null); setError(null); setMs(null); setTotal(0); return; }
     setLoading(true);
+    setError(null);
     try {
       const parsed = parseMarketQuery(q);
 
       if (parsed.isMarket && parsed.make) {
-        // Market query → call comps endpoint
         const compsBody: Record<string, any> = { make: parsed.make, limit: 20 };
         if (parsed.model) compsBody.model = parsed.model;
         if (parsed.yearMin) compsBody.year = parsed.yearMin;
         if (parsed.yearMin && parsed.yearMax && parsed.yearMax !== parsed.yearMin) {
           compsBody.year_range = Math.max(2, Math.ceil((parsed.yearMax - parsed.yearMin) / 2));
         }
-        const { data, error } = await supabase.functions.invoke('api-v1-comps', { body: compsBody });
-        if (!error && data?.summary) {
+        const { data, error: fnErr } = await supabase.functions.invoke('api-v1-comps', { body: compsBody });
+        if (!fnErr && data?.summary) {
           setComps(data);
         } else {
           setComps(null);
+          if (fnErr) setError('Market data unavailable');
         }
         setResults([]);
         setMs(null);
         setTotal(0);
       } else {
-        // Entity query → call universal-search
-        const { data, error } = await supabase.functions.invoke('universal-search', {
+        const { data, error: fnErr } = await supabase.functions.invoke('universal-search', {
           body: { query: q.trim(), limit: 6, includeAI: false },
         });
-        if (!error && data) {
+        if (!fnErr && data) {
           setResults(data.results ?? []);
           setMs(data.search_time_ms ?? null);
           setTotal(data.total_count ?? 0);
+        } else if (fnErr) {
+          setError('Search unavailable');
         }
         setComps(null);
       }
-    } catch (err) { console.error('[LiveSearch]', err); } finally { setLoading(false); }
+    } catch (err) {
+      console.error('[LiveSearch]', err);
+      setError('Search unavailable');
+    } finally { setLoading(false); }
   }, []);
 
   const onInput = (v: string) => {
@@ -355,7 +361,12 @@ function LiveSearch() {
           </div>
         </div>
       )}
-      {query.trim() && !loading && !hasComps && !hasResults && (
+      {error && (
+        <div style={{ color: 'var(--text-muted)', padding: 'var(--space-3)', fontFamily: 'monospace', fontSize: '10px' }}>
+          {error}
+        </div>
+      )}
+      {query.trim() && !loading && !error && !hasComps && !hasResults && (
         <div style={{ color: 'var(--text-muted)', padding: 'var(--space-3)' }}>
           No results.
         </div>
