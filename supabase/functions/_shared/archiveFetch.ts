@@ -296,7 +296,7 @@ export async function readArchivedPage(
 
   const query = supabase
     .from("listing_page_snapshots")
-    .select("id, html, markdown, fetched_at")
+    .select("id, html, markdown, fetched_at, html_storage_path, markdown_storage_path")
     .eq("listing_url", url)
     .eq("success", true)
     .order("fetched_at", { ascending: false })
@@ -309,12 +309,34 @@ export async function readArchivedPage(
   }
 
   const { data } = await query.maybeSingle();
+  if (!data) return { html: null, markdown: null, snapshotId: null, fetchedAt: null };
+
+  let html = data.html ?? null;
+  let markdown = data.markdown ?? null;
+
+  // Fetch from storage if content was migrated out of postgres
+  if (!html && data.html_storage_path) {
+    try {
+      const { data: blob } = await supabase.storage
+        .from("listing-snapshots")
+        .download(data.html_storage_path);
+      if (blob) html = await blob.text();
+    } catch (_) { /* storage read failed, return null */ }
+  }
+  if (!markdown && data.markdown_storage_path) {
+    try {
+      const { data: blob } = await supabase.storage
+        .from("listing-snapshots")
+        .download(data.markdown_storage_path);
+      if (blob) markdown = await blob.text();
+    } catch (_) { /* storage read failed, return null */ }
+  }
 
   return {
-    html: data?.html ?? null,
-    markdown: data?.markdown ?? null,
-    snapshotId: data?.id ?? null,
-    fetchedAt: data?.fetched_at ?? null,
+    html,
+    markdown,
+    snapshotId: data.id ?? null,
+    fetchedAt: data.fetched_at ?? null,
   };
 }
 
@@ -329,7 +351,7 @@ export async function readArchivedHistory(
 
   const query = supabase
     .from("listing_page_snapshots")
-    .select("id, html, markdown, fetched_at, html_sha256")
+    .select("id, html, markdown, fetched_at, html_sha256, html_storage_path, markdown_storage_path")
     .eq("listing_url", url)
     .eq("success", true)
     .order("fetched_at", { ascending: false })
@@ -339,11 +361,25 @@ export async function readArchivedHistory(
 
   const { data } = await query;
 
-  return (data ?? []).map((r: any) => ({
-    id: r.id,
-    html: r.html,
-    markdown: r.markdown,
-    fetchedAt: r.fetched_at,
-    htmlSha256: r.html_sha256,
-  }));
+  const results = [];
+  for (const r of data ?? []) {
+    let html = r.html ?? null;
+    let markdown = r.markdown ?? null;
+
+    if (!html && r.html_storage_path) {
+      try {
+        const { data: blob } = await supabase.storage.from("listing-snapshots").download(r.html_storage_path);
+        if (blob) html = await blob.text();
+      } catch (_) {}
+    }
+    if (!markdown && r.markdown_storage_path) {
+      try {
+        const { data: blob } = await supabase.storage.from("listing-snapshots").download(r.markdown_storage_path);
+        if (blob) markdown = await blob.text();
+      } catch (_) {}
+    }
+
+    results.push({ id: r.id, html, markdown, fetchedAt: r.fetched_at, htmlSha256: r.html_sha256 });
+  }
+  return results;
 }
