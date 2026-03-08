@@ -64,7 +64,7 @@ class UniversalSearchService {
       const { data, error } = await supabase.functions.invoke('universal-search', {
         body: {
           query: trimmed,
-          limit: options.limit || 15,
+          limit: options.limit || 60,
           types: options.types,
           includeAI: options.includeAI ?? true
         }
@@ -73,7 +73,7 @@ class UniversalSearchService {
       if (error) {
         console.error('Universal search error:', error);
         // Fallback to local search
-        return this.fallbackLocalSearch(trimmed, options.limit || 15);
+        return this.fallbackLocalSearch(trimmed, options.limit || 60);
       }
 
       const response = data as UniversalSearchResponse;
@@ -128,7 +128,7 @@ class UniversalSearchService {
         vehicleQuery = vehicleQuery.or(`make.ilike.${searchPattern},model.ilike.${searchPattern}`);
       }
 
-      const { data: vehicles } = await vehicleQuery.limit(Math.ceil(limit / 2));
+      const { data: vehicles } = await vehicleQuery.limit(limit);
 
       // Get images for vehicles
       if (vehicles?.length) {

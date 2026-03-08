@@ -26,6 +26,7 @@ import { SALES_PERIODS } from '../types/feedTypes';
 import { normalizeSupabaseStorageUrl, cleanDisplayMake, cleanDisplayModel } from '../lib/feedImageUtils';
 import { DEFAULT_FILTERS, getRememberFilters, loadSavedFilters, saveFiltersToStorage, clearPersistedFiltersAndSort, STORAGE_KEY, REMEMBER_FILTERS_KEY, LOCATION_FAVORITES_KEY } from '../lib/filterPersistence';
 import { parseQuery } from '../lib/search/queryParser';
+import { applyNonAutoFilters } from '../lib/nonAutoExclusion';
 
 const CursorHomepage: React.FC = () => {
   usePageTitle('Nuke');
@@ -948,38 +949,7 @@ const CursorHomepage: React.FC = () => {
           }
 
           // === NON-AUTO EXCLUSION (server-side) ===
-          // Only show CAR, TRUCK, SUV, VAN, MINIVAN, or unclassified (null)
-          q = q.or(
-            'canonical_vehicle_type.in.(CAR,TRUCK,SUV,VAN,MINIVAN),' +
-            'canonical_vehicle_type.is.null'
-          );
-          // Block known non-auto makes (catches null-type junk)
-          q = q.not('make', 'in', '(' + [
-            'YAMAHA','HARLEY-DAVIDSON','KAWASAKI','SUZUKI','DUCATI','KTM','TRIUMPH','INDIAN',
-            'HUSQVARNA','APRILIA','MOTO GUZZI','NORTON','BSA','BUELL','ROYAL ENFIELD',
-            'POLARIS','ARCTIC CAT','CAN-AM',
-            'SEA-DOO','SEA RAY','BAYLINER','BOSTON WHALER','GRUMMAN','GLASTRON','SKEETER','TRACKER',
-            'MASTERCRAFT','MALIBU BOATS','CORRECT CRAFT',
-            'FLEETWOOD','WINNEBAGO','AIRSTREAM','COACHMEN','JAYCO','KEYSTONE','FOREST RIVER',
-            'THOR','NEWMAR','TIFFIN','HOLIDAY RAMBLER','MONACO','FLAGSTAFF','COLEMAN','STARCRAFT',
-            'JOHN DEERE','KUBOTA','CATERPILLAR','BOBCAT','CASE IH','NEW HOLLAND',
-            'MASSEY FERGUSON','FARMALL','ALLIS-CHALMERS','OLIVER',
-            'FREIGHTLINER','PETERBILT','KENWORTH','MACK','HINO','WESTERN STAR',
-            'EZGO','CLUB CAR','CUSHMAN','GEM',
-            'CESSNA','PIPER','BEECHCRAFT','MOONEY','CIRRUS',
-            'FEATHERLITE','SUNDOWNER',
-            'Yamaha','Harley-Davidson','Kawasaki','Suzuki','Ducati','Triumph','Indian',
-            'Husqvarna','Aprilia','Norton','Buell',
-            'Polaris','Arctic Cat','Can-Am','Arctic',
-            'Sea-Doo','Sea Ray','Bayliner','Boston Whaler','Grumman','Glastron','Skeeter','Tracker',
-            'Mastercraft',
-            'Fleetwood','Winnebago','Airstream','Coachmen','Jayco','Keystone','Forest River',
-            'Thor','Newmar','Tiffin','Flagstaff','Coleman','Starcraft','Featherlite',
-            'John Deere','Kubota','Caterpillar','Bobcat','Farmall','Allis-Chalmers','Oliver',
-            'Freightliner','Peterbilt','Kenworth','Mack','Hino','Western Star',
-            'Ezgo','Club Car','Cushman',
-            'Cessna','Piper','Beechcraft','Mooney','Cirrus'
-          ].join(',') + ')');
+          q = applyNonAutoFilters(q);
 
           // === DEALER EXCLUSION (hide dealers unless searching) ===
           if (!debouncedSearchText && !filters.dealer) {
