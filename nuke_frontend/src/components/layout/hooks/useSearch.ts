@@ -1,5 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { parseMarketQuery } from '../../../lib/search/marketQueryParser';
+
+export interface CompsData {
+  summary: { count: number; avg_price: number; median_price: number; min_price: number; max_price: number; auction_event_count: number } | null;
+  query: { make: string; model: string | null; year: number | null; year_range: number };
+  data: { platform: string | null }[];
+}
 
 export interface SearchState {
   query: string;
@@ -10,6 +17,7 @@ export interface SearchState {
   setIsFocused: (focused: boolean) => void;
   autocompleteResults: AutocompleteResult[];
   autocompleteLoading: boolean;
+  compsData: CompsData | null;
   browseResults: BrowseResult[];
   browseLoading: boolean;
   browseStats: BrowseStatsData | null;
@@ -91,6 +99,7 @@ export function useSearch(): SearchState {
   const [isFocused, setIsFocused] = useState(false);
   const [autocompleteResults, setAutocompleteResults] = useState<AutocompleteResult[]>([]);
   const [autocompleteLoading, setAutocompleteLoading] = useState(false);
+  const [compsData, setCompsData] = useState<CompsData | null>(null);
   const [browseResults, setBrowseResults] = useState<BrowseResult[]>([]);
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browseStats, setBrowseStats] = useState<BrowseStatsData | null>(null);
@@ -116,20 +125,42 @@ export function useSearch(): SearchState {
   const executeAutocomplete = useCallback(async (prefix: string) => {
     setAutocompleteLoading(true);
     try {
-      const { data, error } = await supabase.rpc('search_autocomplete', {
-        p_prefix: prefix,
-        p_limit: 10,
-      });
-      if (error) throw error;
-      setAutocompleteResults((data || []).map((r: any) => ({
-        category: r.category,
-        label: r.label,
-        value: r.value,
-        count: Number(r.count) || 0,
-      })));
+      const parsed = parseMarketQuery(prefix);
+
+      if (parsed.isMarket && parsed.make) {
+        // Market query — call comps endpoint
+        const compsBody: Record<string, any> = { make: parsed.make, limit: 20 };
+        if (parsed.model) compsBody.model = parsed.model;
+        if (parsed.yearMin) compsBody.year = parsed.yearMin;
+        if (parsed.yearMin && parsed.yearMax && parsed.yearMax !== parsed.yearMin) {
+          compsBody.year_range = Math.max(2, Math.ceil((parsed.yearMax - parsed.yearMin) / 2));
+        }
+        const { data, error: fnErr } = await supabase.functions.invoke('api-v1-comps', { body: compsBody });
+        if (!fnErr && data?.summary) {
+          setCompsData(data);
+        } else {
+          setCompsData(null);
+        }
+        setAutocompleteResults([]);
+      } else {
+        // Entity query — normal autocomplete
+        setCompsData(null);
+        const { data, error } = await supabase.rpc('search_autocomplete', {
+          p_prefix: prefix,
+          p_limit: 10,
+        });
+        if (error) throw error;
+        setAutocompleteResults((data || []).map((r: any) => ({
+          category: r.category,
+          label: r.label,
+          value: r.value,
+          count: Number(r.count) || 0,
+        })));
+      }
     } catch (err) {
       console.warn('Autocomplete error:', err);
       setAutocompleteResults([]);
+      setCompsData(null);
     } finally {
       setAutocompleteLoading(false);
     }
@@ -198,6 +229,7 @@ export function useSearch(): SearchState {
   const clear = useCallback(() => {
     setQuery('');
     setAutocompleteResults([]);
+    setCompsData(null);
     setBrowseResults([]);
     setBrowseStats(null);
     setTotalCount(0);
@@ -209,7 +241,7 @@ export function useSearch(): SearchState {
     query, setQuery,
     isOpen, setIsOpen,
     isFocused, setIsFocused,
-    autocompleteResults, autocompleteLoading,
+    autocompleteResults, autocompleteLoading, compsData,
     browseResults, browseLoading, browseStats, totalCount,
     executeBrowse, executeAutocomplete, executeSmart,
     clear,
