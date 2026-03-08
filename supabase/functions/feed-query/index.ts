@@ -53,6 +53,7 @@ interface FeedRequest {
   // Quality controls — default ON, user can opt out
   include_non_auto?: boolean;   // false = hide boats/RVs/trailers/motorcycles
   include_no_photos?: boolean;  // false = hide items without photos
+  include_dealers?: boolean;    // false = hide dealer listings (default false when no search)
   min_price?: number;           // quality floor (default 500)
 }
 
@@ -125,26 +126,82 @@ serve(async (req) => {
 
     // ----- QUALITY GATES (default ON — curated experience) -----
 
+    const isSearching = !!(body.q && body.q.trim());
+
     // Exclude non-automobile vehicle types unless explicitly requested
     if (body.include_non_auto !== true) {
-      // Only show CAR, TRUCK, SUV, VAN, MINIVAN, or unclassified that aren't known junk makes
-      // This OR filter: must be an auto type OR null type with a non-junk make
+      // Only show CAR, TRUCK, SUV, VAN, MINIVAN, or unclassified (null)
       query = query.or(
         "canonical_vehicle_type.in.(CAR,TRUCK,SUV,VAN,MINIVAN)," +
         "canonical_vehicle_type.is.null"
       );
-      // For null types, exclude known non-auto makes at the DB level
-      // (The MV already penalizes these in ranking, but we don't even want them in results)
-      query = query.not("make", "in",
-        "(YAMAHA,HARLEY-DAVIDSON,KAWASAKI,SUZUKI,DUCATI,KTM,TRIUMPH,INDIAN," +
-        "POLARIS,ARCTIC CAT,CAN-AM,SEA-DOO,SEA RAY,BAYLINER,BOSTON WHALER,GRUMMAN," +
-        "FLEETWOOD,WINNEBAGO,AIRSTREAM,COACHMEN,JAYCO,KEYSTONE,FOREST RIVER,THOR," +
-        "JOHN DEERE,KUBOTA,CATERPILLAR,BOBCAT," +
-        "EZGO,CLUB CAR,CESSNA,PIPER,BEECHCRAFT,FEATHERLITE,FLAGSTAFF,COLEMAN,STARCRAFT," +
-        "Yamaha,Kawasaki,Suzuki,Ducati,Polaris,Arctic,Fleetwood,Winnebago,Airstream," +
-        "Coachmen,Flagstaff,Coleman,Glastron,Skeeter,Sea,Skidoo,Seadoo,Bayliner," +
-        "Grumman,Cessna,Ezgo,Club,Starcraft,Tracker,KTM,Triumph,Harley-Davidson)"
-      );
+    }
+
+    // Block known non-auto makes (case-insensitive via RPC)
+    // This catches null-type vehicles that slipped past classification.
+    // When user is searching, we still block — if they want motorcycles
+    // they can use include_non_auto=true.
+    if (body.include_non_auto !== true) {
+      // PostgREST .not().in() is case-sensitive, so we use uppercased make
+      // column (MV uses COALESCE(canonical_name, make) which may be mixed case).
+      // Block all known case variants:
+      const NON_AUTO_MAKES = [
+        // Motorcycles
+        "YAMAHA", "HARLEY-DAVIDSON", "KAWASAKI", "SUZUKI", "DUCATI", "KTM",
+        "TRIUMPH", "INDIAN", "HUSQVARNA", "APRILIA", "MOTO GUZZI", "MV AGUSTA",
+        "NORTON", "BSA", "ROYAL ENFIELD", "BUELL", "ZERO MOTORCYCLES",
+        // Motorcycles — mixed case variants in DB
+        "Yamaha", "Harley-Davidson", "Harley-Davidson–Branded", "Harley",
+        "Kawasaki", "Suzuki", "Ducati", "KTm", "Triumph", "Indian",
+        "Husqvarna", "Aprilia", "Norton", "Buell",
+        "yamaha", "harley-davidson", "kawasaki", "suzuki", "ducati",
+        "triumph", "indian",
+        // Off-road / ATV / UTV
+        "POLARIS", "ARCTIC CAT", "CAN-AM", "ARCTIC",
+        "Polaris", "Arctic Cat", "Can-Am", "Arctic",
+        // Marine / Boats
+        "SEA-DOO", "SEA RAY", "BAYLINER", "BOSTON WHALER", "GRUMMAN",
+        "GLASTRON", "SKEETER", "TRACKER", "LUND", "RANGER BOATS",
+        "MASTERCRAFT", "MALIBU BOATS", "CORRECT CRAFT", "CHAPARRAL",
+        "Sea-Doo", "Sea Ray", "Bayliner", "Boston Whaler", "Grumman",
+        "Glastron", "Skeeter", "Tracker", "Seadoo", "Sea",
+        // RVs / Campers / Trailers
+        "FLEETWOOD", "WINNEBAGO", "AIRSTREAM", "COACHMEN", "JAYCO",
+        "KEYSTONE", "FOREST RIVER", "THOR", "NEWMAR", "TIFFIN",
+        "HOLIDAY RAMBLER", "MONACO", "FLAGSTAFF", "COLEMAN", "STARCRAFT",
+        "FEATHERLITE", "SUNDOWNER",
+        "Fleetwood", "Winnebago", "Airstream", "Coachmen", "Jayco",
+        "Keystone", "Forest River", "Thor", "Newmar", "Tiffin",
+        "Flagstaff", "Coleman", "Starcraft", "Featherlite",
+        // Farm equipment / Heavy equipment
+        "JOHN DEERE", "KUBOTA", "CATERPILLAR", "BOBCAT", "CASE IH",
+        "NEW HOLLAND", "MASSEY FERGUSON", "FARMALL", "ALLIS-CHALMERS",
+        "OLIVER", "MINNEAPOLIS-MOLINE",
+        "John Deere", "Kubota", "Caterpillar", "Bobcat", "Farmall",
+        "Allis-Chalmers", "Oliver",
+        // Medium & heavy duty trucks
+        "FREIGHTLINER", "PETERBILT", "KENWORTH", "MACK", "HINO",
+        "WESTERN STAR", "AUTOCAR", "CRANE CARRIER",
+        "Freightliner", "Peterbilt", "Kenworth", "Mack", "Hino",
+        "Western Star",
+        // Aircraft
+        "CESSNA", "PIPER", "BEECHCRAFT", "MOONEY", "CIRRUS",
+        "Cessna", "Piper", "Beechcraft", "Mooney", "Cirrus",
+        // Golf carts / utility
+        "EZGO", "CLUB CAR", "CUSHMAN", "GEM",
+        "Ezgo", "Club Car", "Cushman", "Club",
+        // Snowmobiles
+        "SKI-DOO", "Ski-Doo", "Skidoo",
+      ];
+      query = query.not("make", "in", `(${NON_AUTO_MAKES.join(",")})`);
+    }
+
+    // Dealer penalty: hide dealer listings from default feed.
+    // When user is actively searching, show dealers in results.
+    // When user explicitly sets include_dealers=true, show them.
+    const showDealers = body.include_dealers === true || isSearching;
+    if (!showDealers) {
+      query = query.is("origin_organization_id", null);
     }
 
     // Quality floor: skip scam-price listings (default $500 minimum)

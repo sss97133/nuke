@@ -148,6 +148,7 @@ export interface FeedQueryParams {
   hide_sold?: boolean;
   has_images?: boolean;
   excluded_sources?: string[];
+  include_dealers?: boolean;
   sort: FeedSortField;
   direction: 'asc' | 'desc';
   cursor?: string;
