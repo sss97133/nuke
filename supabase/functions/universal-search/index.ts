@@ -150,7 +150,7 @@ serve(async (req) => {
 
     const query: string = urlParams.get('query') || urlParams.get('q') || body.query || '';
     const limitRaw = urlParams.get('limit') ?? body.limit;
-    const limit: number = limitRaw ? Number(limitRaw) : 20;
+    const limit: number = limitRaw ? Number(limitRaw) : 60;
     const types: string[] | undefined = urlParams.get('types')?.split(',') ?? body.types;
     const includeAI: boolean = urlParams.has('includeAI') ? urlParams.get('includeAI') !== 'false' : (body.includeAI ?? true);
 
@@ -168,16 +168,28 @@ serve(async (req) => {
     // Cap query length to prevent abuse and slow searches
     const sanitizedQuery = query.length > 500 ? query.slice(0, 500) : query;
     // Cap limit to reasonable range
-    const sanitizedLimit = Math.max(1, Math.min(typeof limit === 'number' ? limit : 20, 100));
+    const sanitizedLimit = Math.max(1, Math.min(typeof limit === 'number' ? limit : 20, 200));
 
     const queryType = detectInputType(sanitizedQuery);
     const trimmedQuery = sanitizedQuery.trim();
     const results: SearchResult[] = [];
 
     // Shared rich vehicle SELECT — includes all fields needed for tier calculation and UI display
-    const VEHICLE_SELECT = 'id, year, make, model, vin, color, status, sale_price, current_value, asking_price, primary_image_url, seller_name, bat_seller, data_quality_score, view_count, bat_view_count, profile_origin, ownership_verified, comment_count, mileage, transmission, engine_size';
+    const VEHICLE_SELECT = 'id, year, make, model, vin, color, status, sale_price, current_value, asking_price, primary_image_url, seller_name, bat_seller, data_quality_score, view_count, bat_view_count, profile_origin, ownership_verified, comment_count, mileage, transmission, engine_size, canonical_vehicle_type, canonical_body_style';
+
+    // Exclude non-automobile types from all search results
+    const NON_AUTO_TYPES = new Set(['MOTORCYCLE', 'BOAT', 'TRAILER', 'ATV', 'BUS', 'RV', 'SNOWMOBILE', 'OTHER', 'EQUIPMENT']);
+    const isNonAutomobile = (v: any): boolean => {
+      const vtype = (v.canonical_vehicle_type || '').toUpperCase();
+      const bstyle = (v.canonical_body_style || '').toUpperCase();
+      return NON_AUTO_TYPES.has(vtype) || NON_AUTO_TYPES.has(bstyle);
+    };
 
     // Build a rich metadata object from a vehicle row
+    // _imageCounts and _observationCounts are Maps populated by enrichWithCounts()
+    let _imageCounts: Map<string, number> = new Map();
+    let _observationCounts: Map<string, number> = new Map();
+
     const buildVehicleMetadata = (v: any) => ({
       year: v.year,
       make: v.make,
@@ -193,37 +205,87 @@ serve(async (req) => {
       view_count: v.view_count || v.bat_view_count || 0,
       profile_origin: v.profile_origin,
       ownership_verified: v.ownership_verified || false,
-      // comment_count is a solid engagement proxy (BaT comments, auction comments)
-      event_count: v.comment_count || 0,
-      image_count: v.primary_image_url ? 1 : 0,
+      // Real counts from vehicle_images and vehicle_observations (enriched post-query)
+      event_count: _observationCounts.get(v.id) ?? v.comment_count ?? 0,
+      image_count: _imageCounts.get(v.id) ?? (v.primary_image_url ? 1 : 0),
+      observation_count: _observationCounts.get(v.id) ?? 0,
       mileage: v.mileage,
       transmission: v.transmission,
       engine_size: v.engine_size,
     });
 
+    // Fetch real image and observation counts for a set of vehicle IDs.
+    // Uses parallel per-vehicle HEAD counts (fast, each uses vehicle_id index).
+    // Limited to first 15 results to cap latency. Removed is_duplicate filter
+    // since it causes the or() to use a slower scan.
+    const enrichWithCounts = async (vehicleIds: string[]) => {
+      if (!vehicleIds.length) return;
+      const subset = vehicleIds.slice(0, 15);
+      const imgPromises = subset.map(async (vid) => {
+        try {
+          const { count } = await supabase
+            .from('vehicle_images')
+            .select('id', { count: 'exact', head: true })
+            .eq('vehicle_id', vid);
+          if (count !== null) _imageCounts.set(vid, count);
+        } catch { /* ignore */ }
+      });
+      const obsPromises = subset.map(async (vid) => {
+        try {
+          const { count } = await supabase
+            .from('vehicle_observations')
+            .select('id', { count: 'exact', head: true })
+            .eq('vehicle_id', vid);
+          if (count !== null) _observationCounts.set(vid, count);
+        } catch { /* ignore */ }
+      });
+      await Promise.all([...imgPromises, ...obsPromises]);
+    };
+
     // ============================================
-    // VIN SEARCH - Direct lookup
+    // VIN SEARCH - Direct lookup (case-insensitive, exact + partial)
     // ============================================
     if (queryType === 'vin') {
       const vin = trimmedQuery.toUpperCase();
 
-      const { data: vehicles } = await supabase
+      // Try exact match first (case-insensitive via ilike)
+      const { data: exactVehicles } = await supabase
         .from('vehicles')
         .select(VEHICLE_SELECT)
-        .eq('vin', vin)
+        .ilike('vin', vin)
         .eq('is_public', true)
-        .limit(5);
+        .limit(10);
 
-      if (vehicles?.length) {
+      let vehicles = exactVehicles || [];
+
+      // If no exact match, try partial match (last 6-8 digits, or substring)
+      if (!vehicles.length && vin.length >= 5) {
+        const { data: partialVehicles } = await supabase
+          .from('vehicles')
+          .select(VEHICLE_SELECT)
+          .ilike('vin', `%${escapeIlike(vin)}%`)
+          .eq('is_public', true)
+          .not('year', 'is', null)
+          .not('make', 'is', null)
+          .limit(10);
+        vehicles = partialVehicles || [];
+      }
+
+      if (vehicles.length) {
+        // Enrich with real counts
+        await enrichWithCounts(vehicles.map((v: any) => v.id));
+
         for (const v of vehicles) {
+          if (isNonAutomobile(v)) continue;
           const price = v.sale_price || v.current_value || v.asking_price;
+          const isExact = (v.vin || '').toUpperCase() === vin;
           results.push({
             id: v.id,
             type: 'vin_match',
             title: `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'Vehicle',
             subtitle: `VIN: ${v.vin}`,
             image_url: v.primary_image_url,
-            relevance_score: 1.0,
+            relevance_score: isExact ? 1.0 : 0.85,
             metadata: { ...buildVehicleMetadata(v), status: v.status, subtitle: price ? `$${price.toLocaleString()}` : undefined }
           });
         }
@@ -270,7 +332,11 @@ serve(async (req) => {
         .limit(sanitizedLimit);
 
       if (vehicles?.length) {
+        // Enrich with real image/observation counts
+        await enrichWithCounts(vehicles.filter((v: any) => !isNonAutomobile(v)).map((v: any) => v.id));
+
         for (const v of vehicles) {
+          if (isNonAutomobile(v)) continue;
           const price = v.sale_price || v.current_value || v.asking_price;
           results.push({
             id: v.id,
@@ -306,7 +372,8 @@ serve(async (req) => {
     // --- VEHICLES (full-text search with ts_rank) ---
     if (allowedTypes.includes('vehicle')) {
       searches.push((async () => {
-        const vehicleLimit = Math.ceil(sanitizedLimit / 2);
+        // Vehicles are the primary content — give them most of the result slots
+        const vehicleLimit = Math.max(sanitizedLimit - 6, Math.ceil(sanitizedLimit * 0.75));
 
         // Convert query to tsquery format: "BMW M3 E30" → "BMW & M3 & E30"
         const tsqueryTerms = tokens.map(t => t.replace(/[^a-zA-Z0-9]/g, '')).filter(t => t.length > 0);
@@ -364,10 +431,12 @@ serve(async (req) => {
           }
         }
 
-        // ILIKE fallback — always try this and merge; structured field matching is more reliable
-        // than FTS for make/model queries like "Porsche 997 GT3"
-        // FIX: For multi-token queries, prefer ILIKE over FTS (more precise for "porsche 911")
-        {
+        // ILIKE fallback — structured field matching is more reliable than FTS for
+        // multi-token queries like "Porsche 997 GT3". Skip for single-token queries
+        // when FTS already returned enough results (ILIKE on broad terms like "mustang"
+        // scans 30K+ rows and takes 15+ seconds to sort).
+        const skipIlike = vehicles.length >= Math.ceil(vehicleLimit / 2);
+        if (!skipIlike) {
           const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
           let ilikeQuery = supabase
             .from('vehicles')
@@ -444,6 +513,10 @@ serve(async (req) => {
         }
 
         if (vehicles?.length) {
+          // Enrich with real image/observation counts before building metadata
+          const nonMotorcycleIds = vehicles.filter((v: any) => !isNonAutomobile(v)).map((v: any) => v.id);
+          await enrichWithCounts(nonMotorcycleIds);
+
           // Deduplicate by ID only — year+make+model dedup incorrectly collapsed distinct
           // vehicles (e.g. all 1973 Porsche 911s became one result). ID dedup at the end
           // of the function handles final deduplication.
@@ -451,6 +524,7 @@ serve(async (req) => {
 
           for (const v of vehicles) {
             if (seenIds.has(v.id)) continue;
+            if (isNonAutomobile(v)) continue;
             seenIds.add(v.id);
 
             const titleLower = `${v.year} ${v.make} ${v.model}`.toLowerCase();
@@ -498,6 +572,7 @@ serve(async (req) => {
         const queryTokens = tokenizeQuery(trimmedQuery);
 
         for (const v of userVehicles) {
+          if (isNonAutomobile(v)) continue;
           // Check if this vehicle matches the search query (client-side)
           const fields = [
             v.year?.toString(),

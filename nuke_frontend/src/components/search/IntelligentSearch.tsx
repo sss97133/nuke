@@ -258,6 +258,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
 
   const executeSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
+    setShowSuggestions(false);
 
     const trimmedQuery = searchQuery.trim();
     onSearchStart?.();
@@ -468,7 +469,9 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
         // Fail if we don't have make (required field)
         if (!finalMake || !finalMake.trim()) {
           console.warn('Cannot create vehicle - missing make');
-          return; // Don't create vehicle with bad data
+          onSearchResults([], 'Could not extract vehicle make from listing');
+          setIsSearching(false);
+          return;
         }
         
         // Create vehicle immediately
@@ -681,7 +684,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
         const { data: edgeData, error: edgeError } = await supabase.functions.invoke('universal-search', {
           body: {
             query: searchQuery.trim(),
-            limit: 24,
+            limit: 100,
           }
         });
 
@@ -1390,7 +1393,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
               external_identity_id: identity.id,
               member_since: memberSince,
               comments_count: commentsCount,
-              metadata: metadata
+              ...metadata
             },
             relevance_score: identity.handle.toLowerCase() === searchTerm.toLowerCase() ? 0.9 : 0.7,
             created_at: metadata.scraped_at || null
@@ -1899,7 +1902,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
             }}
             onKeyDown={handleKeyDown}
             onFocus={(e) => { setShowSuggestions(true); e.currentTarget.style.borderColor = '#3b82f6'; }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = '#000'; setTimeout(() => setShowSuggestions(false), 200); }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = '#000'; setShowSuggestions(false); }}
             style={{
               fontSize: '13px',
               padding: queryIsUrl ? '10px 68px 10px 28px' : '10px 68px 10px 14px',
@@ -1996,6 +1999,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
               {autocompleteResults.map((result, index) => (
                 <div
                   key={result.id}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     if (result.type === 'vehicle') {
                       navigate(`/vehicle/${result.id}`);
@@ -2052,6 +2056,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
               {suggestions.map((suggestion, index) => (
                 <div
                   key={index}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleSuggestionClick(suggestion)}
                   style={{
                     padding: '8px 16px',
@@ -2077,6 +2082,7 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
               {searchHistory.slice(0, 5).map((historyQuery, index) => (
                 <div
                   key={index}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleSuggestionClick(historyQuery)}
                   style={{
                     padding: '8px 16px',
