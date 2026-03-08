@@ -1,0 +1,4179 @@
+{
+  "timestamp": "2026-01-06T18:35:17.204Z",
+  "total_audited": 240,
+  "summary": {
+    "total_profiles": 240,
+    "successfully_checked": 152,
+    "fetch_failures": 88,
+    "average_accuracy": 0.25,
+    "high_accuracy_count": 38,
+    "low_accuracy_count": 114,
+    "high_accuracy_rate": 0.25
+  },
+  "results": [
+    {
+      "vehicle_id": "878f9f8c-6f3d-4105-8c3a-ac5af04d44b0",
+      "identity": "2014 Chevrolet Corvette Stingray Convertible",
+      "source_url": "https://carsandbids.com/auctions/3ow8zpl1/2014-chevrolet-corvette-stingray-convertible",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "59bbc424-04f0-474a-95a4-6ac9c350107d",
+      "identity": "2018 Mercedes-Benz C-Class AMG",
+      "source_url": "https://carsandbids.com/auctions/3655ol6x/2018-mercedes-amg-c63-s-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "a1be0d96-dba5-4a82-89cf-4bc31c57526e",
+      "identity": "2001 Porsche 911 Carrera Cabriolet",
+      "source_url": "https://carsandbids.com/auctions/kz8oveo9/2001-porsche-911-carrera-cabriolet",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "e676032b-4799-4f8e-afa7-f3c8d10ce024",
+      "identity": "2007 Porsche 911",
+      "source_url": "https://carsandbids.com/auctions/rja8v450/2007-porsche-911-carrera-4s-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "e3e6f906-f4d6-435b-82db-56d0eb89e857",
+      "identity": "2017 Porsche 991 911",
+      "source_url": "https://carsandbids.com/auctions/9emjmjey/2017-porsche-911-carrera-4s-cabriolet",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "13fa8580-f627-4c99-a549-2e369db215e6",
+      "identity": "2011 Chevrolet Camaro 2ss Coupe",
+      "source_url": "https://carsandbids.com/auctions/9nbrg6wn/2011-chevrolet-camaro-2ss-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "78b9c636-223b-459d-a179-b586f543811d",
+      "identity": "1993 Bentley Continental Convertible",
+      "source_url": "https://carsandbids.com/auctions/9abordjp/1993-bentley-continental-convertible",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "df773236-b463-49cf-b9d2-670fbbfe5148",
+      "identity": "1995 Chevrolet Corvette",
+      "source_url": "https://mecum.com/lots/1119469/1995-chevrolet-corvette-convertible",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "1G1YY32P7S5100716",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 82921,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 82921
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "cff91d79-7a9a-481c-97cc-d9dafab39a67",
+      "identity": "1986 Honda TRX250R",
+      "source_url": "https://mecum.com/lots/1118528/1986-honda-trx250r-fourtrax",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "JH3TE1200GC015644",
+        "engine_size": null,
+        "transmission": "6-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "d3f22460-551e-4e26-9920-b641d0d4e67a",
+      "identity": "1989 Honda TRX250R",
+      "source_url": "https://mecum.com/lots/1118531/1989-honda-trx250r-fourtrax",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "JH3TE1200KK304022",
+        "engine_size": null,
+        "transmission": "6-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "e0a75477-c1db-4b25-8e52-ae0b7f1260bd",
+      "identity": "1989 Toyota FJ-70 Land Cruiser",
+      "source_url": "https://mecum.com/lots/1120484/1989-toyota-fj-70-land-cruiser",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "5-Speed Manual",
+        "mileage": 456665,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 456665
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "f0eef451-e82c-4149-8dde-e20c774da275",
+      "identity": "1985 Cadillac Eldorado",
+      "source_url": "https://mecum.com/lots/1120734/1985-cadillac-eldorado-commemorative-edition-coupe",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "1G6EL5789FE666956",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 62571,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 62571
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "7186de34-e518-460c-822e-42830174e1de",
+      "identity": "1940 Ford Deluxe",
+      "source_url": "https://mecum.com/lots/1120686/1940-ford-deluxe-coupe",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": "350 V-8",
+        "transmission": null,
+        "mileage": 25399,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 25399
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "df3cc488-3c1f-4a3f-b375-6b60b7cb2d57",
+      "identity": "1986 Honda TRX250",
+      "source_url": "https://mecum.com/lots/1118530/1986-honda-trx250-fourtrax",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "JH3TE120XGC011147",
+        "engine_size": null,
+        "transmission": "6-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "0b53a25a-1650-4c4e-8de8-3353bd2f0c45",
+      "identity": "1980 MG B",
+      "source_url": "https://mecum.com/lots/1120852/1980-mg-b-limited-edition-convertible",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "4-Speed Manual",
+        "mileage": 37191,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 37191
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "f3d8cd84-d100-4b9f-ab3c-0a3eb7b785c6",
+      "identity": "2024 Chevrolet Tin Neon Sign",
+      "source_url": "https://mecum.com/lots/1120556/chevrolet-single-sided-tin-neon-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "62eb4bed-0aea-468e-8608-a3181b32f038",
+      "identity": "2024 Unknown Unknown",
+      "source_url": "https://mecum.com/lots/1120475/oak-motor-oil-double-sided-porcelain-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "72c6f215-8247-4679-a2b8-0f3ee3200202",
+      "identity": "1980 Pontiac Turbo Trans Am",
+      "source_url": "https://mecum.com/lots/1120456/1980-pontiac-turbo-trans-am-pace-car-edition",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": "350 V-8",
+        "transmission": "3-Speed Automatic",
+        "mileage": 8841,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 8841
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "e150ba4e-d492-41bf-b9f2-5195babd69f8",
+      "identity": "1969 Chevrolet C10",
+      "source_url": "https://mecum.com/lots/1120861/1969-chevrolet-c10-pickup",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": "350 V-8",
+        "transmission": null,
+        "mileage": 85405,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 85405
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "35d81243-22a0-4469-8111-64fe1fbbaafe",
+      "identity": "1993 Chevrolet Corvette",
+      "source_url": "https://mecum.com/lots/1121783/1993-chevrolet-corvette-coupe",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "1G1YY23P1P5117897",
+        "engine_size": null,
+        "transmission": "6-Speed Manual",
+        "mileage": 22428,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 22428
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "229acbf7-8e2c-4895-ab4b-c21a7e9dca5b",
+      "identity": "1918 Unknown Unknown",
+      "source_url": "https://mecum.com/lots/1120545/1918-delaware-punch-single-sided-masonite-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "2b9fa4c9-079b-4036-842b-e778efc083a1",
+      "identity": "2007 Audi S8",
+      "source_url": "https://mecum.com/lots/1115897/2007-audi-s8",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "WAUPN44E37N019701",
+        "engine_size": null,
+        "transmission": "6-Speed Automatic",
+        "mileage": 136490,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 136490
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "235c15e8-ab89-40cb-ae4b-85ed5bd3faca",
+      "identity": "1980 Rolls-Royce Corniche",
+      "source_url": "https://mecum.com/lots/1120334/1980-rolls-royce-corniche-convertible",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 51558,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 51558
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "946058a4-82a1-48b7-aec4-cdab3be8f785",
+      "identity": "2024 Buick Single-Sided Porcelain Sign",
+      "source_url": "https://mecum.com/lots/1120396/buick-single-sided-porcelain-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "b85f55fe-813d-44fb-b047-f878b5af0b35",
+      "identity": "1932 Plymouth Custom",
+      "source_url": "https://mecum.com/lots/1120842/1932-plymouth-custom-sedan",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": "350 V-8",
+        "transmission": null,
+        "mileage": 10879,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 10879
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "e0e99437-c803-486b-8163-ee7dd9d7c49b",
+      "identity": "1958 BMW Isetta",
+      "source_url": "https://mecum.com/lots/1120862/1958-bmw-isetta-300-coupe",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "4-Speed Manual",
+        "mileage": 24074,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 24074
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "4101489b-7672-4c76-ab04-ca3785b43221",
+      "identity": "1987 Chevrolet Camaro",
+      "source_url": "https://mecum.com/lots/1121180/1987-chevrolet-camaro-iroc-z",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "1G1FP2182HN141844",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "7cbeacdd-6faa-464b-b5e8-22cd91ff52b6",
+      "identity": "2009 Ford Shelby GT500",
+      "source_url": "https://mecum.com/lots/1121804/2009-ford-shelby-gt500-convertible",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "1ZVHT89S195138396",
+        "engine_size": null,
+        "transmission": "6-Speed Manual",
+        "mileage": 38458,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 38458
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "db223cee-b5db-45e1-8dd9-07e45ef002bb",
+      "identity": "1978 GMC Jimmy",
+      "source_url": "https://mecum.com/lots/1120347/1978-gmc-jimmy",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": "350 V-8",
+        "transmission": "5-Speed Manual",
+        "mileage": 37282,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 37282
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "7fae15fd-e189-4d8e-b92e-0509cde170fe",
+      "identity": "1986 London Sterling Coach",
+      "source_url": "https://mecum.com/lots/1120863/1986-london-sterling-coach-limousine",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "SCRUB75L1FD461875",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 33702,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 33702
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "827d963f-fff7-4746-8d82-e9176d7aaa80",
+      "identity": "1963 Chevrolet Corvette",
+      "source_url": "https://mecum.com/lots/1119855/1963-chevrolet-corvette-convertible",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": "327 V-8",
+        "transmission": "4-Speed Manual",
+        "mileage": 48582,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 48582
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "b72d1cbb-c742-4d80-9657-c305e8c4cb13",
+      "identity": "2014 Ford Mustang",
+      "source_url": "https://mecum.com/lots/1121903/2014-ford-mustang-coupe",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "1ZVBP8AMXE5268050",
+        "engine_size": null,
+        "transmission": "6-Speed Manual",
+        "mileage": 59,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 59
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "d04ae9a7-129c-4b94-9c51-7d78ca1fd5fd",
+      "identity": "1976 Ford Bronco",
+      "source_url": "https://mecum.com/lots/1119812/1976-ford-bronco",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": "302 V-8",
+        "transmission": null,
+        "mileage": 2807,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 2807
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "1f2c495d-f0d2-4587-999b-d5825b510d85",
+      "identity": "1995 Chevrolet Camaro",
+      "source_url": "https://mecum.com/lots/1118930/1995-chevrolet-camaro-z28-coupe",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "2G1FP22P5S2122147",
+        "engine_size": null,
+        "transmission": "6-Speed Manual",
+        "mileage": 6600,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 6600
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "9483cc8d-2a5b-4955-843c-8e6071d685a2",
+      "identity": "2009 Dodge Challenger",
+      "source_url": "https://mecum.com/lots/1119643/2009-dodge-challenger-srt-8",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "2B3LJ74W39H576855",
+        "engine_size": null,
+        "transmission": "6-Speed Automatic",
+        "mileage": 10187,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 10187
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "8bbcdd05-ab37-44c4-9008-02a165ccd038",
+      "identity": "1948 Studebaker Pickup",
+      "source_url": "https://mecum.com/lots/1119391/1948-studebaker-pickup",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "4-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "f0754544-0257-430d-9d44-edfc09c05fe5",
+      "identity": "1955 Chevrolet Bel Air",
+      "source_url": "https://mecum.com/lots/1116382/1955-chevrolet-bel-air-hardtop",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 85353,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 85353
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "7e25e29a-ccd0-415a-8591-3ec75f5bd12b",
+      "identity": "2025 Porsche taycan turbo gt weissach",
+      "source_url": "https://bringatrailer.com/listing/2025-porsche-taycan-turbo-gt-weissach-2",
+      "matches": {
+        "vin": null,
+        "mileage": false,
+        "engine": null
+      },
+      "discrepancies": [
+        "Mileage mismatch: Profile(10000) vs Source(141)"
+      ],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "WP0AE2Y13SSA58189",
+        "engine_size": null,
+        "transmission": "automatic",
+        "mileage": 10000,
+        "price": 432000
+      },
+      "source_data": {
+        "transmission": "automatic transmission.\",\"offers\":{\"@ty",
+        "mileage": 141,
+        "price": 2500
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "08f7119a-9dc8-4373-be76-e79ee15fdc9c",
+      "identity": "1999 Chevrolet K2500 HD LS",
+      "source_url": "https://bringatrailer.com/listing/1999-chevrolet-k2500-pickup",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": null,
+        "price": null
+      },
+      "source_data": {
+        "vin": "1GCGK23J1XF088525",
+        "engine": "7.4-liter V8 linked with a four-speed automatic transmission",
+        "transmission": "automatic transmission and a dual-range",
+        "price": 18251,
+        "mileage": 5
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "44a1d9e0-a82c-45a9-bbb3-3dd738b3bbd1",
+      "identity": "1985 Alfa romeo spider veloce",
+      "source_url": "https://bringatrailer.com/listing/1985-alfa-romeo-spider-veloce-20",
+      "matches": {
+        "vin": null,
+        "mileage": false,
+        "engine": null
+      },
+      "discrepancies": [
+        "Mileage mismatch: Profile(60000) vs Source(20)"
+      ],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "ZARBA5412F1022029",
+        "engine_size": null,
+        "transmission": "manual",
+        "mileage": 60000,
+        "price": 432000
+      },
+      "source_data": {
+        "engine": "2.0L twin-cam inline-four paired with a five-speed manu",
+        "transmission": "manual transmission. Features includ",
+        "mileage": 20,
+        "price": 13250
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "aa78b899-4fb7-4057-b52e-a2e041807860",
+      "identity": "1969 Ford mustang mach 1",
+      "source_url": "https://bringatrailer.com/listing/1969-ford-mustang-mach-1-168",
+      "matches": {
+        "vin": null,
+        "mileage": false,
+        "engine": null
+      },
+      "discrepancies": [
+        "Mileage mismatch: Profile(66000) vs Source(5)"
+      ],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "automatic",
+        "mileage": 66000,
+        "price": 432000
+      },
+      "source_data": {
+        "transmission": "automatic, Meadowlark Yellow paintwork,",
+        "price": 2500,
+        "mileage": 5
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "e5f26736-e802-4437-a06e-03bc63d9adff",
+      "identity": "1979 Ford F-350",
+      "source_url": "https://velocityrestorations.com/models/classic-ford-f350",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "80791141-b399-401a-8c31-471995afc505",
+      "identity": "1984 Pontiac fiero",
+      "source_url": "https://bringatrailer.com/listing/1984-pontiac-fiero-43",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": null,
+        "price": null
+      },
+      "source_data": {
+        "engine": "2.5-liter inline-four paired with a four-speed manual transa",
+        "transmission": "manual transaxle and is finished in ",
+        "price": 6600,
+        "mileage": 5
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "0fa270de-6dab-4383-8dd3-32dc9c55c50e",
+      "identity": "2011 Porsche cayenne turbo",
+      "source_url": "https://bringatrailer.com/listing/2011-porsche-cayenne-turbo-47",
+      "matches": {
+        "vin": null,
+        "mileage": false,
+        "engine": null
+      },
+      "discrepancies": [
+        "Mileage mismatch: Profile(167000) vs Source(1000)"
+      ],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "WP1AC2A29BLA81801",
+        "engine_size": null,
+        "transmission": "automatic",
+        "mileage": 167000,
+        "price": 432000
+      },
+      "source_data": {
+        "engine": "4.8-liter V8 linked with an eight-speed Tiptronic S automati",
+        "transmission": "automatic transmission and a locking ce",
+        "mileage": 1000,
+        "price": 14650
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "9555caf0-29b9-4fc3-91f1-de6839a14be5",
+      "identity": "1972 Chevrolet K10",
+      "source_url": "https://velocityrestorations.com/models/classic-chevrolet-k10",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "517391c9-989f-4b5e-8b23-cc50d35ec407",
+      "identity": "2000 Bmw m5",
+      "source_url": "https://bringatrailer.com/listing/2000-bmw-m5-362",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": null,
+        "price": null
+      },
+      "source_data": {
+        "engine": "4.9-liter V8 paired with a six-speed manual transmission. Mo",
+        "transmission": "manual transmission. Modifications i",
+        "mileage": 100,
+        "price": 42250
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "1da20f3a-6f57-4633-80fd-584862b4ff12",
+      "identity": "2004 Porsche 911 turbo coupe",
+      "source_url": "https://bringatrailer.com/listing/2004-porsche-911-turbo-coupe-24",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": null,
+        "price": null
+      },
+      "source_data": {
+        "engine": "3.6L flat-six that drives all four wheels via a six-spe",
+        "transmission": "manual-start-all\",(0,S.J)(()=>{(0,h.",
+        "mileage": 24000,
+        "price": 9
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "60dda581-e23d-4934-8a24-c0ad7367cb03",
+      "identity": "2011 Mercedes benz sls amg",
+      "source_url": "https://bringatrailer.com/listing/2011-mercedes-benz-sls-amg-90",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "WDDRJ7HA9BA004741",
+        "engine_size": null,
+        "transmission": "automatic",
+        "mileage": 7000,
+        "price": 432000
+      },
+      "source_data": {
+        "engine": "6.2-liter V8 linked with a seven-speed dual-clutch automatic",
+        "transmission": "manual-start-all\",(0,S.J)(()=>{(0,h.",
+        "mileage": 6500,
+        "price": 9
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "304773b1-2009-4d3f-bbc5-6a9473e85af5",
+      "identity": "1979 Volkswagen super beetle convertible",
+      "source_url": "https://bringatrailer.com/listing/1979-volkswagen-super-beetle-convertible-97",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": null,
+        "price": null
+      },
+      "source_data": {
+        "engine": "1.6-liter flat-four paired with a four-speed manual transaxl",
+        "transmission": "manual transaxle.\",\"offers\":{\"@type\"",
+        "price": 35500,
+        "mileage": 5
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "3fac8a4e-f859-4787-8f87-48d42d02598a",
+      "identity": "2022 Rivian r1t",
+      "source_url": "https://bringatrailer.com/listing/2022-rivian-r1t-154",
+      "matches": {
+        "vin": null,
+        "mileage": false,
+        "engine": null
+      },
+      "discrepancies": [
+        "Mileage mismatch: Profile(25000) vs Source(60000)"
+      ],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "7FCTGAAAXNN011338",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 25000,
+        "price": 432000
+      },
+      "source_data": {
+        "transmission": "manual, service records, a clean Car",
+        "mileage": 60000,
+        "price": 53500
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "de28d33b-f0f5-465d-8151-e68c7d085244",
+      "identity": "2002 Mini cooper s",
+      "source_url": "https://bringatrailer.com/listing/2002-mini-cooper-s-50",
+      "matches": {
+        "vin": null,
+        "mileage": false,
+        "engine": null
+      },
+      "discrepancies": [
+        "Mileage mismatch: Profile(48000) vs Source(2002)"
+      ],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "WMWRE334X2TD52819",
+        "engine_size": null,
+        "transmission": "6-Speed Manual",
+        "mileage": 48000,
+        "price": 432000
+      },
+      "source_data": {
+        "engine": "1.6-liter inline-four paired with a six-speed manual transax",
+        "transmission": "manual transaxle and is finished in ",
+        "price": 8100,
+        "mileage": 2002
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "6f7cbb98-7637-40b1-a72a-ae03a20dba10",
+      "identity": "2014 Mini cooper s convertible",
+      "source_url": "https://bringatrailer.com/listing/2014-mini-cooper-s-convertible-2",
+      "matches": {
+        "vin": null,
+        "mileage": false,
+        "engine": null
+      },
+      "discrepancies": [
+        "Mileage mismatch: Profile(121000) vs Source(1000)"
+      ],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "WMWZP3C57ET298609",
+        "engine_size": null,
+        "transmission": "manual",
+        "mileage": 121000,
+        "price": 432000
+      },
+      "source_data": {
+        "engine": "1.6L inline-four paired with a six-speed manual transax",
+        "transmission": "manual transaxle.\\u00a0Finished in C",
+        "mileage": 1000,
+        "price": 6500
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "555548e0-701d-433d-8e17-3cf80371c218",
+      "identity": "1980 Buick regal",
+      "source_url": "https://bringatrailer.com/listing/1980-buick-regal-5",
+      "matches": {
+        "vin": null,
+        "mileage": false,
+        "engine": null
+      },
+      "discrepancies": [
+        "Mileage mismatch: Profile(46000) vs Source(1500)"
+      ],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "automatic",
+        "mileage": 46000,
+        "price": 432000
+      },
+      "source_data": {
+        "engine": "5.3-liter General Motors V8 paired with a four-speed automat",
+        "transmission": "automatic transmission. Repainted in me",
+        "mileage": 1500,
+        "price": 2500
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "d874dc35-5b7e-4927-acc4-1591ad913338",
+      "identity": "1954 Studebaker commander",
+      "source_url": "https://bringatrailer.com/listing/1954-studebaker-commander-19",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "5-Speed Manual",
+        "mileage": 900,
+        "price": null
+      },
+      "source_data": {
+        "transmission": "manual transmission. The rear end wa",
+        "mileage": 900,
+        "price": 56300
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "c8bd1b7c-2a92-4348-a1f2-1198d358e837",
+      "identity": "2024 Ford Single-Sided Neon Sign",
+      "source_url": "https://mecum.com/lots/1122868/authorized-ford-single-sided-neon-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "697c4cae-8cf4-411a-8920-caf4b174f0a7",
+      "identity": "2024 Unknown Unknown",
+      "source_url": "https://mecum.com/lots/1122869/dog-n-suds-single-sided-neon-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "934df634-ee01-4fc8-91d2-6a824251de7c",
+      "identity": "2024 Chevrolet Single-Sided Neon Sign",
+      "source_url": "https://mecum.com/lots/1122870/chevrolet-single-sided-neon-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "dde07099-623d-476a-88e5-931916816ab5",
+      "identity": "2024 Ford Neon Sign",
+      "source_url": "https://mecum.com/lots/1122871/ford-oval-single-sided-neon-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "11f3b1df-2d15-42ec-a4ba-77b05f91548c",
+      "identity": "2024 Ford GT500",
+      "source_url": "https://mecum.com/lots/1122872/gt500-single-sided-led-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "8a71df29-9357-4f33-9051-dfc40bdf1d04",
+      "identity": "2024 Unknown Unknown",
+      "source_url": "https://mecum.com/lots/1122873/mopar-single-sided-neon-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "972ea247-1492-459a-8b86-dfb3b8f2a89b",
+      "identity": "2024 Unknown Unknown",
+      "source_url": "https://mecum.com/lots/1122874/coca-cola-single-sided-neon-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "c2efd747-4e34-4c25-9e6a-332cc2f4ed9b",
+      "identity": "2024 N/A N/A",
+      "source_url": "https://mecum.com/lots/1123065/dependable-used-cars-single-sided-neon-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "0c4ca3e0-34d5-4228-85f8-906fd2337f45",
+      "identity": "2024 Unknown Unknown",
+      "source_url": "https://mecum.com/lots/1122875/shelby-snake-single-sided-neon-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "63bc70a6-1c99-49df-8ed6-cea74d8d0199",
+      "identity": "2024 Corvette C8",
+      "source_url": "https://mecum.com/lots/1122876/corvette-c8-single-sided-neon-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "ac813ce9-daa6-47f5-9f44-9942cb7914d6",
+      "identity": "2024 APCO Porcelain Sign",
+      "source_url": "https://mecum.com/lots/1124525/apco-petroleum-products-double-sided-porcelain-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "4ba78d31-c3a0-4d2e-8e40-bafa7e4b195f",
+      "identity": "1950 Phillips 66 Double-Sided Porcelain Sign",
+      "source_url": "https://mecum.com/lots/1124524/phillips-66-double-sided-porcelain-sign",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "15e78781-12d1-4986-b279-ac4033accab3",
+      "identity": "1950 Unknown Sky Fighter",
+      "source_url": "https://mecum.com/lots/1124981/1950s-sky-fighter-rocket-amusement-park-ride",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "e651888a-eff1-4be3-912a-6cee8b103914",
+      "identity": "2023 Dodge challenger r t scat pack",
+      "source_url": "https://bringatrailer.com/listing/2023-dodge-challenger-r-t-scat-pack-8",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "26118361184SCALED",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": null,
+        "price": null
+      },
+      "source_data": {
+        "transmission": "manual transmission and is finished ",
+        "mileage": 533,
+        "price": 42000
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "be3176d6-68da-4835-a2d4-8ab0b5dc1a82",
+      "identity": "1977 Datsun 280z",
+      "source_url": "https://bringatrailer.com/listing/1977-datsun-280z-143",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "manual",
+        "mileage": 137,
+        "price": 432000
+      },
+      "source_data": {
+        "engine": "2.8-liter L28 inline-six is said to have been rebuilt by Rob",
+        "transmission": "manual transmission. This modified 2",
+        "mileage": 137,
+        "price": 32000
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "2e1d5799-b2b5-41f5-ad58-cf73d9b86f52",
+      "identity": "2003 Chevrolet trailblazer",
+      "source_url": "https://bringatrailer.com/listing/2003-chevrolet-trailblazer-3",
+      "matches": {
+        "vin": null,
+        "mileage": false,
+        "engine": null
+      },
+      "discrepancies": [
+        "Mileage mismatch: Profile(98000) vs Source(4)"
+      ],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "1GNDT13S132346604",
+        "engine_size": null,
+        "transmission": "automatic",
+        "mileage": 98000,
+        "price": 432000
+      },
+      "source_data": {
+        "engine": "4.2-liter inline-six paired with a four-speed automatic tran",
+        "transmission": "manual-start-all\",(0,S.J)(()=>{(0,h.",
+        "mileage": 4,
+        "price": 9
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "e529bf17-b6a0-41e1-9880-6413b4f4d06d",
+      "identity": "1986 Honda TR200 Fat Cat",
+      "source_url": "https://bringatrailer.com/listing/1986-honda-tr200-fat-cat",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "JH2PE17060K506425",
+        "engine_size": null,
+        "transmission": "with an extra-low first gear",
+        "mileage": null,
+        "price": 432000
+      },
+      "source_data": {
+        "transmission": "automatic centrifugal clutch and a five",
+        "price": 10750,
+        "mileage": 5
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "9c9d0c99-8c15-4778-8c6a-821bff49af4a",
+      "identity": "1936 Harley-Davidson EL Knucklehead",
+      "source_url": "https://mecum.com/lots/520591/1936-harley-davidson-el-knucklehead",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "4-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "93c10c7b-8e8c-450e-bbac-ae60efcb491e",
+      "identity": "1963 Scott Flying Squirrel",
+      "source_url": "https://mecum.com/lots/1108992/1963-scott-flying-squirrel",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 4351,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 4351
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "2b448c45-0d08-42ad-aaf1-c0e7f2e10f42",
+      "identity": "2017 Bentley Continental Supersports",
+      "source_url": "https://carsandbids.com/auctions/rgoqvn02/2017-bentley-continental-supersports",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "ef61222e-ae96-4fcb-b096-d99bb11d8ad8",
+      "identity": "1963 Scott Flying Squirrel",
+      "source_url": "https://mecum.com/lots/403741/1963-scott-flying-squirrel",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "135ebb1f-576e-4f44-94d3-4f479265ba72",
+      "identity": "1926 Scott Super Squirrel",
+      "source_url": "https://mecum.com/lots/1105180/1926-scott-super-squirrel",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "49bea2ef-ac7b-4cf1-aeaf-4e82cf429f3b",
+      "identity": "1929 Scott Sport Squirrel",
+      "source_url": "https://mecum.com/lots/1128983/1929-scott-sport-squirrel",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "3-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "62b19ecd-4747-4925-8258-0e42abd1652e",
+      "identity": "1963 Scott Flying Squirrel",
+      "source_url": "https://mecum.com/lots/1162202/1963-scott-flying-squirrel",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "3-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "7554a6d8-b59a-4594-9f94-94facfc2d4e9",
+      "identity": "1929 Scott Flying Squirrel",
+      "source_url": "https://mecum.com/lots/1107827/1929-scott-flying-squirrel",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "2-Speed Manual",
+        "mileage": 0,
+        "price": 2656
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "00b9038a-309a-46d0-a818-c96ecb5a973c",
+      "identity": "1930 Scott Flying Squirrel",
+      "source_url": "https://mecum.com/lots/1129253/1930-scott-flying-squirrel",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "3-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "7b3ba1c3-5354-4f31-91c8-7d7f75541156",
+      "identity": "2022 Lamborghini Urus",
+      "source_url": "https://carsandbids.com/auctions/rgqzgbro/2022-lamborghini-urus",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "e41d1883-e1c5-4418-a094-42cf31c31472",
+      "identity": "2023 Ferrari Roma",
+      "source_url": "https://carsandbids.com/auctions/rnmn1gx5/2023-ferrari-roma",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "f9dcf82c-3db7-4a2a-9d0a-2cdaa877edee",
+      "identity": "2020 Audi R8 V10 Coupe",
+      "source_url": "https://carsandbids.com/auctions/36bbgj8x/2020-audi-r8-v10-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "3a517d39-5403-46fd-80bd-d977d71a469b",
+      "identity": "2010 Audi R8 V10 Coupe",
+      "source_url": "https://carsandbids.com/auctions/rxqv8eqw/2010-audi-r8-v10-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "c3af2f3a-490c-4f27-a13b-8acb4e31116e",
+      "identity": "2022 Mclaren 765lt Spider",
+      "source_url": "https://carsandbids.com/auctions/kvxalynz/2022-mclaren-765lt-spider",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "3b150804-0202-4c58-99df-3008eb014beb",
+      "identity": "2017 Aston Martin Vantage Gt4",
+      "source_url": "https://carsandbids.com/auctions/30ab6pal/2017-aston-martin-vantage-gt4",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "5b15a683-ee53-4d49-a05d-a6c52393dbf4",
+      "identity": "2021 Lamborghini Huracan Evo Rwd Coupe",
+      "source_url": "https://carsandbids.com/auctions/9ngrpyrl/2021-lamborghini-huracan-evo-rwd-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "6a8e8d2f-773e-4be3-be05-3858e598337c",
+      "identity": "2020 Mclaren 720s Spider Performance",
+      "source_url": "https://carsandbids.com/auctions/37lv2blk/2020-mclaren-720s-spider-performance",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "e1cd004a-fbda-46f4-92d4-2e9c0918b7fc",
+      "identity": "2004 Rolls Royce Phantom",
+      "source_url": "https://carsandbids.com/auctions/925xlgeb/2004-rolls-royce-phantom",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "890fdfcd-db04-4b44-9e51-7279d689143d",
+      "identity": "2022 Ferrari Sf90 Stradale",
+      "source_url": "https://carsandbids.com/auctions/rkp7q0wl/2022-ferrari-sf90-stradale",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "7d5c207a-1dde-4b80-89b0-af17da916689",
+      "identity": "2022 Rivian R1s Launch Edition",
+      "source_url": "https://carsandbids.com/auctions/3oexbod1/2022-rivian-r1s-launch-edition",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "ac20698e-2735-424f-91b4-f4a3ff1ebd9c",
+      "identity": "2020 Mclaren 620r",
+      "source_url": "https://carsandbids.com/auctions/92ry2qd6/2020-mclaren-620r",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "7ed9c038-6204-4416-95d5-2a40124cd27b",
+      "identity": "2012 Audi R8 GT Spyder",
+      "source_url": "https://carsandbids.com/auctions/3onaxb2y/2012-audi-r8-gt-spyder",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "d3fb778f-48de-4fbe-ac9b-ec47ff1d0506",
+      "identity": "1985 Mercedes Benz 300sd",
+      "source_url": "https://carsandbids.com/auctions/3g1agx8r/1985-mercedes-benz-300sd",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "0a08282e-566f-4c56-bf24-df7a20504944",
+      "identity": "2013 Mclaren Mp4 12c Spider",
+      "source_url": "https://carsandbids.com/auctions/rmx15x6l/2013-mclaren-mp4-12c-spider",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "35c4985d-44cd-4dc1-99e9-33946829a2af",
+      "identity": "2012 Ferrari FF",
+      "source_url": "https://carsandbids.com/auctions/kmynxemb/2012-ferrari-ff",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "7fd4faba-b958-4a2a-a082-9930838eddd3",
+      "identity": "2020 Mclaren 600lt Spider",
+      "source_url": "https://carsandbids.com/auctions/rxoxnqjj/2020-mclaren-600lt-spider",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "d5feab11-71f7-4f0b-b29d-d89539a7c9dc",
+      "identity": "2024 Mclaren 750s",
+      "source_url": "https://carsandbids.com/auctions/36ejjxnl/2024-mclaren-750s",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "15bbcdca-e8c1-4183-b2c3-93d6feebf52b",
+      "identity": "2018 Ferrari 812 Superfast",
+      "source_url": "https://carsandbids.com/auctions/rkglane4/2018-ferrari-812-superfast",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "e01e9c67-e86f-4d54-b3d4-db75c51b0f82",
+      "identity": "2000 Ferrari 360 Spider",
+      "source_url": "https://carsandbids.com/auctions/92v6p7aj/2000-ferrari-360-spider",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "cb09f468-4d7f-438c-aa70-95a2f5410b92",
+      "identity": "2021 Lamborghini Urus",
+      "source_url": "https://carsandbids.com/auctions/3gqwoo0g/2021-lamborghini-urus",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "697d267d-b892-43c5-a47b-dfc92a6f756a",
+      "identity": "2020 Mclaren 600lt Spider",
+      "source_url": "https://carsandbids.com/auctions/3qbqnva5/2020-mclaren-600lt-spider",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "31980b37-b495-4713-81c5-4049e9509fbe",
+      "identity": "2021 Ferrari Roma",
+      "source_url": "https://carsandbids.com/auctions/rejrgklr/2021-ferrari-roma",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "824ce120-2c49-47ad-a40d-e9472489c069",
+      "identity": "2022 Lamborghini Huracan Sto",
+      "source_url": "https://carsandbids.com/auctions/3omdzgnj/2022-lamborghini-huracan-sto",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "0488d13f-0056-42ec-b3ae-a6a4513f7fbc",
+      "identity": "2006 Aston Martin Db9 Coupe",
+      "source_url": "https://carsandbids.com/auctions/3o1a1owr/2006-aston-martin-db9-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "de4985d3-33f8-466a-82ed-d265f2104662",
+      "identity": "1995 Bmw M3 Coupe",
+      "source_url": "https://carsandbids.com/auctions/3zvmbgoz/1995-bmw-m3-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "d37b20c4-5cf2-4791-8d7c-163b400286fd",
+      "identity": "2022 Rolls Royce Ghost",
+      "source_url": "https://carsandbids.com/auctions/3gqx8ole/2022-rolls-royce-ghost",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "af42d36e-8882-4bbf-aad6-f40b4c21ab46",
+      "identity": "1986 Ferrari Mondial 32 Coupe",
+      "source_url": "https://carsandbids.com/auctions/rnboqkaw/1986-ferrari-mondial-32-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "6fe6c7fe-67c8-4de1-8b58-29a02cc9bba5",
+      "identity": "1999 Ferrari F355 Spider",
+      "source_url": "https://carsandbids.com/auctions/gkmjgqnr/1999-ferrari-f355-spider",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "c1f1945d-85f3-4866-abae-ef84e8a27eb9",
+      "identity": "2020 Aston Martin Vantage",
+      "source_url": "https://carsandbids.com/auctions/9l4joemz/2020-aston-martin-vantage",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "136e6bc7-0911-429b-8088-06931ca75dee",
+      "identity": "2004 AM General M998",
+      "source_url": "https://carsandbids.com/auctions/9lz8pzgk/2004-am-general-m998",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "0ec18701-3bfb-42b7-9eeb-14324a390423",
+      "identity": "2022 Lamborghini Huracan Evo Coupe",
+      "source_url": "https://carsandbids.com/auctions/kp8xn5lq/2022-lamborghini-huracan-evo-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "0181301c-3ab0-42ac-86ef-8e196f1c7efd",
+      "identity": "1997 Toyota Crown Majesta",
+      "source_url": "https://carsandbids.com/auctions/98mz0rb6/1997-toyota-crown-majesta",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "feba49f2-78f6-4fff-a513-a98e4b688be2",
+      "identity": "2017 Mclaren 570s",
+      "source_url": "https://carsandbids.com/auctions/kyx0zd1l/2017-mclaren-570s",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "6bd2f351-af98-49f2-9e9e-519b4fa1727a",
+      "identity": "2017 Jaguar F Type S Coupe",
+      "source_url": "https://carsandbids.com/auctions/3pzwqvqn/2017-jaguar-f-type-s-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "dc1cfd3e-f31e-460e-bce1-a728d41bc15e",
+      "identity": "2018 Mclaren 720s",
+      "source_url": "https://carsandbids.com/auctions/36gjwewx/2018-mclaren-720s",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "5ef44250-c23d-43c0-bca9-78f46fe0d391",
+      "identity": "2014 Volkswagen Touareg Tdi R Line",
+      "source_url": "https://carsandbids.com/auctions/rglxalz4/2014-volkswagen-touareg-tdi-r-line",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "7cd3a480-c2b6-4eb0-8004-87d3d1049736",
+      "identity": "2011 Audi R8 V10 Spyder",
+      "source_url": "https://carsandbids.com/auctions/98la1vd9/2011-audi-r8-v10-spyder",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "242e1017-ff4a-42a8-bd80-8c8eee04942f",
+      "identity": "2020 Mclaren 720s Spider Performance",
+      "source_url": "https://carsandbids.com/auctions/kznga0xo/2020-mclaren-720s-spider-performance",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "fb7f8a7d-76b2-46a8-9ffc-42ec999f272f",
+      "identity": "2022 Maserati Mc20 Coupe",
+      "source_url": "https://carsandbids.com/auctions/rgoonyvj/2022-maserati-mc20-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "30f07bca-78f2-4627-b3ee-5db80f6ea49c",
+      "identity": "2012 Audi R8 V10 Coupe",
+      "source_url": "https://carsandbids.com/auctions/kdevrb1y/2012-audi-r8-v10-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "84c9e37a-781f-41d7-84ba-50569d965873",
+      "identity": "2005 Aston Martin Db9 Coupe",
+      "source_url": "https://carsandbids.com/auctions/km24ne60/2005-aston-martin-db9-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "a36373c9-2f4c-47f2-af85-b5fe0924b2de",
+      "identity": "1957 Cadillac Series 62",
+      "source_url": "https://mecum.com/lots/1120516/1957-cadillac-series-62-coupe",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": "400 V-8",
+        "transmission": "4-Speed Automatic",
+        "mileage": 995,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 995
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "443d787d-2b71-41cf-85f1-265139bdd89e",
+      "identity": "1931 Packard 840",
+      "source_url": "https://mecum.com/lots/1121165/1931-packard-840-deluxe-eight-convertible-coupe",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "4-Speed Manual",
+        "mileage": 13479,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 13479
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "4fc06a59-c446-4266-aec6-c1ddb1c99506",
+      "identity": "1970 Plymouth Hemi Cuda",
+      "source_url": "https://mecum.com/lots/1121409/1970-plymouth-hemi-cuda",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 64317,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 64317
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "0adb3326-88f6-4a80-8c87-8bce21ea771f",
+      "identity": "1964 TVR Griffith",
+      "source_url": "https://mecum.com/lots/1121164/1964-tvr-griffith-coupe",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "4-Speed Manual",
+        "mileage": 11066,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 11066
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "461ec704-da9e-45d4-b404-623748c2d705",
+      "identity": "1959 Chevrolet Corvette",
+      "source_url": "https://mecum.com/lots/1123495/1959-chevrolet-corvette-convertible",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "4-Speed Manual",
+        "mileage": 117,
+        "price": 90000
+      },
+      "source_data": {
+        "mileage": 117
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "6cd2a6b8-ef49-456f-9e49-8f519345d126",
+      "identity": "1960 Champion Kiddie Ride",
+      "source_url": "https://mecum.com/lots/1124375/champion-kiddie-ride",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "45ebe989-971e-4ba3-af07-d5afa9a166e8",
+      "identity": "2024 Unknown Unknown",
+      "source_url": "https://mecum.com/lots/1125108/curing-kids-cancer-quilt-by-patty-schroeder",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "a7c634b3-b12b-40c7-a395-2d53958cb456",
+      "identity": "1993 Kawasaki KX125",
+      "source_url": "https://mecum.com/lots/1114376/1993-kawasaki-kx125",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "JKAKXRJ16PA011079",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "95c94676-3b7d-4c3e-a86d-bd794f9abcf2",
+      "identity": "1991 Kawasaki KDX200",
+      "source_url": "https://mecum.com/lots/1114377/1991-kawasaki-kdx200",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "JKADXNE16MA013941",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "da491dee-5180-4c95-9670-dac605f8eaaf",
+      "identity": "1992 Kawasaki KDX250",
+      "source_url": "https://mecum.com/lots/1114378/1992-kawasaki-kdx250",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "ef209096-8d82-4915-bfe6-6766926e3b1d",
+      "identity": "1986 Kawasaki KX250",
+      "source_url": "https://mecum.com/lots/1114379/1986-kawasaki-kx250",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "JKAKXMD18GA006190",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "723116bd-4b24-460b-9843-fb553ef9d150",
+      "identity": "1988 Kawasaki KX500",
+      "source_url": "https://mecum.com/lots/1114380/1988-kawasaki-kx500",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "JKAKXVD11JA000650",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "0813a534-5120-4cd4-9f92-509474c0b2d0",
+      "identity": "1992 Chevrolet Suburban",
+      "source_url": "https://mecum.com/lots/1124843/1992-chevrolet-suburban",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "1GNFK16K6NJ312349",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 51968,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 51968
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "90bd8140-c401-4d80-9e5d-a50d7942754c",
+      "identity": "1978 Kawasaki KX250",
+      "source_url": "https://mecum.com/lots/1114381/1978-kawasaki-kx250",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "3f4ad1bc-5fd8-444f-8fc6-166b9084cf44",
+      "identity": "1971 Honda Z50",
+      "source_url": "https://mecum.com/lots/1125174/1971-honda-z50-mini-trail",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "3-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 50
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "8e2a406d-2744-418a-9a2c-af4aba7e75b1",
+      "identity": "1972 Honda Z50",
+      "source_url": "https://mecum.com/lots/1125175/1972-honda-z50-mini-trail",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "3-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 50
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "5aca9000-278e-40b0-a10c-a343714a4d10",
+      "identity": "1972 Honda Z50",
+      "source_url": "https://mecum.com/lots/1125176/1972-honda-z50",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "3-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "efce2efb-1d79-4dc9-9c4c-b442ec8ef438",
+      "identity": "1985 Honda ATC",
+      "source_url": "https://mecum.com/lots/1125177/1985-honda-atc-350x-trike",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "JH3TE0805FM022955",
+        "engine_size": "350 V-8",
+        "transmission": "6-Speed Automatic",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "14dfe1bc-9322-41de-afe3-b0e5bb548518",
+      "identity": "1969 Honda Z50",
+      "source_url": "https://mecum.com/lots/1124754/1969-honda-z50-silver-tag",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "3-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "8ca52b75-861d-40a2-b04d-ce62e740f780",
+      "identity": "1973 Honda SL100",
+      "source_url": "https://mecum.com/lots/1124757/1973-honda-sl100-k2",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "5-Speed Manual",
+        "mileage": 46,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 46
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "ee6b81b6-929d-4798-9c15-8cd771738b87",
+      "identity": "1984 Honda CR250",
+      "source_url": "https://mecum.com/lots/1124758/1984-honda-cr250",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "JH2ME0309FC705800",
+        "engine_size": null,
+        "transmission": "5-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "cc07e95c-c5a2-4c67-995e-935d720d6c46",
+      "identity": "2012 Fisker Karma",
+      "source_url": "https://mecum.com/lots/1122882/2012-fisker-karma",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "YH4K14AA5CA000892",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 10000,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 10000
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "a40c7b6c-59a7-4c3e-9325-4e839cb8355a",
+      "identity": "2014 Ford Shelby GT500",
+      "source_url": "https://mecum.com/lots/1123561/2014-ford-shelby-gt500-widebody",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "1ZVBP8JZ7E5261231",
+        "engine_size": null,
+        "transmission": "6-Speed Manual",
+        "mileage": 2839,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 2839
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "9a0b4970-9957-4612-9fad-b5a145bd664d",
+      "identity": "1961 Porsche T217",
+      "source_url": "https://mecum.com/lots/1124199/1961-porsche-t217-s",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "1631b9a0-0694-42ca-a63f-c45a77346d55",
+      "identity": "2017 Jeep Wrangler",
+      "source_url": "https://mecum.com/lots/1123621/2017-jeep-wrangler",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "1C4AJWAG7HL608091",
+        "engine_size": null,
+        "transmission": "6-Speed Manual",
+        "mileage": 82797,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 82797
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "19aa1f73-def7-4b37-b1d6-2fc5e4d19051",
+      "identity": "2006 Bentley Continental",
+      "source_url": "https://mecum.com/lots/1114084/2006-bentley-continental-gt",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": "SCBCR63WX6C037086",
+        "engine_size": null,
+        "transmission": "6-Speed Automatic",
+        "mileage": 38027,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 38027
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "0bd5f65d-29c3-421f-bfd9-0d7bf3e32c2f",
+      "identity": "2019 Lamborghini Aventador Svj",
+      "source_url": "https://carsandbids.com/auctions/3ggal8wz/2019-lamborghini-aventador-svj",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "6189ea0f-9a22-441e-910b-cd8aaad37e9d",
+      "identity": "2021 Lamborghini Huracan Evo Rwd Spyder",
+      "source_url": "https://carsandbids.com/auctions/rNYb7VNE/2021-lamborghini-huracan-evo-rwd-spyder",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "c558793f-00aa-4b30-ab15-8547d00eccd4",
+      "identity": "2017 Ferrari 488 Challenge",
+      "source_url": "https://carsandbids.com/auctions/3R0G8GmN/2017-ferrari-488-challenge",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "062a5898-cdbf-4a13-ba73-2d5fd31a604a",
+      "identity": "2012 Lamborghini Gallardo Lp550 2 Coupe",
+      "source_url": "https://carsandbids.com/auctions/3oM45qd7/2012-lamborghini-gallardo-lp550-2-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "32939c1b-116a-447d-b8e6-da40b5092d4e",
+      "identity": "2010 Bmw M3 Coupe",
+      "source_url": "https://carsandbids.com/auctions/KZqjgdQo/2010-bmw-m3-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "5aead6b0-2391-4f33-aa9a-9960305c06a6",
+      "identity": "2016 Ferrari 488 Spider",
+      "source_url": "https://carsandbids.com/auctions/3o046oQ7/2016-ferrari-488-spider",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "67f67001-8e43-48fb-92bb-a91b0772ed7e",
+      "identity": "2017 Ferrari 488 Gtb",
+      "source_url": "https://carsandbids.com/auctions/3z2OLREN/2017-ferrari-488-gtb",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "c01ef80d-c17d-4e21-bc84-d5a582626aec",
+      "identity": "2024 Tesla Model S Plaid",
+      "source_url": "https://carsandbids.com/auctions/rkna1bWK/2024-tesla-model-s-plaid",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "23f7155b-52ef-431f-a224-2d76b514f5c6",
+      "identity": "2014 Lamborghini Aventador Lp720 4 50th Anniversario",
+      "source_url": "https://carsandbids.com/auctions/rwyj757Z/2014-lamborghini-aventador-lp720-4-50th-anniversario",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "caf95d6d-a794-44ca-b79c-a7ee31697bdc",
+      "identity": "2011 Ferrari 458 Italia",
+      "source_url": "https://carsandbids.com/auctions/30P8bp5P/2011-ferrari-458-italia",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "95151f33-8aa8-4884-b671-546c8144d14d",
+      "identity": "2013 Lamborghini Aventador Lp700 4",
+      "source_url": "https://carsandbids.com/auctions/37QmXbB0/2013-lamborghini-aventador-lp700-4",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "fd7b3bb2-0098-40da-a36d-f962f4a4f098",
+      "identity": "2016 Ferrari 488 Gtb Coupe",
+      "source_url": "https://carsandbids.com/auctions/3q1e6OV1/2016-ferrari-488-gtb-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "289448ff-a67b-4555-9b62-9da7be5ef7ab",
+      "identity": "2011 Lamborghini Gallardo Lp570 4 Spyder Performante",
+      "source_url": "https://carsandbids.com/auctions/9lYD1dJE/2011-lamborghini-gallardo-lp570-4-spyder-performante",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "44bf28de-b7fd-41c3-9f81-ed30abaa54d3",
+      "identity": "2012 Ferrari 458 Spider",
+      "source_url": "https://carsandbids.com/auctions/98LXlMgw/2012-ferrari-458-spider",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "7bc52c38-bbd1-49b7-acfa-3a4fb5b51b2a",
+      "identity": "2018 Ferrari 488 Spider",
+      "source_url": "https://carsandbids.com/auctions/r4vWzZn3/2018-ferrari-488-spider",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "6542ce4e-d61b-4e86-b312-a9c7b0f5afec",
+      "identity": "1999 Lotus Esprit V8",
+      "source_url": "https://carsandbids.com/auctions/rkOzz2GN/1999-lotus-esprit-v8",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "d2803185-db31-4cb9-a1d5-dd4f31867102",
+      "identity": "2012 Lamborghini Aventador",
+      "source_url": "https://carsandbids.com/auctions/rEQzP1Zb/2012-lamborghini-aventador",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "b0d49624-bc2f-4425-8ca4-d57155797501",
+      "identity": "2012 Lamborghini Gallardo Lp570 4 Super Trofeo Stradale",
+      "source_url": "https://carsandbids.com/auctions/92qvo1ee/2012-lamborghini-gallardo-lp570-4-super-trofeo-stradale",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "e636ad09-6927-43fc-9694-09b0d2016f3c",
+      "identity": "2023 Ferrari F8 Spider",
+      "source_url": "https://carsandbids.com/auctions/3vGkLZPR/2023-ferrari-f8-spider",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "dbeed742-9102-45c9-bc38-6f30c032f320",
+      "identity": "2018 Ferrari 488 Gtb",
+      "source_url": "https://carsandbids.com/auctions/KmaL0zw6/2018-ferrari-488-gtb",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "5a61dfca-5f82-49fa-afb0-39f68b30c3ce",
+      "identity": "2012 Lamborghini Aventador Lp700 4 Coupe",
+      "source_url": "https://carsandbids.com/auctions/rGeAadM2/2012-lamborghini-aventador-lp700-4-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "9ca3206b-8ca7-411f-9247-d37927baca81",
+      "identity": "2020 Lamborghini Aventador",
+      "source_url": "https://carsandbids.com/auctions/30nwwmlr/2020-lamborghini-aventador-svj",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "6fc72a79-fea9-4a01-965e-78072c376e82",
+      "identity": "2019 Ferrari 488 Gtb",
+      "source_url": "https://carsandbids.com/auctions/92dv5al6/2019-ferrari-488-gtb",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "209f0e74-42c6-429a-b343-187cedbf8a67",
+      "identity": "2013 Ferrari 458 Spider",
+      "source_url": "https://carsandbids.com/auctions/3gkav0r3/2013-ferrari-458-spider",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "4a45c0a4-9d16-4e76-a4c7-d0e142ad421a",
+      "identity": "2019 Lamborghini Huracan LP 580 2 Coupe",
+      "source_url": "https://carsandbids.com/auctions/kv0756zp/2019-lamborghini-huracan-lp-580-2-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "331e7d2d-7cc1-4b87-9976-c38fc372f3b3",
+      "identity": "1979 Ford F-250",
+      "source_url": "https://www.velocityrestorations.com/models/classic-ford-f250/",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "b2132b1e-66ee-434c-a154-1f44bc67aedf",
+      "identity": "1980 International Scout II",
+      "source_url": "https://velocityrestorations.com/models/international-scout",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "bc87e4af-618a-49cd-9a7b-c9f9715aaa7d",
+      "identity": "1968 Ford Mustang",
+      "source_url": "https://velocityrestorations.com/models/classic-ford-mustang",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "a7fbd3c6-7e35-455b-a501-9ba30ccbbc11",
+      "identity": "1972 Chevrolet K5 Blazer",
+      "source_url": "https://velocityrestorations.com/models/chevrolet-k5-blazer",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "21579081-0edc-4d72-8cd7-6f6e799d9836",
+      "identity": "1968 Classic Ford",
+      "source_url": "https://www.velocityrestorations.com/",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "d8adc3dc-c817-4aa0-874b-d2e84cc34b2e",
+      "identity": "1970 Ford Mustang",
+      "source_url": "https://mecum.com/lots/1154889/1970-ford-mustang-mach-1-fastback/sitemap.xml",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": "302 V-8",
+        "transmission": "6-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "5061914b-3247-40b1-89e2-48ae87ebf908",
+      "identity": "1969 Chevrolet Chevelle",
+      "source_url": "https://mecum.com/lots/1153055/1969-chevrolet-chevelle-ss/sitemap.xml",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": "396 V-8",
+        "transmission": null,
+        "mileage": 0,
+        "price": 1969
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "b2d9a7d5-0c28-4de1-b634-9bd28d0ce84a",
+      "identity": "1965 Plymouth Satellite",
+      "source_url": "https://mecum.com/lots/1154872/1965-plymouth-satellite-convertible/sitemap.xml",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "3-Speed Automatic",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "ddd199e5-c009-4bcf-9dcd-a80563a74e88",
+      "identity": "1970 AMC AMX",
+      "source_url": "https://mecum.com/lots/1154883/1970-amc-amx/sitemap.xml",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "4-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "2ca90a07-ead4-404f-bb9d-f496a42dd368",
+      "identity": "1966 Shelby GT350",
+      "source_url": "https://mecum.com/lots/1154874/1966-shelby-gt350-fastback/sitemap.xml",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "4-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "501cef9c-39cc-4294-baab-684158f895d0",
+      "identity": "1965 Pontiac GTO",
+      "source_url": "https://mecum.com/lots/1155209/1965-pontiac-gto/sitemap.xml",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "5-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "404788c2-e467-40b0-b6c2-0b7e4b85307b",
+      "identity": "1969 Chevrolet Nova",
+      "source_url": "https://mecum.com/lots/1154880/1969-chevrolet-nova-ss/sitemap.xml",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": "396 V-8",
+        "transmission": "4-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "91847741-5769-4705-95c2-a080e7d27bf9",
+      "identity": "1932 Ford Custom",
+      "source_url": "https://mecum.com/lots/1154824/1932-ford-custom-roadster/sitemap.xml",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "4-Speed Automatic",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "370c65c2-0b6a-468e-9dcf-21d82796c1d2",
+      "identity": "1968 Shelby GT500",
+      "source_url": "https://mecum.com/lots/1152861/1968-shelby-gt500-convertible/sitemap.xml",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "3-Speed Automatic",
+        "mileage": 56140,
+        "price": 2739428
+      },
+      "source_data": {
+        "mileage": 56140
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "f4055927-4ebc-4e6d-8139-17655468d428",
+      "identity": "1957 Chevrolet Bel Air",
+      "source_url": "https://mecum.com/lots/1154840/1957-chevrolet-bel-air-convertible/sitemap.xml",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "3-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "a763e3fc-12b5-44e4-81a8-c5fdfb20a884",
+      "identity": "1942 Packard 120",
+      "source_url": "https://mecum.com/lots/1154830/1942-packard-120-convertible/sitemap.xml",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "3-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "0c6adc05-f675-4e44-9896-725f997eb7f1",
+      "identity": "1974 Porsche 911S",
+      "source_url": "https://mecum.com/lots/179660/1974-porsche-911s-race-car",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "4-Speed Manual",
+        "mileage": 0,
+        "price": null
+      },
+      "source_data": {},
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "658b04f2-8326-4892-a0aa-3b2a1e6d1233",
+      "identity": "1977 Pontiac Trans Am",
+      "source_url": "https://mecum.com/lots/1154488/1977-pontiac-trans-am/sitemap.xml",
+      "matches": {
+        "vin": null,
+        "mileage": true,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 1,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": "6-Speed Manual",
+        "mileage": 2500,
+        "price": null
+      },
+      "source_data": {
+        "mileage": 2500
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "34d95c26-ac15-41e0-85f3-c228a617b152",
+      "identity": "2014 Chevrolet Corvette Stingray Coupe",
+      "source_url": "https://carsandbids.com/auctions/kde5jgj0/2014-chevrolet-corvette-stingray-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "17eee0e4-c462-42df-8874-1b59860c1fb3",
+      "identity": "2007 Chevrolet Corvette Z06",
+      "source_url": "https://carsandbids.com/auctions/rbl0dxxl/2007-chevrolet-corvette-z06",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "6ef4de88-7095-407d-a82a-bbe0dee874a6",
+      "identity": "2024 Broad Arrow Auctions LLC Unknown",
+      "source_url": "https://www.broadarrowauctions.com/vehicles/available",
+      "status": "source_fetch_failed",
+      "error": "HTTP 404",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "4c5bce99-9a7b-4d66-96ec-65611a23b6de",
+      "identity": "1966 Rolls-Royce Silver Cloud III Mulliner Park Ward Drophead Coupe",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0028/1966-rolls-royce-silver-cloud-iii-mulliner-park-ward-drophead-coupe",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 83375
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "f5e7a154-3d19-4f3a-9cea-2dea8134c709",
+      "identity": "2002 Chevrolet Corvette Convertible",
+      "source_url": "https://carsandbids.com/auctions/rjzbdoyn/2002-chevrolet-corvette-convertible",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "b3de4394-28cc-4c36-b66b-0eb875bebff3",
+      "identity": "2019 Chevrolet Corvette Grand Sport Coupe",
+      "source_url": "https://carsandbids.com/auctions/36y5zrko/2019-chevrolet-corvette-grand-sport-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "e7954e5f-9a78-4e32-8ea8-2d251aaea4aa",
+      "identity": "1964 Bentley S3 Continental Mulliner Park Ward Drophead Coupe",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0029/1964-bentley-s3-continental-mulliner-park-ward-drophead-coupe",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 57500
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "c0ee68af-8607-41a7-90d4-baec7ef3ee39",
+      "identity": "1988 Rolls-Royce Corniche II",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0052/1988-rolls-royce-corniche-ii",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 19000,
+        "price": 52900
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "d942298d-9713-4586-bae4-8c9cc5e1b36e",
+      "identity": "2020 Bugatti Chiron Sport",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0008/2020-bugatti-chiron-sport",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "VF9SP3V32KM795231",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 10879,
+        "price": 0
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "d799c035-d938-4255-8171-42715d992366",
+      "identity": "2009 Abarth 500 Ferrari Dealer Edition",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0032/2009-abarth-500-ferrari-dealer-edition",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 39828,
+        "price": 34500
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "347a7da4-0978-4cf3-a376-cf3debd9fdd0",
+      "identity": "2014 McLaren P1",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0030/2014-mclaren-p1",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 1108750
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "fd7d32c9-ca4a-473a-bfd5-3bf8087f82c1",
+      "identity": "1990 Porsche 911 Coupe",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0011/1990-porsche-911-coupe-reimagined-by-singer-goldfinger-commission",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "WP0AB2964LS451541",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 14158,
+        "price": 0
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "e9653cab-9bdf-4e99-bb76-9e74eae71582",
+      "identity": "1993 Lamborghini Diablo Evolution GTR",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0026/1993-lamborghini-diablo-evolution-gtr",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 33824,
+        "price": 343750
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "8fe6c4e3-f5f9-4663-912c-5344be392c66",
+      "identity": "2019 Porsche 935",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0001/2019-porsche-935",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "WP0ZZZ99ZKS199175",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 0
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "d9352583-a11b-4bdd-a78f-3daaf6d55904",
+      "identity": "1994 Audi RS2 Avant",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0015/1994-audi-rs2-avant",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 43125
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "0c1571db-dfc1-4487-84ec-60db55527dea",
+      "identity": "2009 Rolls-Royce Phantom Coupé",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0050/2009-rolls-royce-phantom-coupe",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 13847,
+        "price": 230000
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "de5f72f6-ffb3-4a68-a335-ba7ed947175b",
+      "identity": "2007 Chevrolet Corvette Coupe",
+      "source_url": "https://carsandbids.com/auctions/98vqdr40/2007-chevrolet-corvette-coupe",
+      "status": "source_fetch_failed",
+      "error": "HTTP 403",
+      "accuracy_score": 0
+    },
+    {
+      "vehicle_id": "1a76c84e-2be9-411c-a6fa-8907133e8819",
+      "identity": "1956 Alfa Romeo Giulietta Spider",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0013/1956-alfa-romeo-giulietta-spider",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 40250
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "a8cd4db6-2c5c-4eb4-988c-280659e96c01",
+      "identity": "1966 Ferrari 275 GTB Alloy",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0031/1966-ferrari-275-gtb-alloy",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 2312500
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "3c7a3eb3-d727-47f4-9de1-af4c015fc19f",
+      "identity": "1970 Alfa Romeo 1300 Junior Zagato",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0012/1970-alfa-romeo-1300-junior-zagato",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 54625
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "e3f4031e-46f6-4af5-ae18-e178431e0912",
+      "identity": "1952 Ferrari 212 Europa Pinin Farina Coupe",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0004/1952-ferrari-212-europa-pinin-farina-coupe",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 816250
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "28f61665-7dd1-4201-9189-30a24e31b02d",
+      "identity": "1975 Rolls-Royce Silver Shadow",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0022/1975-rolls-royce-silver-shadow-long-wheelbase-saloon-ex-princess-margaret",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 79000,
+        "price": 46000
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "c1193919-428f-4ee9-b33e-292177c8c11c",
+      "identity": "2010 Porsche 911 Turbo Cabriolet",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0010/2010-porsche-911-turbo-cabriolet",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "WP0ZZZ99ZAS770460",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 302,
+        "price": 0
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "cf3776ee-8314-4482-b87e-fbac37cdfb7c",
+      "identity": "2016 Porsche 911 R",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0009/2016-porsche-911-r",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 11000,
+        "price": 298750
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "727ce9f8-0882-4657-bc05-d7bf257aee4c",
+      "identity": "2004 Ferrari 575 GTC",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0064/2004-ferrari-575-gtc-stradale",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 230000
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "7a75449e-dad3-4a1f-8876-b94b9fde1840",
+      "identity": "2015 Porsche 918 Spyder",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0061/2015-porsche-918-spyder",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 6452,
+        "price": 1418125
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "9267abf7-a421-49f6-a103-5da1b4342f5a",
+      "identity": "2005 Ferrari Superamerica",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0068/2005-ferrari-superamerica",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 14000,
+        "price": 241500
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "f9419b0b-868e-4fc7-858a-26e55c390b15",
+      "identity": "1981 Citroën CX Limousine",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0016/1981-citroen-cx-limousine",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 35000,
+        "price": 23000
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "840c8ec3-0774-4a40-9441-39c2ded5490a",
+      "identity": "1937 SS Jaguar 100 3 ½-Litre",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0027/1937-ss-jaguar-100-3-litre",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 321250
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "1179109d-8d64-4785-8bdf-c953a98833e2",
+      "identity": "2008 Bugatti Veyron EB 16.4 Coupe",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0067/2008-bugatti-veyron-eb-16-4-coupe",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "VF9SA15C38M795169",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 9802,
+        "price": 0
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "36361ce2-a70f-42ad-abc8-04889ed49ded",
+      "identity": "2009 Ferrari Scuderia Spider 16M",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0046/2009-ferrari-scuderia-spider-16m",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 4524,
+        "price": 501250
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "1fe02ffd-e64a-411b-8033-e38dad743e3e",
+      "identity": "1991 Isdera Sbarro Espera Turbo S20E",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0060/1991-isdera-sbarro-espera-turbo-s20e",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 103500
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "984dd2b9-6531-4528-a89d-331336a2d2b4",
+      "identity": "1956 Jaguar D-Type",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0003/1956-jaguar-d-type",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 5181250
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "0e47f438-151c-490f-832d-9dcb3c2ecd75",
+      "identity": "1962 Lotus 22 Formula Junior",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0045/1962-lotus-22-formula-junior-ex-jo-siffert-scuderia-filipinetti",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 86250
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "a49cb017-60c0-4801-beee-7863170d5a1d",
+      "identity": "2023 Ferrari 812 Competizione A",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0018/2023-ferrari-812-competizione-a",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 94,
+        "price": 1525000
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "5c8a3d39-7f40-4961-b9b2-bcd764e54c7e",
+      "identity": "1987 Ferrari 412",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0048/1987-ferrari-412",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 97750
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "b7dcc2d1-4bb1-40ab-8ab3-271dee5aa2db",
+      "identity": "2007 Porsche 911 Turbo Gemballa Avalanche GTR 750 EVO-R",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0006/2007-porsche-911-turbo-gemballa-avalanche-gtr-750-evo-r",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 17559,
+        "price": 150000
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "391a2d5e-685b-42b2-afe4-7b222af4a341",
+      "identity": "1983 Maserati Khamsin",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0037/1983-maserati-khamsin",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 95000,
+        "price": 106375
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "ae2a6c01-adee-4aa0-a1e5-7e1921ac0ef5",
+      "identity": "1967 Lamborghini Miura P400",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0043/1967-lamborghini-miura-p400",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 0
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "67270f6b-4dbd-4a3e-9c5d-e20b54f8c7f8",
+      "identity": "1969 Lamborghini Islero",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0017/1969-lamborghini-islero",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 270250
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "03650895-7523-4479-9717-9867ffc3dd69",
+      "identity": "2008 Porsche 911 GT2 Clubsport",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0025/2008-porsche-911-gt2-clubsport",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 2000,
+        "price": 310000
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "4573faf0-2180-476c-90e8-d4967e8900d6",
+      "identity": "2010 Porsche 911 GT3 RS Clubsport",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0057/2010-porsche-911-gt3-rs-clubsport",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 31427,
+        "price": 195500
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "f44daf5e-3dad-472c-9a65-44fbcc637d15",
+      "identity": "1990 Ferrari 348 ts",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0042/1990-ferrari-348-ts",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 5298,
+        "price": 75000
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "0eff5c56-e660-4a77-8e3b-37a44a6ff750",
+      "identity": "2012 Mercedes-Benz SLS AMG Roadster",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0056/2012-mercedes-benz-sls-amg-roadster",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": "WMX1974771A007072",
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 31759,
+        "price": 0
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "a9ce2bfd-e8cb-4c61-8c73-870313df803b",
+      "identity": "1954 Swallow Doretti",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0034/1954-swallow-doretti",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 103500
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "0464d933-e9c6-4631-9053-0e2205d3077d",
+      "identity": "1971 Fiat 500 L",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0014/1971-fiat-500-l",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 1000,
+        "price": 11500
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "15294aa0-121b-40cb-801f-bf2cab6b6d27",
+      "identity": "2024 Aston Martin Valkyrie Spider",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0063/2024-aston-martin-valkyrie-spider",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 97,
+        "price": 2706250
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "05013ada-af8f-4321-8986-fbd9ffc50d07",
+      "identity": "1995 Aston Martin Vantage V550",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0047/1995-aston-martin-vantage-v550",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 43891,
+        "price": 132250
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    },
+    {
+      "vehicle_id": "27cc6c5f-dff8-4b12-81f6-6c0dfe50f48a",
+      "identity": "1983 Ferrari 400 i Automatic",
+      "source_url": "https://broadarrowauctions.com/vehicles/dg25_r0049/1983-ferrari-400-i-automatic",
+      "matches": {
+        "vin": null,
+        "mileage": null,
+        "engine": null
+      },
+      "discrepancies": [],
+      "accuracy_score": 0,
+      "profile_data": {
+        "vin": null,
+        "engine_size": null,
+        "transmission": null,
+        "mileage": 0,
+        "price": 80500
+      },
+      "source_data": {
+        "mileage": 0
+      },
+      "status": "checked"
+    }
+  ]
+}

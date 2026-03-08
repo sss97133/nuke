@@ -33,6 +33,7 @@ const operations: AdminNavItem[] = [
   { label: 'Image Processing', to: '/admin/image-processing' },
   { label: 'Live Analysis', to: '/admin/live-analysis' },
   { label: 'Batch Analysis', to: '/admin/batch-analysis' },
+  { label: 'Sources', to: '/admin/sources', description: 'Source onboarding, coverage, and data flow' },
   { label: 'Extraction Monitor', to: '/admin/extraction-monitor' },
   { label: 'Data Quality', to: '/admin/data-quality', description: 'Field completion rates + enrichment workforce' },
   { label: 'User Metrics', to: '/admin/user-metrics', description: '509K identity seeds across all sources' },

@@ -1,0 +1,23 @@
+{
+  "id": "002",
+  "type": "pipeline-health",
+  "priority": 0,
+  "schedule": "every 30 minutes",
+  "params": {
+    "check_queue": true,
+    "check_errors": true,
+    "check_domains": true,
+    "alert_on": {
+      "error_rate_above": 0.1,
+      "queue_stalled_mins": 60,
+      "new_failing_domain": true
+    }
+  },
+  "last_run": "2026-01-31T02:44:11.884597",
+  "status": "completed",
+  "notes": "Monitor Nuke extraction pipeline health",
+  "last_result": {
+    "status": "error",
+    "error": "The read operation timed out"
+  }
+}

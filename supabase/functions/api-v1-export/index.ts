@@ -14,6 +14,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { authenticateRequest, logApiUsage } from "../_shared/apiKeyAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -95,13 +96,16 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Authenticate
-    const { userId, isServiceRole, isApiKey, error: authError } = await authenticateRequest(req, supabase);
-    if (authError || !userId) {
+    const auth = await authenticateRequest(req, supabase, { endpoint: 'export' });
+    if (auth.error || !auth.userId) {
       return new Response(
-        JSON.stringify({ error: authError || "Authentication required" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: auth.error || "Authentication required" }),
+        { status: auth.status || 401, headers: { ...corsHeaders, ...auth.headers, "Content-Type": "application/json" } }
       );
     }
+    const userId = auth.userId;
+    const isServiceRole = auth.isServiceRole;
+    const isApiKey = !isServiceRole && userId !== 'service-role';
 
     const url = new URL(req.url);
     const params = url.searchParams;
@@ -339,99 +343,4 @@ function buildNextParams(params: URLSearchParams, cursor: string): string {
   return next.toString();
 }
 
-async function authenticateRequest(
-  req: Request,
-  supabase: ReturnType<typeof createClient>
-): Promise<{
-  userId: string | null;
-  isServiceRole?: boolean;
-  isApiKey?: boolean;
-  error?: string;
-}> {
-  const authHeader = req.headers.get("Authorization");
-  const apiKey = req.headers.get("X-API-Key");
-
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.replace("Bearer ", "");
-
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const altServiceRoleKey = Deno.env.get("SERVICE_ROLE_KEY");
-    if (
-      (serviceRoleKey && token === serviceRoleKey) ||
-      (altServiceRoleKey && token === altServiceRoleKey)
-    ) {
-      return { userId: "service-role", isServiceRole: true };
-    }
-
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (user && !error) {
-      return { userId: user.id };
-    }
-  }
-
-  if (apiKey) {
-    const rawKey = apiKey.startsWith("nk_live_") ? apiKey.slice(8) : apiKey;
-    const keyHash = await hashApiKey(rawKey);
-
-    const { data: keyData, error } = await supabase
-      .from("api_keys")
-      .select("user_id, scopes, is_active, rate_limit_remaining, expires_at")
-      .eq("key_hash", keyHash)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (keyData && !error) {
-      if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
-        return { userId: null, error: "API key has expired" };
-      }
-      if (keyData.rate_limit_remaining !== null && keyData.rate_limit_remaining <= 0) {
-        return { userId: null, error: "Rate limit exceeded" };
-      }
-
-      // Deduct more for bulk export (10 credits per export call)
-      const deduct = Math.min(10, keyData.rate_limit_remaining ?? 10);
-      await supabase
-        .from("api_keys")
-        .update({
-          rate_limit_remaining:
-            keyData.rate_limit_remaining !== null
-              ? keyData.rate_limit_remaining - deduct
-              : null,
-          last_used_at: new Date().toISOString(),
-        })
-        .eq("key_hash", keyHash);
-
-      return { userId: keyData.user_id, isApiKey: true };
-    }
-  }
-
-  return { userId: null, error: "Invalid or missing authentication" };
-}
-
-async function hashApiKey(key: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(key);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return "sha256_" + hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function logApiUsage(
-  supabase: ReturnType<typeof createClient>,
-  userId: string,
-  resource: string,
-  action: string,
-  rowCount: number
-) {
-  try {
-    await supabase.from("api_usage_logs").insert({
-      user_id: userId,
-      resource,
-      action,
-      resource_id: String(rowCount),
-      timestamp: new Date().toISOString(),
-    });
-  } catch (e) {
-    console.error("Failed to log API usage:", e);
-  }
-}
+// authenticateRequest, logApiUsage imported from _shared/apiKeyAuth.ts

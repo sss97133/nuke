@@ -4,8 +4,6 @@ import { supabase } from '../lib/supabase';
 import { readCachedSession } from '../utils/cachedSession';
 import { CashBalanceService } from '../services/cashBalanceService';
 import type { CashTransaction } from '../services/cashBalanceService';
-import CashBalance from '../components/trading/CashBalance';
-import { TradingService } from '../services/tradingService';
 
 interface ShareHolding {
   offering_id: string;
@@ -388,7 +386,7 @@ export default function Portfolio() {
   const handleCancelOrder = async (orderId: string) => {
     setCancellingOrderId(orderId);
     try {
-      const ok = await TradingService.cancelOrder(orderId);
+      const ok = await Promise.resolve(false);
       if (ok) {
         setOpenOrders(prev => prev.filter(o => o.id !== orderId));
         // Refresh cash balance (reserved cash was released)
@@ -560,7 +558,7 @@ export default function Portfolio() {
           </div>
 
           {/* Cash Balance */}
-          <CashBalance compact={false} showActions={true} />
+          {/* CashBalance component removed — trading feature retired */}
 
           {/* Unrealized P&L */}
           <div style={{
@@ -720,7 +718,7 @@ export default function Portfolio() {
           {/* Cash Tab */}
           {activeTab === 'cash' && (
             <div style={{ padding: '20px' }}>
-              <CashBalance compact={false} showActions={true} />
+              {/* CashBalance component removed — trading feature retired */}
               
               <div style={{ marginTop: '20px' }}>
                 <div style={{ fontSize: '9px', fontWeight: 600, marginBottom: '12px' }}>

@@ -36,7 +36,7 @@ const CurationQueue = React.lazy(() => import('../pages/CurationQueue'));
 const UnlinkedReceipts = React.lazy(() => import('../pages/UnlinkedReceipts'));
 
 // Investor Offering Portal (Data Room) — kept for business/fundraising
-const InvestorOffering = React.lazy(() => import('../pages/InvestorOffering'));
+// InvestorOffering removed — feature retired
 
 // Business management
 const BusinessSettings = React.lazy(() => import('../pages/BusinessSettings'));
@@ -70,10 +70,6 @@ const TeamInbox = React.lazy(() => import('../pages/TeamInbox'));
 // Photo / Unified Inbox
 const PersonalPhotoLibrary = React.lazy(() => import('../pages/PersonalPhotoLibrary').then(m => ({ default: m.PersonalPhotoLibrary })));
 
-// Predictions (betting)
-const BettingPage = React.lazy(() => import('../pages/betting/index'));
-const MarketDetail = React.lazy(() => import('../pages/betting/MarketDetail'));
-const LiveAuctionView = React.lazy(() => import('../components/betting/LiveAuctionView').then(m => ({ default: m.LiveAuctionView })));
 const ApiKeysPage = React.lazy(() => import('../pages/settings/ApiKeysPage'));
 const WebhooksPage = React.lazy(() => import('../pages/settings/WebhooksPage'));
 const UsageDashboardPage = React.lazy(() => import('../pages/settings/UsageDashboardPage'));
@@ -150,7 +146,6 @@ export const DomainRoutes = () => {
         <Route path="/profile/:userId" element={<Profile />} />
         <Route path="/profile/external/:externalIdentityId" element={<Profile />} />
         {/* Investor offering / data room — semi-public fundraising page */}
-        <Route path="/offering" element={<InvestorOffering />} />
         {/* Docs / developers landing */}
         <Route path="/developers" element={<DevelopersPage />} />
         <Route path="/docs" element={<DevelopersPage />} />
@@ -206,10 +201,6 @@ export const DomainRoutes = () => {
           {/* Identity & social */}
           <Route path="/claim-identity" element={<ClaimExternalIdentity />} />
 
-          {/* Predictions / betting */}
-          <Route path="/predictions" element={<BettingPage />} />
-          <Route path="/predictions/:id" element={<MarketDetail />} />
-          <Route path="/predictions/live" element={<LiveAuctionView />} />
 
           {/* Settings (protected) */}
           <Route element={<ProtectedRoute />}>

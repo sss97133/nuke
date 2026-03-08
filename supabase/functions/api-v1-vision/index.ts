@@ -38,6 +38,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { authenticateRequest } from "../_shared/apiKeyAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -75,13 +76,11 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
   // ── Auth ──────────────────────────────────────────────────────────────────
-  const { userId, error: authError } = await authenticateRequest(
-    req,
-    supabase
-  );
-  if (authError || !userId) {
-    return json({ error: authError || "Authentication required" }, 401);
+  const auth = await authenticateRequest(req, supabase, { endpoint: 'vision' });
+  if (auth.error || !auth.userId) {
+    return json({ error: auth.error || "Authentication required" }, auth.status || 401);
   }
+  const userId = auth.userId;
 
   // ── Route ─────────────────────────────────────────────────────────────────
   const url = new URL(req.url);
@@ -401,54 +400,7 @@ async function fetchComps(
   }
 }
 
-// ── Auth (matches api-v1-vehicles pattern) ───────────────────────────────
-
-async function authenticateRequest(
-  req: Request,
-  supabase: any
-): Promise<{ userId: string | null; error?: string }> {
-  const authHeader = req.headers.get("Authorization");
-  const apiKeyHeader = req.headers.get("X-API-Key");
-
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.replace("Bearer ", "");
-    if (
-      token === SERVICE_ROLE_KEY ||
-      token === Deno.env.get("SERVICE_ROLE_KEY")
-    ) {
-      return { userId: "service-role" };
-    }
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser(token);
-    if (user && !error) return { userId: user.id };
-  }
-
-  if (apiKeyHeader) {
-    const raw = apiKeyHeader.startsWith("nk_live_")
-      ? apiKeyHeader.slice(8)
-      : apiKeyHeader;
-    const keyHash = await hashApiKey(raw);
-    const { data: keyData } = await supabase
-      .from("api_keys")
-      .select("user_id, is_active, scopes")
-      .eq("key_hash", keyHash)
-      .eq("is_active", true)
-      .maybeSingle();
-    if (keyData) return { userId: keyData.user_id };
-  }
-
-  return { userId: null, error: "Invalid or missing authentication" };
-}
-
-async function hashApiKey(key: string): Promise<string> {
-  const enc = new TextEncoder();
-  const buf = await crypto.subtle.digest("SHA-256", enc.encode(key));
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
+// authenticateRequest imported from _shared/apiKeyAuth.ts
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {

@@ -9,6 +9,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { authenticateRequest, logApiUsage } from "../_shared/apiKeyAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,14 +46,16 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Authenticate user (JWT or API key)
-    const { userId, isServiceRole, error: authError } = await authenticateRequest(req, supabase);
-    if (authError || !userId) {
+    // Authenticate user (JWT or API key) — uses atomic rate limiting
+    const auth = await authenticateRequest(req, supabase, { endpoint: 'vehicles' });
+    if (auth.error || !auth.userId) {
       return new Response(
-        JSON.stringify({ error: authError || "Authentication required" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: auth.error || "Authentication required" }),
+        { status: auth.status || 401, headers: { ...corsHeaders, ...auth.headers, "Content-Type": "application/json" } }
       );
     }
+    const userId = auth.userId;
+    const isServiceRole = auth.isServiceRole;
 
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
@@ -450,97 +453,4 @@ serve(async (req) => {
   }
 });
 
-/**
- * Authenticate request via JWT or API key
- */
-async function authenticateRequest(req: Request, supabase: any): Promise<{ userId: string | null; isServiceRole?: boolean; error?: string }> {
-  const authHeader = req.headers.get("Authorization");
-  const apiKey = req.headers.get("X-API-Key");
-
-  // Check for service role key or user JWT
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.replace("Bearer ", "");
-
-    // Check if token is the actual service role key (used by MCP servers and internal tools)
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const altServiceRoleKey = Deno.env.get("SERVICE_ROLE_KEY");
-    if ((serviceRoleKey && token === serviceRoleKey) || (altServiceRoleKey && token === altServiceRoleKey)) {
-      return { userId: "service-role", isServiceRole: true };
-    }
-
-    // Try user JWT (verified by Supabase auth)
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (user && !error) {
-      return { userId: user.id };
-    }
-  }
-
-  // Try API key
-  if (apiKey) {
-    // Strip prefix if present
-    const rawKey = apiKey.startsWith('nk_live_') ? apiKey.slice(8) : apiKey;
-    const keyHash = await hashApiKey(rawKey);
-
-    const { data: keyData, error } = await supabase
-      .from("api_keys")
-      .select("user_id, scopes, is_active, rate_limit_remaining, expires_at")
-      .eq("key_hash", keyHash)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (keyData && !error) {
-      // Check expiry
-      if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
-        return { userId: null, error: "API key has expired" };
-      }
-
-      // Check rate limit
-      if (keyData.rate_limit_remaining !== null && keyData.rate_limit_remaining <= 0) {
-        return { userId: null, error: "Rate limit exceeded" };
-      }
-
-      // Decrement rate limit (fix: use !== null check instead of falsy check)
-      await supabase
-        .from("api_keys")
-        .update({
-          rate_limit_remaining: keyData.rate_limit_remaining !== null ? keyData.rate_limit_remaining - 1 : null,
-          last_used_at: new Date().toISOString(),
-        })
-        .eq("key_hash", keyHash);
-
-      return { userId: keyData.user_id };
-    }
-  }
-
-  return { userId: null, error: "Invalid or missing authentication" };
-}
-
-/**
- * Hash API key using SHA-256
- */
-async function hashApiKey(key: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(key);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return 'sha256_' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-/**
- * Log API usage for analytics
- */
-async function logApiUsage(supabase: any, userId: string, resource: string, action: string, resourceId?: string) {
-  try {
-    await supabase
-      .from("api_usage_logs")
-      .insert({
-        user_id: userId,
-        resource,
-        action,
-        resource_id: resourceId,
-        timestamp: new Date().toISOString(),
-      });
-  } catch (e) {
-    console.error("Failed to log API usage:", e);
-  }
-}
+// authenticateRequest, hashApiKey, logApiUsage imported from _shared/apiKeyAuth.ts
