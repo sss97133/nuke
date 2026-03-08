@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { getBodyStyleDisplay } from '../services/bodyStyleTaxonomy';
+import { NON_AUTO_MAKES } from '../lib/nonAutoExclusion';
 
 interface UseFeedFilterOptionsParams {
   selectedMakes: string[];
@@ -94,8 +95,11 @@ export function useFeedFilterOptions({ selectedMakes, runVehiclesQueryWithListin
           seenLower.add(key);
           uniqueMakes.push(cleaned);
         }
-        uniqueMakes.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-        setAvailableMakes(uniqueMakes);
+        // Remove non-auto makes from the dropdown
+        const nonAutoSet = new Set(NON_AUTO_MAKES.map(m => m.toLowerCase()));
+        const autoOnlyMakes = uniqueMakes.filter(m => !nonAutoSet.has(m.toLowerCase()));
+        autoOnlyMakes.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+        setAvailableMakes(autoOnlyMakes);
 
         // Body styles
         const canonicalBodyStyles: string[] = [];
@@ -150,13 +154,13 @@ export function useFeedFilterOptions({ selectedMakes, runVehiclesQueryWithListin
         }
         uniqueBody.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
         setAvailableBodyStyles(uniqueBody);
-      } catch {
-        // Error loading filter options - silent
+      } catch (err) {
+        console.warn('[useFeedFilterOptions] Error loading filter options:', err);
       }
     };
 
     loadFilterOptions();
-  }, []);
+  }, [runVehiclesQueryWithListingKindFallback]);
 
   // Load models when selected makes change
   useEffect(() => {
@@ -167,7 +171,7 @@ export function useFeedFilterOptions({ selectedMakes, runVehiclesQueryWithListin
       }
       try {
         const makeClauses = selectedMakes.map(m => `make.ilike.${m}`).join(',');
-        const { data: modelData } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+        const { data: modelData, error: modelError } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
           let q = supabase
             .from('vehicles')
             .select('model')
@@ -180,6 +184,11 @@ export function useFeedFilterOptions({ selectedMakes, runVehiclesQueryWithListin
           if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
           return q;
         });
+
+        if (modelError) {
+          console.warn('[useFeedFilterOptions] Model query error:', selectedMakes, modelError);
+          return;
+        }
 
         if (modelData && Array.isArray(modelData)) {
           const baseModelMap = new Map<string, { display: string; count: number; variants: Set<string> }>();
@@ -225,12 +234,12 @@ export function useFeedFilterOptions({ selectedMakes, runVehiclesQueryWithListin
             .map(([, v]) => v.display);
           setAvailableModels(sortedModels);
         }
-      } catch {
-        // Error loading models - silent
+      } catch (err) {
+        console.warn('[useFeedFilterOptions] Model load error:', err);
       }
     };
     loadModelsForMakes();
-  }, [selectedMakes]);
+  }, [selectedMakes, runVehiclesQueryWithListingKindFallback]);
 
   return { availableMakes, availableModels, availableBodyStyles };
 }

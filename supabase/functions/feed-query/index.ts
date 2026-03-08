@@ -220,10 +220,17 @@ serve(async (req) => {
       query = query.lte("year", body.year_max);
     }
 
-    // Make (case-insensitive)
+    // Make filter — MV has mixed case (PONTIAC + Pontiac), so match both variants
     if (body.makes && body.makes.length > 0 && body.makes.length <= 20) {
-      const uppercased = body.makes.map((m) => m.toUpperCase().replace(/[%_'"\\]/g, ""));
-      query = query.in("make", uppercased);
+      const toTitle = (s: string) =>
+        s.toLowerCase().replace(/(^|[\s-])\w/g, (c) => c.toUpperCase());
+      const variants = body.makes.flatMap((m) => {
+        const safe = m.replace(/[%_'"\\]/g, "");
+        const upper = safe.toUpperCase();
+        const title = toTitle(safe);
+        return upper === title ? [upper] : [upper, title];
+      });
+      query = query.in("make", [...new Set(variants)]);
     }
 
     // Model (ilike substring for flexibility)

@@ -175,7 +175,7 @@ serve(async (req) => {
     const results: SearchResult[] = [];
 
     // Shared rich vehicle SELECT — includes all fields needed for tier calculation and UI display
-    const VEHICLE_SELECT = 'id, year, make, model, vin, color, status, sale_price, current_value, asking_price, primary_image_url, seller_name, bat_seller, data_quality_score, view_count, bat_view_count, profile_origin, ownership_verified, comment_count, mileage, transmission, engine_size, canonical_vehicle_type, canonical_body_style';
+    const VEHICLE_SELECT = 'id, year, make, model, vin, color, status, sale_price, current_value, asking_price, primary_image_url, seller_name, bat_seller, data_quality_score, view_count, bat_view_count, profile_origin, ownership_verified, comment_count, mileage, transmission, engine_size, canonical_vehicle_type, canonical_body_style, image_count, observation_count';
 
     // Exclude non-automobile types from all search results
     const NON_AUTO_TYPES = new Set(['MOTORCYCLE', 'BOAT', 'TRAILER', 'ATV', 'BUS', 'RV', 'SNOWMOBILE', 'OTHER', 'EQUIPMENT']);
@@ -185,11 +185,9 @@ serve(async (req) => {
       return NON_AUTO_TYPES.has(vtype) || NON_AUTO_TYPES.has(bstyle);
     };
 
-    // Build a rich metadata object from a vehicle row
-    // _imageCounts and _observationCounts are Maps populated by enrichWithCounts()
-    let _imageCounts: Map<string, number> = new Map();
-    let _observationCounts: Map<string, number> = new Map();
-
+    // Build a rich metadata object from a vehicle row.
+    // image_count and observation_count are denormalized columns on vehicles,
+    // kept in sync by triggers on vehicle_images and vehicle_observations.
     const buildVehicleMetadata = (v: any) => ({
       year: v.year,
       make: v.make,
@@ -205,42 +203,14 @@ serve(async (req) => {
       view_count: v.view_count || v.bat_view_count || 0,
       profile_origin: v.profile_origin,
       ownership_verified: v.ownership_verified || false,
-      // Real counts from vehicle_images and vehicle_observations (enriched post-query)
-      event_count: _observationCounts.get(v.id) ?? v.comment_count ?? 0,
-      image_count: _imageCounts.get(v.id) ?? (v.primary_image_url ? 1 : 0),
-      observation_count: _observationCounts.get(v.id) ?? 0,
+      // Denormalized counts from vehicles table — no runtime enrichment needed
+      event_count: v.observation_count || v.comment_count || 0,
+      image_count: v.image_count || (v.primary_image_url ? 1 : 0),
+      observation_count: v.observation_count || 0,
       mileage: v.mileage,
       transmission: v.transmission,
       engine_size: v.engine_size,
     });
-
-    // Fetch real image and observation counts for a set of vehicle IDs.
-    // Uses parallel per-vehicle HEAD counts (fast, each uses vehicle_id index).
-    // Limited to first 15 results to cap latency. Removed is_duplicate filter
-    // since it causes the or() to use a slower scan.
-    const enrichWithCounts = async (vehicleIds: string[]) => {
-      if (!vehicleIds.length) return;
-      const subset = vehicleIds.slice(0, 15);
-      const imgPromises = subset.map(async (vid) => {
-        try {
-          const { count } = await supabase
-            .from('vehicle_images')
-            .select('id', { count: 'exact', head: true })
-            .eq('vehicle_id', vid);
-          if (count !== null) _imageCounts.set(vid, count);
-        } catch { /* ignore */ }
-      });
-      const obsPromises = subset.map(async (vid) => {
-        try {
-          const { count } = await supabase
-            .from('vehicle_observations')
-            .select('id', { count: 'exact', head: true })
-            .eq('vehicle_id', vid);
-          if (count !== null) _observationCounts.set(vid, count);
-        } catch { /* ignore */ }
-      });
-      await Promise.all([...imgPromises, ...obsPromises]);
-    };
 
     // ============================================
     // VIN SEARCH - Direct lookup (case-insensitive, exact + partial)
@@ -272,9 +242,6 @@ serve(async (req) => {
       }
 
       if (vehicles.length) {
-        // Enrich with real counts
-        await enrichWithCounts(vehicles.map((v: any) => v.id));
-
         for (const v of vehicles) {
           if (isNonAutomobile(v)) continue;
           const price = v.sale_price || v.current_value || v.asking_price;
@@ -332,9 +299,6 @@ serve(async (req) => {
         .limit(sanitizedLimit);
 
       if (vehicles?.length) {
-        // Enrich with real image/observation counts
-        await enrichWithCounts(vehicles.filter((v: any) => !isNonAutomobile(v)).map((v: any) => v.id));
-
         for (const v of vehicles) {
           if (isNonAutomobile(v)) continue;
           const price = v.sale_price || v.current_value || v.asking_price;
@@ -513,10 +477,6 @@ serve(async (req) => {
         }
 
         if (vehicles?.length) {
-          // Enrich with real image/observation counts before building metadata
-          const nonMotorcycleIds = vehicles.filter((v: any) => !isNonAutomobile(v)).map((v: any) => v.id);
-          await enrichWithCounts(nonMotorcycleIds);
-
           // Deduplicate by ID only — year+make+model dedup incorrectly collapsed distinct
           // vehicles (e.g. all 1973 Porsche 911s became one result). ID dedup at the end
           // of the function handles final deduplication.

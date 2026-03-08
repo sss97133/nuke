@@ -76,72 +76,29 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Load ALL notification sources in parallel
-      const [userNotifs, workApprovals] = await Promise.all([
-        // Standard user notifications
-        supabase
-          .from('user_notifications')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(50),
-        
-        // Work approval notifications
-        supabase.rpc('get_pending_work_approvals', { p_user_id: user.id })
-      ])
+      const { data: userNotifs } = await supabase
+        .from('user_notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50)
 
-      // Combine all notifications into unified format
-      const unifiedNotifications: Notification[] = []
+      const unifiedNotifications: Notification[] = (userNotifs || []).map(n => ({
+        id: n.id,
+        notification_type: n.notification_type || n.type || 'unknown',
+        title: n.title,
+        message: n.message,
+        vehicle_id: n.vehicle_id,
+        image_id: n.image_id,
+        organization_id: n.organization_id,
+        from_user_id: n.from_user_id,
+        action_url: n.action_url,
+        metadata: n.metadata || {},
+        is_read: n.is_read || false,
+        created_at: n.created_at
+      }))
 
-      // Add user notifications
-      if (userNotifs.data) {
-        userNotifs.data.forEach(n => {
-          unifiedNotifications.push({
-            id: n.id,
-            notification_type: n.notification_type || n.type || 'unknown',
-            title: n.title,
-            message: n.message,
-            vehicle_id: n.vehicle_id,
-            image_id: n.image_id,
-            organization_id: n.organization_id,
-            from_user_id: n.from_user_id,
-            action_url: n.action_url,
-            metadata: n.metadata || {},
-            is_read: n.is_read || false,
-            created_at: n.created_at
-          })
-        })
-      }
-
-      // Add work approvals
-      if (workApprovals.data) {
-        workApprovals.data.forEach((wa: any) => {
-          unifiedNotifications.push({
-            id: `work_${wa.id}`,
-            notification_type: 'work_approval_request',
-            title: `Work Approval: ${wa.work_type || 'Work'}`,
-            message: `${wa.work_type || 'Work'} detected on ${wa.vehicle_name}`,
-            vehicle_id: wa.vehicle_id,
-            organization_id: wa.organization_id,
-            metadata: {
-              requires_confirmation: true,
-              action: 'approve_work',
-              work_id: wa.id,
-              work_type: wa.work_type,
-              data_point: `${wa.work_type || 'Work'} on ${wa.vehicle_name} - Approve this work?`
-            },
-            is_read: false,
-            created_at: wa.created_at
-          })
-        })
-      }
-
-      // Sort by created_at descending
-      unifiedNotifications.sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )
-
-      setNotifications(unifiedNotifications.slice(0, 50))
+      setNotifications(unifiedNotifications)
       setUnreadCount(unifiedNotifications.filter(n => !n.is_read).length)
 
       // Load vehicle images
@@ -221,7 +178,6 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
-      // Handle approval/yes action
       if (notification.metadata?.action === 'approve_assignment') {
         const { error } = await supabase.rpc('approve_pending_assignment', {
           p_assignment_id: notification.metadata.assignment_id,
@@ -229,27 +185,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
           p_notes: null
         })
         if (error) throw error
-      } else if (notification.metadata?.action === 'approve_work') {
-        // Use the work approval RPC
-        const { error } = await supabase.rpc('respond_to_work_approval', {
-          p_notification_id: notification.metadata.work_id,
-          p_user_id: user.id,
-          p_response_action: 'approve',
-          p_response_notes: null
-        })
-        if (error) throw error
-      } else if (notification.id.startsWith('work_')) {
-        // Work approval from ID
-        const workId = notification.id.replace('work_', '')
-        const { error } = await supabase.rpc('respond_to_work_approval', {
-          p_notification_id: workId,
-          p_user_id: user.id,
-          p_response_action: 'approve',
-          p_response_notes: null
-        })
-        if (error) throw error
       } else if (notification.id.startsWith('assignment_')) {
-        // Assignment from ID
         const assignmentId = notification.id.replace('assignment_', '')
         const { error } = await supabase.rpc('approve_pending_assignment', {
           p_assignment_id: assignmentId,
@@ -258,7 +194,6 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
         })
         if (error) throw error
       } else {
-        // Standard user notification - just mark as read
         await handleMarkRead(notification.id)
       }
 
@@ -279,7 +214,6 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
-      // Handle rejection/no action
       if (notification.metadata?.action === 'approve_assignment' || notification.id.startsWith('assignment_')) {
         const assignmentId = notification.metadata?.assignment_id || notification.id.replace('assignment_', '')
         const { error } = await supabase.rpc('reject_pending_assignment', {
@@ -288,17 +222,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
           p_notes: notes || null
         })
         if (error) throw error
-      } else if (notification.metadata?.action === 'approve_work' || notification.id.startsWith('work_')) {
-        const workId = notification.metadata?.work_id || notification.id.replace('work_', '')
-        const { error } = await supabase.rpc('respond_to_work_approval', {
-          p_notification_id: workId,
-          p_user_id: user.id,
-          p_response_action: 'reject',
-          p_response_notes: notes || null
-        })
-        if (error) throw error
       } else {
-        // Standard notification - just mark as read
         await handleMarkRead(notification.id)
       }
 

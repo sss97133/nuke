@@ -62,6 +62,7 @@ interface VehicleCardDenseProps {
     uploader_name?: string;
     event_count?: number;
     image_count?: number;
+    observation_count?: number;
     view_count?: number;
     active_viewers?: number;
     is_streaming?: boolean;
@@ -165,13 +166,13 @@ const getTierNextSteps = (tier: string, vehicle: VehicleCardDenseProps['vehicle'
   const hasVIN = raw.length >= 4 && !raw.startsWith('VIVA') && !raw.startsWith('TEST') && /^[A-HJ-NPR-Z0-9]{4,17}$/.test(raw);
   const hasPrice = !!(vehicle.asking_price || vehicle.current_value || vehicle.sale_price);
   const imgCount = vehicle.all_images?.length || vehicle.image_count || 0;
-  const eventCount = vehicle.event_count || 0;
+  const obsCount = vehicle.observation_count || vehicle.event_count || 0;
 
   if (!hasVIN) steps.push('Add VIN');
   if (!hasPrice) steps.push('Add price / estimate');
   if (imgCount < 5) steps.push(`Add more photos (${imgCount} now, need 5+)`);
-  else if (imgCount < 10) steps.push(`Add more photos (${imgCount} now, 10+ for next tier)`);
-  if (eventCount < 1) steps.push('Log timeline events');
+  else if (imgCount < 15) steps.push(`Add more photos (${imgCount} now, 15+ for next tier)`);
+  if (obsCount < 1) steps.push('Add data observations');
   if (!vehicle.receipt_count) steps.push('Upload receipts / documentation');
   if (!vehicle.ownership_verified) steps.push('Verify ownership');
 
@@ -618,89 +619,82 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       })(),
       hasPrice: !!(vehicle.asking_price || vehicle.current_value || vehicle.sale_price),
       hasYearMakeModel: !!(vehicle.year && vehicle.make && vehicle.model),
-      
+
       // Visual documentation
       imageCount: vehicle.all_images?.length || vehicle.image_count || 0,
-      
-      // Engagement & activity (shows user investment)
-      eventCount: vehicle.event_count || 0,
+
+      // Engagement & activity — use observation_count (real data from vehicle_observations)
+      // and fall back to event_count (which may be comment_count from backend)
+      observationCount: vehicle.observation_count || vehicle.event_count || 0,
       recentActivity: vehicle.activity_7d || 0,
       viewCount: vehicle.view_count || 0,
-      
+
       // Documentation quality
       receiptCount: vehicle.receipt_count || 0,
       ownershipVerified: vehicle.ownership_verified || false,
-      
+
       // Source quality
       isBATImport: vehicle.profile_origin === 'bat_import',
-      isScraped: vehicle.profile_origin === 'url_scraper' || 
-                 vehicle.profile_origin === 'craigslist_scrape' || 
+      isScraped: vehicle.profile_origin === 'url_scraper' ||
+                 vehicle.profile_origin === 'craigslist_scrape' ||
                  vehicle.profile_origin === 'ksl_import',
       isDealer: vehicle.profile_origin === 'url_scraper' || vehicle.profile_origin === 'craigslist_scrape',
       isFlipper: (vehicle.profile_origin === 'url_scraper' || vehicle.profile_origin === 'craigslist_scrape') && vehicle.is_for_sale,
+      // Nuke estimate
+      hasNukeEstimate: !!(vehicle.nuke_estimate),
     };
-    
-    const { hasVIN, hasPrice, hasYearMakeModel, imageCount, eventCount, recentActivity, viewCount, 
-            receiptCount, ownershipVerified, isBATImport, isScraped, isDealer, isFlipper } = completenessFactors;
-    
+
+    const { hasVIN, hasPrice, hasYearMakeModel, imageCount, observationCount, recentActivity, viewCount,
+            receiptCount, ownershipVerified, isBATImport, isScraped, isDealer, isFlipper, hasNukeEstimate } = completenessFactors;
+
     // Calculate completeness score (0-100)
-    // This scoring system can be adjusted as requirements evolve
+    // Revised: properly weights images and observations which are the richest data signals
     let completenessScore = 0;
-    
+
     // Basic identification (20 points)
     if (hasYearMakeModel) completenessScore += 5;
     if (hasVIN) completenessScore += 10;
     if (hasPrice) completenessScore += 5;
-    
-    // Visual documentation (30 points)
+
+    // Visual documentation (25 points) — images are the #1 data signal
     if (imageCount >= 1) completenessScore += 5;
-    if (imageCount >= 5) completenessScore += 10;
-    if (imageCount >= 10) completenessScore += 10;
-    if (imageCount >= 20) completenessScore += 5;
-    
-    // Engagement & activity (25 points)
-    if (eventCount >= 1) completenessScore += 5;
-    if (eventCount >= 5) completenessScore += 10;
-    if (eventCount >= 10) completenessScore += 10;
-    if (recentActivity >= 3) completenessScore += 5;
+    if (imageCount >= 5) completenessScore += 5;
+    if (imageCount >= 15) completenessScore += 5;
+    if (imageCount >= 30) completenessScore += 5;
+    if (imageCount >= 50) completenessScore += 5;
+
+    // Observations & engagement (25 points) — real data from vehicle_observations
+    if (observationCount >= 1) completenessScore += 5;
+    if (observationCount >= 5) completenessScore += 5;
+    if (observationCount >= 10) completenessScore += 5;
+    if (observationCount >= 25) completenessScore += 5;
     if (viewCount >= 50) completenessScore += 5;
-    
+
     // Documentation quality (15 points)
     if (receiptCount >= 1) completenessScore += 5;
     if (receiptCount >= 5) completenessScore += 5;
-    if (receiptCount >= 10) completenessScore += 5;
     if (ownershipVerified) completenessScore += 5;
-    
+
+    // Intelligence layer (15 points) — nuke estimate, recent activity
+    if (hasNukeEstimate) completenessScore += 5;
+    if (recentActivity >= 1) completenessScore += 5;
+    if (recentActivity >= 5) completenessScore += 5;
+
     // Source quality adjustments (penalties for dealers/flippers)
     if (isDealer || isFlipper) {
-      // Dealers/flippers need to prove quality through engagement
       if (!hasVIN || !hasPrice) completenessScore -= 10;
-      if (eventCount < 2 && viewCount < 50) completenessScore -= 5;
+      if (observationCount < 2 && viewCount < 50) completenessScore -= 5;
     }
-    
+
     // Map completeness score to tier
-    // These thresholds can be adjusted as the system evolves
-    // Made stricter: C tier requires substantial data (not just basic info)
     if (completenessScore < 10) return 'F'; // No/minimal data
-    if (completenessScore < 20) return 'E'; // Very basic (1 image, no VIN/price)
-    if (completenessScore < 40) return 'D'; // Has potential, good bones (VIN OR price + some images)
-    if (completenessScore < 60) return 'C'; // Vast majority - baseline (VIN + price + 10+ images OR engagement)
-    if (completenessScore < 75) return 'B'; // Making an effort / cool BAT cars (engagement + documentation)
-    if (completenessScore < 90) return 'A'; // Strong engagement and documentation (comprehensive)
-    // 90+ would be S tier, but that's manually assigned only
-    
-    // Stricter fallback: Don't default to C for basic data
-    // Nearly empty profiles should be F/E/D, not C
-    if (imageCount === 0) return 'F';
-    if (imageCount === 1) return 'E';
-    if (imageCount < 5 && !hasVIN && !hasPrice) return 'E';
-    if (imageCount < 10 && !hasVIN && !hasPrice && eventCount === 0) return 'D';
-    // Only C if has substantial data
-    if (hasVIN && hasPrice && imageCount >= 10) return 'C';
-    if (hasVIN && hasPrice && imageCount >= 5 && eventCount >= 1) return 'C';
-    // Otherwise D or lower
-    if (hasVIN || hasPrice) return 'D';
-    return 'E';
+    if (completenessScore < 20) return 'E'; // Very basic
+    if (completenessScore < 35) return 'D'; // Has potential (VIN OR price + some images)
+    if (completenessScore < 50) return 'C'; // Solid baseline (VIN + price + images)
+    if (completenessScore < 65) return 'B'; // Good data (images + observations + price)
+    if (completenessScore < 80) return 'A'; // Strong (comprehensive documentation)
+    // 80+ = A (S/SSS are manually assigned only)
+    return 'A';
   };
 
   const normalizeTierLabel = (raw: any): string | null => {
@@ -1522,9 +1516,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           {vehicle.condition_rating && ` • C:${vehicle.condition_rating}`}
         </div>
         
-        {/* Counts */}
+        {/* Counts — real data from vehicle_images and vehicle_observations */}
         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          {vehicle.image_count || 0} img • {vehicle.event_count || 0} evt
+          {(vehicle.image_count || 0) > 0 ? `${vehicle.image_count} img` : '0 img'}
+          {(vehicle.observation_count || vehicle.event_count || 0) > 0 && ` • ${vehicle.observation_count || vehicle.event_count} obs`}
         </div>
         
         {/* Value - Show LotBadge for Mecum, otherwise show price */}
@@ -1857,10 +1852,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
                   if (!tierLabel) return null;
                   const imgCount = vehicle.all_images?.length || vehicle.image_count || 0;
-                  const evtCount = vehicle.event_count || 0;
+                  const obsCount = vehicle.observation_count || vehicle.event_count || 0;
                   const parts: string[] = [];
                   if (imgCount > 0) parts.push(`${imgCount} img`);
-                  if (evtCount > 0) parts.push(`${evtCount} evt`);
+                  if (obsCount > 0) parts.push(`${obsCount} obs`);
                   return (
                     <span
                       style={{ fontWeight: 700, cursor: 'pointer', position: 'relative' }}
@@ -1955,7 +1950,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         <div>{hasVIN ? '\u2705' : '\u274C'} VIN</div>
                         <div>{hasPrice ? '\u2705' : '\u274C'} Price / Estimate</div>
                         <div>{imgCount >= 5 ? '\u2705' : imgCount >= 1 ? '\u26A0\uFE0F' : '\u274C'} Photos ({imgCount})</div>
-                        <div>{(vehicle.event_count || 0) >= 1 ? '\u2705' : '\u274C'} Timeline events ({vehicle.event_count || 0})</div>
+                        <div>{(vehicle.observation_count || vehicle.event_count || 0) >= 1 ? '\u2705' : '\u274C'} Observations ({vehicle.observation_count || vehicle.event_count || 0})</div>
                         <div>{(vehicle.receipt_count || 0) >= 1 ? '\u2705' : '\u274C'} Receipts ({vehicle.receipt_count || 0})</div>
                       </div>
                       {nextSteps.length > 0 && (
@@ -2623,7 +2618,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         <div>{hasVIN ? '\u2705' : '\u274C'} VIN</div>
                         <div>{hasPrice ? '\u2705' : '\u274C'} Price / Estimate</div>
                         <div>{imgCount >= 5 ? '\u2705' : imgCount >= 1 ? '\u26A0\uFE0F' : '\u274C'} Photos ({imgCount})</div>
-                        <div>{(vehicle.event_count || 0) >= 1 ? '\u2705' : '\u274C'} Timeline events ({vehicle.event_count || 0})</div>
+                        <div>{(vehicle.observation_count || vehicle.event_count || 0) >= 1 ? '\u2705' : '\u274C'} Observations ({vehicle.observation_count || vehicle.event_count || 0})</div>
                         <div>{(vehicle.receipt_count || 0) >= 1 ? '\u2705' : '\u274C'} Receipts ({vehicle.receipt_count || 0})</div>
                       </div>
                       {nextSteps.length > 0 && (
@@ -2784,7 +2779,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             {(() => {
               const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
               if (!tierLabel) return null;
-              const totalObservations = (vehicle.image_count || 0) + (vehicle.event_count || 0);
+              const totalObservations = (vehicle.image_count || 0) + (vehicle.observation_count || vehicle.event_count || 0);
               return (
                 <span
                   style={{ fontWeight: 700, cursor: 'pointer' }}

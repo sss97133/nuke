@@ -380,7 +380,23 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
               >
                 {filters.makes.length > 0 ? `make: ${filters.makes.join(', ')}` : 'make'}
               </button>
-              
+
+              {/* Model filter button */}
+              <button
+                onClick={() => toggleCollapsedSection('modelFilters')}
+                className="button-win95"
+                style={{
+                  padding: '3px 7px',
+                  fontSize: '9px',
+                  background: !collapsedSections.modelFilters ? 'var(--grey-600)' : (filters.models?.length > 0) ? 'var(--grey-300)' : 'var(--white)',
+                  color: !collapsedSections.modelFilters ? 'var(--white)' : 'var(--text)',
+                  fontWeight: (!collapsedSections.modelFilters || filters.models?.length > 0) ? 700 : 400,
+                  border: !collapsedSections.modelFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
+                }}
+              >
+                {filters.models?.length > 0 ? `model: ${filters.models.join(', ')}` : 'model'}
+              </button>
+
               {/* Price button - combines sort and filter */}
               <button
                 onClick={() => toggleCollapsedSection('priceFilters')}
@@ -474,35 +490,6 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                 status
               </button>
               
-              {/* Remember filters: when off (default), filters reset every time you visit */}
-              <label
-                title="When on, your filters and sort are restored when you come back. When off, every visit starts with no filters."
-                style={{
-                  marginLeft: 'auto',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '9px',
-                  cursor: 'pointer',
-                  fontFamily: '"MS Sans Serif", sans-serif',
-                  color: 'var(--text-muted)'
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={rememberFilters}
-                  onChange={(e) => {
-                    const v = e.target.checked;
-                    setRememberFilters(v);
-                    try {
-                      localStorage.setItem(REMEMBER_FILTERS_KEY, v ? 'true' : 'false');
-                    } catch { /* ignore */ }
-                    if (!v) clearPersistedFiltersAndSort();
-                  }}
-                  style={{ width: '12px', height: '12px', cursor: 'pointer' }}
-                />
-                Keep filters when I leave
-              </label>
               {/* Reset button */}
               {activeFilterCount > 0 && (
                 <button
@@ -525,8 +512,28 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
               )}
             </div>
             
+            {/* Feed search CLI — type "1980 ford pickup" to auto-fill filters */}
+            <div style={{ padding: '4px 6px', borderBottom: '1px solid var(--border)' }}>
+              <input
+                type="text"
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder='TRY "1980 CHEVY TRUCK" OR "PORSCHE 911 UNDER $100K"'
+                style={{
+                  width: '100%',
+                  border: '1px solid var(--border)',
+                  borderRadius: 0,
+                  background: 'var(--white)',
+                  padding: '4px 8px',
+                  fontSize: '10px',
+                  fontFamily: "'Courier New', monospace",
+                  outline: 'none',
+                }}
+              />
+            </div>
+
             {/* Expanded filter controls - shown when sections are open */}
-            <div style={{ padding: '6px' }}>
+            <div style={{ padding: '6px', position: 'sticky', top: 'var(--header-height, 40px)', zIndex: 50, background: 'var(--white)', maxHeight: 'calc(100vh - var(--header-height, 40px) - 60px)', overflowY: 'auto' }}>
               {/* Year filters - expanded */}
               {!collapsedSections.yearFilters && (
                 <div 
@@ -1075,8 +1082,22 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                 );
               })()}
 
-              {/* Model filter - inline badge input (shows when makes are selected) */}
-              {filters.makes.length > 0 && availableModels.length > 0 && (() => {
+              {/* Model filter - inline badge input (shows when model button is open or models are selected) */}
+              {(!collapsedSections.modelFilters || (filters.models?.length ?? 0) > 0) && filters.makes.length === 0 && (
+                <div style={{
+                  marginBottom: '8px',
+                  padding: '6px 8px',
+                  background: 'var(--grey-50)',
+                  border: '1px solid var(--border)',
+                  fontSize: '9px',
+                  color: 'var(--text-muted)',
+                  fontFamily: 'Arial, sans-serif',
+                  letterSpacing: '0.5px',
+                }}>
+                  SELECT A MAKE FIRST
+                </div>
+              )}
+              {(!collapsedSections.modelFilters || (filters.models?.length ?? 0) > 0) && filters.makes.length > 0 && (() => {
                 // Fuzzy matching helper
                 const normalize = (s: string) => s.toLowerCase().replace(/[-\/\s]/g, '');
                 const searchLower = modelSearchText.toLowerCase().trim();

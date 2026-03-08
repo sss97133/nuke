@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import type { FeedItem } from '../feed/types';
 import ContentCard from '../feed/ContentCard';
 import VehicleCardDense from '../vehicles/VehicleCardDense';
@@ -31,6 +31,7 @@ interface SearchResultsProps {
 
 const SearchResults = ({ results, searchSummary, loading = false, activeFilter, onFilterChange }: SearchResultsProps) => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const searchQuery = searchParams.get('q') || '';
   const [viewMode, setViewMode] = useState<'cards' | 'list' | 'map'>('cards');
   const [sortBy, setSortBy] = useState<'relevance' | 'date' | 'location' | 'price_asc' | 'price_desc' | 'year_desc' | 'year_asc'>('relevance');
@@ -209,16 +210,16 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
     return (
       <div style={{ padding: '0' }}>
         <style>{`
+          .sk { background: var(--border); animation: skeleton-shimmer 1.5s infinite; }
           @keyframes skeleton-shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.8; }
           }
-          .sk { background: linear-gradient(90deg, var(--bg) 25%, var(--border) 50%, var(--bg) 75%); background-size: 200% 100%; animation: skeleton-shimmer 1.5s infinite; }
         `}</style>
         {/* Fake summary bar */}
         <div style={{ background: 'var(--bg)', border: '2px solid var(--border)', padding: '10px 14px', marginBottom: '12px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div className="sk" style={{ height: '14px', width: '80px', borderRadius: '3px' }} />
-          <div className="sk" style={{ height: '12px', width: '160px', borderRadius: '3px' }} />
+          <div className="sk" style={{ height: '14px', width: '80px' }} />
+          <div className="sk" style={{ height: '12px', width: '160px' }} />
         </div>
         {/* Skeleton vehicle cards grid */}
         <div style={{
@@ -227,12 +228,12 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           gap: '12px',
         }}>
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} style={{ border: '1px solid var(--border)', borderRadius: '4px', overflow: 'hidden', background: 'var(--surface)' }}>
+            <div key={i} style={{ border: '1px solid var(--border)', overflow: 'hidden', background: 'var(--surface)' }}>
               <div className="sk" style={{ height: '160px', width: '100%' }} />
               <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div className="sk" style={{ height: '13px', width: '70%', borderRadius: '2px' }} />
-                <div className="sk" style={{ height: '11px', width: '45%', borderRadius: '2px' }} />
-                <div className="sk" style={{ height: '11px', width: '55%', borderRadius: '2px' }} />
+                <div className="sk" style={{ height: '13px', width: '70%' }} />
+                <div className="sk" style={{ height: '11px', width: '45%' }} />
+                <div className="sk" style={{ height: '11px', width: '55%' }} />
               </div>
             </div>
           ))}
@@ -312,7 +313,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                         fontWeight: 700,
                         color: isActive ? 'var(--bg)' : 'var(--text)',
                         cursor: 'pointer',
-                        transition: 'all 0.1s ease',
+                        transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                       }}
                       onClick={() => { setFilterBy(type); setViewMode('cards'); }}
                       onMouseEnter={(e) => {
@@ -558,7 +559,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                   color: 'var(--text-secondary)',
                   textDecoration: 'none',
                   cursor: 'pointer',
-                  transition: 'all 0.1s ease',
+                  transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; e.currentTarget.style.color = 'var(--text)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
@@ -597,6 +598,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                         view_count: result.metadata?.view_count,
                         image_count: result.metadata?.image_count,
                         event_count: result.metadata?.event_count,
+                        observation_count: result.metadata?.observation_count,
                         location:
                           (result.metadata?.city || result.metadata?.state)
                             ? `${result.metadata?.city || ''}${result.metadata?.city && result.metadata?.state ? ', ' : ''}${result.metadata?.state || ''}`.trim()
@@ -615,33 +617,30 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     />
                   </div>
                 ) : (
-                  <div 
-                    key={result.id} 
-                    style={{ 
+                  <div
+                    key={result.id}
+                    style={{
                       position: 'relative',
-                      transition: 'transform 0.12s ease, box-shadow 0.12s ease'
+                      transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+                      border: '2px solid transparent'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                      e.currentTarget.style.borderColor = 'var(--text)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.borderColor = 'transparent';
                     }}
                   >
                     <div style={{
                       position: 'absolute',
                       top: '12px',
                       right: '12px',
-                      background: 'rgba(59, 130, 246, 0.95)',
+                      background: 'var(--text)',
                       color: 'var(--bg)',
                       padding: '4px 10px',
-                      borderRadius: '12px',
                       fontSize: '9px',
                       fontWeight: 700,
                       zIndex: 10,
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                     }}>
                       {Math.round(result.relevance_score * 100)}% match
                     </div>
@@ -669,7 +668,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     if (href.startsWith('http://') || href.startsWith('https://')) {
                       window.open(href, '_blank', 'noopener,noreferrer');
                     } else {
-                      window.location.href = href;
+                      navigate(href);
                     }
                   }}
                   style={{
@@ -678,7 +677,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     padding: '12px',
                     borderBottom: index < filteredAndSortedResults.length - 1 ? '1px solid var(--text)' : 'none',
                     cursor: 'pointer',
-                    transition: 'background 0.12s ease',
+                    transition: 'background 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                     background: 'var(--surface)'
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg)'}
@@ -747,11 +746,11 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                         {result.metadata?.transmission && (
                           <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>{result.metadata.transmission}</span>
                         )}
-                        {(result.metadata?.image_count > 0 || result.metadata?.event_count > 0) && (
+                        {(result.metadata?.image_count > 0 || result.metadata?.event_count > 0 || result.metadata?.observation_count > 0) && (
                           <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                             {result.metadata.image_count > 0 ? `${result.metadata.image_count} img` : ''}
-                            {result.metadata.image_count > 0 && result.metadata.event_count > 0 ? ' · ' : ''}
-                            {result.metadata.event_count > 0 ? `${result.metadata.event_count} evt` : ''}
+                            {result.metadata.image_count > 0 && (result.metadata.event_count > 0 || result.metadata.observation_count > 0) ? ' · ' : ''}
+                            {result.metadata.observation_count > 0 ? `${result.metadata.observation_count} obs` : (result.metadata.event_count > 0 ? `${result.metadata.event_count} evt` : '')}
                           </span>
 
                         )}
