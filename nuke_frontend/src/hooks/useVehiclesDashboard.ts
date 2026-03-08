@@ -90,6 +90,8 @@ function permissionRoleToRelationship(role: string): RelationshipType {
   const r = role.toLowerCase();
   if (r === 'owner') return 'OWNER';
   if (r === 'co_owner' || r === 'co-owner') return 'CO-OWNER';
+  if (r === 'consigned') return 'CONSIGNED';
+  if (r === 'previously_owned' || r === 'prev_owner') return 'PREVIOUSLY OWNED';
   if (r === 'contributor') return 'CONTRIBUTOR';
   return 'CONTRIBUTOR';
 }
