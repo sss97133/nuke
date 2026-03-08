@@ -186,7 +186,16 @@ Deno.serve(async (req: Request) => {
     for (const img of images) {
       const vehicle = vehicleMap.get(img.vehicle_id);
       if (!vehicle) {
-        errors.push({ image_id: img.id, error: "Parent vehicle not found" });
+        // Orphaned image — parent vehicle deleted/merged. Mark so we skip next time.
+        if (!dryRun) {
+          await supabase.from("vehicle_images")
+            .update({ image_vehicle_match_status: "unrelated" })
+            .eq("id", img.id);
+        }
+        results.push({
+          image_id: img.id, image_url: img.image_url, status: "unrelated",
+          ai_detected_vehicle: null, confidence: 1.0, reason: "Orphaned image — parent vehicle not found",
+        });
         continue;
       }
 
