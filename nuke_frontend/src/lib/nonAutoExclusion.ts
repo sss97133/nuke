@@ -51,7 +51,7 @@ export const NON_AUTO_MAKES = [
   // NOTE: Dual-use makes (Yamaha, Kawasaki, Suzuki, Triumph, Indian) are NOT blocked
   // because they also make cars. The DB is_auto_vehicle() function + canonical_vehicle_type
   // handles them correctly.
-  'Harley-Davidson','Harley','Ducati','KTM',
+  'Harley-Davidson','Harley','Ducati',
   'Husqvarna','Aprilia','Norton','Buell','Royal Enfield',
   'Vincent','Velocette','Vespa','Piaggio',
   'Polaris','Arctic Cat','Can-Am',
@@ -104,12 +104,17 @@ export function isAutoVehicle(vehicle: {
 }): boolean {
   const vType = (vehicle.canonical_vehicle_type || '').toUpperCase();
 
+  // If classified as an auto type, trust the classification
+  if (vType && AUTO_VEHICLE_TYPES.includes(vType as any)) {
+    return true;
+  }
+
   // If classified as a non-auto type, reject
-  if (vType && !AUTO_VEHICLE_TYPES.includes(vType as any)) {
+  if (vType) {
     return false;
   }
 
-  // Check make against blocklist (case-insensitive)
+  // Unclassified: check make against blocklist (case-insensitive)
   const make = (vehicle.make || '').toUpperCase();
   if (make && NON_AUTO_MAKES.some(m => m.toUpperCase() === make)) {
     return false;
