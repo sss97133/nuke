@@ -588,7 +588,8 @@ const VehicleProfile: React.FC = () => {
         .select('image_url, is_primary')
         .eq('vehicle_id', vehicle.id)
         // Quarantine/duplicate rows should never appear in standard galleries
-        .or('is_duplicate.is.null,is_duplicate.eq.false');
+        .or('is_duplicate.is.null,is_duplicate.eq.false')
+        .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")');
         // NO LIMIT - show ALL images from all sources
       const images = (imgs || []) as any[];
       // Services removed during cleanup - simplified composition
@@ -1516,7 +1517,8 @@ const VehicleProfile: React.FC = () => {
         .select('area, labels, sensitive_type')
         .eq('vehicle_id', vehicle.id)
         // Quarantine/duplicate rows should never appear in standard galleries
-        .or('is_duplicate.is.null,is_duplicate.eq.false');
+        .or('is_duplicate.is.null,is_duplicate.eq.false')
+        .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")');
 
       const sources: FieldSource[] = (data || []).map((e: any) => ({
         field_name: fieldName,

@@ -47,6 +47,7 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
           .from('vehicle_images')
           .select('image_url, is_primary')
           .eq('vehicle_id', vehicleId)
+          .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")')
           .order('is_primary', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(10);
