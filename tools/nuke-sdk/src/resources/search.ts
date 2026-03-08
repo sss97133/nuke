@@ -18,9 +18,9 @@ export class Search {
    * @example
    * ```typescript
    * const results = await nuke.search.query({ q: 'porsche 911 turbo', limit: 10 });
-   * console.log(results.total_count, results.query_type);
+   * console.log(results.pagination.total_count, results.search_time_ms);
    * for (const r of results.data) {
-   *   console.log(r.type, r.title, r.relevance_score);
+   *   console.log(r.year, r.make, r.model, r.sale_price);
    * }
    * ```
    */

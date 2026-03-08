@@ -21,9 +21,9 @@
  * // Add an observation
  * await nuke.observations.create({
  *   vehicle_id: vehicle.id,
- *   source_type: 'manual',
- *   observation_kind: 'mileage_reading',
- *   data: { mileage: 45000 },
+ *   source_id: 'manual-source-uuid',
+ *   kind: 'mileage_reading',
+ *   structured_data: { mileage: 45000 },
  * });
  * ```
  */
@@ -71,7 +71,7 @@ import { NukeError, NukeAPIError, NukeAuthenticationError, NukeRateLimitError } 
 
 const DEFAULT_BASE_URL = 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1';
 const DEFAULT_TIMEOUT = 30000;
-const SDK_VERSION = '1.6.0';
+const SDK_VERSION = '2.0.0';
 
 export default class Nuke {
   private apiKey: string;

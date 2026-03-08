@@ -29,7 +29,7 @@ export class Listings {
    * const { data } = await nuke.listings.list({ platform: 'bat', status: 'sold' });
    *
    * for (const listing of data) {
-   *   console.log(listing.platform, listing.final_price, listing.listing_url);
+   *   console.log(listing.source_platform, listing.final_price, listing.source_url);
    * }
    * ```
    */
@@ -63,7 +63,7 @@ export class Listings {
    * @example
    * ```typescript
    * for await (const listing of nuke.listings.listAll({ platform: 'bat' })) {
-   *   console.log(listing.listing_url);
+   *   console.log(listing.source_url);
    * }
    * ```
    */

@@ -18,7 +18,7 @@ export class Comps {
    * @example
    * ```typescript
    * // By make/model/year
-   * const result = await nuke.agps.get({
+   * const result = await nuke.comps.get({
    *   make: 'Porsche',
    *   model: '911',
    *   year: 1973,
@@ -30,7 +30,7 @@ export class Comps {
    * console.log(result.data);    // comparable sold vehicles
    *
    * // By VIN (resolves make/model/year automatically)
-   * const result = await nuke.agps.get({ vin: 'WP0AB0916KS121279' });
+   * const result = await nuke.comps.get({ vin: 'WP0AB0916KS121279' });
    * ```
    */
   async get(
