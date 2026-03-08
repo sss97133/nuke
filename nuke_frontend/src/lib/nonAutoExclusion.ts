@@ -15,15 +15,16 @@ export const AUTO_VEHICLE_TYPES = ['CAR', 'TRUCK', 'SUV', 'VAN', 'MINIVAN'] as c
  * the DB has inconsistent casing and PostgREST `.not('make','in',...)` is case-sensitive.
  */
 export const NON_AUTO_MAKES = [
-  // Motorcycles
-  'YAMAHA','HARLEY-DAVIDSON','KAWASAKI','SUZUKI','DUCATI','KTM','TRIUMPH','INDIAN',
+  // Motorcycles (unambiguous — never made cars)
+  'HARLEY-DAVIDSON','HARLEY','HARLEYDAVIDSON','DUCATI','KTM',
   'HUSQVARNA','APRILIA','MOTO GUZZI','NORTON','BSA','BUELL','ROYAL ENFIELD',
   'VINCENT','VELOCETTE','AJS','MATCHLESS','EXCELSIOR','HENDERSON','BIMOTA',
   'BENELLI','CROCKER','LAVERDA','MV AGUSTA','VESPA','PIAGGIO',
   // Powersports / UTV / ATV
   'POLARIS','ARCTIC CAT','CAN-AM','SKI-DOO','SKIDOO',
   // Marine
-  'SEA-DOO','SEA RAY','BAYLINER','BOSTON WHALER','GRUMMAN','GLASTRON','SKEETER','TRACKER',
+  'SEA-DOO','SEADOO','SEA DOO','SEA RAY','SEARAY','SEA',
+  'BAYLINER','BOSTON WHALER','GRUMMAN','GLASTRON','SKEETER','TRACKER',
   'MASTERCRAFT','MALIBU BOATS','CORRECT CRAFT','RIVA','CHRIS-CRAFT','WELLCRAFT','RINKER',
   'CHAPARRAL','COBALT','LUND','CRESTLINER','BENNINGTON',
   // RV / Camper
@@ -47,7 +48,10 @@ export const NON_AUTO_MAKES = [
   'PROMO','COLLECTION','AEROVAULT','DISPLAY','VINTAGE SIGN',
 
   // === Mixed-case variants ===
-  'Yamaha','Harley-Davidson','Kawasaki','Suzuki','Ducati','KTM','Triumph','Indian',
+  // NOTE: Dual-use makes (Yamaha, Kawasaki, Suzuki, Triumph, Indian) are NOT blocked
+  // because they also make cars. The DB is_auto_vehicle() function + canonical_vehicle_type
+  // handles them correctly.
+  'Harley-Davidson','Harley','Ducati','KTM',
   'Husqvarna','Aprilia','Norton','Buell','Royal Enfield',
   'Vincent','Velocette','Vespa','Piaggio',
   'Polaris','Arctic Cat','Can-Am',
