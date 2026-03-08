@@ -251,6 +251,24 @@ priv/
 ops/
 audit/
 
+# Agent working files (ralph is retired)
+.ralph/
+agents/*/digests/
+
+# Internal docs (keep locally, don't track)
+PITCH.md
+VISION.md
+NUKE_COMPANY_BRIEF.md
+YC_*.md
+
+# Script session artifacts (agent notes, not source code)
+scripts/*.md
+!scripts/README.md
+scripts/rlm/*.md
+scripts/prompts/*.md
+scripts/data/*.md
+scripts/tools/*.md
+
 # Misc generated
 overnight-batch.log
 osxphotos_crash.log
