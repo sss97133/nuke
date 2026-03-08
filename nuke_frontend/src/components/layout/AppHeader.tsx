@@ -123,6 +123,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         onClose={() => search.setIsOpen(false)}
         autocompleteResults={search.autocompleteResults}
         autocompleteLoading={search.autocompleteLoading}
+        compsData={search.compsData}
         recentItems={recentItems.items}
         onSelect={(cat, val, label) => {
           recentItems.addItem(label, cat);
