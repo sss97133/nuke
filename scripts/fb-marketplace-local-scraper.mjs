@@ -302,11 +302,23 @@ const MAKES = [
   "DeLorean", "Isuzu", "Mitsubishi", "Suzuki", "Eagle",
 ];
 
-function parseTitle(title) {
+function parseTitle(title, city, state) {
   if (!title) return { year: null, make: null, model: null };
-  const year = parseYear(title);
+
+  // Strip city/state that Facebook appends to listing titles
+  let cleaned = title;
+  if (city || state) {
+    const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (city && state) {
+      cleaned = cleaned.replace(new RegExp(`\\s+${esc(city)}\\s*,?\\s*${esc(state)}\\s*$`, "i"), "");
+    }
+    if (city) cleaned = cleaned.replace(new RegExp(`\\s+${esc(city)}\\s*$`, "i"), "");
+    if (state) cleaned = cleaned.replace(new RegExp(`\\s+${esc(state)}\\s*$`, "i"), "");
+  }
+
+  const year = parseYear(cleaned);
   if (!year) return { year: null, make: null, model: null };
-  const rest = title.replace(/^\d{4}\s+/, "").trim();
+  const rest = cleaned.replace(/^\d{4}\s+/, "").trim();
   const lower = rest.toLowerCase();
   for (const make of MAKES) {
     if (lower.startsWith(make.toLowerCase())) {
@@ -314,7 +326,7 @@ function parseTitle(title) {
       const model =
         afterMake
           .split(/[\s·•|—]+/)
-          .slice(0, 3)
+          .slice(0, 2)
           .join(" ")
           .trim() || null;
       return { year, make: make === "Chevy" ? "Chevrolet" : make, model };
@@ -324,7 +336,7 @@ function parseTitle(title) {
   return {
     year,
     make: words[0] || null,
-    model: words.slice(1, 3).join(" ") || null,
+    model: words.slice(1, 2).join(" ") || null,
   };
 }
 
@@ -773,15 +785,15 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
       const listing = edge.node?.listing;
       if (!listing) continue;
 
-      const { year, make, model } = parseTitle(listing.marketplace_listing_title);
+      const city = listing.location?.reverse_geocode?.city || null;
+      const state = listing.location?.reverse_geocode?.state || null;
+      const { year, make, model } = parseTitle(listing.marketplace_listing_title, city, state);
       const price = listing.listing_price?.amount
         ? parseFloat(listing.listing_price.amount)
         : null;
       const allImages = extractAllImages(edge);
       const imageUrl = allImages[0] || null;
       const { lat: listingLat, lng: listingLng } = extractCoords(edge);
-      const city = listing.location?.reverse_geocode?.city || null;
-      const state = listing.location?.reverse_geocode?.state || null;
       const isSold = listing.is_sold || false;
       const isPending = listing.is_pending || false;
       const description = listing.redacted_description?.text || null;
