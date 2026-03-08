@@ -76,7 +76,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
       case 'active': return 'var(--success)';
       case 'stagnant': return 'var(--error)';
       case 'moderate': return 'var(--warning)';
-      case 'for_sale': return '#8b5cf6';
+      case 'for_sale': return 'var(--accent)';
       default: return 'var(--text-secondary)';
     }
   };
