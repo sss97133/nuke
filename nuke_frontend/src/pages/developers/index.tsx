@@ -270,6 +270,61 @@ function ParamTable({ params }: { params: { name: string; type: string; required
   );
 }
 
+function TransformCard({ label, inputLabel, inputContent, outputLines }: {
+  label: string;
+  inputLabel: string;
+  inputContent: React.ReactNode;
+  outputLines: { key: string; value: string }[];
+}) {
+  return (
+    <div style={{ border: '2px solid var(--border-medium)', background: 'var(--white)', marginBottom: 'var(--space-3)' }}>
+      <div style={{
+        padding: 'var(--space-2) var(--space-3)',
+        borderBottom: '1px solid var(--border-light)',
+        fontSize: '8px',
+        fontWeight: 'bold' as const,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase' as const,
+        color: 'var(--text-muted)',
+      }}>
+        {label}
+      </div>
+      <div style={{ display: 'flex' }}>
+        <div style={{
+          flex: 1,
+          padding: 'var(--space-3)',
+          borderRight: '1px solid var(--border-light)',
+          display: 'flex',
+          flexDirection: 'column' as const,
+          justifyContent: 'center',
+        }}>
+          <div style={{ fontSize: '8px', textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 'var(--space-1)' }}>
+            {inputLabel}
+          </div>
+          {inputContent}
+        </div>
+        <div style={{
+          flex: 1,
+          padding: 'var(--space-3)',
+          fontFamily: '"Courier New", monospace',
+          fontSize: '11px',
+          lineHeight: '1.6',
+        }}>
+          <div style={{ fontSize: '8px', textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 'var(--space-1)', fontFamily: 'Arial, sans-serif' }}>
+            OUTPUT
+          </div>
+          {outputLines.map(({ key, value }) => (
+            <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0' }}>
+              <span style={{ color: 'var(--text-muted)' }}>{key}</span>
+              <span>{value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Section definitions                                                */
 /* ------------------------------------------------------------------ */
@@ -316,7 +371,7 @@ function OverviewSection() {
           images:       fmtK(d.images     || d.total_images  || 0),
         });
       })
-      .catch(() => { /* leave null — no stat bar shown on error */ });
+      .catch(() => {});
   }, []);
 
   const statRows = stats
@@ -330,43 +385,99 @@ function OverviewSection() {
 
   return (
     <div>
-      <h1 style={s.h1}>Nuke Developer Documentation</h1>
+      <h1 style={s.h1}>Vehicle intelligence for your app.</h1>
       <p style={s.p}>
-        Send raw data — photos, URLs, text descriptions. Get structured, queryable vehicle
-        intelligence back. Every value has provenance and confidence scoring.
+        Send a photo, a URL, or a question. Get structured data, valuations, and market comps back. One API.
       </p>
 
-      <h2 style={s.h2}>API Surface</h2>
-      <table style={s.table}>
-        <thead>
-          <tr>
-            <th style={s.th}>Endpoint</th>
-            <th style={s.th}>Purpose</th>
-            <th style={s.th}>Auth</th>
-          </tr>
-        </thead>
-        <tbody>
-          {[
-            { path: '/api-v1-vin-lookup/:vin', purpose: 'One-call vehicle profile by VIN', auth: 'Required' },
-            { path: '/api-v1-vehicle-history/:vin', purpose: 'Observation timeline for a vehicle', auth: 'Required' },
-            { path: '/api-v1-vehicle-auction/:vin', purpose: 'Auction results + sentiment', auth: 'Required' },
-            { path: '/api-v1-market-trends', purpose: 'Price trends by make/model/year', auth: 'Required' },
-            { path: '/api-v1-search', purpose: 'Full-text search (v1 wrapper)', auth: 'Required' },
-            { path: '/api-v1-vehicles', purpose: 'CRUD operations on vehicles', auth: 'Required' },
-            { path: '/api-v1-batch', purpose: 'Bulk import up to 1,000 vehicles', auth: 'Required' },
-            { path: '/api-v1-observations', purpose: 'Query and submit observation events', auth: 'Required' },
-            { path: '/extract-vehicle-data-ai', purpose: 'Structure any listing URL into vehicle data', auth: 'Optional' },
-            { path: '/compute-vehicle-valuation', purpose: 'Confidence-scored vehicle valuation', auth: 'Required' },
-            { path: '/api-v1-business-data', purpose: 'Business/shop dashboard data', auth: 'Required' },
-          ].map((ep) => (
-            <tr key={ep.path}>
-              <td style={{ ...s.td, fontFamily: 'monospace' }}>{ep.path}</td>
-              <td style={s.td}>{ep.purpose}</td>
-              <td style={s.td}>{ep.auth}</td>
-            </tr>
+      {statRows && (
+        <div style={{
+          display: 'flex',
+          gap: 'var(--space-5)',
+          marginBottom: 'var(--space-5)',
+          borderTop: '2px solid var(--border-medium)',
+          borderBottom: '2px solid var(--border-medium)',
+          padding: 'var(--space-3) 0',
+        }}>
+          {statRows.map(({ value, label }) => (
+            <div key={label}>
+              <div style={{ fontFamily: '"Courier New", monospace', fontSize: '13px', fontWeight: 'bold' as const }}>{value}</div>
+              <div style={{ fontSize: '8px', textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-muted)' }}>{label}</div>
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
+
+      <TransformCard
+        label="VISION"
+        inputLabel="INPUT"
+        inputContent={
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+          }}>
+            <div style={{
+              width: '40px',
+              height: '30px',
+              background: 'var(--grey-200)',
+              border: '1px solid var(--border-light)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '8px',
+              color: 'var(--text-muted)',
+              fontWeight: 'bold' as const,
+            }}>IMG</div>
+            <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>parking_lot.jpg</span>
+          </div>
+        }
+        outputLines={[
+          { key: 'make', value: 'Porsche' },
+          { key: 'model', value: '911' },
+          { key: 'year', value: '1973' },
+          { key: 'condition', value: '8.2 / 10' },
+          { key: 'value', value: '$185,000' },
+        ]}
+      />
+
+      <TransformCard
+        label="MARKET DATA"
+        inputLabel="QUESTION"
+        inputContent={
+          <div style={{ fontFamily: 'monospace', fontSize: '11px', fontStyle: 'italic' }}>
+            "how much is a 1973 911 worth?"
+          </div>
+        }
+        outputLines={[
+          { key: 'sales', value: '47' },
+          { key: 'avg', value: '$107K' },
+          { key: 'median', value: '$88K' },
+          { key: 'range', value: '$62K – $210K' },
+        ]}
+      />
+
+      <TransformCard
+        label="STRUCTURING"
+        inputLabel="URL"
+        inputContent={
+          <div style={{ fontFamily: 'monospace', fontSize: '10px', wordBreak: 'break-all' as const }}>
+            bringatrailer.com/listing/1988-porsche-911-turbo
+          </div>
+        }
+        outputLines={[
+          { key: 'year', value: '1988' },
+          { key: 'make', value: 'Porsche' },
+          { key: 'model', value: '911 Turbo' },
+          { key: 'price', value: '$165,000' },
+          { key: 'mileage', value: '37,000' },
+        ]}
+      />
+
+      <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+        <Link to="/settings/api-keys" style={{ ...s.buttonPrimary, textDecoration: 'none', display: 'inline-block' }}>Get API Key</Link>
+        <a href="#quickstart" style={{ ...s.buttonSecondary, textDecoration: 'none', display: 'inline-block' }}>Quickstart</a>
+      </div>
     </div>
   );
 }
@@ -375,109 +486,36 @@ function QuickstartSection() {
   return (
     <div>
       <h1 style={s.h1}>Quickstart</h1>
-      <p style={s.p}>Get up and running in under 5 minutes. Choose your integration path:</p>
+      <p style={s.p}>Install the SDK. Three lines to vehicle intelligence.</p>
 
-      <h2 style={s.h2}>Option A: REST API</h2>
+      <CodeBlock title="Install" code="npm install @nuke1/sdk" />
+      <CodeBlock
+        code={`import Nuke from '@nuke1/sdk';
+const nuke = new Nuke('nk_live_...');
 
-      <h3 style={s.h3}>1. Get an API Key</h3>
-      <p style={s.p}>
-        Sign up at <Link to="/" style={{ color: 'var(--text)', fontWeight: 'bold' }}>Nuke</Link> and
-        generate a key from <Link to="/settings/api-keys" style={{ color: 'var(--text)', fontWeight: 'bold' }}>Settings &gt; API Keys</Link>.
+// Photo → identity + value
+const car = await nuke.vision.analyze({ image_url: 'https://...' });
+// => { make: "Porsche", model: "911", year: 1973, estimated_value: 185000 }
+
+// Question → market data
+const comps = await nuke.comps.get({ make: 'Porsche', model: '911', year: 1973 });
+// => { count: 47, avg_price: 107000, median: 88000 }
+
+// URL → structured data
+const listing = await nuke.extract({ url: 'https://bringatrailer.com/listing/...' });
+// => { year: 1988, make: "Porsche", model: "911 Turbo", price: 165000 }`}
+      />
+
+      <p style={{ ...s.p, marginTop: 'var(--space-2)' }}>
+        Get a key from{' '}
+        <Link to="/settings/api-keys" style={{ color: 'var(--text)', fontWeight: 'bold' }}>Settings &gt; API Keys</Link>.
         Keys are prefixed <code style={s.inlineCode}>nk_live_</code>.
       </p>
 
-      <h3 style={s.h3}>2. Search for a Vehicle</h3>
-      <CodeBlock
-        title="Request"
-        code={`curl -X POST "${API_BASE}/universal-search" \\
-  -H "Content-Type: application/json" \\
-  -H "X-API-Key: nk_live_your_key_here" \\
-  -d '{"query": "1973 Porsche 911", "limit": 5}'`}
-      />
-      <CodeBlock
-        title="Response"
-        code={`{
-  "success": true,
-  "results": [
-    {
-      "id": "a1b2c3d4-...",
-      "type": "vehicle",
-      "title": "1973 Porsche 911 Carrera RS 2.7",
-      "subtitle": "$1,250,000",
-      "image_url": "https://...",
-      "relevance_score": 0.97
-    }
-  ],
-  "query_type": "text",
-  "total_count": 14,
-  "search_time_ms": 42
-}`}
-      />
-
-      <h3 style={s.h3}>3. Get Vehicle Details</h3>
-      <CodeBlock
-        title="Request"
-        code={`curl "${API_BASE}/api-v1-vehicles/a1b2c3d4-..." \\
-  -H "X-API-Key: nk_live_your_key_here"`}
-      />
-      <CodeBlock
-        title="Response"
-        code={`{
-  "data": {
-    "id": "a1b2c3d4-...",
-    "year": 1973,
-    "make": "Porsche",
-    "model": "911 Carrera RS 2.7",
-    "vin": "9113600xxx",
-    "mileage": 42000,
-    "color": "Grand Prix White",
-    "transmission": "Manual",
-    "engine_type": "2.7L Flat-6",
-    "sale_price": 1250000,
-    "primary_image_url": "https://...",
-    "created_at": "2025-12-15T..."
-  }
-}`}
-      />
-
-      <h3 style={s.h3}>4. Structure a Listing URL</h3>
-      <CodeBlock
-        title="Request"
-        code={`curl -X POST "${API_BASE}/extract-vehicle-data-ai" \\
-  -H "Content-Type: application/json" \\
-  -d '{"url": "https://bringatrailer.com/listing/1988-porsche-911-turbo-4/"}'`}
-      />
-      <CodeBlock
-        title="Response"
-        code={`{
-  "success": true,
-  "data": {
-    "year": 1988,
-    "make": "Porsche",
-    "model": "911 Turbo",
-    "vin": "WP0JB0934JS050xxx",
-    "mileage": 37000,
-    "price": 165000,
-    "exterior_color": "Guards Red",
-    "transmission": "Manual",
-    "engine": "3.3L Turbocharged Flat-6",
-    "image_urls": ["https://...", "https://..."]
-  },
-  "confidence": 0.94,
-  "source": "bringatrailer.com"
-}`}
-      />
-
-      <h2 style={s.h2}>Option B: MCP Server (AI Agents)</h2>
+      <h2 style={s.h2}>MCP Server</h2>
       <p style={s.p}>
-        If you're building with Claude, GPT, or any MCP-compatible AI agent, connect the Nuke MCP server
-        to give your agent direct access to vehicle intelligence tools.
+        Give Claude, Cursor, or any MCP client direct access to vehicle tools.
       </p>
-
-      <h3 style={s.h3}>1. Install</h3>
-      <CodeBlock code="npx -y @sss97133/nuke-mcp-server" />
-
-      <h3 style={s.h3}>2. Configure</h3>
       <CodeBlock
         title="claude_desktop_config.json"
         code={`{
@@ -485,64 +523,32 @@ function QuickstartSection() {
     "nuke": {
       "command": "npx",
       "args": ["-y", "@sss97133/nuke-mcp-server"],
-      "env": {
-        "NUKE_API_KEY": "nk_live_your_key_here"
-      }
+      "env": { "NUKE_API_KEY": "nk_live_..." }
     }
   }
 }`}
       />
-
-      <h3 style={s.h3}>3. Use It</h3>
-      <p style={s.p}>
-        Ask your AI agent anything about vehicles. It will automatically call the right Nuke tools:
-      </p>
       <div style={s.note}>
         "What's a 1967 Shelby GT500 worth?"<br />
         "Identify the car in this photo"<br />
-        "Find all Porsche 911s sold above $200K"<br />
-        "What's in this listing? bringatrailer.com/listing/..."
+        "Find all Porsche 911s sold above $200K"
       </div>
 
-      <h2 style={s.h2}>Option C: TypeScript SDK</h2>
+      <h2 style={s.h2}>REST API</h2>
       <p style={s.p}>
-        The official Nuke SDK follows Stripe/Plaid patterns. Install with npm:
+        Works with any language. Send JSON, get JSON back.
       </p>
       <CodeBlock
-        title="Install"
-        code="npm install @nuke1/sdk"
+        code={`curl -X POST ${API_BASE}/api-v1-comps \\
+  -H "X-API-Key: nk_live_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{"make": "Porsche", "model": "911", "year": 1973}'
+
+# => { "summary": { "count": 47, "avg_price": 107000, "median_price": 88000 }, "data": [...] }`}
       />
-      <CodeBlock
-        title="Usage"
-        code={`import Nuke from '@nuke1/sdk';
-
-const nuke = new Nuke('nk_live_your_key_here');
-
-// VIN Lookup — full profile in one call
-const profile = await nuke.vinLookup.get('WP0AB0916KS121279');
-console.log(profile.valuation?.estimated_value);
-
-// Search
-const results = await nuke.search.query({ q: 'porsche 911 turbo' });
-
-// Market Trends
-const trends = await nuke.marketTrends.get({
-  make: 'Porsche', model: '911', period: '1y'
-});
-console.log(trends.summary.trend_direction);
-
-// Vehicle History
-const history = await nuke.vehicleHistory.list('WP0AB0916KS121279');
-
-// Auction Data + Sentiment
-const auction = await nuke.vehicleAuction.get('WP0AB0916KS121279');
-console.log(auction.sentiment?.overall);
-
-// CRUD operations
-const vehicle = await nuke.vehicles.create({
-  year: 1988, make: 'Porsche', model: '911 Turbo'
-});`}
-      />
+      <p style={s.p}>
+        <a href="#vehicles" style={{ color: 'var(--text)', fontWeight: 'bold' }}>Full API reference →</a>
+      </p>
     </div>
   );
 }
