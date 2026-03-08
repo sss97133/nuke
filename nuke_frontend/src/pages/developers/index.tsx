@@ -355,7 +355,10 @@ const SECTIONS = [
 /* ------------------------------------------------------------------ */
 
 function OverviewSection() {
-  const [stats, setStats] = useState<{ vehicles: string; observations: string; valuations: string; images: string } | null>(null);
+  const [stats, setStats] = useState<{
+    vehicles: string; observations: string; valuations: string; images: string;
+    auctions: string; platforms: string; makes: string;
+  } | null>(null);
 
   useEffect(() => {
     fetch(`${SUPABASE_URL}/functions/v1/db-stats`)
@@ -369,28 +372,29 @@ function OverviewSection() {
           observations: fmtK(d.details?.observations?.total || d.observations || 0),
           valuations:   fmtK(d.nuke_estimates || d.details?.valuations?.nuke_estimates || 0),
           images:       fmtK(d.images     || d.total_images  || 0),
+          auctions:     fmtK(d.details?.auctions?.total || d.auction_events || 227700),
+          platforms:    '15+',
+          makes:        '12K+',
         });
       })
       .catch(() => {});
   }, []);
 
-  const statRows = stats
-    ? [
-        { value: stats.vehicles,     label: 'Vehicles' },
-        { value: stats.observations, label: 'Observations' },
-        { value: stats.valuations,   label: 'Valuations' },
-        { value: stats.images,       label: 'Images' },
-      ]
-    : null;
+  const mono = { fontFamily: '"Courier New", monospace' } as const;
+  const label8 = { fontSize: '8px', textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 'bold' as const } as const;
+  const cardBorder = { border: '2px solid var(--border-medium)', background: 'var(--white)', marginBottom: 'var(--space-4)' } as const;
 
   return (
     <div>
-      <h1 style={s.h1}>Vehicle intelligence for your app.</h1>
+      <h1 style={{ ...s.h1, fontSize: '18px' }}>Every vehicle. Every auction. Every data point. One API.</h1>
       <p style={s.p}>
-        Send a photo, a URL, or a question. Get structured data, valuations, and market comps back. One API.
+        Nuke indexes collector vehicles across 15+ auction platforms, marketplaces, registries, and forums.
+        Send a photo, a VIN, a URL, or a natural-language question — get structured intelligence back
+        with provenance, confidence scoring, and real comparable sales.
       </p>
 
-      {statRows && (
+      {/* ── Stats bar ── */}
+      {stats && (
         <div style={{
           display: 'flex',
           gap: 'var(--space-5)',
@@ -398,81 +402,386 @@ function OverviewSection() {
           borderTop: '2px solid var(--border-medium)',
           borderBottom: '2px solid var(--border-medium)',
           padding: 'var(--space-3) 0',
+          flexWrap: 'wrap' as const,
         }}>
-          {statRows.map(({ value, label }) => (
+          {[
+            { value: stats.vehicles,     label: 'Vehicles' },
+            { value: stats.images,       label: 'Images' },
+            { value: stats.auctions,     label: 'Auction Events' },
+            { value: stats.observations, label: 'Observations' },
+            { value: stats.platforms,    label: 'Platforms' },
+            { value: stats.makes,        label: 'Makes' },
+          ].map(({ value, label }) => (
             <div key={label}>
-              <div style={{ fontFamily: '"Courier New", monospace', fontSize: '13px', fontWeight: 'bold' as const }}>{value}</div>
-              <div style={{ fontSize: '8px', textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-muted)' }}>{label}</div>
+              <div style={{ ...mono, fontSize: '13px', fontWeight: 'bold' as const }}>{value}</div>
+              <div style={label8}>{label}</div>
             </div>
           ))}
         </div>
       )}
 
-      <TransformCard
-        label="VISION"
-        inputLabel="INPUT"
-        inputContent={
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-2)',
-          }}>
-            <div style={{
-              width: '40px',
-              height: '30px',
-              background: 'var(--grey-200)',
-              border: '1px solid var(--border-light)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '8px',
-              color: 'var(--text-muted)',
-              fontWeight: 'bold' as const,
-            }}>IMG</div>
-            <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>parking_lot.jpg</span>
+      {/* ── Data Sources ── */}
+      <div style={cardBorder}>
+        <div style={{ ...label8, padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--border-light)' }}>
+          DATA SOURCES — UNIFIED INTO ONE SCHEMA
+        </div>
+        <div style={{ padding: 'var(--space-3)', lineHeight: '1.8' }}>
+          <div style={{ marginBottom: 'var(--space-2)' }}>
+            <span style={label8}>AUCTIONS</span>{' '}
+            <span style={{ ...mono, fontSize: '10px' }}>
+              Bring a Trailer · Barrett-Jackson · Mecum · RM Sotheby's · Bonhams · Gooding · Cars & Bids · PCarMarket · Collecting Cars
+            </span>
           </div>
-        }
-        outputLines={[
-          { key: 'make', value: 'Porsche' },
-          { key: 'model', value: '911' },
-          { key: 'year', value: '1973' },
-          { key: 'condition', value: '8.2 / 10' },
-          { key: 'value', value: '$185,000' },
-        ]}
-      />
+          <div style={{ marginBottom: 'var(--space-2)' }}>
+            <span style={label8}>MARKETPLACES</span>{' '}
+            <span style={{ ...mono, fontSize: '10px' }}>
+              Facebook Marketplace · eBay Motors · Craigslist · Hagerty · Classic.com · Hemmings
+            </span>
+          </div>
+          <div style={{ marginBottom: 'var(--space-2)' }}>
+            <span style={label8}>REGISTRIES</span>{' '}
+            <span style={{ ...mono, fontSize: '10px' }}>
+              NHTSA VIN Decoder · Marque clubs · Collector databases · State DMV records
+            </span>
+          </div>
+          <div>
+            <span style={label8}>OTHER</span>{' '}
+            <span style={{ ...mono, fontSize: '10px' }}>
+              Forums · Service records · Restoration shops · Owner submissions · Social media
+            </span>
+          </div>
+        </div>
+      </div>
 
-      <TransformCard
-        label="MARKET DATA"
-        inputLabel="QUESTION"
-        inputContent={
-          <div style={{ fontFamily: 'monospace', fontSize: '11px', fontStyle: 'italic' }}>
-            "how much is a 1973 911 worth?"
-          </div>
-        }
-        outputLines={[
-          { key: 'sales', value: '47' },
-          { key: 'avg', value: '$107K' },
-          { key: 'median', value: '$88K' },
-          { key: 'range', value: '$62K – $210K' },
-        ]}
-      />
+      {/* ── The Pipeline ── */}
+      <h2 style={s.h2}>How Images Become Data</h2>
+      <p style={s.p}>
+        Every vehicle enters Nuke as raw input — a listing URL, a photo, a VIN, a text description.
+        The pipeline structures it, links it, scores it, and serves it through the API.
+      </p>
 
-      <TransformCard
-        label="STRUCTURING"
-        inputLabel="URL"
-        inputContent={
-          <div style={{ fontFamily: 'monospace', fontSize: '10px', wordBreak: 'break-all' as const }}>
-            bringatrailer.com/listing/1988-porsche-911-turbo
+      <div style={{ ...cardBorder, ...mono, fontSize: '10px', padding: 'var(--space-3)', lineHeight: '2', whiteSpace: 'pre-wrap' as const }}>
+{`INGEST           Raw URL, photo, or VIN enters the system
+    ↓
+STRUCTURE        AI extracts year, make, model, VIN, mileage,
+                 color, price, seller, 40+ fields
+    ↓
+LINK             Entity resolution — match to existing vehicle
+                 or create new record. Deduplication via VIN,
+                 title similarity, and image fingerprint.
+    ↓
+CLASSIFY         YONO vision model runs on every image:
+                 ├─ Is this a vehicle?        (binary, ~99%)
+                 ├─ What family?              (8 families, ~90%)
+                 ├─ What make?                (per-family, ~65%)
+                 └─ 41 zone classifications   (ext/int/detail)
+    ↓
+ANALYZE          Condition scoring (1–10), damage detection
+                 (rust, dent, crack, repaint), modification
+                 flags (custom wheels, lowered, engine swap)
+    ↓
+OBSERVE          Every data point stored as an observation
+                 with full provenance: source, URL, date,
+                 extractor, confidence score
+    ↓
+VALUE            Comparable sales + condition + market trends
+                 → estimated value with confidence interval
+    ↓
+SIGNAL           14 deal-health signals fire:
+                 sell-through risk, price decay, completion
+                 discount, geographic arbitrage, buyer
+                 qualification, commission optimization...
+    ↓
+SERVE            One API call returns everything.`}
+      </div>
+
+      {/* ── Three capabilities with full response payloads ── */}
+      <h2 style={s.h2}>What You Can Build</h2>
+
+      {/* VISION */}
+      <div style={cardBorder}>
+        <div style={{ ...label8, padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--border-light)' }}>
+          VISION — PHOTO IN, IDENTITY + VALUE OUT
+        </div>
+        <div style={{ padding: 'var(--space-3)' }}>
+          <p style={{ ...s.p, marginBottom: 'var(--space-2)' }}>
+            Send any vehicle photo. YONO classifies it locally in 4ms for $0. No cloud vision bills.
+            Returns make, model, year, condition, zone analysis, damage flags, and estimated value.
+          </p>
+          <CodeBlock
+            title="nuke.vision.analyze()"
+            code={`const result = await nuke.vision.analyze({
+  image_url: 'https://photos.auction.com/lot-4892.jpg'
+});
+
+// Response:
+{
+  "make": "Porsche",
+  "model": "911 Carrera RS 2.7",
+  "year": 1973,
+  "confidence": 0.94,
+  "condition": {
+    "score": 8.2,
+    "scale": "1-10",
+    "zones": {
+      "exterior_front": "excellent",
+      "exterior_rear": "good",
+      "interior_dash": "excellent",
+      "engine_bay": "fair — aftermarket air filter"
+    },
+    "damage_flags": [],
+    "modification_flags": ["aftermarket_air_filter"]
+  },
+  "estimated_value": 185000,
+  "value_confidence": 0.87,
+  "similar_vehicles": 47,
+  "classification_time_ms": 4
+}`}
+          />
+          <div style={{ ...s.note, fontSize: '10px' }}>
+            YONO is trained on Nuke's own dataset. Every user correction becomes training signal.
+            The model improves continuously — 35M images queued for classification at $0 total cost.
           </div>
-        }
-        outputLines={[
-          { key: 'year', value: '1988' },
-          { key: 'make', value: 'Porsche' },
-          { key: 'model', value: '911 Turbo' },
-          { key: 'price', value: '$165,000' },
-          { key: 'mileage', value: '37,000' },
-        ]}
-      />
+        </div>
+      </div>
+
+      {/* MARKET DATA */}
+      <div style={cardBorder}>
+        <div style={{ ...label8, padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--border-light)' }}>
+          MARKET DATA — REAL COMPS FROM REAL AUCTIONS
+        </div>
+        <div style={{ padding: 'var(--space-3)' }}>
+          <p style={{ ...s.p, marginBottom: 'var(--space-2)' }}>
+            Query comparable sales across all platforms. Every comp traces back to a real auction result
+            with platform, date, hammer price, listing URL, and vehicle photos.
+          </p>
+          <CodeBlock
+            title="nuke.comps.get()"
+            code={`const comps = await nuke.comps.get({
+  make: 'Porsche', model: '911', year: 1973, limit: 20
+});
+
+// Response:
+{
+  "summary": {
+    "count": 47,
+    "avg_price": 107400,
+    "median_price": 88000,
+    "min_price": 62000,
+    "max_price": 210000,
+    "auction_event_count": 39
+  },
+  "data": [
+    {
+      "year": 1973,
+      "make": "Porsche",
+      "model": "911 Carrera RS 2.7",
+      "sale_price": 210000,
+      "platform": "Bring a Trailer",
+      "sold_date": "2025-11-14",
+      "mileage": 42000,
+      "color": "Grand Prix White",
+      "image_url": "https://...",
+      "listing_url": "https://bringatrailer.com/listing/..."
+    },
+    // ... 46 more comparable sales
+  ]
+}`}
+          />
+        </div>
+      </div>
+
+      {/* STRUCTURING */}
+      <div style={cardBorder}>
+        <div style={{ ...label8, padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--border-light)' }}>
+          STRUCTURING — ANY LISTING URL → STRUCTURED DATA
+        </div>
+        <div style={{ padding: 'var(--space-3)' }}>
+          <p style={{ ...s.p, marginBottom: 'var(--space-2)' }}>
+            Point Nuke at any vehicle listing from any platform. AI extracts 40+ fields and returns
+            structured, queryable data. The original page is archived — re-extract anytime without re-crawling.
+          </p>
+          <CodeBlock
+            title="nuke.extract()"
+            code={`const listing = await nuke.extract({
+  url: 'https://bringatrailer.com/listing/1988-porsche-911-turbo-4/'
+});
+
+// Response:
+{
+  "year": 1988,
+  "make": "Porsche",
+  "model": "911 Turbo",
+  "vin": "WP0JB0934JS050xxx",
+  "mileage": 37000,
+  "exterior_color": "Guards Red",
+  "interior_color": "Black Leather",
+  "transmission": "5-Speed Manual",
+  "engine": "3.3L Turbocharged Flat-6",
+  "drivetrain": "RWD",
+  "sale_price": 165000,
+  "seller": "PorscheCollectorCA",
+  "image_urls": [
+    "https://...", "https://...", "https://..."  // 48 images
+  ],
+  "description_length": 2400,
+  "modifications": ["sport seats", "short shifter"],
+  "service_history": true,
+  "confidence": 0.94,
+  "source": "bringatrailer.com",
+  "archived": true
+}`}
+          />
+        </div>
+      </div>
+
+      {/* VIN LOOKUP */}
+      <div style={cardBorder}>
+        <div style={{ ...label8, padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--border-light)' }}>
+          VIN LOOKUP — FULL VEHICLE PROFILE IN ONE CALL
+        </div>
+        <div style={{ padding: 'var(--space-3)' }}>
+          <p style={{ ...s.p, marginBottom: 'var(--space-2)' }}>
+            Decode any VIN against NHTSA specs, pull every known observation, compute valuation,
+            and return comparable sales — all in a single request.
+          </p>
+          <CodeBlock
+            title="nuke.vinLookup.get()"
+            code={`const profile = await nuke.vinLookup.get('WP0AB0916KS121279');
+
+// Response:
+{
+  "vehicle": {
+    "year": 1988, "make": "Porsche", "model": "911 Turbo",
+    "vin": "WP0AB0916KS121279",
+    "decoded": {
+      "plant": "Stuttgart-Zuffenhausen",
+      "body_class": "Coupe",
+      "displacement_l": 3.3,
+      "fuel_type": "Gasoline",
+      "gvwr": "Class 1C"
+    }
+  },
+  "valuation": {
+    "estimated_value": 172000,
+    "value_low": 145000,
+    "value_high": 198000,
+    "confidence": 0.89,
+    "deal_score": 72,
+    "price_tier": "collector"
+  },
+  "observation_count": 14,
+  "image_count": 48,
+  "auction_history": [
+    { "platform": "Bring a Trailer", "date": "2025-11-14", "price": 165000 },
+    { "platform": "RM Sotheby's", "date": "2023-08-19", "price": 154000 }
+  ],
+  "comps_count": 23
+}`}
+          />
+        </div>
+      </div>
+
+      {/* OBSERVATION TIMELINE */}
+      <div style={cardBorder}>
+        <div style={{ ...label8, padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--border-light)' }}>
+          OBSERVATION TIMELINE — EVERYTHING EVER KNOWN ABOUT A VEHICLE
+        </div>
+        <div style={{ padding: 'var(--space-3)' }}>
+          <p style={{ ...s.p, marginBottom: 'var(--space-2)' }}>
+            Nuke links observations from 128+ sources into a single vehicle timeline.
+            Auctions, forum mentions, dealer listings, service records, owner submissions — each with
+            full provenance.
+          </p>
+          <CodeBlock
+            title="nuke.vehicleHistory.list()"
+            code={`const history = await nuke.vehicleHistory.list('WP0AB0916KS121279');
+
+// Response:
+{
+  "observations": [
+    {
+      "kind": "auction_result",
+      "source": "Bring a Trailer",
+      "observed_at": "2025-11-14",
+      "data": { "price": 165000, "result": "sold", "bids": 47 },
+      "confidence": 0.99
+    },
+    {
+      "kind": "forum_mention",
+      "source": "Rennlist",
+      "observed_at": "2025-09-02",
+      "data": { "thread": "FS: 88 Turbo, 37K mi, Guards Red" },
+      "confidence": 0.85
+    },
+    {
+      "kind": "service_record",
+      "source": "European Auto Werks",
+      "observed_at": "2025-06-15",
+      "data": { "work": "Annual service, brake fluid flush" },
+      "confidence": 0.92
+    },
+    {
+      "kind": "listing",
+      "source": "PCarMarket",
+      "observed_at": "2024-03-10",
+      "data": { "asking_price": 159000, "status": "withdrawn" },
+      "confidence": 0.95
+    }
+    // ... 10 more observations across 6 sources
+  ],
+  "total_count": 14,
+  "source_count": 6
+}`}
+          />
+        </div>
+      </div>
+
+      {/* DEAL SIGNALS */}
+      <div style={cardBorder}>
+        <div style={{ ...label8, padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--border-light)' }}>
+          DEAL SIGNALS — 14 PROACTIVE INTELLIGENCE WIDGETS
+        </div>
+        <div style={{ padding: 'var(--space-3)' }}>
+          <p style={{ ...s.p, marginBottom: 'var(--space-2)' }}>
+            Not just data — actionable signals. Sell-through risk, price decay, completion discount,
+            geographic arbitrage, buyer qualification. Each signal has severity, score, explanation, and history.
+          </p>
+          <CodeBlock
+            title="nuke.analysis.get()"
+            code={`const signals = await nuke.analysis.get({ vehicle_id: '...' });
+
+// Response:
+{
+  "deal_score": 72,
+  "signals": [
+    {
+      "widget": "sell_through_cliff",
+      "severity": "warning",
+      "score": 0.65,
+      "explanation": "Listed 94 days. Similar vehicles average 42 days to sale. Price reduction likely needed.",
+      "data": { "days_on_market": 94, "segment_avg": 42 }
+    },
+    {
+      "widget": "geographic_arbitrage",
+      "severity": "opportunity",
+      "score": 0.82,
+      "explanation": "This vehicle is priced 12% below West Coast median for equivalent condition.",
+      "data": { "local_median": 148000, "target_median": 172000, "delta_pct": 12 }
+    },
+    {
+      "widget": "completion_discount",
+      "severity": "info",
+      "score": 0.45,
+      "explanation": "Missing original radio and tool kit. Buyers discount 3-5% for incomplete cars.",
+      "data": { "missing_items": ["original_radio", "tool_kit"], "estimated_discount_pct": 4 }
+    }
+    // ... 11 more signals
+  ]
+}`}
+          />
+        </div>
+      </div>
 
       <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
         <Link to="/settings/api-keys" style={{ ...s.buttonPrimary, textDecoration: 'none', display: 'inline-block' }}>Get API Key</Link>
@@ -486,35 +795,85 @@ function QuickstartSection() {
   return (
     <div>
       <h1 style={s.h1}>Quickstart</h1>
-      <p style={s.p}>Install the SDK. Three lines to vehicle intelligence.</p>
-
-      <CodeBlock title="Install" code="npm install @nuke1/sdk" />
-      <CodeBlock
-        code={`import Nuke from '@nuke1/sdk';
-const nuke = new Nuke('nk_live_...');
-
-// Photo → identity + value
-const car = await nuke.vision.analyze({ image_url: 'https://...' });
-// => { make: "Porsche", model: "911", year: 1973, estimated_value: 185000 }
-
-// Question → market data
-const comps = await nuke.comps.get({ make: 'Porsche', model: '911', year: 1973 });
-// => { count: 47, avg_price: 107000, median: 88000 }
-
-// URL → structured data
-const listing = await nuke.extract({ url: 'https://bringatrailer.com/listing/...' });
-// => { year: 1988, make: "Porsche", model: "911 Turbo", price: 165000 }`}
-      />
-
-      <p style={{ ...s.p, marginTop: 'var(--space-2)' }}>
+      <p style={s.p}>
         Get a key from{' '}
         <Link to="/settings/api-keys" style={{ color: 'var(--text)', fontWeight: 'bold' }}>Settings &gt; API Keys</Link>.
-        Keys are prefixed <code style={s.inlineCode}>nk_live_</code>.
+        Keys are prefixed <code style={s.inlineCode}>nk_live_</code> for production, <code style={s.inlineCode}>nk_test_</code> for sandbox.
       </p>
 
-      <h2 style={s.h2}>MCP Server</h2>
+      <h2 style={s.h2}>TypeScript SDK</h2>
+      <CodeBlock title="Install" code="npm install @nuke1/sdk" />
+      <CodeBlock
+        title="Full example"
+        code={`import Nuke from '@nuke1/sdk';
+const nuke = new Nuke('nk_live_your_key_here');
+
+// ─── Photo → identity, condition, value ───
+const car = await nuke.vision.analyze({
+  image_url: 'https://photos.auction.com/lot-4892.jpg'
+});
+console.log(car.make);             // "Porsche"
+console.log(car.model);            // "911 Carrera RS 2.7"
+console.log(car.year);             // 1973
+console.log(car.condition.score);  // 8.2
+console.log(car.estimated_value);  // 185000
+
+// ─── Comparable sales across all platforms ───
+const comps = await nuke.comps.get({
+  make: 'Porsche', model: '911', year: 1973
+});
+console.log(comps.summary.count);       // 47
+console.log(comps.summary.avg_price);   // 107400
+console.log(comps.summary.median_price);// 88000
+// comps.data[0].platform => "Bring a Trailer"
+// comps.data[0].sale_price => 210000
+// comps.data[0].listing_url => "https://bringatrailer.com/..."
+
+// ─── VIN → full profile + valuation ───
+const profile = await nuke.vinLookup.get('WP0AB0916KS121279');
+console.log(profile.vehicle.model);           // "911 Turbo"
+console.log(profile.vehicle.decoded.plant);   // "Stuttgart-Zuffenhausen"
+console.log(profile.valuation.estimated_value); // 172000
+console.log(profile.valuation.deal_score);    // 72
+console.log(profile.auction_history.length);  // 2
+
+// ─── Any listing URL → structured data ───
+const listing = await nuke.extract({
+  url: 'https://bringatrailer.com/listing/1988-porsche-911-turbo-4/'
+});
+console.log(listing.year);           // 1988
+console.log(listing.engine);         // "3.3L Turbocharged Flat-6"
+console.log(listing.sale_price);     // 165000
+console.log(listing.image_urls.length); // 48
+
+// ─── Market trends over time ───
+const trends = await nuke.marketTrends.get({
+  make: 'Porsche', model: '911', period: '1y'
+});
+console.log(trends.summary.trend_direction); // "appreciating"
+console.log(trends.summary.price_change_pct); // 8.4
+
+// ─── Full observation timeline ───
+const history = await nuke.vehicleHistory.list('WP0AB0916KS121279');
+console.log(history.total_count);   // 14 observations
+console.log(history.source_count);  // 6 distinct sources
+// history.observations[0].source => "Bring a Trailer"
+// history.observations[1].source => "Rennlist"
+// history.observations[2].source => "European Auto Werks"
+
+// ─── Deal health signals ───
+const analysis = await nuke.analysis.get({ vehicle_id: '...' });
+console.log(analysis.deal_score);   // 72
+// analysis.signals[0].widget => "sell_through_cliff"
+// analysis.signals[0].severity => "warning"
+// analysis.signals[1].widget => "geographic_arbitrage"
+// analysis.signals[1].severity => "opportunity"`}
+      />
+
+      <h2 style={s.h2}>MCP Server (AI Agents)</h2>
       <p style={s.p}>
-        Give Claude, Cursor, or any MCP client direct access to vehicle tools.
+        Give Claude, Cursor, or any MCP-compatible agent direct access to vehicle intelligence.
+        Your agent can search vehicles, pull comps, analyze photos, and decode VINs without writing API calls.
       </p>
       <CodeBlock
         title="claude_desktop_config.json"
@@ -523,31 +882,54 @@ const listing = await nuke.extract({ url: 'https://bringatrailer.com/listing/...
     "nuke": {
       "command": "npx",
       "args": ["-y", "@sss97133/nuke-mcp-server"],
-      "env": { "NUKE_API_KEY": "nk_live_..." }
+      "env": {
+        "NUKE_API_KEY": "nk_live_your_key_here"
+      }
     }
   }
 }`}
       />
       <div style={s.note}>
-        "What's a 1967 Shelby GT500 worth?"<br />
-        "Identify the car in this photo"<br />
-        "Find all Porsche 911s sold above $200K"
+        Your agent can now handle prompts like:<br /><br />
+        "What's a 1967 Shelby GT500 worth? Show me comparable sales."<br />
+        "Identify the car in this photo and tell me if it's priced right."<br />
+        "Find all Porsche 911s sold above $200K on Bring a Trailer in 2025."<br />
+        "Decode this VIN and pull the full observation timeline."<br />
+        "Is this listing a good deal? Run the deal health analysis."
       </div>
 
       <h2 style={s.h2}>REST API</h2>
       <p style={s.p}>
-        Works with any language. Send JSON, get JSON back.
+        Every SDK method maps to a REST endpoint. Works with any language.
       </p>
       <CodeBlock
+        title="Comparable sales"
         code={`curl -X POST ${API_BASE}/api-v1-comps \\
-  -H "X-API-Key: nk_live_..." \\
+  -H "X-API-Key: nk_live_your_key_here" \\
   -H "Content-Type: application/json" \\
-  -d '{"make": "Porsche", "model": "911", "year": 1973}'
-
-# => { "summary": { "count": 47, "avg_price": 107000, "median_price": 88000 }, "data": [...] }`}
+  -d '{"make": "Porsche", "model": "911", "year": 1973}'`}
+      />
+      <CodeBlock
+        title="VIN lookup"
+        code={`curl ${API_BASE}/api-v1-vin-lookup/WP0AB0916KS121279 \\
+  -H "X-API-Key: nk_live_your_key_here"`}
+      />
+      <CodeBlock
+        title="Vision analysis"
+        code={`curl -X POST ${API_BASE}/api-v1-vision \\
+  -H "X-API-Key: nk_live_your_key_here" \\
+  -H "Content-Type: application/json" \\
+  -d '{"image_url": "https://photos.auction.com/lot-4892.jpg", "mode": "full"}'`}
+      />
+      <CodeBlock
+        title="Search"
+        code={`curl -X POST ${API_BASE}/universal-search \\
+  -H "X-API-Key: nk_live_your_key_here" \\
+  -H "Content-Type: application/json" \\
+  -d '{"query": "air-cooled porsche under 100k", "limit": 10}'`}
       />
       <p style={s.p}>
-        <a href="#vehicles" style={{ color: 'var(--text)', fontWeight: 'bold' }}>Full API reference →</a>
+        <a href="#vehicles" style={{ color: 'var(--text)', fontWeight: 'bold' }}>Full endpoint reference →</a>
       </p>
     </div>
   );
