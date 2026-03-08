@@ -25,6 +25,7 @@ import type { HypeVehicle, TimePeriod, SalesTimePeriod, ViewMode, SortBy, SortDi
 import { SALES_PERIODS } from '../types/feedTypes';
 import { normalizeSupabaseStorageUrl, cleanDisplayMake, cleanDisplayModel } from '../lib/feedImageUtils';
 import { DEFAULT_FILTERS, getRememberFilters, loadSavedFilters, saveFiltersToStorage, clearPersistedFiltersAndSort, STORAGE_KEY, REMEMBER_FILTERS_KEY, LOCATION_FAVORITES_KEY } from '../lib/filterPersistence';
+import { parseQuery } from '../lib/search/queryParser';
 
 const CursorHomepage: React.FC = () => {
   usePageTitle('Nuke');
@@ -176,6 +177,7 @@ const CursorHomepage: React.FC = () => {
     sourceFilters: true, // Source filters collapsed by default
     sourcePogs: true, // Source pogs library collapsed by default
     makeFilters: true, // Make filters collapsed by default
+    modelFilters: true, // Model filters collapsed by default
     typeFilters: true, // Body type filters collapsed by default
     yearFilters: true, // Year filters collapsed by default
     priceFilters: true, // Price filters collapsed by default
@@ -497,35 +499,38 @@ const CursorHomepage: React.FC = () => {
     }
   }, [showFilters]);
 
-  // Debounce search to avoid clanky re-filtering on every keystroke.
-  // Also parse intelligent patterns like year ranges (1970-1975), single years (1970), etc.
+  // Debounce search and parse intelligent patterns using the shared queryParser.
+  // Supports: year ranges, compound queries ("1980 ford pickup"), make aliases
+  // ("chevy truck"), body styles ("sedan"), prices ("under $50k"), and more.
   useEffect(() => {
     const t = window.setTimeout(() => {
       const trimmed = searchText.trim();
-
-      // Check for year range pattern: "1970-1975" or "1970-1970"
-      const yearRangeMatch = trimmed.match(/^(\d{4})\s*[-–—to]\s*(\d{4})$/i);
-      if (yearRangeMatch) {
-        const yearMin = parseInt(yearRangeMatch[1], 10);
-        const yearMax = parseInt(yearRangeMatch[2], 10);
-        if (yearMin >= 1900 && yearMin <= 2030 && yearMax >= 1900 && yearMax <= 2030) {
-          // Apply as year filter instead of text search
-          setFilters(prev => ({ ...prev, yearMin, yearMax }));
-          setDebouncedSearchText(''); // Clear text search since we're using year filter
-          return;
-        }
+      if (!trimmed) {
+        setDebouncedSearchText('');
+        return;
       }
 
-      // Check for single year pattern: "1970"
-      const singleYearMatch = trimmed.match(/^(\d{4})$/);
-      if (singleYearMatch) {
-        const year = parseInt(singleYearMatch[1], 10);
-        if (year >= 1900 && year <= 2030) {
-          // Apply as year filter (single year = both min and max)
-          setFilters(prev => ({ ...prev, yearMin: year, yearMax: year }));
-          setDebouncedSearchText(''); // Clear text search since we're using year filter
-          return;
-        }
+      const parsed = parseQuery(trimmed);
+      const hasStructured = parsed.yearMin || parsed.make || parsed.bodyStyle || parsed.priceMin || parsed.priceMax;
+
+      if (hasStructured) {
+        // Map body style to uppercase filter format; "truck" is alias for "PICKUP"
+        const rawBody = parsed.bodyStyle?.toLowerCase();
+        const mappedBody = rawBody ? (rawBody === 'truck' ? 'PICKUP' : rawBody.toUpperCase()) : null;
+
+        setFilters(prev => ({
+          ...prev,
+          ...(parsed.yearMin ? { yearMin: parsed.yearMin, yearMax: parsed.yearMax ?? parsed.yearMin } : {}),
+          ...(parsed.make && !prev.makes.includes(parsed.make.toUpperCase())
+            ? { makes: [...prev.makes, parsed.make.toUpperCase()] } : {}),
+          ...(mappedBody && !prev.bodyStyles.includes(mappedBody)
+            ? { bodyStyles: [...prev.bodyStyles, mappedBody] } : {}),
+          ...(parsed.priceMin ? { priceMin: parsed.priceMin } : {}),
+          ...(parsed.priceMax ? { priceMax: parsed.priceMax } : {}),
+        }));
+        // Remaining freeText (model or unrecognized tokens) goes to text search
+        setDebouncedSearchText(parsed.model || parsed.freeText || '');
+        return;
       }
 
       setDebouncedSearchText(trimmed);
@@ -655,6 +660,7 @@ const CursorHomepage: React.FC = () => {
     if (filters.yearMin !== DEFAULT_FILTERS.yearMin) n++;
     if (filters.yearMax !== DEFAULT_FILTERS.yearMax) n++;
     if ((filters.makes?.length || 0) > 0) n++;
+    if ((filters.models?.length || 0) > 0) n++;
     if ((filters.bodyStyles?.length || 0) > 0) n++;
     if (filters.is4x4 !== DEFAULT_FILTERS.is4x4) n++;
     if (filters.priceMin !== DEFAULT_FILTERS.priceMin) n++;
@@ -940,6 +946,46 @@ const CursorHomepage: React.FC = () => {
           if (listingKindSupportedRef.current) {
             q = q.eq('listing_kind', 'vehicle');
           }
+
+          // === NON-AUTO EXCLUSION (server-side) ===
+          // Only show CAR, TRUCK, SUV, VAN, MINIVAN, or unclassified (null)
+          q = q.or(
+            'canonical_vehicle_type.in.(CAR,TRUCK,SUV,VAN,MINIVAN),' +
+            'canonical_vehicle_type.is.null'
+          );
+          // Block known non-auto makes (catches null-type junk)
+          q = q.not('make', 'in', '(' + [
+            'YAMAHA','HARLEY-DAVIDSON','KAWASAKI','SUZUKI','DUCATI','KTM','TRIUMPH','INDIAN',
+            'HUSQVARNA','APRILIA','MOTO GUZZI','NORTON','BSA','BUELL','ROYAL ENFIELD',
+            'POLARIS','ARCTIC CAT','CAN-AM',
+            'SEA-DOO','SEA RAY','BAYLINER','BOSTON WHALER','GRUMMAN','GLASTRON','SKEETER','TRACKER',
+            'MASTERCRAFT','MALIBU BOATS','CORRECT CRAFT',
+            'FLEETWOOD','WINNEBAGO','AIRSTREAM','COACHMEN','JAYCO','KEYSTONE','FOREST RIVER',
+            'THOR','NEWMAR','TIFFIN','HOLIDAY RAMBLER','MONACO','FLAGSTAFF','COLEMAN','STARCRAFT',
+            'JOHN DEERE','KUBOTA','CATERPILLAR','BOBCAT','CASE IH','NEW HOLLAND',
+            'MASSEY FERGUSON','FARMALL','ALLIS-CHALMERS','OLIVER',
+            'FREIGHTLINER','PETERBILT','KENWORTH','MACK','HINO','WESTERN STAR',
+            'EZGO','CLUB CAR','CUSHMAN','GEM',
+            'CESSNA','PIPER','BEECHCRAFT','MOONEY','CIRRUS',
+            'FEATHERLITE','SUNDOWNER',
+            'Yamaha','Harley-Davidson','Kawasaki','Suzuki','Ducati','Triumph','Indian',
+            'Husqvarna','Aprilia','Norton','Buell',
+            'Polaris','Arctic Cat','Can-Am','Arctic',
+            'Sea-Doo','Sea Ray','Bayliner','Boston Whaler','Grumman','Glastron','Skeeter','Tracker',
+            'Mastercraft',
+            'Fleetwood','Winnebago','Airstream','Coachmen','Jayco','Keystone','Forest River',
+            'Thor','Newmar','Tiffin','Flagstaff','Coleman','Starcraft','Featherlite',
+            'John Deere','Kubota','Caterpillar','Bobcat','Farmall','Allis-Chalmers','Oliver',
+            'Freightliner','Peterbilt','Kenworth','Mack','Hino','Western Star',
+            'Ezgo','Club Car','Cushman',
+            'Cessna','Piper','Beechcraft','Mooney','Cirrus'
+          ].join(',') + ')');
+
+          // === DEALER EXCLUSION (hide dealers unless searching) ===
+          if (!debouncedSearchText && !filters.dealer) {
+            q = q.is('origin_organization_id', null);
+          }
+
           // Source filtering handled client-side in applyFiltersAndSort
 
           // === SERVER-SIDE FILTERS (the critical fix) ===
@@ -1460,8 +1506,8 @@ const CursorHomepage: React.FC = () => {
   }, [hasMore, loading, loadingMore, page]);
 
   const infiniteSentinelRef = useCallback((node: HTMLDivElement | null) => {
-    if (loading || loadingMore) return;
     if (infiniteObserverRef.current) infiniteObserverRef.current.disconnect();
+    if (!node) return;
 
     infiniteObserverRef.current = new IntersectionObserver(
       (entries) => {
@@ -1477,8 +1523,8 @@ const CursorHomepage: React.FC = () => {
       }
     );
 
-    if (node) infiniteObserverRef.current.observe(node);
-  }, [hasMore, loadMore, loading, loadingMore]);
+    infiniteObserverRef.current.observe(node);
+  }, [hasMore, loadMore]);
 
   // Format currency values for display (exact numbers with commas)
   const formatCurrency = (value: number): string => {
@@ -1539,7 +1585,15 @@ const CursorHomepage: React.FC = () => {
         onRemove: () => setFilters({ ...filters, makes: [] })
       });
     }
-    
+
+    // Models
+    if (filters.models && filters.models.length > 0) {
+      badges.push({
+        label: `Model: ${filters.models.join(', ')}`,
+        onRemove: () => setFilters({ ...filters, models: [] })
+      });
+    }
+
     // Body styles / vehicle type
     if (filters.bodyStyles.length > 0) {
       badges.push({
@@ -1790,8 +1844,6 @@ const CursorHomepage: React.FC = () => {
             setCardsPerRow={setCardsPerRow}
             thumbFitMode={thumbFitMode}
             setThumbFitMode={setThumbFitMode}
-            rememberFilters={rememberFilters}
-            setRememberFilters={setRememberFilters}
             openFiltersFromMiniBar={openFiltersFromMiniBar}
             setShowRecentlyAddedPanel={setShowRecentlyAddedPanel}
             toggleForSale={toggleForSale}
@@ -1800,12 +1852,10 @@ const CursorHomepage: React.FC = () => {
             openStatsPanel={openStatsPanel}
             setFilters={setFilters}
             setSearchText={setSearchText}
-            clearPersistedFiltersAndSort={clearPersistedFiltersAndSort}
             setSourceIncluded={setSourceIncluded}
             formatCurrency={formatCurrency}
             faviconUrl={faviconUrl}
             domainGradient={domainGradient}
-            REMEMBER_FILTERS_KEY={REMEMBER_FILTERS_KEY}
             DEFAULT_FILTERS={DEFAULT_FILTERS}
           />
         )}

@@ -56,6 +56,9 @@ function toQueryParams(input: UseFeedQueryInput): FeedQueryParams {
   if (filters.hideDealerSites) excluded.push('dealer_sites');
   if (filters.hideDealerListings) excluded.push('dealer_listings');
 
+  // Show dealers when user explicitly wants them or is searching
+  const includeDealers = filters.dealer || undefined;
+
   return {
     q: searchText || undefined,
     year_min: filters.yearMin ?? undefined,
@@ -71,6 +74,7 @@ function toQueryParams(input: UseFeedQueryInput): FeedQueryParams {
     hide_sold: filters.hideSold || undefined,
     has_images: filters.hasImages || undefined,
     excluded_sources: excluded.length > 0 ? excluded : undefined,
+    include_dealers: includeDealers,
     sort: sortMap[sortBy] || 'newest',
     direction: sortDirection,
     zip: filters.zipCode || undefined,
