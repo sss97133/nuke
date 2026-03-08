@@ -674,12 +674,55 @@ Automated Labor Estimation Pipeline — all 7 phases built, deployed, and commit
 - **Files**: Read-only audit, report output to .claude/reports/
 - **Status**: Active
 
-### Agent: Barrett-Jackson Gold Mine Audit — 2026-03-07
+### ~~Agent: Barrett-Jackson Gold Mine Audit — 2026-03-07~~ DONE
 - **Task**: Audit 69K BJ archived snapshots, assess extraction state, write report
-- **Files**: Read-only audit, report output to .claude/reports/
-- **Status**: Active
+- **Output**: `.claude/reports/barrett-jackson-gold-mine.md`
+- **Key Finding**: 78,901 snapshots, 100% have HTML, but extraction yields 0.00 fields per item due to CSR/BailoutToCSR mismatch
+- REMOVED: session complete
 
 ## Financial Systems Audit Agent — 2026-03-07
 - **Task**: Prompt 10 — Full audit of all 10 financial systems
 - **Output**: `.claude/reports/financial-systems-audit.md`
 - **Status**: COMPLETE
+
+### Agent: K10 Patient Zero Fix — 2026-03-07 — COMPLETED
+- **Task**: Fix the founder's 1984 K10 — link owner, write description, create observations, trigger YONO, fix valuation
+- **Result**: Owner linked, description written, 5 observations created, valuation record inserted, quality score 70->85, display tier browse->showcase, YONO processing started, iPhoto intake re-running with --force
+- **REMOVED**: session complete
+
+## Agent: Engagement Infrastructure Activation — 2026-03-07 21:00 UTC
+- **Task**: Activate empty engagement tables (user_subscriptions, vehicle_watchlist, user_notifications, email_digest_queue)
+- **Files/Areas**: DB engagement tables, RLS policies, NotificationCenter.tsx, .claude/reports/engagement-activation.md
+- **Status**: Starting
+
+## Agent: Wire Ingest Function to Frontend
+- **Started**: 2026-03-07 21:00 UTC
+- **Task**: Connect frontend search/URL pasting to the `ingest` edge function
+- **Files**: `nuke_frontend/src/components/search/`, `nuke_frontend/src/services/aiDataIngestion.ts`
+- **Status**: DONE — committed a2c9bca0e
+
+## Agent: Competitive Intelligence Deep Dive
+- **Task**: Deep competitive analysis of all vehicle data platform competitors
+- **Started**: 2026-03-07 ~21:00 UTC
+- **Files**: `.claude/reports/competitive-intelligence-deep.md`, docs/
+- **Status**: COMPLETE
+
+## Agent: Image Pipeline Unstick + YONO Processing -- COMPLETED 2026-03-07 21:05 UTC
+- Released 28,149 stuck locks, fixed 4 edge function bugs, processed 1,624 images
+- Report: .claude/reports/image-pipeline-unstick.md
+
+## Agent: Data Fix - Vehicle States/Makes/Platforms
+- **Started**: 2026-03-07 21:30
+- **Task**: Fix 13K impossible vehicle states, normalize platform slugs, fix make casing
+- **Tables**: vehicles, external_identities
+
+## Agent: Duplicate Vehicle Cleanup
+- **Task**: Phase 1-4 duplicate vehicle analysis and marking
+- **Started**: 2026-03-07
+- **Touching**: vehicles table (status column only), read-only on vehicle_images, vehicle_observations, vehicle_events, auction_comments
+- **Will NOT**: delete any rows, only mark status='duplicate'
+
+## Agent: Identity Stats & Engagement Infrastructure — 2026-03-07 21:30 UTC
+- Task: Build identity stats, claim page data, verify engagement triggers, NotificationCenter icons
+- Files: DB tables (bat_identity_stats_v1, user_notifications, user_subscriptions), nuke_frontend/src/components/notifications/
+- Status: ACTIVE

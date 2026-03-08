@@ -339,10 +339,13 @@ const SECTIONS = [
   { id: 'vehicle-auction', label: 'Vehicle Auction', group: 'REST API' },
   { id: 'market-trends', label: 'Market Trends', group: 'REST API' },
   { id: 'search', label: 'Search', group: 'REST API' },
+  { id: 'vision', label: 'Vision', group: 'REST API' },
+  { id: 'comps', label: 'Comps', group: 'REST API' },
   { id: 'batch', label: 'Batch Import', group: 'REST API' },
   { id: 'observations', label: 'Observations', group: 'REST API' },
   { id: 'extraction', label: 'Structuring', group: 'REST API' },
   { id: 'valuations', label: 'Valuations', group: 'REST API' },
+  { id: 'signal', label: 'Deal Signals', group: 'REST API' },
   { id: 'business', label: 'Business Data', group: 'REST API' },
   { id: 'mcp', label: 'MCP Server', group: 'Integrations' },
   { id: 'webhooks', label: 'Webhooks', group: 'Integrations' },
@@ -1282,6 +1285,118 @@ function SearchSection() {
   );
 }
 
+function VisionSection() {
+  return (
+    <div>
+      <h1 style={s.h1}>Vision</h1>
+      <p style={s.p}>
+        Send a vehicle photo. YONO — Nuke's local vision model — classifies it in 4ms for $0.
+        No cloud vision bills. Returns make, model confidence, vehicle zone, condition scoring,
+        damage flags, and modification detection. Full analysis adds comparable sales.
+      </p>
+
+      <div style={s.endpoint}>
+        <div style={s.endpointHeader}>
+          <span style={s.methodBadge('POST')}>POST</span>
+          <span>/api-v1-vision</span>
+        </div>
+
+        <ParamTable params={[
+          { name: 'image_url', type: 'string', required: true, description: 'URL of the vehicle image to analyze' },
+          { name: 'mode', type: 'string', description: '"classify" (make only, ~4ms) or "full" (make + condition + zones, ~5s). Default: "classify"' },
+          { name: 'include_comps', type: 'boolean', description: 'Include comparable sales in response. Only applies when mode="full". Default: false' },
+        ]} />
+
+        <CodeBlock
+          title="curl — classify"
+          code={`curl -X POST "${API_BASE}/api-v1-vision" \\
+  -H "X-API-Key: nk_live_xxx" \\
+  -H "Content-Type: application/json" \\
+  -d '{"image_url": "https://photos.example.com/car.jpg", "mode": "classify"}'`}
+        />
+
+        <CodeBlock
+          title="SDK — classify"
+          code={`// Quick make classification (~4ms, $0)
+const result = await nuke.vision.classify('https://photos.example.com/car.jpg');
+console.log(result.make);       // "Porsche"
+console.log(result.family);     // "german"
+console.log(result.confidence); // 0.91
+console.log(result.top5);       // [{ make: "Porsche", confidence: 0.91 }, ...]`}
+        />
+
+        <CodeBlock
+          title="SDK — full analysis"
+          code={`// Full vehicle intelligence (~5s, $0)
+const analysis = await nuke.vision.analyze('https://photos.example.com/car.jpg');
+
+console.log(analysis.make);              // "Porsche"
+console.log(analysis.model);             // "911"
+console.log(analysis.year_estimate);     // 1973
+console.log(analysis.vehicle_zone);      // "ext_front_driver"
+console.log(analysis.condition_score);   // 7.5
+console.log(analysis.damage_flags);      // ["minor_scratches"]
+console.log(analysis.modification_flags);// ["aftermarket_wheels"]
+console.log(analysis.photo_quality);     // "high"
+console.log(analysis.is_vehicle);        // true`}
+        />
+
+        <CodeBlock
+          title="SDK — batch"
+          code={`// Batch classification (up to 100 images, $0)
+const batch = await nuke.vision.batch([
+  'https://photos.example.com/car1.jpg',
+  'https://photos.example.com/car2.jpg',
+  'https://photos.example.com/car3.jpg',
+]);
+console.log(batch.count);        // 3
+console.log(batch.results[0].make); // "Ford"
+console.log(batch.total_time_ms);   // 12`}
+        />
+
+        <CodeBlock
+          title="Response — full analysis"
+          code={`{
+  "make": "Porsche",
+  "model": "911",
+  "year_estimate": 1973,
+  "family": "german",
+  "confidence": 0.91,
+  "top5": [
+    { "make": "Porsche", "confidence": 0.91 },
+    { "make": "Volkswagen", "confidence": 0.04 },
+    { "make": "BMW", "confidence": 0.02 }
+  ],
+  "vehicle_zone": "ext_front_driver",
+  "condition_score": 7.5,
+  "condition_scale": "1-10",
+  "damage_flags": ["minor_scratches"],
+  "modification_flags": ["aftermarket_wheels"],
+  "photo_quality": "high",
+  "photo_type": "exterior",
+  "is_vehicle": true,
+  "classification_time_ms": 4,
+  "analysis_time_ms": 4800
+}`}
+        />
+
+        <h3 style={s.h3}>Vehicle Zones (41 zones)</h3>
+        <p style={s.p}>
+          YONO identifies which part of the vehicle is shown in the photo. Zones are grouped into
+          exterior (ext_front_driver, ext_rear_passenger, etc.), interior (int_dashboard, int_seats, etc.),
+          detail (engine_bay, undercarriage, trunk), and other (documentation, key, badge).
+        </p>
+
+        <h3 style={s.h3}>Cost</h3>
+        <div style={s.note}>
+          All vision endpoints are $0. YONO runs locally on Nuke's infrastructure — no cloud vision
+          API calls. Classify runs in 4ms. Full analysis (with Florence-2 for zones and condition) runs in ~5s.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function VinLookupSection() {
   return (
     <div>
@@ -1678,6 +1793,116 @@ for (const p of trends.periods) {
   );
 }
 
+function CompsSection() {
+  return (
+    <div>
+      <h1 style={s.h1}>Comparable Sales</h1>
+      <p style={s.p}>
+        Find comparable vehicle sales across all tracked platforms. Returns real auction results with
+        platform, date, hammer price, listing URL, and vehicle photos. Supports filtering by
+        make/model/year, VIN, vehicle ID, and price range.
+      </p>
+
+      <div style={s.endpoint}>
+        <div style={s.endpointHeader}>
+          <span style={s.methodBadge('GET')}>GET</span>
+          <span style={s.methodBadge('POST')}>POST</span>
+          <span>/api-v1-comps</span>
+        </div>
+
+        <ParamTable params={[
+          { name: 'make', type: 'string', required: true, description: 'Vehicle make (e.g., "Porsche"). Required unless vehicle_id or vin provided.' },
+          { name: 'model', type: 'string', description: 'Vehicle model (e.g., "911")' },
+          { name: 'year', type: 'number', description: 'Center year for range search' },
+          { name: 'year_range', type: 'number', description: 'Years +/- from center year. Default: 2' },
+          { name: 'vehicle_id', type: 'uuid', description: 'Look up by Nuke vehicle ID. Auto-resolves make/model/year and excludes this vehicle from results.' },
+          { name: 'vin', type: 'string', description: 'Look up by VIN. Auto-resolves make/model/year.' },
+          { name: 'min_price', type: 'number', description: 'Minimum sale price filter' },
+          { name: 'max_price', type: 'number', description: 'Maximum sale price filter' },
+          { name: 'limit', type: 'number', description: 'Max results (1-100). Default: 20' },
+        ]} />
+
+        <CodeBlock
+          title="curl"
+          code={`curl "${API_BASE}/api-v1-comps?make=Porsche&model=911&year=1973&limit=20" \\
+  -H "X-API-Key: nk_live_xxx"`}
+        />
+
+        <CodeBlock
+          title="SDK"
+          code={`// By make/model/year
+const comps = await nuke.comps.get({
+  make: 'Porsche',
+  model: '911',
+  year: 1973,
+  year_range: 3,
+  limit: 20,
+});
+
+console.log(comps.summary.count);        // 47
+console.log(comps.summary.avg_price);    // 107400
+console.log(comps.summary.median_price); // 88000
+
+for (const c of comps.data) {
+  console.log(c.year, c.make, c.model, c.sale_price, c.platform, c.sold_date);
+}
+
+// By VIN (auto-resolves make/model/year)
+const comps2 = await nuke.comps.get({ vin: 'WP0AB0916KS121279' });`}
+        />
+
+        <CodeBlock
+          title="Response"
+          code={`{
+  "summary": {
+    "count": 47,
+    "avg_price": 107400,
+    "median_price": 88000,
+    "min_price": 62000,
+    "max_price": 210000,
+    "auction_event_count": 39
+  },
+  "data": [
+    {
+      "vehicle_id": "a1b2c3d4-...",
+      "year": 1973,
+      "make": "Porsche",
+      "model": "911 Carrera RS 2.7",
+      "trim": "Touring",
+      "vin": "9113600xxx",
+      "sale_price": 210000,
+      "mileage": 42000,
+      "color": "Grand Prix White",
+      "image_url": "https://...",
+      "listing_url": "https://bringatrailer.com/listing/...",
+      "platform": "Bring a Trailer",
+      "platform_raw": "bat",
+      "sold_date": "2025-11-14",
+      "source_type": "auction_event"
+    }
+  ],
+  "query": {
+    "make": "Porsche",
+    "model": "911",
+    "year": 1973,
+    "year_range": 2,
+    "excluded_vehicle_id": null
+  }
+}`}
+        />
+
+        <h3 style={s.h3}>Data Sources</h3>
+        <p style={s.p}>
+          Comps are sourced from two systems in priority order: auction_events (real hammer prices from
+          Bring a Trailer, Barrett-Jackson, Mecum, RM Sotheby's, Bonhams, Gooding, Cars & Bids,
+          PCarMarket, and others) and vehicle transaction records (sale_price from dealer and marketplace listings).
+          Results are deduplicated and merged.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function BatchSection() {
   return (
     <div>
@@ -2061,6 +2286,115 @@ function ValuationsSection() {
                 <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.label}</td>
                 <td style={s.td}>{row.range}</td>
                 <td style={s.td}>{row.meaning}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function SignalSection() {
+  return (
+    <div>
+      <h1 style={s.h1}>Deal Signals</h1>
+      <p style={s.p}>
+        Answers "is this a good deal?" Combines comparable sales, listing price vs market, heat score,
+        and auction sentiment into a single 0–100 deal score with confidence-weighted breakdown.
+      </p>
+
+      <div style={s.endpoint}>
+        <div style={s.endpointHeader}>
+          <span style={s.methodBadge('GET')}>GET</span>
+          <span>/api-v1-signal</span>
+        </div>
+
+        <ParamTable params={[
+          { name: 'vehicle_id', type: 'uuid', description: 'Nuke vehicle ID. Required if vin not provided.' },
+          { name: 'vin', type: 'string', description: 'Vehicle VIN. Required if vehicle_id not provided.' },
+        ]} />
+
+        <CodeBlock
+          title="curl"
+          code={`curl "${API_BASE}/api-v1-signal?vehicle_id=a1b2c3d4-..." \\
+  -H "X-API-Key: nk_live_xxx"`}
+        />
+
+        <CodeBlock
+          title="SDK"
+          code={`// Score by vehicle ID
+const score = await nuke.signal.score({ vehicle_id: 'a1b2c3d4-...' });
+
+// Score by VIN
+const score = await nuke.signal.score({ vin: 'WP0AB0916KS121279' });
+
+// Shorthand (vehicle ID string)
+const score = await nuke.signal.score('a1b2c3d4-...');
+
+console.log(score.deal_score);       // 87
+console.log(score.deal_score_label); // "strong_buy"
+console.log(score.price_vs_market);  // -12 (12% below market)
+console.log(score.comp_count);       // 14
+console.log(score.confidence);       // 0.84
+console.log(score.heat_score);       // 72`}
+        />
+
+        <CodeBlock
+          title="Response"
+          code={`{
+  "deal_score": 87,
+  "deal_score_label": "strong_buy",
+  "price_vs_market": -12,
+  "comp_count": 14,
+  "confidence": 0.84,
+  "heat_score": 72,
+  "signals": {
+    "price_position": {
+      "score": 0.92,
+      "weight": 0.35,
+      "detail": "Listed 12% below median comp price"
+    },
+    "market_heat": {
+      "score": 0.72,
+      "weight": 0.20,
+      "detail": "Above average search volume for segment"
+    },
+    "condition_premium": {
+      "score": 0.85,
+      "weight": 0.25,
+      "detail": "Photo analysis indicates above-average condition"
+    },
+    "sentiment": {
+      "score": 0.78,
+      "weight": 0.20,
+      "detail": "Positive auction comment sentiment (78th percentile)"
+    }
+  }
+}`}
+        />
+
+        <h3 style={s.h3}>Deal Score Labels</h3>
+        <table style={s.table}>
+          <thead>
+            <tr>
+              <th style={s.th}>Score</th>
+              <th style={s.th}>Label</th>
+              <th style={s.th}>Interpretation</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              { score: '90–100', label: 'strong_buy', interp: 'Exceptional deal — well below market with high confidence' },
+              { score: '70–89', label: 'buy', interp: 'Good deal — below market or strong fundamentals' },
+              { score: '50–69', label: 'fair', interp: 'Fair price — near market value' },
+              { score: '30–49', label: 'hold', interp: 'Above market — may need price reduction' },
+              { score: '0–29', label: 'overpriced', interp: 'Significantly above comparable sales' },
+            ].map((row) => (
+              <tr key={row.label}>
+                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.score}</td>
+                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.label}</td>
+                <td style={s.td}>{row.interp}</td>
               </tr>
             ))}
           </tbody>
@@ -2561,10 +2895,13 @@ const sectionComponents: Record<string, () => JSX.Element> = {
   'vehicle-auction': VehicleAuctionSection,
   'market-trends': MarketTrendsSection,
   search: SearchSection,
+  vision: VisionSection,
+  comps: CompsSection,
   batch: BatchSection,
   observations: ObservationsSection,
   extraction: ExtractionSection,
   valuations: ValuationsSection,
+  signal: SignalSection,
   business: BusinessSection,
   mcp: McpSection,
   webhooks: WebhooksSection,
