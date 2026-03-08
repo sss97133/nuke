@@ -726,3 +726,13 @@ Automated Labor Estimation Pipeline — all 7 phases built, deployed, and commit
 - Task: Build identity stats, claim page data, verify engagement triggers, NotificationCenter icons
 - Files: DB tables (bat_identity_stats_v1, user_notifications, user_subscriptions), nuke_frontend/src/components/notifications/
 - Status: ACTIVE
+
+## Agent: Garbage Make Cleanup
+- **Task:** Investigate and clean ~18K vehicles with garbage/null makes where canonical_vehicle_type IS NULL
+- **Started:** 2026-03-08 
+- **Touching:** vehicles table (make, canonical_vehicle_type, status columns only)
+
+### Agent: primary_image_url backfill — 2026-03-08
+- Task: Backfill primary_image_url on vehicles from vehicle_images
+- Files: vehicles table, vehicle_images table (read-only)
+- Status: ACTIVE
