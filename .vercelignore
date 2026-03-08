@@ -9,7 +9,6 @@ node_modules
 /dealerscan
 /.claude
 *.log
-*.lock
 nuke_frontend/node_modules
 nuke_frontend/dist
 /yono
