@@ -32,6 +32,7 @@ export interface GarageVehicle {
   trim: string | null;
   vin: string | null;
   primary_image_url: string | null;
+  resolved_image_url: string | null;
   estimated_value: number | null;
   purchase_price: number | null;
   value_delta: number | null;
@@ -139,7 +140,9 @@ function buildSections(vehicles: GarageVehicle[]): GarageSection[] {
 // Vehicle select columns (only columns that exist on the vehicles table)
 // ---------------------------------------------------------------------------
 
-const VEHICLE_SELECT = 'id, year, make, model, trim, vin, current_value, purchase_price, primary_image_url, confidence_score, heat_score, view_count, created_at, updated_at';
+const VEHICLE_SELECT = 'id, year, make, model, trim, vin, current_value, purchase_price, primary_image_url, confidence_score, heat_score, view_count, created_at, updated_at, status';
+
+const VISIBLE_STATUSES = new Set(['active', 'pending', 'discovered', 'pending_backfill']);
 
 interface VehicleRow {
   id: string;
@@ -156,6 +159,7 @@ interface VehicleRow {
   view_count: number | null;
   created_at: string;
   updated_at: string;
+  status: string | null;
 }
 
 function rowToGarageVehicle(
@@ -163,6 +167,8 @@ function rowToGarageVehicle(
   relationship_type: RelationshipType,
   relationship_source: GarageVehicle['relationship_source'],
   permission_role?: string,
+  image_count?: number | null,
+  fallback_image_url?: string | null,
 ): GarageVehicle {
   const estimated_value = row.current_value ?? row.purchase_price ?? null;
   const value_delta =
@@ -178,11 +184,12 @@ function rowToGarageVehicle(
     trim: row.trim,
     vin: row.vin,
     primary_image_url: row.primary_image_url,
+    resolved_image_url: row.primary_image_url || fallback_image_url || null,
     estimated_value,
     purchase_price: row.purchase_price,
     value_delta,
     health_score: row.confidence_score,
-    image_count: null,
+    image_count: image_count ?? null,
     event_count: null,
     view_count: row.view_count,
     last_event_title: null,
@@ -338,12 +345,43 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
 
         if (cancelled) return;
 
-        // Build GarageVehicle array
+        // Batch fetch image counts + fallback images in parallel
+        const vehicleIdArray = Array.from(allRows.keys());
+        const imageCounts = new Map<string, number>();
+        const fallbackImages = new Map<string, string>();
+
+        if (vehicleIdArray.length > 0) {
+          // IDs missing primary_image_url need fallback images
+          const needsFallback = vehicleIdArray.filter(id => !allRows.get(id)?.primary_image_url);
+
+          const [countsRes, fallbackRes] = await Promise.all([
+            supabase.rpc('count_vehicle_images_batch', { vehicle_ids: vehicleIdArray }),
+            needsFallback.length > 0
+              ? supabase.rpc('get_first_image_batch', { vehicle_ids: needsFallback })
+              : Promise.resolve({ data: [] }),
+          ]);
+
+          if (countsRes.data) {
+            for (const c of countsRes.data as { vehicle_id: string; count: number }[]) {
+              imageCounts.set(c.vehicle_id, Number(c.count));
+            }
+          }
+          if (fallbackRes.data) {
+            for (const f of fallbackRes.data as { vehicle_id: string; image_url: string }[]) {
+              fallbackImages.set(f.vehicle_id, f.image_url);
+            }
+          }
+        }
+
+        if (cancelled) return;
+
+        // Build GarageVehicle array — filter out non-visible statuses
         const garage: GarageVehicle[] = [];
         for (const [id, row] of allRows) {
           const rel = relMap.get(id);
-          if (!rel) continue; // dismissed with no other relationship
-          garage.push(rowToGarageVehicle(row, rel.type, rel.source, rel.role));
+          if (!rel) continue;
+          if (row.status && !VISIBLE_STATUSES.has(row.status)) continue;
+          garage.push(rowToGarageVehicle(row, rel.type, rel.source, rel.role, imageCounts.get(id), fallbackImages.get(id)));
         }
 
         setRawVehicles(garage);

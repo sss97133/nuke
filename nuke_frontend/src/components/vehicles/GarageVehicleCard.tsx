@@ -435,9 +435,9 @@ function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
             flexShrink: 0,
           }}
         >
-          {vehicle.primary_image_url ? (
+          {(vehicle.resolved_image_url || vehicle.primary_image_url) ? (
             <img
-              src={optimizeImageUrl(vehicle.primary_image_url)}
+              src={optimizeImageUrl(vehicle.resolved_image_url || vehicle.primary_image_url!)}
               alt={title}
               style={{
                 position: 'absolute',
@@ -460,7 +460,7 @@ function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
                 justifyContent: 'center',
               }}
             >
-              <VehicleThumbnail vehicleId={vehicle.id} />
+              <img src="/nuke.png" alt="No image" style={{ width: 48, height: 48, opacity: 0.3, objectFit: 'contain' }} />
             </div>
           )}
 
@@ -607,9 +607,9 @@ function ListCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
             overflow: 'hidden',
           }}
         >
-          {vehicle.primary_image_url ? (
+          {(vehicle.resolved_image_url || vehicle.primary_image_url) ? (
             <img
-              src={optimizeImageUrl(vehicle.primary_image_url)}
+              src={optimizeImageUrl(vehicle.resolved_image_url || vehicle.primary_image_url!)}
               alt={title}
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
               loading="lazy"
