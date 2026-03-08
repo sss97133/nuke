@@ -7,7 +7,7 @@
 
 import { supabase } from '../lib/supabase';
 import vinDecoderService from './vinDecoder';
-import { listingURLParser, type ParsedListing } from './listingURLParser';
+// listingURLParser no longer used — URL extraction now routes through ingest edge function
 
 export interface ExtractedVehicleData {
   vin?: string;
@@ -253,35 +253,58 @@ class AIDataIngestionService {
     try {
       // First, check if this is an organization website (not a vehicle listing)
       const isOrgWebsite = this.isOrganizationWebsite(url);
-      
+
       if (isOrgWebsite) {
         return await this.handleOrganizationWebsite(url, userId);
       }
 
-      // Otherwise, treat as vehicle listing
-      const parsed = await listingURLParser.parseListingURL(url);
-      
+      // Route vehicle listing URLs through the universal ingest function.
+      // It handles source detection, dedup, VIN matching, enrichment (BaT, C&B,
+      // Hagerty), vehicle creation, image attachment, and user discovery linking.
+      const result = await ingestVehicle({ url, enrich: true });
+
+      if (result.status === 'error') {
+        throw new Error(result.error || 'URL ingestion failed');
+      }
+
+      // Fetch the created/matched vehicle to populate the extraction result
+      let vehicleData: ExtractedVehicleData | undefined;
+      if (result.vehicle_id) {
+        const { data: vehicle } = await supabase
+          .from('vehicles')
+          .select('vin, year, make, model, trim, mileage, asking_price, exterior_color, transmission, drivetrain, engine, location, description, primary_image_url')
+          .eq('id', result.vehicle_id)
+          .single();
+
+        if (vehicle) {
+          vehicleData = {
+            vin: vehicle.vin || undefined,
+            year: vehicle.year || undefined,
+            make: vehicle.make || undefined,
+            model: vehicle.model || undefined,
+            trim: vehicle.trim || undefined,
+            mileage: vehicle.mileage || undefined,
+            price: vehicle.asking_price || undefined,
+            color: vehicle.exterior_color || undefined,
+            transmission: vehicle.transmission || undefined,
+            drivetrain: vehicle.drivetrain || undefined,
+            engine: vehicle.engine || undefined,
+            location: vehicle.location || undefined,
+            description: vehicle.description || undefined,
+            images: vehicle.primary_image_url ? [vehicle.primary_image_url] : undefined,
+          };
+        }
+      }
+
       return {
         inputType: 'url',
-        vehicleData: {
-          vin: parsed.vin,
-          year: parsed.year,
-          make: parsed.make,
-          model: parsed.model,
-          trim: parsed.trim,
-          mileage: parsed.mileage,
-          price: parsed.price || parsed.sold_price,
-          color: parsed.exterior_color,
-          transmission: parsed.transmission,
-          drivetrain: parsed.drivetrain,
-          engine: parsed.engine,
-          location: parsed.location,
-          description: parsed.description,
-          images: parsed.images
+        vehicleData,
+        confidence: vehicleData?.vin ? 0.95 : 0.85,
+        source: result.source || 'ingest',
+        rawData: {
+          ...result,
+          vehicle_id: result.vehicle_id,
         },
-        confidence: parsed.vin ? 0.95 : 0.85, // Higher confidence with VIN
-        source: parsed.source,
-        rawData: parsed
       };
     } catch (error: any) {
       return {

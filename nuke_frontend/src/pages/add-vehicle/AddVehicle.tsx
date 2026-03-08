@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, getSupabaseFunctionsUrl } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { ingestVehicle } from '../../services/aiDataIngestion';
 import { uploadQueue } from '../../services/globalUploadQueue';
 import { TimelineEventService } from '../../services/timelineEventService';
 // AppLayout now provided globally by App.tsx
@@ -1057,37 +1058,43 @@ Redirecting to vehicle profile...`);
         }
       });
 
-      // Insert vehicle directly into Supabase
-      const { data: vehicle, error: insertError } = await supabase
-        .from('vehicles')
-        .insert([vehicleData])
-        .select()
-        .single();
+      // Create vehicle via the universal ingest function (handles dedup, VIN matching, enrichment)
+      const ingestResult = await ingestVehicle({
+        year: vehicleData.year || undefined,
+        make: vehicleData.make || undefined,
+        model: vehicleData.model || undefined,
+        vin: vehicleData.vin || undefined,
+        url: formData.import_url || undefined,
+        price: vehicleData.asking_price || vehicleData.sale_price || undefined,
+        mileage: vehicleData.mileage || undefined,
+        engine: vehicleData.engine_size || undefined,
+        transmission: vehicleData.transmission || undefined,
+        color: vehicleData.color || undefined,
+        location: vehicleData.purchase_location || undefined,
+        description: vehicleData.notes || undefined,
+        image_urls: (formData.import_url && Array.isArray(lastScrapedData?.images) && lastScrapedData.images.length > 0)
+          ? lastScrapedData.images.slice(0, 20)
+          : undefined,
+        enrich: true,
+      });
 
-      if (insertError) {
-        throw new Error(insertError.message);
+      if (ingestResult.status === 'error') {
+        throw new Error(ingestResult.error || 'Failed to create vehicle');
       }
 
-      if (vehicle) {
-        const vehicleId = vehicle.id;
+      const vehicleId = ingestResult.vehicle_id;
+      if (!vehicleId) {
+        throw new Error('Failed to create vehicle - no vehicle_id returned');
+      }
 
-        // If we scraped images from an external listing, convert them into stable Supabase Storage images now.
-        // This avoids hotlink blocks and ensures the homepage can render thumbnails.
-        if (formData.import_url && Array.isArray(lastScrapedData?.images) && lastScrapedData.images.length > 0) {
-          try {
-            await supabase.functions.invoke('backfill-images', {
-              body: {
-                vehicle_id: vehicleId,
-                image_urls: lastScrapedData.images.slice(0, 20),
-                source: 'external_import',
-                run_analysis: false
-              }
-            });
-          } catch (err) {
-            // Non-fatal: vehicle was created; images can be backfilled later.
-            console.warn('URL image backfill failed (non-fatal):', err);
-          }
-        }
+      // Fetch the created vehicle record for downstream use
+      const { data: vehicle } = await supabase
+        .from('vehicles')
+        .select('*')
+        .eq('id', vehicleId)
+        .single();
+
+      if (vehicle) {
         
         // Create timeline event for vehicle creation or discovery
         try {

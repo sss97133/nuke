@@ -1023,7 +1023,7 @@ fetch(\`\${API_BASE}/api-v1-vehicles\`, {
             { ep: 'api-v1-vehicles', anon: 'Read', api: 'CRUD', jwt: 'CRUD (own)' },
             { ep: 'api-v1-batch', anon: '-', api: 'Write', jwt: 'Write' },
             { ep: 'api-v1-observations', anon: 'Read', api: 'Read/Write', jwt: 'Read/Write' },
-            { ep: 'extract-vehicle-data-ai', anon: 'Read', api: 'Read', jwt: 'Read' },
+            { ep: 'ingest', anon: '-', api: 'Write', jwt: 'Write' },
             { ep: 'compute-vehicle-valuation', anon: '-', api: 'Read', jwt: '-' },
             { ep: 'api-v1-business-data', anon: '-', api: 'Read', jwt: 'Read (own org)' },
             { ep: 'db-stats', anon: 'Read', api: 'Read', jwt: 'Read' },
@@ -1886,55 +1886,51 @@ function ExtractionSection() {
       <div style={s.endpoint}>
         <div style={s.endpointHeader}>
           <span style={s.methodBadge('POST')}>POST</span>
-          <span>/extract-vehicle-data-ai</span>
+          <span>/ingest</span>
         </div>
 
         <ParamTable params={[
-          { name: 'url', type: 'string', required: true, description: 'The listing URL to structure' },
-          { name: 'html', type: 'string', description: 'Pre-fetched HTML (skips fetch)' },
-          { name: 'textContent', type: 'string', description: 'Pre-extracted text content' },
-          { name: 'save_to_db', type: 'boolean', description: 'Auto-save to vehicles table (default: false)' },
+          { name: 'url', type: 'string', description: 'A vehicle listing URL (BaT, C&B, Hagerty, Craigslist, eBay, FB Marketplace, etc.)' },
+          { name: 'text', type: 'string', description: 'Free-text vehicle description (e.g. "1980 Chevy C10 $27,500 Greeneville TN")' },
+          { name: 'year', type: 'number', description: 'Vehicle year' },
+          { name: 'make', type: 'string', description: 'Vehicle make' },
+          { name: 'model', type: 'string', description: 'Vehicle model' },
+          { name: 'vin', type: 'string', description: 'Vehicle VIN' },
+          { name: 'price', type: 'number', description: 'Asking or sale price' },
+          { name: 'enrich', type: 'boolean', description: 'Auto-enrich from source URL (default: true)' },
+          { name: 'batch', type: 'array', description: 'Array of inputs for batch ingestion (max 50)' },
         ]} />
 
         <CodeBlock
-          title="Example"
-          code={`curl -X POST "${API_BASE}/extract-vehicle-data-ai" \\
+          title="Example — URL"
+          code={`curl -X POST "${API_BASE}/ingest" \\
+  -H "Authorization: Bearer YOUR_JWT" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "url": "https://carsandbids.com/auctions/xxxxxxx/2022-porsche-911-gt3",
-    "save_to_db": true
+    "url": "https://carsandbids.com/auctions/xxxxxxx/2022-porsche-911-gt3"
+  }'`}
+        />
+
+        <CodeBlock
+          title="Example — Structured"
+          code={`curl -X POST "${API_BASE}/ingest" \\
+  -H "Authorization: Bearer YOUR_JWT" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "year": 1980, "make": "Chevrolet", "model": "C10",
+    "price": 27500, "location": "Greeneville, TN"
   }'`}
         />
 
         <CodeBlock
           title="Response"
           code={`{
-  "success": true,
-  "data": {
-    "year": 2022,
-    "make": "Porsche",
-    "model": "911 GT3",
-    "vin": "WP0AC2A98NS2...",
-    "mileage": 3200,
-    "price": 225000,
-    "exterior_color": "Shark Blue",
-    "interior_color": "Black",
-    "transmission": "Manual",
-    "engine": "4.0L Flat-6",
-    "drivetrain": "RWD",
-    "body_style": "Coupe",
-    "description": "One owner, all service records...",
-    "image_urls": [
-      "https://...",
-      "https://..."
-    ],
-    "location": "Austin, TX",
-    "seller": "enthusiast_garage"
-  },
-  "confidence": 0.96,
-  "source": "carsandbids.com",
-  "vehicle_id": "uuid-created",
-  "images_saved": 24
+  "status": "created",
+  "vehicle_id": "uuid-...",
+  "discovery_id": "uuid-...",
+  "is_new_vehicle": true,
+  "source": "cars_and_bids",
+  "external_id": "xxxxxxx"
 }`}
         />
       </div>
