@@ -29,6 +29,8 @@ const VALID_ADDRESSES = [
   "skylar@nuke.ag",
   // Vehicle listing alert forwarding — routes to process-alert-email → import_queue
   "alerts@nuke.ag",
+  // KSL Classifieds saved-search alerts — routes to process-ksl-email → import_queue
+  "ksl@nuke.ag",
   // Agent addresses — routed to agent_messages
   "coo@nuke.ag",
   "cto@nuke.ag",
@@ -273,6 +275,33 @@ Deno.serve(async (req) => {
         console.log(`[inbound-email] alerts routing → process-alert-email: queued=${alertResult.queued ?? 0}, source=${alertResult.source ?? "unknown"}`);
       } catch (alertErr) {
         console.warn("[inbound-email] Failed to forward to process-alert-email:", alertErr);
+      }
+    }
+
+    // Route ksl@nuke.ag to process-ksl-email → import_queue
+    if (nukeAddress === "ksl@nuke.ag") {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const kslRes = await fetch(`${supabaseUrl}/functions/v1/process-ksl-email`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: fromAddress,
+            to: nukeAddress,
+            subject: data.subject || "",
+            html: bodyHtml || "",
+            text: bodyText || "",
+            messageId: emailId,
+          }),
+        });
+        const kslResult = await kslRes.json().catch(() => ({}));
+        console.log(`[inbound-email] ksl routing → process-ksl-email: queued=${kslResult.queued ?? 0}, listings=${kslResult.listings_found ?? 0}, tier=${kslResult.tier ?? "unknown"}`);
+      } catch (kslErr) {
+        console.warn("[inbound-email] Failed to forward to process-ksl-email:", kslErr);
       }
     }
 

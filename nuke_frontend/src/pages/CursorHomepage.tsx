@@ -24,7 +24,7 @@ import { isPoorQualityImage, dedupeVehicles, getDedupeKey } from '../lib/feedDat
 import type { HypeVehicle, TimePeriod, SalesTimePeriod, ViewMode, SortBy, SortDirection, FilterState } from '../types/feedTypes';
 import { SALES_PERIODS } from '../types/feedTypes';
 import { normalizeSupabaseStorageUrl, cleanDisplayMake, cleanDisplayModel } from '../lib/feedImageUtils';
-import { DEFAULT_FILTERS, getRememberFilters, loadSavedFilters, saveFiltersToStorage, clearPersistedFiltersAndSort, STORAGE_KEY, REMEMBER_FILTERS_KEY, LOCATION_FAVORITES_KEY } from '../lib/filterPersistence';
+import { DEFAULT_FILTERS, getRememberFilters, loadSavedFilters, saveFiltersToStorage, clearPersistedFiltersAndSort, STORAGE_KEY, LOCATION_FAVORITES_KEY } from '../lib/filterPersistence';
 import { parseQuery } from '../lib/search/queryParser';
 import { applyNonAutoFilters } from '../lib/nonAutoExclusion';
 
@@ -1903,11 +1903,11 @@ const CursorHomepage: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px', padding: '8px 0' }}>
             <style>{`@keyframes cursor-sk-pulse { 0%,100%{opacity:.6} 50%{opacity:.3} }`}</style>
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 2, overflow: 'hidden', background: 'var(--surface)' }}>
+              <div key={i} style={{ border: '2px solid var(--border)', borderRadius: 0, overflow: 'hidden', background: 'var(--surface)' }}>
                 <div style={{ width: '100%', paddingBottom: '75%', background: 'var(--border)', animation: 'cursor-sk-pulse 1.5s ease-in-out infinite' }} />
                 <div style={{ padding: '8px 10px' }}>
-                  <div style={{ height: 12, background: 'var(--border)', borderRadius: 2, marginBottom: 6, width: '65%', animation: 'cursor-sk-pulse 1.5s ease-in-out infinite' }} />
-                  <div style={{ height: 9, background: 'var(--border)', borderRadius: 2, width: '40%', animation: 'cursor-sk-pulse 1.5s ease-in-out infinite' }} />
+                  <div style={{ height: 12, background: 'var(--border)', borderRadius: 0, marginBottom: 6, width: '65%', animation: 'cursor-sk-pulse 1.5s ease-in-out infinite' }} />
+                  <div style={{ height: 9, background: 'var(--border)', borderRadius: 0, width: '40%', animation: 'cursor-sk-pulse 1.5s ease-in-out infinite' }} />
                 </div>
               </div>
             ))}

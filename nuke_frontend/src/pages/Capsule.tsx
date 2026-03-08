@@ -8,7 +8,6 @@ import OrganizationAffiliations from '../components/profile/OrganizationAffiliat
 import ProfessionalToolbox from '../components/profile/ProfessionalToolbox';
 import { ProfileVerification } from '../components/ProfileVerification';
 import ChangePasswordForm from '../components/auth/ChangePasswordForm';
-import CashBalance from '../components/trading/CashBalance';
 import StripeKeysManager from '../components/settings/StripeKeysManager';
 import AIProviderSettings from '../components/settings/AIProviderSettings';
 import APIAccessSubscription from '../components/settings/APIAccessSubscription';
@@ -150,7 +149,7 @@ const Capsule: React.FC = () => {
                 <div className="card-body">
                   <div>
                     <div className="text text-small text-muted" style={{ marginBottom: '8px', fontWeight: 600 }}>Cash Balance</div>
-                    <CashBalance compact={false} showActions={true} />
+                    <div className="text text-muted">Trading removed</div>
                   </div>
                 </div>
               </div>

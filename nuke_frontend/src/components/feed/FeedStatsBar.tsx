@@ -50,8 +50,6 @@ export interface FeedStatsBarProps {
   setCardsPerRow: (n: number) => void;
   thumbFitMode: 'square' | 'original';
   setThumbFitMode: (m: 'square' | 'original') => void;
-  rememberFilters: boolean;
-  setRememberFilters: (v: boolean) => void;
 
   // Actions
   openFiltersFromMiniBar: () => void;
@@ -62,7 +60,6 @@ export interface FeedStatsBarProps {
   openStatsPanel: (kind: string) => void;
   setFilters: (f: any) => void;
   setSearchText: (s: string) => void;
-  clearPersistedFiltersAndSort: () => void;
   setSourceIncluded: (key: string, included: boolean) => void;
 
   // Helpers
@@ -71,7 +68,6 @@ export interface FeedStatsBarProps {
   domainGradient: (domain: string) => string;
 
   // Constants
-  REMEMBER_FILTERS_KEY: string;
   DEFAULT_FILTERS: any;
 }
 
@@ -92,8 +88,6 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
   setCardsPerRow,
   thumbFitMode,
   setThumbFitMode,
-  rememberFilters,
-  setRememberFilters,
   openFiltersFromMiniBar,
   setShowRecentlyAddedPanel,
   toggleForSale,
@@ -102,12 +96,10 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
   openStatsPanel,
   setFilters,
   setSearchText,
-  clearPersistedFiltersAndSort,
   setSourceIncluded,
   formatCurrency,
   faviconUrl,
   domainGradient,
-  REMEMBER_FILTERS_KEY,
   DEFAULT_FILTERS,
 }) => {
   return (
@@ -127,12 +119,10 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
         position: 'sticky',
         top: 'var(--header-height, 40px)',
         background: 'var(--surface-glass)',
-        backdropFilter: 'blur(8px)',
         border: '1px solid var(--border)',
         padding: '7px 12px',
         marginBottom: '10px',
         zIndex: 900,
-        boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
         display: 'flex',
         flexWrap: 'nowrap',
         gap: '10px',
@@ -149,7 +139,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
         gap: '8px',
         flex: '0 0 auto',
         fontSize: '11px',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontFamily: 'Arial, sans-serif',
       }}>
         {/* Vehicle count */}
         <div style={{ fontWeight: 700, color: 'var(--text)' }}>
@@ -170,7 +160,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
               title="View recently added vehicles analytics"
               style={{
                 padding: '2px 8px',
-                borderRadius: '999px',
+                borderRadius: 0,
                 border: filters.addedTodayOnly
                   ? '1px solid rgba(16,185,129,0.55)'
                   : '1px solid rgba(16,185,129,0.25)',
@@ -179,10 +169,10 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                 fontSize: '11px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
+                fontFamily: 'Arial, sans-serif',
                 flex: '0 0 auto',
                 lineHeight: 1.3,
-                transition: 'background 0.15s ease',
+                transition: 'background 0.12s ease',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'rgba(16,185,129,0.22)';
@@ -241,11 +231,11 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                 padding: 0,
                 margin: 0,
                 cursor: 'pointer',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
+                fontFamily: 'Arial, sans-serif',
                 fontSize: '11px',
                 color: filters.forSale ? 'var(--success)' : 'var(--text-muted)',
                 fontWeight: filters.forSale ? 700 : 400,
-                transition: 'color 0.15s ease',
+                transition: 'color 0.12s ease',
               }}
             >
               {displayStats.forSaleCount.toLocaleString()} for sale
@@ -266,16 +256,16 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
               title="Live auctions with countdown timers, bid counts, and market analytics"
               style={{
                 border: 'none',
-                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                background: 'var(--error)',
                 padding: '2px 8px',
                 margin: 0,
                 cursor: 'pointer',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                fontSize: '7.5pt',
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '9px',
                 color: 'var(--bg)',
-                borderRadius: '999px',
+                borderRadius: 0,
                 fontWeight: 700,
-                transition: 'opacity 0.15s ease',
+                transition: 'opacity 0.12s ease',
               }}
             >
               LIVE
@@ -294,17 +284,17 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
             }}
             title="Facebook Marketplace classic cars - live monitor feed"
             style={{
-              border: 'none',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+              border: '2px solid var(--accent)',
+              background: 'var(--accent)',
               padding: '2px 8px',
               margin: 0,
               cursor: 'pointer',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
-              fontSize: '7.5pt',
-              color: 'var(--bg)',
-              borderRadius: '999px',
+              fontFamily: 'Arial, sans-serif',
+              fontSize: '9px',
+              color: 'var(--surface)',
+              borderRadius: 0,
               fontWeight: 700,
-              transition: 'opacity 0.15s ease',
+              transition: 'opacity 0.12s ease',
             }}
           >
             FB CARS
@@ -327,19 +317,17 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
             }}
             title="Sort by deal score — vehicles priced below their Nuke Estimate"
             style={{
-              border: sortBy === 'deal_score' ? '1px solid rgba(16,185,129,0.5)' : 'none',
-              background: sortBy === 'deal_score'
-                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                : 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(5,150,105,0.12) 100%)',
+              border: sortBy === 'deal_score' ? '2px solid var(--success)' : '2px solid var(--border)',
+              background: sortBy === 'deal_score' ? 'var(--success)' : 'var(--success-dim)',
               padding: '2px 8px',
               margin: 0,
               cursor: 'pointer',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
-              fontSize: '7.5pt',
-              color: sortBy === 'deal_score' ? 'var(--bg)' : 'var(--success)',
-              borderRadius: '999px',
+              fontFamily: 'Arial, sans-serif',
+              fontSize: '9px',
+              color: sortBy === 'deal_score' ? 'var(--surface)' : 'var(--success)',
+              borderRadius: 0,
               fontWeight: 700,
-              transition: 'all 0.15s ease',
+              transition: 'all 0.12s ease',
             }}
           >
             DEALS
@@ -362,19 +350,17 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
             }}
             title="Sort by heat score — most exciting vehicles right now"
             style={{
-              border: sortBy === 'heat_score' ? '1px solid rgba(239,68,68,0.5)' : 'none',
-              background: sortBy === 'heat_score'
-                ? 'linear-gradient(135deg, #f97316 0%, #ef4444 100%)'
-                : 'linear-gradient(135deg, rgba(249,115,22,0.12) 0%, rgba(239,68,68,0.12) 100%)',
+              border: sortBy === 'heat_score' ? '2px solid var(--warning)' : '2px solid var(--border)',
+              background: sortBy === 'heat_score' ? 'var(--warning)' : 'var(--warning-dim)',
               padding: '2px 8px',
               margin: 0,
               cursor: 'pointer',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
-              fontSize: '7.5pt',
-              color: sortBy === 'heat_score' ? 'var(--bg)' : 'var(--warning)',
-              borderRadius: '999px',
+              fontFamily: 'Arial, sans-serif',
+              fontSize: '9px',
+              color: sortBy === 'heat_score' ? 'var(--surface)' : 'var(--warning)',
+              borderRadius: 0,
               fontWeight: 700,
-              transition: 'all 0.15s ease',
+              transition: 'all 0.12s ease',
             }}
           >
             TRENDING
@@ -398,11 +384,11 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                 padding: 0,
                 margin: 0,
                 cursor: 'pointer',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
+                fontFamily: 'Arial, sans-serif',
                 fontSize: '11px',
                 color: statsPanel === 'sold_today' ? 'var(--purple, #7c3aed)' : 'var(--text-muted)',
                 fontWeight: statsPanel === 'sold_today' ? 700 : 400,
-                transition: 'color 0.15s ease',
+                transition: 'color 0.12s ease',
               }}
             >
               {salesByPeriod.count.toLocaleString()} sold {salesByPeriod.label}
@@ -443,10 +429,10 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
               padding: '2px 10px',
               background: 'var(--grey-200)',
               border: '1px solid var(--border)',
-              borderRadius: '999px',
-              fontSize: '7.5pt',
+              borderRadius: 0,
+              fontSize: '9px',
               color: 'var(--text-muted)',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
+              fontFamily: 'Arial, sans-serif',
               flex: '0 0 auto',
             }}
           >
@@ -463,9 +449,9 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                 padding: '2px 10px',
                 background: 'var(--grey-200)',
                 border: '1px solid var(--border)',
-                borderRadius: '999px',
-                fontSize: '7.5pt',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
+                borderRadius: 0,
+                fontSize: '9px',
+                fontFamily: 'Arial, sans-serif',
                 flex: '0 0 auto',
               }}
             >
@@ -515,17 +501,15 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                     width: '18px',
                     height: '18px',
                     padding: 0,
-                    borderRadius: '999px',
+                    borderRadius: 0,
                     border: '1px solid rgba(255,255,255,0.14)',
                     background: `${domainGradient(p.domain)}, var(--surface-glass)`,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: '0 0 0 1px rgba(0,0,0,0.08), 0 0 0 2px var(--accent-dim)',
                     opacity: 1,
                     flex: '0 0 auto',
-                    backdropFilter: 'blur(10px) saturate(1.35)',
                   }}
                 >
                   <img
@@ -538,7 +522,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                     style={{
                       width: '14px',
                       height: '14px',
-                      borderRadius: '3px',
+                      borderRadius: 0,
                       filter: 'none',
                     }}
                   />
@@ -550,7 +534,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                   flex: '0 0 auto',
                   width: '18px',
                   height: '18px',
-                  borderRadius: '999px',
+                  borderRadius: 0,
                   border: '1px solid var(--border)',
                   background: 'var(--grey-200)',
                   display: 'inline-flex',
@@ -558,7 +542,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
                   justifyContent: 'center',
                   fontSize: '9px',
                   color: 'var(--text-muted)',
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                  fontFamily: 'Arial, sans-serif',
                   userSelect: 'none',
                 }}
                 title="Open filters to add more sources"
@@ -577,7 +561,7 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
           style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
           title={`${cardsPerRow} per row`}
         >
-          <div style={{ fontSize: '7.5pt', color: 'var(--text-muted)', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'Arial, sans-serif' }}>
             {cardsPerRow}/row
           </div>
           <input
@@ -599,14 +583,14 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
               }}
               style={{
                 padding: '2px 8px',
-                fontSize: '7.5pt',
+                fontSize: '9px',
                 border: '1px solid var(--border)',
                 background: thumbFitMode === 'square' ? 'var(--grey-600)' : 'var(--grey-200)',
                 color: thumbFitMode === 'square' ? 'var(--white)' : 'var(--text)',
                 cursor: 'pointer',
-                borderRadius: '999px',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                transition: 'all 0.15s ease',
+                borderRadius: 0,
+                fontFamily: 'Arial, sans-serif',
+                transition: 'all 0.12s ease',
               }}
               title="Square thumbnails"
             >
@@ -620,14 +604,14 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
               }}
               style={{
                 padding: '2px 8px',
-                fontSize: '7.5pt',
+                fontSize: '9px',
                 border: '1px solid var(--border)',
                 background: thumbFitMode === 'original' ? 'var(--grey-600)' : 'var(--grey-200)',
                 color: thumbFitMode === 'original' ? 'var(--white)' : 'var(--text)',
                 cursor: 'pointer',
-                borderRadius: '999px',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                transition: 'all 0.15s ease',
+                borderRadius: 0,
+                fontFamily: 'Arial, sans-serif',
+                transition: 'all 0.12s ease',
               }}
               title="Original aspect (letterbox)"
             >
@@ -635,34 +619,6 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
             </button>
           </div>
         </div>
-        <label
-          title="When on, filters and sort are restored when you come back. When off (default), every visit starts with no filters."
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-            fontSize: '7.5pt',
-            cursor: 'pointer',
-            color: 'var(--text-muted)',
-            marginLeft: '8px',
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={rememberFilters}
-            onChange={(e) => {
-              e.stopPropagation();
-              const v = e.target.checked;
-              setRememberFilters(v);
-              try {
-                localStorage.setItem(REMEMBER_FILTERS_KEY, v ? 'true' : 'false');
-              } catch { /* ignore */ }
-              if (!v) clearPersistedFiltersAndSort();
-            }}
-            style={{ width: '11px', height: '11px', cursor: 'pointer' }}
-          />
-          Keep filters
-        </label>
         {activeFilterCount > 0 && (
           <button
             onClick={(e) => {
@@ -672,15 +628,15 @@ const FeedStatsBar: React.FC<FeedStatsBarProps> = ({
             }}
             style={{
               padding: '2px 8px',
-              fontSize: '7.5pt',
+              fontSize: '9px',
               border: '1px solid var(--border)',
               background: 'var(--grey-200)',
               color: 'var(--text)',
               cursor: 'pointer',
-              borderRadius: '2px',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
+              borderRadius: 0,
+              fontFamily: 'Arial, sans-serif',
               fontWeight: 700,
-              transition: 'background 0.15s ease',
+              transition: 'background 0.12s ease',
             }}
           >
             Reset

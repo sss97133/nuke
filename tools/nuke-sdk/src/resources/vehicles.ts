@@ -125,16 +125,29 @@ export class Vehicles {
     if (params?.page) queryParams.set('page', String(params.page));
     if (params?.limit) queryParams.set('limit', String(params.limit));
     if (params?.mine) queryParams.set('mine', 'true');
+    if (params?.make) queryParams.set('make', params.make);
+    if (params?.model) queryParams.set('model', params.model);
+    if (params?.year) queryParams.set('year', String(params.year));
+    if (params?.year_min) queryParams.set('year_min', String(params.year_min));
+    if (params?.year_max) queryParams.set('year_max', String(params.year_max));
+    if (params?.sort) queryParams.set('sort', params.sort);
+    if (params?.sort_dir) queryParams.set('sort_dir', params.sort_dir);
 
     const query = queryParams.toString();
     const endpoint = query ? `api-v1-vehicles?${query}` : 'api-v1-vehicles';
 
-    return this.client.request<PaginatedResponse<Vehicle>>(
+    // API returns { vehicles: [...], pagination } but SDK expects { data: [...], pagination }
+    const response = await this.client.request<{ vehicles: Vehicle[]; pagination: PaginatedResponse<Vehicle>['pagination'] }>(
       'GET',
       endpoint,
       undefined,
       options
     );
+
+    return {
+      data: response.vehicles,
+      pagination: response.pagination,
+    };
   }
 
   /**

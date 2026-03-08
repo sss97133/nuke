@@ -42,6 +42,14 @@ export type {
   VisionHealthResult,
 } from './resources/vision';
 export type { Signal } from './resources/signal';
+export type {
+  Analysis,
+  AnalysisSignal,
+  AnalysisReport,
+  AnalysisHealth,
+  AnalysisHistoryEntry,
+  AnalysisHistoryResponse,
+} from './resources/analysis';
 
 import { NukeConfig, RequestOptions } from './types';
 import { Vehicles } from './resources/vehicles';
@@ -58,11 +66,12 @@ import { MarketTrends } from './resources/market-trends';
 import { Search } from './resources/search';
 import { Vision } from './resources/vision';
 import { Signal } from './resources/signal';
+import { Analysis } from './resources/analysis';
 import { NukeError, NukeAPIError, NukeAuthenticationError, NukeRateLimitError } from './errors';
 
 const DEFAULT_BASE_URL = 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1';
 const DEFAULT_TIMEOUT = 30000;
-const SDK_VERSION = '1.5.0';
+const SDK_VERSION = '1.6.0';
 
 export default class Nuke {
   private apiKey: string;
@@ -84,6 +93,7 @@ export default class Nuke {
   public search: Search;
   public vision: Vision;
   public signal: Signal;
+  public analysis: Analysis;
 
   constructor(apiKey: string, config?: Partial<NukeConfig>) {
     if (!apiKey) {
@@ -109,6 +119,7 @@ export default class Nuke {
     this.search = new Search(this);
     this.vision = new Vision(this);
     this.signal = new Signal(this);
+    this.analysis = new Analysis(this);
   }
 
   /**

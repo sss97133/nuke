@@ -1,6 +1,6 @@
 import React from 'react';
 import type { FilterState, SortBy, SortDirection } from '../../types/feedTypes';
-import { LOCATION_FAVORITES_KEY, REMEMBER_FILTERS_KEY, DEFAULT_FILTERS, clearPersistedFiltersAndSort } from '../../lib/filterPersistence';
+import { LOCATION_FAVORITES_KEY, DEFAULT_FILTERS, clearPersistedFiltersAndSort } from '../../lib/filterPersistence';
 import { looksLikeHttpError } from '../../lib/sourceClassification';
 
 export type StatsPanelKind = 'vehicles' | 'value' | 'for_sale' | 'sold_today' | 'auctions';
@@ -271,14 +271,14 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                     title="Live auctions with countdown timers, bid counts, and market analytics. Click to open."
                     style={{
                       border: 'none',
-                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                      background: 'var(--error)',
                       padding: '2px 8px',
                       margin: 0,
                       cursor: 'pointer',
                       fontFamily: 'monospace',
                       fontSize: '9px',
                       color: 'var(--bg)',
-                      borderRadius: '4px',
+                      borderRadius: 0,
                       fontWeight: 700,
                       animation: 'pulse 2s infinite',
                     }}
@@ -334,10 +334,10 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                   border: '1px solid var(--border)',
                   background: 'transparent',
                   cursor: 'pointer',
-                  fontFamily: '"MS Sans Serif", sans-serif'
+                  fontFamily: 'Arial, sans-serif'
                 }}
               >
-                hide
+                HIDE
               </button>
             </div>
 
@@ -362,7 +362,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                   border: !collapsedSections.yearFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                 }}
               >
-                {filters.yearMin && filters.yearMax ? `${filters.yearMin}-${filters.yearMax}` : 'year'}
+                {filters.yearMin && filters.yearMax ? `${filters.yearMin}-${filters.yearMax}` : 'YEAR'}
               </button>
               
               {/* Make filter button */}
@@ -378,7 +378,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                   border: !collapsedSections.makeFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                 }}
               >
-                {filters.makes.length > 0 ? `make: ${filters.makes.join(', ')}` : 'make'}
+                {filters.makes.length > 0 ? `MAKE: ${filters.makes.join(', ')}` : 'MAKE'}
               </button>
 
               {/* Model filter button */}
@@ -394,7 +394,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                   border: !collapsedSections.modelFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                 }}
               >
-                {filters.models?.length > 0 ? `model: ${filters.models.join(', ')}` : 'model'}
+                {filters.models?.length > 0 ? `MODEL: ${filters.models.join(', ')}` : 'MODEL'}
               </button>
 
               {/* Price button - combines sort and filter */}
@@ -414,9 +414,9 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                   if (filters.priceMin || filters.priceMax) {
                     return `$${filters.priceMin ? (filters.priceMin/1000).toFixed(0) + 'k' : '?'}-${filters.priceMax ? (filters.priceMax/1000).toFixed(0) + 'k' : '?'}`;
                   }
-                  if (sortBy === 'price_high') return 'price (high)';
-                  if (sortBy === 'price_low') return 'price (low)';
-                  return 'price';
+                  if (sortBy === 'price_high') return 'PRICE (HIGH)';
+                  if (sortBy === 'price_low') return 'PRICE (LOW)';
+                  return 'PRICE';
                 })()}
               </button>
               
@@ -434,10 +434,10 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                 }}
               >
                 {filters.locations && filters.locations.length > 0 
-                  ? `📍${filters.locations.length} loc${filters.locations.length > 1 ? 's' : ''}`
-                  : filters.zipCode 
-                    ? `📍${filters.zipCode}` 
-                    : 'location'}
+                  ? `${filters.locations.length} LOC${filters.locations.length > 1 ? 'S' : ''}`
+                  : filters.zipCode
+                    ? filters.zipCode
+                    : 'LOCATION'}
               </button>
               
               {/* Type filter button (body style) */}
@@ -453,9 +453,9 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                   border: !collapsedSections.typeFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                 }}
               >
-                {filters.bodyStyles.length > 0 || filters.is4x4 
-                  ? `type: ${[...filters.bodyStyles, filters.is4x4 ? '4x4' : ''].filter(Boolean).join(', ')}`
-                  : 'type'}
+                {filters.bodyStyles.length > 0 || filters.is4x4
+                  ? `TYPE: ${[...filters.bodyStyles, filters.is4x4 ? '4X4' : ''].filter(Boolean).join(', ')}`
+                  : 'TYPE'}
               </button>
               
               {/* Sources button */}
@@ -471,7 +471,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                   border: !collapsedSections.sourcePogs ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                 }}
               >
-                sources: {sourcePogs.selected.length}/{sourcePogs.all.length}
+                SOURCES: {sourcePogs.selected.length}/{sourcePogs.all.length}
               </button>
               
               {/* Status filters button */}
@@ -487,9 +487,9 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                   border: !collapsedSections.statusFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                 }}
               >
-                status
+                STATUS
               </button>
-              
+
               {/* Reset button */}
               {activeFilterCount > 0 && (
                 <button
@@ -501,13 +501,13 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                     marginLeft: '6px',
                     padding: '3px 7px',
                     fontSize: '9px',
-                    border: '1px solid var(--border)',
+                    border: '2px solid var(--border)',
                     background: 'transparent',
                     cursor: 'pointer',
-                    fontFamily: '"MS Sans Serif", sans-serif'
+                    fontFamily: 'Arial, sans-serif'
                   }}
                 >
-                  reset
+                  RESET
                 </button>
               )}
             </div>
@@ -570,7 +570,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         padding: '3px 5px',
                         border: '1px solid var(--border)',
                         fontSize: '9px',
-                        fontFamily: '"MS Sans Serif", sans-serif'
+                        fontFamily: 'Arial, sans-serif'
                       }}
                     />
                     <span style={{ fontSize: '9px' }}>to</span>
@@ -587,7 +587,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         padding: '3px 5px',
                         border: '1px solid var(--border)',
                         fontSize: '9px',
-                        fontFamily: '"MS Sans Serif", sans-serif'
+                        fontFamily: 'Arial, sans-serif'
                       }}
                     />
                     {(filters.yearMin || filters.yearMax) && (
@@ -596,11 +596,11 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         className="button-win95"
                         style={{ padding: '3px 7px', fontSize: '9px' }}
                       >
-                        clear
+                        CLEAR
                       </button>
                     )}
                   </div>
-                  
+
                   {/* Quick year buttons - only visible if container is wide enough */}
                   <div 
                     className="year-quick-buttons"
@@ -823,7 +823,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         padding: '2px 6px',
                         fontSize: '9px',
                         border: '1px solid var(--border)',
-                        fontFamily: '"MS Sans Serif", sans-serif',
+                        fontFamily: 'Arial, sans-serif',
                         minWidth: '80px'
                       }}
                     />
@@ -863,7 +863,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                           padding: '2px 4px',
                           cursor: 'pointer',
                           background: p.included ? 'var(--white)' : 'transparent',
-                          borderRadius: '1px'
+                          borderRadius: 0
                         }}
                       >
                         <input
@@ -922,7 +922,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         padding: '4px 6px',
                         background: 'var(--white)',
                         border: '1px solid var(--border)',
-                        borderRadius: '2px',
+                        borderRadius: 0,
                         minHeight: '24px',
                         cursor: 'text'
                       }}
@@ -937,7 +937,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                             background: 'var(--grey-600)',
                             color: 'var(--white)',
                             fontSize: '9px',
-                            borderRadius: '2px',
+                            borderRadius: 0,
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '3px',
@@ -1033,7 +1033,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                           outline: 'none',
                           padding: '2px 0',
                           fontSize: '9px',
-                          fontFamily: '"MS Sans Serif", sans-serif',
+                          fontFamily: 'Arial, sans-serif',
                           background: 'transparent'
                         }}
                       />
@@ -1052,7 +1052,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         border: '1px solid var(--border)',
                         borderTop: 'none',
                         zIndex: 100,
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        border: '2px solid var(--border)'
                       }}>
                         {makeSuggestions.map((make, idx) => (
                           <div
@@ -1138,7 +1138,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         padding: '4px 6px',
                         background: 'var(--white)',
                         border: '1px solid var(--border)',
-                        borderRadius: '2px',
+                        borderRadius: 0,
                         minHeight: '24px',
                         cursor: 'text'
                       }}
@@ -1153,7 +1153,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                             background: 'var(--grey-600)',
                             color: 'var(--white)',
                             fontSize: '9px',
-                            borderRadius: '2px',
+                            borderRadius: 0,
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '3px',
@@ -1245,7 +1245,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                           outline: 'none',
                           padding: '2px 0',
                           fontSize: '9px',
-                          fontFamily: '"MS Sans Serif", sans-serif',
+                          fontFamily: 'Arial, sans-serif',
                           background: 'transparent'
                         }}
                       />
@@ -1264,7 +1264,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         border: '1px solid var(--border)',
                         borderTop: 'none',
                         zIndex: 100,
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        border: '2px solid var(--border)'
                       }}>
                         {modelSuggestions.map((model, idx) => (
                           <div
@@ -1358,7 +1358,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         className="button-win95"
                         style={{ padding: '3px 6px', fontSize: '9px' }}
                       >
-                        clear
+                        CLEAR
                       </button>
                     )}
                   </div>
@@ -1407,7 +1407,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                 }}>
                   {/* Sort direction toggle */}
                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>sort:</span>
+                    <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>SORT:</span>
                     <button
                       onClick={() => {
                         if (sortBy === 'price_high') {
@@ -1431,13 +1431,13 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         border: (sortBy === 'price_high' || sortBy === 'price_low') ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                       }}
                     >
-                      {sortBy === 'price_high' ? 'highest first' : sortBy === 'price_low' ? 'lowest first' : 'none'}
+                      {sortBy === 'price_high' ? 'HIGHEST FIRST' : sortBy === 'price_low' ? 'LOWEST FIRST' : 'NONE'}
                     </button>
                   </div>
 
                   {/* Price range inputs */}
                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>range:</span>
+                    <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>RANGE:</span>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -1450,7 +1450,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         padding: '3px 5px',
                         border: '1px solid var(--border)',
                         fontSize: '9px',
-                        fontFamily: '"MS Sans Serif", sans-serif'
+                        fontFamily: 'Arial, sans-serif'
                       }}
                     />
                     <span style={{ fontSize: '9px' }}>–</span>
@@ -1466,7 +1466,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         padding: '3px 5px',
                         border: '1px solid var(--border)',
                         fontSize: '9px',
-                        fontFamily: '"MS Sans Serif", sans-serif'
+                        fontFamily: 'Arial, sans-serif'
                       }}
                     />
                     {(filters.priceMin || filters.priceMax) && (
@@ -1475,7 +1475,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                         className="button-win95"
                         style={{ padding: '3px 7px', fontSize: '9px' }}
                       >
-                        clear
+                        CLEAR
                       </button>
                     )}
                   </div>
@@ -1593,10 +1593,10 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                           padding: '3px 5px',
                           border: '1px solid var(--border)',
                           fontSize: '9px',
-                          fontFamily: '"MS Sans Serif", sans-serif'
+                          fontFamily: 'Arial, sans-serif'
                         }}
                       />
-                      <span style={{ fontSize: '9px' }}>within</span>
+                      <span style={{ fontSize: '9px' }}>WITHIN</span>
                       <select
                         value={currentRadius}
                         onChange={(e) => setCurrentRadius(Number(e.target.value))}
@@ -1604,7 +1604,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                           padding: '3px 5px',
                           border: '1px solid var(--border)',
                           fontSize: '9px',
-                          fontFamily: '"MS Sans Serif", sans-serif',
+                          fontFamily: 'Arial, sans-serif',
                           width: '80px',
                           background: 'var(--white)',
                           cursor: 'pointer'
@@ -1642,7 +1642,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       {/* Active locations inline on same row */}
                       {((filters.locations && filters.locations.length > 0) || (filters.zipCode && filters.zipCode.length === 5 && filters.radiusMiles > 0)) && (
                         <>
-                          <span style={{ fontSize: '9px', marginLeft: '4px' }}>active:</span>
+                          <span style={{ fontSize: '9px', marginLeft: '4px' }}>ACTIVE:</span>
                           {(filters.locations && filters.locations.length > 0
                             ? filters.locations
                             : [{ zipCode: filters.zipCode!, radiusMiles: filters.radiusMiles }]
@@ -1673,7 +1673,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                     {/* Favorites */}
                     {locationFavorites.length > 0 && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ fontSize: '9px', fontWeight: 700 }}>favorites:</span>
+                        <span style={{ fontSize: '9px', fontWeight: 700 }}>FAVORITES:</span>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
                           {locationFavorites.map((fav, idx) => {
                             const isActive = filters.locations?.some(loc => loc.zipCode === fav.zipCode && loc.radiusMiles === fav.radiusMiles);
@@ -1735,7 +1735,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       checked={filters.forSale}
                       onChange={(e) => setFilters({...filters, forSale: e.target.checked})}
                     />
-                    <span>for sale only</span>
+                    <span>FOR SALE ONLY</span>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '9px' }}>
                     <input
@@ -1743,7 +1743,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       checked={filters.hideSold}
                       onChange={(e) => setFilters({ ...filters, hideSold: e.target.checked })}
                     />
-                    <span>hide sold</span>
+                    <span>HIDE SOLD</span>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '9px' }}>
                     <input
@@ -1751,7 +1751,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       checked={filters.showPending}
                       onChange={(e) => setFilters({...filters, showPending: e.target.checked})}
                     />
-                    <span>show pending</span>
+                    <span>SHOW PENDING</span>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '9px' }}>
                     <input
@@ -1759,7 +1759,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       checked={filters.privateParty}
                       onChange={(e) => setFilters({...filters, privateParty: e.target.checked})}
                     />
-                    <span>private party</span>
+                    <span>PRIVATE PARTY</span>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '9px' }}>
                     <input
@@ -1767,7 +1767,7 @@ const FeedFilterPanel: React.FC<FeedFilterPanelProps> = ({
                       checked={filters.dealer}
                       onChange={(e) => setFilters({...filters, dealer: e.target.checked})}
                     />
-                    <span>dealer</span>
+                    <span>DEALER</span>
                   </label>
                 </div>
               )}

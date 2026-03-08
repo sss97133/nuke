@@ -36,20 +36,26 @@ export interface Vehicle {
   year: number | null;
   make: string | null;
   model: string | null;
+  trim?: string | null;
+  series?: string | null;
   vin: string | null;
   mileage: number | null;
-  exterior_color: string | null;
+  color?: string | null;
   interior_color: string | null;
   transmission: string | null;
-  engine: string | null;
+  engine_type?: string | null;
+  engine_displacement?: string | null;
   drivetrain: string | null;
   body_style: string | null;
   sale_price: number | null;
-  description: string | null;
+  purchase_price?: number | null;
+  description?: string | null;
   is_public: boolean;
-  owner_id: string;
+  owner_id?: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
+  primary_image_url?: string | null;
+  discovery_url?: string | null;
 }
 
 export interface VehicleCreateParams {
@@ -58,13 +64,13 @@ export interface VehicleCreateParams {
   model?: string;
   vin?: string;
   mileage?: number;
-  exterior_color?: string;
+  color?: string;
   interior_color?: string;
   transmission?: string;
-  engine?: string;
+  engine_type?: string;
   drivetrain?: string;
   body_style?: string;
-  sale_price?: number;
+  purchase_price?: number;
   description?: string;
   is_public?: boolean;
 }
@@ -75,48 +81,52 @@ export interface VehicleUpdateParams {
   model?: string;
   vin?: string;
   mileage?: number;
-  exterior_color?: string;
+  color?: string;
   interior_color?: string;
   transmission?: string;
-  engine?: string;
+  engine_type?: string;
   drivetrain?: string;
   body_style?: string;
-  sale_price?: number;
+  purchase_price?: number;
   description?: string;
   is_public?: boolean;
 }
 
 export interface VehicleListParams extends PaginationParams {
   mine?: boolean;
+  make?: string;
+  model?: string;
+  year?: number;
+  year_min?: number;
+  year_max?: number;
+  vin?: string;
+  price_min?: number;
+  price_max?: number;
+  transmission?: string;
+  mileage_max?: number;
+  sort?: 'created_at' | 'year' | 'sale_price' | 'mileage' | 'updated_at';
+  sort_dir?: 'asc' | 'desc';
 }
 
 // Observation Types
 export interface Observation {
   id: string;
   vehicle_id: string;
-  vin: string | null;
-  source_type: string;
-  observation_kind: string;
+  source_id: string | null;
+  kind: string;
   observed_at: string;
-  data: Record<string, any>;
-  confidence: number;
-  provenance: {
-    ingested_by?: string;
-    ingested_via?: string;
-    url?: string;
-    document_id?: string;
-    extracted_by?: string;
-  };
+  structured_data: Record<string, any> | null;
+  confidence: number | null;
   created_at: string;
 }
 
 export interface ObservationCreateParams {
   vehicle_id?: string;
   vin?: string;
-  source_type: string;
-  observation_kind: string;
+  source_id: string;
+  kind: string;
   observed_at?: string;
-  data: Record<string, any>;
+  structured_data: Record<string, any>;
   confidence?: number;
   provenance?: {
     url?: string;
@@ -259,16 +269,17 @@ export interface ValuationGetParams {
 }
 
 // External Listing Types
+// Field names match the vehicle_events table returned by api-v1-listings
 export interface ExternalListing {
   id: string;
   vehicle_id: string;
-  platform: string;
-  listing_url: string;
-  listing_id: string;
-  listing_status: string;
-  start_date: string | null;
-  end_date: string | null;
-  current_bid: number | null;
+  source_platform: string;
+  source_url: string | null;
+  source_listing_id: string | null;
+  event_status: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  current_price: number | null;
   reserve_price: number | null;
   buy_now_price: number | null;
   bid_count: number | null;
@@ -289,19 +300,22 @@ export interface ListingListParams extends PaginationParams {
 
 // Comparable Types
 export interface Comparable {
-  vehicle_id: string;
-  year: number;
-  make: string;
-  model: string;
+  vehicle_id: string | null;
+  year: number | null;
+  make: string | null;
+  model: string | null;
   trim: string | null;
   vin: string | null;
   sale_price: number;
   mileage: number | null;
-  transmission: string | null;
   color: string | null;
-  condition_rating: number | null;
   image_url: string | null;
   location: string | null;
+  listing_url: string | null;
+  platform: string | null;
+  platform_raw: string | null;
+  sold_date: string | null;
+  source_type: 'auction_event' | 'vehicle_record';
 }
 
 export interface CompsSummary {
@@ -310,6 +324,7 @@ export interface CompsSummary {
   median_price: number;
   min_price: number;
   max_price: number;
+  auction_event_count: number;
 }
 
 export interface CompsResponse {
@@ -320,6 +335,7 @@ export interface CompsResponse {
     model: string | null;
     year: number | null;
     year_range: number;
+    excluded_vehicle_id: string | null;
   };
 }
 
@@ -466,7 +482,26 @@ export interface VehicleAuctionResponse {
     vin: string | null;
     sale_price: number | null;
   };
-  listings: ExternalListing[];
+  /** Auction/listing records from vehicle_events table */
+  listings: Array<{
+    id: string;
+    source_platform: string | null;
+    source_url: string | null;
+    source_listing_id: string | null;
+    event_status: string | null;
+    started_at: string | null;
+    ended_at: string | null;
+    current_price: number | null;
+    reserve_price: number | null;
+    buy_now_price: number | null;
+    bid_count: number | null;
+    view_count: number | null;
+    watcher_count: number | null;
+    final_price: number | null;
+    sold_at: string | null;
+    created_at: string;
+    updated_at: string;
+  }>;
   comments: {
     total_count: number;
     recent: AuctionComment[];
@@ -585,6 +620,8 @@ export interface SignalScore {
   calculated_at: string | null;
   /** True if the score is older than the staleness threshold */
   is_stale: boolean | null;
+  /** True if the score was computed on-demand (no pre-existing estimate) */
+  computed_on_demand?: boolean;
 }
 
 export interface SignalScoreParams {
@@ -597,29 +634,59 @@ export interface SignalScoreParams {
 // Search Types
 export interface SearchParams {
   q: string;
+  make?: string;
+  model?: string;
+  year_from?: number;
+  year_to?: number;
+  has_vin?: boolean;
+  sort?: 'relevance' | 'price_desc' | 'price_asc' | 'year_desc' | 'year_asc';
   types?: string[];
   limit?: number;
+  page?: number;
 }
 
 export interface SearchResult {
   id: string;
-  type: string;
+  vin: string | null;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  trim: string | null;
   title: string;
-  subtitle: string | null;
-  description: string | null;
-  image_url: string | null;
-  relevance_score: number;
-  metadata: Record<string, any> | null;
+  sale_price: number | null;
+  mileage: number | null;
+  color: string | null;
+  interior_color: string | null;
+  transmission: string | null;
+  engine_size: string | null;
+  body_style: string | null;
+  auction_source: string | null;
+  valuation: {
+    estimated_value: number | null;
+    confidence_score: number | null;
+  } | null;
+  data_density: {
+    has_vin: boolean;
+    has_valuation: boolean;
+    has_price: boolean;
+  };
 }
 
 export interface SearchResponse {
   data: SearchResult[];
   query: {
-    q: string;
-    types: string[] | null;
-    limit: number;
+    q: string | null;
+    make: string | null;
+    model: string | null;
+    year_from: number | null;
+    year_to: number | null;
+    sort: string;
   };
-  total_count: number;
-  query_type: string;
-  search_time_ms: number | null;
+  pagination: {
+    page: number;
+    limit: number;
+    total_count: number;
+    total_pages: number;
+  };
+  search_time_ms: number;
 }

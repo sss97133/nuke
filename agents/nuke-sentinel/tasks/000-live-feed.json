@@ -1,0 +1,38 @@
+{
+  "id": "000",
+  "type": "live-feed",
+  "priority": -1,
+  "schedule": "every 5 minutes",
+  "params": {
+    "youtube": {
+      "channels": [
+        {"name": "Anthropic", "id": "UCrDwWp7EBBv4NwvScIpBDOA"},
+        {"name": "Fireship", "id": "UCsBjURrPoezykLs9EqgamOA"},
+        {"name": "AI Explained", "id": "UCNJ1Ymd5yFuUPtn21xtRbbw"},
+        {"name": "Matthew Berman", "id": "UCML_5grfABPGvbWM1SWqzCQ"},
+        {"name": "David Ondrej", "id": "UCw4SrWjSPhT3h2sqJPXvlRg"},
+        {"name": "All About AI", "id": "UCUxw2FfmIHPtzr_mFw_vccw"},
+        {"name": "WorldofAI", "id": "UCWqOqNb0E3O0Gp8UMgUmHfQ"},
+        {"name": "AI Jason", "id": "UCdv5TSmMZ658yWEpeSWUZ1Q"}
+      ],
+      "keywords": ["claude", "anthropic", "claude code", "mcp", "opus", "sonnet", "haiku", "ai agent", "claude api"]
+    },
+    "twitter": {
+      "accounts": [
+        "AnthropicAI",
+        "alexalbert__",
+        "swyx",
+        "karpathy",
+        "emollick",
+        "bindureddy",
+        "DrJimFan",
+        "simonw"
+      ],
+      "keywords": ["claude code", "claude 4", "anthropic", "mcp server", "claude skills", "opus 4"],
+      "method": "nitter_rss"
+    }
+  },
+  "last_run": null,
+  "status": "pending",
+  "notes": "Near real-time monitoring of X and YouTube for Claude/AI updates - runs every 5 min"
+}

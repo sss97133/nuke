@@ -50,8 +50,9 @@ const QuickStatsBar: React.FC<{
   imageCount: number;
   eventCount: number;
   commentCount: number;
+  observationCount?: number;
   updatedAt?: string | null;
-}> = ({ imageCount, eventCount, commentCount, updatedAt }) => {
+}> = ({ imageCount, eventCount, commentCount, observationCount, updatedAt }) => {
   const timeAgo = React.useMemo(() => {
     if (!updatedAt) return null;
     try {
@@ -73,6 +74,7 @@ const QuickStatsBar: React.FC<{
 
   const parts: string[] = [];
   if (imageCount > 0) parts.push(`${imageCount} image${imageCount === 1 ? '' : 's'}`);
+  if (observationCount && observationCount > 0) parts.push(`${observationCount} observation${observationCount === 1 ? '' : 's'}`);
   if (eventCount > 0) parts.push(`${eventCount} event${eventCount === 1 ? '' : 's'}`);
   if (commentCount > 0) parts.push(`${commentCount} comment${commentCount === 1 ? '' : 's'}`);
   if (timeAgo) parts.push(`Updated ${timeAgo}`);
@@ -134,6 +136,7 @@ const VehicleProfile: React.FC = () => {
   const [heroMeta, setHeroMeta] = useState<HeroImageMeta | null>(null);
   const [recentCommentCount, setRecentCommentCount] = useState<number>(0);
   const [totalCommentCount, setTotalCommentCount] = useState<number>(0);
+  const [observationCount, setObservationCount] = useState<number>(0);
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [loading, setLoading] = useState(true); // Start true to show loading state until data loads
   const [ownershipVerifications, setOwnershipVerifications] = useState<any[]>([]);
@@ -745,6 +748,12 @@ const VehicleProfile: React.FC = () => {
       loadPresenceCount();
       loadRecentComments();
       loadTotalCommentCount();
+      // Load observation count from vehicle_observations
+      supabase
+        .from('vehicle_observations')
+        .select('id', { count: 'exact', head: true })
+        .eq('vehicle_id', vehicle.id)
+        .then(({ count }) => { if (count !== null) setObservationCount(count); });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle?.id]); // Only re-run when vehicle ID changes, not on every vehicle object change
@@ -1890,7 +1899,14 @@ const VehicleProfile: React.FC = () => {
           </React.Suspense>
         </div>
 
-        {/* WalkAroundCarousel and QuickStatsBar removed */}
+        {/* Quick Stats — real data counts from vehicle_images and vehicle_observations */}
+        <QuickStatsBar
+          imageCount={vehicleImages.length}
+          eventCount={timelineEvents.length}
+          commentCount={totalCommentCount}
+          observationCount={observationCount}
+          updatedAt={vehicle?.updated_at}
+        />
 
         {/* Add Organization Relationship Modal */}
         {showAddOrgRelationship && vehicle && session?.user?.id && (

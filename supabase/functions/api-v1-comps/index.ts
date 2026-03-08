@@ -13,6 +13,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { authenticateRequest } from "../_shared/apiKeyAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -69,9 +70,8 @@ serve(async (req) => {
 
     // --- Auth ---
     // Comps data is public auction results — no auth required for reads.
-    // We still run authenticateRequest to identify the caller if present (for future rate limiting),
-    // but we allow anonymous access through regardless.
-    await authenticateRequest(req, supabase);
+    // Still run auth to identify caller and apply rate limits.
+    await authenticateRequest(req, supabase, { endpoint: 'comps' });
 
     // --- Parse params (GET query string or POST JSON body) ---
     const url = new URL(req.url);
@@ -271,64 +271,4 @@ serve(async (req) => {
   }
 });
 
-// --- Auth helper ---
-
-async function hashApiKey(key: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(key);
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function authenticateRequest(req: Request, supabase: any): Promise<{ userId: string | null; isServiceRole?: boolean; error?: string }> {
-  const authHeader = req.headers.get("Authorization");
-  const apiKey = req.headers.get("X-API-Key");
-  // Supabase clients send the anon key as the `apikey` header for unauthenticated requests
-  const apikeyHeader = req.headers.get("apikey");
-
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const altServiceRoleKey = Deno.env.get("SERVICE_ROLE_KEY");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-
-  // Allow anon key passthrough — comps data is public auction results, no auth needed
-  if (anonKey) {
-    if (apikeyHeader === anonKey) return { userId: "anon" };
-    if (authHeader === `Bearer ${anonKey}`) return { userId: "anon" };
-  }
-
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.replace("Bearer ", "");
-    if ((serviceRoleKey && token === serviceRoleKey) || (altServiceRoleKey && token === altServiceRoleKey)) {
-      return { userId: "service-role", isServiceRole: true };
-    }
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (user && !error) return { userId: user.id };
-  }
-
-  if (apiKey) {
-    const rawKey = apiKey.startsWith("nk_live_") ? apiKey.slice(8) : apiKey;
-    const keyHash = await hashApiKey(rawKey);
-    const { data: keyData, error } = await supabase
-      .from("api_keys")
-      .select("user_id, scopes, is_active, rate_limit_remaining, expires_at")
-      .eq("key_hash", keyHash)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (keyData && !error) {
-      if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
-        return { userId: null, error: "API key has expired" };
-      }
-      if (keyData.rate_limit_remaining !== null && keyData.rate_limit_remaining <= 0) {
-        return { userId: null, error: "Rate limit exceeded" };
-      }
-      await supabase.from("api_keys").update({
-        rate_limit_remaining: keyData.rate_limit_remaining !== null ? keyData.rate_limit_remaining - 1 : null,
-        last_used_at: new Date().toISOString(),
-      }).eq("key_hash", keyHash);
-      return { userId: keyData.user_id };
-    }
-  }
-
-  return { userId: null, error: "Invalid or missing authentication" };
-}
+// authenticateRequest imported from _shared/apiKeyAuth.ts

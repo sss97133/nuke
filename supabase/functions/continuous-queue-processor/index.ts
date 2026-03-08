@@ -116,13 +116,8 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
     maxDelay: 3000,
     sourceIds: ["b1e0d050-ca10-46b9-abdc-e8fb55e6a439"],
   },
-  ksl: {
-    pattern: "%ksl.com%",
-    extractor: "extract-vehicle-data-ai",
-    minDelay: 1000,
-    maxDelay: 2000,
-    sourceIds: ["a7c3c539-487d-4af4-8395-9e5bc1d2a795", "b894cdf1-a3f5-4124-b960-898372805ae8", "c466bffc-552b-46b6-baa6-ca3de323b930"],
-  },
+  // KSL: requires residential IP — handled by scripts/ksl-extract-local.mjs, NOT datacenter
+  // ksl: { pattern: "%ksl.com%", extractor: "extract-ksl-listing", ... },
   bonhams: {
     pattern: "%bonhams.com%",
     extractor: "extract-bonhams",
@@ -243,9 +238,56 @@ serve(async (req) => {
     const maxRuntimeSeconds = Math.min(body.max_runtime_seconds || 270, 290);
     const maxRuntimeMs = maxRuntimeSeconds * 1000;
 
+    // ── Dynamic sources from source_registry ──────────────────────────
+    // Sources onboarded via onboard-source get processed automatically
+    const dynamicConfigs: Record<string, SourceConfig> = {};
+    if (source === "all" || !SOURCE_CONFIGS[source]) {
+      try {
+        const { data: dynSources } = await supabase
+          .from("source_registry")
+          .select("slug, extractor_function, listing_url_pattern, observation_source_id")
+          .in("status", ["active", "monitoring"])
+          .not("extractor_function", "is", null);
+
+        if (dynSources?.length) {
+          const hardcodedSlugs = new Set(Object.keys(SOURCE_CONFIGS));
+
+          for (const ds of dynSources) {
+            if (hardcodedSlugs.has(ds.slug)) continue;
+
+            // Look up scrape_sources entry for source_id claiming
+            const { data: scrapeSource } = await supabase
+              .from("scrape_sources")
+              .select("id")
+              .or(`name.eq.${ds.slug},url.ilike.%${ds.slug}%`)
+              .limit(1)
+              .maybeSingle();
+
+            dynamicConfigs[ds.slug] = {
+              pattern: ds.listing_url_pattern
+                ? `%${ds.listing_url_pattern.replace(/[.*+?^${}()|[\]\\]/g, '')}%`
+                : `%${ds.slug}%`,
+              extractor: ds.extractor_function,
+              minDelay: 2000,
+              maxDelay: 4000,
+              sourceIds: scrapeSource?.id ? [scrapeSource.id] : undefined,
+            };
+          }
+
+          if (Object.keys(dynamicConfigs).length > 0) {
+            console.log(`[cqp] Loaded ${Object.keys(dynamicConfigs).length} dynamic sources: ${Object.keys(dynamicConfigs).join(", ")}`);
+          }
+        }
+      } catch (e: any) {
+        console.warn(`[cqp] Dynamic source load failed: ${e.message}`);
+      }
+    }
+
+    const allConfigs = { ...SOURCE_CONFIGS, ...dynamicConfigs };
+
     // Determine which sources to process
     const sourcesToProcess = source === "all"
-      ? Object.keys(SOURCE_CONFIGS)
+      ? Object.keys(allConfigs)
       : [source];
 
     // Initialize metrics for each source
@@ -269,7 +311,7 @@ serve(async (req) => {
 
       // Process each source in round-robin fashion
       for (const sourceName of sourcesToProcess) {
-        const config = SOURCE_CONFIGS[sourceName];
+        const config = allConfigs[sourceName];
         if (!config) continue;
 
         // Check runtime again before each source

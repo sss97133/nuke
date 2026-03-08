@@ -65,7 +65,11 @@
     "import:craigslist:dry-run": "tsx scripts/craigslist-import/index.ts --dry-run --verbose",
     "extract:verified": "bash scripts/verified-extraction-run.sh",
     "extract:verified:cron": "bash scripts/cron-verified-extraction.sh",
-    "status:targets": "bash scripts/status-targets.sh"
+    "status:targets": "bash scripts/status-targets.sh",
+    "yono:daily": "dotenvx run -- node yono/daily_progress.mjs",
+    "yono:daily:dry": "dotenvx run -- node yono/daily_progress.mjs --dry-run",
+    "yono:daily:report": "dotenvx run -- node yono/daily_progress.mjs --report-only",
+    "yono:daily:unstick": "dotenvx run -- node yono/daily_progress.mjs --unstick"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",

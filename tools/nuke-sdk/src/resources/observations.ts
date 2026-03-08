@@ -28,9 +28,9 @@ export class Observations {
    * ```typescript
    * const observation = await nuke.observations.create({
    *   vehicle_id: 'uuid-here',
-   *   source_type: 'manual',
-   *   observation_kind: 'mileage_reading',
-   *   data: {
+   *   source_id: 'manual-source-uuid',
+   *   kind: 'mileage_reading',
+   *   structured_data: {
    *     mileage: 45000,
    *     date: '2024-01-15',
    *   },
@@ -42,9 +42,9 @@ export class Observations {
    * // You can also use VIN instead of vehicle_id
    * const observation = await nuke.observations.create({
    *   vin: 'WP0AA0918LS123456',
-   *   source_type: 'auction',
-   *   observation_kind: 'sale_result',
-   *   data: {
+   *   source_id: 'auction-source-uuid',
+   *   kind: 'sale_result',
+   *   structured_data: {
    *     sale_price: 125000,
    *     platform: 'bring-a-trailer',
    *   },
@@ -110,7 +110,7 @@ export class Observations {
    * @example
    * ```typescript
    * for await (const obs of nuke.observations.listAll({ vehicle_id: 'uuid-here' })) {
-   *   console.log(obs.observation_kind, obs.data);
+   *   console.log(obs.kind, obs.structured_data);
    * }
    * ```
    */

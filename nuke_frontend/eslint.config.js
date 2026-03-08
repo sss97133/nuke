@@ -3,6 +3,7 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
+import designSystem from './eslint-plugin-design-system.js'
 
 export default tseslint.config(
   { ignores: ['dist'] },
@@ -16,6 +17,7 @@ export default tseslint.config(
     plugins: {
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
+      'design-system': designSystem,
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
@@ -44,6 +46,19 @@ export default tseslint.config(
           message: 'design-system.css is deprecated. Styles are loaded globally via index.css → unified-design-system.css. Remove this import; if you need a token that is missing, add it as an alias in src/styles/unified-design-system.css.',
         }],
       }],
+    },
+  },
+  // Design system enforcement: catch violations in app source.
+  // Existing violations grandfathered — add eslint-disable comments as needed.
+  // New violations fail on build.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'design-system/no-hardcoded-colors': 'warn',
+      'design-system/no-border-radius': 'warn',
+      'design-system/no-box-shadow': 'warn',
+      'design-system/no-gradient': 'warn',
+      'design-system/no-banned-fonts': 'warn',
     },
   },
   // Allow console usage in scripts and configuration files

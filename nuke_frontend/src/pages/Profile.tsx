@@ -755,6 +755,7 @@ const Profile: React.FC = () => {
             { key: 'discoveries', label: 'Discoveries', public: true },
             { key: 'collection', label: 'Collection', public: true },
             { key: 'gallery', label: 'Gallery', public: true },
+            { key: 'photos', label: 'Photos' },
             { key: 'professional', label: 'Professional' },
             { key: 'organizations', label: 'My Organizations' },
             { key: 'auctions', label: 'My Auctions' },

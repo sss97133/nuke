@@ -1,0 +1,339 @@
+-- 🏢 BUSINESS ENTITY SYSTEM SETUP
+-- Run this in Supabase SQL Editor to create business entities
+
+-- Core Business Entities Table
+CREATE TABLE IF NOT EXISTS businesses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- Basic Business Information
+    business_name TEXT NOT NULL,
+    legal_name TEXT,
+    business_type TEXT CHECK (business_type IN (
+        'sole_proprietorship', 'partnership', 'llc', 'corporation', 
+        'garage', 'dealership', 'restoration_shop', 'performance_shop', 
+        'body_shop', 'detailing', 'mobile_service', 'specialty_shop',
+        'parts_supplier', 'fabrication', 'racing_team', 'other'
+    )),
+    industry_focus TEXT[] DEFAULT ARRAY[]::TEXT[],
+    
+    -- Contact Information
+    email TEXT,
+    phone TEXT,
+    website TEXT,
+    
+    -- Location
+    address TEXT,
+    city TEXT,
+    state TEXT,
+    zip_code TEXT,
+    country TEXT DEFAULT 'US',
+    
+    -- Business Details
+    description TEXT,
+    specializations TEXT[] DEFAULT ARRAY[]::TEXT[],
+    services_offered TEXT[] DEFAULT ARRAY[]::TEXT[],
+    years_in_business INTEGER,
+    employee_count INTEGER,
+    
+    -- Service Capabilities
+    accepts_dropoff BOOLEAN DEFAULT false,
+    offers_mobile_service BOOLEAN DEFAULT false,
+    has_lift BOOLEAN DEFAULT false,
+    has_paint_booth BOOLEAN DEFAULT false,
+    has_dyno BOOLEAN DEFAULT false,
+    has_alignment_rack BOOLEAN DEFAULT false,
+    
+    -- Market Data
+    hourly_rate_min DECIMAL(10,2),
+    hourly_rate_max DECIMAL(10,2),
+    service_radius_miles INTEGER,
+    
+    -- Reputation & Performance
+    total_projects_completed INTEGER DEFAULT 0,
+    total_vehicles_worked INTEGER DEFAULT 0,
+    average_project_rating DECIMAL(3,2) DEFAULT 0,
+    total_reviews INTEGER DEFAULT 0,
+    repeat_customer_rate DECIMAL(5,2) DEFAULT 0,
+    on_time_completion_rate DECIMAL(5,2) DEFAULT 0,
+    
+    -- Verification & Trust
+    is_verified BOOLEAN DEFAULT false,
+    verification_date TIMESTAMPTZ,
+    verification_level TEXT DEFAULT 'unverified' CHECK (verification_level IN ('unverified', 'basic', 'premium', 'elite')),
+    
+    -- Business Status
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended', 'for_sale', 'sold')),
+    is_public BOOLEAN DEFAULT true,
+    
+    -- Market Value (for trading)
+    estimated_value DECIMAL(15,2),
+    is_for_sale BOOLEAN DEFAULT false,
+    asking_price DECIMAL(15,2),
+    
+    -- Legal
+    business_license TEXT,
+    tax_id TEXT,
+    registration_state TEXT,
+    registration_date DATE,
+    
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Business Ownership Table
+CREATE TABLE IF NOT EXISTS business_ownership (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    owner_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    
+    ownership_percentage DECIMAL(5,2) NOT NULL CHECK (ownership_percentage > 0 AND ownership_percentage <= 100),
+    ownership_type TEXT CHECK (ownership_type IN ('founder', 'partner', 'investor', 'employee_equity', 'acquired')),
+    ownership_title TEXT,
+    
+    acquisition_date DATE NOT NULL,
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'pending', 'transferred', 'dissolved')),
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    UNIQUE(business_id, owner_id)
+);
+
+-- Business User Roles Table
+CREATE TABLE IF NOT EXISTS business_user_roles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    
+    role_title TEXT NOT NULL,
+    role_type TEXT CHECK (role_type IN ('owner', 'manager', 'employee', 'contractor', 'intern', 'consultant')),
+    department TEXT,
+    
+    permissions TEXT[] DEFAULT ARRAY['view_business', 'view_projects'],
+    can_manage_vehicles BOOLEAN DEFAULT false,
+    can_manage_users BOOLEAN DEFAULT false,
+    can_create_projects BOOLEAN DEFAULT true,
+    
+    employment_type TEXT CHECK (employment_type IN ('full_time', 'part_time', 'contract', 'temporary', 'volunteer')),
+    hourly_rate DECIMAL(10,2),
+    start_date DATE NOT NULL,
+    end_date DATE,
+    
+    skill_level TEXT CHECK (skill_level IN ('apprentice', 'journeyman', 'expert', 'master')),
+    specializations TEXT[] DEFAULT ARRAY[]::TEXT[],
+    
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'on_leave', 'terminated')),
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Business Vehicle Fleet Table
+CREATE TABLE IF NOT EXISTS business_vehicle_fleet (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+    
+    fleet_role TEXT CHECK (fleet_role IN (
+        'inventory', 'project_car', 'customer_vehicle', 'company_vehicle', 
+        'demo_vehicle', 'parts_car', 'completed_project', 'for_sale'
+    )),
+    
+    relationship_type TEXT CHECK (relationship_type IN ('owned', 'consignment', 'customer_dropoff', 'lease', 'rental')),
+    assigned_to UUID REFERENCES auth.users(id),
+    
+    project_name TEXT,
+    project_status TEXT CHECK (project_status IN ('planning', 'in_progress', 'on_hold', 'completed', 'delivered')),
+    estimated_completion DATE,
+    project_budget DECIMAL(12,2),
+    
+    acquisition_cost DECIMAL(12,2),
+    acquisition_date DATE,
+    target_sale_price DECIMAL(12,2),
+    
+    customer_id UUID REFERENCES auth.users(id),
+    
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'completed', 'sold', 'returned')),
+    
+    added_to_fleet TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Business Timeline Events Table
+CREATE TABLE IF NOT EXISTS business_timeline_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    created_by UUID NOT NULL REFERENCES auth.users(id),
+    
+    event_type TEXT NOT NULL CHECK (event_type IN (
+        'founded', 'incorporated', 'license_acquired', 'facility_move', 'equipment_purchase',
+        'employee_hired', 'employee_terminated', 'partnership', 'acquisition', 'certification',
+        'award_received', 'milestone_reached', 'expansion', 'renovation', 'sale_listing',
+        'ownership_transfer', 'closure', 'rebranding', 'other'
+    )),
+    event_category TEXT NOT NULL CHECK (event_category IN (
+        'legal', 'operational', 'personnel', 'financial', 'recognition', 'growth', 'other'
+    )),
+    
+    title TEXT NOT NULL,
+    description TEXT,
+    event_date DATE NOT NULL,
+    location TEXT,
+    
+    documentation_urls TEXT[] DEFAULT ARRAY[]::TEXT[],
+    cost_amount DECIMAL(12,2),
+    cost_currency TEXT DEFAULT 'USD',
+    
+    affects_valuation BOOLEAN DEFAULT false,
+    affects_capacity BOOLEAN DEFAULT false,
+    affects_reputation BOOLEAN DEFAULT false,
+    
+    verification_status TEXT DEFAULT 'unverified' CHECK (verification_status IN (
+        'unverified', 'user_verified', 'document_verified', 'third_party_verified'
+    )),
+    
+    metadata JSONB DEFAULT '{}',
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_businesses_owner ON businesses(id);
+CREATE INDEX IF NOT EXISTS idx_businesses_location ON businesses(city, state);
+CREATE INDEX IF NOT EXISTS idx_businesses_type ON businesses(business_type);
+CREATE INDEX IF NOT EXISTS idx_businesses_status ON businesses(status);
+
+CREATE INDEX IF NOT EXISTS idx_business_ownership_business ON business_ownership(business_id);
+CREATE INDEX IF NOT EXISTS idx_business_ownership_owner ON business_ownership(owner_id);
+
+CREATE INDEX IF NOT EXISTS idx_business_user_roles_business ON business_user_roles(business_id);
+CREATE INDEX IF NOT EXISTS idx_business_user_roles_user ON business_user_roles(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_business_vehicle_fleet_business ON business_vehicle_fleet(business_id);
+CREATE INDEX IF NOT EXISTS idx_business_vehicle_fleet_vehicle ON business_vehicle_fleet(vehicle_id);
+
+CREATE INDEX IF NOT EXISTS idx_business_timeline_events_business ON business_timeline_events(business_id);
+CREATE INDEX IF NOT EXISTS idx_business_timeline_events_date ON business_timeline_events(event_date);
+
+-- Enable RLS
+ALTER TABLE businesses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE business_ownership ENABLE ROW LEVEL SECURITY;
+ALTER TABLE business_user_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE business_vehicle_fleet ENABLE ROW LEVEL SECURITY;
+ALTER TABLE business_timeline_events ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for Businesses
+CREATE POLICY "Verified businesses are publicly viewable" ON businesses
+    FOR SELECT USING (is_verified = true AND is_public = true);
+
+CREATE POLICY "Business owners can view their businesses" ON businesses
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM business_ownership 
+            WHERE business_ownership.business_id = businesses.id 
+            AND business_ownership.owner_id = auth.uid()
+            AND business_ownership.status = 'active'
+        )
+    );
+
+CREATE POLICY "Business owners can update their businesses" ON businesses
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM business_ownership 
+            WHERE business_ownership.business_id = businesses.id 
+            AND business_ownership.owner_id = auth.uid()
+            AND business_ownership.status = 'active'
+        )
+    );
+
+CREATE POLICY "Users can create businesses" ON businesses
+    FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
+-- RLS Policies for Business Ownership
+CREATE POLICY "Owners can view business ownership" ON business_ownership
+    FOR SELECT USING (
+        owner_id = auth.uid() OR 
+        EXISTS (
+            SELECT 1 FROM business_ownership bo2 
+            WHERE bo2.business_id = business_ownership.business_id 
+            AND bo2.owner_id = auth.uid()
+            AND bo2.status = 'active'
+        )
+    );
+
+CREATE POLICY "Users can create ownership records" ON business_ownership
+    FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
+-- RLS Policies for Business User Roles
+CREATE POLICY "Business members can view roles" ON business_user_roles
+    FOR SELECT USING (
+        user_id = auth.uid() OR
+        EXISTS (
+            SELECT 1 FROM business_ownership 
+            WHERE business_ownership.business_id = business_user_roles.business_id 
+            AND business_ownership.owner_id = auth.uid()
+            AND business_ownership.status = 'active'
+        )
+    );
+
+-- RLS Policies for Business Vehicle Fleet
+CREATE POLICY "Business owners can manage fleet" ON business_vehicle_fleet
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM business_ownership 
+            WHERE business_ownership.business_id = business_vehicle_fleet.business_id 
+            AND business_ownership.owner_id = auth.uid()
+            AND business_ownership.status = 'active'
+        )
+    );
+
+-- RLS Policies for Business Timeline Events
+CREATE POLICY "Business timeline events are viewable by business members" ON business_timeline_events
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM business_ownership 
+            WHERE business_ownership.business_id = business_timeline_events.business_id 
+            AND business_ownership.owner_id = auth.uid()
+            AND business_ownership.status = 'active'
+        ) OR
+        EXISTS (
+            SELECT 1 FROM business_user_roles 
+            WHERE business_user_roles.business_id = business_timeline_events.business_id 
+            AND business_user_roles.user_id = auth.uid()
+            AND business_user_roles.status = 'active'
+        )
+    );
+
+-- Function to create initial business ownership
+CREATE OR REPLACE FUNCTION create_initial_business_ownership()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO business_ownership (
+        business_id, 
+        owner_id, 
+        ownership_percentage, 
+        ownership_type, 
+        ownership_title,
+        acquisition_date
+    ) VALUES (
+        NEW.id, 
+        auth.uid(), 
+        100.00, 
+        'founder', 
+        'Founder/Owner',
+        CURRENT_DATE
+    );
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to create initial ownership
+DROP TRIGGER IF EXISTS trigger_create_initial_business_ownership ON businesses;
+CREATE TRIGGER trigger_create_initial_business_ownership
+    AFTER INSERT ON businesses
+    FOR EACH ROW
+    EXECUTE FUNCTION create_initial_business_ownership();

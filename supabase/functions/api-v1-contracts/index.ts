@@ -22,6 +22,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { authenticateRequest } from "../_shared/apiKeyAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,7 +44,9 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { userId, isServiceRole, error: authError } = await authenticateRequest(req, supabase);
+    const auth = await authenticateRequest(req, supabase, { endpoint: 'contracts' });
+    const userId = auth.userId;
+    const isServiceRole = auth.isServiceRole;
 
     const url = new URL(req.url);
     const pathParts = url.pathname.split("/").filter(Boolean);
@@ -645,48 +648,4 @@ function getEntityContext(entityType: string): any {
   return contexts[entityType] || { name: entityType, description: "Entity details not available." };
 }
 
-async function authenticateRequest(req: Request, supabase: any): Promise<{ userId: string | null; isServiceRole?: boolean; error?: string }> {
-  const authHeader = req.headers.get("Authorization");
-  const apiKey = req.headers.get("X-API-Key");
-
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.replace("Bearer ", "");
-
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (serviceRoleKey && token === serviceRoleKey) {
-      return { userId: "service-role", isServiceRole: true };
-    }
-
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (user && !error) return { userId: user.id };
-  }
-
-  if (apiKey) {
-    const rawKey = apiKey.startsWith("nk_live_") ? apiKey.slice(8) : apiKey;
-    const keyHash = await hashApiKey(rawKey);
-
-    const { data: keyData } = await supabase
-      .from("api_keys")
-      .select("user_id, scopes, is_active, expires_at")
-      .eq("key_hash", keyHash)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (keyData) {
-      if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
-        return { userId: null, error: "API key expired" };
-      }
-      return { userId: keyData.user_id };
-    }
-  }
-
-  // Allow unauthenticated read access (public contracts)
-  return { userId: null };
-}
-
-async function hashApiKey(key: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(key);
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+// authenticateRequest imported from _shared/apiKeyAuth.ts
