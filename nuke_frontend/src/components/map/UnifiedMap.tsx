@@ -51,6 +51,7 @@ export default function UnifiedMap() {
 
   // deck.gl viewState
   const [viewState, setViewState] = useState(INITIAL_VIEW);
+  const zoom = viewState.zoom;
 
   // Side panel popup (replaces floating popup that overlapped data)
   const [selectedPin, setSelectedPin] = useState<{ pin: VPin | ColPin | BizPin | PhotoPin | MarketplacePin; type: 'vehicle' | 'collection' | 'business' | 'photo' | 'marketplace' } | null>(null);
@@ -778,8 +779,6 @@ export default function UnifiedMap() {
   }, [showCollections, showVehicles, showBusinesses, showPhotos, showMarketplace, collections, filteredVehicles, businesses, photos, marketplace, queryResults, hasQuery, viewportBounds]);
 
   // --- deck.gl layers ---
-  const zoom = viewState.zoom;
-
   const layers = useMapLayers({
     filteredVehicles, collections, businesses, photos, marketplace, queryResults,
     showVehicles, showCollections, showBusinesses, showPhotos, showMarketplace, showCountyOverlay, hasQuery,
