@@ -70,6 +70,10 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
 
   const getNotificationIcon = (type: Notification['type']) => {
     switch (type) {
+      case 'price_change': return '$';
+      case 'new_listing': return 'CAR';
+      case 'auction_result': return 'BID';
+      case 'observation_added': return 'EYE';
       case 'vin_request': return 'VIN';
       case 'verification_request': return 'VERIFY';
       case 'contribution_request': return 'CONTRIB';
@@ -79,7 +83,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
       case 'timeline_contribution': return 'TIMELINE';
       case 'missing_image_dates': return 'DATES';
       case 'incomplete_profile': return 'PROFILE';
-      default: return 'INFO';
+      default: return 'NTF';
     }
   };
 

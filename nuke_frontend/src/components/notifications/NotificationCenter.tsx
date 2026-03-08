@@ -286,15 +286,24 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
+      case 'price_change':
+      case 'price_updated': return '[$]'
+      case 'new_listing': return '[CAR]'
+      case 'auction_result': return '[BID]'
+      case 'observation_added':
+      case 'vehicle_update': return '[EYE]'
       case 'comment_on_vehicle': return '[CMT]'
       case 'vehicle_access_request': return '[ACC]'
       case 'vehicle_contribution': return '[ADD]'
       case 'vehicle_liked': return '[LKE]'
       case 'upload_completed': return '[UPL]'
       case 'analysis_completed': return '[AI]'
-      case 'price_updated': return '[PRC]'
       case 'work_order_assigned': return '[WRK]'
-      default: return '[NOT]'
+      case 'welcome': return '[HI]'
+      case 'profile_import_ready': return '[IMP]'
+      case 'vehicle_merged': return '[MRG]'
+      case 'vin_needed': return '[VIN]'
+      default: return '[NTF]'
     }
   }
 
