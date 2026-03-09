@@ -6,7 +6,7 @@
  *
  * @example
  * ```typescript
- * import Nuke from '@nuke/sdk';
+ * import Nuke from '@nuke1/sdk';
  *
  * const nuke = new Nuke('nk_live_...');
  *
