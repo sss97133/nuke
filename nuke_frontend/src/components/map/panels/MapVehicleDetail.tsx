@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { getPlatformDisplayName } from '../../../services/platformNomenclature';
+import { thumbUrl } from '../mapUtils';
 
 const MAP_FONT = 'Arial, Helvetica, sans-serif';
 
@@ -49,7 +50,7 @@ interface VehicleData {
   discovery_url: string | null;
   primary_image_url: string | null;
   status: string | null;
-  images: { id: string; url: string }[];
+  images: { id: string; image_url: string }[];
 }
 
 export default function MapVehicleDetail({ vehicleId, onBack, onNavigate }: Props) {
@@ -68,10 +69,10 @@ export default function MapVehicleDetail({ vehicleId, onBack, onNavigate }: Prop
 
       if (cancelled) return;
 
-      let images: { id: string; url: string }[] = [];
+      let images: { id: string; image_url: string }[] = [];
       const { data: imgs } = await supabase
         .from('vehicle_images')
-        .select('id, url')
+        .select('id, image_url')
         .eq('vehicle_id', vehicleId)
         .limit(8);
       if (!cancelled && imgs) images = imgs;
@@ -147,9 +148,10 @@ export default function MapVehicleDetail({ vehicleId, onBack, onNavigate }: Prop
       {vehicle.primary_image_url && (
         <div style={{ width: '100%', height: 200, overflow: 'hidden' }}>
           <img
-            src={vehicle.primary_image_url}
+            src={thumbUrl(vehicle.primary_image_url) || vehicle.primary_image_url}
             alt={title}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
         </div>
       )}
@@ -238,7 +240,7 @@ export default function MapVehicleDetail({ vehicleId, onBack, onNavigate }: Prop
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2, marginBottom: 12 }}>
             {vehicle.images.slice(0, 8).map(img => (
               <div key={img.id} style={{ aspectRatio: '1', overflow: 'hidden' }}>
-                <img src={img.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={thumbUrl(img.image_url) || img.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               </div>
             ))}
           </div>
