@@ -922,7 +922,7 @@ export default function UnifiedMap() {
                     color: mode === m ? 'var(--bg)' : 'var(--text-disabled)',
                     border: '1px solid var(--border)',
                     cursor: 'pointer' }}>
-                    {m === 'density' ? 'GLOW' : m === 'points' ? 'POINTS' : 'THERMAL'}
+                    {m === 'density' ? 'HEX' : m === 'points' ? 'POINTS' : 'THERMAL'}
                   </button>
                 ))}
               </div>
@@ -946,8 +946,8 @@ export default function UnifiedMap() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <SliderControl label="Point Size" value={pointSize} min={1} max={12} onChange={setPointSize} />
                 {(mode === 'density' || mode === 'thermal') && <>
-                  <SliderControl label={mode === 'thermal' ? 'Heat Rad' : 'Glow Size'} value={glowRadius} min={5} max={200} onChange={setGlowRadius} />
-                  <SliderControl label={mode === 'thermal' ? 'Heat Int' : 'Glow Int'} value={glowIntensity} min={1} max={100} onChange={setGlowIntensity} />
+                  <SliderControl label={mode === 'thermal' ? 'Heat Rad' : 'Hex Size'} value={glowRadius} min={5} max={200} onChange={setGlowRadius} />
+                  <SliderControl label={mode === 'thermal' ? 'Heat Int' : 'Opacity'} value={glowIntensity} min={1} max={100} onChange={setGlowIntensity} />
                 </> }
               </div>
             </div>
