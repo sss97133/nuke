@@ -209,7 +209,7 @@ for await (const vehicle of nuke.vehicles.listAll({ mine: true })) {
 | `engine_type` | `string` | Engine description |
 | `drivetrain` | `string` | `'rwd'`, `'awd'`, `'4wd'`, etc. |
 | `body_style` | `string` | `'coupe'`, `'sedan'`, `'suv'`, etc. |
-| `sale_price` | `number` | Sale/asking price in USD |
+| `purchase_price` | `number` | Purchase/asking price in USD |
 | `description` | `string` | Free-text description |
 | `is_public` | `boolean` | Whether visible to other users |
 
@@ -316,6 +316,35 @@ const score = await nuke.signal.score({ vehicle_id: 'vehicle-uuid' });
 | `hold` | At market, neutral |
 | `pass` | Above market or insufficient data |
 | `overpriced` | Meaningfully above comparable sales |
+
+---
+
+### `nuke.analysis`
+
+Proactive deal health signals — monitors your vehicles and surfaces actionable alerts (price drops, new comps, stale data).
+
+```typescript
+// Get all signals for a vehicle
+const report = await nuke.analysis.get('vehicle-uuid');
+// → { health: 'good', signal_count: 3, signals: [...] }
+
+// Get a specific signal
+const signal = await nuke.analysis.signal('vehicle-uuid', 'price_drop');
+// → { widget: 'price_drop', severity: 'warning', message: '...', data: {...} }
+
+// Force recompute all signals
+await nuke.analysis.refresh('vehicle-uuid');
+
+// Get signal change history
+const history = await nuke.analysis.history('vehicle-uuid', 'price_drop');
+// → { history: [{ changed_at: '...', old_value: {...}, new_value: {...} }], count: 5 }
+
+// Mark a signal as seen
+await nuke.analysis.acknowledge('signal-uuid');
+
+// Snooze a signal for 48 hours
+await nuke.analysis.dismiss('signal-uuid', 48);
+```
 
 ---
 
@@ -693,6 +722,13 @@ import type {
   // Signal
   SignalScore,
   SignalScoreParams,
+
+  // Analysis
+  AnalysisSignal,
+  AnalysisReport,
+  AnalysisHealth,
+  AnalysisHistoryEntry,
+  AnalysisHistoryResponse,
 
   // Comps
   CompsResponse,
