@@ -52,6 +52,7 @@ export default function UnifiedMap() {
   // deck.gl viewState
   const [viewState, setViewState] = useState(INITIAL_VIEW);
   const zoom = viewState.zoom;
+  const quantizedZoom = Math.round(zoom * 2) / 2; // snap to 0.5 steps for layer perf
 
   // Side panel popup (replaces floating popup that overlapped data)
   const [selectedPin, setSelectedPin] = useState<{ pin: VPin | ColPin | BizPin | PhotoPin | MarketplacePin; type: 'vehicle' | 'collection' | 'business' | 'photo' | 'marketplace' } | null>(null);
@@ -782,7 +783,7 @@ export default function UnifiedMap() {
   const layers = useMapLayers({
     filteredVehicles, collections, businesses, photos, marketplace, queryResults,
     showVehicles, showCollections, showBusinesses, showPhotos, showMarketplace, showCountyOverlay, hasQuery,
-    zoom, mode, glowRadius, glowIntensity, pointSize, colorPreset,
+    zoom: quantizedZoom, mode, glowRadius, glowIntensity, pointSize, colorPreset,
     tick, liveEventsRef,
     countyFeatures, clusterIndex, viewportBounds, zctaGeoJson, selectedZip, selectedCounties,
     handleLayerClick, setHoverInfo, setSelectedPin, setSelectedCounties, setSelectedZip, setViewState, deckClickedRef,

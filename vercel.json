@@ -9,6 +9,10 @@
       "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path+"
     },
     {
+      "source": "/data/:path+",
+      "destination": "/data/:path+"
+    },
+    {
       "source": "/:path*",
       "destination": "/index.html"
     }
