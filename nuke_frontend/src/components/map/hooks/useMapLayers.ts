@@ -1,14 +1,12 @@
 import { useMemo } from 'react';
 import { FlyToInterpolator } from '@deck.gl/core';
 import { ScatterplotLayer, TextLayer, GeoJsonLayer, IconLayer } from '@deck.gl/layers';
-import { HeatmapLayer, HexagonLayer } from '@deck.gl/aggregation-layers';
+import { HeatmapLayer } from '@deck.gl/aggregation-layers';
 import type Supercluster from 'supercluster';
 import {
   COLOR_PRESETS, MAP_FONT,
-  hexRadiusForZoom, hexColorRange,
-  HEX_FADE_START, HEX_FADE_END, POINTS_FADE_START, POINTS_FADE_END,
-  colColor, CAR_SVG_URI, BUILDING_SVG_URI,
-  fmtPrice, simpleHash,
+  colColor,
+  fmtPrice,
 } from '../mapUtils';
 import type {
   ColorPreset, VPin, ColPin, BizPin, PhotoPin, MarketplacePin, LiveEvent,
@@ -82,10 +80,6 @@ export function useMapLayers(params: UseMapLayersParams) {
     // Glow fades as you zoom in past z12, but never fully disappears
     const showGlow = mode === 'density';
     const glowFade = showGlow ? Math.max(0.15, Math.min(1, (14 - zoom) / 8)) : 0;
-
-    // Shape evolution: circles crossfade to rectangles at z14+
-    const shapeFade = Math.max(0, Math.min(1, zoom - 13)); // 0 at z13, 1 at z14+
-    const circleFade = 1 - shapeFade;
 
     // --- Thermal Choropleth (county boundaries colored by vehicle density) ---
     if (showVehicles && mode === 'thermal' && countyFeatures) {
@@ -275,81 +269,12 @@ export function useMapLayers(params: UseMapLayersParams) {
     }
 
     // ============================================================
-    // VEHICLE LAYERS — hex binning + crossfade architecture
+    // VEHICLE LAYERS — dots at all zoom levels
     // ============================================================
-    const hexRadiusBase = hexRadiusForZoom(Math.round(zoom));
-    const hexRadius = Math.round(hexRadiusBase * (glowRadius / 60));
     const layerOpacity = glowIntensity / 100;
-    const hexOpacity = mode !== 'density' ? 0
-      : zoom < HEX_FADE_START ? 0.85
-      : zoom > HEX_FADE_END ? 0
-      : 0.85 * ((HEX_FADE_END - zoom) / (HEX_FADE_END - HEX_FADE_START));
-    const pointsOpacity = mode === 'points' ? 1
-      : mode === 'thermal' ? 0
-      : zoom < POINTS_FADE_START ? 0
-      : zoom > POINTS_FADE_END ? 1
-      : (zoom - POINTS_FADE_START) / (POINTS_FADE_END - POINTS_FADE_START);
+    const pointsOpacity = mode === 'thermal' ? 0 : 1;
 
-    // --- Vehicle hex bins (density mode only, z3-z12.5) ---
-    if (showVehicles && !hasQuery && hexOpacity > 0) {
-      result.push(new HexagonLayer({
-        id: 'vehicle-hexbins',
-        data: filteredVehicles,
-        gpuAggregation: false,
-        getPosition: (d: VPin) => [d.lng, d.lat],
-        getColorWeight: (d: VPin) => d.weight || 1,
-        colorAggregation: 'SUM',
-        radius: hexRadius,
-        coverage: 0.88,
-        extruded: false,
-        colorRange: hexColorRange(vehColor),
-        colorScaleType: 'quantile',
-        opacity: hexOpacity * layerOpacity,
-        pickable: true,
-        onHover: ({ object, x, y }: any) => {
-          if (object) {
-            const count = object.points?.length || object.colorValue || 0;
-            const pts = object.points?.map((p: any) => p.source || p) as VPin[] | undefined;
-            let detail = `${count.toLocaleString()} vehicles`;
-            if (pts && pts.length > 0) {
-              const prices = pts.filter((p: VPin) => p.price).map((p: VPin) => p.price as number);
-              if (prices.length > 0) {
-                const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
-                detail += ` · avg ${fmtPrice(avg)}`;
-              }
-            }
-            setHoverInfo({ x, y, text: detail });
-          } else {
-            setHoverInfo(null);
-          }
-        },
-        onClick: ({ object }: any) => {
-          if (object) {
-            deckClickedRef.current = true;
-            const pts = (object.points || []).map((p: any) => p.source || p) as VPin[];
-            setSelectedPin({
-              pin: {
-                id: `hex-${object.position?.[0]?.toFixed(4)}-${object.position?.[1]?.toFixed(4)}`,
-                _isHexBin: true,
-                _hexCount: pts.length,
-                _hexPoints: pts,
-                _hexPosition: object.position,
-                lat: object.position?.[1] || 0,
-                lng: object.position?.[0] || 0,
-              } as any,
-              type: 'vehicle',
-            });
-            setTimeout(() => { deckClickedRef.current = false; }, 100);
-          }
-        },
-        updateTriggers: {
-          colorRange: [colorPreset],
-          radius: [zoom, glowRadius],
-        },
-      }));
-    }
-
-    // --- Vehicle individual points (always visible in 'points' mode, crossfade in 'density') ---
+    // --- Vehicle individual points ---
     if (showVehicles && !hasQuery && pointsOpacity > 0) {
       let clusterData: any[] = [];
       let singlePoints: VPin[] = filteredVehicles;
@@ -382,7 +307,7 @@ export function useMapLayers(params: UseMapLayersParams) {
         getFillColor: (d: VPin) => d.isGpsOnly
           ? [150, 150, 150, 100] as [number, number, number, number]
           : [...vehColor, 200] as [number, number, number, number],
-        opacity: pointsOpacity * (zoom >= 13 ? circleFade : 1) * layerOpacity,
+        opacity: pointsOpacity * layerOpacity,
         pickable: pointsOpacity > 0.5,
         onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
         onHover: ({ object, x, y }: any) => {
@@ -398,7 +323,7 @@ export function useMapLayers(params: UseMapLayersParams) {
           getPosition: { duration: 600 },
           getFillColor: { duration: 800 },
         },
-        updateTriggers: { getFillColor: [colorPreset], getRadius: [pointSize, zoom], opacity: [pointsOpacity, circleFade] },
+        updateTriggers: { getFillColor: [colorPreset], getRadius: [pointSize, zoom], opacity: [pointsOpacity] },
       }));
 
       // Render cluster circles
@@ -463,103 +388,6 @@ export function useMapLayers(params: UseMapLayersParams) {
       }
     }
 
-    // --- Vehicle shape evolution — rectangles at z14+ ---
-    if (showVehicles && !hasQuery && mode !== 'thermal' && pointsOpacity > 0 && shapeFade > 0) {
-      result.push(new IconLayer({
-        id: 'vehicle-shapes',
-        data: filteredVehicles,
-        getPosition: (d: VPin) => [d.lng, d.lat],
-        getIcon: () => ({
-          url: CAR_SVG_URI,
-          width: 10,
-          height: 4,
-          anchorX: 5,
-          anchorY: 2,
-        }),
-        getSize: 5,
-        sizeUnits: 'meters' as const,
-        sizeMinPixels: 0,
-        sizeMaxPixels: 8,
-        getAngle: (d: VPin) => simpleHash(d.id) % 360,
-        getColor: (d: VPin) => [...vehColor, Math.round(220 * shapeFade)] as [number, number, number, number],
-        pickable: true,
-        onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
-        onHover: ({ object, x, y }: any) => {
-          if (object) {
-            const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
-            const price = object.price ? ' · ' + fmtPrice(object.price) : '';
-            setHoverInfo({ x, y, text: (t || 'Vehicle') + price });
-          } else {
-            setHoverInfo(null);
-          }
-        },
-        updateTriggers: { getColor: [colorPreset, zoom] },
-      }));
-    }
-
-    // ============================================================
-    // QUERY RESULTS — hex binning + crossfade (same architecture as vehicles)
-    // ============================================================
-
-    // --- Query hex bins (density mode only, z3-z12.5) ---
-    if (hasQuery && showVehicles && queryResults.length > 0 && hexOpacity > 0) {
-      result.push(new HexagonLayer({
-        id: 'query-hexbins',
-        data: queryResults,
-        gpuAggregation: false,
-        getPosition: (d: VPin) => [d.lng, d.lat],
-        getColorWeight: (d: VPin) => d.weight || 1,
-        colorAggregation: 'SUM',
-        radius: hexRadius,
-        coverage: 0.88,
-        extruded: false,
-        colorRange: hexColorRange(colors.query),
-        colorScaleType: 'quantile',
-        opacity: hexOpacity,
-        pickable: true,
-        onHover: ({ object, x, y }: any) => {
-          if (object) {
-            const count = object.points?.length || object.colorValue || 0;
-            const pts = object.points?.map((p: any) => p.source || p) as VPin[] | undefined;
-            let detail = `${count.toLocaleString()} results`;
-            if (pts && pts.length > 0) {
-              const prices = pts.filter((p: VPin) => p.price).map((p: VPin) => p.price as number);
-              if (prices.length > 0) {
-                const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
-                detail += ` · avg ${fmtPrice(avg)}`;
-              }
-            }
-            setHoverInfo({ x, y, text: detail });
-          } else {
-            setHoverInfo(null);
-          }
-        },
-        onClick: ({ object }: any) => {
-          if (object) {
-            deckClickedRef.current = true;
-            const pts = (object.points || []).map((p: any) => p.source || p) as VPin[];
-            setSelectedPin({
-              pin: {
-                id: `qhex-${object.position?.[0]?.toFixed(4)}-${object.position?.[1]?.toFixed(4)}`,
-                _isHexBin: true,
-                _hexCount: pts.length,
-                _hexPoints: pts,
-                _hexPosition: object.position,
-                lat: object.position?.[1] || 0,
-                lng: object.position?.[0] || 0,
-              } as any,
-              type: 'vehicle',
-            });
-            setTimeout(() => { deckClickedRef.current = false; }, 100);
-          }
-        },
-        updateTriggers: {
-          colorRange: [colorPreset],
-          radius: [zoom],
-        },
-      }));
-    }
-
     // --- Query individual points ---
     if (hasQuery && showVehicles && queryResults.length > 0 && pointsOpacity > 0) {
       result.push(new ScatterplotLayer({
@@ -588,40 +416,6 @@ export function useMapLayers(params: UseMapLayersParams) {
           getRadius: { duration: 200 },
         },
         updateTriggers: { getRadius: [pointSize, zoom], opacity: [pointsOpacity] },
-      }));
-    }
-
-    // --- Query shape evolution — rectangles at z14+ ---
-    if (hasQuery && showVehicles && queryResults.length > 0 && pointsOpacity > 0 && shapeFade > 0) {
-      result.push(new IconLayer({
-        id: 'query-shapes',
-        data: queryResults,
-        getPosition: (d: VPin) => [d.lng, d.lat],
-        getIcon: () => ({
-          url: CAR_SVG_URI,
-          width: 10,
-          height: 4,
-          anchorX: 5,
-          anchorY: 2,
-        }),
-        getSize: 5,
-        sizeUnits: 'meters' as const,
-        sizeMinPixels: 0,
-        sizeMaxPixels: 14,
-        getAngle: (d: VPin) => simpleHash(d.id) % 360,
-        getColor: [...colors.query, Math.round(220 * shapeFade)] as [number, number, number, number],
-        pickable: true,
-        onClick: ({ object }: any) => handleLayerClick(object, 'vehicle'),
-        onHover: ({ object, x, y }: any) => {
-          if (object) {
-            const t = [object.year, object.make, object.model].filter(Boolean).join(' ');
-            const price = object.price ? ' · ' + fmtPrice(object.price) : '';
-            setHoverInfo({ x, y, text: (t || 'Vehicle') + price });
-          } else {
-            setHoverInfo(null);
-          }
-        },
-        updateTriggers: { getColor: [colorPreset, zoom] },
       }));
     }
 
@@ -694,29 +488,6 @@ export function useMapLayers(params: UseMapLayersParams) {
         }));
       }
 
-      // Collection shapes (building squares) at z14+
-      if (shapeFade > 0) {
-        result.push(new IconLayer({
-          id: 'collection-shapes',
-          data: collections,
-          getPosition: (d: ColPin) => [d.lng, d.lat],
-          getIcon: () => ({
-            url: BUILDING_SVG_URI,
-            width: 8,
-            height: 8,
-            anchorX: 4,
-            anchorY: 4,
-          }),
-          getSize: 25,
-          sizeUnits: 'meters' as const,
-          sizeMinPixels: 0,
-          sizeMaxPixels: 14,
-          getColor: (d: ColPin) => [...colColor(d.country), Math.round(220 * shapeFade)] as [number, number, number, number],
-          pickable: true,
-          onClick: ({ object }: any) => handleLayerClick(object, 'collection'),
-          updateTriggers: { getColor: [zoom] },
-        }));
-      }
     }
 
     // --- Business Glow ---
@@ -787,85 +558,9 @@ export function useMapLayers(params: UseMapLayersParams) {
         }));
       }
 
-      // Business shapes (building squares) at z14+
-      if (shapeFade > 0) {
-        result.push(new IconLayer({
-          id: 'business-shapes',
-          data: businesses,
-          getPosition: (d: BizPin) => [d.lng, d.lat],
-          getIcon: () => ({
-            url: BUILDING_SVG_URI,
-            width: 8,
-            height: 8,
-            anchorX: 4,
-            anchorY: 4,
-          }),
-          getSize: 15,
-          sizeUnits: 'meters' as const,
-          sizeMinPixels: 0,
-          sizeMaxPixels: 10,
-          getColor: [...colors.business, Math.round(220 * shapeFade)] as [number, number, number, number],
-          pickable: true,
-          onClick: ({ object }: any) => handleLayerClick(object, 'business'),
-          updateTriggers: { getColor: [zoom, colorPreset] },
-        }));
-      }
     }
 
-    // ============================================================
-    // PHOTO LAYERS — hex binning + crossfade architecture
-    // ============================================================
-
-    // --- Photo hex bins (density mode only, z3-z12.5) ---
-    if (showPhotos && !hasQuery && photos.length > 0 && hexOpacity > 0) {
-      result.push(new HexagonLayer({
-        id: 'photo-hexbins',
-        data: photos,
-        gpuAggregation: false,
-        getPosition: (d: PhotoPin) => [d.lng, d.lat],
-        getColorWeight: () => 1,
-        colorAggregation: 'SUM',
-        radius: hexRadiusForZoom(Math.round(zoom)),
-        coverage: 0.88,
-        extruded: false,
-        colorRange: hexColorRange(colors.photo),
-        colorScaleType: 'quantile',
-        opacity: hexOpacity,
-        pickable: true,
-        onHover: ({ object, x, y }: any) => {
-          if (object) {
-            const count = object.points?.length || object.colorValue || 0;
-            setHoverInfo({ x, y, text: `${count.toLocaleString()} photos` });
-          } else {
-            setHoverInfo(null);
-          }
-        },
-        onClick: ({ object }: any) => {
-          if (object) {
-            deckClickedRef.current = true;
-            const pts = (object.points || []).map((p: any) => p.source || p) as PhotoPin[];
-            setSelectedPin({
-              pin: {
-                id: `photo-hex-${object.position?.[0]?.toFixed(4)}-${object.position?.[1]?.toFixed(4)}`,
-                _isPhotoHexBin: true,
-                _hexCount: pts.length,
-                _hexPoints: pts,
-                lat: object.position?.[1] || 0,
-                lng: object.position?.[0] || 0,
-              } as any,
-              type: 'photo',
-            });
-            setTimeout(() => { deckClickedRef.current = false; }, 100);
-          }
-        },
-        updateTriggers: {
-          colorRange: [colorPreset],
-          radius: [zoom],
-        },
-      }));
-    }
-
-    // --- Photo individual points (fade in z13 → z15) ---
+    // --- Photo individual points ---
     if (showPhotos && !hasQuery && photos.length > 0 && pointsOpacity > 0) {
       const photoThumbFade = Math.max(0, Math.min(1, zoom - 13.5));
       const photoDotFade = 1 - photoThumbFade;
