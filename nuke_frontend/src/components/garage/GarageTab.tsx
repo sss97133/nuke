@@ -10,10 +10,13 @@
  *  - Utilitarian empty state (no illustration)
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { ViewMode, FilterMode, GarageSection, VehiclesDashboardState } from '../../hooks/useVehiclesDashboard';
+import type { ViewMode, FilterMode, GarageSection, GarageVehicle, VehiclesDashboardState } from '../../hooks/useVehiclesDashboard';
 import { GarageVehicleCard } from '../vehicles/GarageVehicleCard';
+import TriageDock from './TriageDock';
+import type { TriageAction } from './TriageDock';
+import { supabase } from '../../lib/supabase';
 
 // ---------------------------------------------------------------------------
 // Design tokens (inline, referencing CSS vars)
@@ -110,10 +113,16 @@ function SectionVehicles({
   section,
   viewMode,
   onRefresh,
+  draggingVehicle,
+  onDragStart,
+  onDragEnd,
 }: {
   section: GarageSection;
   viewMode: ViewMode;
   onRefresh: () => void;
+  draggingVehicle: GarageVehicle | null;
+  onDragStart: (v: GarageVehicle) => void;
+  onDragEnd: () => void;
 }) {
   const containerStyle =
     viewMode === 'GRID' ? s.grid : viewMode === 'LIST' ? s.list : s.compact;
@@ -126,6 +135,10 @@ function SectionVehicles({
           vehicle={v}
           viewMode={viewMode}
           onRefresh={onRefresh}
+          onDragStart={() => onDragStart(v)}
+          onDragEnd={onDragEnd}
+          isDragging={draggingVehicle?.id === v.id}
+          isTriageActive={draggingVehicle !== null && draggingVehicle.id !== v.id}
         />
       ))}
     </div>
@@ -326,9 +339,34 @@ export default function GarageTab({ dashboard }: { dashboard: VehiclesDashboardS
     refresh,
   } = dashboard;
 
+  const [draggingVehicle, setDraggingVehicle] = useState<GarageVehicle | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Get user ID for triage actions
+  React.useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setUserId(data.user.id);
+    });
+  }, []);
+
   const clearFilter = useCallback(() => setFilterMode('ALL'), [setFilterMode]);
 
+  const handleDragStart = useCallback((v: GarageVehicle) => setDraggingVehicle(v), []);
+  const handleDragEnd = useCallback(() => setDraggingVehicle(null), []);
+
+  const handleTriageComplete = useCallback((action: TriageAction) => {
+    setDraggingVehicle(null);
+    // Small delay to let toast show before refreshing
+    setTimeout(() => refresh(), 600);
+  }, [refresh]);
+
   const showSections = sections.length > 1;
+
+  const dragProps = {
+    draggingVehicle,
+    onDragStart: handleDragStart,
+    onDragEnd: handleDragEnd,
+  };
 
   return (
     <div style={s.wrap}>
@@ -339,7 +377,7 @@ export default function GarageTab({ dashboard }: { dashboard: VehiclesDashboardS
       ) : vehicles.length === 0 ? (
         <EmptyState filterMode={filterMode} onClearFilter={clearFilter} />
       ) : (
-        <div style={s.content}>
+        <div style={{ ...s.content, paddingBottom: draggingVehicle ? 132 : undefined }}>
           {showSections
             ? sections.map((section) => (
                 <div key={section.relationship_type}>
@@ -347,7 +385,7 @@ export default function GarageTab({ dashboard }: { dashboard: VehiclesDashboardS
                     title={section.relationship_type}
                     count={section.vehicles.length}
                   />
-                  <SectionVehicles section={section} viewMode={viewMode} onRefresh={refresh} />
+                  <SectionVehicles section={section} viewMode={viewMode} onRefresh={refresh} {...dragProps} />
                 </div>
               ))
             : sections.map((section) => (
@@ -356,9 +394,19 @@ export default function GarageTab({ dashboard }: { dashboard: VehiclesDashboardS
                   section={section}
                   viewMode={viewMode}
                   onRefresh={refresh}
+                  {...dragProps}
                 />
               ))}
         </div>
+      )}
+
+      {draggingVehicle && userId && (
+        <TriageDock
+          vehicle={draggingVehicle}
+          userId={userId}
+          onComplete={handleTriageComplete}
+          onDragEnd={handleDragEnd}
+        />
       )}
     </div>
   );

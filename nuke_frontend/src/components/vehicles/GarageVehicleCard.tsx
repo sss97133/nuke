@@ -27,6 +27,10 @@ export interface GarageVehicleCardProps {
   vehicle: GarageVehicle;
   viewMode?: ViewMode;
   onRefresh?: () => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+  isDragging?: boolean;
+  isTriageActive?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -634,7 +638,10 @@ function ActionStrip({
 // Grid card (full detail)
 // ---------------------------------------------------------------------------
 
-function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: () => void }) {
+function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTriageActive }: {
+  vehicle: GarageVehicle; onRefresh?: () => void;
+  onDragStart?: () => void; onDragEnd?: () => void; isDragging?: boolean; isTriageActive?: boolean;
+}) {
   const [hovered, setHovered] = useState(false);
   const [vinCopied, setVinCopied] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
@@ -663,14 +670,27 @@ function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
     ? `${formatCurrency(vehicle.purchase_price)} → ${formatCurrency(vehicle.estimated_value!)}`
     : '';
 
+  const dragStyle: React.CSSProperties = isDragging
+    ? { borderColor: 'var(--text, #2a2a2a)', transform: 'scale(1.02)', opacity: 0.8, zIndex: 10 }
+    : isTriageActive
+    ? { opacity: 0.4, transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)' }
+    : {};
+
   return (
     <Link
       to={`/vehicle/${vehicle.id}`}
-      style={{ textDecoration: 'none', display: 'block', color: 'inherit' }}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', vehicle.id);
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart?.();
+      }}
+      onDragEnd={() => onDragEnd?.()}
+      style={{ textDecoration: 'none', display: 'block', color: 'inherit', ...dragStyle }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <article style={{ ...BASE, ...(hovered ? BASE_HOVER : {}) }}>
+      <article style={{ ...BASE, ...(hovered && !isTriageActive ? BASE_HOVER : {}) }}>
         {/* Image 16:9 + mini barcode */}
         <div
           style={{
@@ -861,7 +881,10 @@ function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
 // List card (horizontal)
 // ---------------------------------------------------------------------------
 
-function ListCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: () => void }) {
+function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTriageActive }: {
+  vehicle: GarageVehicle; onRefresh?: () => void;
+  onDragStart?: () => void; onDragEnd?: () => void; isDragging?: boolean; isTriageActive?: boolean;
+}) {
   const [hovered, setHovered] = useState(false);
   const [vinCopied, setVinCopied] = useState(false);
   const title = formatVehicleTitle(vehicle);
@@ -875,14 +898,27 @@ function ListCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
     }
   }, [vehicle.vin]);
 
+  const dragStyle: React.CSSProperties = isDragging
+    ? { borderColor: 'var(--text, #2a2a2a)', transform: 'scale(1.02)', opacity: 0.8, zIndex: 10 }
+    : isTriageActive
+    ? { opacity: 0.4, transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)' }
+    : {};
+
   return (
     <Link
       to={`/vehicle/${vehicle.id}`}
-      style={{ textDecoration: 'none', display: 'block', color: 'inherit' }}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', vehicle.id);
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart?.();
+      }}
+      onDragEnd={() => onDragEnd?.()}
+      style={{ textDecoration: 'none', display: 'block', color: 'inherit', ...dragStyle }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <article style={{ ...BASE, flexDirection: 'row', alignItems: 'stretch', ...(hovered ? BASE_HOVER : {}) }}>
+      <article style={{ ...BASE, flexDirection: 'row', alignItems: 'stretch', ...(hovered && !isTriageActive ? BASE_HOVER : {}) }}>
         {/* Thumbnail with mini barcode */}
         <div
           style={{
@@ -996,7 +1032,10 @@ function ListCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
 // Compact card (one-liner)
 // ---------------------------------------------------------------------------
 
-function CompactCard({ vehicle }: { vehicle: GarageVehicle }) {
+function CompactCard({ vehicle, onDragStart, onDragEnd, isDragging, isTriageActive }: {
+  vehicle: GarageVehicle;
+  onDragStart?: () => void; onDragEnd?: () => void; isDragging?: boolean; isTriageActive?: boolean;
+}) {
   const [hovered, setHovered] = useState(false);
   const [vinCopied, setVinCopied] = useState(false);
   const title = formatVehicleTitle(vehicle);
@@ -1004,7 +1043,18 @@ function CompactCard({ vehicle }: { vehicle: GarageVehicle }) {
   return (
     <Link
       to={`/vehicle/${vehicle.id}`}
-      style={{ textDecoration: 'none', display: 'block', color: 'inherit' }}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', vehicle.id);
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart?.();
+      }}
+      onDragEnd={() => onDragEnd?.()}
+      style={{
+        textDecoration: 'none', display: 'block', color: 'inherit',
+        ...(isDragging ? { borderColor: 'var(--text, #2a2a2a)', transform: 'scale(1.02)', opacity: 0.8, zIndex: 10 } :
+            isTriageActive ? { opacity: 0.4, transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)' } : {}),
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -1015,7 +1065,7 @@ function CompactCard({ vehicle }: { vehicle: GarageVehicle }) {
           alignItems: 'center',
           padding: '6px 8px',
           gap: 8,
-          ...(hovered ? BASE_HOVER : {}),
+          ...(hovered && !isTriageActive ? BASE_HOVER : {}),
         }}
       >
         <HoverData tooltip={vehicle.vin ? `VIN: ${vehicle.vin}` : 'NO VIN'}>
@@ -1063,10 +1113,15 @@ export function GarageVehicleCard({
   vehicle,
   viewMode = 'GRID',
   onRefresh,
+  onDragStart,
+  onDragEnd,
+  isDragging,
+  isTriageActive,
 }: GarageVehicleCardProps) {
-  if (viewMode === 'LIST') return <ListCard vehicle={vehicle} onRefresh={onRefresh} />;
-  if (viewMode === 'COMPACT') return <CompactCard vehicle={vehicle} />;
-  return <GridCard vehicle={vehicle} onRefresh={onRefresh} />;
+  const dragProps = { onDragStart, onDragEnd, isDragging, isTriageActive };
+  if (viewMode === 'LIST') return <ListCard vehicle={vehicle} onRefresh={onRefresh} {...dragProps} />;
+  if (viewMode === 'COMPACT') return <CompactCard vehicle={vehicle} {...dragProps} />;
+  return <GridCard vehicle={vehicle} onRefresh={onRefresh} {...dragProps} />;
 }
 
 export default GarageVehicleCard;
