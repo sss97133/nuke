@@ -278,6 +278,231 @@ class HierarchicalYONO:
         )
 
 
+class ContextualYONOClassifier:
+    """
+    Contextual vehicle image analysis. Zero API calls.
+
+    Uses Y/M/M knowledge profiles for context-aware predictions.
+    Multi-task outputs: zone, condition, damage, modifications, price tier.
+
+    Usage:
+        clf = ContextualYONOClassifier()
+        result = clf.analyze("photo.jpg", year=1972, make="Chevrolet", model="K10")
+        # {
+        #   "zone": "ext_front", "zone_confidence": 0.85,
+        #   "condition_score": 3, "condition_confidence": 0.72,
+        #   "damage_flags": ["rust", "paint_fade"],
+        #   "modification_flags": ["lift_kit"],
+        #   "price_tier": "mid",
+        #   "ymm_context": {...}
+        # }
+    """
+
+    # Taxonomy constants
+    ZONE_CODES = [
+        "ext_front", "ext_front_driver", "ext_front_passenger",
+        "ext_driver_side", "ext_passenger_side",
+        "ext_rear", "ext_rear_driver", "ext_rear_passenger",
+        "ext_roof", "ext_undercarriage",
+        "panel_hood", "panel_trunk",
+        "panel_door_fl", "panel_door_fr", "panel_door_rl", "panel_door_rr",
+        "panel_fender_fl", "panel_fender_fr", "panel_fender_rl", "panel_fender_rr",
+        "wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr",
+        "int_dashboard", "int_front_seats", "int_rear_seats", "int_cargo",
+        "int_headliner",
+        "int_door_panel_fl", "int_door_panel_fr", "int_door_panel_rl", "int_door_panel_rr",
+        "mech_engine_bay", "mech_transmission", "mech_suspension",
+        "detail_vin", "detail_badge", "detail_damage", "detail_odometer",
+        "other",
+    ]
+    DAMAGE_FLAGS = ["rust", "dent", "crack", "paint_fade", "broken_glass", "missing_parts", "accident_damage"]
+    MOD_FLAGS = ["lift_kit", "lowered", "aftermarket_wheels", "roll_cage", "engine_swap", "body_kit", "exhaust_mod", "suspension_mod"]
+    PRICE_TIERS = ["elite", "high", "mid", "entry", "budget"]
+
+    def __init__(self, model_path: str = None, ymm_store_path: str = None):
+        import onnxruntime as ort
+
+        model_path = model_path or str(MODELS_DIR / "yono_contextual_v3.onnx")
+        if not Path(model_path).exists():
+            raise FileNotFoundError(
+                f"Contextual model not found at {model_path}. "
+                "Train with: modal run yono/contextual_training/modal_contextual_train.py --version v3 --action all"
+            )
+
+        self._session = ort.InferenceSession(model_path)
+        self._make_clf = None  # Lazy-loaded for Y/M/M fallback
+
+        # Load Y/M/M knowledge store (local Parquet or in-memory dict)
+        self._ymm_store = {}
+        ymm_path = ymm_store_path or str(YONO_DIR / "data" / "ymm_knowledge.parquet")
+        if Path(ymm_path).exists():
+            self._load_ymm_store(ymm_path)
+
+        # Load config
+        config_path = Path(model_path).with_suffix(".onnx").parent / "yono_contextual_v3_config.json"
+        self._config = {}
+        if config_path.exists():
+            self._config = json.loads(config_path.read_text())
+
+    def _load_ymm_store(self, path: str):
+        """Load Y/M/M profiles from Parquet into memory."""
+        try:
+            import pyarrow.parquet as pq
+            table = pq.read_table(path)
+            for i in range(table.num_rows):
+                key = table.column("ymm_key")[i].as_py()
+                profile_json = table.column("profile_json")[i].as_py()
+                self._ymm_store[key] = json.loads(profile_json)
+        except ImportError:
+            # Fallback: no pyarrow, try loading from JSON sidecar
+            json_path = Path(path).with_suffix(".json")
+            if json_path.exists():
+                data = json.loads(json_path.read_text())
+                for entry in data:
+                    self._ymm_store[entry["ymm_key"]] = entry
+
+    def _get_ymm_features(self, year: int, make: str, model: str) -> np.ndarray:
+        """Get Y/M/M feature vector. Returns zeros if not found."""
+        from yono.contextual_training.featurizers import (
+            featurize_ymm_profile, default_ymm_profile, FEATURE_DIM_YMM
+        )
+        ymm_key = f"{year}_{make}_{model}"
+        profile = self._ymm_store.get(ymm_key, default_ymm_profile())
+        return featurize_ymm_profile(profile)
+
+    def analyze(
+        self,
+        image_path: str,
+        year: int = None,
+        make: str = None,
+        model: str = None,
+        vehicle_row: dict = None,
+        damage_threshold: float = 0.4,
+        mod_threshold: float = 0.4,
+    ) -> dict:
+        """
+        Analyze a vehicle image with contextual knowledge.
+
+        Args:
+            image_path: Path to image file
+            year/make/model: Vehicle identification (optional, uses make classifier if missing)
+            vehicle_row: Vehicle metadata dict for instance features
+            damage_threshold: Sigmoid threshold for damage flag detection
+            mod_threshold: Sigmoid threshold for modification detection
+
+        Returns:
+            Dict with zone, condition, damage_flags, modification_flags, price_tier
+        """
+        from yono.contextual_training.featurizers import (
+            featurize_ymm_profile, featurize_vehicle_instance,
+            default_ymm_profile, FEATURE_DIM_YMM, FEATURE_DIM_VEHICLE, FEATURE_DIM_TIMELINE
+        )
+
+        # 1. Classify make if Y/M/M unknown
+        if not (year and make and model):
+            if self._make_clf is None:
+                self._make_clf = HierarchicalYONO()
+            make_result = self._make_clf.predict(image_path)
+            make = make_result.get("make", "Unknown")
+
+        # 2. Get Y/M/M features
+        ymm_key = f"{year}_{make}_{model}"
+        profile = self._ymm_store.get(ymm_key, default_ymm_profile())
+        ymm_features = featurize_ymm_profile(profile)
+
+        # 3. Vehicle instance features
+        veh_data = vehicle_row or {}
+        if year:
+            veh_data["_ymm_year"] = year
+        vehicle_features = featurize_vehicle_instance(veh_data)
+
+        # 4. Timeline features (zeros for single-image analysis)
+        timeline_features = np.zeros(FEATURE_DIM_TIMELINE, dtype=np.float32)
+
+        # 5. Concatenate context
+        context = np.concatenate([ymm_features, vehicle_features, timeline_features])
+        context = context[np.newaxis]  # (1, 133)
+
+        # 6. Preprocess image
+        image_tensor = _preprocess(image_path)
+
+        # 7. Run inference
+        outputs = self._session.run(None, {
+            "image": image_tensor.astype(np.float32),
+            "context": context.astype(np.float32),
+        })
+
+        zone_logits, cond_logits, damage_logits, mod_logits, price_logits = outputs
+
+        # 8. Decode outputs
+        zone_probs = _softmax(zone_logits)[0]
+        zone_idx = int(zone_probs.argmax())
+        zone = self.ZONE_CODES[zone_idx]
+        zone_conf = float(zone_probs[zone_idx])
+
+        cond_probs = _softmax(cond_logits)[0]
+        cond_idx = int(cond_probs.argmax())
+        condition_score = cond_idx + 1  # 1-5
+        cond_conf = float(cond_probs[cond_idx])
+
+        damage_probs = 1 / (1 + np.exp(-damage_logits[0]))  # sigmoid
+        damage_flags = [
+            self.DAMAGE_FLAGS[i]
+            for i in range(len(self.DAMAGE_FLAGS))
+            if damage_probs[i] > damage_threshold
+        ]
+        damage_detail = {
+            self.DAMAGE_FLAGS[i]: float(damage_probs[i])
+            for i in range(len(self.DAMAGE_FLAGS))
+        }
+
+        mod_probs = 1 / (1 + np.exp(-mod_logits[0]))  # sigmoid
+        modification_flags = [
+            self.MOD_FLAGS[i]
+            for i in range(len(self.MOD_FLAGS))
+            if mod_probs[i] > mod_threshold
+        ]
+        mod_detail = {
+            self.MOD_FLAGS[i]: float(mod_probs[i])
+            for i in range(len(self.MOD_FLAGS))
+        }
+
+        price_probs = _softmax(price_logits)[0]
+        price_idx = int(price_probs.argmax())
+        price_tier = self.PRICE_TIERS[price_idx]
+
+        return {
+            "zone": zone,
+            "zone_confidence": zone_conf,
+            "zone_top5": [
+                (self.ZONE_CODES[i], float(zone_probs[i]))
+                for i in zone_probs.argsort()[::-1][:5]
+            ],
+            "condition_score": condition_score,
+            "condition_confidence": cond_conf,
+            "damage_flags": damage_flags,
+            "damage_detail": damage_detail,
+            "modification_flags": modification_flags,
+            "mod_detail": mod_detail,
+            "price_tier": price_tier,
+            "price_confidence": float(price_probs[price_idx]),
+            "ymm_key": ymm_key,
+            "ymm_context": {
+                "vehicle_count": profile.get("vehicle_count", 0),
+                "source_comment_count": profile.get("source_comment_count", 0),
+                "factory_specs": profile.get("factory_specs", {}),
+                "market": profile.get("market", {}),
+            },
+        }
+
+    def __repr__(self):
+        return (
+            f"ContextualYONOClassifier("
+            f"ymm_store={len(self._ymm_store)} profiles, "
+            f"model={'loaded' if self._session else 'missing'})"
+        )
+
+
 def _has_coreml() -> bool:
     try:
         import onnxruntime as ort
