@@ -148,6 +148,46 @@ const TOTAL_GROUPS = 4;
 const YEAR_MIN = 1960;
 const YEAR_MAX = 1999;
 
+/**
+ * Download an image from a URL and upload it to Supabase storage.
+ * Returns the public Supabase URL, or null on failure (falls back to original URL).
+ * Facebook CDN URLs expire — this ensures we own the image permanently.
+ */
+async function downloadAndStoreImage(sourceUrl, vehicleId, index = 0) {
+  try {
+    const resp = await fetch(sourceUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!resp.ok) return null;
+
+    const contentType = resp.headers.get("content-type") || "image/jpeg";
+    const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
+    const buffer = Buffer.from(await resp.arrayBuffer());
+
+    // Skip tiny images (likely icons/placeholders)
+    if (buffer.length < 5000) return null;
+
+    const storagePath = `${vehicleId}/fb-marketplace/${Date.now()}-${index}.${ext}`;
+    const { error: uploadErr } = await supabase.storage
+      .from("vehicle-photos")
+      .upload(storagePath, buffer, { contentType, upsert: false });
+
+    if (uploadErr) {
+      // If already exists, that's fine — get its public URL
+      if (!uploadErr.message?.includes("already exists")) return null;
+    }
+
+    const { data: pubData } = supabase.storage
+      .from("vehicle-photos")
+      .getPublicUrl(storagePath);
+
+    return pubData?.publicUrl || null;
+  } catch {
+    return null;
+  }
+}
+
 // Rate limit tracking — skip individual cities, abort only after consecutive failures
 let consecutiveRateLimits = 0;
 const MAX_CONSECUTIVE_RATE_LIMITS = 3;
@@ -286,6 +326,321 @@ async function fetchPage(location, lat, lng, cursor = null) {
 function parseYear(title) {
   const m = title?.match(/^(\d{4})\s/);
   return m ? parseInt(m[1]) : null;
+}
+
+// ── Non-automobile filtering ──────────────────────────────────────
+// Prevents motorcycles, boats, RVs, ATVs, farm equipment, golf carts
+// from entering the vehicles table.
+
+/** Makes that NEVER produce automobiles. Case-insensitive lookup. */
+const NON_AUTO_MAKES_LC = new Set([
+  // Motorcycles (pure moto brands)
+  'harley-davidson','harley','ducati','ktm','husqvarna','aprilia',
+  'moto guzzi','norton','buell','royal enfield','indian','bimota',
+  'benelli','mv agusta','vespa','piaggio','bsa','crocker','laverda',
+  'velocette','excelsior','henderson','matchless','ajs','vincent',
+  // Motorcycle-primary (no production cars in 1960-1999)
+  'yamaha','kawasaki',
+  // Powersports / UTV / ATV
+  'polaris','arctic cat','can-am','ski-doo',
+  // Marine
+  'sea-doo','sea ray','bayliner','boston whaler','mastercraft',
+  'chris-craft','wellcraft','chaparral','cobalt','malibu boats',
+  'correct craft','riva','rinker','lund','crestliner','bennington',
+  'grumman','glastron','skeeter','tracker',
+  // RV / Camper
+  'fleetwood','winnebago','airstream','coachmen','jayco','keystone',
+  'forest river','thor','newmar','tiffin','starcraft','heartland',
+  'dutchmen','grand design','entegra','gulf stream','coleman',
+  'holiday rambler','monaco','flagstaff',
+  // Farm / Heavy Equipment
+  'john deere','kubota','caterpillar','bobcat','case ih','new holland',
+  'massey ferguson','farmall','allis-chalmers','oliver','agco',
+  // Heavy Duty / Commercial
+  'freightliner','peterbilt','kenworth','mack','hino','western star',
+  'autocar','navistar',
+  // Golf Carts
+  'ezgo','club car','cushman','gem',
+  // Aircraft
+  'cessna','piper','beechcraft','mooney','cirrus',
+  // Trailers
+  'featherlite','sundowner','big tex','load trail','pj trailers',
+]);
+
+/**
+ * Motorcycle/non-auto model patterns for dual-use makes (Honda, Suzuki, BMW, Triumph).
+ * These makes produce BOTH cars and motorcycles — we classify by model.
+ */
+const MOTORCYCLE_MODEL_PATTERNS = [
+  // Honda motorcycle series (1960-1999)
+  /^CB\d/i, /^CL\d/i, /^CT\d/i, /^XL\d/i, /^XR\d/i, /^CR\d/i, /^GL\d/i,
+  /^VT\d/i, /^VF\d/i, /^CBR/i, /^CRF/i, /^NX\d/i, /^CMX/i,
+  /^Shadow/i, /^Rebel/i, /^Nighthawk/i, /^Magna/i, /^Gold\s?Wing/i,
+  /^Interceptor/i, /^Pacific Coast/i, /^Valkyrie/i,
+  // Suzuki motorcycle series
+  /^GS\d/i, /^GSX/i, /^DR\d/i, /^RM\d/i, /^VS\d/i, /^SV\d/i, /^TL\d/i,
+  /^Intruder/i, /^Katana/i, /^Bandit/i, /^Boulevard/i, /^Hayabusa/i,
+  /^Savage/i, /^Marauder/i,
+  // Suzuki ATV series
+  /^LT\d/i, /^LT-/i, /^King\s?Quad/i, /^Eiger/i, /^Ozark/i,
+  // BMW motorcycle series (R/K/F/G — BMW cars use 3-digit series like 325i, M3, Z3)
+  /^R\d{2}/i, /^K\d{2}/i, /^F\d{3}\s/i, /^F\d{3}$/i, /^G\d{3}/i,
+  // Triumph motorcycle models
+  /^Bonneville/i, /^Thruxton/i, /^Tiger\b/i, /^Trident/i, /^Trophy/i,
+  /^Daytona\b/i, /^Speed\s?Triple/i, /^Sprint/i, /^Scrambler/i, /^Rocket/i,
+  // Generic non-auto keywords in model field
+  /Motorcycle/i, /Dirt\s?Bike/i, /Sport\s?Bike/i, /Chopper/i, /Bobber/i,
+  /\bATV\b/i, /\bUTV\b/i, /\bQuad\b/i, /Scooter/i, /Moped/i,
+  /Jet\s?Ski/i, /Wave\s?Runner/i, /Golf\s?Cart/i,
+  /Motorhome/i, /Camper\b/i, /\bRV\b/i, /Trailer\b/i, /Tractor\b/i,
+];
+
+/**
+ * Classify a vehicle as auto or non-auto, and return a vehicle type.
+ * Returns { isAuto: bool, vehicleType: string|null }
+ */
+function classifyVehicle(make, model) {
+  if (!make) return { isAuto: false, vehicleType: null };
+  const makeLc = make.toLowerCase().trim();
+
+  // Known non-auto make → classify by category
+  if (NON_AUTO_MAKES_LC.has(makeLc)) {
+    let vtype = 'MOTORCYCLE'; // default for moto brands
+    if (['polaris','arctic cat','can-am','ski-doo'].includes(makeLc)) vtype = 'ATV';
+    if (['sea-doo','sea ray','bayliner','boston whaler','mastercraft','chris-craft','wellcraft','chaparral','cobalt','malibu boats','correct craft','riva','rinker','lund','crestliner','bennington','grumman','glastron','skeeter','tracker'].includes(makeLc)) vtype = 'BOAT';
+    if (['fleetwood','winnebago','airstream','coachmen','jayco','keystone','forest river','thor','newmar','tiffin','starcraft','heartland','dutchmen','grand design','entegra','gulf stream','coleman','holiday rambler','monaco','flagstaff'].includes(makeLc)) vtype = 'RV';
+    if (['john deere','kubota','caterpillar','bobcat','case ih','new holland','massey ferguson','farmall','allis-chalmers','oliver','agco'].includes(makeLc)) vtype = 'FARM_EQUIPMENT';
+    if (['freightliner','peterbilt','kenworth','mack','hino','western star','autocar','navistar'].includes(makeLc)) vtype = 'COMMERCIAL_TRUCK';
+    if (['ezgo','club car','cushman','gem'].includes(makeLc)) vtype = 'GOLF_CART';
+    if (['cessna','piper','beechcraft','mooney','cirrus'].includes(makeLc)) vtype = 'AIRCRAFT';
+    if (['featherlite','sundowner','big tex','load trail','pj trailers'].includes(makeLc)) vtype = 'TRAILER';
+    return { isAuto: false, vehicleType: vtype };
+  }
+
+  // Dual-use make — check model for motorcycle patterns
+  if (model && MOTORCYCLE_MODEL_PATTERNS.some(p => p.test(model))) {
+    // Determine subtype from model keywords
+    if (/\b(ATV|UTV|Quad|Four.?Wheeler)\b/i.test(model)) return { isAuto: false, vehicleType: 'ATV' };
+    if (/\b(Jet.?Ski|Wave.?Runner)\b/i.test(model)) return { isAuto: false, vehicleType: 'BOAT' };
+    if (/\b(Golf.?Cart)\b/i.test(model)) return { isAuto: false, vehicleType: 'GOLF_CART' };
+    if (/\b(Motorhome|Camper|RV)\b/i.test(model)) return { isAuto: false, vehicleType: 'RV' };
+    if (/\b(Trailer)\b/i.test(model)) return { isAuto: false, vehicleType: 'TRAILER' };
+    if (/\b(Tractor)\b/i.test(model)) return { isAuto: false, vehicleType: 'FARM_EQUIPMENT' };
+    return { isAuto: false, vehicleType: 'MOTORCYCLE' };
+  }
+
+  return { isAuto: true, vehicleType: null };
+}
+
+/**
+ * Y/M/M market price index — loaded at startup from our 313K+ sale records.
+ * Used to compute signal: how does this listing's price compare to market?
+ *
+ * A 1967 Shelby GT500 at $150K = noise (that's the market).
+ * A 1967 Shelby GT500 at $35K  = screaming signal.
+ *
+ * Signal is NOT hardcoded by make/model. It emerges from the data.
+ */
+let marketIndex = new Map(); // key: "year_make_model" → { median, p25, p75, n }
+let makeModelIndex = new Map(); // key: "make_model" → fallback when exact year missing
+let ymmIndexLoaded = false;
+
+async function loadMarketIndex() {
+  if (ymmIndexLoaded) return;
+  console.log('\n[Market Index] Loading Y/M/M price data...');
+
+  // Exact Y/M/M stats (year 1960-1999, 5+ comps)
+  const { data: ymm, error: ymmErr } = await supabase.rpc('execute_sql_readonly', {
+    query: `
+      SELECT year, LOWER(make) as make, LOWER(model) as model,
+        count(*) as n,
+        percentile_cont(0.25) WITHIN GROUP (ORDER BY sale_price) as p25,
+        percentile_cont(0.50) WITHIN GROUP (ORDER BY sale_price) as median,
+        percentile_cont(0.75) WITHIN GROUP (ORDER BY sale_price) as p75
+      FROM vehicles
+      WHERE year BETWEEN 1950 AND 2000
+        AND sale_price > 500
+        AND status NOT IN ('deleted','merged','duplicate')
+        AND make IS NOT NULL AND model IS NOT NULL
+      GROUP BY year, LOWER(make), LOWER(model)
+      HAVING count(*) >= 3
+    `
+  });
+
+  if (ymmErr) {
+    // Fallback: direct query with aggregation (slower but works without RPC)
+    console.warn('[Market Index] RPC not available, using direct query fallback...');
+    const { data: fallback, error: fbErr } = await supabase
+      .from('vehicles')
+      .select('year, make, model, sale_price')
+      .gte('year', 1950).lte('year', 2000)
+      .gt('sale_price', 500)
+      .not('make', 'is', null)
+      .not('model', 'is', null)
+      .neq('status', 'deleted')
+      .neq('status', 'merged')
+      .limit(50000);
+
+    if (!fbErr && fallback) {
+      // Build index from raw rows client-side
+      const groups = {};
+      for (const v of fallback) {
+        const key = `${v.year}_${v.make.toLowerCase()}_${v.model.toLowerCase()}`;
+        if (!groups[key]) groups[key] = { prices: [], year: v.year, make: v.make.toLowerCase(), model: v.model.toLowerCase() };
+        groups[key].prices.push(Number(v.sale_price));
+      }
+      for (const [key, g] of Object.entries(groups)) {
+        if (g.prices.length < 3) continue;
+        g.prices.sort((a, b) => a - b);
+        const n = g.prices.length;
+        marketIndex.set(key, {
+          median: g.prices[Math.floor(n * 0.5)],
+          p25: g.prices[Math.floor(n * 0.25)],
+          p75: g.prices[Math.floor(n * 0.75)],
+          n,
+        });
+        const mmKey = `${g.make}_${g.model}`;
+        if (!makeModelIndex.has(mmKey)) makeModelIndex.set(mmKey, { prices: [] });
+        makeModelIndex.get(mmKey).prices.push(...g.prices);
+      }
+      // Finalize make/model rollups
+      for (const [key, g] of makeModelIndex.entries()) {
+        g.prices.sort((a, b) => a - b);
+        const n = g.prices.length;
+        makeModelIndex.set(key, {
+          median: g.prices[Math.floor(n * 0.5)],
+          p25: g.prices[Math.floor(n * 0.25)],
+          p75: g.prices[Math.floor(n * 0.75)],
+          n,
+        });
+      }
+      console.log(`[Market Index] Loaded ${marketIndex.size} Y/M/M groups, ${makeModelIndex.size} M/M groups (fallback)`);
+    }
+  } else if (ymm) {
+    for (const row of ymm) {
+      const key = `${row.year}_${row.make}_${row.model}`;
+      marketIndex.set(key, {
+        median: Number(row.median),
+        p25: Number(row.p25),
+        p75: Number(row.p75),
+        n: Number(row.n),
+      });
+      // Also build make/model rollup (across years)
+      const mmKey = `${row.make}_${row.model}`;
+      if (!makeModelIndex.has(mmKey)) makeModelIndex.set(mmKey, { prices: [] });
+      makeModelIndex.get(mmKey).prices.push(Number(row.median));
+    }
+    // Finalize make/model rollups
+    for (const [key, g] of makeModelIndex.entries()) {
+      g.prices.sort((a, b) => a - b);
+      const n = g.prices.length;
+      makeModelIndex.set(key, {
+        median: g.prices[Math.floor(n * 0.5)],
+        p25: g.prices[Math.floor(n * 0.25)],
+        p75: g.prices[Math.floor(n * 0.75)],
+        n,
+      });
+    }
+    console.log(`[Market Index] Loaded ${marketIndex.size} Y/M/M groups, ${makeModelIndex.size} M/M groups`);
+  }
+
+  ymmIndexLoaded = true;
+}
+
+/**
+ * Get market comps for a vehicle. Cascading lookup:
+ * 1. Exact Y/M/M → best signal
+ * 2. Make/Model across years → good signal
+ * 3. null → unknown, can't compute price signal
+ */
+function getMarketComps(year, make, model) {
+  if (!make) return null;
+  const makeLc = make.toLowerCase();
+  const modelLc = (model || '').toLowerCase();
+
+  // Exact match
+  const exact = marketIndex.get(`${year}_${makeLc}_${modelLc}`);
+  if (exact) return { ...exact, matchType: 'exact' };
+
+  // Make/Model across years
+  const mm = makeModelIndex.get(`${makeLc}_${modelLc}`);
+  if (mm) return { ...mm, matchType: 'make_model' };
+
+  return null;
+}
+
+/**
+ * Compute discovery signal (0-100) from MARKET DATA, not hardcoded lists.
+ *
+ * Signal = how interesting is this listing relative to what we already know?
+ *
+ * Components:
+ *   PRICE ANOMALY (0-50): asking price vs market median
+ *     ratio < 0.25 → 50 pts (screaming deal — GT500 at 1/4 price)
+ *     ratio < 0.50 → 40 pts (strong deal)
+ *     ratio < 0.75 → 25 pts (below market)
+ *     ratio 0.75-1.25 → 5 pts (at market — boring)
+ *     ratio > 1.25 → 0 pts (overpriced)
+ *     no comps → 15 pts (unknown = mildly interesting, could be rare)
+ *
+ *   RARITY (0-25): how uncommon is this Y/M/M in our database?
+ *     1-2 comps → 25 pts (nearly unique)
+ *     3-9 comps → 20 pts (rare)
+ *     10-49 → 12 pts (uncommon)
+ *     50-199 → 5 pts (common)
+ *     200+ → 0 pts (commodity — 800 Camaros)
+ *
+ *   LISTING QUALITY (0-15): is this a real listing or junk?
+ *     has price → 5 pts
+ *     has 3+ photos → 5 pts
+ *     has description → 5 pts
+ *
+ *   NON-AUTO PENALTY: -90 (still stored, near-zero priority)
+ */
+function computeDiscoverySignal(year, make, model, price, imageCount, hasDescription, isAuto) {
+  if (!isAuto) return 1; // store it, but bottom of the pile
+
+  let signal = 0;
+  const comps = getMarketComps(year, make, model);
+
+  // === PRICE ANOMALY (0-50) ===
+  if (price && price > 100 && comps && comps.median > 0) {
+    const ratio = price / comps.median;
+    if (ratio < 0.25)      signal += 50; // screaming deal
+    else if (ratio < 0.40) signal += 45;
+    else if (ratio < 0.50) signal += 40;
+    else if (ratio < 0.65) signal += 30;
+    else if (ratio < 0.75) signal += 25;
+    else if (ratio < 1.0)  signal += 10; // slightly below market
+    else if (ratio < 1.25) signal += 5;  // at market
+    // else overpriced → 0
+  } else if (price && price > 100 && !comps) {
+    // No comps = we don't know this vehicle well. That's interesting.
+    signal += 15;
+  } else if (!price) {
+    // No price listed — mild signal (could be negotiable / hiding value)
+    signal += 5;
+  }
+
+  // === RARITY (0-25) ===
+  if (comps) {
+    const n = comps.n;
+    if (n <= 2)       signal += 25;
+    else if (n <= 9)  signal += 20;
+    else if (n <= 49) signal += 12;
+    else if (n <= 199) signal += 5;
+    // else commodity → 0
+  } else {
+    // Not in our database at all — very interesting
+    signal += 25;
+  }
+
+  // === LISTING QUALITY (0-15) ===
+  if (price && price > 100) signal += 5;
+  if (imageCount >= 3) signal += 5;
+  if (hasDescription) signal += 5;
+
+  return Math.min(signal, 100);
 }
 
 const MAKES = [
@@ -487,6 +842,20 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
   const result = { vehicleId: null, imagesInserted: 0 };
   if (!year || !make) return result;
 
+  // Classify vehicle type and compute market-relative signal
+  const { isAuto, vehicleType } = classifyVehicle(make, model);
+  const signal = computeDiscoverySignal(year, make, model, price, allImages.length, !!description, isAuto);
+  const comps = isAuto ? getMarketComps(year, make, model) : null;
+
+  if (!isAuto) {
+    console.log(`    ○ ${vehicleType}: ${year} ${make} ${model || ''}`);
+  } else if (signal >= 60) {
+    const ratio = (price && comps?.median) ? (price / comps.median).toFixed(2) : '?';
+    console.log(`    ★ FIND [${signal}]: ${year} ${make} ${model || ''} $${price || '?'} (market $${comps?.median || '?'}, ratio ${ratio}, ${comps?.n || 0} comps)`);
+  } else if (signal >= 40) {
+    console.log(`    ◆ Interesting [${signal}]: ${year} ${make} ${model || ''} $${price || '?'}`);
+  }
+
   const fbUrl = `https://www.facebook.com/marketplace/item/${facebookId}`;
   const location = city && state ? `${city}, ${state}` : city || null;
 
@@ -509,7 +878,11 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
     if (location) updates.listing_location = location;
     if (listingLat) updates.gps_latitude = listingLat;
     if (listingLng) updates.gps_longitude = listingLng;
-    if (imageUrl) updates.primary_image_url = imageUrl;
+    if (imageUrl) {
+      // Download primary image to Supabase storage (FB CDN URLs expire)
+      const storedPrimary = await downloadAndStoreImage(imageUrl, vehicleId, 0);
+      if (storedPrimary) updates.primary_image_url = storedPrimary;
+    }
 
     if (Object.keys(updates).length > 0) {
       // Only update NULL fields
@@ -521,24 +894,37 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
     }
   } else {
     // Create new vehicle
+    const insertData = {
+      year,
+      make: make.charAt(0).toUpperCase() + make.slice(1),
+      model: model || null,
+      listing_url: fbUrl,
+      asking_price: price ? Math.round(price) : null,
+      description: description || null,
+      listing_location: location,
+      gps_latitude: listingLat,
+      gps_longitude: listingLng,
+      status: "discovered",
+      auction_source: "facebook_marketplace",
+      discovery_source: "facebook_marketplace",
+    };
+    // Classify at extraction time so the feed can filter/sort
+    if (vehicleType) insertData.canonical_vehicle_type = vehicleType;
+    if (signal > 0) insertData.discovery_priority = signal;
+
     const { data: newVeh, error: vehErr } = await supabase
       .from("vehicles")
-      .insert({
-        year,
-        make: make.charAt(0).toUpperCase() + make.slice(1),
-        model: model || null,
-        listing_url: fbUrl,
-        asking_price: price ? Math.round(price) : null,
-        description: description || null,
-        listing_location: location,
-        gps_latitude: listingLat,
-        gps_longitude: listingLng,
-        primary_image_url: imageUrl,
-        status: "discovered",
-        auction_source: "facebook_marketplace",
-      })
+      .insert(insertData)
       .select("id")
       .single();
+
+    // Download primary image after vehicle creation (need vehicleId for storage path)
+    if (newVeh?.id && imageUrl) {
+      const storedPrimary = await downloadAndStoreImage(imageUrl, newVeh.id, 0);
+      if (storedPrimary) {
+        await supabase.from("vehicles").update({ primary_image_url: storedPrimary }).eq("id", newVeh.id);
+      }
+    }
 
     if (vehErr) {
       console.error(`    Vehicle insert error for ${facebookId}: ${vehErr.message}`);
@@ -549,24 +935,32 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
 
   result.vehicleId = vehicleId;
 
-  // Insert all images to vehicle_images
+  // Download and store images in Supabase storage (FB CDN URLs expire)
   if (allImages.length > 0 && vehicleId) {
-    // Check which images already exist
+    // Check which images already exist (by source_url to avoid re-downloading)
     const { data: existingImgs } = await supabase
       .from("vehicle_images")
-      .select("image_url")
+      .select("image_url, source_url")
       .eq("vehicle_id", vehicleId);
 
-    const existingUrls = new Set((existingImgs || []).map(i => i.image_url));
-    const newImages = allImages.filter(url => !existingUrls.has(url));
+    const existingSourceUrls = new Set((existingImgs || []).map(i => i.source_url || i.image_url));
+    const newImages = allImages.filter(url => !existingSourceUrls.has(url));
 
     if (newImages.length > 0) {
-      const imgRows = newImages.map((url, idx) => ({
-        vehicle_id: vehicleId,
-        image_url: url,
-        source: "facebook_marketplace",
-        display_order: (existingUrls.size || 0) + idx,
-      }));
+      const imgRows = [];
+      for (let idx = 0; idx < newImages.length; idx++) {
+        const originalUrl = newImages[idx];
+        // Download to Supabase storage so we own the image permanently
+        const storedUrl = await downloadAndStoreImage(originalUrl, vehicleId, idx);
+        if (!storedUrl) continue; // Skip — never store expiring CDN URLs
+        imgRows.push({
+          vehicle_id: vehicleId,
+          image_url: storedUrl,
+          source_url: originalUrl, // Preserve original URL for dedup
+          source: "facebook_marketplace",
+          display_order: (existingSourceUrls.size || 0) + idx,
+        });
+      }
 
       const { error: imgErr } = await supabase
         .from("vehicle_images")
@@ -959,6 +1353,11 @@ async function main() {
   console.log(`Disappearance detection: ${!SKIP_DISAPPEARANCE && !DRY_RUN}`);
   console.log(`Vehicle creation: ${!SKIP_VEHICLES && !DRY_RUN}`);
   console.log(`Estimated max listings to scan: ${locationsToScrape.length * MAX_PAGES * 24}`);
+
+  // Load market price index for signal computation
+  if (!SKIP_VEHICLES && !DRY_RUN) {
+    await loadMarketIndex();
+  }
 
   // Create sweep job
   const sweepId = DRY_RUN ? null : await startSweepJob(locationsToScrape.length);
