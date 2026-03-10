@@ -20,6 +20,14 @@ Endpoints:
                                           damage_flags, modification_flags, interior_quality,
                                           photo_quality, surface_coord_u, surface_coord_v, ms, model}
   POST /analyze/batch   → {images: [{image_url},...]} → {results: [...], count: N}
+
+  POST /condition/context    → {image_id, vehicle_id} → 5W context (free metadata)
+  POST /condition/bridge     → {vehicle_id?, limit?} → bridge YONO v1 flags → taxonomy observations
+  POST /condition/score      → {vehicle_id} → 0-100 score with tier, percentiles, rarity
+  POST /condition/contextual → {vehicle_id} → Phase 3C contextual pass (Y/M/M knowledge signals)
+  POST /condition/sequence   → {vehicle_id} → Phase 3D sequence cross-reference pass
+  POST /condition/pipeline   → {vehicle_id} → full multipass: bridge → contextual → sequence → score → distribute
+  POST /condition/distribute → {ymm_key? | all?} → recompute per-Y/M/M distributions
 """
 
 import argparse
@@ -770,10 +778,23 @@ class BatchRequest(BaseModel):
 
 class AnalyzeRequest(BaseModel):
     image_url: str
+    image_id: Optional[str] = None     # if provided, writes observations to DB
+    vehicle_id: Optional[str] = None   # required with image_id for observation writing
 
 
 class AnalyzeBatchRequest(BaseModel):
     images: List[AnalyzeRequest]
+
+
+class ContextualAnalyzeRequest(BaseModel):
+    image_url: str
+    year: int = None
+    make: str = None
+    model: str = None
+    mileage: int = None
+    sale_price: int = None
+    damage_threshold: float = 0.4
+    mod_threshold: float = 0.4
 
 
 # ============================================================
@@ -959,7 +980,23 @@ def analyze(req: AnalyzeRequest):
                 pass
 
     elapsed_ms = round((time.perf_counter() - t0) * 1000, 1)
-    return {**result, "ms": elapsed_ms, "image_url": req.image_url}
+
+    # Auto-write observations if image_id + vehicle_id provided
+    observations_written = 0
+    if req.image_id and req.vehicle_id:
+        try:
+            from condition_spectrometer import bridge_yono_output, get_connection
+            conn = get_connection()
+            observations_written = bridge_yono_output(
+                conn, req.image_id, req.vehicle_id, result,
+                source="yono_v2", source_version="server_live",
+            )
+            conn.close()
+        except Exception as e:
+            print(f"Auto-observation write failed: {e}")
+
+    return {**result, "ms": elapsed_ms, "image_url": req.image_url,
+            "observations_written": observations_written}
 
 
 @app.post("/analyze/batch")
@@ -982,6 +1019,246 @@ def analyze_batch(req: AnalyzeBatchRequest):
             results.append({"image_url": item.image_url, "error": e.detail})
 
     return {"results": results, "count": len(results)}
+
+
+# ============================================================
+# Condition Spectrometer endpoints
+# ============================================================
+
+class ConditionScoreRequest(BaseModel):
+    vehicle_id: str
+
+
+class ConditionContextRequest(BaseModel):
+    image_id: str
+    vehicle_id: str
+
+
+class ConditionBridgeRequest(BaseModel):
+    vehicle_id: Optional[str] = None
+    limit: int = 1000
+
+
+class ConditionDistributeRequest(BaseModel):
+    ymm_key: Optional[str] = None
+    all: bool = False
+
+
+@app.post("/condition/context")
+def condition_context(req: ConditionContextRequest):
+    """
+    Get 5W context (who/what/where/when/which) for an image.
+    Free metadata — costs zero inference. Informs all subsequent passes.
+    """
+    try:
+        from condition_spectrometer import get_5w_context, get_connection
+        conn = get_connection()
+        ctx = get_5w_context(conn, req.image_id, req.vehicle_id)
+        conn.close()
+        return ctx
+    except Exception as e:
+        raise HTTPException(500, f"Context failed: {e}")
+
+
+@app.post("/condition/bridge")
+def condition_bridge(req: ConditionBridgeRequest):
+    """
+    Bridge existing YONO v1 output → condition observations.
+    Maps damage_flags/modification_flags to the expandable condition_taxonomy.
+    """
+    try:
+        from condition_spectrometer import bridge_vehicle_images, get_connection
+        conn = get_connection()
+        result = bridge_vehicle_images(conn, vehicle_id=req.vehicle_id, limit=req.limit)
+        conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(500, f"Bridge failed: {e}")
+
+
+@app.post("/condition/score")
+def condition_score(req: ConditionScoreRequest):
+    """
+    Compute 0-100 condition score for a vehicle from all observations.
+
+    Rubric: exterior(30) + interior(20) + mechanical(20) + provenance(15) + structural(15) = 100
+    Includes distribution-relative percentile within Y/M/M and globally.
+    """
+    try:
+        from condition_spectrometer import compute_condition_score, save_condition_score, get_connection
+        conn = get_connection()
+        score_data = compute_condition_score(conn, req.vehicle_id)
+        if not score_data:
+            conn.close()
+            raise HTTPException(404, "No observations found for this vehicle")
+        save_condition_score(conn, score_data)
+        conn.close()
+        return score_data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Score computation failed: {e}")
+
+
+@app.post("/condition/contextual")
+def condition_contextual(req: ConditionScoreRequest):
+    """
+    Run contextual pass (Phase 3C) — Y/M/M knowledge-informed observations.
+    Loads the vehicle's Y/M/M profile and generates signals about rarity,
+    unexpected conditions, and coverage gaps.
+    """
+    try:
+        from condition_spectrometer import contextual_pass, get_connection
+        conn = get_connection()
+        result = contextual_pass(conn, req.vehicle_id)
+        conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(500, f"Contextual pass failed: {e}")
+
+
+@app.post("/condition/sequence")
+def condition_sequence(req: ConditionScoreRequest):
+    """
+    Run sequence cross-reference pass (Phase 3D).
+    Analyzes photo sequences for zone imbalance, multi-angle damage confirmation,
+    sequence patterns, and coverage completeness.
+    """
+    try:
+        from condition_spectrometer import sequence_pass, get_connection
+        conn = get_connection()
+        result = sequence_pass(conn, req.vehicle_id)
+        conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(500, f"Sequence pass failed: {e}")
+
+
+@app.post("/condition/pipeline")
+def condition_pipeline(req: ConditionScoreRequest):
+    """
+    Run the full multipass pipeline for a vehicle:
+    bridge → contextual → sequence → score → distribute.
+    Returns all results from each pass.
+    """
+    try:
+        from condition_spectrometer import (
+            bridge_vehicle_images, contextual_pass, sequence_pass,
+            compute_condition_score, save_condition_score,
+            compute_distribution, get_connection,
+        )
+        conn = get_connection()
+
+        bridge = bridge_vehicle_images(conn, vehicle_id=req.vehicle_id)
+        ctx = contextual_pass(conn, req.vehicle_id)
+        seq = sequence_pass(conn, req.vehicle_id)
+
+        score_data = compute_condition_score(conn, req.vehicle_id)
+        if score_data:
+            save_condition_score(conn, score_data)
+            dist = compute_distribution(conn, ymm_key=score_data["ymm_key"], group_type="ymm")
+        else:
+            dist = None
+
+        conn.close()
+        return {
+            "bridge": bridge,
+            "contextual": ctx,
+            "sequence": seq,
+            "score": score_data,
+            "distribution": dist,
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Pipeline failed: {e}")
+
+
+@app.post("/condition/distribute")
+def condition_distribute(req: ConditionDistributeRequest):
+    """
+    Recompute condition distributions for Y/M/M groups.
+    Distributions enable rarity signals: rarity = 1 - CDF(score, ymm_distribution).
+    """
+    try:
+        from condition_spectrometer import compute_distribution, recompute_all_distributions, get_connection
+        conn = get_connection()
+        if req.all:
+            result = recompute_all_distributions(conn)
+        elif req.ymm_key:
+            dist = compute_distribution(conn, ymm_key=req.ymm_key, group_type="ymm")
+            result = dist if dist else {"error": "Not enough data (need >= 3 scored vehicles)"}
+        else:
+            raise HTTPException(400, "Provide ymm_key or set all=true")
+        conn.close()
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Distribution compute failed: {e}")
+
+
+# ============================================================
+# Contextual analysis (V3 — Y/M/M knowledge-aware)
+# ============================================================
+
+_contextual_clf = None
+
+@app.post("/analyze/contextual")
+def analyze_contextual(req: ContextualAnalyzeRequest):
+    """
+    Contextual vehicle image analysis using Y/M/M knowledge profiles.
+
+    Unlike /analyze (which uses Florence-2 zero-shot), this endpoint uses the
+    ContextualModelV3 trained on Y/M/M knowledge from 24K+ expert commentators.
+    Zero API calls — pure local ONNX inference.
+
+    Requires the v3 model: yono/models/yono_contextual_v3.onnx
+    Falls back to /analyze if model not available.
+    """
+    global _contextual_clf
+
+    # Lazy load contextual classifier
+    if _contextual_clf is None:
+        try:
+            from yono import ContextualYONOClassifier
+            _contextual_clf = ContextualYONOClassifier()
+        except (FileNotFoundError, ImportError) as e:
+            # Fall back to regular analyze
+            return analyze(AnalyzeRequest(image_url=req.image_url))
+
+    t0 = time.perf_counter()
+    tmp_path = None
+    try:
+        tmp_path = _download_image(req.image_url)
+
+        vehicle_row = {}
+        if req.mileage:
+            vehicle_row["mileage"] = req.mileage
+        if req.sale_price:
+            vehicle_row["sale_price"] = req.sale_price
+
+        result = _contextual_clf.analyze(
+            tmp_path,
+            year=req.year,
+            make=req.make,
+            model=req.model,
+            vehicle_row=vehicle_row,
+            damage_threshold=req.damage_threshold,
+            mod_threshold=req.mod_threshold,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(422, f"Contextual analysis failed: {e}")
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+    elapsed_ms = round((time.perf_counter() - t0) * 1000, 1)
+    return {**result, "ms": elapsed_ms, "image_url": req.image_url, "model": "contextual_v3"}
 
 
 # ============================================================

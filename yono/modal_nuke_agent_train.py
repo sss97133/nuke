@@ -49,12 +49,12 @@ volume = modal.Volume.from_name("yono-data", create_if_missing=True)
 def train_nuke_agent(
     model_name: str = "Qwen/Qwen2.5-7B-Instruct",
     epochs: int = 3,
-    batch_size: int = 4,
-    gradient_accumulation: int = 8,
+    batch_size: int = 2,
+    gradient_accumulation: int = 16,
     learning_rate: float = 2e-4,
     lora_rank: int = 64,
     lora_alpha: int = 128,
-    max_seq_length: int = 2048,
+    max_seq_length: int = 4096,
 ):
     """Train Nuke agent on A100 with QLoRA."""
     import torch
@@ -198,7 +198,7 @@ def train_nuke_agent(
         eval_strategy="steps",
         eval_steps=100,
         save_strategy="steps",
-        save_steps=200,
+        save_steps=50,
         save_total_limit=3,
         bf16=True,
         gradient_checkpointing=True,
@@ -324,7 +324,7 @@ def list_agent_runs():
 def main(
     action: str = "train",
     epochs: int = 3,
-    batch_size: int = 4,
+    batch_size: int = 2,
     lora_rank: int = 64,
     run_id: str = "",
 ):
