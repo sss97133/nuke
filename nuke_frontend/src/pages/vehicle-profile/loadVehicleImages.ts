@@ -336,7 +336,13 @@ export async function loadVehicleImagesImpl({
             .limit(1)
             .maybeSingle();
 
-          if (externalListing?.metadata) {
+          // Guard: only use event images if the event's source_url matches this vehicle's
+          // known URLs. Cross-linked events (677 found in audit) cause wrong images to appear.
+          const eventSourceUrl = externalListing?.source_url || '';
+          const vehicleUrls = [vehicle.bat_auction_url, vehicle.discovery_url, vehicle.listing_url, vehicle.rennlist_url].filter(Boolean).map((u: string) => u.toLowerCase());
+          const eventBelongsToVehicle = !eventSourceUrl || vehicleUrls.length === 0 || vehicleUrls.some((u: string) => u === eventSourceUrl.toLowerCase());
+
+          if (externalListing?.metadata && eventBelongsToVehicle) {
             const metadata = externalListing.metadata as any;
             const platform = externalListing.source_platform || 'unknown';
             const metadataImages = metadata.images || metadata.image_urls || [];
@@ -443,7 +449,12 @@ export async function loadVehicleImagesImpl({
             .limit(1)
             .maybeSingle();
 
-          if (externalListing?.metadata) {
+          // Guard: verify event belongs to this vehicle (cross-linked events cause wrong images)
+          const batEventUrl = externalListing?.source_url || '';
+          const vehicleBatUrls = [vehicle.bat_auction_url, vehicle.discovery_url].filter(Boolean).map((u: string) => u.toLowerCase());
+          const batEventOwned = !batEventUrl || vehicleBatUrls.length === 0 || vehicleBatUrls.some((u: string) => u === batEventUrl.toLowerCase());
+
+          if (externalListing?.metadata && batEventOwned) {
             const metadata = externalListing.metadata as any;
             // Check for image URLs in metadata (from extract-premium-auction)
             const metadataImages = metadata.images || metadata.image_urls || [];

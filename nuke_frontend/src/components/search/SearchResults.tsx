@@ -27,9 +27,13 @@ interface SearchResultsProps {
   loading?: boolean;
   activeFilter?: SearchFilter;
   onFilterChange?: (next: SearchFilter) => void;
+  totalCount?: number;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  loadingMore?: boolean;
 }
 
-const SearchResults = ({ results, searchSummary, loading = false, activeFilter, onFilterChange }: SearchResultsProps) => {
+const SearchResults = ({ results, searchSummary, loading = false, activeFilter, onFilterChange, totalCount, hasMore, onLoadMore, loadingMore }: SearchResultsProps) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const searchQuery = searchParams.get('q') || '';
@@ -260,6 +264,9 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                 <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text)' }}>
                   {filteredAndSortedResults.length}
                 </span>
+              )}
+              {results.length > 0 && totalCount && totalCount > results.length && filterBy === 'all' && (
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>of {totalCount.toLocaleString()}</span>
               )}
               {results.length > 0 && filterBy !== 'all' && (
                 <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>of {results.length}</span>
@@ -703,7 +710,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
-                      <h4 style={{ 
+                      <h4 style={{
                         margin: 0,
                         fontSize: '12px',
                         fontWeight: 700,
@@ -824,10 +831,10 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     flexShrink: 0
                   }}>
                     <div style={{ fontWeight: 600, marginBottom: '2px' }}>
-                      {new Date(result.created_at).toLocaleDateString('en-US', { 
-                        month: 'short', 
-                        day: 'numeric', 
-                        year: 'numeric' 
+                      {new Date(result.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
                       })}
                     </div>
                     <div style={{
@@ -840,6 +847,46 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Load More button */}
+          {hasMore && onLoadMore && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              padding: '24px 0 12px',
+            }}>
+              <button
+                onClick={onLoadMore}
+                disabled={loadingMore}
+                style={{
+                  padding: '10px 32px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  border: '2px solid var(--text)',
+                  background: loadingMore ? 'var(--surface)' : 'var(--bg)',
+                  color: loadingMore ? 'var(--text-secondary)' : 'var(--text)',
+                  cursor: loadingMore ? 'not-allowed' : 'pointer',
+                  transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+                }}
+                onMouseEnter={(e) => {
+                  if (!loadingMore) {
+                    e.currentTarget.style.background = 'var(--text)';
+                    e.currentTarget.style.color = 'var(--bg)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!loadingMore) {
+                    e.currentTarget.style.background = 'var(--bg)';
+                    e.currentTarget.style.color = 'var(--text)';
+                  }
+                }}
+              >
+                {loadingMore ? 'Loading...' : `Load more${totalCount ? ` (${results.length} of ${totalCount.toLocaleString()})` : ''}`}
+              </button>
             </div>
           )}
         </>

@@ -1004,22 +1004,51 @@ select:focus {
 .uppercase { text-transform: uppercase; }
 
 /* ================================================
-   MOBILE BOTTOM NAV — override deprecated design-system.css rules
+   MOBILE BOTTOM NAV
+   Hidden on desktop, shown on mobile only
    ================================================ */
+.mobile-bottom-nav {
+  display: none;
+}
+
 @media (max-width: 768px) {
-  /* Fix font-size: use px, not pt */
+  .mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: var(--surface);
+    border-top: 2px solid var(--border);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1000;
+  }
+
   .mobile-bottom-nav-item {
-    font-size: var(--fs-10) !important; /* 10px — readable and fits 5 items */
-    min-height: 44px; /* WCAG 2.5.5 minimum touch target */
-    /* Remove the 1fr flex to allow items to size naturally with content */
     flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--fs-10) !important;
+    font-family: Arial, sans-serif;
+    color: var(--text-disabled);
+    text-decoration: none;
+    border: none;
+    background: transparent;
+    min-height: 44px;
     padding: 0 4px;
   }
 
-  /* Ensure active item uses theme accent for clarity */
   .mobile-bottom-nav-item.active {
     color: var(--text) !important;
     font-weight: 700 !important;
+  }
+
+  .main-content {
+    padding-bottom: 60px;
   }
 }
 

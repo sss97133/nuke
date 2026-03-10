@@ -27,6 +27,7 @@ const SORT_OPTIONS: { value: SortBy; label: string }[] = [
   { value: 'popular', label: 'RANK' },
   { value: 'newest', label: 'NEWEST' },
   { value: 'oldest', label: 'OLDEST' },
+  { value: 'finds', label: 'FINDS' },
   { value: 'deal_score', label: 'DEALS' },
   { value: 'heat_score', label: 'HEAT' },
   { value: 'price_high', label: 'PRICE \u2193' },

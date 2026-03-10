@@ -1,21 +1,52 @@
-import { test, expect } from 'playwright/test';
+import { test, expect, Page } from 'playwright/test';
 
 /**
  * CursorHomepage Filters (Production)
  *
- * The production baseURL (see config/playwright.config.ts) currently lands on the
- * CursorHomepage-style grid with the Win95 filter bar (year/make/price/location/type/sources/status).
+ * Tests the Win95-style filter bar (year/make/model/price/location/type/sources/status).
+ * Validates that filters change the rendered vehicle list without relying on a specific dataset.
  *
- * This test validates that filters actually change the rendered vehicle list without relying on
- * any specific dataset.
+ * Handles transient Supabase API failures (PGRST002) via retry logic.
  */
-test.describe('Homepage filter bar', () => {
-  test('year min filter reduces results to 0, reset restores results', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-    // Ensure we have vehicles rendered before applying any filters (avoids false positives during initial load).
+/** Wait for vehicle cards to appear, retrying via Refresh button or page reload on API failures. */
+async function waitForVehicles(page: Page, timeout = 90000) {
+  const vehicleLinks = page.locator('main a[href^="/vehicle/"]');
+  const refreshBtn = page.getByRole('button', { name: /^refresh$/i }).first();
+  const deadline = Date.now() + timeout;
+  let reloadCount = 0;
+
+  while (Date.now() < deadline) {
+    // If vehicles are already visible, we're done.
+    if (await vehicleLinks.first().isVisible({ timeout: 8000 }).catch(() => false)) {
+      return;
+    }
+    // If the error state is showing, click Refresh to retry.
+    if (await refreshBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await refreshBtn.click();
+      await page.waitForTimeout(3000);
+      continue;
+    }
+    // Fallback: full page reload (handles edge case where error state hasn't rendered)
+    if (reloadCount < 3) {
+      reloadCount++;
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(3000);
+    }
+  }
+  // Final assertion — will produce a clear error if still not visible.
+  await expect(vehicleLinks.first()).toBeVisible({ timeout: 15000 });
+}
+
+test.describe('Homepage filter bar', () => {
+  test.setTimeout(120000);
+
+  test('year min filter reduces results to 0, reset restores results', async ({ page }) => {
+    await page.goto('/?tab=feed', { waitUntil: 'domcontentloaded' });
+
+    // Wait for vehicles with retry on transient API failures.
     const vehicleLinks = page.locator('main a[href^="/vehicle/"]');
-    await expect(vehicleLinks.first()).toBeVisible({ timeout: 30000 });
+    await waitForVehicles(page);
 
     // Ensure filter panel is visible; if it's hidden, show it.
     const yearButton = page.getByRole('button', { name: /^year$/i }).first();
@@ -54,7 +85,6 @@ test.describe('Homepage filter bar', () => {
     const resetBtn = page.getByRole('button', { name: /^reset$/i }).first();
     await resetBtn.click();
 
-    await expect(vehicleLinks.first()).toBeVisible({ timeout: 30000 });
+    await waitForVehicles(page);
   });
 });
-

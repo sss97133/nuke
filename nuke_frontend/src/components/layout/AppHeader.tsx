@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useHeaderHeight } from './hooks/useHeaderHeight';
 import { useHeaderVariant } from './hooks/useHeaderVariant';
 import { useSearch } from './hooks/useSearch';
@@ -28,8 +29,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const headerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   useHeaderHeight(headerRef);
+  const location = useLocation();
 
   const [variant] = useHeaderVariant();
+  // Hide header search on homepage — the feed has its own search
+  const hideSearch = location.pathname === '/';
   const { session, userProfile } = useSession();
   const userId = session?.user?.id;
   const unreadCount = useNotificationBadge(userId);
@@ -97,6 +101,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     userProfile,
     unreadCount,
     onUserClick: () => setShowUserDropdown(true),
+    hideSearch,
   };
 
   return (

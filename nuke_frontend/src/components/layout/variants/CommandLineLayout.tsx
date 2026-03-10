@@ -16,6 +16,7 @@ interface Props {
   userProfile: any;
   unreadCount: number;
   onUserClick: () => void;
+  hideSearch?: boolean;
 }
 
 /**
@@ -29,16 +30,19 @@ export const CommandLineLayout: React.FC<Props> = ({
   userProfile,
   unreadCount,
   onUserClick,
+  hideSearch,
 }) => {
   return (
-    <div className="header-variant header-variant--command-line">
+    <div className={`header-variant header-variant--command-line${hideSearch ? ' header-variant--no-search' : ''}`}>
       <Link to="/" className="header-wordmark" aria-label="Nuke — home">
         NUKE
       </Link>
 
-      <div className="header-search-zone">
-        <AIDataIngestionSearch />
-      </div>
+      {!hideSearch && (
+        <div className="header-search-zone">
+          <AIDataIngestionSearch />
+        </div>
+      )}
 
       <NavLinks items={COMMAND_LINE_NAV} />
 

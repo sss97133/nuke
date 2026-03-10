@@ -306,6 +306,15 @@
   min-width: 0;
 }
 
+/* When search is hidden (homepage), collapse grid to 3 columns */
+.header-variant--command-line.header-variant--no-search {
+  grid-template-columns: max-content 1fr max-content;
+}
+
+.header-variant--segmented.header-variant--no-search {
+  grid-template-columns: max-content 1fr max-content;
+}
+
 /* ============================================================================
    VARIANT B — SEGMENTED
    Wordmark + nav (1fr) + search (minmax 200px, 40%) + user

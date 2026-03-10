@@ -16,6 +16,7 @@ interface Props {
   unreadCount: number;
   onUserClick: () => void;
   onCommandPaletteOpen: () => void;
+  hideSearch?: boolean;
 }
 
 /**
@@ -32,6 +33,7 @@ export const MinimalLayout: React.FC<Props> = ({
   userProfile,
   unreadCount,
   onUserClick,
+  hideSearch,
 }) => {
   return (
     <div className="header-variant header-variant--minimal">
@@ -41,13 +43,15 @@ export const MinimalLayout: React.FC<Props> = ({
 
       <div className="header-minimal-spacer" />
 
-      <SearchBar
-        value=""
-        onChange={() => {}}
-        onSubmit={() => {}}
-        onFocus={onCommandPaletteOpen}
-        mode="trigger"
-      />
+      {!hideSearch && (
+        <SearchBar
+          value=""
+          onChange={() => {}}
+          onSubmit={() => {}}
+          onFocus={onCommandPaletteOpen}
+          mode="trigger"
+        />
+      )}
 
       <div className="header-user-zone">
         <GlobalUploadIndicator />
