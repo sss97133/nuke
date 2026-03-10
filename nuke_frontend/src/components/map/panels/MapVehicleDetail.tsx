@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { getPlatformDisplayName } from '../../../services/platformNomenclature';
-import { thumbUrl } from '../mapUtils';
+import { thumbUrl } from '../mapService';
 
 const MAP_FONT = 'Arial, Helvetica, sans-serif';
 

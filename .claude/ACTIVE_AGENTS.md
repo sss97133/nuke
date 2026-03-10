@@ -736,3 +736,7 @@ Automated Labor Estimation Pipeline — all 7 phases built, deployed, and commit
 - Task: Backfill primary_image_url on vehicles from vehicle_images
 - Files: vehicles table, vehicle_images table (read-only)
 - Status: ACTIVE
+
+### ~~Map Rebuild — 2026-03-10~~ DONE
+- Event-centric map rebuild (all 6 phases). NukeMap.tsx replaces UnifiedMap.tsx.
+- REMOVED: session complete

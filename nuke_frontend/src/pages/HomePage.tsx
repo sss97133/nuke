@@ -167,7 +167,7 @@ function useSearchPreview(query: string) {
 
 const CursorHomepage = lazy(() => import('./CursorHomepage'));
 const GarageTab = lazy(() => import('../components/garage/GarageTab'));
-const UnifiedMap = lazy(() => import('../components/map/UnifiedMap'));
+const UnifiedMap = lazy(() => import('../components/map/NukeMap'));
 
 type TabId = 'garage' | 'feed' | 'map';
 
