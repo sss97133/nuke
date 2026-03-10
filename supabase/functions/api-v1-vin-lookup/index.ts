@@ -69,12 +69,20 @@ serve(async (req) => {
       return jsonResponse({ error: "Vehicle not found for VIN", vin }, 404);
     }
 
-    // Run parallel queries for enrichment
-    const [valuationResult, listingCountResult, observationCountResult, imagesResult] = await Promise.all([
-      // Valuation (nuke_estimates)
+    // Run parallel queries for FULL intelligence
+    const [
+      valuationResult,
+      listingCountResult,
+      observationsResult,
+      imagesResult,
+      commentDiscoveriesResult,
+      descriptionDiscoveriesResult,
+      imageCountResult,
+    ] = await Promise.all([
+      // Valuation (nuke_estimates) — full row including signal_weights
       supabase
         .from("nuke_estimates")
-        .select("estimated_value, value_low, value_high, confidence_score, deal_score, deal_score_label, heat_score, heat_score_label, price_tier, model_version, calculated_at, is_stale")
+        .select("*")
         .eq("vehicle_id", vehicle.id)
         .maybeSingle(),
 
@@ -84,11 +92,13 @@ serve(async (req) => {
         .select("id", { count: "exact", head: true })
         .eq("vehicle_id", vehicle.id),
 
-      // Observation count (vehicle_observations)
+      // All observations — the full intelligence layer
       supabase
         .from("vehicle_observations")
-        .select("id", { count: "exact", head: true })
-        .eq("vehicle_id", vehicle.id),
+        .select("kind, structured_data, confidence, confidence_score, observed_at, source_url")
+        .eq("vehicle_id", vehicle.id)
+        .eq("is_superseded", false)
+        .order("observed_at", { ascending: false }),
 
       // First 5 images
       supabase
@@ -98,7 +108,39 @@ serve(async (req) => {
         .order("is_primary", { ascending: false })
         .order("position", { ascending: true })
         .limit(5),
+
+      // Comment discoveries — community intelligence
+      supabase
+        .from("comment_discoveries")
+        .select("overall_sentiment, sentiment_score, comment_count, total_fields, raw_extraction, data_quality_score")
+        .eq("vehicle_id", vehicle.id)
+        .order("discovered_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+
+      // Description discoveries — extracted specs
+      supabase
+        .from("description_discoveries")
+        .select("raw_extraction, keys_found, total_fields")
+        .eq("vehicle_id", vehicle.id)
+        .order("discovered_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+
+      // Total image count
+      supabase
+        .from("vehicle_images")
+        .select("id", { count: "exact", head: true })
+        .eq("vehicle_id", vehicle.id),
     ]);
+
+    // Build observations index by kind
+    const observations: Record<string, any> = {};
+    for (const obs of (observationsResult.data || [])) {
+      if (!observations[obs.kind]) {
+        observations[obs.kind] = obs;
+      }
+    }
 
     const response = {
       data: {
@@ -106,10 +148,23 @@ serve(async (req) => {
         valuation: valuationResult.data || null,
         counts: {
           listings: listingCountResult.count || 0,
-          observations: observationCountResult.count || 0,
-          images: (imagesResult.data || []).length,
+          observations: (observationsResult.data || []).length,
+          images: imageCountResult.count || 0,
+          comments: commentDiscoveriesResult.data?.comment_count || 0,
         },
         images: imagesResult.data || [],
+        // The full intelligence layer
+        intelligence: {
+          observations,
+          community: commentDiscoveriesResult.data ? {
+            sentiment: commentDiscoveriesResult.data.overall_sentiment,
+            sentiment_score: commentDiscoveriesResult.data.sentiment_score,
+            comment_count: commentDiscoveriesResult.data.comment_count,
+            data_quality: commentDiscoveriesResult.data.data_quality_score,
+            insights: commentDiscoveriesResult.data.raw_extraction,
+          } : null,
+          description: descriptionDiscoveriesResult.data?.raw_extraction || null,
+        },
       },
     };
 

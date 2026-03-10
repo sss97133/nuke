@@ -118,6 +118,37 @@ function isValidVehicleImage(url: string): boolean {
   return true;
 }
 
+// ─── IMAGE DOWNLOAD TO STORAGE ──────────────────────────────────────
+// FB CDN URLs expire in 24-48h. Download to Supabase storage for permanence.
+async function downloadAndStoreImage(
+  supabase: any,
+  sourceUrl: string,
+  vehicleId: string,
+  index: number,
+): Promise<string | null> {
+  try {
+    const resp = await fetch(sourceUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!resp.ok) return null;
+    const ct = resp.headers.get("content-type") || "image/jpeg";
+    if (!ct.startsWith("image/")) return null;
+    const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : "jpg";
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    if (buf.length < 5000) return null;
+    const path = `${vehicleId}/fb-marketplace/${Date.now()}-${index}.${ext}`;
+    const { error } = await supabase.storage
+      .from("vehicle-photos")
+      .upload(path, buf, { contentType: ct, upsert: false });
+    if (error && !error.message?.includes("already exists")) return null;
+    const { data } = supabase.storage.from("vehicle-photos").getPublicUrl(path);
+    return data?.publicUrl || null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── PRICE VALIDATION ─────────────────────────────────────────────────
 function isSuspiciousPrice(price: number | null): boolean {
   if (price === null) return false;
@@ -557,7 +588,7 @@ Deno.serve(async (req) => {
           discovery_source: 'facebook_marketplace',
           profile_origin: 'facebook_marketplace',
           description: listing.description,
-          primary_image_url: primaryImage,
+          primary_image_url: null, // Set after download to storage (CDN URLs expire)
           city,
           state,
           origin_metadata: {
@@ -608,18 +639,33 @@ Deno.serve(async (req) => {
           })
           .eq('id', listing.id);
 
-        // Import only valid images (no pollution)
+        // Download images to Supabase storage (FB CDN URLs expire in 24-48h)
         if (validImages.length > 0) {
-          const imageRecords = validImages.slice(0, 10).map((url, i) => ({
-            vehicle_id: vehicle.id,
-            url,
-            is_primary: i === 0,
-            source: 'facebook_marketplace',
-          }));
+          const imageRecords = [];
+          for (let i = 0; i < Math.min(validImages.length, 10); i++) {
+            const storedUrl = await downloadAndStoreImage(supabase, validImages[i], vehicle.id, i);
+            if (!storedUrl) continue; // Skip — never store expiring CDN URLs
+            imageRecords.push({
+              vehicle_id: vehicle.id,
+              image_url: storedUrl,
+              source_url: validImages[i],
+              is_primary: i === 0,
+              source: 'facebook_marketplace',
+            });
+          }
 
-          await supabase
-            .from('vehicle_images')
-            .insert(imageRecords);
+          if (imageRecords.length > 0) {
+            await supabase.from('vehicle_images').insert(imageRecords);
+            // Update primary_image_url to stored version
+            await supabase.from('vehicles')
+              .update({ primary_image_url: imageRecords[0].image_url })
+              .eq('id', vehicle.id);
+          } else {
+            // All downloads failed — null out the CDN URL
+            await supabase.from('vehicles')
+              .update({ primary_image_url: null })
+              .eq('id', vehicle.id);
+          }
         }
 
         results.created++;

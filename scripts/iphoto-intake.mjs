@@ -13,7 +13,7 @@
 
 import { execSync, spawnSync } from 'child_process';
 import { createClient } from '@supabase/supabase-js';
-import { readFileSync, readdirSync, statSync, mkdirSync, rmSync } from 'fs';
+import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, rmSync, existsSync } from 'fs';
 import { join, basename } from 'path';
 import os from 'os';
 import dns from 'dns';
@@ -612,6 +612,7 @@ async function mapOnlyAlbum(albumName, vehicleId = null) {
   const existingNames = new Set((existing || []).map(r => r.file_name));
 
   let inserted = 0, skipped = 0, noGps = 0;
+  const mappings = [];
   // Deduplicate — metaMap has 2 keys per photo (filename + original_filename).
   // Track which meta objects we've already processed.
   const seenMeta = new WeakSet();
@@ -629,14 +630,7 @@ async function mapOnlyAlbum(albumName, vehicleId = null) {
     }
 
     const row = {
-      vehicle_id: vehicleId,
-      image_url: `https://placeholder.nuke.app/iphoto/${vehicleId}/${fileName}`,
-      source: 'iphoto',
       file_name: fileName,
-      is_external: false,
-      ai_processing_status: 'pending',
-      optimization_status: 'pending',
-      documented_by_user_id: USER_ID,
       latitude: meta.latitude,
       longitude: meta.longitude,
       ...(meta.location_name && { location_name: meta.location_name }),
@@ -644,19 +638,27 @@ async function mapOnlyAlbum(albumName, vehicleId = null) {
       ...(meta.exif_data && { exif_data: meta.exif_data }),
     };
 
-    const { error } = await supabase.from('vehicle_images').insert(row);
-    if (error) {
-      if (error.message.includes('duplicate') || error.message.includes('unique')) {
-        skipped++;
-      } else if (inserted + skipped === 0) {
-        console.error(`  Insert error: ${error.message.slice(0, 100)}`);
-      }
-    } else {
-      inserted++;
-    }
+    mappings.push(row);
+    inserted++;
   }
-  console.log(`  Inserted ${inserted} photo pins (${skipped} dupe, ${noGps} no GPS)`);
-  return inserted;
+
+  // Write to local JSON file instead of DB (no more placeholder URLs)
+  const mappingDir = join(process.cwd(), 'data', 'iphoto-mappings');
+  if (!existsSync(mappingDir)) mkdirSync(mappingDir, { recursive: true });
+  const mappingFile = join(mappingDir, `${vehicleId}.json`);
+
+  // Merge with existing mappings if file already exists
+  let existing = [];
+  if (existsSync(mappingFile)) {
+    try { existing = JSON.parse(readFileSync(mappingFile, 'utf8')); } catch {}
+  }
+  const existingFileNames = new Set(existing.map(r => r.file_name));
+  const newMappings = mappings.filter(r => !existingFileNames.has(r.file_name));
+  const merged = [...existing, ...newMappings];
+  writeFileSync(mappingFile, JSON.stringify(merged, null, 2));
+
+  console.log(`  Saved ${newMappings.length} photo mappings to ${mappingFile} (${skipped} dupe, ${noGps} no GPS)`);
+  return newMappings.length;
 }
 
 // ─── Sync mode: download from iCloud → upload → replace placeholders ────────
@@ -689,6 +691,14 @@ async function syncAlbum(albumName, vehicleId = null) {
     const count = convertHeicToJpeg(tmpExport, tmpJpeg);
     console.log(`  Converted: ${count} images`);
     if (count === 0) { console.log('  No images to upload'); return null; }
+
+    // Load local JSON mappings if they exist (from --map-only)
+    const localMappingFile = join(process.cwd(), 'data', 'iphoto-mappings', `${vehicleId}.json`);
+    let localMappings = [];
+    if (existsSync(localMappingFile)) {
+      try { localMappings = JSON.parse(readFileSync(localMappingFile, 'utf8')); } catch {}
+      console.log(`  Found ${localMappings.length} local mappings from --map-only`);
+    }
 
     // Get existing placeholder records for this vehicle (to replace them)
     // Placeholders may be keyed by UUID filename or original filename — build a
@@ -814,6 +824,12 @@ async function syncAlbum(albumName, vehicleId = null) {
     }
     process.stdout.write('\n');
     console.log(`  Done: ${uploaded} uploaded (${replaced} replaced placeholders), ${skipped} skipped, ${errors} errors`);
+
+    // Clean up local mapping file after successful sync
+    if (errors === 0 && existsSync(localMappingFile)) {
+      try { rmSync(localMappingFile); console.log(`  Cleaned up local mapping file`); } catch {}
+    }
+
     return { uploaded, replaced, skipped, errors, total: files.length };
   } finally {
     try { rmSync(tmpExport, { recursive: true, force: true }); } catch {}

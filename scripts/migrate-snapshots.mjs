@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Fast snapshot migration — parallel uploads, no contention
-// Usage: dotenvx run -- node scripts/migrate-snapshots.mjs [--workers 4] [--batch 50] [--concurrency 6]
+// Fast snapshot migration — resilient to connection drops
+// Usage: dotenvx run -- node scripts/migrate-snapshots.mjs [--workers 4] [--batch 10] [--concurrency 6]
 
 import pg from "pg";
 import { createClient } from "@supabase/supabase-js";
@@ -9,7 +9,7 @@ const BUCKET = "listing-snapshots";
 const args = process.argv.slice(2);
 const flag = (name) => args.find((_, i, a) => a[i - 1] === `--${name}`);
 const WORKERS = parseInt(flag("workers") || "4");
-const BATCH = parseInt(flag("batch") || "50");
+const BATCH = parseInt(flag("batch") || "10");
 const UPLOAD_CONCURRENCY = parseInt(flag("concurrency") || "6");
 
 const DB_URL = "postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres";
@@ -19,18 +19,31 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
 
-const pool = new pg.Pool({
-  connectionString: DB_URL,
-  max: WORKERS + 4,
-  statement_timeout: 300000,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
-});
+let pool = createPool();
 
-// Prevent unhandled pool errors from crashing the process
-pool.on("error", (err) => {
-  console.error(`\n[Pool] Connection error (non-fatal): ${err.message}`);
-});
+function createPool() {
+  const p = new pg.Pool({
+    connectionString: DB_URL,
+    max: WORKERS + 4,
+    statement_timeout: 120000,
+    idleTimeoutMillis: 20000,
+    connectionTimeoutMillis: 10000,
+  });
+  p.on("error", (err) => {
+    console.error(`\n[Pool] ${err.message}`);
+  });
+  return p;
+}
+
+// Query with timeout — prevents workers from hanging forever
+async function queryWithTimeout(sql, params, timeoutMs = 90000) {
+  return Promise.race([
+    pool.query(sql, params),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Query timeout")), timeoutMs),
+    ),
+  ]);
+}
 
 function buildPath(platform, fetchedAt, id, ext) {
   const d = new Date(fetchedAt);
@@ -41,15 +54,14 @@ let totalMigrated = 0;
 let totalBytes = 0;
 let totalErrors = 0;
 const startTime = Date.now();
-const REMAINING_EST = 598000;
 
-function printProgress() {
+function printProgress(remaining) {
   const elapsed = (Date.now() - startTime) / 1000;
   const rate = elapsed > 0 ? (totalMigrated / (elapsed / 60)).toFixed(0) : "0";
   const mbMoved = (totalBytes / 1024 / 1024).toFixed(0);
-  const eta = totalMigrated > 0 ? ((REMAINING_EST - totalMigrated) / (totalMigrated / elapsed) / 3600).toFixed(1) : "?";
+  const eta = totalMigrated > 0 ? (remaining / (totalMigrated / elapsed) / 3600).toFixed(1) : "?";
   process.stdout.write(
-    `\r[${elapsed.toFixed(0)}s] ${totalMigrated} done | ${mbMoved} MB | ${rate}/min | ETA ${eta}h | ${totalErrors} err    `,
+    `\r[${elapsed.toFixed(0)}s] ${totalMigrated} done | ${mbMoved} MB | ${rate}/min | ETA ${eta}h | ${totalErrors} err | ${remaining} left    `,
   );
 }
 
@@ -78,6 +90,8 @@ async function uploadOne(row) {
   return { id: row.id, htmlPath, mdPath, bytes };
 }
 
+let globalRemaining = 0;
+
 async function worker(id) {
   let idle = 0;
   let consecutiveErrors = 0;
@@ -86,35 +100,39 @@ async function worker(id) {
     try {
       client = await pool.connect();
 
-      // Claim + read in one query using FOR UPDATE SKIP LOCKED
-      const { rows } = await client.query(
-        `WITH claimed AS (
+      // Step 1: Claim IDs only (no TOAST — fast)
+      const { rows: claimed } = await client.query(
+        `UPDATE listing_page_snapshots
+         SET html_storage_path = 'claiming'
+         WHERE id IN (
            SELECT id FROM listing_page_snapshots
            WHERE html_storage_path IS NULL AND success = true AND content_length > 0
-           ORDER BY content_length ASC
            LIMIT $1
            FOR UPDATE SKIP LOCKED
-         )
-         UPDATE listing_page_snapshots lps
-         SET html_storage_path = 'claiming'
-         FROM claimed
-         WHERE lps.id = claimed.id
-         RETURNING lps.id, lps.platform, lps.fetched_at, lps.html, lps.markdown`,
+         ) RETURNING id`,
         [BATCH],
       );
       client.release();
       client = null;
       consecutiveErrors = 0;
 
-      if (!rows.length) {
+      if (!claimed.length) {
         idle++;
         if (idle > 3) { console.log(`\n[W${id}] No more rows. Done.`); return; }
         await new Promise((r) => setTimeout(r, 2000));
         continue;
       }
       idle = 0;
+      const claimedIds = claimed.map((r) => r.id);
 
-      // Upload concurrently (no DB connections needed for uploads)
+      // Step 2: Read HTML (separate query, with timeout)
+      const { rows } = await queryWithTimeout(
+        `SELECT id, platform, fetched_at, html, markdown FROM listing_page_snapshots WHERE id = ANY($1)`,
+        [claimedIds],
+        90000,
+      );
+
+      // Upload concurrently
       const uploaded = [];
       const failed = [];
       let idx = 0;
@@ -137,12 +155,12 @@ async function worker(id) {
       );
       await Promise.all(uploadWorkers);
 
-      // Batch mark migrated in DB
+      // Batch mark migrated
       if (uploaded.length) {
         const ids = uploaded.map((u) => u.id);
         const htmlPaths = uploaded.map((u) => u.htmlPath);
         const mdPaths = uploaded.map((u) => u.mdPath);
-        await pool.query(
+        await queryWithTimeout(
           `UPDATE listing_page_snapshots
            SET html_storage_path = paths.hp,
                markdown_storage_path = paths.mp,
@@ -154,34 +172,42 @@ async function worker(id) {
         );
         totalMigrated += uploaded.length;
         for (const u of uploaded) totalBytes += u.bytes;
+        globalRemaining -= uploaded.length;
       }
 
       // Unclaim failures
       if (failed.length) {
-        await pool.query(
+        await queryWithTimeout(
           `UPDATE listing_page_snapshots SET html_storage_path = NULL
            WHERE id = ANY($1) AND html_storage_path = 'claiming'`,
           [failed],
         );
       }
 
-      printProgress();
+      printProgress(globalRemaining);
     } catch (e) {
       if (client) { try { client.release(true); } catch (_) {} }
       consecutiveErrors++;
       console.error(`\n[W${id}] Error #${consecutiveErrors}: ${e.message}`);
-      if (consecutiveErrors > 10) {
-        console.error(`\n[W${id}] Too many consecutive errors, stopping.`);
+
+      // On connection errors, recreate pool
+      if (e.message.includes("DbHandler") || e.message.includes("timeout") || e.message.includes("terminated") || e.message.includes("Connection")) {
+        console.error(`\n[W${id}] Pool reset due to connection issue`);
+        try { await pool.end(); } catch (_) {}
+        pool = createPool();
+      }
+
+      if (consecutiveErrors > 15) {
+        console.error(`\n[W${id}] Too many errors, stopping.`);
         return;
       }
-      await new Promise((r) => setTimeout(r, 3000 + consecutiveErrors * 1000));
+      await new Promise((r) => setTimeout(r, 2000 + consecutiveErrors * 1000));
     }
   }
 }
 
 process.on("uncaughtException", (err) => {
   console.error(`\n[FATAL] ${err.message}`);
-  // Don't exit — let workers finish gracefully
 });
 
 // Quick count
@@ -189,8 +215,9 @@ const { rows: [{ cnt }] } = await pool.query(
   `SELECT COUNT(*)::INT as cnt FROM listing_page_snapshots
    WHERE html_storage_path IS NULL AND success = true AND content_length > 0`,
 );
+globalRemaining = cnt;
 console.log(`Starting: ${cnt} snapshots | ${WORKERS} workers | batch ${BATCH} | ${UPLOAD_CONCURRENCY} concurrent uploads/worker`);
-console.log(`Max concurrent uploads: ${WORKERS * UPLOAD_CONCURRENCY} | Pool: ${pool.options.max} connections\n`);
+console.log(`Pool: ${pool.options.max} connections | Query timeout: 90s\n`);
 
 const workers = [];
 for (let i = 0; i < WORKERS; i++) {
@@ -198,7 +225,7 @@ for (let i = 0; i < WORKERS; i++) {
   await new Promise((r) => setTimeout(r, 300));
 }
 await Promise.all(workers);
-await pool.end();
+try { await pool.end(); } catch (_) {}
 
 const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
 console.log(`\n\nDone! ${totalMigrated} migrated, ${(totalBytes / 1024 / 1024).toFixed(0)} MB in ${elapsed}s, ${totalErrors} errors`);

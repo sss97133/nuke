@@ -29,6 +29,7 @@ const RATE_LIMIT_CONFIG = {
 interface SearchRequest {
   query: string;
   limit?: number;
+  offset?: number;
   types?: string[]; // Filter to specific types: vehicle, organization, user, tag
   includeAI?: boolean; // Whether to use AI fallback
 }
@@ -51,6 +52,12 @@ interface SearchResponse {
   total_count: number;
   ai_suggestion?: string;
   search_time_ms: number;
+  meta?: {
+    total_count: number;
+    offset: number;
+    limit: number;
+    has_more: boolean;
+  };
 }
 
 // Input type detection
@@ -151,6 +158,8 @@ serve(async (req) => {
     const query: string = urlParams.get('query') || urlParams.get('q') || body.query || '';
     const limitRaw = urlParams.get('limit') ?? body.limit;
     const limit: number = limitRaw ? Number(limitRaw) : 60;
+    const offsetRaw = urlParams.get('offset') ?? body.offset;
+    const offset: number = offsetRaw ? Math.max(0, Math.min(Number(offsetRaw), 10000)) : 0;
     const types: string[] | undefined = urlParams.get('types')?.split(',') ?? body.types;
     const includeAI: boolean = urlParams.has('includeAI') ? urlParams.get('includeAI') !== 'false' : (body.includeAI ?? true);
 
@@ -333,6 +342,7 @@ serve(async (req) => {
 
     // Parallel searches
     const searches: Promise<void>[] = [];
+    let vehicleTotalCount = 0;
 
     // --- VEHICLES (full-text search with ts_rank) ---
     if (allowedTypes.includes('vehicle')) {
@@ -346,10 +356,10 @@ serve(async (req) => {
 
         let vehicles: any[] = [];
 
-        // Build ILIKE query (reused for pagination and first-page fallback)
-        const buildIlikeQuery = () => {
-          const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
-          let q = supabase
+        // Pagination (offset > 0): use ILIKE directly for consistent results.
+        // The RPC uses cascading strategies with independent limits that don't paginate well.
+        if (offset > 0 && tsqueryStr) {
+          let paginationQuery = supabase
             .from('vehicles')
             .select(VEHICLE_SELECT)
             .eq('is_public', true)
@@ -357,107 +367,162 @@ serve(async (req) => {
             .not('make', 'is', null)
             .not('model', 'is', null);
 
+          const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
           if (yearMatch) {
             const year = parseInt(yearMatch[1], 10);
             const rest = escapeIlike(escapePostgrestValue(yearMatch[2].toLowerCase()));
-            q = q.eq('year', year)
+            paginationQuery = paginationQuery.eq('year', year)
               .or(`make.ilike.%${rest}%,model.ilike.%${rest}%,color.ilike.%${rest}%`);
           } else if (tokens.length >= 2) {
             const t0 = escapeIlike(escapePostgrestValue(tokens[0]));
             const tRest = escapeIlike(escapePostgrestValue(tokens.slice(1).join(' ')));
-            const tokenClauses = tokens
-              .map(t => `model.ilike.%${escapeIlike(escapePostgrestValue(t))}%`)
-              .join(',');
-            q = q.or(
+            paginationQuery = paginationQuery.or(
               `and(make.ilike.%${t0}%,model.ilike.%${tRest}%),` +
-              `and(model.ilike.%${t0}%,make.ilike.%${tRest}%),` +
-              `and(color.ilike.%${t0}%,model.ilike.%${tRest}%),` +
-              `and(color.ilike.%${t0}%,make.ilike.%${tRest}%),` +
-              `and(model.ilike.%${t0}%,color.ilike.%${tRest}%),` +
-              `and(make.ilike.%${t0}%,${tokenClauses.split(',')[1] || tokenClauses})`
+              `and(model.ilike.%${t0}%,make.ilike.%${tRest}%)`
             );
           } else {
             const t = escapePostgrestValue(searchPattern);
-            q = q.or(`make.ilike.${t},model.ilike.${t},color.ilike.${t}`);
+            paginationQuery = paginationQuery.or(`make.ilike.${t},model.ilike.${t},color.ilike.${t}`);
           }
-          return q;
-        };
 
-        // Count query runs in parallel with search
-        const countPromise = tsqueryStr
-          ? supabase.rpc('count_vehicles_search', { query_text: tsqueryStr })
-          : Promise.resolve({ data: null, error: null });
-
-        if (offset > 0) {
-          // Pagination: use ILIKE directly for consistent offset behavior.
-          // The RPC uses cascading strategies with independent offsets which breaks pagination.
-          const [ilikeResponse, countResponse] = await Promise.all([
-            buildIlikeQuery()
+          const [paginationResponse, countResponse] = await Promise.all([
+            paginationQuery
               .order('sale_price', { ascending: false, nullsFirst: false })
               .range(offset, offset + vehicleLimit - 1),
-            countPromise,
+            supabase.rpc('count_vehicles_search', { query_text: tsqueryStr }),
           ]);
+
           if (countResponse.data !== null) vehicleTotalCount = countResponse.data as number;
-          if (ilikeResponse.data?.length) vehicles = ilikeResponse.data;
-        } else {
-          // First page: use RPC for best ranking, with ILIKE fallback
-          if (tsqueryStr) {
-            const [ftsResponse, countResponse] = await Promise.all([
-              supabase.rpc('search_vehicles_fts', {
-                query_text: tsqueryStr,
-                limit_count: vehicleLimit,
-              }),
-              countPromise,
-            ]);
+          if (paginationResponse.data?.length) vehicles = paginationResponse.data;
+        }
+        // First page: use RPC for best ranking
+        else if (tsqueryStr) {
+          // Run search + count in parallel
+          const [ftsResponse, countResponse] = await Promise.all([
+            supabase.rpc('search_vehicles_fts', {
+              query_text: tsqueryStr,
+              limit_count: vehicleLimit,
+            }),
+            supabase.rpc('count_vehicles_search', { query_text: tsqueryStr }),
+          ]);
 
-            const { data: ftsResults, error: ftsError } = ftsResponse;
-            if (countResponse.data !== null) vehicleTotalCount = countResponse.data as number;
-
-            if (!ftsError && ftsResults?.length) {
-              const highConfidence = ftsResults.filter((r: any) => (r.relevance || 0) >= 0.85);
-              const ftsIds = highConfidence.map((r: any) => r.id);
-              const { data: enriched } = await supabase
-                .from('vehicles')
-                .select(VEHICLE_SELECT)
-                .in('id', ftsIds);
-
-              if (enriched?.length) {
-                const enrichedMap = new Map(enriched.map((v: any) => [v.id, v]));
-                vehicles = highConfidence
-                  .map((r: any) => ({ ...enrichedMap.get(r.id), relevance: r.relevance }))
-                  .filter((v: any) => v.id);
-              } else {
-                vehicles = highConfidence;
-              }
-            } else if (ftsError) {
-              const { data: directResults } = await supabase
-                .from('vehicles')
-                .select(VEHICLE_SELECT)
-                .eq('is_public', true)
-                .not('year', 'is', null)
-                .not('make', 'is', null)
-                .not('model', 'is', null)
-                .textSearch('search_vector', tsqueryStr, { type: 'plain', config: 'english' })
-                .limit(vehicleLimit);
-              if (directResults?.length) vehicles = directResults;
-            }
+          const { data: ftsResults, error: ftsError } = ftsResponse;
+          if (countResponse.data !== null) {
+            vehicleTotalCount = countResponse.data as number;
           }
 
-          // ILIKE fallback when FTS returned too few results
-          const skipIlike = vehicles.length >= Math.ceil(vehicleLimit / 2);
-          if (!skipIlike) {
-            const { data: ilikeResults, error: ilikeError } = await buildIlikeQuery()
-              .order('sale_price', { ascending: false, nullsFirst: false })
+          if (!ftsError && ftsResults?.length) {
+            // Filter to high-confidence results only (relevance >= 0.85 = strategies 1a/1b).
+            // Strategy 2 (raw FTS, relevance = 0.8) produces too many false positives.
+            // FIX: Only use high-confidence results. Discard low-relevance garbage completely.
+            const highConfidence = ftsResults.filter((r: any) => (r.relevance || 0) >= 0.85);
+            const useFts = highConfidence; // Changed: don't fall back to low-quality results
+
+            // FTS RPC returns limited columns — enrich with full vehicle data in one query
+            const ftsIds = useFts.map((r: any) => r.id);
+            const { data: enriched } = await supabase
+              .from('vehicles')
+              .select(VEHICLE_SELECT)
+              .in('id', ftsIds);
+
+            if (enriched?.length) {
+              const enrichedMap = new Map(enriched.map((v: any) => [v.id, v]));
+              vehicles = useFts
+                .map((r: any) => ({ ...enrichedMap.get(r.id), relevance: r.relevance }))
+                .filter((v: any) => v.id);
+            } else {
+              vehicles = useFts;
+            }
+          } else if (ftsError) {
+            // Fallback: direct textSearch on search_vector (handles RPC schema issues)
+            const { data: directResults } = await supabase
+              .from('vehicles')
+              .select(VEHICLE_SELECT)
+              .eq('is_public', true)
+              .not('year', 'is', null)
+              .not('make', 'is', null)
+              .not('model', 'is', null)
+              .textSearch('search_vector', tsqueryStr, { type: 'plain', config: 'english' })
               .limit(vehicleLimit);
 
-            if (ilikeError) console.error('ILIKE query error:', ilikeError.message);
+            if (directResults?.length) {
+              vehicles = directResults;
+            }
+          }
+        }
 
-            if (ilikeResults?.length) {
-              if (!vehicles.length) {
-                vehicles = ilikeResults;
-              } else if (tokens.length >= 2) {
+        // ILIKE fallback — structured field matching is more reliable than FTS for
+        // multi-token queries like "Porsche 997 GT3". Skip for single-token queries
+        // when FTS already returned enough results (ILIKE on broad terms like "mustang"
+        // scans 30K+ rows and takes 15+ seconds to sort).
+        const skipIlike = vehicles.length >= Math.ceil(vehicleLimit / 2);
+        if (!skipIlike) {
+          const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
+          let ilikeQuery = supabase
+            .from('vehicles')
+            .select(VEHICLE_SELECT)
+            .eq('is_public', true)
+            // Filter stub vehicles (no year/make/model) from search results
+            .not('year', 'is', null)
+            .not('make', 'is', null)
+            .not('model', 'is', null);
+
+          if (yearMatch) {
+            // "1973 Porsche 911" → year=1973 AND (make|model ILIKE '%porsche 911%')
+            const year = parseInt(yearMatch[1], 10);
+            const rest = escapeIlike(escapePostgrestValue(yearMatch[2].toLowerCase()));
+            ilikeQuery = ilikeQuery
+              .eq('year', year)
+              .or(`make.ilike.%${rest}%,model.ilike.%${rest}%,color.ilike.%${rest}%`);
+          } else if (tokens.length >= 2) {
+            // Build filter: first token assumed to be make, rest is model — AND also try all
+            // tokens against model independently (catches "Porsche 997 GT3" → model ILIKE '%997%')
+            const t0 = escapeIlike(escapePostgrestValue(tokens[0]));
+            // All tokens after the first joined as model substring
+            const tRest = escapeIlike(escapePostgrestValue(tokens.slice(1).join(' ')));
+            // Each individual token for broader model matching
+            const tokenClauses = tokens
+              .map(t => `model.ilike.%${escapeIlike(escapePostgrestValue(t))}%`)
+              .join(',');
+
+            ilikeQuery = ilikeQuery.or(
+              // Primary: make=token[0], model contains rest
+              `and(make.ilike.%${t0}%,model.ilike.%${tRest}%),` +
+              // Reverse: model=token[0], make contains rest
+              `and(model.ilike.%${t0}%,make.ilike.%${tRest}%),` +
+              // Color + model/make: "white bronco" → color=white, model=bronco
+              `and(color.ilike.%${t0}%,model.ilike.%${tRest}%),` +
+              `and(color.ilike.%${t0}%,make.ilike.%${tRest}%),` +
+              `and(model.ilike.%${t0}%,color.ilike.%${tRest}%),` +
+              // Broad: make matches any token (e.g. "gt3" alone won't match but "porsche" will)
+              `and(make.ilike.%${t0}%,${tokenClauses.split(',')[1] || tokenClauses})`
+            );
+          } else {
+            // Single token: search both make, model, and color
+            const t = escapePostgrestValue(searchPattern);
+            ilikeQuery = ilikeQuery.or(`make.ilike.${t},model.ilike.${t},color.ilike.${t}`);
+          }
+
+          const { data: ilikeResults, error: ilikeError } = await ilikeQuery
+            .order('sale_price', { ascending: false, nullsFirst: false })
+            .range(offset, offset + vehicleLimit - 1);
+
+          if (ilikeError) {
+            console.error('ILIKE query error:', ilikeError.message);
+          }
+
+          if (ilikeResults?.length) {
+            if (!vehicles.length) {
+              // No FTS results — use ILIKE exclusively
+              vehicles = ilikeResults;
+            } else {
+              // FIX: For specific queries (2+ tokens), prioritize ILIKE over FTS
+              // ILIKE is more precise for "porsche 997 gt3" than full-text search
+              if (tokens.length >= 2) {
+                // Replace FTS results with ILIKE (more accurate for make/model searches)
                 vehicles = ilikeResults;
               } else {
+                // Merge: ILIKE results get higher relevance than low-confidence FTS
                 const ftsIds = new Set(vehicles.map((v: any) => v.id));
                 for (const r of ilikeResults) {
                   if (!ftsIds.has(r.id)) vehicles.push({ ...r, _from_ilike: true });
@@ -719,7 +784,13 @@ serve(async (req) => {
       query_type: 'text',
       total_count: dedupedResults.length,
       ai_suggestion: aiSuggestion,
-      search_time_ms: Date.now() - startTime
+      search_time_ms: Date.now() - startTime,
+      meta: {
+        total_count: vehicleTotalCount || dedupedResults.length,
+        offset,
+        limit: sanitizedLimit,
+        has_more: vehicleTotalCount > offset + dedupedResults.length,
+      },
     }), { headers: { ...corsHeaders, ...rlHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
