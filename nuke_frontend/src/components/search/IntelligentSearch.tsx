@@ -25,14 +25,22 @@ interface SearchResponse {
   };
 }
 
+export interface SearchMeta {
+  total_count: number;
+  offset: number;
+  limit: number;
+  has_more: boolean;
+}
+
 interface IntelligentSearchProps {
   onSearchResults: (results: SearchResult[], summary: string) => void;
+  onSearchMeta?: (meta: SearchMeta) => void;
   onSearchStart?: () => void;
   initialQuery?: string;
   userLocation?: { lat: number; lng: number };
 }
 
-const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', userLocation }: IntelligentSearchProps) => {
+const IntelligentSearch = ({ onSearchResults, onSearchMeta, onSearchStart, initialQuery = '', userLocation }: IntelligentSearchProps) => {
   const navigate = useNavigate();
   const escapeILike = (s: string) => String(s || '').replace(/([%_\\])/g, '\\$1');
   const [query, setQuery] = useState(initialQuery);
@@ -707,9 +715,13 @@ const IntelligentSearch = ({ onSearchResults, onSearchStart, initialQuery = '', 
             metadata: r.metadata ?? {},
             created_at: r.metadata?.updated_at || r.metadata?.created_at || '',
           }));
-          const total = (edgeData as any).total_count ?? edgeResults.length;
+          const meta = (edgeData as any).meta;
+          const total = meta?.total_count ?? (edgeData as any).total_count ?? edgeResults.length;
           const edgeSummary = `Found ${total} result${total !== 1 ? 's' : ''} for "${searchQuery.trim()}".`;
           onSearchResults(edgeResults, edgeSummary);
+          if (onSearchMeta && meta) {
+            onSearchMeta(meta as SearchMeta);
+          }
           edgeFunctionWorked = true;
           return;
         } else if (edgeError) {

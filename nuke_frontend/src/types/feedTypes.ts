@@ -55,7 +55,7 @@ export interface HypeVehicle {
 export type TimePeriod = 'ALL' | 'AT' | '1Y' | 'Q' | 'W' | 'D' | 'RT';
 export type SalesTimePeriod = 'today' | '7d' | '30d' | '90d' | '1y' | '3y' | '5y' | '10y' | 'all';
 export type ViewMode = 'gallery' | 'grid' | 'technical';
-export type SortBy = 'year' | 'make' | 'model' | 'mileage' | 'newest' | 'oldest' | 'popular' | 'price_high' | 'price_low' | 'volume' | 'images' | 'events' | 'views' | 'deal_score' | 'heat_score';
+export type SortBy = 'year' | 'make' | 'model' | 'mileage' | 'newest' | 'oldest' | 'popular' | 'price_high' | 'price_low' | 'volume' | 'images' | 'events' | 'views' | 'deal_score' | 'heat_score' | 'finds';
 export type SortDirection = 'asc' | 'desc';
 
 export const SALES_PERIODS: { value: SalesTimePeriod; label: string; days: number | null }[] = [

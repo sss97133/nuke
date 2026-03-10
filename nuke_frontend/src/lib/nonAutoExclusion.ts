@@ -76,16 +76,22 @@ export const NON_AUTO_MAKES_CSV = NON_AUTO_MAKES.join(',');
  * Works with any `.from('vehicles')` query.
  *
  * Adds:
- * 1. canonical_vehicle_type whitelist (CAR/TRUCK/SUV/VAN/MINIVAN or null)
- * 2. Make blocklist (catches null-type junk from known non-auto brands)
+ * 1. canonical_vehicle_type whitelist (CAR/TRUCK/SUV/VAN/MINIVAN)
+ * 2. Unclassified vehicles allowed ONLY from trusted sources (not FB Marketplace)
+ * 3. Make blocklist (catches junk from known non-auto brands)
+ *
+ * FB Marketplace imports are ~50% motorcycles/boats/ATVs when unclassified.
+ * BaT/C&B are >99% automobiles even when unclassified.
  */
 export function applyNonAutoFilters<T extends { or: (...args: any[]) => any; not: (...args: any[]) => any }>(
   query: T,
 ): T {
-  // Only allow auto types or unclassified
+  // Allow classified auto types, OR unclassified from trusted sources.
+  // Unclassified FB Marketplace vehicles are blocked (too much junk).
   query = query.or(
     'canonical_vehicle_type.in.(CAR,TRUCK,SUV,VAN,MINIVAN),' +
-    'canonical_vehicle_type.is.null'
+    'and(canonical_vehicle_type.is.null,discovery_source.is.null),' +
+    'and(canonical_vehicle_type.is.null,discovery_source.neq.facebook_marketplace)'
   );
   // Block known non-auto makes
   query = query.not('make', 'in', '(' + NON_AUTO_MAKES_CSV + ')');

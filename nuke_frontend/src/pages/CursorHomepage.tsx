@@ -900,7 +900,7 @@ const CursorHomepage: React.FC = () => {
           discovery_url, discovery_source, profile_origin,
           listing_url, bat_auction_url, platform_source,
           nuke_estimate, nuke_estimate_confidence, deal_score, heat_score,
-          zip_code, gps_latitude, gps_longitude`;
+          zip_code, gps_latitude, gps_longitude, discovery_priority`;
       const selectV1 = `${baseFields}, ${sharedFields}`;
       const selectV2 = `${baseFields}, canonical_vehicle_type, canonical_body_style, ${sharedFields}`;
 
@@ -935,14 +935,13 @@ const CursorHomepage: React.FC = () => {
           }
           q = q.neq('status', 'deleted');
 
-          // Only show vehicles with images — UNLESS sorting by newest (so new extractions are visible)
-          if (sortBy !== 'newest') {
-            q = q.not('primary_image_url', 'is', null);
-          }
+          // Always require images for feed quality
+          q = q.not('primary_image_url', 'is', null);
 
           // Only show vehicles with valid year/make/model
           q = q.not('year', 'is', null);
           q = q.not('make', 'is', null);
+          q = q.not('model', 'is', null);
 
           if (listingKindSupportedRef.current) {
             q = q.eq('listing_kind', 'vehicle');
@@ -1052,6 +1051,12 @@ const CursorHomepage: React.FC = () => {
               orderColumn = 'heat_score';
               orderAscending = false;
               q = q.not('heat_score', 'is', null);
+              break;
+            case 'finds':
+              orderColumn = 'discovery_priority';
+              orderAscending = false;
+              q = q.not('discovery_priority', 'is', null)
+                   .gt('discovery_priority', 0);
               break;
             default:
               orderColumn = 'created_at';

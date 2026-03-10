@@ -16,6 +16,7 @@ interface Props {
   userProfile: any;
   unreadCount: number;
   onUserClick: () => void;
+  hideSearch?: boolean;
 }
 
 /**
@@ -35,6 +36,7 @@ export const TwoRowLayout: React.FC<Props> = ({
   userProfile,
   unreadCount,
   onUserClick,
+  hideSearch,
 }) => {
   return (
     <div className="header-variant header-variant--two-row">
@@ -62,17 +64,19 @@ export const TwoRowLayout: React.FC<Props> = ({
       </div>
 
       {/* Row 2: Search */}
-      <div className="header-two-row-search">
-        <SearchBar
-          value={query}
-          onChange={onQueryChange}
-          onSubmit={onSubmit}
-          onFocus={onSearchFocus}
-          onBlur={onSearchBlur}
-          mode="inline"
-          inputRef={searchInputRef}
-        />
-      </div>
+      {!hideSearch && (
+        <div className="header-two-row-search">
+          <SearchBar
+            value={query}
+            onChange={onQueryChange}
+            onSubmit={onSubmit}
+            onFocus={onSearchFocus}
+            onBlur={onSearchBlur}
+            mode="inline"
+            inputRef={searchInputRef}
+          />
+        </div>
+      )}
     </div>
   );
 };

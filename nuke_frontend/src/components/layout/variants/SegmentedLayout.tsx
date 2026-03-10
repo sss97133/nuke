@@ -16,6 +16,7 @@ interface Props {
   userProfile: any;
   unreadCount: number;
   onUserClick: () => void;
+  hideSearch?: boolean;
 }
 
 /**
@@ -35,26 +36,29 @@ export const SegmentedLayout: React.FC<Props> = ({
   userProfile,
   unreadCount,
   onUserClick,
+  hideSearch,
 }) => {
   return (
-    <div className="header-variant header-variant--segmented">
+    <div className={`header-variant header-variant--segmented${hideSearch ? ' header-variant--no-search' : ''}`}>
       <Link to="/" className="header-wordmark" aria-label="Nuke — home">
         NUKE
       </Link>
 
       <NavLinks items={SEGMENTED_NAV} />
 
-      <div className="header-search-zone">
-        <SearchBar
-          value={query}
-          onChange={onQueryChange}
-          onSubmit={onSubmit}
-          onFocus={onSearchFocus}
-          onBlur={onSearchBlur}
-          mode="compact"
-          inputRef={searchInputRef}
-        />
-      </div>
+      {!hideSearch && (
+        <div className="header-search-zone">
+          <SearchBar
+            value={query}
+            onChange={onQueryChange}
+            onSubmit={onSubmit}
+            onFocus={onSearchFocus}
+            onBlur={onSearchBlur}
+            mode="compact"
+            inputRef={searchInputRef}
+          />
+        </div>
+      )}
 
       <div className="header-user-zone">
         <GlobalUploadIndicator />

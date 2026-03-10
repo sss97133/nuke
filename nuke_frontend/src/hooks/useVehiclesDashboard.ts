@@ -24,6 +24,14 @@ export type ViewMode = 'GRID' | 'LIST' | 'COMPACT';
 export type SortMode = 'RECENT' | 'VALUE' | 'HEALTH' | 'NAME';
 export type FilterMode = 'ALL' | 'OWNED' | 'CONTRIBUTED';
 
+export interface EventSummary {
+  total_events: number;
+  times_sold: number;
+  platforms: string[];
+  first_event_date: string | null;
+  last_event_date: string | null;
+}
+
 export interface GarageVehicle {
   id: string;
   year: number | null;
@@ -47,6 +55,8 @@ export interface GarageVehicle {
   relationship_type: RelationshipType;
   relationship_source: 'verification' | 'permission' | 'contributor' | 'discovered' | 'uploaded_by';
   permission_role?: string;
+  event_weeks: string[] | null;
+  event_summary: EventSummary | null;
 }
 
 export interface GarageSection {
@@ -171,6 +181,8 @@ function rowToGarageVehicle(
   permission_role?: string,
   image_count?: number | null,
   fallback_image_url?: string | null,
+  event_weeks?: string[] | null,
+  event_summary?: EventSummary | null,
 ): GarageVehicle {
   const estimated_value = row.current_value ?? row.purchase_price ?? null;
   const value_delta =
@@ -192,15 +204,17 @@ function rowToGarageVehicle(
     value_delta,
     health_score: row.confidence_score,
     image_count: image_count ?? null,
-    event_count: null,
+    event_count: event_summary?.total_events ?? null,
     view_count: row.view_count,
     last_event_title: null,
-    last_event_at: null,
+    last_event_at: event_summary?.last_event_date ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     relationship_type,
     relationship_source,
     permission_role,
+    event_weeks: event_weeks ?? null,
+    event_summary: event_summary ?? null,
   };
 }
 
@@ -335,20 +349,27 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
 
         if (cancelled) return;
 
-        // Batch fetch image counts + fallback images in parallel
+        // Batch fetch image counts, fallback images, event summaries, event weeks in parallel
         const vehicleIdArray = Array.from(allRows.keys());
         const imageCounts = new Map<string, number>();
         const fallbackImages = new Map<string, string>();
+        const eventSummaries = new Map<string, EventSummary>();
+        const eventWeeksMap = new Map<string, string[]>();
 
         if (vehicleIdArray.length > 0) {
           // IDs missing primary_image_url need fallback images
           const needsFallback = vehicleIdArray.filter(id => !allRows.get(id)?.primary_image_url);
 
-          const [countsRes, fallbackRes] = await Promise.all([
+          const [countsRes, fallbackRes, eventSummaryRes, eventWeeksRes] = await Promise.all([
             supabase.rpc('count_vehicle_images_batch', { vehicle_ids: vehicleIdArray }),
             needsFallback.length > 0
               ? supabase.rpc('get_first_image_batch', { vehicle_ids: needsFallback })
               : Promise.resolve({ data: [] }),
+            supabase
+              .from('vehicle_event_summary')
+              .select('vehicle_id, total_events, times_sold, platform_list, first_event_date, last_event_date')
+              .in('vehicle_id', vehicleIdArray),
+            supabase.rpc('get_vehicle_event_weeks_batch', { vehicle_ids: vehicleIdArray }),
           ]);
 
           if (countsRes.data) {
@@ -361,6 +382,23 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
               fallbackImages.set(f.vehicle_id, f.image_url);
             }
           }
+          if (eventSummaryRes.data) {
+            for (const s of eventSummaryRes.data as any[]) {
+              eventSummaries.set(s.vehicle_id, {
+                total_events: Number(s.total_events) || 0,
+                times_sold: Number(s.times_sold) || 0,
+                platforms: s.platform_list || [],
+                first_event_date: s.first_event_date,
+                last_event_date: s.last_event_date,
+              });
+            }
+          }
+          if (eventWeeksRes.data) {
+            for (const w of eventWeeksRes.data as { vehicle_id: string; event_week: string }[]) {
+              if (!eventWeeksMap.has(w.vehicle_id)) eventWeeksMap.set(w.vehicle_id, []);
+              eventWeeksMap.get(w.vehicle_id)!.push(w.event_week);
+            }
+          }
         }
 
         if (cancelled) return;
@@ -371,7 +409,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
           const rel = relMap.get(id);
           if (!rel) continue;
           if (row.status && !VISIBLE_STATUSES.has(row.status)) continue;
-          garage.push(rowToGarageVehicle(row, rel.type, rel.source, rel.role, imageCounts.get(id), fallbackImages.get(id)));
+          garage.push(rowToGarageVehicle(row, rel.type, rel.source, rel.role, imageCounts.get(id), fallbackImages.get(id), eventWeeksMap.get(id), eventSummaries.get(id)));
         }
 
         setRawVehicles(garage);

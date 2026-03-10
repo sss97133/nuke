@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import IntelligentSearch from '../components/search/IntelligentSearch';
+import type { SearchMeta } from '../components/search/IntelligentSearch';
 import SearchResults from '../components/search/SearchResults';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { aiGateway } from '../lib/aiGateway';
@@ -50,6 +51,9 @@ export default function Search() {
   const resultsRef = useRef<HTMLDivElement | null>(null);
 
   const [vFilters, setVFilters] = useState<VehicleFilters>(DEFAULT_FILTERS);
+
+  const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const [answer, setAnswer] = useState<string>('');
   const [answerLoading, setAnswerLoading] = useState(false);
@@ -490,6 +494,8 @@ export default function Search() {
     setSearchSummary(summary);
     setLoading(false);
     setResultFilter('all');
+    setSearchMeta(null);
+    setLoadingMore(false);
     // Reset vehicle-specific filters when new search runs (keep showFilters state)
     setVFilters(prev => ({ ...DEFAULT_FILTERS, showFilters: prev.showFilters }));
     // Scroll to results
@@ -507,6 +513,59 @@ export default function Search() {
       setAnswerSources([]);
     }
   }, [searchQuery]);
+
+  const handleSearchMeta = useCallback((meta: SearchMeta) => {
+    setSearchMeta(meta);
+  }, []);
+
+  const handleLoadMore = useCallback(async () => {
+    if (!searchMeta || !searchMeta.has_more || loadingMore) return;
+    const nextOffset = searchMeta.offset + searchMeta.limit;
+    setLoadingMore(true);
+    try {
+      const { data: edgeData, error: edgeError } = await supabase.functions.invoke('universal-search', {
+        body: {
+          query: searchQuery.trim(),
+          limit: 100,
+          offset: nextOffset,
+        }
+      });
+      if (!edgeError && edgeData && Array.isArray((edgeData as any).results)) {
+        const rawResults: any[] = (edgeData as any).results;
+        const typeMap: Record<string, string> = {
+          vin_match: 'vehicle',
+          tag: 'reference',
+          external_identity: 'user',
+        };
+        const newResults: SearchResult[] = rawResults.map((r: any) => ({
+          id: r.id,
+          type: (typeMap[r.type] ?? r.type) as SearchResult['type'],
+          title: r.title || '',
+          description: r.description || r.subtitle || '',
+          image_url: r.image_url,
+          relevance_score: r.relevance_score ?? 0,
+          metadata: r.metadata ?? {},
+          created_at: r.metadata?.updated_at || r.metadata?.created_at || '',
+        }));
+        // Deduplicate by id — keep existing results, append only new ones
+        const existingIds = new Set(results.map(r => r.id));
+        const uniqueNew = newResults.filter(r => !existingIds.has(r.id));
+        setResults(prev => [...prev, ...uniqueNew]);
+        // Update meta
+        const meta = (edgeData as any).meta;
+        if (meta) {
+          setSearchMeta(meta as SearchMeta);
+        }
+        const total = meta?.total_count ?? searchMeta.total_count;
+        const combined = results.length + uniqueNew.length;
+        setSearchSummary(`Found ${total.toLocaleString()} results for "${searchQuery.trim()}".`);
+      }
+    } catch (err) {
+      console.error('Load more failed:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [searchMeta, loadingMore, searchQuery, results]);
 
   // Apply vehicle filters to results
   const displayResults = useMemo(() => {
@@ -658,6 +717,7 @@ export default function Search() {
         setLoading(false);
         setResults([]);
         setSearchSummary('');
+        setSearchMeta(null);
       }
     }
   }, [searchParams]);
@@ -670,6 +730,7 @@ export default function Search() {
           initialQuery={searchQuery}
           userLocation={userLocation}
           onSearchResults={handleSearchResults}
+          onSearchMeta={handleSearchMeta}
           onSearchStart={() => setLoading(true)}
         />
       </div>
@@ -1021,6 +1082,10 @@ export default function Search() {
             loading={loading}
             activeFilter={resultFilter}
             onFilterChange={setResultFilter}
+            totalCount={searchMeta?.total_count}
+            hasMore={searchMeta?.has_more}
+            onLoadMore={handleLoadMore}
+            loadingMore={loadingMore}
           />
         </div>
       )}

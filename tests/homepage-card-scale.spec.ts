@@ -1,23 +1,52 @@
-import { test, expect } from 'playwright/test';
+import { test, expect, Page } from 'playwright/test';
 
 /**
  * CursorHomepage card scale sweep
  *
- * This captures screenshots for cards-per-row 1..16 to quickly spot layout regressions:
+ * Captures screenshots for cards-per-row 1..16 to quickly spot layout regressions:
  * - Follow button overlapping price badge
  * - Badge readability
  * - Spacing/proportions as card size changes
+ *
+ * Handles transient Supabase API failures (PGRST002) via retry logic.
  */
+
+/** Wait for vehicle cards to appear, retrying via Refresh button or page reload on API failures. */
+async function waitForVehicles(page: Page, timeout = 90000) {
+  const vehicleLinks = page.locator('main a[href^="/vehicle/"]');
+  const refreshBtn = page.getByRole('button', { name: /^refresh$/i }).first();
+  const deadline = Date.now() + timeout;
+  let reloadCount = 0;
+
+  while (Date.now() < deadline) {
+    if (await vehicleLinks.first().isVisible({ timeout: 8000 }).catch(() => false)) {
+      return;
+    }
+    if (await refreshBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await refreshBtn.click();
+      await page.waitForTimeout(3000);
+      continue;
+    }
+    if (reloadCount < 3) {
+      reloadCount++;
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(3000);
+    }
+  }
+  await expect(vehicleLinks.first()).toBeVisible({ timeout: 15000 });
+}
+
 test.describe('Homepage card scale sweep', () => {
+  test.setTimeout(120000);
+
   test('captures screenshots across 1..16 cards/row (chromium only)', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium', 'Visual sweep is chromium-only');
 
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/?tab=feed', { waitUntil: 'domcontentloaded' });
 
-    // Ensure we have at least one vehicle card rendered (avoids capturing loading skeletons).
-    const vehicleLinks = page.locator('main a[href^="/vehicle/"]');
-    await expect(vehicleLinks.first()).toBeVisible({ timeout: 30000 });
+    // Wait for vehicles with retry on transient API failures.
+    await waitForVehicles(page);
 
     const sliders = page.locator('input[type="range"][min="1"][max="16"]');
     await expect(sliders.first()).toBeAttached({ timeout: 10000 });
@@ -54,4 +83,3 @@ test.describe('Homepage card scale sweep', () => {
     }
   });
 });
-

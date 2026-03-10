@@ -64,10 +64,19 @@ function useLiveShowcase() {
       let q = supabase
         .from('vehicles')
         .select('id, year, make, model, primary_image_url, sale_price, asking_price')
-        .not('primary_image_url', 'is', null);
+        .not('primary_image_url', 'is', null)
+        .not('year', 'is', null)
+        .not('make', 'is', null)
+        .not('model', 'is', null)
+        .eq('is_public', true)
+        .neq('status', 'deleted')
+        .neq('status', 'pending');
       q = applyNonAutoFilters(q);
       q = q.is('origin_organization_id', null);
+      // Prefer vehicles with sale prices (auction results are more interesting)
       const { data, error: err } = await q
+        .not('sale_price', 'is', null)
+        .gt('sale_price', 1000)
         .order('created_at', { ascending: false })
         .limit(8);
       if (err) throw err;
@@ -262,25 +271,27 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
             letterSpacing: '-0.03em',
             lineHeight: 1.05,
             margin: '0 0 12px',
-            color: 'var(--surface)',
+            color: 'var(--text)',
           }}
         >
-          Nuke
+          NUKE
         </h1>
         <p
           style={{
-            fontSize: 'clamp(15px, 2.5vw, 20px)',
+            fontSize: 11,
             lineHeight: 1.5,
-            color: 'var(--text-disabled)',
+            color: 'var(--text-secondary)',
             margin: '0 0 6px',
-            fontWeight: 500,
+            fontWeight: 700,
+            letterSpacing: '0.15em',
+            textTransform: 'uppercase' as const,
           }}
         >
           Vehicle Intelligence for Collectors
         </p>
         <p
           style={{
-            fontSize: 'clamp(13px, 2vw, 15px)',
+            fontSize: 11,
             lineHeight: 1.7,
             color: 'var(--text-secondary)',
             margin: '0 0 32px',
@@ -300,7 +311,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
             style={{
               display: 'flex',
               gap: 0,
-              boxShadow: '0 0 0 2px var(--surface)',
+              border: '2px solid var(--border)',
             }}
           >
             <input
@@ -312,8 +323,9 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
               aria-label="Search vehicles"
               style={{
                 flex: 1,
-                padding: '12px 16px',
-                fontSize: 14,
+                padding: '10px 16px',
+                fontSize: 11,
+                fontFamily: 'Arial, sans-serif',
                 border: 'none',
                 background: 'var(--surface)',
                 color: 'var(--text)',
@@ -324,12 +336,14 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
             <button
               type="submit"
               style={{
-                padding: '12px 24px',
-                fontSize: 13,
+                padding: '10px 24px',
+                fontSize: 9,
                 fontWeight: 700,
-                letterSpacing: '0.5px',
+                letterSpacing: '0.12em',
                 textTransform: 'uppercase',
+                fontFamily: 'Arial, sans-serif',
                 border: 'none',
+                borderLeft: '2px solid var(--border)',
                 background: 'var(--surface)',
                 color: 'var(--text)',
                 cursor: 'pointer',
@@ -402,13 +416,13 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
             onClick={() => navigate('/signup')}
             style={{
               padding: '10px 28px',
-              fontSize: 13,
-              fontWeight: 600,
-              letterSpacing: '0.5px',
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: '0.12em',
               textTransform: 'uppercase',
-              border: '2px solid var(--surface)',
-              background: 'var(--surface)',
-              color: 'var(--text)',
+              border: '2px solid var(--text)',
+              background: 'var(--text)',
+              color: 'var(--bg)',
               cursor: 'pointer',
             }}
           >
@@ -418,13 +432,13 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
             onClick={onBrowse}
             style={{
               padding: '10px 28px',
-              fontSize: 13,
-              fontWeight: 600,
-              letterSpacing: '0.5px',
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: '0.12em',
               textTransform: 'uppercase',
               border: '2px solid var(--border)',
               background: 'transparent',
-              color: 'var(--text-disabled)',
+              color: 'var(--text-secondary)',
               cursor: 'pointer',
             }}
           >
@@ -440,30 +454,30 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
           gap: 0,
           marginBottom: 40,
           background: 'var(--surface)',
-          border: '1px solid var(--border)',
+          border: '2px solid var(--border)',
         }}
       >
         {statItems.map((s, i) => (
           <div
             key={s.label}
             style={{
-              padding: '16px 28px',
+              padding: '16px 32px',
               textAlign: 'center',
-              borderRight: i < statItems.length - 1 ? '1px solid var(--border)' : 'none',
+              borderRight: i < statItems.length - 1 ? '2px solid var(--border)' : 'none',
             }}
           >
             <div
               style={{
-                fontSize: 'clamp(20px, 3vw, 28px)',
+                fontSize: 'clamp(18px, 3vw, 24px)',
                 fontWeight: 700,
-                color: 'var(--text-primary)',
+                color: 'var(--text)',
                 letterSpacing: '-0.02em',
-                fontFamily: 'monospace',
+                fontFamily: 'Courier New, monospace',
               }}
             >
               {s.value}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 2 }}>
+            <div style={{ fontSize: 8, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, marginTop: 4 }}>
               {s.label}
             </div>
           </div>
@@ -509,19 +523,22 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
                 to={`/vehicle/${v.id}`}
                 style={{
                   flexShrink: 0,
-                  width: 160,
+                  width: 180,
                   background: 'var(--surface)',
-                  border: '1px solid var(--border)',
+                  border: '2px solid var(--border)',
                   textDecoration: 'none',
                   color: 'var(--text)',
                   display: 'flex',
                   flexDirection: 'column',
                   overflow: 'hidden',
+                  transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
               >
                 <div style={{
                   width: '100%',
-                  height: 100,
+                  height: 120,
                   overflow: 'hidden',
                   background: 'var(--bg)',
                 }}>
@@ -538,8 +555,10 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
                 </div>
                 <div style={{ padding: '8px 10px' }}>
                   <div style={{
-                    fontSize: 11,
+                    fontSize: 9,
                     fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase' as const,
                     lineHeight: 1.3,
                     marginBottom: 4,
                     overflow: 'hidden',
@@ -551,8 +570,9 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
                   {formatPrice(v) && (
                     <div style={{
                       fontSize: 11,
-                      fontFamily: 'monospace',
-                      color: 'var(--text-muted)',
+                      fontFamily: 'Courier New, monospace',
+                      fontWeight: 700,
+                      color: 'var(--text)',
                     }}>
                       {formatPrice(v)}
                     </div>
@@ -575,11 +595,11 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: 1,
+          gap: 2,
           maxWidth: 720,
           width: '100%',
           background: 'var(--border)',
-          border: '1px solid var(--border)',
+          border: '2px solid var(--border)',
           marginBottom: 32,
         }}
       >
@@ -593,9 +613,9 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
           >
             <div
               style={{
-                fontSize: 11,
+                fontSize: 9,
                 fontWeight: 700,
-                letterSpacing: '0.5px',
+                letterSpacing: '0.12em',
                 textTransform: 'uppercase',
                 color: 'var(--text)',
                 marginBottom: 6,
@@ -605,7 +625,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
             </div>
             <div
               style={{
-                fontSize: 12,
+                fontSize: 10,
                 lineHeight: 1.6,
                 color: 'var(--text-secondary)',
               }}
@@ -621,9 +641,9 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
         style={{
           display: 'flex',
           gap: 16,
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: '0.5px',
+          fontSize: 8,
+          fontWeight: 700,
+          letterSpacing: '0.12em',
           textTransform: 'uppercase',
         }}
       >
