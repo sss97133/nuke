@@ -449,101 +449,54 @@ async function loadMarketIndex() {
   if (ymmIndexLoaded) return;
   console.log('\n[Market Index] Loading Y/M/M price data...');
 
-  // Exact Y/M/M stats (year 1960-1999, 5+ comps)
-  const { data: ymm, error: ymmErr } = await supabase.rpc('execute_sql_readonly', {
-    query: `
-      SELECT year, LOWER(make) as make, LOWER(model) as model,
-        count(*) as n,
-        percentile_cont(0.25) WITHIN GROUP (ORDER BY sale_price) as p25,
-        percentile_cont(0.50) WITHIN GROUP (ORDER BY sale_price) as median,
-        percentile_cont(0.75) WITHIN GROUP (ORDER BY sale_price) as p75
-      FROM vehicles
-      WHERE year BETWEEN 1950 AND 2000
-        AND sale_price > 500
-        AND status NOT IN ('deleted','merged','duplicate')
-        AND make IS NOT NULL AND model IS NOT NULL
-      GROUP BY year, LOWER(make), LOWER(model)
-      HAVING count(*) >= 3
-    `
-  });
-
-  if (ymmErr) {
-    // Fallback: direct query with aggregation (slower but works without RPC)
-    console.warn('[Market Index] RPC not available, using direct query fallback...');
-    const { data: fallback, error: fbErr } = await supabase
-      .from('vehicles')
-      .select('year, make, model, sale_price')
-      .gte('year', 1950).lte('year', 2000)
-      .gt('sale_price', 500)
-      .not('make', 'is', null)
-      .not('model', 'is', null)
-      .neq('status', 'deleted')
-      .neq('status', 'merged')
-      .limit(50000);
-
-    if (!fbErr && fallback) {
-      // Build index from raw rows client-side
-      const groups = {};
-      for (const v of fallback) {
-        const key = `${v.year}_${v.make.toLowerCase()}_${v.model.toLowerCase()}`;
-        if (!groups[key]) groups[key] = { prices: [], year: v.year, make: v.make.toLowerCase(), model: v.model.toLowerCase() };
-        groups[key].prices.push(Number(v.sale_price));
-      }
-      for (const [key, g] of Object.entries(groups)) {
-        if (g.prices.length < 3) continue;
-        g.prices.sort((a, b) => a - b);
-        const n = g.prices.length;
-        marketIndex.set(key, {
-          median: g.prices[Math.floor(n * 0.5)],
-          p25: g.prices[Math.floor(n * 0.25)],
-          p75: g.prices[Math.floor(n * 0.75)],
-          n,
-        });
-        const mmKey = `${g.make}_${g.model}`;
-        if (!makeModelIndex.has(mmKey)) makeModelIndex.set(mmKey, { prices: [] });
-        makeModelIndex.get(mmKey).prices.push(...g.prices);
-      }
-      // Finalize make/model rollups
-      for (const [key, g] of makeModelIndex.entries()) {
-        g.prices.sort((a, b) => a - b);
-        const n = g.prices.length;
-        makeModelIndex.set(key, {
-          median: g.prices[Math.floor(n * 0.5)],
-          p25: g.prices[Math.floor(n * 0.25)],
-          p75: g.prices[Math.floor(n * 0.75)],
-          n,
-        });
-      }
-      console.log(`[Market Index] Loaded ${marketIndex.size} Y/M/M groups, ${makeModelIndex.size} M/M groups (fallback)`);
-    }
-  } else if (ymm) {
-    for (const row of ymm) {
-      const key = `${row.year}_${row.make}_${row.model}`;
-      marketIndex.set(key, {
-        median: Number(row.median),
-        p25: Number(row.p25),
-        p75: Number(row.p75),
-        n: Number(row.n),
-      });
-      // Also build make/model rollup (across years)
-      const mmKey = `${row.make}_${row.model}`;
-      if (!makeModelIndex.has(mmKey)) makeModelIndex.set(mmKey, { prices: [] });
-      makeModelIndex.get(mmKey).prices.push(Number(row.median));
-    }
-    // Finalize make/model rollups
-    for (const [key, g] of makeModelIndex.entries()) {
-      g.prices.sort((a, b) => a - b);
-      const n = g.prices.length;
-      makeModelIndex.set(key, {
-        median: g.prices[Math.floor(n * 0.5)],
-        p25: g.prices[Math.floor(n * 0.25)],
-        p75: g.prices[Math.floor(n * 0.75)],
-        n,
-      });
-    }
-    console.log(`[Market Index] Loaded ${marketIndex.size} Y/M/M groups, ${makeModelIndex.size} M/M groups`);
+  // Paginate to get all Y/M/M groups (PostgREST default limit is 1000)
+  let ymm = [];
+  let ymmErr = null;
+  const PAGE_SIZE = 5000;
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data, error } = await supabase.rpc('get_ymm_market_index', {
+      year_min: YEAR_MIN - 10,
+      year_max: YEAR_MAX + 5,
+    }).range(offset, offset + PAGE_SIZE - 1);
+    if (error) { ymmErr = error; break; }
+    if (!data || data.length === 0) break;
+    ymm.push(...data);
+    if (data.length < PAGE_SIZE) break; // last page
   }
 
+  if (ymmErr) {
+    console.error('[Market Index] RPC failed:', ymmErr.message);
+    ymmIndexLoaded = true;
+    return;
+  }
+
+  for (const row of (ymm || [])) {
+    const key = `${row.year}_${row.make}_${row.model}`;
+    marketIndex.set(key, {
+      median: Number(row.median),
+      p25: Number(row.p25),
+      p75: Number(row.p75),
+      n: Number(row.n),
+    });
+    // Also build make/model rollup (across years)
+    const mmKey = `${row.make}_${row.model}`;
+    if (!makeModelIndex.has(mmKey)) makeModelIndex.set(mmKey, { prices: [] });
+    makeModelIndex.get(mmKey).prices.push(Number(row.median));
+  }
+
+  // Finalize make/model rollups
+  for (const [key, g] of makeModelIndex.entries()) {
+    g.prices.sort((a, b) => a - b);
+    const n = g.prices.length;
+    makeModelIndex.set(key, {
+      median: g.prices[Math.floor(n * 0.5)],
+      p25: g.prices[Math.floor(n * 0.25)],
+      p75: g.prices[Math.floor(n * 0.75)],
+      n,
+    });
+  }
+
+  console.log(`[Market Index] Loaded ${marketIndex.size} Y/M/M groups, ${makeModelIndex.size} M/M groups`);
   ymmIndexLoaded = true;
 }
 
@@ -904,7 +857,7 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
       listing_location: location,
       gps_latitude: listingLat,
       gps_longitude: listingLng,
-      status: "discovered",
+      status: isAuto ? "discovered" : "rejected",
       auction_source: "facebook_marketplace",
       discovery_source: "facebook_marketplace",
     };
