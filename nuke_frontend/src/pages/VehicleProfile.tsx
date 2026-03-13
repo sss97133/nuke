@@ -50,8 +50,6 @@ const VehicleProfileInner: React.FC = () => {
   const [showOwnershipClaim, setShowOwnershipClaim] = useState(false);
   const { lastMemeDrop } = useVehicleMemeDrops(vehicle?.id);
 
-  // Fallback listing images handled by VehicleProfileContext
-
   // Left column: make all cards collapsible by clicking the header bar.
   // This avoids rewriting every individual card component while keeping behavior consistent.
   useEffect(() => {
@@ -115,12 +113,6 @@ const VehicleProfileInner: React.FC = () => {
 
   const { valuation: valuationIntel, readiness: readinessSnapshot } = useValuationIntel(vehicle?.id || null);
 
-  // Permissions, ownership, admin status all provided by VehicleProfileContext
-
-  // Auth, initial load, bundle events, view recording, event listeners all handled by VehicleProfileContext
-
-  // Realtime, heartbeat, timeline events listener all handled by VehicleProfileContext
-
   const updatePrivacy = async () => {
     if (!vehicle || vehicle.isAnonymous) return;
 
@@ -175,8 +167,6 @@ const VehicleProfileInner: React.FC = () => {
 
   const handleEditClick = () => ctx.reloadVehicle();
 
-  // BaT auto-import handled by VehicleProfileContext
-
   if (ctx.loading) {
     return (
         <div className="loading-container">
@@ -204,12 +194,6 @@ const VehicleProfileInner: React.FC = () => {
         </div>
     );
   }
-  
-  // readinessScore removed - was computed but never used in render
-
-  // renderWorkspaceContent extracted to WorkspaceContent.tsx
-
-  // Render vehicle profile (responsive for mobile and desktop)
   return (
       <div className="vehicle-profile-page">
         {/* Vehicle Sub-Header with Price — sticky, z-900 per V3 spec */}
