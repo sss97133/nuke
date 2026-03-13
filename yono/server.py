@@ -1262,6 +1262,121 @@ def analyze_contextual(req: ContextualAnalyzeRequest):
 
 
 # ============================================================
+# Session Detection endpoints
+# ============================================================
+
+class SessionDetectRequest(BaseModel):
+    vehicle_id: str
+    gap_minutes: float = 30
+
+
+class SessionClassifyRequest(BaseModel):
+    session_id: str
+
+
+class SessionNarrativeRequest(BaseModel):
+    session_id: str
+
+
+@app.post("/session/detect")
+def session_detect(req: SessionDetectRequest):
+    """
+    Detect photo sessions for a vehicle.
+    Groups chronologically adjacent images into named sessions,
+    classifies session types, and persists as auto-sessions.
+    """
+    try:
+        from session_detector import detect_sessions, get_connection
+        conn = get_connection()
+        result = detect_sessions(conn, req.vehicle_id, req.gap_minutes)
+        conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(500, f"Session detection failed: {e}")
+
+
+@app.post("/session/classify")
+def session_classify(req: SessionClassifyRequest):
+    """
+    Reclassify an existing session's type without re-detecting.
+    """
+    try:
+        from session_detector import get_connection
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SET statement_timeout = '15s'")
+
+        # Get session + its images
+        cur.execute("""
+            SELECT s.vehicle_id, ARRAY_AGG(m.image_id ORDER BY m.display_order) AS image_ids
+            FROM image_sets s
+            JOIN image_set_members m ON m.image_set_id = s.id
+            WHERE s.id = %s
+            GROUP BY s.vehicle_id
+        """, (req.session_id,))
+        row = cur.fetchone()
+        if not row:
+            cur.close()
+            conn.close()
+            raise HTTPException(404, "Session not found")
+
+        # Fetch image details
+        cur.execute("""
+            SELECT id, vehicle_zone, damage_flags, modification_flags,
+                   source, latitude, longitude,
+                   COALESCE(taken_at, created_at) AS effective_time
+            FROM vehicle_images WHERE id = ANY(%s)
+            ORDER BY COALESCE(taken_at, created_at) ASC
+        """, (row["image_ids"],))
+        images = [dict(r) for r in cur.fetchall()]
+
+        from session_detector import classify_session_type
+        session_type_key, confidence = classify_session_type(images)
+
+        cur.execute("SELECT id, display_label FROM session_type_taxonomy WHERE canonical_key = %s",
+                     (session_type_key,))
+        type_row = cur.fetchone()
+
+        cur.execute("""
+            UPDATE image_sets
+            SET session_type_key = %s, session_type_id = %s, session_type_confidence = %s
+            WHERE id = %s
+        """, (session_type_key, str(type_row["id"]) if type_row else None, confidence, req.session_id))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return {
+            "session_id": req.session_id,
+            "session_type_key": session_type_key,
+            "confidence": confidence,
+            "display_label": type_row["display_label"] if type_row else session_type_key,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Session classification failed: {e}")
+
+
+@app.post("/session/narrative")
+def session_narrative(req: SessionNarrativeRequest):
+    """
+    Generate a narrative for a session.
+    Uses descriptions + condition observations to build a story.
+    """
+    try:
+        from description_generator import generate_session_narrative, get_connection
+        conn = get_connection()
+        result = generate_session_narrative(conn, req.session_id)
+        conn.close()
+        return result
+    except ImportError:
+        raise HTTPException(501, "description_generator module not available")
+    except Exception as e:
+        raise HTTPException(500, f"Narrative generation failed: {e}")
+
+
+# ============================================================
 # Entry point
 # ============================================================
 

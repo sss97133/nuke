@@ -59,19 +59,31 @@ export interface ImageExpandedDataProps {
   imageMetadata?: any;
   /** Attribution / source info */
   attribution?: any;
+  /** Resolved angle from resolveAngle utility */
+  resolvedAngle?: { label: string; degrees?: { x: number; y: number; z?: number }; zone?: string; confidence?: number } | null;
   tags?: any[];
   commentsCount?: number;
   /** Use dark theme (lightbox) vs light */
   dark?: boolean;
+  /** AI-generated description (best pass from image_descriptions) */
+  description?: string | null;
+  /** Session name if image belongs to an auto-session */
+  sessionName?: string | null;
+  /** Session type label */
+  sessionType?: string | null;
 }
 
 export const ImageExpandedData: React.FC<ImageExpandedDataProps> = ({
   imageRecord,
   imageMetadata,
   attribution,
+  resolvedAngle,
   tags = [],
   commentsCount = 0,
   dark = true,
+  description,
+  sessionName,
+  sessionType,
 }) => {
   const meta = imageMetadata || imageRecord || {};
   const id = meta.id;
@@ -90,7 +102,7 @@ export const ImageExpandedData: React.FC<ImageExpandedDataProps> = ({
               ? String(meta.document_category || meta.sensitive_type).replace(/_/g, ' ')
               : '';
 
-  const created = meta.created_at || meta.taken_at;
+  const created = meta.taken_at || meta.created_at;
   const dateStr = created
     ? (() => {
         try {
@@ -121,9 +133,37 @@ export const ImageExpandedData: React.FC<ImageExpandedDataProps> = ({
   const locationStr = loc?.city ? `${loc.city}${loc.state ? `, ${loc.state}` : ''}` : lat != null && lng != null ? `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}` : '';
 
   const zone = meta.vehicle_zone ? String(meta.vehicle_zone).replace(/_/g, ' ') : '';
-  const angle = meta.angle ? String(meta.angle).replace(/_/g, ' ') : '';
+  const rawAngle = meta.angle ? String(meta.angle).replace(/_/g, ' ') : '';
+  const angleLabel = resolvedAngle?.label || rawAngle;
+  const angleDegrees = resolvedAngle?.degrees;
+  const angleDisplay = angleDegrees
+    ? `${angleLabel} (${Math.round(angleDegrees.x)} / ${Math.round(angleDegrees.y)})`
+    : angleLabel;
   const docType = meta.document_category || meta.sensitive_type ? String(meta.document_category || meta.sensitive_type).replace(/_/g, ' ') : '';
-  const sourceType = meta.source ? String(meta.source).replace(/_/g, ' ') : '';
+  const SOURCE_LABELS: Record<string, string> = {
+    user_upload: 'User Upload',
+    bat_import: 'Bring a Trailer',
+    bat_listing: 'Bring a Trailer',
+    iphoto: 'Apple Photos',
+    mecum: 'Mecum Auctions',
+    organization_import: 'Dealer Import',
+    gooding: 'Gooding & Company',
+    broad_arrow: 'Broad Arrow',
+    bonhams_import: 'Bonhams',
+    pcarmarket: 'PCarMarket',
+    external_import: 'External',
+    dealer_scrape: 'Dealer',
+    craigslist_listing: 'Craigslist',
+    craigslist_scrape: 'Craigslist',
+    facebook_marketplace: 'Facebook Marketplace',
+    hagerty: 'Hagerty',
+    scraper: 'Web Import',
+  };
+  const rawSource = meta.source || '';
+  const sourceLabel = SOURCE_LABELS[rawSource] || (rawSource ? String(rawSource).replace(/_/g, ' ') : '');
+  const uploaderUsername = attribution?.uploader?.username;
+  const uploaderAvatar = attribution?.uploader?.avatar_url;
+  const uploaderDisplayLabel = (rawSource === 'user_upload' && uploaderUsername) ? `@${uploaderUsername}` : sourceLabel;
   const sourceUrl = meta.source_url || exif?.source_url || exif?.discovery_url || '';
 
   return (
@@ -137,10 +177,33 @@ export const ImageExpandedData: React.FC<ImageExpandedDataProps> = ({
         {dateStr && <Field label="Date" value={dateStr} />}
       </Section>
 
-      {(sourceType || sourceUrl || attribution) && (
+      {(uploaderDisplayLabel || sourceUrl || attribution) && (
         <Section title="Source">
-          {sourceType && <Field label="Type" value={sourceType} />}
-          {attribution?.seller?.handle && <Field label="Seller" value={attribution.seller.handle} />}
+          {uploaderDisplayLabel && (
+            <div style={{ marginBottom: '6px' }}>
+              <div style={FIELD_LABEL_STYLE}>Source</div>
+              <div style={{ ...FIELD_VALUE_STYLE, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {uploaderAvatar && (
+                  <img
+                    src={uploaderAvatar}
+                    alt=""
+                    style={{ width: 12, height: 12, borderRadius: 0, border: '1px solid rgba(255,255,255,0.2)', flexShrink: 0 }}
+                  />
+                )}
+                {uploaderUsername && rawSource === 'user_upload' ? (
+                  <a href={`/profile/${uploaderUsername}`} style={{ color: 'var(--gulf-blue, #6AADE4)', textDecoration: 'none' }}>
+                    @{uploaderUsername}
+                  </a>
+                ) : (
+                  <span>{uploaderDisplayLabel}</span>
+                )}
+              </div>
+            </div>
+          )}
+          {attribution?.photographer?.name && (
+            <Field label="Photographer" value={attribution.photographer.name} />
+          )}
+          {attribution?.seller?.handle && <Field label="Seller" value={`@${attribution.seller.handle}`} />}
           {attribution?.organization?.name && <Field label="Organization" value={attribution.organization.name} />}
           {sourceUrl && (
             <div style={{ marginBottom: '6px' }}>
@@ -153,13 +216,37 @@ export const ImageExpandedData: React.FC<ImageExpandedDataProps> = ({
         </Section>
       )}
 
-      {(zone || angle || docType || meta.is_document) && (
+      {(zone || angleDisplay || docType || meta.is_document) && (
         <Section title="Classification">
           {zone && <Field label="Vehicle zone" value={zone} />}
-          {angle && <Field label="Angle" value={angle} />}
+          {angleDisplay && (
+            <div style={{ marginBottom: '6px' }}>
+              <div style={FIELD_LABEL_STYLE}>Angle</div>
+              <div style={FIELD_VALUE_STYLE}>
+                {resolvedAngle?.label || rawAngle}
+                {angleDegrees && (
+                  <span style={{ fontFamily: "'Courier New', Courier, monospace", color: 'rgba(255,255,255,0.6)', marginLeft: '6px', fontSize: '10px' }}>
+                    {Math.round(angleDegrees.x)} AZ / {Math.round(angleDegrees.y)} EL
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           {docType && <Field label="Document type" value={docType} />}
           {meta.is_document === true && !docType && <Field label="Document" value="Yes" />}
           {meta.vehicle_vin && <Field label="VIN (detected)" value={meta.vehicle_vin} />}
+        </Section>
+      )}
+
+      {(description || sessionName) && (
+        <Section title="AI Description">
+          {description && (
+            <div style={{ marginBottom: '6px' }}>
+              <div style={FIELD_VALUE_STYLE}>{description}</div>
+            </div>
+          )}
+          {sessionName && <Field label="Session" value={sessionName} />}
+          {sessionType && <Field label="Session type" value={sessionType} />}
         </Section>
       )}
 
