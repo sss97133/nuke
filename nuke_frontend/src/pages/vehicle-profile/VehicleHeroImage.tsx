@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
-import type { VehicleHeroImageProps } from './types';
+import { useVehicleProfile } from './VehicleProfileContext';
 import MobileImageGallery from '../../components/image/MobileImageGallery';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
-const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overlayNode, heroMeta }) => {
+interface VehicleHeroImageProps {
+  overlayNode?: React.ReactNode;
+}
+
+const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
+  const { leadImageUrl, heroMeta } = useVehicleProfile();
   const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
   const [showGallery, setShowGallery] = useState(false);
   const isMobile = useIsMobile();

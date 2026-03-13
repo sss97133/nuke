@@ -373,7 +373,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
 
           {/* Vehicle Scores */}
           <React.Suspense fallback={null}>
-            <VehicleScoresWidget vehicle={vehicle} />
+            <VehicleScoresWidget />
           </React.Suspense>
 
           {/* Videos */}
