@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Vehicle, VehiclePermissions } from './types';
+import { useVehicleProfile } from './VehicleProfileContext';
 import OrphanedVehicleBanner from '../../components/vehicle/OrphanedVehicleBanner';
 
 const LiveAuctionBanner = React.lazy(() => import('../../components/auction/LiveAuctionBanner'));
@@ -7,24 +7,15 @@ const ExternalAuctionLiveBanner = React.lazy(() => import('../../components/auct
 const MergeProposalsPanel = React.lazy(() => import('../../components/vehicle/MergeProposalsPanel'));
 
 export interface VehicleBannersProps {
-  vehicle: Vehicle | null;
-  session: any;
-  permissions: VehiclePermissions;
-  auctionPulse: any;
   auctionCurrency: string;
-  isVerifiedOwner: boolean;
   onMergeComplete: () => void;
 }
 
 const VehicleBanners: React.FC<VehicleBannersProps> = ({
-  vehicle,
-  session,
-  permissions,
-  auctionPulse,
   auctionCurrency,
-  isVerifiedOwner,
   onMergeComplete,
 }) => {
+  const { vehicle, session, permissions, auctionPulse, isVerifiedOwner } = useVehicleProfile();
   if (!vehicle) return null;
 
   return (

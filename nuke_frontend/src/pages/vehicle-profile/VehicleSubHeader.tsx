@@ -1,14 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface VehicleSubHeaderProps {
-  vehicle: any; // full vehicle record
-  stickyTop?: string; // CSS value for top position, default 'var(--header-height, 48px)'
-}
+import { useVehicleProfile } from './VehicleProfileContext';
 
 /** Capitalize first letter of each word for display (e.g. "K5 JIMMY" -> "K5 Jimmy") */
 function toTitleCase(s: string): string {
@@ -296,10 +288,8 @@ const Badge: React.FC<BadgeProps> = ({ variant = '', label, tooltip, children, o
 // VehicleSubHeader
 // ---------------------------------------------------------------------------
 
-const VehicleSubHeader: React.FC<VehicleSubHeaderProps> = ({
-  vehicle,
-  stickyTop = 'var(--header-height, 48px)',
-}) => {
+const VehicleSubHeader: React.FC = () => {
+  const { vehicle } = useVehicleProfile();
   const navigate = useNavigate();
   if (!vehicle) return null;
 
@@ -326,7 +316,7 @@ const VehicleSubHeader: React.FC<VehicleSubHeaderProps> = ({
   // --- Container ---
   const containerStyle: React.CSSProperties = {
     position:        'sticky',
-    top:             stickyTop,
+    top:             'var(--header-height, 48px)',
     zIndex:          90,
     height:          36,
     backgroundColor: TOKEN.surface,

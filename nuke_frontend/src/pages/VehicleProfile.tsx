@@ -1839,54 +1839,35 @@ const VehicleProfileInner: React.FC = () => {
         <div ref={vehicleHeaderRef} className="vehicle-profile-sub-header" style={{ position: 'sticky', top: 'var(--header-height, 40px)', zIndex: 900, background: 'var(--surface)', borderBottom: '2px solid var(--border)' }}>
           <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading header...</div>}>
             <VehicleHeader
-              vehicle={vehicle}
-              isOwner={isRowOwner || isVerifiedOwner}
-              canEdit={canEdit}
-              session={session}
-              permissions={permissions}
               responsibleName={responsibleName || undefined}
-              initialValuation={null}
-              initialPriceSignal={null}
               organizationLinks={linkedOrganizations}
               onClaimClick={() => setShowOwnershipClaim(true)}
-              userOwnershipClaim={userOwnershipClaim as any}
-              suppressExternalListing={!!userOwnershipClaim}
-              leadImageUrl={leadImageUrl}
-              liveSession={liveSession}
-              auctionPulse={auctionPulse}
             />
           </React.Suspense>
         </div>
 
         {/* Vehicle Sub-Header — sticky badge bar */}
         <React.Suspense fallback={null}>
-          <VehicleSubHeader vehicle={vehicle} />
+          <VehicleSubHeader />
         </React.Suspense>
 
         {/* Banners: BaT data flag, live auction, external auction, orphaned vehicle, merge proposals */}
         <React.Suspense fallback={null}>
           <VehicleBanners
-            vehicle={vehicle}
-            session={session}
-            permissions={permissions}
-            auctionPulse={auctionPulse}
             auctionCurrency={auctionCurrency}
-            isVerifiedOwner={isVerifiedOwner}
             onMergeComplete={() => loadVehicle()}
           />
         </React.Suspense>
 
         {/* Barcode Timeline — sticky, 10px collapsed, expandable to heatmap */}
         <React.Suspense fallback={null}>
-          <BarcodeTimeline vehicle={vehicle} timelineEvents={timelineEvents} />
+          <BarcodeTimeline />
         </React.Suspense>
 
         {/* Hero Image Section */}
         <div id="vehicle-hero" className="hero" style={{ scrollMarginTop: 'calc(var(--header-height, 40px) + 88px)' }}>
           <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading hero image...</div>}>
             <VehicleHeroImage
-              leadImageUrl={leadImageUrl}
-              heroMeta={heroMeta}
               overlayNode={<VehicleMemeOverlay lastEvent={lastMemeDrop} />}
             />
           </React.Suspense>

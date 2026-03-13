@@ -1,8 +1,5 @@
 import React from 'react';
-
-interface VehicleScoresWidgetProps {
-  vehicle: any;
-}
+import { useVehicleProfile } from './VehicleProfileContext';
 
 interface ScoreConfig {
   label: string;
@@ -50,7 +47,8 @@ const SCORES: ScoreConfig[] = [
   },
 ];
 
-const VehicleScoresWidget: React.FC<VehicleScoresWidgetProps> = ({ vehicle }) => {
+const VehicleScoresWidget: React.FC = () => {
+  const { vehicle } = useVehicleProfile();
   const [collapsed, setCollapsed] = React.useState(false);
 
   return (

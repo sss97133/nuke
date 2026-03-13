@@ -1,11 +1,5 @@
 import React from 'react';
-import type { Vehicle, LiveSession } from './types';
-
-interface VehicleBadgeBarProps {
-  vehicle: Vehicle;
-  auctionPulse: any;
-  liveSession: LiveSession | null;
-}
+import { useVehicleProfile } from './VehicleProfileContext';
 
 function formatPrice(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n) || n <= 0) return '—';
@@ -17,7 +11,8 @@ function formatPrice(n: number | null | undefined): string {
  * VehicleHeader already renders: SOLD, source, price, seller, buyer, location, mileage, time.
  * This bar adds: BIDS, COMMENTS, WATCHERS, DQ score.
  */
-const VehicleBadgeBar: React.FC<VehicleBadgeBarProps> = ({ vehicle, auctionPulse }) => {
+const VehicleBadgeBar: React.FC = () => {
+  const { vehicle, auctionPulse } = useVehicleProfile();
   const v = vehicle as any;
 
   // Engagement stats — only data VehicleHeader doesn't show

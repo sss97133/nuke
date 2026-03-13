@@ -1,10 +1,8 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import type { Vehicle } from './types';
+import { useVehicleProfile } from './VehicleProfileContext';
 
-interface BarcodeTimelineProps {
-  vehicle: Vehicle;
-  timelineEvents: any[];
-}
+interface BarcodeTimelineProps {}
+
 
 interface EventDay {
   date: string;
@@ -60,7 +58,8 @@ const BARCODE_COLORS: Record<number, string> = {
 
 const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
-const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ vehicle, timelineEvents }) => {
+const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
+  const { vehicle, timelineEvents } = useVehicleProfile();
   const [expanded, setExpanded] = useState(true);
   const [receiptDate, setReceiptDate] = useState<string | null>(null);
   const [receiptPos, setReceiptPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });

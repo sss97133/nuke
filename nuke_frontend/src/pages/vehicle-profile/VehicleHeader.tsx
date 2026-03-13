@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { VehicleHeaderProps } from './types';
+import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
 import { VehicleDeduplicationService } from '../../services/vehicleDeduplicationService';
 // Deprecated modals (history/analysis/tag review) intentionally removed from UI
@@ -63,25 +64,28 @@ import {
 } from './hooks/useVehicleHeaderData';
 
 const VehicleHeader: React.FC<VehicleHeaderProps> = ({
-  vehicle,
-  isOwner,
-  canEdit,
-  session,
-  permissions,
   responsibleName,
-  onPriceClick,
-  initialValuation,
-  initialPriceSignal,
   organizationLinks = [],
   onClaimClick,
-  userOwnershipClaim,
-  suppressExternalListing = false,
-  leadImageUrl = null,
-  liveSession = null,
-  auctionPulse = null
 }) => {
   const navigate = useNavigate();
+  const {
+    vehicle,
+    session,
+    permissions,
+    isRowOwner,
+    isVerifiedOwner: ctxVerifiedOwner,
+    canEdit,
+    userOwnershipClaim,
+    leadImageUrl,
+    liveSession,
+    auctionPulse,
+  } = useVehicleProfile();
+  const isOwner = isRowOwner || ctxVerifiedOwner;
   const { isVerifiedOwner, contributorRole } = permissions || {};
+  const suppressExternalListing = !!userOwnershipClaim;
+  const initialValuation = null;
+  const initialPriceSignal = null;
   const isVerified = isVerifiedOwner || isOwner;
   const hasClaim = !!userOwnershipClaim;
   const claimHasTitle = !!userOwnershipClaim?.title_document_url && userOwnershipClaim?.title_document_url !== 'pending';

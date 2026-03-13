@@ -632,31 +632,11 @@ export interface VehicleBaseProps {
   permissions: VehiclePermissions;
 }
 
+/** Props that VehicleHeader can't get from context (modal callbacks, VehicleProfile-local state). */
 export interface VehicleHeaderProps {
-  vehicle: Vehicle | null;
-  isOwner: boolean;
-  canEdit: boolean;
-  session?: any;
-  permissions?: VehiclePermissions;
   responsibleName?: string;
-  onPriceClick?: () => void;
-  initialValuation?: VehicleValuation | null;
-  initialPriceSignal?: any;
   organizationLinks?: any[];
   onClaimClick?: () => void;
-  userOwnershipClaim?: {
-    id: string;
-    status: string;
-    verification_type?: string | null;
-    title_document_url?: string | null;
-    drivers_license_url?: string | null;
-    created_at?: string | null;
-    updated_at?: string | null;
-  } | null;
-  suppressExternalListing?: boolean;
-  leadImageUrl?: string | null;
-  liveSession?: LiveSession | null;
-  auctionPulse?: AuctionPulse | null;
 }
 
 export interface HeroMeta {
