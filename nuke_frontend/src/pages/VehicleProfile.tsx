@@ -10,10 +10,8 @@ const VehicleHeroImage = React.lazy(() => import('./vehicle-profile/VehicleHeroI
 import '../styles/unified-design-system.css';
 import '../styles/vehicle-profile.css';
 const VehicleSubHeader = React.lazy(() => import('./vehicle-profile/VehicleSubHeader'));
-import { type LinkedOrg } from '../components/vehicle/LinkedOrganizations';
 const AddOrganizationRelationship = React.lazy(() => import('../components/vehicle/AddOrganizationRelationship'));
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
-import { resolveCurrencyCode } from '../utils/currency';
 const ValidationPopupV2 = React.lazy(() => import('../components/vehicle/ValidationPopupV2'));
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
 const VehicleOwnershipPanel = React.lazy(() => import('../components/ownership/VehicleOwnershipPanel'));
@@ -34,25 +32,7 @@ const VehicleProfileInner: React.FC = () => {
 
   // Local-only state (not in context)
   const [referenceLibraryRefreshKey, setReferenceLibraryRefreshKey] = useState(0);
-  const [responsibleName, setResponsibleName] = useState<string | null>(null);
   const [showAddEvent, setShowAddEvent] = useState(false);
-
-  const auctionCurrency = React.useMemo(() => {
-    const v: any = vehicle as any;
-    const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
-    const pulseMeta = (auctionPulse as any)?.metadata;
-    return resolveCurrencyCode(
-      pulseMeta?.currency, pulseMeta?.currency_code, pulseMeta?.currencyCode,
-      pulseMeta?.price_currency, pulseMeta?.priceCurrency,
-      externalListing?.currency, externalListing?.currency_code, externalListing?.price_currency,
-      externalListing?.metadata?.currency, externalListing?.metadata?.currency_code,
-      externalListing?.metadata?.currencyCode, externalListing?.metadata?.price_currency,
-      externalListing?.metadata?.priceCurrency,
-      v?.origin_metadata?.currency, v?.origin_metadata?.currency_code,
-      v?.origin_metadata?.price_currency, v?.origin_metadata?.priceCurrency,
-      v?.origin_metadata?.priceCurrencyCode,
-    );
-  }, [vehicle, auctionPulse]);
   const vehicleHeaderRef = React.useRef<HTMLDivElement | null>(null);
 
   // Measure VehicleHeader height for sticky positioning
@@ -66,7 +46,6 @@ const VehicleProfileInner: React.FC = () => {
     return () => ro.disconnect();
   }, [vehicle, auctionPulse]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [linkedOrganizations, setLinkedOrganizations] = useState<LinkedOrg[]>([]);
   const [showAddOrgRelationship, setShowAddOrgRelationship] = useState(false);
   const [showOwnershipClaim, setShowOwnershipClaim] = useState(false);
   const [batAutoImportStatus, setBatAutoImportStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
@@ -159,19 +138,11 @@ const VehicleProfileInner: React.FC = () => {
 
   // Event listeners for vehicle_images_updated and timeline_updated handled by VehicleProfileContext
 
-  // Post-vehicle-load side effects (unique to VehicleProfile.tsx — context handles images/timeline/comments/observations)
+  // Post-vehicle-load side effects (unique to VehicleProfile.tsx — context handles images/timeline/comments/observations/orgs/responsible)
   useEffect(() => {
-    if (vehicle?.id) {
-      recordView();
-      loadResponsible();
-    }
+    if (vehicle?.id) recordView();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle?.id]);
-
-  useEffect(() => {
-    if (!vehicle?.id) return;
-    loadLinkedOrgs(vehicle.id);
-  }, [vehicle?.id]); // Removed loadLinkedOrgs from deps - it's useCallback with [] deps so never changes
 
   // Realtime vehicles, vehicle_images, auction pulse all handled by VehicleProfileContext
 
@@ -190,57 +161,7 @@ const VehicleProfileInner: React.FC = () => {
   }, [vehicle?.id]);
 
 
-  const loadResponsible = async () => {
-    try {
-      // For imported profiles, show organization instead of user.
-      // This applies to Classic.com/org imports too (not just Dropbox).
-      const origin = String(vehicle?.profile_origin || '');
-      const isImportedProfile = Boolean(
-        vehicle?.origin_organization_id &&
-          (
-            vehicle?.origin_metadata?.automated_import === true ||
-            vehicle?.origin_metadata?.no_user_uploader === true ||
-            !vehicle?.uploaded_by ||
-            ['dropbox_import', 'url_scraper', 'api_import', 'organization_import', 'classic_com_indexing'].includes(origin)
-          )
-      );
-      
-      if (isImportedProfile && vehicle?.origin_organization_id) {
-        // Load organization name for automated imports
-        const { data: orgData, error: orgError } = await supabase
-          .from('businesses')
-          .select('business_name')
-          .eq('id', vehicle.origin_organization_id)
-          .maybeSingle();
-        
-        if (!orgError && orgData?.business_name) {
-          setResponsibleName(orgData.business_name);
-          return;
-        }
-        // If org exists but name fetch fails, still avoid an empty card.
-        setResponsibleName('Imported');
-        return;
-      }
-      
-      // For regular user uploads, show user name
-      if (!vehicle?.uploaded_by) return;
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('username, full_name')
-        .eq('id', vehicle.uploaded_by)
-        .maybeSingle();
-      if (error) {
-        console.warn('Unable to load responsible profile:', error.message);
-        return;
-      }
-      if (data) {
-        const display = data.full_name || data.username || null;
-        setResponsibleName(display);
-      }
-    } catch (err) {
-      console.warn('Error loading responsible profile:', err);
-    }
-  };
+  // loadResponsible handled by VehicleProfileContext
 
 
   // Heartbeat: upsert current user presence
@@ -331,93 +252,7 @@ const VehicleProfileInner: React.FC = () => {
 
   const handleEditClick = () => ctx.reloadVehicle();
 
-  const loadLinkedOrgs = useCallback(async (vehId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('organization_vehicles')
-        .select(`
-          id,
-          organization_id,
-          relationship_type,
-          auto_tagged,
-          gps_match_confidence,
-          status,
-          businesses!inner (
-            id,
-            business_name,
-            business_type,
-            city,
-            state,
-            logo_url
-          )
-        `)
-        .eq('vehicle_id', vehId)
-        // Include sold/pending relationships so the header can still show the org "emblem"
-        // even after inventory status changes.
-        .in('status', ['active', 'sold', 'pending', 'past', 'archived']);
-
-      if (error) {
-        console.warn('Unable to load linked orgs:', error.message);
-        setLinkedOrganizations([]);
-        return;
-      }
-
-      const enriched = (data || []).map((ov: any) => ({
-        id: ov.id,
-        organization_id: ov.organization_id,
-        relationship_type: ov.relationship_type,
-        auto_tagged: ov.auto_tagged,
-        gps_match_confidence: ov.gps_match_confidence,
-        status: ov.status,
-        business_name: ov.businesses?.business_name || 'Unknown org',
-        business_type: ov.businesses?.business_type,
-        city: ov.businesses?.city,
-        state: ov.businesses?.state,
-        logo_url: ov.businesses?.logo_url
-      })) as LinkedOrg[];
-
-      // De-dupe by org and keep the most relevant link for header display.
-      // Priority: active > sold > pending > past > archived
-      const statusRank = (s: any) => {
-        const v = String(s || '').toLowerCase();
-        if (v === 'active') return 0;
-        if (v === 'sold') return 1;
-        if (v === 'pending') return 2;
-        if (v === 'past') return 3;
-        if (v === 'archived') return 4;
-        return 5;
-      };
-      const byOrg = new Map<string, LinkedOrg>();
-      for (const link of enriched) {
-        const orgId = String((link as any).organization_id || '');
-        if (!orgId) continue;
-        const existing = byOrg.get(orgId);
-        if (!existing) {
-          byOrg.set(orgId, link);
-          continue;
-        }
-        const nextRank = statusRank((link as any).status);
-        const prevRank = statusRank((existing as any).status);
-        if (nextRank < prevRank) {
-          byOrg.set(orgId, link);
-          continue;
-        }
-        if (nextRank === prevRank) {
-          // Prefer non-auto-tagged when status is the same.
-          const nextAuto = Boolean((link as any).auto_tagged);
-          const prevAuto = Boolean((existing as any).auto_tagged);
-          if (prevAuto && !nextAuto) byOrg.set(orgId, link);
-        }
-      }
-
-      setLinkedOrganizations(Array.from(byOrg.values()));
-    } catch (err) {
-      console.warn('Linked org load failed:', err);
-      setLinkedOrganizations([]);
-    }
-  }, []);
-
-  // loadVehicleImages handled by VehicleProfileContext
+  // loadLinkedOrgs handled by VehicleProfileContext
 
   const handleSetPrimaryImage = async (imageId: string) => {
     if (!vehicle || !isAdmin) {
@@ -571,8 +406,6 @@ const VehicleProfileInner: React.FC = () => {
         <div ref={vehicleHeaderRef} className="vehicle-profile-sub-header" style={{ position: 'sticky', top: 'var(--header-height, 40px)', zIndex: 900, background: 'var(--surface)', borderBottom: '2px solid var(--border)' }}>
           <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading header...</div>}>
             <VehicleHeader
-              responsibleName={responsibleName || undefined}
-              organizationLinks={linkedOrganizations}
               onClaimClick={() => setShowOwnershipClaim(true)}
             />
           </React.Suspense>
@@ -586,7 +419,6 @@ const VehicleProfileInner: React.FC = () => {
         {/* Banners: BaT data flag, live auction, external auction, orphaned vehicle, merge proposals */}
         <React.Suspense fallback={null}>
           <VehicleBanners
-            auctionCurrency={auctionCurrency}
             onMergeComplete={() => ctx.reloadVehicle()}
           />
         </React.Suspense>
@@ -615,7 +447,7 @@ const VehicleProfileInner: React.FC = () => {
               vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
               userId={session.user.id}
               onSuccess={() => {
-                loadLinkedOrgs(vehicle.id);
+                ctx.reloadLinkedOrgs();
                 setShowAddOrgRelationship(false);
               }}
               onClose={() => setShowAddOrgRelationship(false)}
