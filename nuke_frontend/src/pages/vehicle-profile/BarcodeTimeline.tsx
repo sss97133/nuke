@@ -22,21 +22,140 @@ function dateStr(d: Date): string {
   return `${y}-${m}-${dd}`;
 }
 
-/** Normalize to YYYY-MM-DD so events don't shift to wrong day due to timezone. */
+/** Normalize to YYYY-MM-DD in local timezone so midnight UTC doesn't shift days. */
 function toDateOnly(d: string | undefined): string | null {
   if (!d) return null;
-  const s = String(d).trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  const date = new Date(s);
-  if (Number.isNaN(date.getTime())) return null;
-  return dateStr(date);
+  const date = new Date(String(d).trim());
+  if (isNaN(date.getTime())) return null;
+  return date.toLocaleDateString('en-CA'); // YYYY-MM-DD in local tz
 }
 
-/** Human-readable label from event_type or title (e.g. "auction_listed" → "Auction listed"). */
+/** Merge adjacent days that belong to the same session (spanning midnight). */
+function mergeAdjacentSessions(map: Record<string, EventDay>): void {
+  const sorted = Object.keys(map).sort();
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const dayA = sorted[i];
+    const dayB = sorted[i + 1];
+    const evA = map[dayA];
+    const evB = map[dayB];
+    if (!evA || !evB) continue;
+
+    // Check if dayB is the next calendar day
+    const dA = new Date(dayA + 'T12:00:00');
+    const dB = new Date(dayB + 'T12:00:00');
+    const diffMs = dB.getTime() - dA.getTime();
+    if (diffMs < 0 || diffMs > 2 * 86400000) continue; // not adjacent
+
+    // If dayA has late events (after 8pm) and dayB has early events (before 8am), merge
+    const hasLateA = evA.items.length > 0; // simplified: if adjacent days both have events, merge
+    const hasEarlyB = evB.items.length > 0;
+    if (hasLateA && hasEarlyB && diffMs <= 86400000) {
+      const groupId = evA.group || dayA;
+      evA.group = groupId;
+      evB.group = groupId;
+
+      // Build session label: "Oct 9-10, 2023"
+      const startDate = new Date(dayA + 'T12:00:00');
+      const endDate = new Date(dayB + 'T12:00:00');
+      const startMonth = startDate.toLocaleDateString('en-US', { month: 'short' });
+      const endMonth = endDate.toLocaleDateString('en-US', { month: 'short' });
+      const year = endDate.getFullYear();
+
+      const sessionLabel = startMonth === endMonth
+        ? `${startMonth} ${startDate.getDate()}-${endDate.getDate()}, ${year}`
+        : `${startMonth} ${startDate.getDate()} - ${endMonth} ${endDate.getDate()}, ${year}`;
+
+      // Set group metadata on all days in this group
+      const groupDays = Object.keys(map).filter(k => map[k].group === groupId).sort();
+      groupDays.forEach((k, idx) => {
+        map[k].groupDay = idx + 1;
+        map[k].groupTotal = String(groupDays.length);
+      });
+
+      // Combine totals
+      const totalCost = groupDays.reduce((sum, k) => {
+        const t = map[k].total;
+        if (t === '—') return sum;
+        return sum + parseFloat(t.replace(/[$,]/g, ''));
+      }, 0);
+      const combinedTotal = totalCost > 0 ? `$${Math.round(totalCost).toLocaleString()}` : '—';
+      groupDays.forEach(k => { map[k].groupTotal = combinedTotal; });
+    }
+  }
+}
+
+const EVENT_LABELS: Record<string, string> = {
+  auction_listed: 'Listed for Sale',
+  auction_sold: 'Sold',
+  auction_started: 'Auction Started',
+  auction_ended: 'Auction Ended',
+  vehicle_added: 'Profile Created',
+  mileage_reading: 'Mileage Recorded',
+  repair: 'Repair',
+  modification: 'Modification',
+  maintenance: 'Maintenance',
+  inspection: 'Inspection',
+  purchase: 'Purchased',
+  sale: 'Sold',
+  registration: 'Registered',
+  insurance: 'Insurance',
+  photo_session: 'Photo Session',
+  other: 'Activity',
+};
+
+const SOURCE_PLATFORM_LABELS: Record<string, string> = {
+  bat: 'BaT',
+  bat_import: 'BaT',
+  craigslist: 'Craigslist',
+  craigslist_listing: 'Craigslist',
+  facebook_marketplace: 'FB Marketplace',
+  mecum: 'Mecum',
+  pcarmarket: 'PCarMarket',
+  hagerty: 'Hagerty',
+  gooding: 'Gooding',
+  broad_arrow: 'Broad Arrow',
+  bonhams: 'Bonhams',
+};
+
+/** Context-aware human-readable event label. */
 function formatEventLabel(ev: any): string {
+  const eventType = String(ev.event_type || ev.category || 'event').trim().toLowerCase();
+  const source = String(ev.source || '').trim().toLowerCase();
+  const sourceType = String(ev.source_type || '').trim().toLowerCase();
+  const dataSource = String(ev.data_source || '').trim().toLowerCase();
+  const platform = SOURCE_PLATFORM_LABELS[source] || SOURCE_PLATFORM_LABELS[dataSource] || '';
+
+  // System-ingested / extracted data: prefix with "Discovered on"
+  const isSystemIngested = sourceType === 'system' || dataSource.startsWith('extract');
+
+  // Photo session: show session type if available in metadata
+  if (eventType === 'photo_session') {
+    const sessionType = ev.metadata?.session_type_label || ev.metadata?.session_type_key;
+    if (sessionType) return `Photo Session: ${String(sessionType).replace(/_/g, ' ')}`;
+    const count = ev.metadata?.image_count || (Array.isArray(ev.image_urls) ? ev.image_urls.length : 0);
+    if (count > 0) return `Photo Session (${count} photos)`;
+    return 'Photo Session';
+  }
+
+  if (eventType === 'vehicle_added') {
+    if (platform) return `Added via ${platform}`;
+    if (ev.user_id) return 'Added by User';
+    return 'Profile Created';
+  }
+
+  if (eventType === 'auction_listed') {
+    if (platform) return isSystemIngested ? `Discovered on ${platform}` : `Listed on ${platform}`;
+    return isSystemIngested ? 'Discovered Listing' : 'Listed for Sale';
+  }
+
+  if (eventType === 'auction_sold' && platform) return `Sold on ${platform}`;
+
+  const base = EVENT_LABELS[eventType];
+  if (base) return base;
+
+  // Fallback: title-case the raw string
   const raw = ev.title || ev.event_type || ev.category || 'Event';
-  const str = String(raw).trim();
-  return str.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase());
+  return String(raw).trim().replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase());
 }
 
 function formatDate(ds: string): string {
@@ -79,7 +198,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       const d = ev.event_date || ev.created_at;
       const ds = toDateOnly(d);
       if (!ds) continue;
-      const label = ev.event_type || ev.category || 'Event';
+      const label = formatEventLabel(ev);
       const costNum = ev.cost_amount != null ? Number(ev.cost_amount) : ev.cost != null ? Number(ev.cost) : null;
       const costStr = costNum != null && Number.isFinite(costNum) ? `$${Number(costNum).toLocaleString()}` : (() => {
         const urls = Array.isArray(ev.image_urls) ? ev.image_urls : [];
@@ -116,6 +235,9 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       else if (itemCount >= 2) map[ds].level = 2;
       else map[ds].level = 1;
     }
+
+    // Merge adjacent-day sessions spanning midnight
+    mergeAdjacentSessions(map);
 
     // Date range
     const allYears = Object.keys(map).map((d) => new Date(d + 'T00:00:00').getFullYear());
@@ -407,7 +529,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
                 <span>{receiptEvent.total}</span>
               </div>
               {receiptEvent.group && receiptEvent.groupDay && (
-                <div style={{ fontSize: '7px', color: '#bbb', fontFamily: "var(--vp-font-mono)", marginTop: '2px' }}>
+                <div style={{ fontSize: '8px', color: '#bbb', fontFamily: "var(--vp-font-mono)", marginTop: '2px' }}>
                   Day {receiptEvent.groupDay} · Group total: {receiptEvent.groupTotal || '—'}
                 </div>
               )}

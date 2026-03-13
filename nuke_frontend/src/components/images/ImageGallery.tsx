@@ -292,7 +292,11 @@ const ImageGallery = ({
   }, []);
   // Default to newest-first to keep ordering stable across vehicles while AI sorting ramps up.
   const [sortBy, setSortBy] = useState<'quality' | 'date_desc' | 'date_asc'>('date_desc');
-  // Bundle (sessions) view state
+  // Sessions view state (auto-detected sessions via get_vehicle_sessions RPC)
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionCollapsed, setSessionCollapsed] = useState<Record<string, boolean>>({});
+  // Legacy bundle state (kept for backward compat with get_image_bundles_for_vehicle)
   const [bundles, setBundles] = useState<any[]>([]);
   const [bundlesLoading, setBundlesLoading] = useState(false);
   const [bundleCollapsed, setBundleCollapsed] = useState<Record<string, boolean>>({});
@@ -525,9 +529,34 @@ const ImageGallery = ({
     })();
   }, [vehicleId]);
 
-  // Load bundles when sessions view is activated
+  // Load auto-detected sessions when sessions view is activated
   useEffect(() => {
     if (viewMode !== 'bundles' || !vehicleId) return;
+    if (sessions.length > 0) return; // already loaded
+    setSessionsLoading(true);
+    supabase
+      .rpc('get_vehicle_sessions', { p_vehicle_id: vehicleId, p_include_manual: false })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('[ImageGallery sessions]', error);
+          // Fallback to legacy bundles
+          supabase
+            .rpc('get_image_bundles_for_vehicle', { p_vehicle_id: vehicleId, p_min_images: 1 })
+            .then(({ data: legacyData }) => {
+              setBundles(legacyData || []);
+              setSessionsLoading(false);
+            });
+          return;
+        }
+        setSessions((data || []) as any[]);
+        setSessionsLoading(false);
+      });
+  }, [viewMode, vehicleId, sessions.length]);
+
+  // Legacy: load bundles as fallback when no auto-sessions exist
+  useEffect(() => {
+    if (viewMode !== 'bundles' || !vehicleId) return;
+    if (sessions.length > 0 || sessionsLoading) return; // prefer auto-sessions
     if (bundles.length > 0) return; // already loaded
     setBundlesLoading(true);
     supabase
@@ -694,6 +723,25 @@ const ImageGallery = ({
       );
     };
 
+    // Junk image detection: venue maps, location photos, non-vehicle assets
+    const JUNK_URL_PATTERNS = [
+      /\/auctionsites?\//i,
+      /location_map/i,
+      /venue/i,
+      /directions/i,
+      /maps\.googleapis\.com\/maps\/api\/staticmap/i,
+      /maps\.google\.com/i,
+      /\/floor[_-]?plan/i,
+      /\/seating[_-]?chart/i,
+      /\/parking[_-]?map/i,
+    ];
+    const isJunkImage = (img: any) => {
+      const u = String(img?.image_url || '');
+      const p = String(img?.storage_path || '');
+      if (img?.image_vehicle_match_status === 'unrelated') return true;
+      return JUNK_URL_PATTERNS.some(re => re.test(u) || re.test(p));
+    };
+
     const isSoftQuarantined = (img: any) => {
       const u = String(img?.image_url || '').toLowerCase();
       const p = String(img?.storage_path || '').toLowerCase();
@@ -716,7 +764,8 @@ const ImageGallery = ({
     // reassignment/merge, and the old check was incorrectly hiding ALL images for those vehicles.
     const noMismatched = noFileUrls;
 
-    const noLogos = noMismatched.filter((img: any) => !isOrgLogoPath(img));
+    const noJunk = noMismatched.filter((img: any) => !isJunkImage(img));
+    const noLogos = noJunk.filter((img: any) => !isOrgLogoPath(img));
     if (noLogos.length === 0) return [];
 
     const hasBetter = noLogos.some((img: any) => !isSoftQuarantined(img));
@@ -4065,20 +4114,116 @@ const ImageGallery = ({
         </div>
       )}
 
-      {/* Sessions (Bundle) View */}
+      {/* Sessions View — auto-detected sessions with type badges and narratives */}
       {viewMode === 'bundles' && (
         <div style={{ padding: '8px 0' }}>
-          {bundlesLoading && (
+          {sessionsLoading && (
             <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
               Loading sessions…
             </div>
           )}
-          {!bundlesLoading && bundles.length === 0 && (
+          {!sessionsLoading && sessions.length === 0 && bundles.length === 0 && (
             <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-              No sessions found. Images need EXIF dates to be grouped into sessions.
+              No sessions detected. Run session detection to group images into photo sessions.
             </div>
           )}
-          {bundles.map(bundle => {
+
+          {/* Auto-detected sessions (from get_vehicle_sessions) */}
+          {sessions.map(session => {
+            const sid = session.session_id;
+            const isCollapsed = sessionCollapsed[sid] ?? false;
+            const dateLabel = session.session_start
+              ? new Date(session.session_start).toLocaleDateString('en-US', {
+                  weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+                })
+              : 'Unknown date';
+            const durationMin = session.duration_minutes ? Math.round(Number(session.duration_minutes)) : null;
+            const categoryColors: Record<string, string> = {
+              inspection: 'var(--gulf-blue, #00205B)',
+              restoration: 'var(--martini-red, #B71234)',
+              documentation: 'var(--grey-700, #555)',
+              lifestyle: 'var(--brg, #004225)',
+            };
+            const badgeColor = categoryColors[session.session_type_category] || 'var(--grey-600)';
+
+            return (
+              <div key={sid} style={{ borderBottom: '1px solid var(--border)' }}>
+                {/* Session header */}
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', cursor: 'pointer', background: 'var(--white)' }}
+                  onClick={() => setSessionCollapsed(prev => ({ ...prev, [sid]: !isCollapsed }))}
+                >
+                  {/* Cover image */}
+                  <div style={{ flexShrink: 0 }}>
+                    {session.cover_image_url ? (
+                      <img src={supabaseTransformUrl(session.cover_image_url, 80, 60)} style={{ width: '48px', height: '48px', objectFit: 'cover', border: '2px solid var(--border)' }} />
+                    ) : (
+                      <div style={{ width: '48px', height: '48px', background: 'var(--grey-100)', border: '2px solid var(--border)' }} />
+                    )}
+                  </div>
+                  {/* Session info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                      <span style={{
+                        display: 'inline-block', fontSize: '8px', fontWeight: 700,
+                        textTransform: 'uppercase', letterSpacing: '0.08em',
+                        padding: '1px 5px', color: '#fff',
+                        backgroundColor: badgeColor,
+                      }}>
+                        {session.session_type_label || 'UNCLASSIFIED'}
+                      </span>
+                      <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                        {dateLabel}
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)' }}>
+                      {session.image_count} photos
+                      {durationMin ? ` · ${durationMin < 60 ? `${durationMin}m` : `${Math.round(durationMin / 60)}h`}` : ''}
+                    </p>
+                    {session.narrative && (
+                      <p style={{
+                        margin: '3px 0 0', fontSize: '10px', color: 'var(--text-muted)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%',
+                        fontStyle: 'italic',
+                      }}>
+                        {session.narrative}
+                      </p>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0 }}>{isCollapsed ? '▶' : '▼'}</span>
+                </div>
+                {/* Expanded: show session images in grid */}
+                {!isCollapsed && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '2px', padding: '2px 12px 12px' }}>
+                    {(session.image_ids || []).slice(0, 40).map((imgId: string) => {
+                      const img = allImages.find(i => i.id === imgId);
+                      if (!img) return null;
+                      return (
+                        <img
+                          key={imgId}
+                          src={getOptimalImageUrl(img, 'thumbnail')}
+                          style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', cursor: 'pointer' }}
+                          onClick={() => {
+                            const globalIdx = allImages.findIndex(i => i.id === imgId);
+                            if (globalIdx >= 0) openLightbox(globalIdx);
+                          }}
+                          loading="lazy"
+                        />
+                      );
+                    })}
+                    {(session.image_ids || []).length > 40 && (
+                      <div style={{ gridColumn: '1/-1', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', padding: '6px 0' }}>
+                        + {session.image_ids.length - 40} more
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Legacy bundles fallback (when no auto-sessions detected) */}
+          {sessions.length === 0 && bundles.map(bundle => {
             const dateStr = String(bundle.bundle_date);
             const isCollapsed = bundleCollapsed[dateStr] ?? false;
             const thumbs: string[] = bundleThumbnails[dateStr] || [];
@@ -4088,19 +4233,16 @@ const ImageGallery = ({
             const durationMin = bundle.duration_minutes ? Math.round(Number(bundle.duration_minutes)) : null;
             return (
               <div key={dateStr} style={{ borderBottom: '1px solid var(--border)' }}>
-                {/* Bundle header */}
                 <div
                   style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', cursor: 'pointer', background: 'var(--white)' }}
                   onClick={() => setBundleCollapsed(prev => ({ ...prev, [dateStr]: !isCollapsed }))}
                 >
-                  {/* Thumbnails */}
                   <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
                     {thumbs.slice(0, 3).map((url, i) => (
-                      <img key={i} src={url} style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '2px', background: 'var(--grey-100)' }} />
+                      <img key={i} src={url} style={{ width: '40px', height: '40px', objectFit: 'cover', background: 'var(--grey-100)' }} />
                     ))}
-                    {thumbs.length === 0 && <div style={{ width: '40px', height: '40px', background: 'var(--grey-100)', borderRadius: '2px' }} />}
+                    {thumbs.length === 0 && <div style={{ width: '40px', height: '40px', background: 'var(--grey-100)' }} />}
                   </div>
-                  {/* Date + meta */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{dateLabel}</p>
                     <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -4110,30 +4252,18 @@ const ImageGallery = ({
                   </div>
                   <span style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0 }}>{isCollapsed ? '▶' : '▼'}</span>
                 </div>
-                {/* Expanded: show images in a small grid */}
                 {!isCollapsed && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '2px', padding: '2px 12px 12px' }}>
-                    {(bundle.image_ids || []).slice(0, 40).map((imgId: string, idx: number) => {
+                    {(bundle.image_ids || []).slice(0, 40).map((imgId: string) => {
                       const img = allImages.find(i => i.id === imgId);
                       if (!img) return null;
                       return (
-                        <img
-                          key={imgId}
-                          src={getOptimalImageUrl(img, 'thumbnail')}
-                          style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '2px', cursor: 'pointer' }}
-                          onClick={() => {
-                            const globalIdx = allImages.findIndex(i => i.id === imgId);
-                            if (globalIdx >= 0) openLightbox(globalIdx);
-                          }}
-                          loading="lazy"
-                        />
+                        <img key={imgId} src={getOptimalImageUrl(img, 'thumbnail')}
+                          style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', cursor: 'pointer' }}
+                          onClick={() => { const gi = allImages.findIndex(i => i.id === imgId); if (gi >= 0) openLightbox(gi); }}
+                          loading="lazy" />
                       );
                     })}
-                    {(bundle.image_ids || []).length > 40 && (
-                      <div style={{ gridColumn: '1/-1', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', padding: '6px 0' }}>
-                        + {bundle.image_ids.length - 40} more
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
