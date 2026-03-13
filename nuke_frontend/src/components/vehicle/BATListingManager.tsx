@@ -37,29 +37,18 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
   useEffect(() => {
     if (!vehicleId) return;
 
-    // Try to get BAT URL from RPC data first (eliminates duplicate query)
-    const rpcData = (window as any).__vehicleProfileRpcData;
-    const vehicleFromWindow = rpcData?.vehicle;
-    
-    if (vehicleFromWindow?.bat_auction_url) {
-      setBatUrl(vehicleFromWindow.bat_auction_url);
-    } else if (vehicleFromWindow?.discovery_url && vehicleFromWindow.discovery_url.includes('bringatrailer.com')) {
-      setBatUrl(vehicleFromWindow.discovery_url);
-    } else {
-      // Fallback: query if not in RPC data
-      supabase
-        .from('vehicles')
-        .select('bat_auction_url, discovery_url')
-        .eq('id', vehicleId)
-        .single()
-        .then(({ data }) => {
-          if (data?.bat_auction_url) {
-            setBatUrl(data.bat_auction_url);
-          } else if (data?.discovery_url && data.discovery_url.includes('bringatrailer.com')) {
-            setBatUrl(data.discovery_url);
-          }
-        });
-    }
+    supabase
+      .from('vehicles')
+      .select('bat_auction_url, discovery_url')
+      .eq('id', vehicleId)
+      .single()
+      .then(({ data }) => {
+        if (data?.bat_auction_url) {
+          setBatUrl(data.bat_auction_url);
+        } else if (data?.discovery_url && data.discovery_url.includes('bringatrailer.com')) {
+          setBatUrl(data.discovery_url);
+        }
+      });
 
     // Get already extracted parts
     supabase

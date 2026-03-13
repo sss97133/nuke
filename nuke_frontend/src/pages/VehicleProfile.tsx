@@ -1295,16 +1295,6 @@ const VehicleProfile: React.FC = () => {
     // This function used for manual refresh after updates
     if (!vehicleId) return;
     
-    // Check if RPC data is available (avoid duplicate query)
-    const rpcData = (window as any).__vehicleProfileRpcData;
-    const rpcMatchesThisVehicle =
-      rpcData &&
-      (rpcData.vehicle_id === vehicleId || (vehicle?.id && rpcData.vehicle_id === vehicle.id));
-    if (rpcMatchesThisVehicle && rpcData?.timeline_events) {
-      setTimelineEvents(rpcData.timeline_events);
-      return;
-    }
-    
     try {
       const { data: events, error: eventsError } = await supabase
         .from('timeline_events')
@@ -1854,8 +1844,8 @@ const VehicleProfile: React.FC = () => {
               session={session}
               permissions={permissions}
               responsibleName={responsibleName || undefined}
-              initialValuation={(window as any).__vehicleProfileRpcData?.latest_valuation}
-              initialPriceSignal={(window as any).__vehicleProfileRpcData?.price_signal}
+              initialValuation={null}
+              initialPriceSignal={null}
               organizationLinks={linkedOrganizations}
               onClaimClick={() => setShowOwnershipClaim(true)}
               userOwnershipClaim={userOwnershipClaim as any}

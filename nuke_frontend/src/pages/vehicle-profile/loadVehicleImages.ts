@@ -40,24 +40,6 @@ export async function loadVehicleImagesImpl({
   if (!vehicle) return;
 
   const { images: originImages, declaredCount } = getOriginImages(vehicle);
-  // Check if RPC data is available (avoid duplicate query)
-  const rpcData = (window as any).__vehicleProfileRpcData;
-  const rpcMatchesThisVehicle = rpcData && rpcData.vehicle_id === vehicle.id;
-  if (rpcMatchesThisVehicle && rpcData?.images && Array.isArray(rpcData.images) && rpcData.images.length > 0) {
-    const imagesRaw = rpcData.images.map((img: any) => img.image_url).filter(Boolean);
-    const images = filterProfileImages(imagesRaw, vehicle, { skipMismatchCheck: true });
-    setVehicleImages(images);
-    // Pick lead image from the filtered list to avoid BaT homepage noise becoming the hero.
-    const leadFromRpc = rpcData.images.find((img: any) => img.is_primary) || rpcData.images[0];
-    const leadCandidate = resolveDbImageUrl(leadFromRpc) || leadFromRpc?.image_url;
-    const leadOk = leadCandidate && filterProfileImages([leadCandidate], vehicle, { skipMismatchCheck: true }).length > 0;
-    const lead = leadOk ? leadCandidate : (images[0] || null);
-    if (lead) {
-      setLeadImageUrl(lead as any);
-    }
-    return;
-  }
-
   let images: string[] = [];
 
   // Load images from database first
