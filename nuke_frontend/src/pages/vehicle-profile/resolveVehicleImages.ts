@@ -36,7 +36,7 @@ export async function resolveVehicleImages(vehicleId: string): Promise<ResolvedI
       // Exclude duplicates
       .or('is_duplicate.is.null,is_duplicate.eq.false')
       // Exclude AI-detected mismatches
-      .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")')
+      .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
       // Order: primary first, then by position, then by insert order
       .order('is_primary', { ascending: false })
       .order('position', { ascending: true, nullsFirst: false })

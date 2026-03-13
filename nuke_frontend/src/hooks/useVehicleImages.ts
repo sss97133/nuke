@@ -72,7 +72,7 @@ export const useVehicleImages = (vehicleId?: string) => {
         // Quarantine/duplicate rows should never appear in standard galleries
         .or('is_duplicate.is.null,is_duplicate.eq.false')
         // Hide AI-detected mismatched/unrelated images
-        .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")')
+        .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
         .order('is_primary', { ascending: false })
         .order('created_at', { ascending: false });
         // NO LIMIT - show ALL images from all sources

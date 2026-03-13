@@ -369,7 +369,7 @@ const ImageGallery = ({
           // Quarantine/duplicate rows should never appear in standard galleries
           .or('is_duplicate.is.null,is_duplicate.eq.false')
           // Hide AI-detected mismatched/unrelated images
-          .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")')
+          .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
           .order('position', { ascending: true })
           .order('created_at', { ascending: true });
 
@@ -1619,7 +1619,7 @@ const ImageGallery = ({
             // Additional filtering: ensure we have valid image URLs
             .not('image_url', 'is', null)
             // Hide AI-detected mismatched/unrelated images
-            .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")')
+            .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
             .order('is_primary', { ascending: false })
             .order('position', { ascending: true, nullsFirst: false })
             .order('created_at', { ascending: true }),
@@ -1714,7 +1714,7 @@ const ImageGallery = ({
               .eq('vehicle_id', vehicleId)
               .not('is_document', 'is', true)
               .not('is_duplicate', 'is', true)
-              .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")')
+              .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
               .order('is_primary', { ascending: false })
               .order('position', { ascending: true, nullsFirst: false })
               .order('created_at', { ascending: true });
@@ -1934,7 +1934,7 @@ const ImageGallery = ({
         // Filter out documents (treat NULL as false)
         .not('is_document', 'is', true)
         .not('is_duplicate', 'is', true)
-        .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")')
+        .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
         .order('is_primary', { ascending: false })
         .order('position', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: true });

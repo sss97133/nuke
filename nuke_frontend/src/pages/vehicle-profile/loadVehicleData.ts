@@ -45,6 +45,7 @@ export async function selectBestHeroImage(
       .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at')
       .eq('vehicle_id', vehicleId)
       .eq('ai_processing_status', 'completed')
+      .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
       .in('vehicle_zone', ['ext_front', 'ext_front_driver', 'ext_front_passenger'])
       .order('photo_quality_score', { ascending: false })
       .limit(20);
@@ -65,6 +66,7 @@ export async function selectBestHeroImage(
       .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at')
       .eq('vehicle_id', vehicleId)
       .not('photo_quality_score', 'is', null)
+      .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
       .order('photo_quality_score', { ascending: false })
       .limit(1);
 
