@@ -17,7 +17,6 @@ import { resolveCurrencyCode } from '../utils/currency';
 const ValidationPopupV2 = React.lazy(() => import('../components/vehicle/ValidationPopupV2'));
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
 const VehicleOwnershipPanel = React.lazy(() => import('../components/ownership/VehicleOwnershipPanel'));
-import { buildAuctionPulseFromExternalListings } from './vehicle-profile/buildAuctionPulse';
 import { VehicleProfileProvider, useVehicleProfile } from './vehicle-profile/VehicleProfileContext';
 const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceContent'));
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
@@ -31,18 +30,12 @@ const VehicleProfileInner: React.FC = () => {
   const ctx = useVehicleProfile();
 
   // Aliases from context — single source of truth
-  const { vehicleId, vehicle, session, vehicleImages, auctionPulse: ctxAuctionPulse, isRowOwner, isVerifiedOwner, canEdit, hasContributorAccess, isAdminUser: isAdmin, canTriggerProofAnalysis, userOwnershipClaim, permissions, isPublic } = ctx;
+  const { vehicleId, vehicle, session, vehicleImages, auctionPulse, isRowOwner, isVerifiedOwner, canEdit, hasContributorAccess, isAdminUser: isAdmin, canTriggerProofAnalysis, userOwnershipClaim, permissions, isPublic } = ctx;
 
   // Local-only state (not in context)
   const [referenceLibraryRefreshKey, setReferenceLibraryRefreshKey] = useState(0);
   const [responsibleName, setResponsibleName] = useState<string | null>(null);
   const [showAddEvent, setShowAddEvent] = useState(false);
-  // Auction pulse: seeded from context, updated by local realtime subscriptions
-  const [auctionPulse, setAuctionPulse] = useState<any | null>(null);
-  // Seed auction pulse from context; local realtime updates override
-  useEffect(() => {
-    if (ctxAuctionPulse && !auctionPulse) setAuctionPulse(ctxAuctionPulse);
-  }, [ctxAuctionPulse]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const auctionCurrency = React.useMemo(() => {
     const v: any = vehicle as any;
@@ -180,235 +173,7 @@ const VehicleProfileInner: React.FC = () => {
     loadLinkedOrgs(vehicle.id);
   }, [vehicle?.id]); // Removed loadLinkedOrgs from deps - it's useCallback with [] deps so never changes
 
-  // Realtime vehicles + vehicle_images subscriptions handled by VehicleProfileContext
-
-  // Realtime auction pulse: update header telemetry as vehicle_events rows change
-  // (BaT/Classic/etc) and as auction_comments stream in.
-  useEffect(() => {
-    if (!vehicle?.id) return;
-
-    const vehicleIdForFilter = vehicle.id;
-
-    const channel = supabase
-      .channel(`auction-pulse:${vehicleIdForFilter}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'vehicle_events',
-          filter: `vehicle_id=eq.${vehicleIdForFilter}`,
-        },
-        (payload) => {
-          const row = (payload as any)?.new as any;
-          if (!row) return;
-          // If we already have a specific listing_url, ignore other events for this vehicle.
-          if (auctionPulse?.listing_url && row.source_url && row.source_url !== auctionPulse.listing_url) return;
-
-          // IMPORTANT: multiple pipelines can create duplicate rows with the same source_url.
-          // Recompute from the DB snapshot and merge, so "active" wins over stale "sold" duplicates.
-          (async () => {
-            try {
-              const { data } = await supabase
-                .from('vehicle_events')
-                .select('source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, metadata, updated_at')
-                .eq('vehicle_id', vehicleIdForFilter)
-                .order('updated_at', { ascending: false })
-                .limit(20);
-              // Normalize vehicle_events columns to legacy shape for buildAuctionPulseFromExternalListings
-              const normalized = (Array.isArray(data) ? data : []).map((r: any) => ({
-                platform: r.source_platform,
-                listing_url: r.source_url,
-                listing_status: r.event_status,
-                end_date: r.ended_at,
-                current_bid: r.current_price,
-                bid_count: r.bid_count,
-                watcher_count: r.watcher_count,
-                view_count: r.view_count,
-                metadata: r.metadata,
-                updated_at: r.updated_at,
-              }));
-              const merged = buildAuctionPulseFromExternalListings(normalized, vehicleIdForFilter);
-              if (merged) {
-                setAuctionPulse((prev: any) => ({ ...(prev || {}), ...merged }));
-              }
-            } catch {
-              // ignore
-            }
-          })();
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'auction_comments',
-          filter: `vehicle_id=eq.${vehicleIdForFilter}`,
-        },
-        (payload) => {
-          const row = (payload as any)?.new as any;
-          const postedAt = row?.posted_at ? String(row.posted_at) : null;
-          const isBid = row?.bid_amount !== null && row?.bid_amount !== undefined;
-          setAuctionPulse((prev: any) => {
-            if (!prev) return prev;
-            const nextCommentCount = typeof prev.comment_count === 'number' ? prev.comment_count + 1 : 1;
-            return {
-              ...prev,
-              comment_count: nextCommentCount,
-              last_comment_at: postedAt || prev.last_comment_at || null,
-              last_bid_at: isBid ? (postedAt || prev.last_bid_at || null) : (prev.last_bid_at || null),
-            };
-          });
-        },
-      )
-      .subscribe();
-
-    return () => {
-      try {
-        supabase.removeChannel(channel);
-      } catch {
-        try {
-          channel.unsubscribe();
-        } catch { /* ignore */ }
-      }
-    };
-  }, [vehicle?.id, auctionPulse?.listing_url, auctionPulse?.platform]);
-
-  // Realtime meme drops on this vehicle are handled by useVehicleMemeDrops()
-
-  // Lightweight auction pulse polling (vehicle_events + last bid/comment timestamps).
-  // This makes live auction vehicles feel bustling without needing a full realtime channel.
-  useEffect(() => {
-    if (!vehicle?.id) return;
-    if (!auctionPulse?.listing_url) return;
-
-    let cancelled = false;
-
-    const refreshAuctionPulse = async () => {
-      try {
-        // Re-read event records and merge duplicates for the same URL.
-        const { data: events } = await supabase
-          .from('vehicle_events')
-          .select('source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, metadata, updated_at')
-          .eq('vehicle_id', vehicle.id)
-          .eq('source_url', auctionPulse?.listing_url || '')
-          .order('updated_at', { ascending: false })
-          .limit(20);
-
-        // Normalize vehicle_events columns to legacy shape for buildAuctionPulseFromExternalListings
-        const normalized = (Array.isArray(events) ? events : []).map((r: any) => ({
-          platform: r.source_platform,
-          listing_url: r.source_url,
-          listing_status: r.event_status,
-          end_date: r.ended_at,
-          current_bid: r.current_price,
-          bid_count: r.bid_count,
-          watcher_count: r.watcher_count,
-          view_count: r.view_count,
-          metadata: r.metadata,
-          updated_at: r.updated_at,
-        }));
-        const merged = buildAuctionPulseFromExternalListings(normalized, vehicle.id);
-        const platform = String((merged as any)?.platform || auctionPulse?.platform || '');
-        const listingUrl = String((merged as any)?.listing_url || auctionPulse?.listing_url || '');
-
-        let commentCount: number | null =
-          typeof (merged as any)?.comment_count === 'number'
-            ? (merged as any).comment_count
-            : (typeof auctionPulse?.comment_count === 'number' ? auctionPulse.comment_count : null);
-        let lastBidAt: string | null = auctionPulse?.last_bid_at || null;
-        let lastCommentAt: string | null = auctionPulse?.last_comment_at || null;
-
-        try {
-          const [cCount, lastBid, lastComment, lastSeller] = await Promise.all([
-            commentCount === null
-              ? supabase
-                  .from('auction_comments')
-                  .select('id', { count: 'exact', head: true })
-                  .eq('vehicle_id', vehicle.id)
-              : Promise.resolve({ count: commentCount } as any),
-            supabase
-              .from('auction_comments')
-              .select('posted_at, author_username')
-              .eq('vehicle_id', vehicle.id)
-              .not('bid_amount', 'is', null)
-              .order('posted_at', { ascending: false })
-              .limit(1)
-              .maybeSingle(),
-            supabase
-              .from('auction_comments')
-              .select('posted_at')
-              .eq('vehicle_id', vehicle.id)
-              .order('posted_at', { ascending: false })
-              .limit(1)
-              .maybeSingle(),
-            supabase
-              .from('auction_comments')
-              .select('author_username')
-              .eq('vehicle_id', vehicle.id)
-              .eq('is_seller', true)
-              .order('posted_at', { ascending: false })
-              .limit(1)
-              .maybeSingle(),
-          ]);
-
-          if (commentCount === null) commentCount = typeof (cCount as any)?.count === 'number' ? (cCount as any).count : null;
-          lastBidAt = (lastBid as any)?.data?.posted_at || lastBidAt;
-          lastCommentAt = (lastComment as any)?.data?.posted_at || lastCommentAt;
-          const winnerName = String((lastBid as any)?.data?.author_username || '').trim() || null;
-          const sellerUsername = String((lastSeller as any)?.data?.author_username || '').trim() || null;
-          if (!cancelled) {
-            setAuctionPulse((prev: any) => ({
-              ...(prev || {}),
-              winner_name: winnerName ?? (prev?.winner_name ?? null),
-              seller_username: sellerUsername ?? (prev?.seller_username ?? null),
-            }));
-          }
-        } catch {
-          // ignore telemetry failures
-        }
-
-        if (!cancelled) {
-          setAuctionPulse({
-            platform,
-            listing_url: listingUrl,
-            listing_status: String((merged as any)?.listing_status || auctionPulse?.listing_status || ''),
-            end_date: (merged as any)?.end_date ?? auctionPulse?.end_date ?? null,
-            current_bid: typeof (merged as any)?.current_bid === 'number' ? (merged as any).current_bid : (auctionPulse?.current_bid ?? null),
-            bid_count: typeof (merged as any)?.bid_count === 'number' ? (merged as any).bid_count : (auctionPulse?.bid_count ?? null),
-            watcher_count: typeof (merged as any)?.watcher_count === 'number' ? (merged as any).watcher_count : (auctionPulse?.watcher_count ?? null),
-            view_count: typeof (merged as any)?.view_count === 'number' ? (merged as any).view_count : (auctionPulse?.view_count ?? null),
-            comment_count: commentCount,
-            last_bid_at: lastBidAt,
-            last_comment_at: lastCommentAt,
-            updated_at: (merged as any)?.updated_at ?? auctionPulse?.updated_at ?? null,
-            metadata: (merged as any)?.metadata ?? (auctionPulse as any)?.metadata ?? null,
-            // Preserve any derived winner/seller identity from auction_comments
-            winner_name: (auctionPulse as any)?.winner_name ?? null,
-            seller_username: (auctionPulse as any)?.seller_username ?? null,
-          });
-        }
-      } catch {
-        // ignore refresh failures
-      }
-    };
-
-    // Initial refresh (so we don't rely purely on the RPC snapshot)
-    refreshAuctionPulse();
-
-    const id = window.setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      refreshAuctionPulse();
-    }, 60000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [vehicle?.id, auctionPulse?.listing_url]);
-
-  // vehicle_images_updated listener handled by VehicleProfileContext
+  // Realtime vehicles, vehicle_images, auction pulse all handled by VehicleProfileContext
 
   // Listen for timeline events created from image uploads to prompt review
   useEffect(() => {
