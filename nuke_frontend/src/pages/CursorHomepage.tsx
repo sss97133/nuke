@@ -1198,7 +1198,7 @@ const CursorHomepage: React.FC = () => {
               .select('vehicle_id, thumbnail_url, medium_url, image_url, variants, file_size')
               .in('vehicle_id', chunk)
               .eq('is_primary', true)
-              .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")')
+              .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
               .limit(chunk.length);
             
             if (imgErr) {

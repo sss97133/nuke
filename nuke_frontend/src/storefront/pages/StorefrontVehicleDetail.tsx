@@ -80,7 +80,7 @@ export default function StorefrontVehicleDetail({ organization }: Props) {
         .from('vehicle_images')
         .select('id, image_url, source_url, is_primary')
         .eq('vehicle_id', vehicleId)
-        .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")')
+        .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
         .order('is_primary', { ascending: false })
         .limit(30);
 
