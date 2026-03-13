@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
-import type { Vehicle, VehiclePermissions, LiveSession } from './types';
+import { useVehicleProfile } from './VehicleProfileContext';
 
 // Lazy-load heavy components
 const WorkMemorySection = React.lazy(() => import('./WorkMemorySection'));
@@ -50,81 +50,59 @@ const ProfileGallery: React.FC<{
 // Keep the type alias so WorkspaceContentProps still compiles.
 export type WorkspaceTabId = 'evidence' | 'gallery' | 'owner';
 
+/** Props that can't come from context (callbacks into VehicleProfile modals, non-context data). */
 export interface WorkspaceContentProps {
-  vehicle: Vehicle;
-  session: any;
-  permissions: VehiclePermissions;
-  activeWorkspaceTab?: WorkspaceTabId;
-  isMobile: boolean;
-  isRowOwner: boolean;
-  isVerifiedOwner: boolean;
-  hasContributorAccess: boolean;
-  canEdit: boolean;
-  isAdminUser: boolean;
-  canTriggerProofAnalysis: boolean;
-  timelineEvents: any[];
-  vehicleImages: string[];
-  fallbackListingImageUrls: string[];
-  totalCommentCount: number;
-  isPublic: boolean;
-  vehicleHeaderHeight: number;
-  liveSession: LiveSession | null;
-  referenceLibraryRefreshKey: number;
-  auctionPulse: any;
   valuationIntel: any;
   readinessSnapshot: any;
+  referenceLibraryRefreshKey: number;
   onAddEventClick: () => void;
   onDataPointClick: (event: React.MouseEvent, dataType: string, dataValue: string, label: string) => void;
   onEditClick: () => void;
   onOpenVINProofImages?: () => void;
-  onLoadLiveSession: () => void;
-  onLoadVehicle: () => void;
-  onLoadTimelineEvents: () => void;
-  onLoadVehicleImages: () => void;
   onUpdatePrivacy: () => void;
-  onSetIsPublic: (value: boolean) => void;
   onSetReferenceLibraryRefreshKey: (fn: (v: number) => number) => void;
 }
 
 const DEFAULT_LEFT_PCT = 30;
 
 const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
-  vehicle,
-  session,
-  permissions,
-  isMobile,
-  isRowOwner,
-  isVerifiedOwner,
-  hasContributorAccess,
-  canEdit,
-  timelineEvents,
-  vehicleImages,
-  fallbackListingImageUrls,
-  totalCommentCount,
-  isPublic,
-  vehicleHeaderHeight,
-  liveSession,
-  referenceLibraryRefreshKey,
-  auctionPulse,
   valuationIntel,
   readinessSnapshot,
+  referenceLibraryRefreshKey,
   onAddEventClick,
   onDataPointClick,
   onEditClick,
   onOpenVINProofImages,
-  onLoadVehicle,
-  onLoadTimelineEvents,
-  onLoadVehicleImages,
   onUpdatePrivacy,
-  onSetIsPublic,
   onSetReferenceLibraryRefreshKey,
 }) => {
+  // All data comes from context — no more prop drilling
+  const {
+    vehicle,
+    session,
+    permissions,
+    isRowOwner,
+    isVerifiedOwner,
+    hasContributorAccess,
+    canEdit,
+    vehicleImages,
+    fallbackListingImageUrls,
+    totalCommentCount,
+    isPublic,
+    auctionPulse,
+    reloadVehicle,
+    reloadImages,
+    reloadTimeline,
+    setIsPublic,
+  } = useVehicleProfile();
   const [galleryCols, setGalleryCols] = useState(3);
   const [leftPct, setLeftPct] = useState(DEFAULT_LEFT_PCT);
   const [galleryView, setGalleryView] = useState<GalleryViewMode>('CATEGORY');
 
   const handleResize = useCallback((pct: number) => setLeftPct(pct), []);
   const handleReset = useCallback(() => setLeftPct(DEFAULT_LEFT_PCT), []);
+
+  if (!vehicle) return null;
 
   const importMeta = (vehicle as any)?.import_metadata || {};
   const evidenceUrls = Array.isArray(importMeta.evidence_urls) ? importMeta.evidence_urls : [];
@@ -277,7 +255,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             </CollapsibleWidget>
           )}
           <CollapsibleWidget variant="profile" title="Reference Library" defaultCollapsed={true}>
-            <VehicleReferenceLibrary vehicleId={vehicle.id} userId={session?.user?.id} year={vehicle.year} make={vehicle.make} series={(vehicle as any).series} model={vehicle.model} bodyStyle={(vehicle as any).body_style} refreshKey={referenceLibraryRefreshKey} onUploadComplete={() => { onLoadVehicle(); onSetReferenceLibraryRefreshKey((v) => v + 1); }} />
+            <VehicleReferenceLibrary vehicleId={vehicle.id} userId={session?.user?.id} year={vehicle.year} make={vehicle.make} series={(vehicle as any).series} model={vehicle.model} bodyStyle={(vehicle as any).body_style} refreshKey={referenceLibraryRefreshKey} onUploadComplete={() => { reloadVehicle(); onSetReferenceLibraryRefreshKey((v) => v + 1); }} />
           </CollapsibleWidget>
           <CollapsibleWidget variant="profile" title="Data Sources" defaultCollapsed={true}
             badge={dataSources.length > 0 ? <span className="widget__count">{dataSources.length}</span> : undefined}
@@ -310,7 +288,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>{isPublic ? 'Public' : 'Private'}</span>
                   <label style={{ display: 'flex', alignItems: 'center' }}>
-                    <input type="checkbox" checked={isPublic} onChange={(e) => { onSetIsPublic(e.target.checked); onUpdatePrivacy(); }} />
+                    <input type="checkbox" checked={isPublic} onChange={(e) => { setIsPublic(e.target.checked); onUpdatePrivacy(); }} />
                   </label>
                 </div>
               </div>
@@ -345,7 +323,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {/* Session Review Queue */}
           {session && (
             <React.Suspense fallback={null}>
-              <BundleReviewQueue vehicleId={vehicle.id} onComplete={() => onLoadTimelineEvents()} />
+              <BundleReviewQueue vehicleId={vehicle.id} onComplete={() => reloadTimeline()} />
             </React.Suspense>
           )}
 
@@ -389,7 +367,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             vehicleImages={vehicleImages}
             fallbackListingImageUrls={fallbackListingImageUrls}
             vehicle={vehicle}
-            onImagesUpdated={() => { onLoadVehicle(); onLoadTimelineEvents(); onLoadVehicleImages(); }}
+            onImagesUpdated={() => { reloadVehicle(); reloadTimeline(); reloadImages(); }}
             galleryView={galleryView}
           />
 

@@ -39,6 +39,7 @@ import { buildAuctionPulseFromExternalListings } from './vehicle-profile/buildAu
 import { loadVehicleImagesImpl } from './vehicle-profile/loadVehicleImages';
 import { loadVehicleImpl, selectBestHeroImage } from './vehicle-profile/loadVehicleData';
 import type { HeroImageMeta } from './vehicle-profile/loadVehicleData';
+import { VehicleProfileProvider } from './vehicle-profile/VehicleProfileContext';
 const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceContent'));
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
 const BarcodeTimeline = React.lazy(() => import('./vehicle-profile/BarcodeTimeline'));
@@ -111,7 +112,7 @@ const QuickStatsBar: React.FC<{
   );
 };
 
-const VehicleProfile: React.FC = () => {
+const VehicleProfileInner: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1923,37 +1924,13 @@ const VehicleProfile: React.FC = () => {
           <React.Suspense fallback={<div style={{ padding: '10px 16px', textAlign: 'center', color: '#888', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Loading...</div>}>
             {vehicle ? (
               <WorkspaceContent
-                vehicle={vehicle}
-                session={session}
-                permissions={permissions}
-                activeWorkspaceTab={'evidence' as any}
-                isMobile={isMobile}
-                isRowOwner={isRowOwner}
-                isVerifiedOwner={isVerifiedOwner}
-                hasContributorAccess={hasContributorAccess}
-                canEdit={canEdit}
-                isAdminUser={isAdminUser}
-                canTriggerProofAnalysis={canTriggerProofAnalysis}
-                timelineEvents={timelineEvents}
-                vehicleImages={vehicleImages}
-                fallbackListingImageUrls={fallbackListingImageUrls}
-                totalCommentCount={totalCommentCount}
-                isPublic={isPublic}
-                vehicleHeaderHeight={vehicleHeaderHeight}
-                liveSession={liveSession}
-                referenceLibraryRefreshKey={referenceLibraryRefreshKey}
-                auctionPulse={auctionPulse}
                 valuationIntel={valuationIntel}
                 readinessSnapshot={readinessSnapshot}
+                referenceLibraryRefreshKey={referenceLibraryRefreshKey}
                 onAddEventClick={() => setShowAddEvent(true)}
                 onDataPointClick={handleDataPointClick}
                 onEditClick={handleEditClick}
-                onLoadLiveSession={loadLiveSession}
-                onLoadVehicle={loadVehicle}
-                onLoadTimelineEvents={loadTimelineEvents}
-                onLoadVehicleImages={loadVehicleImages}
                 onUpdatePrivacy={updatePrivacy}
-                onSetIsPublic={setIsPublic}
                 onSetReferenceLibraryRefreshKey={setReferenceLibraryRefreshKey}
               />
             ) : (
@@ -2062,5 +2039,12 @@ const VehicleProfile: React.FC = () => {
       </div>
   );
 };
+
+/** Wraps VehicleProfileInner with the shared context provider. */
+const VehicleProfile: React.FC = () => (
+  <VehicleProfileProvider>
+    <VehicleProfileInner />
+  </VehicleProfileProvider>
+);
 
 export default VehicleProfile;
