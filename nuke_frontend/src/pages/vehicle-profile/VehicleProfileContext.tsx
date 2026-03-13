@@ -16,6 +16,7 @@ import { AdminNotificationService } from '../../services/adminNotificationServic
 import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
 import { loadVehicleImpl, selectBestHeroImage } from './loadVehicleData';
 import { loadVehicleImagesImpl } from './loadVehicleImages';
+import { resolveVehicleImages } from './resolveVehicleImages';
 import type { Vehicle, VehiclePermissions, LiveSession, AuctionPulse } from './types';
 import type { HeroImageMeta } from './loadVehicleData';
 
@@ -177,18 +178,12 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicleId, session, navigate]);
 
-  const loadVehicleImages = useCallback(() => {
-    if (!vehicle) return;
-    loadVehicleImagesImpl({
-      vehicle,
-      session,
-      leadImageUrl,
-      supabase,
-      setVehicleImages,
-      setLeadImageUrl,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle?.id, session]);
+  const loadVehicleImages = useCallback(async () => {
+    if (!vehicle?.id) return;
+    const result = await resolveVehicleImages(vehicle.id);
+    setVehicleImages(result.urls);
+    if (result.leadUrl) setLeadImageUrl(result.leadUrl);
+  }, [vehicle?.id]);
 
   const loadTimelineEvents = useCallback(async () => {
     if (!vehicleId) return;
