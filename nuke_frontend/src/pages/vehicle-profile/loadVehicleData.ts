@@ -235,23 +235,28 @@ export async function loadVehicleImpl({
     } else {
       vehicleData = rpcData.vehicle;
 
-      // Set additional data from RPC (optimization) - pass to children to avoid duplicate queries
-      if (rpcData.images) {
+      // RPC caps images at 50 for performance (see get_vehicle_profile_data migration).
+      // If the vehicle has more images than the RPC returned, do NOT use RPC images so
+      // loadVehicleImages runs the direct DB query and gets the full gallery + correct count.
+      const totalImageCount = rpcData.stats?.image_count ?? 0;
+      const rpcImageCount = Array.isArray(rpcData.images) ? rpcData.images.length : 0;
+      const rpcImagesTruncated = totalImageCount > rpcImageCount;
+
+      if (rpcData.images && !rpcImagesTruncated) {
         setVehicleImages(rpcData.images.map((img: any) => img.image_url));
       }
       if (rpcData.timeline_events) {
         setTimelineEvents(rpcData.timeline_events);
       }
 
-      // Store RPC data for passing to children (eliminates duplicate queries)
       (window as any).__vehicleProfileRpcData = {
         vehicle_id: vehicleData.id,
-        images: rpcData.images,
+        images: rpcImagesTruncated ? [] : rpcData.images,
         timeline_events: rpcData.timeline_events,
         latest_valuation: rpcData.latest_valuation,
         price_signal: rpcData.price_signal,
         vehicle_events: rpcData.external_listings,
-        external_listings: rpcData.external_listings, // backward compat alias
+        external_listings: rpcData.external_listings,
         comments: rpcData.comments
       };
 

@@ -13,6 +13,7 @@ const VehicleJobs = React.lazy(() => import('../../../pages/VehicleJobs'));
 const WiringPlan = React.lazy(() => import('../../../pages/WiringPlan'));
 
 const VehiclePortfolio = React.lazy(() => import('../../../pages/VehiclePortfolio'));
+const VehicleListFromPhotos = React.lazy(() => import('../../../pages/VehicleListFromPhotos'));
 
 const VehicleModuleRoutes = () => {
   return (
@@ -22,6 +23,7 @@ const VehicleModuleRoutes = () => {
         <Route path="/" element={<VehiclesDashboard />} />
         <Route path="/list" element={<VehiclesDashboard />} />
         <Route path="/list/legacy" element={<VehiclesLegacy />} />
+        <Route path="/list/from-photos" element={<VehicleListFromPhotos />} />
         <Route path="/:vehicleId" element={<VehicleProfile />} />
 
         {/* Protected: write / owner-only actions */}

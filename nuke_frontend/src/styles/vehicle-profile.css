@@ -625,16 +625,16 @@
 
 /* ============ WIDGET SYSTEM ============ */
 
-/* Widgets stack with border-bottom — NO individual borders */
+/* Widgets stack — no section divider lines */
 .widget {
-  border-bottom: 1px solid var(--vp-ghost);
+  border-bottom: none;
 }
 .widget__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: none;
   gap: 8px;
   cursor: default;
   min-height: 32px;
@@ -752,7 +752,7 @@
   padding: 4px 16px;
   font-size: 9px;
   line-height: 1.4;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid transparent;
 }
 .vehicle-profile-page .vehicle-detail:nth-child(even) {
   background: var(--vp-row-alt);
@@ -1195,11 +1195,11 @@
 
 /* ============ OVERRIDES FOR EXISTING COMPONENTS ============ */
 
-/* CollapsibleWidget profile variant — adapt to widget stacking */
+/* CollapsibleWidget profile variant — no section divider lines */
 .vehicle-profile-left-column .collapsible-widget--profile,
 .vehicle-profile-right-column .collapsible-widget--profile {
   border: none !important;
-  border-bottom: 1px solid var(--vp-ghost) !important;
+  border-bottom: none !important;
   background: transparent !important;
   box-shadow: none !important;
   margin: 0 !important;
@@ -1209,7 +1209,7 @@
 .vehicle-profile-right-column .collapsible-widget--profile__header {
   min-height: 32px;
   padding: 10px 16px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: none;
   background: transparent;
 }
 
@@ -1243,7 +1243,7 @@
 .vehicle-profile-left-column .vehicle-profile-section > button {
   min-height: 32px;
   padding: 10px 16px !important;
-  border-bottom: 1px solid #f0f0f0 !important;
+  border-bottom: none !important;
   background: transparent !important;
   font-family: var(--vp-font-sans) !important;
   font-size: 8px !important;
@@ -1260,14 +1260,14 @@
 
 .vehicle-profile-left-column .card .card-footer {
   padding: 10px 16px !important;
-  border-top: 1px solid #f0f0f0 !important;
+  border-top: none !important;
   background: transparent !important;
 }
 
-/* All direct children in left column — widget stacking */
+/* All direct children in left column — widget stacking, no divider lines */
 .vehicle-profile-left-column > div {
   border: none !important;
-  border-bottom: 1px solid var(--vp-ghost) !important;
+  border-bottom: none !important;
   background: transparent !important;
   box-shadow: none !important;
   overflow: hidden;
@@ -1278,7 +1278,7 @@
 .vehicle-profile-left-column > div > div:first-child {
   min-height: 32px !important;
   padding: 10px 16px !important;
-  border-bottom: 1px solid #f0f0f0 !important;
+  border-bottom: none !important;
   background: transparent !important;
   font-family: var(--vp-font-sans) !important;
   font-size: 8px !important;
@@ -1305,10 +1305,10 @@
   border-bottom: none !important;
 }
 
-/* Right column cards */
+/* Right column cards — no divider lines */
 .vehicle-profile-right-column .card {
   border: none !important;
-  border-bottom: 1px solid var(--vp-ghost) !important;
+  border-bottom: none !important;
   background: transparent !important;
   box-shadow: none !important;
   overflow: hidden;
@@ -1317,7 +1317,7 @@
 .vehicle-profile-right-column .card .card-header {
   min-height: 32px;
   padding: 10px 16px !important;
-  border-bottom: 1px solid #f0f0f0 !important;
+  border-bottom: none !important;
   background: transparent !important;
   font-family: var(--vp-font-sans) !important;
   font-size: 8px !important;

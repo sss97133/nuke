@@ -24,6 +24,23 @@ function dateStr(d: Date): string {
   return `${y}-${m}-${dd}`;
 }
 
+/** Normalize to YYYY-MM-DD so events don't shift to wrong day due to timezone. */
+function toDateOnly(d: string | undefined): string | null {
+  if (!d) return null;
+  const s = String(d).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const date = new Date(s);
+  if (Number.isNaN(date.getTime())) return null;
+  return dateStr(date);
+}
+
+/** Human-readable label from event_type or title (e.g. "auction_listed" → "Auction listed"). */
+function formatEventLabel(ev: any): string {
+  const raw = ev.title || ev.event_type || ev.category || 'Event';
+  const str = String(raw).trim();
+  return str.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase());
+}
+
 function formatDate(ds: string): string {
   try {
     const d = new Date(ds + 'T00:00:00');
@@ -61,10 +78,17 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ vehicle, timelineEven
 
     for (const ev of timelineEvents) {
       const d = ev.event_date || ev.created_at;
-      if (!d) continue;
-      const ds = dateStr(new Date(d));
+      const ds = toDateOnly(d);
+      if (!ds) continue;
       const label = ev.event_type || ev.category || 'Event';
-      const costStr = ev.cost != null ? `$${Number(ev.cost).toLocaleString()}` : '—';
+      const costNum = ev.cost_amount != null ? Number(ev.cost_amount) : ev.cost != null ? Number(ev.cost) : null;
+      const costStr = costNum != null && Number.isFinite(costNum) ? `$${Number(costNum).toLocaleString()}` : (() => {
+        const urls = Array.isArray(ev.image_urls) ? ev.image_urls : [];
+        const metaImages = Array.isArray((ev.metadata || {}).image_urls) ? (ev.metadata as any).image_urls : [];
+        const count = urls.length || metaImages.length;
+        if (count > 0) return `${count} photo${count === 1 ? '' : 's'}`;
+        return '—';
+      })();
 
       if (!map[ds]) {
         map[ds] = {
@@ -76,15 +100,15 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ vehicle, timelineEven
         };
       }
       map[ds].items.push({
-        k: (ev.title || ev.event_type || label).toUpperCase(),
+        k: formatEventLabel(ev),
         v: costStr,
       });
 
-      // Accumulate cost
+      // Accumulate cost (only dollar amounts; photo counts don't add to total)
       const existingTotal = map[ds].total === '—' ? 0 : parseFloat(map[ds].total.replace(/[$,]/g, ''));
-      const newCost = ev.cost != null ? Number(ev.cost) : 0;
+      const newCost = costNum != null && Number.isFinite(costNum) ? costNum : 0;
       const sum = existingTotal + newCost;
-      map[ds].total = sum > 0 ? `$${sum.toLocaleString()}` : '—';
+      map[ds].total = sum > 0 ? `$${Math.round(sum).toLocaleString()}` : '—';
 
       // Bump level based on item count
       const itemCount = map[ds].items.length;

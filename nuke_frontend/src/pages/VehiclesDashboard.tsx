@@ -95,9 +95,9 @@ const VehiclesDashboard: React.FC = () => {
   const aggregateStats = useMemo(() => {
     if (!data) return { totalValue: 0, avgConfidence: 0, avgInteraction: 0 };
 
-    const allMyVehicles = data.my_vehicles || [];
-    const allClientVehicles = data.client_vehicles || [];
-    const allFleetVehicles = (data.business_fleets || []).flatMap(f => f.vehicles || []);
+    const allMyVehicles = data.my_vehicles ?? [];
+    const allClientVehicles = data.client_vehicles ?? [];
+    const allFleetVehicles = (data.business_fleets ?? []).flatMap(f => f.vehicles ?? []);
 
     const allVehicles = [
       ...allMyVehicles.map(v => ({
@@ -217,9 +217,9 @@ const VehiclesDashboard: React.FC = () => {
   }
 
   const hasNoVehicles =
-    data.my_vehicles.length === 0 &&
-    data.client_vehicles.length === 0 &&
-    data.business_fleets.every(f => f.vehicles.length === 0);
+    (data.my_vehicles?.length ?? 0) === 0 &&
+    (data.client_vehicles?.length ?? 0) === 0 &&
+    (data.business_fleets ?? []).every(f => (f.vehicles?.length ?? 0) === 0);
 
   if (hasNoVehicles) {
     return <EmptyDashboard />;
@@ -242,6 +242,21 @@ const VehiclesDashboard: React.FC = () => {
           Vehicles Dashboard
         </h1>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <Link
+            to="/vehicle/list/legacy?tab=from_photos"
+            style={{
+              padding: '6px 12px',
+              fontSize: '9px',
+              fontWeight: 600,
+              background: 'var(--surface-hover)',
+              color: 'var(--text-muted)',
+              textDecoration: 'none',
+              border: '1px solid var(--border)',
+              borderRadius: '2px'
+            }}
+          >
+            From my photos
+          </Link>
           <Link
             to="/vehicle/list/legacy"
             style={{
@@ -286,20 +301,20 @@ const VehiclesDashboard: React.FC = () => {
 
       {/* Zone 1: My Vehicles */}
       <MyVehiclesZone
-        vehicles={data.my_vehicles}
+        vehicles={data.my_vehicles ?? []}
         defaultExpanded={true}
         onRefresh={refresh}
       />
 
       {/* Zone 2: Client Work */}
       <ClientWorkZone
-        vehicles={data.client_vehicles}
-        defaultExpanded={data.my_vehicles.length === 0}
+        vehicles={data.client_vehicles ?? []}
+        defaultExpanded={(data.my_vehicles?.length ?? 0) === 0}
       />
 
       {/* Zone 3: Business Fleet */}
       <BusinessFleetZone
-        fleets={data.business_fleets}
+        fleets={data.business_fleets ?? []}
         defaultExpanded={false}
       />
     </div>

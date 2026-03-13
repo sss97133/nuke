@@ -3,7 +3,6 @@ import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import type { Vehicle, VehiclePermissions, LiveSession } from './types';
 
 // Lazy-load heavy components
-const VehicleTimelineSection = React.lazy(() => import('./VehicleTimelineSection'));
 const WorkMemorySection = React.lazy(() => import('./WorkMemorySection'));
 const VehicleBasicInfo = React.lazy(() => import('./VehicleBasicInfo'));
 const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/vehicle/VehicleLedgerDocumentsCard').then(m => ({ default: m.VehicleLedgerDocumentsCard })));
@@ -23,6 +22,8 @@ const VehicleVideoSection = React.lazy(() => import('../../components/vehicle/Ve
 const VehicleScoresWidget = React.lazy(() => import('./VehicleScoresWidget'));
 const ColumnDivider = React.lazy(() => import('./ColumnDivider'));
 
+export type GalleryViewMode = 'ZONES' | 'GRID' | 'FULL' | 'INFO' | 'SESSIONS' | 'CATEGORY' | 'CHRONO' | 'SOURCE';
+
 // Streamlined image gallery — no wrapper chrome
 const ProfileGallery: React.FC<{
   vehicleId: string;
@@ -30,15 +31,17 @@ const ProfileGallery: React.FC<{
   fallbackListingImageUrls: string[];
   vehicle: any;
   onImagesUpdated: () => void;
-}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, vehicle, onImagesUpdated }) => (
+  galleryView?: GalleryViewMode;
+}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, vehicle, onImagesUpdated, galleryView = 'CATEGORY' }) => (
   <React.Suspense fallback={<div className="widget__label" style={{ padding: '10px 16px' }}>Loading gallery...</div>}>
     <ImageGallery
       vehicleId={vehicleId}
       showUpload={false}
-      fallbackImageUrls={vehicleImages.length > 0 ? [] : fallbackListingImageUrls}
+      fallbackImageUrls={vehicleImages.length > 0 ? vehicleImages : fallbackListingImageUrls}
       fallbackLabel="Listing"
       fallbackSourceUrl={vehicle?.discovery_url || vehicle?.bat_auction_url || vehicle?.listing_url || undefined}
       onImagesUpdated={onImagesUpdated}
+      galleryView={galleryView}
     />
   </React.Suspense>
 );
@@ -73,6 +76,7 @@ export interface WorkspaceContentProps {
   onAddEventClick: () => void;
   onDataPointClick: (event: React.MouseEvent, dataType: string, dataValue: string, label: string) => void;
   onEditClick: () => void;
+  onOpenVINProofImages?: () => void;
   onLoadLiveSession: () => void;
   onLoadVehicle: () => void;
   onLoadTimelineEvents: () => void;
@@ -107,6 +111,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   onAddEventClick,
   onDataPointClick,
   onEditClick,
+  onOpenVINProofImages,
   onLoadVehicle,
   onLoadTimelineEvents,
   onLoadVehicleImages,
@@ -116,6 +121,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
 }) => {
   const [galleryCols, setGalleryCols] = useState(3);
   const [leftPct, setLeftPct] = useState(DEFAULT_LEFT_PCT);
+  const [galleryView, setGalleryView] = useState<GalleryViewMode>('CATEGORY');
 
   const handleResize = useCallback((pct: number) => setLeftPct(pct), []);
   const handleReset = useCallback(() => setLeftPct(DEFAULT_LEFT_PCT), []);
@@ -179,6 +185,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
               permissions={permissions}
               onDataPointClick={onDataPointClick}
               onEditClick={onEditClick}
+              onOpenVINProofImages={onOpenVINProofImages}
             />
           </React.Suspense>
 
@@ -198,14 +205,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             readinessSnapshot={readinessSnapshot as any}
           />
 
-          {/* Timeline — hide when no events */}
-          {timelineEvents.length > 0 && (
-            <CollapsibleWidget variant="profile" title="Timeline" defaultCollapsed={false}
-              badge={<span className="widget__count">{timelineEvents.length}</span>}
-            >
-              <VehicleTimelineSection vehicle={vehicle} session={session} permissions={permissions} onAddEventClick={onAddEventClick} />
-            </CollapsibleWidget>
-          )}
+          {/* Timeline — single timeline is the barcode strip at top of profile; no second timeline section here */}
 
           {/* Engine Bay Analysis */}
           {(vehicle as any)?.origin_metadata?.engine_bay_analysis?.engine_family && (
@@ -250,17 +250,6 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           <CollapsibleWidget variant="profile" title="Auction History" defaultCollapsed={true}>
             <ExternalListingCard vehicleId={vehicle.id} />
           </CollapsibleWidget>
-
-          {/* Comments & Bids — hide when empty */}
-          {totalCommentCount > 0 && (
-            <CollapsibleWidget variant="profile" title="Comments & Bids" defaultCollapsed={false}
-              badge={<span className="widget__count">{totalCommentCount}</span>}
-            >
-              <React.Suspense fallback={null}>
-                <VehicleCommentsSection vehicleId={vehicle.id} />
-              </React.Suspense>
-            </CollapsibleWidget>
-          )}
 
           {/* Owner-only tools */}
           {(isRowOwner || isVerifiedOwner) && (
@@ -327,6 +316,17 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
               </div>
             </CollapsibleWidget>
           )}
+
+          {/* Comments & Bids — at bottom of left column; hide when empty */}
+          {totalCommentCount > 0 && (
+            <CollapsibleWidget variant="profile" title="Comments & Bids" defaultCollapsed={false}
+              badge={<span className="widget__count">{totalCommentCount}</span>}
+            >
+              <React.Suspense fallback={null}>
+                <VehicleCommentsSection vehicleId={vehicle.id} />
+              </React.Suspense>
+            </CollapsibleWidget>
+          )}
         </div>
 
         {/* COLUMN DIVIDER */}
@@ -357,10 +357,12 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             </div>
             <div className="widget__controls" style={{ flexWrap: 'wrap', gap: '4px' }}>
               <div className="gallery-toolbar">
-                {['ZONES', 'GRID', 'FULL', 'INFO', 'SESSIONS', 'CATEGORY', 'CHRONO', 'SOURCE'].map((view) => (
+                {(['ZONES', 'GRID', 'FULL', 'INFO', 'SESSIONS', 'CATEGORY', 'CHRONO', 'SOURCE'] as const).map((view) => (
                   <button
                     key={view}
-                    className={`gallery-btn ${view === 'CATEGORY' ? 'gallery-btn--active' : ''}`}
+                    type="button"
+                    className={`gallery-btn ${view === galleryView ? 'gallery-btn--active' : ''}`}
+                    onClick={() => setGalleryView(view)}
                   >
                     {view}
                   </button>
@@ -388,6 +390,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             fallbackListingImageUrls={fallbackListingImageUrls}
             vehicle={vehicle}
             onImagesUpdated={() => { onLoadVehicle(); onLoadTimelineEvents(); onLoadVehicleImages(); }}
+            galleryView={galleryView}
           />
 
           {/* Vehicle Scores */}

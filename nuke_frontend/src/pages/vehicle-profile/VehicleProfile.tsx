@@ -26,6 +26,7 @@ const AddOrganizationRelationship = React.lazy(() => import('../components/vehic
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
 import { resolveCurrencyCode } from '../utils/currency';
 const ValidationPopupV2 = React.lazy(() => import('../components/vehicle/ValidationPopupV2'));
+const VINProofImagesViewer = React.lazy(() => import('../components/vehicle/VINProofImagesViewer').then(m => ({ default: m.VINProofImagesViewer })));
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
 import { calculateFieldScore, analyzeImageEvidence, type FieldSource } from '../services/vehicleFieldScoring';
 const VehicleOwnershipPanel = React.lazy(() => import('../components/ownership/VehicleOwnershipPanel'));
@@ -1435,6 +1436,9 @@ const VehicleProfile: React.FC = () => {
     fieldValue: ''
   });
 
+  // VIN proof images viewer (bubble opens this instead of validation popup)
+  const [vinProofViewerOpen, setVinProofViewerOpen] = useState(false);
+
   const handleDataPointClick = (event: React.MouseEvent, dataType: string, dataValue: string, label: string) => {
     event.preventDefault();
     // Show granular validation popup
@@ -1891,6 +1895,7 @@ const VehicleProfile: React.FC = () => {
                 onAddEventClick={() => setShowAddEvent(true)}
                 onDataPointClick={handleDataPointClick}
                 onEditClick={handleEditClick}
+                onOpenVINProofImages={() => setVinProofViewerOpen(true)}
                 onLoadLiveSession={loadLiveSession}
                 onLoadVehicle={loadVehicle}
                 onLoadTimelineEvents={loadTimelineEvents}
@@ -1919,6 +1924,17 @@ const VehicleProfile: React.FC = () => {
             vehicleMake={vehicle.make}
             onClose={() => setValidationPopup(prev => ({ ...prev, open: false }))}
           /></React.Suspense>
+        )}
+
+        {/* VIN proof images viewer (opened by VIN ... bubble) */}
+        {vinProofViewerOpen && vehicle && (
+          <React.Suspense fallback={null}>
+            <VINProofImagesViewer
+              vehicleId={vehicle.id}
+              canViewTitleDocs={false}
+              onClose={() => setVinProofViewerOpen(false)}
+            />
+          </React.Suspense>
         )}
 
       {/* Add Event Wizard Modal */}

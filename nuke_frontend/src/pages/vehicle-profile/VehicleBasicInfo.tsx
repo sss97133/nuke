@@ -75,7 +75,8 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
   session,
   permissions,
   onDataPointClick = () => {}, // Default no-op function
-  onEditClick
+  onEditClick,
+  onOpenVINProofImages,
 }) => {
   // Ensure onDataPointClick is always a function - defensive wrapper
   const safeOnDataPointClick = React.useMemo(() => {
@@ -593,7 +594,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
       <div style={{
         background: 'var(--grey-200)',
         padding: '4px 6px',
-        borderBottom: '1px solid var(--border)',
+        borderBottom: '1px solid transparent',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -659,7 +660,10 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                 </span>
               )}
               {resolvedEvidence?.['vin'] && (
-                <SourceBadge group={resolvedEvidence['vin']} onClick={() => toggleDrawer('vin')} />
+                <SourceBadge
+                  group={resolvedEvidence['vin']}
+                  onClick={() => (onOpenVINProofImages ? onOpenVINProofImages() : toggleDrawer('vin'))}
+                />
               )}
             </span>
           </div>
@@ -699,7 +703,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
             justifyContent: 'space-between',
             alignItems: 'center',
             padding: '2px 0',
-            borderBottom: '1px solid var(--border)',
+            borderBottom: '1px solid transparent',
             fontSize: '11px',
             marginBottom: '2px'
           }}>
@@ -957,7 +961,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
 
           {/* Data Quality Score */}
           {typeof (vehicle as any).data_quality_score === 'number' && (
-            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0, marginTop: '6px', borderTop: '1px solid var(--border)' }}>
+            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0, marginTop: '6px', borderTop: '1px solid transparent' }}>
               <span>Data Quality</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{

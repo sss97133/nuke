@@ -297,27 +297,30 @@ export async function loadVehicleImagesImpl({
         }
       }
 
-      // For BaT vehicles, prefer Supabase-hosted origin_metadata images (certified source)
-      // But user-uploaded images (with user_id, not import_queue) should still be shown
-      // Only use Supabase-hosted origin images to avoid external API calls
+      // For BaT vehicles, prefer Supabase-hosted origin_metadata images (certified source) only when
+      // the DB set is small or empty. Do NOT replace a large DB gallery (e.g. 1000 images) with
+      // just the listing set (~50) — that was causing "pollution" / missing data.
       const batSupabaseHostedOriginImages = originImages.filter((url: string) => isSupabaseHostedImageUrl(url));
       if (isBat && batSupabaseHostedOriginImages.length > 0) {
         // Get user-uploaded images (those with user_id and not from import_queue)
         const userUploaded = (imageRecords || [])
           .filter((r: any) => {
-            // Must have user_id (actual user upload) and not be from import_queue
             return r?.user_id && !isImportedStoragePath(r?.storage_path);
           })
           .map((r: any) => resolveDbImageUrl(r))
           .filter(Boolean) as string[];
 
-        // Combine: Supabase-hosted origin_metadata images first (certified BaT source, no API calls), then user uploads
         const combined = Array.from(new Set([...batSupabaseHostedOriginImages, ...userUploaded]));
         const batFiltered = filterProfileImages(combined, vehicle, { skipMismatchCheck: true });
 
-        if (batFiltered.length > 0) {
+        // Only use the smaller BaT subset when we wouldn't be throwing away a much larger gallery.
+        // If DB already has many more images than the listing set, keep the full DB set.
+        const dbCount = images.length;
+        const batCount = batFiltered.length;
+        const keepFullGallery = dbCount > 0 && dbCount > batCount * 1.5;
+
+        if (batFiltered.length > 0 && !keepFullGallery) {
           images = batFiltered;
-          // Prefer Supabase-hosted origin_metadata image for lead, but fall back to user upload if needed
           const originLead = batFiltered.find((u) =>
             batSupabaseHostedOriginImages.some(orig => normalizeUrl(orig) === normalizeUrl(u))
           ) || batFiltered.find((u) => isSupabaseHostedImageUrl(u)) || batFiltered[0] || null;

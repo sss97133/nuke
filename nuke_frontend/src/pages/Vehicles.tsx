@@ -28,6 +28,7 @@ interface Vehicle {
   primaryImageUrl: string | null;
   isAnonymous: boolean;
   created_at: string;
+  profile_origin?: string | null;
 }
 
 interface VehicleRelationship {
@@ -69,7 +70,8 @@ type VehiclesTab =
   | 'discovered'
   | 'curated'
   | 'consigned'
-  | 'previously_owned';
+  | 'previously_owned'
+  | 'from_photos';
 
 const VehiclesInner: React.FC = () => {
   usePageTitle('Vehicles');
@@ -176,6 +178,11 @@ const VehiclesInner: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const urlSearchQuery = searchParams.get('search') || '';
+  const urlTab = searchParams.get('tab');
+
+  useEffect(() => {
+    if (urlTab === 'from_photos') setActiveTab('from_photos');
+  }, [urlTab]);
 
   useEffect(() => {
     // No checkAuth() call needed — session comes from global AuthContext.
@@ -573,7 +580,7 @@ const VehiclesInner: React.FC = () => {
       if (allExtraIds.length > 0) {
         const { data: extraVehicles } = await supabase
           .from('vehicles')
-          .select('id,year,make,model,vin,color,mileage,created_at,status,is_public,primary_image_url,discovery_url,discovery_source')
+          .select('id,year,make,model,vin,color,mileage,created_at,status,is_public,primary_image_url,discovery_url,discovery_source,profile_origin')
           .in('id', allExtraIds);
 
         const extraMap = new Map((extraVehicles || []).map(v => [v.id, {
@@ -652,7 +659,8 @@ const VehiclesInner: React.FC = () => {
             mileage: vehicle.mileage,
             primaryImageUrl: imageUrl,
             isAnonymous: false,
-            created_at: vehicle.created_at
+            created_at: vehicle.created_at,
+            profile_origin: vehicle.profile_origin ?? undefined
           },
           relationshipType: 'owned',
           role: 'Verified Owner',
@@ -680,7 +688,8 @@ const VehiclesInner: React.FC = () => {
             mileage: vehicle.mileage,
             primaryImageUrl: imageUrl,
             isAnonymous: false,
-            created_at: vehicle.created_at
+            created_at: vehicle.created_at,
+            profile_origin: vehicle.profile_origin ?? undefined
           },
           relationshipType: 'owned',
           role: roleLabel,
@@ -715,7 +724,8 @@ const VehiclesInner: React.FC = () => {
             mileage: vehicle.mileage,
             primaryImageUrl: imageUrl,
             isAnonymous: false,
-            created_at: vehicle.created_at
+            created_at: vehicle.created_at,
+            profile_origin: vehicle.profile_origin ?? undefined
           },
           relationshipType: discovery.relationship_type,
           role: discovery.relationship_type,
@@ -790,7 +800,8 @@ const VehiclesInner: React.FC = () => {
             mileage: vehicle.mileage,
             primaryImageUrl: imageUrl,
             isAnonymous: false,
-            created_at: vehicle.created_at
+            created_at: vehicle.created_at,
+            profile_origin: vehicle.profile_origin ?? undefined
           },
           relationshipType: 'contributing',
           role: 'Uploader (needs ownership verification)',
@@ -1087,10 +1098,16 @@ const VehiclesInner: React.FC = () => {
     ...vehicleRelationships.previously_owned
   ];
 
+  const fromPhotosRelationships = allRelationships.filter(
+    r => r.vehicle.profile_origin === 'local_photos'
+  );
+
   const currentRelationships: VehicleRelationship[] =
     activeTab === 'associated'
       ? allRelationships
-      : vehicleRelationships[activeTab as Exclude<VehiclesTab, 'associated'>] || [];
+      : activeTab === 'from_photos'
+        ? fromPhotosRelationships
+        : vehicleRelationships[activeTab as Exclude<VehiclesTab, 'associated' | 'from_photos'>] || [];
 
   const relationshipLabel = (t: VehicleRelationship['relationshipType']) => {
     switch (t) {
@@ -1346,6 +1363,7 @@ const VehiclesInner: React.FC = () => {
   const tabMeta: Array<{ key: VehiclesTab; label: string; count: number }> = [
     { key: 'associated', label: 'All', count: allRelationships.length },
     { key: 'owned', label: 'Owned', count: vehicleRelationships.owned.length },
+    { key: 'from_photos', label: 'From my photos', count: fromPhotosRelationships.length },
     { key: 'discovered', label: 'Discovered', count: vehicleRelationships.discovered.length },
     { key: 'curated', label: 'Curated', count: vehicleRelationships.curated.length },
     { key: 'consigned', label: 'Consigned', count: vehicleRelationships.consigned.length },

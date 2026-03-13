@@ -1053,25 +1053,25 @@ div[style*="border:2px solid var(--warning)"],
  * We map both onto v3 widget chrome.
  */
 
-/* Widget container */
+/* Widget container — no section divider lines */
 .widget,
 .card,
 [class*="CollapsibleWidget"],
 [class*="collapsible-widget"],
 [class*="Widget"]:not([class*="badge"]):not([class*="Badge"]):not(button) {
-  border-bottom: 1px solid var(--border-subtle) !important;
+  border-bottom: none !important;
   background: var(--surface) !important;
   border-radius: 0 !important;
   box-shadow: none !important;
 }
 
-/* Remove the 2px border that cards usually have — widget chrome uses bottom border only */
+/* Remove the 2px border that cards usually have */
 .card {
   border: none !important;
-  border-bottom: 1px solid var(--border-subtle) !important;
+  border-bottom: none !important;
 }
 
-/* Widget header / card header */
+/* Widget header / card header — no divider line below header */
 .widget__header,
 .card-header,
 [class*="card-header"],
@@ -1083,7 +1083,7 @@ div[style*="border:2px solid var(--warning)"],
   align-items: center !important;
   justify-content: space-between !important;
   padding: 10px 16px !important;
-  border-bottom: 1px solid var(--border-faint) !important;
+  border-bottom: none !important;
   gap: 8px !important;
   cursor: default !important;
   min-height: 32px !important;

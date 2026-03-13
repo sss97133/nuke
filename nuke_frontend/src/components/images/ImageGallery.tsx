@@ -10,6 +10,9 @@ import ImageZoneSection, { groupImagesByZone } from './ImageZoneSection';
 import { ImageSetService } from '../../services/imageSetService';
 import { OnboardingSlideshow } from '../onboarding/OnboardingSlideshow';
 
+/** Profile toolbar mode: maps to viewMode + groupBySource + chronologicalMode */
+export type GalleryViewMode = 'ZONES' | 'GRID' | 'FULL' | 'INFO' | 'SESSIONS' | 'CATEGORY' | 'CHRONO' | 'SOURCE';
+
 interface ImageGalleryProps {
   vehicleId: string;
   onImagesUpdated?: () => void;
@@ -25,6 +28,12 @@ interface ImageGalleryProps {
    * preserve provenance.
    */
   fallbackSourceUrl?: string;
+  /**
+   * When set (e.g. from vehicle profile toolbar), drives view mode and sort/group.
+   * ZONES/CATEGORY → zones, GRID → grid, FULL → masonry, INFO → list, SESSIONS → bundles,
+   * CHRONO → chronological desc, SOURCE → group by source.
+   */
+  galleryView?: GalleryViewMode;
   // NEW: Image Set features (optional - defaults maintain existing behavior)
   selectMode?: boolean;
   selectedImages?: Set<string>;
@@ -231,6 +240,26 @@ const getEffectiveImageDate = (image: any, auctionStartDate: string | null = nul
   return { iso: createdAt, label: '', isApproximate: false };
 };
 
+function galleryViewToViewMode(galleryView: GalleryViewMode): 'zones' | 'grid' | 'masonry' | 'list' | 'bundles' {
+  switch (galleryView) {
+    case 'ZONES':
+    case 'CATEGORY':
+      return 'zones';
+    case 'GRID':
+      return 'grid';
+    case 'FULL':
+      return 'masonry';
+    case 'INFO':
+      return 'list';
+    case 'SESSIONS':
+      return 'bundles';
+    case 'CHRONO':
+    case 'SOURCE':
+    default:
+      return 'zones';
+  }
+}
+
 const ImageGallery = ({ 
   vehicleId, 
   onImagesUpdated, 
@@ -238,6 +267,7 @@ const ImageGallery = ({
   fallbackImageUrls = [],
   fallbackLabel = 'Listing images',
   fallbackSourceUrl,
+  galleryView,
   // NEW: Optional image set props
   selectMode = false,
   selectedImages,
@@ -254,7 +284,12 @@ const ImageGallery = ({
   const [error, setError] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [viewMode, setViewMode] = useState<'zones' | 'grid' | 'masonry' | 'list' | 'bundles'>('zones');
+  const [viewModeInternal, setViewModeInternal] = useState<'zones' | 'grid' | 'masonry' | 'list' | 'bundles'>('zones');
+  // When parent passes galleryView, derive viewMode; otherwise use internal state
+  const viewMode = galleryView != null ? galleryViewToViewMode(galleryView) : viewModeInternal;
+  const setViewMode = useCallback((mode: 'zones' | 'grid' | 'masonry' | 'list' | 'bundles') => {
+    setViewModeInternal(mode);
+  }, []);
   // Default to newest-first to keep ordering stable across vehicles while AI sorting ramps up.
   const [sortBy, setSortBy] = useState<'quality' | 'date_desc' | 'date_asc'>('date_desc');
   // Bundle (sessions) view state
@@ -265,10 +300,14 @@ const ImageGallery = ({
   const [showFilters, setShowFilters] = useState(false);
   const [showImages, setShowImages] = useState(false);
   const [imagesPerPage] = useState(25);
-  // New sorting/grouping states
+  // New sorting/grouping states — when galleryView is SOURCE/CHRONO, override from parent
   const [groupByCategory, setGroupByCategory] = useState(false);
-  const [groupBySource, setGroupBySource] = useState(false);
-  const [chronologicalMode, setChronologicalMode] = useState<'off' | 'asc' | 'desc'>('off'); // off, ascending, descending
+  const [groupBySourceInternal, setGroupBySourceInternal] = useState(false);
+  const groupBySource = galleryView === 'SOURCE' ? true : groupBySourceInternal;
+  const setGroupBySource = useCallback((v: boolean) => setGroupBySourceInternal(v), []);
+  const [chronologicalModeInternal, setChronologicalModeInternal] = useState<'off' | 'asc' | 'desc'>('off');
+  const chronologicalMode = galleryView === 'CHRONO' ? 'desc' : chronologicalModeInternal;
+  const setChronologicalMode = useCallback((v: 'off' | 'asc' | 'desc') => setChronologicalModeInternal(v), []);
   const [imagesPerRow, setImagesPerRow] = useState(3); // 1-16
   const [preserveAspectRatio, setPreserveAspectRatio] = useState(false); // Original image ratio
   const [auctionStartDate, setAuctionStartDate] = useState<string | null>(null); // For date calculations
@@ -1998,6 +2037,24 @@ const ImageGallery = ({
     }
   };
 
+  /** Display name for lightbox header: caption, filename, zone, angle, or doc type */
+  const getImageDisplayName = (image: any): string => {
+    if (!image) return '';
+    const caption = image.caption && String(image.caption).trim();
+    if (caption) return caption;
+    const file = image.file_name || image.filename;
+    if (file && String(file).trim()) return String(file).trim();
+    const zone = image.vehicle_zone && String(image.vehicle_zone).replace(/_/g, ' ').trim();
+    if (zone) return zone;
+    const angle = image.angle && String(image.angle).replace(/_/g, ' ').trim();
+    if (angle) return angle;
+    const doc = image.document_category || image.sensitive_type;
+    if (doc && String(doc).trim()) return String(doc).replace(/_/g, ' ').trim();
+    const cat = image.category && String(image.category).trim();
+    if (cat) return cat;
+    return '';
+  };
+
   const handleShowImages = () => {
     setShowImages(true);
     loadMoreImages();
@@ -2179,6 +2236,15 @@ const ImageGallery = ({
     return '';
   };
 
+  // Truncate URL for metadata display (max length, show start + ... + end)
+  const truncateUrl = (url: string | undefined, maxLen = 50): string => {
+    if (!url || typeof url !== 'string') return '';
+    const s = url.trim();
+    if (s.length <= maxLen) return s;
+    const half = Math.floor((maxLen - 3) / 2);
+    return s.slice(0, half) + '…' + s.slice(-half);
+  };
+
   // Helper: format location text from EXIF which may be a string or an object
   const getLocationText = (exif: any): string => {
     if (!exif || !exif.location) return '';
@@ -2323,30 +2389,20 @@ const ImageGallery = ({
   return (
     <div>
       {usingFallback && (
-        <div className="card" style={{ marginBottom: 'var(--space-3)' }}>
-          <div className="card-body" style={{ fontSize: '11px', lineHeight: 1.4 }}>
-            <div style={{ fontWeight: 800, marginBottom: 6 }}>
-              Showing listing images (read-only)
-            </div>
-            <div className="text-muted">
-              These images were discovered from external listings and may not be fully attributed yet. Upload your own photos to add verified evidence.
-            </div>
-            {session?.user?.id && normalizeFallbackUrls(fallbackImageUrls).length > 0 && (
-              <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <button
-                  className="button button-secondary"
-                  style={{ fontSize: '11px', padding: '6px 10px', cursor: importingFallback ? 'not-allowed' : 'pointer', opacity: importingFallback ? 0.7 : 1 }}
-                  onClick={importFallbackImages}
-                  disabled={importingFallback}
-                >
-                  {importingFallback ? 'Importing...' : `Import ${Math.min(normalizeFallbackUrls(fallbackImageUrls).length, 120)} Images`}
-                </button>
-                <span className="text-muted" style={{ fontSize: '11px' }}>
-                  Imports these into the vehicle gallery for dedupe, tagging, and AI analysis.
-                </span>
-              </div>
-            )}
-          </div>
+        <div style={{ marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: '11px' }}>
+          <span className="text-muted">Listing images · read-only until imported</span>
+          {session?.user?.id && normalizeFallbackUrls(fallbackImageUrls).length > 0 && (
+            <>
+              <button
+                className="button button-secondary"
+                style={{ fontSize: '11px', padding: '4px 10px', cursor: importingFallback ? 'not-allowed' : 'pointer', opacity: importingFallback ? 0.7 : 1 }}
+                onClick={importFallbackImages}
+                disabled={importingFallback}
+              >
+                {importingFallback ? 'Importing...' : `Import ${Math.min(normalizeFallbackUrls(fallbackImageUrls).length, 120)} Images`}
+              </button>
+            </>
+          )}
         </div>
       )}
       {/* Upload Progress Bar */}
@@ -2630,7 +2686,8 @@ const ImageGallery = ({
             {allImages.length} {allImages.length === 1 ? 'image' : 'images'}
           </span>
 
-          {/* View Mode */}
+          {/* View Mode — hidden when parent controls via galleryView (e.g. vehicle profile toolbar) */}
+          {galleryView == null && (
           <div style={{ 
             display: 'flex', 
             border: '2px solid var(--border)', 
@@ -2723,6 +2780,7 @@ const ImageGallery = ({
               Sessions
             </button>
           </div>
+          )}
 
           {/* Toggle Buttons for Sorting */}
           <div style={{ 
@@ -2953,6 +3011,7 @@ const ImageGallery = ({
                     selectMode={selectMode}
                     selectedImages={selectedImages}
                     onImageSelect={handleImageSelect}
+                    sectionLabelOverride={usingFallback && zs.section.key === 'uncategorized' ? 'Listing images' : undefined}
                   />
                 ))}
                 {emptySectionCount > 0 && (
@@ -3927,12 +3986,24 @@ const ImageGallery = ({
                 })()}
               </div>
 
-              {/* Info - Everything compressed */}
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '1px' }}>
+              {/* Info - Primary + extensive metadata */}
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {image.is_primary && <span style={{ backgroundColor: 'var(--grey-900)', color: 'var(--white)', padding: '1px 4px', marginRight: '4px', fontSize: '8px' }}>PRIMARY</span>}
-                  {image.caption || 'Vehicle Image'}
+                  {(image as any).__external ? 'Listing image' : (image.caption || 'Vehicle Image')}
                 </div>
+                {(image as any).__external ? (
+                  <>
+                    <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
+                      {index + 1} of {displayedImages.length} · Not imported — no metadata yet
+                    </div>
+                    <div style={{ fontSize: '8px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={image.image_url}>
+                      URL: {truncateUrl(image.image_url)}
+                      {fallbackSourceUrl && ` · Source: ${truncateUrl(fallbackSourceUrl, 40)}`}
+                    </div>
+                  </>
+                ) : (
+                  <>
                 <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                   {getDisplayDate(image)}
                   {getTimeOfDayLabel(image.taken_at || image.created_at) && ` • ${getTimeOfDayLabel(image.taken_at || image.created_at)}`}
@@ -3971,10 +4042,23 @@ const ImageGallery = ({
                       </>
                     );
                   })()}
-                  {typeof imageViewCounts[image.id] === 'number' && imageViewCounts[image.id] > 0 && <span> • {imageViewCounts[image.id]}v</span>}
-                  {typeof imageCommentCounts[image.id] === 'number' && imageCommentCounts[image.id] > 0 && <span> • {imageCommentCounts[image.id]}c</span>}
-                  {imageTagCounts[image.id] && <span> • {imageTagCounts[image.id]}t</span>}
+                  {typeof imageViewCounts[image.id] === 'number' && imageViewCounts[image.id] > 0 && <span> · {imageViewCounts[image.id]}v</span>}
+                  {typeof imageCommentCounts[image.id] === 'number' && imageCommentCounts[image.id] > 0 && <span> · {imageCommentCounts[image.id]}c</span>}
+                  {imageTagCounts[image.id] && <span> · {imageTagCounts[image.id]}t</span>}
                 </div>
+                {/* Extended metadata: zone, quality, condition, angle, category, source */}
+                <div style={{ fontSize: '8px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {[image.vehicle_zone && `Zone: ${String(image.vehicle_zone).replace(/^ext_|^int_|^mech_|^wheel_|^detail_|^panel_/, '')}`,
+                    typeof image.photo_quality_score === 'number' && `Quality: ${image.photo_quality_score.toFixed(1)}`,
+                    typeof image.condition_score === 'number' && `Condition: ${image.condition_score.toFixed(1)}`,
+                    image.damage_flags && Array.isArray(image.damage_flags) && image.damage_flags.length > 0 && `Damage: ${(image.damage_flags as string[]).slice(0, 3).join(', ')}`,
+                    image.angle && `Angle: ${image.angle}`,
+                    image.category && `Category: ${image.category}`,
+                    image.source_url && `Source: ${truncateUrl(image.source_url, 35)}`].filter(Boolean).join(' · ')}
+                  {image.file_hash && <span title={image.file_hash}> · Hash: {String(image.file_hash).slice(0, 8)}…</span>}
+                </div>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -4071,6 +4155,8 @@ const ImageGallery = ({
           canEdit={canCreateTags && !usingFallback}
           title={`${currentImageIndex + 1} of ${displayedImages.length}`}
           description={getDisplayDate(currentImage)}
+          imageDisplayName={getImageDisplayName(currentImage)}
+          imageRecord={currentImage}
         />
       )}
 
