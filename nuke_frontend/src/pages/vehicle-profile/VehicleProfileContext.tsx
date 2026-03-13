@@ -300,6 +300,125 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle?.id]);
 
+  // ── Fallback listing images (BaT/C&B vehicles with no DB images) ──
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!vehicle?.id) return;
+        const hasDbImages = vehicleImages.length > 0;
+        if (hasDbImages) {
+          if (fallbackListingImageUrls.length > 0) setFallbackListingImageUrls([]);
+          return;
+        }
+        const origin = String((vehicle as any)?.profile_origin || '');
+        const discoveryUrl = String((vehicle as any)?.discovery_url || '');
+        const listingUrl =
+          String((auctionPulse as any)?.listing_url || '').trim() ||
+          discoveryUrl ||
+          String((vehicle as any)?.bat_auction_url || '').trim() ||
+          String((vehicle as any)?.listing_url || '').trim();
+        const isBat = origin === 'bat_import' || listingUrl.includes('bringatrailer.com/listing/');
+        const isCarsAndBids = listingUrl.includes('carsandbids.com/auctions/');
+        if (!isBat && !isCarsAndBids) return;
+        if (fallbackListingImageUrls.length > 0) return;
+
+        const cacheKey = isCarsAndBids
+          ? `carsandbids_fallback_images_${vehicle.id}`
+          : `bat_fallback_images_${vehicle.id}`;
+
+        const filterNonPhotoUrls = (arr: string[]): string[] => {
+          const urls = Array.isArray(arr) ? arr : [];
+          const keep = urls.filter((rawUrl) => {
+            const raw = String(rawUrl || '').trim();
+            if (!raw || !raw.startsWith('http')) return false;
+            const s = raw.toLowerCase();
+            if (s.includes('gstatic.com/faviconv2')) return false;
+            if (s.includes('favicon.ico') || s.includes('/favicon')) return false;
+            if (s.includes('apple-touch-icon')) return false;
+            if (s.endsWith('.ico')) return false;
+            if (s.includes('bringatrailer.com/wp-content/uploads/')) {
+              if (s.includes('qotw') || s.includes('winner-template') || s.includes('weekly-weird') ||
+                  s.includes('mile-marker') || s.includes('podcast') || s.includes('merch') ||
+                  s.includes('dec-merch') || s.includes('podcast-graphic') ||
+                  s.includes('site-post-') || s.includes('thumbnail-template') ||
+                  s.includes('screenshot-') || s.includes('countries/') ||
+                  s.includes('themes/') || s.includes('assets/img/') ||
+                  /\/web-\d{3,}-/i.test(s)) {
+                return false;
+              }
+            }
+            try {
+              const u = new URL(raw);
+              const sizeParam = u.searchParams.get('size') || u.searchParams.get('sz') || u.searchParams.get('w') || u.searchParams.get('width');
+              if (sizeParam) {
+                const n = Number(String(sizeParam).replace(/[^0-9.]/g, ''));
+                if (Number.isFinite(n) && n > 0 && n <= 64) return false;
+              }
+            } catch { /* ignore */ }
+            return true;
+          });
+          return keep.length > 0 ? keep : urls;
+        };
+
+        // Check localStorage cache first
+        try {
+          const cached = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const urls = filterNonPhotoUrls(parsed.filter((u: any) => typeof u === 'string' && u.startsWith('http')));
+              if (urls.length > 0) {
+                setFallbackListingImageUrls(urls);
+                if (!leadImageUrl && urls[0]) setLeadImageUrl(urls[0]);
+                return;
+              }
+            }
+          }
+        } catch { /* ignore */ }
+
+        if (isCarsAndBids) {
+          try {
+            const { data: listings } = await supabase
+              .from('vehicle_events')
+              .select('metadata')
+              .eq('vehicle_id', vehicle.id)
+              .eq('source_url', listingUrl)
+              .order('updated_at', { ascending: false })
+              .limit(5);
+            const meta = Array.isArray(listings) && listings.length > 0 ? (listings[0] as any)?.metadata : null;
+            const images: string[] =
+              (Array.isArray(meta?.image_urls) ? meta.image_urls : null) ||
+              (Array.isArray(meta?.images) ? meta.images : null) || [];
+            const filtered = filterNonPhotoUrls(images);
+            if (filtered.length > 0) {
+              setFallbackListingImageUrls(filtered);
+              try { window.localStorage.setItem(cacheKey, JSON.stringify(filtered.slice(0, 250))); } catch { /* ignore */ }
+              if (!leadImageUrl && filtered[0]) setLeadImageUrl(filtered[0]);
+            }
+          } catch { /* ignore */ }
+          return;
+        }
+
+        if (!isBat || !listingUrl.includes('bringatrailer.com/listing/')) return;
+        const { data, error } = await supabase.functions.invoke('simple-scraper', {
+          body: { url: listingUrl },
+        });
+        if (error) throw error;
+        const images: string[] =
+          (data?.success && Array.isArray(data?.data?.images) ? data.data.images : null) ||
+          (Array.isArray(data?.images) ? data.images : null) || [];
+        const filtered = filterNonPhotoUrls(images);
+        if (filtered.length > 0) {
+          setFallbackListingImageUrls(filtered);
+          try { window.localStorage.setItem(cacheKey, JSON.stringify(filtered.slice(0, 250))); } catch { /* ignore */ }
+          if (!leadImageUrl && filtered[0]) setLeadImageUrl(filtered[0]);
+        }
+      } catch { /* ignore */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicle?.id, (vehicle as any)?.profile_origin, (vehicle as any)?.discovery_url, auctionPulse?.listing_url, vehicleImages.length]);
+
   // ── Event listeners ──
 
   useEffect(() => {

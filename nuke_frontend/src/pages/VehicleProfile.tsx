@@ -1,25 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { formatSupabaseInvokeError } from '../utils/formatSupabaseInvokeError';
-import { readCachedSession } from '../utils/cachedSession';
-import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
 import { useValuationIntel } from '../hooks/useValuationIntel';
 import { useVehicleMemeDrops } from '../hooks/useVehicleMemeDrops';
-import { useAdminAccess } from '../hooks/useAdminAccess';
 import { TimelineEventService } from '../services/timelineEventService';
-// Lazy-load heavy tab-specific and modal components
 const AddEventWizard = React.lazy(() => import('../components/AddEventWizard'));
-// Lazy load vehicle profile components to avoid circular dependencies
 const VehicleHeader = React.lazy(() => import('./vehicle-profile/VehicleHeader'));
 const VehicleHeroImage = React.lazy(() => import('./vehicle-profile/VehicleHeroImage'));
-import type {
-  Vehicle,
-  VehiclePermissions,
-  SaleSettings,
-  FieldAudit,
-  LiveSession
-} from './vehicle-profile/types';
 import '../styles/unified-design-system.css';
 import '../styles/vehicle-profile.css';
 const VehicleSubHeader = React.lazy(() => import('./vehicle-profile/VehicleSubHeader'));
@@ -29,364 +16,70 @@ import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
 import { resolveCurrencyCode } from '../utils/currency';
 const ValidationPopupV2 = React.lazy(() => import('../components/vehicle/ValidationPopupV2'));
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
-import { calculateFieldScore, analyzeImageEvidence, type FieldSource } from '../services/vehicleFieldScoring';
 const VehicleOwnershipPanel = React.lazy(() => import('../components/ownership/VehicleOwnershipPanel'));
-import { AdminNotificationService } from '../services/adminNotificationService';
-// Extracted sub-components
-// WorkspaceTabBar removed — all sections render flat in left column
 import { buildAuctionPulseFromExternalListings } from './vehicle-profile/buildAuctionPulse';
-// Image filter utilities are used by extracted loadVehicleImages.ts and loadVehicleData.ts
-import { loadVehicleImagesImpl } from './vehicle-profile/loadVehicleImages';
-import { loadVehicleImpl, selectBestHeroImage } from './vehicle-profile/loadVehicleData';
-import type { HeroImageMeta } from './vehicle-profile/loadVehicleData';
-import { VehicleProfileProvider } from './vehicle-profile/VehicleProfileContext';
+import { VehicleProfileProvider, useVehicleProfile } from './vehicle-profile/VehicleProfileContext';
 const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceContent'));
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
 const BarcodeTimeline = React.lazy(() => import('./vehicle-profile/BarcodeTimeline'));
-const VehicleBadgeBar = React.lazy(() => import('./vehicle-profile/VehicleBadgeBar'));
-// WalkAroundCarousel removed from vehicle profile layout
 
-/** Quick Stats line shown below hero image */
-const QuickStatsBar: React.FC<{
-  imageCount: number;
-  eventCount: number;
-  commentCount: number;
-  observationCount?: number;
-  updatedAt?: string | null;
-}> = ({ imageCount, eventCount, commentCount, observationCount, updatedAt }) => {
-  const timeAgo = React.useMemo(() => {
-    if (!updatedAt) return null;
-    try {
-      const d = new Date(updatedAt);
-      const ms = Date.now() - d.getTime();
-      if (ms < 0 || !Number.isFinite(ms)) return null;
-      const mins = Math.floor(ms / 60000);
-      if (mins < 1) return 'just now';
-      if (mins < 60) return `${mins}m ago`;
-      const hrs = Math.floor(mins / 60);
-      if (hrs < 24) return `${hrs}h ago`;
-      const days = Math.floor(hrs / 24);
-      if (days < 30) return `${days}d ago`;
-      return d.toLocaleDateString();
-    } catch {
-      return null;
-    }
-  }, [updatedAt]);
-
-  const parts: string[] = [];
-  if (imageCount > 0) parts.push(`${imageCount} image${imageCount === 1 ? '' : 's'}`);
-  if (observationCount && observationCount > 0) parts.push(`${observationCount} observation${observationCount === 1 ? '' : 's'}`);
-  if (eventCount > 0) parts.push(`${eventCount} event${eventCount === 1 ? '' : 's'}`);
-  if (commentCount > 0) parts.push(`${commentCount} comment${commentCount === 1 ? '' : 's'}`);
-  if (timeAgo) parts.push(`Updated ${timeAgo}`);
-
-  if (parts.length === 0) return null;
-
-  return (
-    <div style={{
-      padding: '8px 16px',
-      maxWidth: '1600px',
-      margin: '0 auto',
-      background: 'transparent',
-    }}>
-      <div style={{
-        fontFamily: "'Courier New', Courier, monospace",
-        fontSize: '8px',
-        fontWeight: 400,
-        color: '#888',
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase' as const,
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '4px',
-        alignItems: 'center',
-      }}>
-        {parts.map((p, i) => (
-          <React.Fragment key={i}>
-            {i > 0 && <span style={{ opacity: 0.4 }}>&middot;</span>}
-            <span>{p}</span>
-          </React.Fragment>
-        ))}
-      </div>
-    </div>
-  );
-};
+const QuickStatsBar = React.lazy(() => import('./vehicle-profile/QuickStatsBar'));
 
 const VehicleProfileInner: React.FC = () => {
-  const { vehicleId } = useParams<{ vehicleId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  // All state hooks must be declared before any conditional returns
-  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
-  // Initialize session from localStorage cache so loadVehicle() doesn't have to
-  // wait for the async getSession() round-trip before it can start.
-  const [session, setSession] = useState<any>(() => readCachedSession());
-  const [vehicleImages, setVehicleImages] = useState<string[]>([]);
-  const [fallbackListingImageUrls, setFallbackListingImageUrls] = useState<string[]>([]);
-  const [viewCount, setViewCount] = useState<number>(0);
-  const [referenceLibraryRefreshKey, setReferenceLibraryRefreshKey] = useState(0);
-  // Workspace tabs removed — all sections flat
+  const ctx = useVehicleProfile();
 
-  // STATE DECLARATIONS
-  const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
+  // Aliases from context — single source of truth
+  const { vehicleId, vehicle, session, vehicleImages, auctionPulse: ctxAuctionPulse, isRowOwner, isVerifiedOwner, canEdit, hasContributorAccess, isAdminUser: isAdmin, canTriggerProofAnalysis, userOwnershipClaim, permissions, isPublic } = ctx;
+
+  // Local-only state (not in context)
+  const [referenceLibraryRefreshKey, setReferenceLibraryRefreshKey] = useState(0);
   const [responsibleName, setResponsibleName] = useState<string | null>(null);
-  const [isPublic, setIsPublic] = useState(false);
-  const [liveSession, setLiveSession] = useState<LiveSession | null>(null);
-  const [presenceCount, setPresenceCount] = useState<number>(0);
-  const [leadImageUrl, setLeadImageUrl] = useState<string | null>(null);
-  const [heroMeta, setHeroMeta] = useState<HeroImageMeta | null>(null);
-  const [recentCommentCount, setRecentCommentCount] = useState<number>(0);
-  const [totalCommentCount, setTotalCommentCount] = useState<number>(0);
-  const [observationCount, setObservationCount] = useState<number>(0);
   const [showAddEvent, setShowAddEvent] = useState(false);
-  const [loading, setLoading] = useState(true); // Start true to show loading state until data loads
-  const [ownershipVerifications, setOwnershipVerifications] = useState<any[]>([]);
-  const [newEventsNotice, setNewEventsNotice] = useState<{ show: boolean; count: number; dates: string[] }>({ show: false, count: 0, dates: [] });
+  // Auction pulse: seeded from context, updated by local realtime subscriptions
   const [auctionPulse, setAuctionPulse] = useState<any | null>(null);
-  // walkAroundImages state removed
+  // Seed auction pulse from context; local realtime updates override
+  useEffect(() => {
+    if (ctxAuctionPulse && !auctionPulse) setAuctionPulse(ctxAuctionPulse);
+  }, [ctxAuctionPulse]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const auctionCurrency = React.useMemo(() => {
     const v: any = vehicle as any;
     const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
     const pulseMeta = (auctionPulse as any)?.metadata;
     return resolveCurrencyCode(
-      pulseMeta?.currency,
-      pulseMeta?.currency_code,
-      pulseMeta?.currencyCode,
-      pulseMeta?.price_currency,
-      pulseMeta?.priceCurrency,
-      externalListing?.currency,
-      externalListing?.currency_code,
-      externalListing?.price_currency,
-      externalListing?.metadata?.currency,
-      externalListing?.metadata?.currency_code,
-      externalListing?.metadata?.currencyCode,
-      externalListing?.metadata?.price_currency,
+      pulseMeta?.currency, pulseMeta?.currency_code, pulseMeta?.currencyCode,
+      pulseMeta?.price_currency, pulseMeta?.priceCurrency,
+      externalListing?.currency, externalListing?.currency_code, externalListing?.price_currency,
+      externalListing?.metadata?.currency, externalListing?.metadata?.currency_code,
+      externalListing?.metadata?.currencyCode, externalListing?.metadata?.price_currency,
       externalListing?.metadata?.priceCurrency,
-      v?.origin_metadata?.currency,
-      v?.origin_metadata?.currency_code,
-      v?.origin_metadata?.price_currency,
-      v?.origin_metadata?.priceCurrency,
+      v?.origin_metadata?.currency, v?.origin_metadata?.currency_code,
+      v?.origin_metadata?.price_currency, v?.origin_metadata?.priceCurrency,
       v?.origin_metadata?.priceCurrencyCode,
     );
   }, [vehicle, auctionPulse]);
   const vehicleHeaderRef = React.useRef<HTMLDivElement | null>(null);
-  const [vehicleHeaderHeight, setVehicleHeaderHeight] = React.useState<number>(88);
-  
-  // Measure VehicleHeader height (including auction rail) for sticky positioning
+
+  // Measure VehicleHeader height for sticky positioning
   useEffect(() => {
-    const updateHeaderHeight = () => {
-      if (vehicleHeaderRef.current) {
-        const height = vehicleHeaderRef.current.offsetHeight;
-        setVehicleHeaderHeight(height);
-      }
-    };
-    
-    updateHeaderHeight();
-    const resizeObserver = new ResizeObserver(updateHeaderHeight);
-    if (vehicleHeaderRef.current) {
-      resizeObserver.observe(vehicleHeaderRef.current);
-    }
-    
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [vehicle, auctionPulse, liveSession]); // Re-measure when auction state changes
-  const liveAvailableRef = React.useRef<boolean>(true);
-  const [fieldAudit, setFieldAudit] = useState<FieldAudit>({
-    open: false,
-    fieldName: '',
-    fieldLabel: '',
-    entries: []
-  });
-  const [saleSettings, setSaleSettings] = useState<SaleSettings>({
-    for_sale: false,
-    live_auction: false,
-    partners: [],
-    reserve: ''
-  });
-  const [savingSale, setSavingSale] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  // Start as true if we have a cached session — eliminates the auth-gate waterfall
-  // for returning users. The async checkInitialAuth() still runs to validate/refresh.
-  const [authChecked, setAuthChecked] = useState(() => readCachedSession() !== null);
-  const [latestExpertValuation, setLatestExpertValuation] = useState<any | null>(null);
-  const expertAnalysisRunningRef = React.useRef(false);
+    const el = vehicleHeaderRef.current;
+    if (!el) return;
+    const update = () => ctx.setVehicleHeaderHeight(el.offsetHeight);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [vehicle, auctionPulse]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [linkedOrganizations, setLinkedOrganizations] = useState<LinkedOrg[]>([]);
-  const [isMobile, setIsMobile] = useState(false);
   const [showAddOrgRelationship, setShowAddOrgRelationship] = useState(false);
   const [showOwnershipClaim, setShowOwnershipClaim] = useState(false);
-  const ranBatSyncRef = React.useRef<string | null>(null);
   const [batAutoImportStatus, setBatAutoImportStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
   const { lastMemeDrop } = useVehicleMemeDrops(vehicle?.id);
-  const [isAdmin, setIsAdmin] = useState(false);
-  // isMismatchedVehicleImage extracted to imageFilterUtils.ts (used by loadVehicleData.ts)
 
-  // For BaT-import vehicles with no `vehicle_images` yet, fetch listing gallery URLs so the profile isn't empty.
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!vehicle?.id) return;
-
-        const hasDbImages = Array.isArray(vehicleImages) && vehicleImages.length > 0;
-        if (hasDbImages) {
-          // If we have real images, we don't need fallback listing images.
-          if (fallbackListingImageUrls.length > 0) setFallbackListingImageUrls([]);
-          return;
-        }
-
-        const origin = String((vehicle as any)?.profile_origin || '');
-        const discoveryUrl = String((vehicle as any)?.discovery_url || '');
-        const listingUrl =
-          String((auctionPulse as any)?.listing_url || '').trim() ||
-          discoveryUrl ||
-          String((vehicle as any)?.bat_auction_url || '').trim() ||
-          String((vehicle as any)?.listing_url || '').trim();
-
-        const isBat = origin === 'bat_import' || listingUrl.includes('bringatrailer.com/listing/');
-        const isCarsAndBids = listingUrl.includes('carsandbids.com/auctions/');
-        if (!isBat && !isCarsAndBids) return;
-        if (fallbackListingImageUrls.length > 0) return;
-
-        const cacheKey = isCarsAndBids
-          ? `carsandbids_fallback_images_${vehicle.id}`
-          : `bat_fallback_images_${vehicle.id}`;
-        const filterNonPhotoListingUrls = (arr: string[]): string[] => {
-          const urls = Array.isArray(arr) ? arr : [];
-          const keep = urls.filter((rawUrl) => {
-            const raw = String(rawUrl || '').trim();
-            if (!raw || !raw.startsWith('http')) return false;
-            const s = raw.toLowerCase();
-            
-            // Filter out icons and UI elements
-            if (s.includes('gstatic.com/faviconv2')) return false;
-            if (s.includes('favicon.ico') || s.includes('/favicon')) return false;
-            if (s.includes('apple-touch-icon')) return false;
-            if (s.endsWith('.ico')) return false;
-            
-            // Filter out known BaT non-vehicle content
-            if (s.includes('bringatrailer.com/wp-content/uploads/')) {
-              if (s.includes('qotw') || s.includes('winner-template') || s.includes('weekly-weird') ||
-                  s.includes('mile-marker') || s.includes('podcast') || s.includes('merch') ||
-                  s.includes('dec-merch') || s.includes('podcast-graphic') ||
-                  s.includes('site-post-') || s.includes('thumbnail-template') ||
-                  s.includes('screenshot-') || s.includes('countries/') ||
-                  s.includes('themes/') || s.includes('assets/img/') ||
-                  /\/web-\d{3,}-/i.test(s)) {
-                return false;
-              }
-            }
-            
-            try {
-              const u = new URL(raw);
-              const sizeParam = u.searchParams.get('size') || u.searchParams.get('sz') || u.searchParams.get('w') || u.searchParams.get('width');
-              if (sizeParam) {
-                const n = Number(String(sizeParam).replace(/[^0-9.]/g, ''));
-                if (Number.isFinite(n) && n > 0 && n <= 64) return false;
-              }
-            } catch {
-              // ignore
-            }
-            return true;
-          });
-          return keep.length > 0 ? keep : urls;
-        };
-        try {
-          const cached = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              const urls = filterNonPhotoListingUrls(parsed.filter((u: any) => typeof u === 'string' && u.startsWith('http')));
-              if (urls.length > 0) {
-                setFallbackListingImageUrls(urls);
-                if (!leadImageUrl && urls[0]) setLeadImageUrl(urls[0]);
-                return;
-              }
-            }
-          }
-        } catch {
-          // ignore cache parse errors
-        }
-
-        // Cars & Bids: do NOT scrape (bot-protected). Use images already stored in vehicle_events metadata.
-        if (isCarsAndBids) {
-          try {
-            const { data: listings } = await supabase
-              .from('vehicle_events')
-              .select('metadata')
-              .eq('vehicle_id', vehicle.id)
-              .eq('source_url', listingUrl)
-              .order('updated_at', { ascending: false })
-              .limit(5);
-
-            const meta = Array.isArray(listings) && listings.length > 0 ? (listings[0] as any)?.metadata : null;
-            const images: string[] =
-              (Array.isArray(meta?.image_urls) ? meta.image_urls : null) ||
-              (Array.isArray(meta?.images) ? meta.images : null) ||
-              [];
-
-            const filtered = filterNonPhotoListingUrls(images);
-            if (filtered.length > 0) {
-              setFallbackListingImageUrls(filtered);
-              try {
-                window.localStorage.setItem(cacheKey, JSON.stringify(filtered.slice(0, 250)));
-              } catch {
-                // ignore
-              }
-              if (!leadImageUrl && filtered[0]) setLeadImageUrl(filtered[0]);
-            }
-          } catch {
-            // carsandbids fallback listing images skipped
-          }
-
-          return;
-        }
-
-        // BaT-only fallback: fetch gallery URLs via simple-scraper
-        if (!isBat) return;
-        if (!listingUrl || !listingUrl.includes('bringatrailer.com/listing/')) return;
-
-        const { data, error } = await supabase.functions.invoke('simple-scraper', {
-          body: { url: listingUrl },
-        });
-
-        if (error) throw error;
-        const images: string[] =
-          (data?.success && Array.isArray(data?.data?.images) ? data.data.images : null) ||
-          (Array.isArray(data?.images) ? data.images : null) ||
-          [];
-
-        const filtered = filterNonPhotoListingUrls(images);
-        if (filtered.length > 0) {
-          setFallbackListingImageUrls(filtered);
-          try {
-            window.localStorage.setItem(cacheKey, JSON.stringify(filtered.slice(0, 250)));
-          } catch {
-            // ignore
-          }
-          if (!leadImageUrl && filtered[0]) setLeadImageUrl(filtered[0]);
-        }
-      } catch {
-        // fallback listing images skipped
-      }
-    })();
-    // Intentionally omit leadImageUrl to avoid re-fetch loops; we set it opportunistically.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle?.id, (vehicle as any)?.profile_origin, (vehicle as any)?.discovery_url, auctionPulse?.listing_url, vehicleImages.length]);
-
-  // buildAuctionPulseFromExternalListings extracted to ./vehicle-profile/buildAuctionPulse.ts (uses vehicle_events now)
-
-  // MOBILE DETECTION
-  useEffect(() => {
-    const checkMobile = () => {
-      const isNarrowScreen = window.innerWidth < 768;
-      // Treat tablet widths (e.g., ~800px iPad) as non-mobile. Mobile UI should only
-      // activate at true phone widths to avoid degrading tablet/desktop layouts.
-      setIsMobile(isNarrowScreen);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  // Fallback listing images handled by VehicleProfileContext
 
   // Left column: make all cards collapsible by clicking the header bar.
   // This avoids rewriting every individual card component while keeping behavior consistent.
@@ -449,227 +142,11 @@ const VehicleProfileInner: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search, location.pathname]);
 
-  // VALUATION HOOK - Re-enabled after fixing TDZ
-  const {
-    valuation: valuationIntel,
-    components: valuationComponents,
-    readiness: readinessSnapshot,
-    loading: valuationIntelLoading
-  } = useValuationIntel(vehicle?.id || null);
-  const valuationPayload = valuationIntelLoading ? undefined : valuationIntel;
-  const valuationComponentsPayload = valuationIntelLoading ? undefined : valuationComponents;
+  const { valuation: valuationIntel, readiness: readinessSnapshot } = useValuationIntel(vehicle?.id || null);
 
-  // PERMISSIONS HOOK - Re-enabled after fixing TDZ (with safe fallbacks in OwnershipService)
-  const {
-    isOwner: isRowOwner,
-    hasContributorAccess,
-    contributorRole,
-    canEdit,
-    canUpload
-  } = useVehiclePermissions(vehicleId || null, session, vehicle);
-  const { isAdmin: isAdminUser } = useAdminAccess();
+  // Permissions, ownership, admin status all provided by VehicleProfileContext
 
-  // Additional permission checks - use database function for claim status
-  // Ownership claim status should not rely on missing RPCs. Use ownership_verifications directly.
-  const userOwnershipClaim = React.useMemo(() => {
-    const uid = session?.user?.id;
-    if (!uid) return null;
-    return (ownershipVerifications || []).find((v: any) => v?.user_id === uid) || null;
-  }, [ownershipVerifications, session?.user?.id]);
-
-  const isVerifiedOwner = Boolean((vehicle as any)?.ownership_verified) || (() => {
-    // Strict: only treat as verified owner when BOTH documents are present and status is approved.
-    if (!userOwnershipClaim) return false;
-    const hasTitle = !!userOwnershipClaim.title_document_url && userOwnershipClaim.title_document_url !== 'pending';
-    const hasId = !!userOwnershipClaim.drivers_license_url && userOwnershipClaim.drivers_license_url !== 'pending';
-    return userOwnershipClaim.status === 'approved' && hasTitle && hasId;
-  })();
-  const isDbUploader = Boolean(session?.user?.id && vehicle?.uploaded_by === session.user.id);
-  const canTriggerProofAnalysis = Boolean(isRowOwner || isVerifiedOwner || hasContributorAccess || isAdminUser);
-
-  // Consolidated permissions object - ensure all values are primitives for React safety
-  const permissions: VehiclePermissions = {
-    isVerifiedOwner: Boolean(isVerifiedOwner),
-    hasContributorAccess: Boolean(hasContributorAccess),
-    contributorRole: contributorRole ? String(contributorRole) : null,
-    isDbUploader: Boolean(isDbUploader)
-  };
-
-  const loadSaleSettings = async (vehId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('vehicle_sale_settings')
-        .select('for_sale, live_auction, partners, reserve')
-        .eq('vehicle_id', vehId)
-        .maybeSingle();
-      if (error) {
-        // table may not exist yet — skip quietly
-        return;
-      }
-      if (data) {
-        setSaleSettings({
-          for_sale: !!data.for_sale,
-          live_auction: !!data.live_auction,
-          partners: Array.isArray(data.partners) ? data.partners : [],
-          reserve: typeof data.reserve === 'number' ? data.reserve : ''
-        });
-      }
-    } catch { /* ignore */ }
-  };
-
-  const shouldRunExpertAgent = useCallback((valuation: any | null) => {
-    // RE-ENABLED: Expert agent runs analysis but does NOT auto-update sale prices
-    // Analysis creates valuation records for review only
-    const canTrigger = Boolean(isRowOwner || isVerifiedOwner || hasContributorAccess);
-    if (!canTrigger) return false;
-    if (!valuation) return true;
-    const lastValuationDate = valuation?.valuation_date ? new Date(valuation.valuation_date) : null;
-    if (!lastValuationDate) return true;
-    const hoursSince = (Date.now() - lastValuationDate.getTime()) / (1000 * 60 * 60);
-    return hoursSince > 24;
-  }, [hasContributorAccess, isRowOwner, isVerifiedOwner]);
-
-  const runExpertAgent = useCallback(async (vehId: string) => {
-    if (expertAnalysisRunningRef.current) return;
-    if (!(isRowOwner || isVerifiedOwner || hasContributorAccess)) return;
-    expertAnalysisRunningRef.current = true;
-    try {
-      // Trigger vehicle-expert-agent
-      const { error } = await supabase.functions.invoke('vehicle-expert-agent', {
-        body: { vehicleId: vehId }
-      });
-      if (error) throw new Error(await formatSupabaseInvokeError(error));
-      const { data } = await supabase
-        .from('vehicle_valuations')
-        .select('id, estimated_value, documented_components, confidence_score, components, environmental_context, value_justification, valuation_date')
-        .eq('vehicle_id', vehId)
-        .order('valuation_date', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (data) {
-        setLatestExpertValuation(data);
-      }
-      window.dispatchEvent(new Event('vehicle_valuation_updated'));
-    } catch (error) {
-      console.error('Expert agent failed:', error);
-    } finally {
-      expertAnalysisRunningRef.current = false;
-    }
-  }, [hasContributorAccess, isRowOwner, isVerifiedOwner]);
-
-  const fetchLatestExpertValuation = useCallback(async (vehId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('vehicle_valuations')
-        .select('id, estimated_value, documented_components, confidence_score, components, environmental_context, value_justification, valuation_date')
-        .eq('vehicle_id', vehId)
-        .order('valuation_date', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!error) {
-        setLatestExpertValuation(data || null);
-      }
-
-      if (shouldRunExpertAgent(data || null)) {
-        await runExpertAgent(vehId);
-      }
-    } catch (error) {
-      console.warn('Failed to fetch expert valuation:', error);
-    }
-  }, [runExpertAgent, shouldRunExpertAgent]);
-
-  // Build a universal package from live vehicle + images and store in localStorage for bookmarklet
-  const composeListingForPartner = async (partnerKey: string) => {
-    if (!vehicle) return;
-    try {
-      // Load images from DB
-      const { data: imgs } = await supabase
-        .from('vehicle_images')
-        .select('image_url, is_primary')
-        .eq('vehicle_id', vehicle.id)
-        // Quarantine/duplicate rows should never appear in standard galleries
-        .or('is_duplicate.is.null,is_duplicate.eq.false')
-        .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")');
-        // NO LIMIT - show ALL images from all sources
-      const images = (imgs || []) as any[];
-      // Services removed during cleanup - simplified composition
-      const pkg = {
-        partner: partnerKey,
-        vehicle,
-        images,
-        reserve: saleSettings.reserve === '' ? null : Number(saleSettings.reserve),
-        title: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-        description: vehicle.description || ''
-      };
-      localStorage.setItem('nuke_sale_package', JSON.stringify(pkg));
-      setComposeText({ title: pkg.title, description: pkg.description, specs: [] });
-      // Bookmarklet functionality removed during cleanup
-      setBookmarklets([]);
-    } catch (e) {
-      console.warn('Compose failed:', e);
-    }
-  };
-
-  const copyToClipboard = async (text: string) => {
-    try { await navigator.clipboard.writeText(text); } catch { /* ignore */ }
-  };
-
-  const saveSaleSettings = async () => {
-    if (!vehicle) return;
-    setSavingSale(true);
-    try {
-      const payload = {
-        vehicle_id: vehicle.id,
-        for_sale: saleSettings.for_sale,
-        live_auction: saleSettings.live_auction,
-        partners: saleSettings.partners,
-        reserve: saleSettings.reserve === '' ? null : Number(saleSettings.reserve),
-        updated_at: new Date().toISOString()
-      } as any;
-      const { error } = await supabase
-        .from('vehicle_sale_settings')
-        .upsert(payload, { onConflict: 'vehicle_id' });
-      if (error) {
-        console.warn('Sale settings save failed (table may not exist):', error.message);
-      }
-    } catch (e) {
-      console.warn('Sale settings save error:', e);
-    } finally {
-      setSavingSale(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!vehicleId) return;
-    checkAuth();
-    loadOwnershipVerifications();
-    // Don't load vehicle and timeline until we know auth status
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicleId]);
-  
-  // Check auth before loading vehicle
-  useEffect(() => {
-    const checkInitialAuth = async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      setSession(currentSession);
-      setAuthChecked(true);
-      
-      // Check admin status
-      if (currentSession?.user) {
-        const adminStatus = await AdminNotificationService.isCurrentUserAdmin();
-        setIsAdmin(adminStatus);
-      }
-    };
-    checkInitialAuth();
-  }, []);
-  
-  useEffect(() => {
-    if (!vehicleId || !authChecked) return;
-    loadVehicle();
-    loadTimelineEvents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicleId, authChecked]);
+  // Auth bootstrap + initial load + ownership verifications handled by VehicleProfileContext
 
   // Auto-create bundle events when owner views their vehicle
   // Fire-and-forget: idempotent, safe to run on every load
@@ -687,138 +164,23 @@ const VehicleProfileInner: React.FC = () => {
     }).catch(() => {}); // intentionally silent — not critical path
   }, [vehicleId, canEdit, session?.access_token]);
 
-  // Listen for auth state changes
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-    });
+  // Event listeners for vehicle_images_updated and timeline_updated handled by VehicleProfileContext
 
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Load user profile when session or vehicle changes
-  useEffect(() => {
-    loadUserProfile();
-  }, [session, vehicle]);
-
-  useEffect(() => {
-    const imageHandler = (e: any) => {
-      const vid = e?.detail?.vehicleId;
-      if (!vehicleId || (vid && vid !== vehicleId)) return;
-      try {
-        loadVehicleImages();
-        loadTimelineEvents();
-      } catch { /* ignore */ }
-    };
-
-    const timelineHandler = (e: any) => {
-      const vid = e?.detail?.vehicleId;
-      if (!vehicleId || (vid && vid !== vehicleId)) return;
-      try {
-        loadTimelineEvents();
-      } catch { /* ignore */ }
-    };
-
-    window.addEventListener('vehicle_images_updated', imageHandler);
-    window.addEventListener('timeline_updated', timelineHandler);
-
-    // Refresh timeline periodically (reduced from 30s to 60s to prevent excessive re-renders)
-    const intervalId = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        loadTimelineEvents();
-      }
-    }, 60000); // 60 seconds, only when page is visible
-
-    return () => {
-      window.removeEventListener('vehicle_images_updated', imageHandler);
-      window.removeEventListener('timeline_updated', timelineHandler);
-      clearInterval(intervalId);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicleId]);
-
-  // Use vehicle.id instead of vehicle object to prevent render loops
+  // Post-vehicle-load side effects (unique to VehicleProfile.tsx — context handles images/timeline/comments/observations)
   useEffect(() => {
     if (vehicle?.id) {
-      loadVehicleImages();
-      loadViewCount();
       recordView();
-      loadTimelineEvents();
-      loadSaleSettings(vehicle.id);
       loadResponsible();
-      loadLiveSession();
-      loadPresenceCount();
-      loadRecentComments();
-      loadTotalCommentCount();
-      // Load observation count from vehicle_observations
-      supabase
-        .from('vehicle_observations')
-        .select('id', { count: 'exact', head: true })
-        .eq('vehicle_id', vehicle.id)
-        .then(({ count }) => { if (count !== null) setObservationCount(count); });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle?.id]); // Only re-run when vehicle ID changes, not on every vehicle object change
+  }, [vehicle?.id]);
 
   useEffect(() => {
     if (!vehicle?.id) return;
     loadLinkedOrgs(vehicle.id);
   }, [vehicle?.id]); // Removed loadLinkedOrgs from deps - it's useCallback with [] deps so never changes
 
-  // Realtime vehicle and image updates: refresh when database changes
-  // This ensures profile pages update immediately when fix scripts or other processes update the database
-  useEffect(() => {
-    if (!vehicle?.id) return;
-
-    const vehicleIdForFilter = vehicle.id;
-
-    const channel = supabase
-      .channel(`vehicle-updates:${vehicleIdForFilter}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'vehicles',
-          filter: `id=eq.${vehicleIdForFilter}`,
-        },
-        (payload) => {
-          const updatedVehicle = (payload as any)?.new as any;
-          if (updatedVehicle) {
-            // Vehicle updated via realtime
-            // Reload vehicle data to get all updated fields (bat_seller, bat_location, etc.)
-            loadVehicle();
-          }
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'vehicle_images',
-          filter: `vehicle_id=eq.${vehicleIdForFilter}`,
-        },
-        (payload) => {
-          const event = (payload as any)?.eventType || (payload as any)?.event;
-          // Vehicle images changed via realtime
-          // Reload images immediately when source changes, new images added, or images deleted
-          loadVehicleImages();
-        },
-      )
-      .subscribe();
-
-    return () => {
-      try {
-        supabase.removeChannel(channel);
-      } catch {
-        try {
-          channel.unsubscribe();
-        } catch { /* ignore */ }
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle?.id]); // Only re-subscribe when vehicle ID changes
+  // Realtime vehicles + vehicle_images subscriptions handled by VehicleProfileContext
 
   // Realtime auction pulse: update header telemetry as vehicle_events rows change
   // (BaT/Classic/etc) and as auction_comments stream in.
@@ -1046,63 +408,22 @@ const VehicleProfileInner: React.FC = () => {
     };
   }, [vehicle?.id, auctionPulse?.listing_url]);
 
-  // Refresh hero/gallery when images update elsewhere
-  useEffect(() => {
-    const handler = (e: any) => {
-      if (!vehicle?.id) return;
-      if (!e?.detail?.vehicleId || e.detail.vehicleId === vehicle.id) {
-        loadVehicleImages();
-      }
-    };
-    window.addEventListener('vehicle_images_updated', handler);
-    return () => window.removeEventListener('vehicle_images_updated', handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle?.id]); // Depend on ID only, not entire vehicle object
+  // vehicle_images_updated listener handled by VehicleProfileContext
 
-  // Listen for timeline events created from image uploads to prompt review and refresh timeline
+  // Listen for timeline events created from image uploads to prompt review
   useEffect(() => {
     const onEventsCreated = (e: any) => {
       if (!vehicle?.id) return;
-      const { vehicleId, count, dates } = e?.detail || {};
-      if (vehicleId && vehicleId === vehicle.id) {
-        setNewEventsNotice({ show: true, count: count || 0, dates: Array.isArray(dates) ? dates : [] });
-        loadTimelineEvents();
+      const { vehicleId: vid, count, dates } = e?.detail || {};
+      if (vid && vid === vehicle.id) {
+        ctx.reloadTimeline();
       }
     };
     window.addEventListener('timeline_events_created', onEventsCreated as any);
     return () => window.removeEventListener('timeline_events_created', onEventsCreated as any);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle?.id]); // Depend on ID only
+  }, [vehicle?.id]);
 
-
-  const loadUserProfile = async () => {
-    if (!session?.user?.id) return;
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, full_name, email, phone, address, city, state, zip')
-        .eq('id', session?.user?.id)
-        .maybeSingle();
-      if (error) {
-        console.warn('Unable to load user profile:', error.message);
-        return;
-      }
-      if (data) {
-        setUserProfile({
-          id: data.id,
-          full_name: data.full_name || data.username || session?.user?.email || 'Unknown User',
-          email: session?.user?.email || data.email || '',
-          phone: data.phone,
-          address: data.address,
-          city: data.city,
-          state: data.state,
-          zip: data.zip
-        });
-      }
-    } catch (err) {
-      console.warn('Error loading user profile:', err);
-    }
-  };
 
   const loadResponsible = async () => {
     try {
@@ -1156,83 +477,6 @@ const VehicleProfileInner: React.FC = () => {
     }
   };
 
-  const loadRecentComments = async () => {
-    try {
-      if (!vehicle?.id) return;
-      // Count comments in the last 10 minutes for this vehicle
-      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-      const { count, error } = await supabase
-        .from('vehicle_comments')
-        .select('id', { count: 'exact', head: true })
-        .eq('vehicle_id', vehicle.id)
-        .gte('created_at', tenMinutesAgo);
-      if (error) {
-        console.warn('Unable to load recent comment count:', error.message);
-        return;
-      }
-      setRecentCommentCount(count || 0);
-    } catch (err) {
-      console.warn('Error loading recent comment count:', err);
-    }
-  };
-
-  const loadTotalCommentCount = async () => {
-    try {
-      if (!vehicle?.id) return;
-      const { count, error } = await supabase
-        .from('vehicle_comments')
-        .select('id', { count: 'exact', head: true })
-        .eq('vehicle_id', vehicle.id);
-      if (!error && count !== null) {
-        setTotalCommentCount(count);
-      }
-    } catch {
-      // ignore
-    }
-  };
-
-  const loadPresenceCount = async () => {
-    try {
-      if (!vehicle?.id) return;
-      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      const { count, error } = await supabase
-        .from('user_presence')
-        .select('id', { count: 'exact', head: true })
-        .eq('vehicle_id', vehicle.id)
-        .gte('last_seen_at', fiveMinAgo);
-
-      if (!error) {
-        setPresenceCount(count || 0);
-      } else {
-        // Silently default to 0 if table doesn't exist
-        setPresenceCount(0);
-      }
-    } catch {
-      // Silently default to 0
-      setPresenceCount(0);
-    }
-  };
-
-  const loadOwnershipVerifications = async () => {
-    try {
-      // Use route param vehicleId (vehicle may not be loaded yet)
-      const vid = vehicle?.id || vehicleId;
-      if (!vid) return;
-      const { data, error } = await supabase
-        .from('ownership_verifications')
-        .select('*')
-        .eq('vehicle_id', vid)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.warn('Unable to load ownership verifications:', error.message);
-        return;
-      }
-      setOwnershipVerifications(data || []);
-    } catch (err) {
-      console.warn('Error loading ownership verifications:', err);
-    }
-  };
 
   // Heartbeat: upsert current user presence
   useEffect(() => {
@@ -1258,123 +502,7 @@ const VehicleProfileInner: React.FC = () => {
     }
   }, [vehicle]);
 
-  const loadLiveSession = async () => {
-    try {
-      if (!vehicle?.id) return;
-      const { data, error } = await supabase
-        .from('live_streaming_sessions')
-        .select('id, platform, stream_url, title, ended_at')
-        .eq('vehicle_id', vehicle.id)
-        .is('ended_at', null)
-        .order('started_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) {
-        // Disable further polling if table is missing or endpoint 404s
-        liveAvailableRef.current = false;
-        return;
-      }
-      if (data) setLiveSession({
-        id: data.id,
-        platform: data.platform,
-        stream_url: data.stream_url,
-        title: data.title,
-      });
-      else setLiveSession(null);
-    } catch (err) {
-      liveAvailableRef.current = false;
-    }
-  };
-
-  const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    setSession(session);
-  };
-
-  const loadTimelineEvents = async () => {
-    // OPTIMIZED: Timeline events loaded via RPC in loadVehicle()
-    // This function used for manual refresh after updates
-    if (!vehicleId) return;
-    
-    try {
-      const { data: events, error: eventsError } = await supabase
-        .from('timeline_events')
-        .select('*')
-        .eq('vehicle_id', vehicleId)
-        .order('event_date', { ascending: false });
-
-      if (eventsError) {
-        console.error('Error loading timeline events:', eventsError);
-        return;
-      }
-
-      // If no timeline_events, synthesize from vehicle_images photo dates
-      if (!events?.length && vehicleId) {
-        try {
-          const { data: photos } = await supabase
-            .from('vehicle_images')
-            .select('taken_at, source, image_category, category')
-            .eq('vehicle_id', vehicleId)
-            .not('taken_at', 'is', null)
-            .order('taken_at', { ascending: true });
-
-          if (photos?.length) {
-            // Group photos by date into synthetic timeline events
-            const byDate: Record<string, number> = {};
-            for (const p of photos) {
-              const d = new Date(p.taken_at).toISOString().slice(0, 10);
-              byDate[d] = (byDate[d] || 0) + 1;
-            }
-            const synthetic = Object.entries(byDate).map(([date, count]) => ({
-              event_date: date,
-              event_type: 'photo_session',
-              title: `${count} photo${count > 1 ? 's' : ''} documented`,
-              category: 'documentation',
-              created_at: date,
-            }));
-            setTimelineEvents(synthetic);
-            return;
-          }
-        } catch {
-          // Fallback: no synthetic events
-        }
-      }
-
-      setTimelineEvents(events || []);
-    } catch (error) {
-      console.error('Error loading timeline events:', error);
-    }
-  };
-
-  const loadVehicle = async () => {
-    await loadVehicleImpl({
-      vehicleId,
-      session,
-      leadImageUrl,
-      supabase,
-      navigate,
-      ranBatSyncRef,
-      setLoading,
-      setVehicle,
-      setIsPublic,
-      setLeadImageUrl,
-      setVehicleImages,
-      setTimelineEvents,
-      setAuctionPulse,
-    });
-
-    // Auto-select best hero image based on quality/zone scores (non-blocking)
-    if (vehicleId) {
-      selectBestHeroImage(vehicleId, supabase).then((result) => {
-        if (result?.url) {
-          setLeadImageUrl(result.url);
-          setHeroMeta(result.meta);
-        }
-      }).catch(() => {
-        // Non-fatal: keep whatever leadImageUrl was already set
-      });
-    }
-  };
+  // loadLiveSession, checkAuth, loadTimelineEvents, loadVehicle all handled by VehicleProfileContext
 
   const updatePrivacy = async () => {
     if (!vehicle || vehicle.isAnonymous) return;
@@ -1407,62 +535,13 @@ const VehicleProfileInner: React.FC = () => {
     }
   };
 
-  const recordView = async () => {
+  // Record view (fire-and-forget)
+  const recordView = useCallback(async () => {
     if (!vehicleId) return;
-
     try {
-      // Record view in vehicle_views table
-      const { error } = await supabase
-        .from('vehicle_views')
-        .insert({
-          vehicle_id: vehicleId,
-          user_id: session?.user?.id || null,
-          viewed_at: new Date().toISOString(),
-          ip_address: null // Could be added later
-        });
-
-      if (!error) {
-        // Update vehicle view_count
-        const { error: updateError } = await supabase
-          .from('vehicles')
-          .update({
-            view_count: (vehicle?.view_count || 0) + 1,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', vehicleId);
-
-        if (!updateError) {
-          setViewCount(prev => prev + 1);
-        }
-      }
-    } catch {
-      // View recording failed silently
-    }
-  };
-
-  const loadViewCount = async () => {
-    if (!vehicleId) return;
-
-    try {
-      const { count, error } = await supabase
-        .from('vehicle_views')
-        .select('id', { count: 'exact', head: true })
-        .eq('vehicle_id', vehicleId);
-
-      if (!error && count !== null) {
-        setViewCount(count);
-      } else {
-        // Fallback to vehicle.view_count if table doesn't exist
-        setViewCount(vehicle?.view_count || 0);
-      }
-    } catch {
-      setViewCount(vehicle?.view_count || 0);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
-  };
+      await supabase.from('vehicle_views').insert({ vehicle_id: vehicleId, user_id: session?.user?.id || null, viewed_at: new Date().toISOString() });
+    } catch { /* silent */ }
+  }, [vehicleId, session?.user?.id]);
 
   // Granular validation popup state
   const [validationPopup, setValidationPopup] = useState<{
@@ -1485,104 +564,7 @@ const VehicleProfileInner: React.FC = () => {
     });
   };
 
-  const openFieldAudit = async (fieldName: string, fieldLabel: string) => {
-    try {
-      if (!vehicle?.id) return;
-      // Attempt to load field history from vehicle_field_sources
-      const { data, error } = await supabase
-        .from('vehicle_field_sources')
-        .select('field_value, source_type, user_id, is_verified, updated_at')
-        .eq('vehicle_id', vehicle.id)
-        .eq('field_name', fieldName)
-        .order('updated_at', { ascending: false });
-
-      if (error) {
-        console.warn('Field audit unavailable:', error.message);
-        setFieldAudit({ open: true, fieldName, fieldLabel, entries: [], score: undefined, met: [], next: [] });
-        return;
-      }
-
-      // Compute score using shared utility
-      const { data: imgs } = await supabase
-        .from('vehicle_images')
-        .select('area, labels, sensitive_type')
-        .eq('vehicle_id', vehicle.id)
-        // Quarantine/duplicate rows should never appear in standard galleries
-        .or('is_duplicate.is.null,is_duplicate.eq.false')
-        .not('image_vehicle_match_status', 'in', '("mismatch","unrelated")');
-
-      const sources: FieldSource[] = (data || []).map((e: any) => ({
-        field_name: fieldName,
-        field_value: e.field_value,
-        source_type: e.source_type,
-        user_id: e.user_id
-      }));
-
-      const images = (imgs || []).map((img: any) => ({
-        labels: img.labels,
-        area: img.area,
-        sensitive_type: img.sensitive_type
-      }));
-
-      // Use shared utility to calculate score
-      const imageEvidence = analyzeImageEvidence(images);
-      const result = calculateFieldScore(fieldName, sources, imageEvidence);
-
-      setFieldAudit({ open: true, fieldName, fieldLabel, entries: data || [], score: result.score, met: result.met, next: result.next });
-
-      // Persist score and criteria back to vehicle_field_sources (best-effort)
-      try {
-        const latestVal = (data && data[0]?.field_value) || '';
-        const payload: any = {
-          vehicle_id: vehicle.id,
-          field_name: fieldName,
-          field_value: latestVal,
-          source_type: (data && data[0]?.source_type) || 'computed',
-          confidence_score: result.score,
-          criteria: { met: result.met, next: result.next }
-        };
-        // Prefer upsert if unique constraint on (vehicle_id, field_name), else fallback to insert
-        const { error: upErr } = await supabase.from('vehicle_field_sources').upsert(payload, { onConflict: 'vehicle_id,field_name' });
-        if (upErr && upErr.code === '42710') {
-          // constraint issue; fallback: update last row
-          await supabase
-            .from('vehicle_field_sources')
-            .update({ confidence_score: result.score, criteria: { met: result.met, next: result.next } })
-            .eq('vehicle_id', vehicle.id)
-            .eq('field_name', fieldName);
-        }
-      } catch (persistErr) {
-        console.warn('Score persistence skipped:', persistErr);
-      }
-    } catch (err) {
-      console.warn('Error loading field audit:', err);
-      setFieldAudit({ open: true, fieldName, fieldLabel, entries: [], score: undefined, met: [], next: [] });
-    }
-  };
-
-  const formatNumber = (num: number | null) => {
-    return num ? num.toLocaleString() : 'Not specified';
-  };
-
-  const handleImportComplete = async (results: any) => {
-    if (vehicle) {
-      await loadVehicleImages();
-      await runExpertAgent(vehicle.id);
-    }
-  };
-
-  const handleEditClick = () => {
-    // Refresh vehicle data
-    loadVehicle();
-  };
-
-  const handlePriceClick = () => {
-    // Scroll to the price section
-    const priceSection = document.getElementById('price-section');
-    if (priceSection) {
-      priceSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
+  const handleEditClick = () => ctx.reloadVehicle();
 
   const loadLinkedOrgs = useCallback(async (vehId: string) => {
     try {
@@ -1670,19 +652,7 @@ const VehicleProfileInner: React.FC = () => {
     }
   }, []);
 
-  const loadVehicleImages = async () => {
-    if (!vehicle) return;
-    await loadVehicleImagesImpl({
-      vehicle,
-      session,
-      leadImageUrl,
-      supabase,
-      setVehicleImages,
-      setLeadImageUrl,
-    });
-  };
-
-  // loadWalkAroundImages removed (carousel removed from layout)
+  // loadVehicleImages handled by VehicleProfileContext
 
   const handleSetPrimaryImage = async (imageId: string) => {
     if (!vehicle || !isAdmin) {
@@ -1721,8 +691,7 @@ const VehicleProfileInner: React.FC = () => {
         }
       }
 
-      // Reload images to reflect the change
-      await loadVehicleImages();
+      ctx.reloadImages();
       // Primary image updated
     } catch (error: any) {
       console.error('Error setting primary image:', error);
@@ -1735,9 +704,7 @@ const VehicleProfileInner: React.FC = () => {
     (async () => {
       try {
         if (!vehicle?.id) return;
-        // Only attempt auto-import when auth has been checked and we have a user session.
-        // Supabase Edge Functions in this project require a real user JWT (not anon key).
-        if (!authChecked) return;
+        // Context loads vehicle only after auth — if vehicle exists, auth is done.
         if (!session?.user?.id) return;
 
         const origin = String((vehicle as any)?.profile_origin || '');
@@ -1784,9 +751,9 @@ const VehicleProfileInner: React.FC = () => {
         }
 
         // Refresh vehicle + images + timeline after import
-        await loadVehicle();
-        await loadTimelineEvents();
-        await loadVehicleImages();
+        ctx.reloadVehicle();
+        ctx.reloadTimeline();
+        ctx.reloadImages();
         setBatAutoImportStatus('done');
       } catch (e) {
         console.warn('BaT auto-import exception:', e);
@@ -1798,9 +765,9 @@ const VehicleProfileInner: React.FC = () => {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle?.id, authChecked, session?.user?.id]);
+  }, [vehicle?.id, session?.user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading) {
+  if (ctx.loading) {
     return (
         <div className="loading-container">
           <div className="loading-spinner"></div>
@@ -1855,7 +822,7 @@ const VehicleProfileInner: React.FC = () => {
         <React.Suspense fallback={null}>
           <VehicleBanners
             auctionCurrency={auctionCurrency}
-            onMergeComplete={() => loadVehicle()}
+            onMergeComplete={() => ctx.reloadVehicle()}
           />
         </React.Suspense>
 
@@ -1873,14 +840,7 @@ const VehicleProfileInner: React.FC = () => {
           </React.Suspense>
         </div>
 
-        {/* Quick Stats — real data counts from vehicle_images and vehicle_observations */}
-        <QuickStatsBar
-          imageCount={vehicleImages.length}
-          eventCount={timelineEvents.length}
-          commentCount={totalCommentCount}
-          observationCount={observationCount}
-          updatedAt={vehicle?.updated_at}
-        />
+        <React.Suspense fallback={null}><QuickStatsBar /></React.Suspense>
 
         {/* Add Organization Relationship Modal */}
         {showAddOrgRelationship && vehicle && session?.user?.id && (
@@ -2010,7 +970,7 @@ const VehicleProfileInner: React.FC = () => {
                   session={session}
                   isOwner={isRowOwner || isVerifiedOwner}
                   hasContributorAccess={hasContributorAccess}
-                  contributorRole={contributorRole ?? undefined}
+                  contributorRole={permissions.contributorRole ?? undefined}
                 />
               </React.Suspense>
             </div>
