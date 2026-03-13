@@ -745,18 +745,4 @@ export interface VehicleMetadataProps extends VehicleBaseProps {
   onPrivacyChange: (isPublic: boolean) => void;
 }
 
-export interface WorkspaceContentProps {
-  vehicle: Vehicle;
-  session: any;
-  permissions: VehiclePermissions;
-  images: ImageRecord[];
-  timelineEvents: TimelineEvent[];
-  comments: VehicleComment[];
-  stats: ProfileStats;
-  latestValuation: VehicleValuation | null;
-  externalListings: ExternalListing[];
-  activeTab: string;
-  onTabChange: (tab: string) => void;
-  onImageClick: (image: ImageRecord, index: number) => void;
-  onImagesUpdated: () => void;
-}
+// WorkspaceContentProps is defined in WorkspaceContent.tsx (reads from VehicleProfileContext)
