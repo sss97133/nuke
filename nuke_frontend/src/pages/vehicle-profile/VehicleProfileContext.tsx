@@ -673,14 +673,94 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       if (vid && vid !== vehicleId) return;
       loadTimelineEvents();
     };
+    const eventsCreatedHandler = (e: any) => {
+      const vid = e?.detail?.vehicleId;
+      if (vid && vid === vehicleId) loadTimelineEvents();
+    };
     window.addEventListener('vehicle_images_updated', imageHandler);
     window.addEventListener('timeline_updated', timelineHandler);
+    window.addEventListener('timeline_events_created', eventsCreatedHandler as any);
     return () => {
       window.removeEventListener('vehicle_images_updated', imageHandler);
       window.removeEventListener('timeline_updated', timelineHandler);
+      window.removeEventListener('timeline_events_created', eventsCreatedHandler as any);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicleId]);
+
+  // ── Post-load side effects ──
+
+  useEffect(() => {
+    if (!vehicle?.id) return;
+    // Record view (fire-and-forget)
+    supabase.from('vehicle_views').insert({ vehicle_id: vehicle.id, user_id: session?.user?.id || null, viewed_at: new Date().toISOString() }).then(() => {}).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicle?.id]);
+
+  // Auto-create bundle events when owner views their vehicle
+  useEffect(() => {
+    if (!vehicleId || !canEdit) return;
+    const token = session?.access_token;
+    if (!token) return;
+    fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auto-create-bundle-events`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vehicle_id: vehicleId }),
+    }).catch(() => {});
+  }, [vehicleId, canEdit, session?.access_token]);
+
+  // Heartbeat: upsert current user presence
+  useEffect(() => {
+    if (!vehicle?.id) return;
+    const beat = async () => {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const uid = auth?.user?.id || null;
+        await supabase.from('user_presence').upsert(
+          { vehicle_id: vehicle!.id, user_id: uid, last_seen_at: new Date().toISOString() },
+          { onConflict: 'vehicle_id,user_id' },
+        );
+      } catch { /* silent */ }
+    };
+    beat();
+    const t = setInterval(beat, 60_000);
+    return () => clearInterval(t);
+  }, [vehicle?.id]);
+
+  // BaT auto-import: once per vehicle for bat_import vehicles with no images or broken identity
+  const batAutoImportRan = useRef(false);
+  useEffect(() => {
+    if (!vehicle?.id || !session?.user?.id || batAutoImportRan.current) return;
+    (async () => {
+      try {
+        const origin = String(vehicle?.profile_origin || '');
+        const discoveryUrl = String((vehicle as any)?.discovery_url || '');
+        const isBat = origin === 'bat_import' || discoveryUrl.includes('bringatrailer.com/listing/');
+        if (!isBat) return;
+        const key = `bat_auto_import_attempted_${vehicle.id}`;
+        if (typeof window !== 'undefined' && window.localStorage.getItem(key)) return;
+        const make = String(vehicle?.make || '');
+        const model = String(vehicle?.model || '');
+        const looksBadIdentity = /mile/i.test(make) || /bring a trailer/i.test(model) || /on\s+bat\s+auctions/i.test(model) || model.length > 80;
+        if (vehicleImages.length > 0 && !looksBadIdentity) return;
+        window.localStorage.setItem(key, new Date().toISOString());
+        batAutoImportRan.current = true;
+        const batUrl = discoveryUrl || String((vehicle as any)?.bat_auction_url || '') || String((vehicle as any)?.listing_url || '');
+        if (!batUrl.includes('bringatrailer.com/listing/')) return;
+        const { data, error } = await supabase.functions.invoke('complete-bat-import', { body: { bat_url: batUrl, vehicle_id: vehicle.id } });
+        if (error || !data) {
+          try { window.localStorage.removeItem(key); } catch { /* ignore */ }
+          return;
+        }
+        loadVehicle();
+        loadTimelineEvents();
+        loadVehicleImages();
+      } catch (e) {
+        try { if (vehicle?.id) window.localStorage.removeItem(`bat_auto_import_attempted_${vehicle.id}`); } catch { /* ignore */ }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicle?.id, session?.user?.id]);
 
   // ── Context value ──
 

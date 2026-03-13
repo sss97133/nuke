@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useValuationIntel } from '../hooks/useValuationIntel';
@@ -28,7 +28,7 @@ const VehicleProfileInner: React.FC = () => {
   const ctx = useVehicleProfile();
 
   // Aliases from context — single source of truth
-  const { vehicleId, vehicle, session, vehicleImages, auctionPulse, isRowOwner, isVerifiedOwner, canEdit, hasContributorAccess, isAdminUser: isAdmin, canTriggerProofAnalysis, userOwnershipClaim, permissions, isPublic } = ctx;
+  const { vehicleId, vehicle, session, auctionPulse, isRowOwner, isVerifiedOwner, hasContributorAccess, userOwnershipClaim, permissions, isPublic } = ctx;
 
   // Local-only state (not in context)
   const [referenceLibraryRefreshKey, setReferenceLibraryRefreshKey] = useState(0);
@@ -48,7 +48,6 @@ const VehicleProfileInner: React.FC = () => {
 
   const [showAddOrgRelationship, setShowAddOrgRelationship] = useState(false);
   const [showOwnershipClaim, setShowOwnershipClaim] = useState(false);
-  const [batAutoImportStatus, setBatAutoImportStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
   const { lastMemeDrop } = useVehicleMemeDrops(vehicle?.id);
 
   // Fallback listing images handled by VehicleProfileContext
@@ -118,77 +117,9 @@ const VehicleProfileInner: React.FC = () => {
 
   // Permissions, ownership, admin status all provided by VehicleProfileContext
 
-  // Auth bootstrap + initial load + ownership verifications handled by VehicleProfileContext
+  // Auth, initial load, bundle events, view recording, event listeners all handled by VehicleProfileContext
 
-  // Auto-create bundle events when owner views their vehicle
-  // Fire-and-forget: idempotent, safe to run on every load
-  useEffect(() => {
-    if (!vehicleId || !canEdit) return;
-    const token = session?.access_token;
-    if (!token) return;
-    fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auto-create-bundle-events`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ vehicle_id: vehicleId }),
-    }).catch(() => {}); // intentionally silent — not critical path
-  }, [vehicleId, canEdit, session?.access_token]);
-
-  // Event listeners for vehicle_images_updated and timeline_updated handled by VehicleProfileContext
-
-  // Post-vehicle-load side effects (unique to VehicleProfile.tsx — context handles images/timeline/comments/observations/orgs/responsible)
-  useEffect(() => {
-    if (vehicle?.id) recordView();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle?.id]);
-
-  // Realtime vehicles, vehicle_images, auction pulse all handled by VehicleProfileContext
-
-  // Listen for timeline events created from image uploads to prompt review
-  useEffect(() => {
-    const onEventsCreated = (e: any) => {
-      if (!vehicle?.id) return;
-      const { vehicleId: vid, count, dates } = e?.detail || {};
-      if (vid && vid === vehicle.id) {
-        ctx.reloadTimeline();
-      }
-    };
-    window.addEventListener('timeline_events_created', onEventsCreated as any);
-    return () => window.removeEventListener('timeline_events_created', onEventsCreated as any);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle?.id]);
-
-
-  // loadResponsible handled by VehicleProfileContext
-
-
-  // Heartbeat: upsert current user presence
-  useEffect(() => {
-    let t: any;
-    const beat = async () => {
-      try {
-        if (!vehicle?.id) return;
-        const { data: auth } = await supabase.auth.getUser();
-        const uid = auth?.user?.id || null;
-        // Presence tracking - silently ignore all errors as table may not exist
-        const { error } = await supabase
-          .from('user_presence')
-          .upsert({ vehicle_id: vehicle.id, user_id: uid, last_seen_at: new Date().toISOString() }, { onConflict: 'vehicle_id,user_id' });
-        // Intentionally ignore error - presence is non-critical
-      } catch {
-        // Silently ignore all presence tracking failures
-      }
-    };
-    if (vehicle) {
-      beat();
-      t = setInterval(beat, 60 * 1000);
-      return () => clearInterval(t);
-    }
-  }, [vehicle]);
-
-  // loadLiveSession, checkAuth, loadTimelineEvents, loadVehicle all handled by VehicleProfileContext
+  // Realtime, heartbeat, timeline events listener all handled by VehicleProfileContext
 
   const updatePrivacy = async () => {
     if (!vehicle || vehicle.isAnonymous) return;
@@ -221,14 +152,6 @@ const VehicleProfileInner: React.FC = () => {
     }
   };
 
-  // Record view (fire-and-forget)
-  const recordView = useCallback(async () => {
-    if (!vehicleId) return;
-    try {
-      await supabase.from('vehicle_views').insert({ vehicle_id: vehicleId, user_id: session?.user?.id || null, viewed_at: new Date().toISOString() });
-    } catch { /* silent */ }
-  }, [vehicleId, session?.user?.id]);
-
   // Granular validation popup state
   const [validationPopup, setValidationPopup] = useState<{
     open: boolean;
@@ -252,120 +175,7 @@ const VehicleProfileInner: React.FC = () => {
 
   const handleEditClick = () => ctx.reloadVehicle();
 
-  // loadLinkedOrgs handled by VehicleProfileContext
-
-  const handleSetPrimaryImage = async (imageId: string) => {
-    if (!vehicle || !isAdmin) {
-      return; // Admin privileges required
-    }
-
-    try {
-      // Clear all primary flags for this vehicle
-      await supabase
-        .from('vehicle_images')
-        .update({ is_primary: false })
-        .eq('vehicle_id', vehicle.id);
-
-      // Set the selected image as primary
-      const { error: updateError } = await supabase
-        .from('vehicle_images')
-        .update({ is_primary: true })
-        .eq('id', imageId);
-
-      if (updateError) throw updateError;
-
-      // Also update vehicle's primary_image_url if the image has a URL
-      const { data: imageData } = await supabase
-        .from('vehicle_images')
-        .select('image_url, large_url, medium_url')
-        .eq('id', imageId)
-        .single();
-
-      if (imageData) {
-        const imageUrl = imageData.large_url || imageData.medium_url || imageData.image_url;
-        if (imageUrl) {
-          await supabase
-            .from('vehicles')
-            .update({ primary_image_url: imageUrl })
-            .eq('id', vehicle.id);
-        }
-      }
-
-      ctx.reloadImages();
-      // Primary image updated
-    } catch (error: any) {
-      console.error('Error setting primary image:', error);
-      // Failed to set primary image
-    }
-  };
-
-  // Auto-run BaT import once for bat_import vehicles that have no images / broken identity.
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!vehicle?.id) return;
-        // Context loads vehicle only after auth — if vehicle exists, auth is done.
-        if (!session?.user?.id) return;
-
-        const origin = String((vehicle as any)?.profile_origin || '');
-        const discoveryUrl = String((vehicle as any)?.discovery_url || '');
-        const isBat = origin === 'bat_import' || discoveryUrl.includes('bringatrailer.com/listing/');
-        if (!isBat) return;
-
-        // Guard: don't spam imports for the same vehicle.
-        const key = `bat_auto_import_attempted_${vehicle.id}`;
-        const attempted = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
-        if (attempted) return;
-
-        const make = String((vehicle as any)?.make || '');
-        const model = String((vehicle as any)?.model || '');
-        const looksBadIdentity = /mile/i.test(make) || /bring a trailer/i.test(model) || /on\s+bat\s+auctions/i.test(model) || model.length > 80;
-
-        // If we already have images and identity looks fine, do nothing.
-        const hasAnyImages = Array.isArray(vehicleImages) && vehicleImages.length > 0;
-        if (hasAnyImages && !looksBadIdentity) return;
-
-        // Mark attempted once we are actually going to call the function (prevents anon 401 from poisoning retries).
-        window.localStorage.setItem(key, new Date().toISOString());
-        setBatAutoImportStatus('running');
-
-        const batUrl =
-          discoveryUrl ||
-          String((vehicle as any)?.bat_auction_url || '') ||
-          String((vehicle as any)?.listing_url || '');
-        if (!batUrl.includes('bringatrailer.com/listing/')) {
-          setBatAutoImportStatus('failed');
-          return;
-        }
-
-        const { data, error } = await supabase.functions.invoke('complete-bat-import', {
-          body: { bat_url: batUrl, vehicle_id: vehicle.id }
-        });
-
-        if (error || !data) {
-          console.warn('BaT auto-import failed:', error);
-          // Allow retry next time.
-          try { window.localStorage.removeItem(key); } catch { /* ignore */ }
-          setBatAutoImportStatus('failed');
-          return;
-        }
-
-        // Refresh vehicle + images + timeline after import
-        ctx.reloadVehicle();
-        ctx.reloadTimeline();
-        ctx.reloadImages();
-        setBatAutoImportStatus('done');
-      } catch (e) {
-        console.warn('BaT auto-import exception:', e);
-        // Allow retry next time.
-        try {
-          if (vehicle?.id) window.localStorage.removeItem(`bat_auto_import_attempted_${vehicle.id}`);
-        } catch { /* ignore */ }
-        try { setBatAutoImportStatus('failed'); } catch { /* ignore */ }
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle?.id, session?.user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // BaT auto-import handled by VehicleProfileContext
 
   if (ctx.loading) {
     return (
