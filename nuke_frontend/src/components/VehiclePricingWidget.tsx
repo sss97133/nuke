@@ -136,13 +136,6 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
 
     const loadAuctionPulse = async () => {
       try {
-        // Prefer RPC snapshot if present to avoid duplicate reads
-        const rpcCache = (window as any).__vehicleProfileRpcData;
-        const rpcListings =
-          rpcCache && rpcCache.vehicle_id === vehicleId ? rpcCache.vehicle_events : null;
-        const fromRpc = Array.isArray(rpcListings) ? pickBestListing(rpcListings) : null;
-
-        // Always try to refresh from DB for live accuracy (best-effort)
         const { data: listings } = await supabase
           .from('vehicle_events')
           .select('source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, metadata, updated_at')
@@ -150,7 +143,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
           .order('updated_at', { ascending: false })
           .limit(10);
 
-        const best = pickBestListing((listings && listings.length > 0) ? listings : (fromRpc ? [fromRpc] : []));
+        const best = pickBestListing(listings || []);
         if (!(best?.source_url || best?.listing_url) || !(best?.source_platform || best?.platform)) {
           if (!cancelled) setAuctionPulse(null);
           return;

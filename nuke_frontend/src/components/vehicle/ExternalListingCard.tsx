@@ -126,16 +126,6 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
 
   const loadVehicleEvents = async () => {
     try {
-      // Use RPC data if available (eliminates duplicate query)
-      const rpcData = (window as any).__vehicleProfileRpcData;
-      const rpcMatchesThisVehicle = rpcData && rpcData.vehicle_id === vehicleId;
-      if (rpcMatchesThisVehicle && rpcData?.vehicle_events) {
-        setListings(normalizeAndSortListings(rpcData.vehicle_events));
-        setLoading(false);
-        return; // Skip fetch if provided
-      }
-
-      // Fallback: fetch if not in RPC data
       const { data, error } = await supabase
         .from('vehicle_events')
         .select('*')

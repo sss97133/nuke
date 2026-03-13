@@ -156,9 +156,6 @@ export async function loadVehicleImpl({
 }: LoadVehicleParams): Promise<void> {
   try {
     setLoading(true);
-    // Prevent cross-vehicle cache bleed when navigating between profiles.
-    // We only trust RPC caches when they explicitly match the current vehicle.
-    (window as any).__vehicleProfileRpcData = null;
 
     // Accept both UUID format (with hyphens) and VIN format (17 chars alphanumeric)
     const isUUID = vehicleId && vehicleId.length >= 20 && vehicleId.includes('-');
@@ -249,17 +246,6 @@ export async function loadVehicleImpl({
         setTimelineEvents(rpcData.timeline_events);
       }
 
-      (window as any).__vehicleProfileRpcData = {
-        vehicle_id: vehicleData.id,
-        images: rpcImagesTruncated ? [] : rpcData.images,
-        timeline_events: rpcData.timeline_events,
-        latest_valuation: rpcData.latest_valuation,
-        price_signal: rpcData.price_signal,
-        vehicle_events: rpcData.external_listings,
-        external_listings: rpcData.external_listings,
-        comments: rpcData.comments
-      };
-
     }
 
     // For non-authenticated users, only show public vehicles
@@ -287,24 +273,17 @@ export async function loadVehicleImpl({
 
       // Derive auction pulse for header (prefer vehicle_events over stale vehicles.* fields)
     try {
-      const rpcCache = (window as any).__vehicleProfileRpcData;
-      const listings =
-        rpcCache && rpcCache.vehicle_id === vehicleData.id ? (rpcCache.vehicle_events || rpcCache.external_listings) : null;
-      let arr = Array.isArray(listings) ? listings : [];
-
-      // If RPC didn't include listings (or returned empty due to env/RLS quirks), do a direct fetch.
-      if (arr.length === 0) {
-        try {
-          const { data } = await supabase
-            .from('vehicle_events')
-            .select('id, source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
-            .eq('vehicle_id', vehicleData.id)
-            .order('updated_at', { ascending: false })
-            .limit(10);
-          arr = Array.isArray(data) ? data : [];
-        } catch {
-          // ignore
-        }
+      let arr: any[] = [];
+      try {
+        const { data } = await supabase
+          .from('vehicle_events')
+          .select('id, source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+          .eq('vehicle_id', vehicleData.id)
+          .order('updated_at', { ascending: false })
+          .limit(10);
+        arr = Array.isArray(data) ? data : [];
+      } catch {
+        // ignore
       }
       // Filter out stale active listings if vehicle is sold
       const vOutcome = String((vehicleData as any)?.auction_outcome || '').toLowerCase();
