@@ -64,6 +64,42 @@ export interface GarageSection {
   vehicles: GarageVehicle[];
 }
 
+/** Dashboard page: "my" vehicles (owned, co-owned, consigned, previously owned) */
+export interface MyVehicle {
+  vehicle_id: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  acquisition_date: string | null;
+  last_activity_date: string | null;
+  event_count: number | null;
+  image_count: number | null;
+  confidence_score: number;
+  interaction_score: number;
+  primary_image_url: string | null;
+  current_value?: number | null;
+  purchase_price?: number | null;
+}
+
+/** Dashboard page: client/contributor vehicles (same row shape as MyVehicle) */
+export type ClientVehicle = MyVehicle;
+
+/** Dashboard page: business fleet group */
+export interface BusinessFleet {
+  id: string;
+  name: string;
+  vehicle_count: number;
+  vehicles: MyVehicle[];
+}
+
+/** Dashboard page: aggregate counts for stats bar */
+export interface DashboardSummary {
+  total_my_vehicles: number;
+  total_client_vehicles: number;
+  total_business_vehicles: number;
+  recent_activity_30d: number;
+}
+
 export interface VehiclesDashboardState {
   sections: GarageSection[];
   vehicles: GarageVehicle[];
@@ -77,6 +113,15 @@ export interface VehiclesDashboardState {
   setSortMode: (m: SortMode) => void;
   setFilterMode: (m: FilterMode) => void;
   refresh: () => void;
+  /** Dashboard page shape: my_vehicles, client_vehicles, business_fleets, summary */
+  data: {
+    my_vehicles: MyVehicle[];
+    client_vehicles: ClientVehicle[];
+    business_fleets: BusinessFleet[];
+    summary: DashboardSummary;
+  } | null;
+  /** Alias for isLoading for dashboard page */
+  loading: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -133,6 +178,59 @@ function sortVehicles(a: GarageVehicle, b: GarageVehicle, sort: SortMode): numbe
     default:
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
   }
+}
+
+function garageToMyVehicle(v: GarageVehicle): MyVehicle {
+  return {
+    vehicle_id: v.id,
+    year: v.year,
+    make: v.make,
+    model: v.model,
+    acquisition_date: v.created_at ?? null,
+    last_activity_date: v.last_event_at ?? v.updated_at ?? null,
+    event_count: v.event_count,
+    image_count: v.image_count,
+    confidence_score: v.health_score ?? 0,
+    interaction_score: 0,
+    primary_image_url: v.resolved_image_url ?? v.primary_image_url ?? null,
+    current_value: v.estimated_value,
+    purchase_price: v.purchase_price,
+  };
+}
+
+const MY_RELATIONSHIP_TYPES: RelationshipType[] = ['VERIFIED OWNER', 'OWNER', 'CO-OWNER', 'PREVIOUSLY OWNED', 'CONSIGNED'];
+
+function buildDashboardData(
+  sections: GarageSection[],
+  vehicles: GarageVehicle[],
+): { my_vehicles: MyVehicle[]; client_vehicles: ClientVehicle[]; business_fleets: BusinessFleet[]; summary: DashboardSummary } {
+  const myVehicles: MyVehicle[] = [];
+  const clientVehicles: ClientVehicle[] = [];
+  for (const s of sections) {
+    const list = s.vehicles.map(garageToMyVehicle);
+    if (MY_RELATIONSHIP_TYPES.includes(s.relationship_type)) {
+      myVehicles.push(...list);
+    } else if (s.relationship_type === 'CONTRIBUTOR') {
+      clientVehicles.push(...list);
+    }
+  }
+  const now = Date.now();
+  const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+  const recentActivity30d = vehicles.filter((v) => {
+    const t = v.last_event_at ?? v.updated_at;
+    return t ? new Date(t).getTime() >= thirtyDaysAgo : false;
+  }).length;
+  return {
+    my_vehicles: myVehicles,
+    client_vehicles: clientVehicles,
+    business_fleets: [],
+    summary: {
+      total_my_vehicles: myVehicles.length,
+      total_client_vehicles: clientVehicles.length,
+      total_business_vehicles: 0,
+      recent_activity_30d: recentActivity30d,
+    },
+  };
 }
 
 function buildSections(vehicles: GarageVehicle[]): GarageSection[] {
@@ -246,8 +344,8 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
 
     async function fetchAll() {
       try {
-        // Fire 4 relationship queries in parallel (explicit relationships only)
-        const [verifiedRes, permRes, contribRes, prevOwnedRes] = await Promise.all([
+        // Fire 5 relationship queries in parallel (explicit + local_photos)
+        const [verifiedRes, permRes, contribRes, prevOwnedRes, localPhotosRes] = await Promise.all([
           // Q1: ownership_verifications (approved)
           supabase
             .from('ownership_verifications')
@@ -275,6 +373,13 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
             .eq('user_id', userId)
             .eq('relationship_type', 'previously_owned')
             .eq('is_active', true),
+
+          // Q5: vehicles whose data originates from my photos (profile_origin = local_photos)
+          supabase
+            .from('vehicles')
+            .select('id')
+            .eq('profile_origin', 'local_photos')
+            .or(`user_id.eq.${userId},uploaded_by.eq.${userId}`),
         ]);
 
         if (cancelled) return;
@@ -320,6 +425,13 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
         if (prevOwnedRes.data) {
           for (const row of prevOwnedRes.data) {
             setRel(row.vehicle_id, 'PREVIOUSLY OWNED', 'discovered');
+          }
+        }
+
+        // Q5: from my photos (data originates from user's photo library)
+        if (localPhotosRes.data) {
+          for (const row of localPhotosRes.data as { id: string }[]) {
+            setRel(row.id, 'OWNER', 'uploaded_by');
           }
         }
 
@@ -439,6 +551,8 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
     0,
   );
 
+  const data = userId ? buildDashboardData(sections, vehicles) : null;
+
   return {
     sections,
     vehicles,
@@ -452,5 +566,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
     setSortMode,
     setFilterMode,
     refresh,
+    data,
+    loading: isLoading,
   };
 }

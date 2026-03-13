@@ -203,6 +203,8 @@ export interface MobileVehicleProfileV2Props {
 export interface VehicleBasicInfoProps extends VehicleBaseProps {
   onDataPointClick?: (event: React.MouseEvent, dataType: string, dataValue: string, label: string) => void;
   onEditClick?: () => void;
+  /** When provided, VIN proof bubble opens this viewer instead of the provenance drawer */
+  onOpenVINProofImages?: () => void;
 }
 
 export interface VehicleTimelineSectionProps extends VehicleBaseProps {

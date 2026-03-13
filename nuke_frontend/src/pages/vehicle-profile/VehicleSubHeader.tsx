@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -7,6 +8,15 @@ import React from 'react';
 interface VehicleSubHeaderProps {
   vehicle: any; // full vehicle record
   stickyTop?: string; // CSS value for top position, default 'var(--header-height, 48px)'
+}
+
+/** Capitalize first letter of each word for display (e.g. "K5 JIMMY" -> "K5 Jimmy") */
+function toTitleCase(s: string): string {
+  return String(s || '')
+    .trim()
+    .split(/\s+/)
+    .map((w) => (w.length > 0 ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w))
+    .join(' ');
 }
 
 // ---------------------------------------------------------------------------
@@ -154,14 +164,15 @@ function resolveLocation(vehicle: any): string | null {
 // Base CSS values inlined as React style objects
 // ---------------------------------------------------------------------------
 
+/** Use CSS variables so dark mode is respected (design rule: no hardcoded hex). */
 const TOKEN = {
   fontBody: 'Arial, Helvetica, sans-serif' as const,
-  fontMono: "'Courier New', Courier, monospace" as const,
-  ink:      '#1a1a1a',
-  ink2:     '#888888',
-  surface:  '#ffffff',
-  borderSubtle: '1px solid #dddddd',
-  borderPrimary: '2px solid #1a1a1a',
+  fontMono: 'var(--font-mono, "Courier New", Courier, monospace)' as const,
+  ink:      'var(--text, var(--ink, #1a1a1a))',
+  ink2:     'var(--text-muted, var(--text-secondary, #888888))',
+  surface:  'var(--surface, #ffffff)',
+  borderSubtle: '1px solid var(--border, var(--border-subtle, #dddddd))',
+  borderPrimary: '2px solid var(--border, #1a1a1a)',
 };
 
 const BADGE_BASE: React.CSSProperties = {
@@ -214,13 +225,19 @@ interface BadgeProps {
   label: string;
   tooltip?: string;
   children?: React.ReactNode;
+  /** Optional click handler for data-view navigation (e.g. garage filtered by year/make/model) */
+  onClick?: () => void;
 }
 
-const Badge: React.FC<BadgeProps> = ({ variant = '', label, tooltip, children }) => {
+const Badge: React.FC<BadgeProps> = ({ variant = '', label, tooltip, children, onClick }) => {
   const [hovered, setHovered] = React.useState(false);
 
   const variantStyle = variant ? (BADGE_VARIANTS[variant] ?? {}) : {};
-  const style: React.CSSProperties = { ...BADGE_BASE, ...variantStyle };
+  const style: React.CSSProperties = {
+    ...BADGE_BASE,
+    ...variantStyle,
+    ...(onClick ? { cursor: 'pointer' as const } : {}),
+  };
 
   const tooltipStyle: React.CSSProperties = {
     position:       'absolute',
@@ -255,9 +272,13 @@ const Badge: React.FC<BadgeProps> = ({ variant = '', label, tooltip, children })
 
   return (
     <span
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
       style={style}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={onClick}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
     >
       {label}
       {children}
@@ -279,13 +300,17 @@ const VehicleSubHeader: React.FC<VehicleSubHeaderProps> = ({
   vehicle,
   stickyTop = 'var(--header-height, 48px)',
 }) => {
+  const navigate = useNavigate();
   if (!vehicle) return null;
 
   // --- Derived values ---
   const year      = vehicle.year   ?? vehicle.model_year   ?? '';
   const make      = vehicle.make   ?? vehicle.make_name    ?? '';
   const model     = vehicle.model  ?? vehicle.model_name   ?? '';
-  const titleStr  = [year, make, model].filter(Boolean).join(' ').toUpperCase();
+  const trim      = vehicle.trim   ?? vehicle.trim_name    ?? '';
+  // Title in proper case for display (e.g. "1973 GMC K5 Jimmy")
+  const titleParts = [year, make, model, trim].filter(Boolean);
+  const titleStr  = titleParts.map((p) => (typeof p === 'number' ? String(p) : toTitleCase(String(p)))).join(' ');
 
   const mileage   = vehicle.mileage    ?? vehicle.odometer   ?? vehicle.miles;
   const bidCount  = vehicle.bid_count  ?? vehicle.bidCount   ?? vehicle.bids ?? 0;
@@ -338,7 +363,7 @@ const VehicleSubHeader: React.FC<VehicleSubHeaderProps> = ({
   const dividerStyle: React.CSSProperties = {
     width:       1,
     height:      16,
-    background:  '#dddddd',
+    background:  'var(--border, var(--border-subtle, #dddddd))',
     flexShrink:  0,
   };
 
@@ -355,13 +380,55 @@ const VehicleSubHeader: React.FC<VehicleSubHeaderProps> = ({
     msOverflowStyle: 'none' as any,
   };
 
+  // Garage filter links for YMM badges (hover shows stats intent; click opens garage)
+  const garageBase = '/?tab=garage';
+  const onYearClick = year ? () => navigate(`${garageBase}&year=${encodeURIComponent(String(year))}`) : undefined;
+  const onMakeClick = make ? () => navigate(`${garageBase}&make=${encodeURIComponent(String(make).trim())}`) : undefined;
+  const onModelClick = model ? () => navigate(`${garageBase}&model=${encodeURIComponent(String(model).trim())}`) : undefined;
+  const onTrimClick = trim ? () => navigate(`${garageBase}&trim=${encodeURIComponent(String(trim).trim())}`) : undefined;
+
   return (
     <div className="vp-sub-header" style={containerStyle}>
-      {/* Left: title + mileage */}
+      {/* Left: YMM (+ trim) as clickable badges, then mileage */}
       <div className="vp-sub-header__left" style={leftStyle}>
-        <span className="vp-sub-header__title" style={titleStyle} title={titleStr}>
-          {titleStr || 'VEHICLE'}
-        </span>
+        {titleStr ? (
+          <>
+            {year && (
+              <Badge
+                variant="source"
+                label={String(year)}
+                tooltip={`View all vehicles from ${year}`}
+                onClick={onYearClick}
+              />
+            )}
+            {make && (
+              <Badge
+                variant="source"
+                label={toTitleCase(String(make))}
+                tooltip={`View all ${String(make).trim()} vehicles`}
+                onClick={onMakeClick}
+              />
+            )}
+            {model && (
+              <Badge
+                variant="source"
+                label={toTitleCase(String(model))}
+                tooltip={make ? `View ${String(model).trim()} (e.g. ${String(make).trim()} / related makes)` : `View ${String(model).trim()} vehicles`}
+                onClick={onModelClick}
+              />
+            )}
+            {trim && (
+              <Badge
+                variant="source"
+                label={toTitleCase(String(trim))}
+                tooltip={`View ${String(trim).trim()} variants`}
+                onClick={onTrimClick}
+              />
+            )}
+          </>
+        ) : (
+          <span className="vp-sub-header__title" style={titleStyle}>VEHICLE</span>
+        )}
 
         {mileage != null && mileage !== '' && (
           <Badge

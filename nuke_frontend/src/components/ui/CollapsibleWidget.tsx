@@ -43,8 +43,12 @@ export function CollapsibleWidget({
       <div
         role="button"
         tabIndex={0}
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsCollapsed(!isCollapsed); } }}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsCollapsed((prev) => !prev);
+        }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsCollapsed((prev) => !prev); } }}
         className={cn(
           'flex w-full items-center justify-between text-left cursor-pointer',
           isProfile ? 'collapsible-widget--profile__header' : 'p-4',

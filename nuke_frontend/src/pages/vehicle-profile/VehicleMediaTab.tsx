@@ -26,7 +26,7 @@ const VehicleMediaTab: React.FC<VehicleMediaTabProps> = ({
         <ImageGallery
           vehicleId={vehicle.id}
           showUpload={true}
-          fallbackImageUrls={vehicleImages.length > 0 ? [] : fallbackListingImageUrls}
+          fallbackImageUrls={vehicleImages.length > 0 ? vehicleImages : fallbackListingImageUrls}
           fallbackLabel={(vehicle as any)?.profile_origin === 'bat_import' ? 'BaT listing' : 'Listing'}
           fallbackSourceUrl={
             (vehicle as any)?.discovery_url ||

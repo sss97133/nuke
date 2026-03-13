@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { ImageExpandedData } from './ImageExpandedData';
 
 type PanelState = 'closed' | 'peek' | 'full';
 type TabType = 'info' | 'tags' | 'comments' | 'actions';
@@ -14,6 +15,8 @@ interface ImageInfoPanelProps {
   attribution: any;
   tags: any[];
   comments: any[];
+  /** Full image record (caption, file_name, vehicle_zone, etc.) for catalog-style expanded data */
+  imageRecord?: any;
   canEdit: boolean;
   onTag: () => void;
   onSetPrimary: () => void;
@@ -29,6 +32,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
   attribution,
   tags,
   comments,
+  imageRecord,
   canEdit,
   onTag,
   onSetPrimary,
@@ -180,139 +184,25 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
       });
     }
 
+    // Catalog-style expanded data (same as desktop DETAIL panel)
     return (
       <div style={{ color: 'white', fontSize: '13px', lineHeight: '1.5' }}>
-        {/* Date/Time */}
-        {(imageMetadata?.created_at || imageMetadata?.taken_at) && (
-          <>
-            <div>{formatDate(imageMetadata.taken_at || imageMetadata.created_at)}</div>
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>
-              {(() => {
-                const now = new Date();
-                const then = new Date(imageMetadata.taken_at || imageMetadata.created_at);
-                const days = Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
-                if (days === 0) return 'Today';
-                if (days === 1) return 'Yesterday';
-                return `${days} days ago`;
-              })()}
-            </div>
-          </>
-        )}
+        <ImageExpandedData
+          imageRecord={imageRecord}
+          imageMetadata={imageMetadata}
+          attribution={attribution}
+          tags={tags}
+          commentsCount={comments.length}
+          dark
+        />
+      </div>
+    );
+  };
 
-      {/* Location - Check multiple sources */}
-      {(() => {
-        const location = imageMetadata?.exif_data?.location;
-        const gps = imageMetadata?.exif_data?.gps;
-        const lat = location?.latitude || gps?.latitude || imageMetadata?.latitude;
-        const lng = location?.longitude || gps?.longitude || imageMetadata?.longitude;
-        
-        if (!lat || !lng) return null;
-        
-        return (
-          <>
-            <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
-            {/* Priority 1: City + State (if reverse geocoded) */}
-            {location && typeof location === 'object' && location.city ? (
-              <>
-                <div>{location.city}{location.state ? `, ${location.state}` : ''}</div>
-                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>
-                  {lat.toFixed(4)}, {lng.toFixed(4)}
-                </div>
-              </>
-            ) : location && typeof location === 'string' ? (
-              <div>{location}</div>
-            ) : (
-              <div>{lat.toFixed(4)}, {lng.toFixed(4)}</div>
-            )}
-          </>
-        );
-      })()}
-
-      {/* Camera/EXIF - Always show if camera exists, even without EXIF details */}
-      {imageMetadata?.exif_data?.camera && (
-        <>
-          <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
-          <div>
-            {typeof imageMetadata.exif_data.camera === 'string' 
-              ? imageMetadata.exif_data.camera 
-              : `${imageMetadata.exif_data.camera.make || ''} ${imageMetadata.exif_data.camera.model || ''}`.trim() || 'Camera'
-            }
-          </div>
-          {getExifText() && (
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>
-              {getExifText()}
-            </div>
-          )}
-          {imageMetadata?.exif_data?.dimensions && (
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>
-              {imageMetadata.exif_data.dimensions.width} × {imageMetadata.exif_data.dimensions.height}
-            </div>
-          )}
-          {!getExifText() && !imageMetadata?.exif_data?.dimensions && (
-            <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px', fontStyle: 'italic' }}>
-              No EXIF details available
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Source/Attribution */}
-      {attribution && (
-        <>
-          <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
-          {attribution.photographer?.name && (
-            <div>{attribution.photographer.name}</div>
-          )}
-          {attribution.organization ? (
-            <>
-              <div style={{ fontWeight: 600 }}>{attribution.organization.name}</div>
-              {attribution.organization.relationshipLabel && (
-                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>
-                  {attribution.organization.relationshipLabel}
-                </div>
-              )}
-            </>
-          ) : attribution.uploader ? (
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>
-              {attribution.uploader.full_name || attribution.uploader.username || 'User'}
-            </div>
-          ) : null}
-          {/* Only show source if it's not bat_listing (already shown via organization) */}
-          {attribution.source && attribution.source !== 'bat_listing' && (
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>
-              Source: {attribution.source}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Stats - Always show if we have any data */}
-      {(imageMetadata?.view_count || imageMetadata?.comment_count || comments.length > 0) && (
-        <>
-          <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
-          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>
-            {[
-              imageMetadata?.view_count ? `${imageMetadata.view_count} ${imageMetadata.view_count === 1 ? 'view' : 'views'}` : null,
-              comments.length > 0 ? `${comments.length} ${comments.length === 1 ? 'comment' : 'comments'}` : null
-            ].filter(Boolean).join(' • ') || 'No stats'}
-          </div>
-        </>
-      )}
-
-      {/* Tags preview - Show even if empty to indicate section exists */}
-      <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
-      {tags.length > 0 ? (
-        <div style={{ fontSize: '12px', color: 'var(--surface-glass)' }}>
-          {tags.slice(0, 5).map(tag => tag.tag_text || tag.tag_name || tag.text || 'tag').filter(Boolean).join(' • ')}
-        </div>
-      ) : (
-        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>
-          No tags
-        </div>
-      )}
-
-      {/* Vision Summary — YONO + pipeline results in user-friendly format */}
-      {(() => {
+  const renderTagsTab = () => (
+    <div style={{ color: 'white' }}>
+      {/* Legacy Vision/Provenance/Components block removed; ImageExpandedData covers this. */}
+      {false && (() => {
         const zone = imageMetadata?.vehicle_zone;
         const condScore = imageMetadata?.condition_score;
         const dmgFlags: string[] = imageMetadata?.damage_flags || [];
@@ -720,12 +610,6 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
           </div>
         </>
       )}
-      </div>
-    );
-  };
-
-  const renderTagsTab = () => (
-    <div style={{ color: 'white' }}>
       {tags.length > 0 ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
           {tags.map((tag, i) => (

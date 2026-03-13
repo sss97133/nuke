@@ -201,6 +201,8 @@ interface ImageZoneSectionProps {
   selectMode?: boolean;
   selectedImages?: Set<string>;
   onImageSelect?: (imageId: string, event: React.MouseEvent) => void;
+  /** When set (e.g. for listing-only fallback), use this instead of section.label in the header */
+  sectionLabelOverride?: string;
 }
 
 const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
@@ -214,10 +216,13 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
   selectMode = false,
   selectedImages,
   onImageSelect,
+  sectionLabelOverride,
 }) => {
   const [collapsed, setCollapsed] = useState(!defaultOpen);
 
   if (images.length === 0) return null;
+
+  const displayLabel = sectionLabelOverride ?? section.label;
 
   return (
     <div data-zone-section={section.key} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -245,7 +250,7 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
               letterSpacing: '0.5px',
             }}
           >
-            {section.label}
+            {displayLabel}
           </span>
           <span
             style={{

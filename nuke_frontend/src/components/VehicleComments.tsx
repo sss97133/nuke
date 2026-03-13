@@ -1027,18 +1027,8 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
   };
 
   return (
-    <div>
-      {/* Extraction Queue Status */}
+    <>
       <ExtractionQueueStatus vehicleId={vehicleId} />
-
-      {/* Compact header only if there are comments */}
-      {comments.length > 0 && (
-        <div style={{ marginBottom: '12px', fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>
-          Comments ({comments.length})
-        </div>
-      )}
-      
-      {/* Comment Box */}
       <div className="comment-form">
         <div className="form-group" style={{ position: 'relative', marginBottom: '12px' }}>
           <textarea
@@ -1162,7 +1152,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
             </div>
           ) : null
       }
-    </div>
+    </>
   );
 };
 
