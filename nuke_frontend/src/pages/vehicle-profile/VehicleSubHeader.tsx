@@ -512,4 +512,3 @@ const VehicleSubHeader: React.FC = () => {
 };
 
 export default VehicleSubHeader;
-export type { VehicleSubHeaderProps };
