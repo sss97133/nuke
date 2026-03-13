@@ -7,15 +7,13 @@ const ExternalAuctionLiveBanner = React.lazy(() => import('../../components/auct
 const MergeProposalsPanel = React.lazy(() => import('../../components/vehicle/MergeProposalsPanel'));
 
 export interface VehicleBannersProps {
-  auctionCurrency: string;
   onMergeComplete: () => void;
 }
 
 const VehicleBanners: React.FC<VehicleBannersProps> = ({
-  auctionCurrency,
   onMergeComplete,
 }) => {
-  const { vehicle, session, permissions, auctionPulse, isVerifiedOwner } = useVehicleProfile();
+  const { vehicle, session, permissions, auctionPulse, auctionCurrency, isVerifiedOwner } = useVehicleProfile();
   if (!vehicle) return null;
 
   return (

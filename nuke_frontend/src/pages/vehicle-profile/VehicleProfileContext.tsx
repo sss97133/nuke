@@ -17,6 +17,7 @@ import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
 import { loadVehicleImpl, selectBestHeroImage } from './loadVehicleData';
 import { loadVehicleImagesImpl } from './loadVehicleImages';
 import { resolveVehicleImages } from './resolveVehicleImages';
+import { resolveCurrencyCode } from '../../utils/currency';
 import type { Vehicle, VehiclePermissions, LiveSession, AuctionPulse } from './types';
 import type { HeroImageMeta } from './loadVehicleData';
 
@@ -53,6 +54,11 @@ interface VehicleProfileContextValue {
   canTriggerProofAnalysis: boolean;
   userOwnershipClaim: any;
 
+  // Header data
+  responsibleName: string | null;
+  linkedOrganizations: any[];
+  auctionCurrency: string;
+
   // UI state
   loading: boolean;
   isMobile: boolean;
@@ -63,6 +69,7 @@ interface VehicleProfileContextValue {
   reloadVehicle: () => void;
   reloadImages: () => void;
   reloadTimeline: () => void;
+  reloadLinkedOrgs: () => void;
   setIsPublic: (v: boolean) => void;
   setVehicleHeaderHeight: (h: number) => void;
 }
@@ -102,6 +109,10 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   // ── Auction ──
   const [auctionPulse, setAuctionPulse] = useState<AuctionPulse | null>(null);
   const [liveSession, setLiveSession] = useState<LiveSession | null>(null);
+
+  // ── Header data ──
+  const [responsibleName, setResponsibleName] = useState<string | null>(null);
+  const [linkedOrganizations, setLinkedOrganizations] = useState<any[]>([]);
 
   // ── Auth ──
   const [session, setSession] = useState<any>(() => readCachedSession());
@@ -233,6 +244,78 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     } catch { /* ignore */ }
   }, [vehicleId]);
 
+  const loadResponsible = useCallback(async () => {
+    if (!vehicle) return;
+    try {
+      const origin = String(vehicle?.profile_origin || '');
+      const isImportedProfile = Boolean(
+        vehicle?.origin_organization_id &&
+        (vehicle?.origin_metadata?.automated_import === true ||
+         vehicle?.origin_metadata?.no_user_uploader === true ||
+         !vehicle?.uploaded_by ||
+         ['dropbox_import', 'url_scraper', 'api_import', 'organization_import', 'classic_com_indexing'].includes(origin))
+      );
+      if (isImportedProfile && vehicle?.origin_organization_id) {
+        const { data: orgData, error: orgError } = await supabase
+          .from('businesses').select('business_name').eq('id', vehicle.origin_organization_id).maybeSingle();
+        if (!orgError && orgData?.business_name) { setResponsibleName(orgData.business_name); return; }
+        setResponsibleName('Imported');
+        return;
+      }
+      if (!vehicle?.uploaded_by) return;
+      const { data, error } = await supabase
+        .from('profiles').select('username, full_name').eq('id', vehicle.uploaded_by).maybeSingle();
+      if (!error && data) setResponsibleName(data.full_name || data.username || null);
+    } catch { /* ignore */ }
+  }, [vehicle?.id, vehicle?.profile_origin, vehicle?.origin_organization_id, vehicle?.uploaded_by]);
+
+  const loadLinkedOrgs = useCallback(async () => {
+    if (!vehicle?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('organization_vehicles')
+        .select('id, organization_id, relationship_type, auto_tagged, gps_match_confidence, status, businesses!inner (id, business_name, business_type, city, state, logo_url)')
+        .eq('vehicle_id', vehicle.id)
+        .in('status', ['active', 'sold', 'pending', 'past', 'archived']);
+      if (error) { setLinkedOrganizations([]); return; }
+      const enriched = (data || []).map((ov: any) => ({
+        id: ov.id, organization_id: ov.organization_id, relationship_type: ov.relationship_type,
+        auto_tagged: ov.auto_tagged, gps_match_confidence: ov.gps_match_confidence, status: ov.status,
+        business_name: ov.businesses?.business_name || 'Unknown org', business_type: ov.businesses?.business_type,
+        city: ov.businesses?.city, state: ov.businesses?.state, logo_url: ov.businesses?.logo_url,
+      }));
+      // De-dupe by org, keep most relevant (active > sold > pending > past > archived)
+      const rank = (s: any) => { const v = String(s || '').toLowerCase(); return v === 'active' ? 0 : v === 'sold' ? 1 : v === 'pending' ? 2 : v === 'past' ? 3 : v === 'archived' ? 4 : 5; };
+      const byOrg = new Map<string, any>();
+      for (const link of enriched) {
+        const orgId = String(link.organization_id || '');
+        if (!orgId) continue;
+        const existing = byOrg.get(orgId);
+        if (!existing) { byOrg.set(orgId, link); continue; }
+        const nr = rank(link.status), pr = rank(existing.status);
+        if (nr < pr || (nr === pr && existing.auto_tagged && !link.auto_tagged)) byOrg.set(orgId, link);
+      }
+      setLinkedOrganizations(Array.from(byOrg.values()));
+    } catch { setLinkedOrganizations([]); }
+  }, [vehicle?.id]);
+
+  const auctionCurrency = useMemo(() => {
+    const v: any = vehicle as any;
+    const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
+    const pulseMeta = (auctionPulse as any)?.metadata;
+    return resolveCurrencyCode(
+      pulseMeta?.currency, pulseMeta?.currency_code, pulseMeta?.currencyCode,
+      pulseMeta?.price_currency, pulseMeta?.priceCurrency,
+      externalListing?.currency, externalListing?.currency_code, externalListing?.price_currency,
+      externalListing?.metadata?.currency, externalListing?.metadata?.currency_code,
+      externalListing?.metadata?.currencyCode, externalListing?.metadata?.price_currency,
+      externalListing?.metadata?.priceCurrency,
+      v?.origin_metadata?.currency, v?.origin_metadata?.currency_code,
+      v?.origin_metadata?.price_currency, v?.origin_metadata?.priceCurrency,
+      v?.origin_metadata?.priceCurrencyCode,
+    );
+  }, [vehicle, auctionPulse]);
+
   // ── Auth bootstrap ──
 
   useEffect(() => {
@@ -268,6 +351,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     loadVehicleImages();
     loadTotalCommentCount();
     loadLiveSession();
+    loadResponsible();
+    loadLinkedOrgs();
     supabase
       .from('vehicle_observations')
       .select('id', { count: 'exact', head: true })
@@ -620,6 +705,9 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     isAdminUser,
     canTriggerProofAnalysis,
     userOwnershipClaim,
+    responsibleName,
+    linkedOrganizations,
+    auctionCurrency,
     loading,
     isMobile,
     isPublic,
@@ -627,6 +715,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     reloadVehicle: loadVehicle,
     reloadImages: loadVehicleImages,
     reloadTimeline: loadTimelineEvents,
+    reloadLinkedOrgs: loadLinkedOrgs,
     setIsPublic,
     setVehicleHeaderHeight,
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -636,8 +725,9 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     leadImageUrl, heroMeta, auctionPulse, liveSession,
     session, isRowOwner, isVerifiedOwner, hasContributorAccess,
     canEdit, isAdminUser, canTriggerProofAnalysis, userOwnershipClaim,
+    responsibleName, linkedOrganizations, auctionCurrency,
     loading, isMobile, isPublic, vehicleHeaderHeight,
-    loadVehicle, loadVehicleImages, loadTimelineEvents,
+    loadVehicle, loadVehicleImages, loadTimelineEvents, loadLinkedOrgs,
   ]);
 
   return (

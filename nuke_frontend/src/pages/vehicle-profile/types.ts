@@ -632,10 +632,8 @@ export interface VehicleBaseProps {
   permissions: VehiclePermissions;
 }
 
-/** Props that VehicleHeader can't get from context (modal callbacks, VehicleProfile-local state). */
+/** Props that VehicleHeader can't get from context (modal callbacks). */
 export interface VehicleHeaderProps {
-  responsibleName?: string;
-  organizationLinks?: any[];
   onClaimClick?: () => void;
 }
 

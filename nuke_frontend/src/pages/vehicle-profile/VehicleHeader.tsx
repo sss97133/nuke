@@ -64,8 +64,6 @@ import {
 } from './hooks/useVehicleHeaderData';
 
 const VehicleHeader: React.FC<VehicleHeaderProps> = ({
-  responsibleName,
-  organizationLinks = [],
   onClaimClick,
 }) => {
   const navigate = useNavigate();
@@ -78,6 +76,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     canEdit,
     userOwnershipClaim,
     leadImageUrl,
+    responsibleName,
+    linkedOrganizations: organizationLinks,
     liveSession,
     auctionPulse,
   } = useVehicleProfile();
