@@ -4128,8 +4128,12 @@ const ImageGallery = ({
             </div>
           )}
 
-          {/* Auto-detected sessions (from get_vehicle_sessions) */}
-          {sessions.map(session => {
+          {/* Auto-detected sessions (from get_vehicle_sessions), sorted chronologically */}
+          {[...sessions].sort((a, b) => {
+            const ta = a.session_start ? new Date(a.session_start).getTime() : 0;
+            const tb = b.session_start ? new Date(b.session_start).getTime() : 0;
+            return ta - tb;
+          }).map(session => {
             const sid = session.session_id;
             const isCollapsed = sessionCollapsed[sid] ?? false;
             const dateLabel = session.session_start
@@ -4148,20 +4152,14 @@ const ImageGallery = ({
 
             return (
               <div key={sid} style={{ borderBottom: '1px solid var(--border)' }}>
-                {/* Session header */}
+                {/* Session header — text only, no cover images */}
                 <div
-                  style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', cursor: 'pointer', background: 'var(--white)' }}
+                  className="session-header"
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', cursor: 'pointer', position: 'relative' }}
                   onClick={() => setSessionCollapsed(prev => ({ ...prev, [sid]: !isCollapsed }))}
+                  title={session.narrative || `${session.session_type_label || 'Session'}: ${session.image_count} photos`}
                 >
-                  {/* Cover image */}
-                  <div style={{ flexShrink: 0 }}>
-                    {session.cover_image_url ? (
-                      <img src={supabaseTransformUrl(session.cover_image_url, 80, 60)} style={{ width: '48px', height: '48px', objectFit: 'cover', border: '2px solid var(--border)' }} />
-                    ) : (
-                      <div style={{ width: '48px', height: '48px', background: 'var(--grey-100)', border: '2px solid var(--border)' }} />
-                    )}
-                  </div>
-                  {/* Session info */}
+                  {/* Session info — no cover image */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                       <span style={{
@@ -4175,27 +4173,18 @@ const ImageGallery = ({
                       <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>
                         {dateLabel}
                       </span>
+                      <span style={{ fontSize: '10px', fontFamily: "'Courier New', monospace", color: 'var(--text-muted)' }}>
+                        {session.image_count} photos
+                        {durationMin != null && durationMin > 0 ? ` · ${durationMin < 60 ? `${durationMin}m` : `${Math.round(durationMin / 60)}h`}` : ''}
+                      </span>
                     </div>
-                    <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)' }}>
-                      {session.image_count} photos
-                      {durationMin ? ` · ${durationMin < 60 ? `${durationMin}m` : `${Math.round(durationMin / 60)}h`}` : ''}
-                    </p>
-                    {session.narrative && (
-                      <p style={{
-                        margin: '3px 0 0', fontSize: '10px', color: 'var(--text-muted)',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%',
-                        fontStyle: 'italic',
-                      }}>
-                        {session.narrative}
-                      </p>
-                    )}
                   </div>
                   <span style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0 }}>{isCollapsed ? '▶' : '▼'}</span>
                 </div>
-                {/* Expanded: show session images in grid */}
+                {/* Expanded: show ALL session images in grid (no limit) */}
                 {!isCollapsed && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '2px', padding: '2px 12px 12px' }}>
-                    {(session.image_ids || []).slice(0, 40).map((imgId: string) => {
+                    {(session.image_ids || []).map((imgId: string) => {
                       const img = allImages.find(i => i.id === imgId);
                       if (!img) return null;
                       return (
@@ -4211,11 +4200,6 @@ const ImageGallery = ({
                         />
                       );
                     })}
-                    {(session.image_ids || []).length > 40 && (
-                      <div style={{ gridColumn: '1/-1', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', padding: '6px 0' }}>
-                        + {session.image_ids.length - 40} more
-                      </div>
-                    )}
                   </div>
                 )}
               </div>

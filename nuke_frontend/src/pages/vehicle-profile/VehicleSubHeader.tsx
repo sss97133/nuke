@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
 
 /** Capitalize first letter of each word for display (e.g. "K5 JIMMY" -> "K5 Jimmy") */
@@ -27,23 +28,6 @@ function formatMileage(value: number | string | null | undefined): string {
   const n = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.]/g, '')) : value;
   if (isNaN(n)) return String(value);
   return n.toLocaleString('en-US') + ' mi';
-}
-
-function relativeTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return '';
-  const then = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - then.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHr  = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHr  / 24);
-
-  if (diffSec <  60)  return `${diffSec}s ago`;
-  if (diffMin <  60)  return `${diffMin}m ago`;
-  if (diffHr  <  24)  return `${diffHr}h ago`;
-  if (diffDay < 365)  return `${diffDay}d ago`;
-  return `${Math.floor(diffDay / 365)}y ago`;
 }
 
 function endingIn(dateStr: string | null | undefined): string {
@@ -86,7 +70,7 @@ function resolveStatus(vehicle: any): {
     const isEndingSoon = (() => {
       if (!end) return false;
       const diffMs = new Date(end).getTime() - Date.now();
-      return diffMs > 0 && diffMs < 1000 * 60 * 60 * 6; // < 6 hours
+      return diffMs > 0 && diffMs < 1000 * 60 * 60 * 6;
     })();
 
     if (isEndingSoon) {
@@ -97,11 +81,7 @@ function resolveStatus(vehicle: any): {
       };
     }
     if (hasBids && reserveMet === false) {
-      return {
-        label: 'RNM',
-        variant: 'rnm',
-        tooltip: 'Reserve not met',
-      };
+      return { label: 'RNM', variant: 'rnm', tooltip: 'Reserve not met' };
     }
     return {
       label: 'LIVE',
@@ -109,7 +89,6 @@ function resolveStatus(vehicle: any): {
       tooltip: remaining ? `Ends in ${remaining}` : 'Auction live',
     };
   }
-  // Fallback: ended but no clear status
   if (status === 'ended' || status === 'closed') {
     if (hasBids && reserveMet === false) {
       return { label: 'RNM', variant: 'rnm', tooltip: 'Reserve not met' };
@@ -119,28 +98,35 @@ function resolveStatus(vehicle: any): {
   return { label: status.toUpperCase() || 'UNKNOWN', variant: 'draft', tooltip: `Status: ${status}` };
 }
 
-function resolveSource(vehicle: any): string | null {
+/** Only show source badge for real auction/marketplace platforms */
+const PLATFORM_SOURCES: Record<string, string> = {
+  'bring_a_trailer': 'BaT',
+  'bat': 'BaT',
+  'bring a trailer': 'BaT',
+  'cars_and_bids': 'C&B',
+  'cars and bids': 'C&B',
+  'c&b': 'C&B',
+  'pcarmarket': 'PCM',
+  'pcm': 'PCM',
+  'rm_sothebys': 'RM',
+  'rm': 'RM',
+  'gooding': 'Gooding',
+  'bonhams': 'Bonhams',
+  'barrett_jackson': 'B-J',
+  'barrett-jackson': 'B-J',
+  'mecum': 'Mecum',
+  'craigslist': 'CL',
+  'craigslist_listing': 'CL',
+  'facebook_marketplace': 'FB',
+  'hagerty': 'Hagerty',
+  'broad_arrow': 'Broad Arrow',
+};
+
+function resolvePlatformSource(vehicle: any): string | null {
   const raw = vehicle?.source ?? vehicle?.auction_source ?? vehicle?.auctionSource;
   if (!raw) return null;
-  const map: Record<string, string> = {
-    'bring_a_trailer': 'BaT',
-    'bat': 'BaT',
-    'bring a trailer': 'BaT',
-    'cars_and_bids': 'C&B',
-    'cars and bids': 'C&B',
-    'c&b': 'C&B',
-    'pcarmarket': 'PCM',
-    'pcm': 'PCM',
-    'rm_sothebys': 'RM',
-    'rm': 'RM',
-    'gooding': 'Gooding',
-    'bonhams': 'Bonhams',
-    'barrett_jackson': 'B-J',
-    'barrett-jackson': 'B-J',
-    'mecum': 'Mecum',
-  };
   const key = raw.toLowerCase().replace(/\s+/g, ' ').trim();
-  return map[key] ?? raw.toUpperCase();
+  return PLATFORM_SOURCES[key] ?? null; // null = not a real platform, don't show badge
 }
 
 function resolveLocation(vehicle: any): string | null {
@@ -156,7 +142,6 @@ function resolveLocation(vehicle: any): string | null {
 // Base CSS values inlined as React style objects
 // ---------------------------------------------------------------------------
 
-/** Use CSS variables so dark mode is respected (design rule: no hardcoded hex). */
 const TOKEN = {
   fontBody: 'Arial, Helvetica, sans-serif' as const,
   fontMono: 'var(--font-mono, "Courier New", Courier, monospace)' as const,
@@ -198,7 +183,6 @@ const BADGE_VARIANTS: Record<string, React.CSSProperties> = {
   location:     { background: 'transparent', fontFamily: TOKEN.fontMono, fontSize: 7, letterSpacing: '0.06em', color: TOKEN.ink2 },
   price:        { background: 'rgba(26,26,26,0.04)', fontFamily: TOKEN.fontMono, fontWeight: 700, color: TOKEN.ink, letterSpacing: '0.04em' },
   sold:         { background: 'rgba(0,66,37,0.07)',     borderColor: 'rgba(0,66,37,0.35)',    color: '#004225' },
-  time:         { background: 'transparent', fontFamily: TOKEN.fontMono, fontSize: 7, color: TOKEN.ink2 },
   source:       { background: 'rgba(26,26,26,0.06)',    borderColor: 'rgba(26,26,26,0.20)',   color: TOKEN.ink, letterSpacing: '0.14em' },
   live:         { background: 'rgba(0,66,37,0.07)',     borderColor: 'rgba(0,66,37,0.35)',    color: '#004225' },
   rnm:          { background: 'rgba(238,118,35,0.06)',  borderColor: 'rgba(238,118,35,0.35)', color: '#b05510' },
@@ -206,23 +190,215 @@ const BADGE_VARIANTS: Record<string, React.CSSProperties> = {
   'ending-soon':{ background: 'rgba(255,128,0,0.08)',   borderColor: 'rgba(255,128,0,0.40)',  color: '#994d00' },
   draft:        { background: 'rgba(136,136,136,0.08)', borderColor: 'rgba(136,136,136,0.3)', color: TOKEN.ink2 },
   mileage:      { background: 'transparent', fontFamily: TOKEN.fontMono, fontSize: 7, color: TOKEN.ink2, letterSpacing: '0.06em' },
+  finance:      { background: 'rgba(0,66,37,0.05)', fontFamily: TOKEN.fontMono, fontSize: 7, fontWeight: 700, letterSpacing: '0.04em' },
 };
 
 // ---------------------------------------------------------------------------
-// Sub-components
+// StatsStack — hover popover showing market stats for a Y/M/M dimension
+// ---------------------------------------------------------------------------
+
+interface StatsStackData {
+  count: number;
+  avgPrice: number | null;
+  medianPrice: number | null;
+  priceRange: { min: number; max: number } | null;
+}
+
+function useStatsStack(dimension: 'year' | 'make' | 'model' | 'trim', value: string | number | null) {
+  const [data, setData] = useState<StatsStackData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const fetchedRef = useRef(false);
+
+  const load = useCallback(async () => {
+    if (!value || fetchedRef.current || loading) return;
+    fetchedRef.current = true;
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('vehicles')
+        .select('sale_price, nuke_estimate')
+        .eq('status', 'active')
+        .not('sale_price', 'is', null);
+
+      if (dimension === 'year') query = query.eq('year', Number(value));
+      else if (dimension === 'make') query = query.ilike('make', String(value));
+      else if (dimension === 'model') query = query.ilike('model', String(value));
+      else if (dimension === 'trim') query = query.ilike('trim', String(value));
+
+      const { data: rows } = await query.limit(500);
+      if (!rows || rows.length === 0) {
+        setData({ count: 0, avgPrice: null, medianPrice: null, priceRange: null });
+        setLoading(false);
+        return;
+      }
+      const prices = rows
+        .map((r: any) => Number(r.sale_price || r.nuke_estimate || 0))
+        .filter((p: number) => p > 0)
+        .sort((a: number, b: number) => a - b);
+      const count = rows.length;
+      const avg = prices.length > 0 ? Math.round(prices.reduce((s: number, p: number) => s + p, 0) / prices.length) : null;
+      const median = prices.length > 0 ? prices[Math.floor(prices.length / 2)] : null;
+      const range = prices.length > 0 ? { min: prices[0], max: prices[prices.length - 1] } : null;
+      setData({ count, avgPrice: avg, medianPrice: median, priceRange: range });
+    } catch {
+      setData(null);
+    }
+    setLoading(false);
+  }, [dimension, value, loading]);
+
+  return { data, loading, load };
+}
+
+// ---------------------------------------------------------------------------
+// YMMBadge — Y/M/M badge with StatsStack hover popover
+// ---------------------------------------------------------------------------
+
+interface YMMBadgeProps {
+  label: string;
+  dimension: 'year' | 'make' | 'model' | 'trim';
+  value: string | number | null;
+  onClick?: () => void;
+}
+
+const STATS_STACK_STYLE: React.CSSProperties = {
+  position:       'absolute',
+  top:            'calc(100% + 4px)',
+  left:           0,
+  zIndex:         300,
+  background:     TOKEN.ink,
+  color:          '#ffffff',
+  fontFamily:     TOKEN.fontBody,
+  fontSize:       8,
+  fontWeight:     400,
+  textTransform:  'none',
+  letterSpacing:  0,
+  padding:        '8px 10px',
+  minWidth:       160,
+  pointerEvents:  'none',
+  transition:     'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+};
+
+const STATS_ROW: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 12,
+  padding: '2px 0',
+};
+
+const STATS_LABEL: React.CSSProperties = {
+  fontFamily: TOKEN.fontBody,
+  fontSize: 7,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'rgba(255,255,255,0.55)',
+};
+
+const STATS_VALUE: React.CSSProperties = {
+  fontFamily: TOKEN.fontMono,
+  fontSize: 9,
+  fontWeight: 700,
+  color: '#ffffff',
+};
+
+const YMMBadge: React.FC<YMMBadgeProps> = ({ label, dimension, value, onClick }) => {
+  const [hovered, setHovered] = useState(false);
+  const { data, loading, load } = useStatsStack(dimension, value);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleEnter = useCallback(() => {
+    setHovered(true);
+    timerRef.current = setTimeout(() => load(), 200); // lazy-load on hover
+  }, [load]);
+
+  const handleLeave = useCallback(() => {
+    setHovered(false);
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  const variantStyle = BADGE_VARIANTS['source'] ?? {};
+  const style: React.CSSProperties = {
+    ...BADGE_BASE,
+    ...variantStyle,
+    cursor: 'pointer',
+  };
+
+  const dimensionLabels: Record<string, string> = {
+    year: 'vehicles from this year',
+    make: 'vehicles by this make',
+    model: 'this model in garage',
+    trim: 'this trim variant',
+  };
+
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      style={style}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+      onClick={onClick}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+    >
+      {label}
+      {hovered && (
+        <span style={{ ...STATS_STACK_STYLE, opacity: 1 }}>
+          {loading && !data && (
+            <span style={{ ...STATS_LABEL, color: 'rgba(255,255,255,0.4)' }}>Loading...</span>
+          )}
+          {data && (
+            <>
+              <div style={STATS_ROW}>
+                <span style={STATS_LABEL}>In garage</span>
+                <span style={STATS_VALUE}>{data.count}</span>
+              </div>
+              {data.avgPrice != null && (
+                <div style={STATS_ROW}>
+                  <span style={STATS_LABEL}>Avg price</span>
+                  <span style={STATS_VALUE}>{formatPrice(data.avgPrice)}</span>
+                </div>
+              )}
+              {data.medianPrice != null && (
+                <div style={STATS_ROW}>
+                  <span style={STATS_LABEL}>Median</span>
+                  <span style={STATS_VALUE}>{formatPrice(data.medianPrice)}</span>
+                </div>
+              )}
+              {data.priceRange && (
+                <div style={STATS_ROW}>
+                  <span style={STATS_LABEL}>Range</span>
+                  <span style={STATS_VALUE}>{formatPrice(data.priceRange.min)} — {formatPrice(data.priceRange.max)}</span>
+                </div>
+              )}
+              <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>
+                Click to view {dimensionLabels[dimension]}
+              </div>
+            </>
+          )}
+          {!loading && !data && (
+            <span style={{ ...STATS_LABEL, color: 'rgba(255,255,255,0.4)' }}>No data</span>
+          )}
+        </span>
+      )}
+    </span>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Badge (simple — for non-YMM badges)
 // ---------------------------------------------------------------------------
 
 interface BadgeProps {
   variant?: string;
   label: string;
   tooltip?: string;
-  children?: React.ReactNode;
-  /** Optional click handler for data-view navigation (e.g. garage filtered by year/make/model) */
   onClick?: () => void;
 }
 
-const Badge: React.FC<BadgeProps> = ({ variant = '', label, tooltip, children, onClick }) => {
-  const [hovered, setHovered] = React.useState(false);
+const Badge: React.FC<BadgeProps> = ({ variant = '', label, tooltip, onClick }) => {
+  const [hovered, setHovered] = useState(false);
 
   const variantStyle = variant ? (BADGE_VARIANTS[variant] ?? {}) : {};
   const style: React.CSSProperties = {
@@ -273,7 +449,6 @@ const Badge: React.FC<BadgeProps> = ({ variant = '', label, tooltip, children, o
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
     >
       {label}
-      {children}
       {tooltip && (
         <span style={tooltipStyle}>
           <span style={arrowStyle} />
@@ -285,6 +460,28 @@ const Badge: React.FC<BadgeProps> = ({ variant = '', label, tooltip, children, o
 };
 
 // ---------------------------------------------------------------------------
+// Finance badge helpers
+// ---------------------------------------------------------------------------
+
+function resolveFinance(vehicle: any): { label: string; variant: string; tooltip: string; color: string } | null {
+  const estimate = Number(vehicle?.nuke_estimate || 0);
+  const salePrice = Number(vehicle?.sold_price ?? vehicle?.sale_price ?? vehicle?.final_price ?? vehicle?.price ?? 0);
+  if (!estimate || !salePrice) return null;
+
+  const diff = estimate - salePrice;
+  const pct = Math.round((diff / salePrice) * 100);
+  const absPct = Math.abs(pct);
+
+  if (absPct < 5) {
+    return { label: 'FAIR MARKET', variant: 'finance', tooltip: `Estimate ${formatPrice(estimate)} vs ${formatPrice(salePrice)} (${pct >= 0 ? '+' : ''}${pct}%)`, color: TOKEN.ink2 };
+  }
+  if (diff > 0) {
+    return { label: `+${absPct}% UNDER`, variant: 'finance', tooltip: `Underpriced: estimate ${formatPrice(estimate)} vs paid ${formatPrice(salePrice)}`, color: '#004225' };
+  }
+  return { label: `${absPct}% OVER`, variant: 'finance', tooltip: `Overpriced: estimate ${formatPrice(estimate)} vs paid ${formatPrice(salePrice)}`, color: '#8a0020' };
+}
+
+// ---------------------------------------------------------------------------
 // VehicleSubHeader
 // ---------------------------------------------------------------------------
 
@@ -293,12 +490,10 @@ const VehicleSubHeader: React.FC = () => {
   const navigate = useNavigate();
   if (!vehicle) return null;
 
-  // --- Derived values ---
   const year      = vehicle.year   ?? vehicle.model_year   ?? '';
   const make      = vehicle.make   ?? vehicle.make_name    ?? '';
   const model     = vehicle.model  ?? vehicle.model_name   ?? '';
   const trim      = vehicle.trim   ?? vehicle.trim_name    ?? '';
-  // Title in proper case for display (e.g. "1973 GMC K5 Jimmy")
   const titleParts = [year, make, model, trim].filter(Boolean);
   const titleStr  = titleParts.map((p) => (typeof p === 'number' ? String(p) : toTitleCase(String(p)))).join(' ');
 
@@ -308,12 +503,11 @@ const VehicleSubHeader: React.FC = () => {
 
   const price     = vehicle.sold_price ?? vehicle.final_price ?? vehicle.high_bid ?? vehicle.price;
   const location  = resolveLocation(vehicle);
-  const source    = resolveSource(vehicle);
+  const source    = resolvePlatformSource(vehicle);
   const status    = resolveStatus(vehicle);
+  const finance   = resolveFinance(vehicle);
 
-  const timeStr   = vehicle.sold_date ?? vehicle.end_date ?? vehicle.endDate ?? vehicle.updated_at ?? vehicle.updatedAt;
-
-  // --- Container ---
+  // --- Styles ---
   const containerStyle: React.CSSProperties = {
     position:        'sticky',
     top:             'var(--header-height, 48px)',
@@ -325,7 +519,7 @@ const VehicleSubHeader: React.FC = () => {
     alignItems:      'center',
     padding:         '0 12px',
     gap:             10,
-    overflow:        'hidden',
+    overflow:        'visible',
     fontFamily:      TOKEN.fontBody,
   };
 
@@ -365,12 +559,10 @@ const VehicleSubHeader: React.FC = () => {
     overflowX:  'auto',
     overflowY:  'visible',
     minWidth:   0,
-    // Hide scrollbar
     scrollbarWidth: 'none',
     msOverflowStyle: 'none' as any,
   };
 
-  // Garage filter links for YMM badges (hover shows stats intent; click opens garage)
   const garageBase = '/?tab=garage';
   const onYearClick = year ? () => navigate(`${garageBase}&year=${encodeURIComponent(String(year))}`) : undefined;
   const onMakeClick = make ? () => navigate(`${garageBase}&make=${encodeURIComponent(String(make).trim())}`) : undefined;
@@ -379,39 +571,39 @@ const VehicleSubHeader: React.FC = () => {
 
   return (
     <div className="vp-sub-header" style={containerStyle}>
-      {/* Left: YMM (+ trim) as clickable badges, then mileage */}
+      {/* Left: YMM (+ trim) as StatsStack badges, then mileage */}
       <div className="vp-sub-header__left" style={leftStyle}>
         {titleStr ? (
           <>
             {year && (
-              <Badge
-                variant="source"
+              <YMMBadge
                 label={String(year)}
-                tooltip={`View all vehicles from ${year}`}
+                dimension="year"
+                value={year}
                 onClick={onYearClick}
               />
             )}
             {make && (
-              <Badge
-                variant="source"
+              <YMMBadge
                 label={toTitleCase(String(make))}
-                tooltip={`View all ${String(make).trim()} vehicles`}
+                dimension="make"
+                value={make}
                 onClick={onMakeClick}
               />
             )}
             {model && (
-              <Badge
-                variant="source"
+              <YMMBadge
                 label={toTitleCase(String(model))}
-                tooltip={make ? `View ${String(model).trim()} (e.g. ${String(make).trim()} / related makes)` : `View ${String(model).trim()} vehicles`}
+                dimension="model"
+                value={model}
                 onClick={onModelClick}
               />
             )}
             {trim && (
-              <Badge
-                variant="source"
+              <YMMBadge
                 label={toTitleCase(String(trim))}
-                tooltip={`View ${String(trim).trim()} variants`}
+                dimension="trim"
+                value={trim}
                 onClick={onTrimClick}
               />
             )}
@@ -441,7 +633,7 @@ const VehicleSubHeader: React.FC = () => {
           tooltip={status.tooltip}
         />
 
-        {/* Source */}
+        {/* Source — only for real platforms (BaT, C&B, Mecum, etc.) */}
         {source && (
           <Badge
             variant="source"
@@ -465,6 +657,15 @@ const VehicleSubHeader: React.FC = () => {
           />
         )}
 
+        {/* Finance: estimate vs sale price */}
+        {finance && (
+          <Badge
+            variant="finance"
+            label={finance.label}
+            tooltip={finance.tooltip}
+          />
+        )}
+
         {/* Bids */}
         {bidCount > 0 && (
           <Badge
@@ -478,7 +679,7 @@ const VehicleSubHeader: React.FC = () => {
         {commentCount > 0 && (
           <Badge
             variant="comments"
-            label={`${commentCount} CMT`}
+            label={`${commentCount} Comment${commentCount !== 1 ? 's' : ''}`}
             tooltip={`${commentCount} comment${commentCount !== 1 ? 's' : ''}`}
           />
         )}
@@ -492,20 +693,7 @@ const VehicleSubHeader: React.FC = () => {
           />
         )}
 
-        {/* Time */}
-        {timeStr && (
-          <Badge
-            variant="time"
-            label={relativeTime(timeStr)}
-            tooltip={new Date(timeStr).toLocaleString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
-          />
-        )}
+        {/* Time badge REMOVED — user found "1D AGO" meaningless */}
       </div>
     </div>
   );
