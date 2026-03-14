@@ -1376,3 +1376,20 @@
     animation-duration: 0.01ms !important;
   }
 }
+
+/* ─── Vehicle Dossier: Mobile Responsive ─── */
+@media (max-width: 768px) {
+  .dossier-field-grid {
+    grid-template-columns: 80px 1fr auto 16px !important;
+    padding: 4px 6px !important;
+  }
+  .dossier-identity-ymm {
+    font-size: 13px !important;
+  }
+  .dossier-evidence-row {
+    grid-template-columns: 40px 1fr 36px 80px !important;
+  }
+  .dossier-evidence-context {
+    display: none !important;
+  }
+}

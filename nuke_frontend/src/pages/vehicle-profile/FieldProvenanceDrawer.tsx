@@ -65,9 +65,6 @@ function getConfidenceColor(confidence: number): string {
 
 const S = {
   drawer: {
-    border: '2px solid #ccc',
-    background: '#f5f5f5',
-    marginTop: '2px',
     overflow: 'hidden',
     transition: 'max-height 0.2s ease-out',
   } as React.CSSProperties,
@@ -117,11 +114,14 @@ const S = {
 
   body: {
     padding: '6px 8px 8px',
-    borderTop: '1px solid #ddd',
+    borderTop: '1px dashed #ccc',
+    borderBottom: '1px dashed #ccc',
+    background: '#fafaf0',
   } as React.CSSProperties,
 
   row: {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: '50px 1fr 44px 1fr 60px',
     alignItems: 'center',
     gap: '6px',
     padding: '3px 0',
@@ -132,7 +132,6 @@ const S = {
     fontFamily: 'Arial, Helvetica, sans-serif',
     fontSize: '10px',
     color: '#222',
-    flex: 1,
     minWidth: 0,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -192,12 +191,10 @@ function formatDate(iso: string): string {
   try {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return '';
-    const now = Date.now();
-    const ms = now - d.getTime();
-    if (ms < 3600000) return `${Math.floor(ms / 60000)}m`;
-    if (ms < 86400000) return `${Math.floor(ms / 3600000)}h`;
-    if (ms < 2592000000) return `${Math.floor(ms / 86400000)}d`;
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yy = String(d.getFullYear()).slice(-2);
+    return `${mm}/${dd}/${yy}`;
   } catch {
     return '';
   }
@@ -230,8 +227,6 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
       style={{
         ...S.drawer,
         maxHeight: isOpen ? `${bodyHeight + 40}px` : '0px',
-        borderColor: isOpen ? '#ccc' : 'transparent',
-        marginTop: isOpen ? '2px' : '0px',
       }}
       data-testid={`provenance-drawer-${fieldName}`}
     >
@@ -268,7 +263,7 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
           const isConflict = !isPrimary && primaryValue && thisValue && thisValue !== primaryValue;
 
           return (
-            <div key={row.id} style={{
+            <div key={row.id} className="dossier-evidence-row" style={{
               ...S.row,
               borderBottom: idx === sources.length - 1 ? 'none' : '1px solid #eee',
               borderLeft: isPrimary ? '2px solid #000' : '2px solid transparent',
@@ -301,23 +296,20 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
               </span>
 
               {/* Extraction context */}
-              {row.extraction_context && (
-                <span
-                  style={{
-                    fontFamily: 'Arial, Helvetica, sans-serif',
-                    fontSize: '8px',
-                    color: '#888',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap' as const,
-                    maxWidth: '200px',
-                    flex: '0 1 auto',
-                  }}
-                  title={row.extraction_context}
-                >
-                  {row.extraction_context}
-                </span>
-              )}
+              <span
+                className="dossier-evidence-context"
+                style={{
+                  fontFamily: 'Arial, Helvetica, sans-serif',
+                  fontSize: '8px',
+                  color: '#888',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap' as const,
+                }}
+                title={row.extraction_context || ''}
+              >
+                {row.extraction_context || ''}
+              </span>
 
               {/* Timestamp */}
               <span style={S.timestamp}>
