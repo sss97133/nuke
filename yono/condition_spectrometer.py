@@ -217,12 +217,17 @@ def get_5w_context(conn, image_id: str, vehicle_id: str) -> dict:
 _template_cache = {}  # {(make, model, year): {zone_bounds, length, width, height}}
 
 def _load_template(conn, make: str, model: str, year: int) -> Optional[dict]:
-    """Load vehicle_surface_templates for a Y/M/M. Returns zone_bounds + dimensions."""
+    """Load vehicle_surface_templates for a Y/M/M. Returns zone_bounds + dimensions.
+
+    Uses fuzzy model matching: first tries exact match, then prefix match
+    (e.g. template "K10" matches vehicle "K10 SWB", "K10 Scottsdale", etc.)
+    """
     cache_key = (make, model, year)
     if cache_key in _template_cache:
         return _template_cache[cache_key]
 
     cur = conn.cursor(cursor_factory=RealDictCursor)
+    # Try exact match first
     cur.execute("""
         SELECT zone_bounds, length_inches, width_inches, height_inches
         FROM vehicle_surface_templates
@@ -230,6 +235,17 @@ def _load_template(conn, make: str, model: str, year: int) -> Optional[dict]:
         LIMIT 1
     """, (make, model, year, year))
     row = cur.fetchone()
+
+    # Fuzzy: vehicle model starts with template model (K10 SWB → K10)
+    if not row and model:
+        cur.execute("""
+            SELECT zone_bounds, length_inches, width_inches, height_inches
+            FROM vehicle_surface_templates
+            WHERE make = %s AND %s ILIKE model || '%%' AND year_start <= %s AND year_end >= %s
+            ORDER BY length(model) DESC
+            LIMIT 1
+        """, (make, model, year, year))
+        row = cur.fetchone()
     cur.close()
 
     if row:
