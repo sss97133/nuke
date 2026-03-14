@@ -286,6 +286,10 @@ blazer-analysis.html
 windsurf_parser.py
 export_windsurf.sh
 
+# Temp test scripts
+detailed-test*.mjs
+test-brandheartbeat.mjs
+
 # Misc generated
 overnight-batch.log
 osxphotos_crash.log
