@@ -12,7 +12,13 @@ const SERVICE_ROLE_KEY =
 
 const DEFAULT_LIMIT = 20
 const MAX_LIMIT = 200
-const ALLOWED_TABLES = new Set(["vehicles", "public.vehicles"])
+const ALLOWED_TABLES = new Set([
+  "vehicles", "public.vehicles",
+  "surface_observations", "public.surface_observations",
+  "vehicle_surface_templates", "public.vehicle_surface_templates",
+  "vehicle_surface_coverage", "public.vehicle_surface_coverage",
+  "vehicle_images", "public.vehicle_images",
+])
 const DISALLOWED_TOKENS = [
   "insert",
   "update",
@@ -125,11 +131,16 @@ Output JSON schema:
 
 Rules:
 - If the request is ambiguous or missing key constraints, use action="clarify" and ask ONE concise question.
-- If the request is out of scope for public.vehicles, use action="reject" and explain why.
+- If the request is out of scope, use action="reject" and explain why.
 - Otherwise use action="run" and return SQL.
 - Only SELECT statements. Do not use WITH, INSERT, UPDATE, DELETE, or DDL.
-- Use only the table public.vehicles (alias ok).
-- Allowed columns: id, year, make, model, status, created_at, updated_at, vin.
+- Allowed tables: public.vehicles, public.surface_observations, public.vehicle_images, public.vehicle_surface_templates, public.vehicle_surface_coverage (view).
+- vehicles columns: id, year, make, model, status, created_at, updated_at, vin.
+- surface_observations columns: id, vehicle_image_id, vehicle_id, zone, u_min_inches, u_max_inches, v_min_inches, v_max_inches, h_min_inches, h_max_inches, resolution_level, bbox_x, bbox_y, bbox_w, bbox_h, observation_type, label, confidence, metadata, model_version, pass_name, created_at.
+  - observation_type values: 'zone_classify', 'condition', 'modification', 'part', 'damage', 'color', 'label'.
+  - zone values: ext_front, ext_rear, ext_front_driver, ext_front_passenger, ext_rear_driver, ext_rear_passenger, ext_driver_side, ext_passenger_side, ext_roof, ext_undercarriage, fender_front_driver, fender_front_passenger, fender_rear_driver, fender_rear_passenger, door_driver, door_passenger, int_dashboard, int_steering, int_gauges, int_center_console, int_front_seats, int_rear_seats, int_headliner, int_cargo, int_door_panel_driver, int_door_panel_passenger, mech_engine_bay, mech_exhaust, mech_suspension, mech_transmission, wheel_fl, wheel_fr, wheel_rl, wheel_rr, detail_badge, detail_vin_plate, detail_damage, bed_floor, bed_side_driver, bed_side_passenger, tailgate, other.
+- vehicle_surface_coverage view columns: vehicle_id, year, make, model, zone, image_count, observation_count, max_resolution, observation_types.
+- vehicle_images columns: id, vehicle_id, image_url, vehicle_zone, zone_confidence, condition_score, damage_flags, modification_flags, photo_quality_score.
 - Prefer aggregated answers (COUNT, GROUP BY) when the user asks for totals/top/most.
 - Use btrim/coalesce for make/model:
   COALESCE(NULLIF(btrim(make), ''), '[unknown]')
@@ -137,6 +148,16 @@ Rules:
 - ${includeMerged ? "Include" : "Exclude"} vehicles with status = 'merged' by default.
 - If returning rows (not just a single scalar), include LIMIT ${limit}.
 - Today's date (UTC): ${today}
+
+Spatial query examples:
+1. "Show me all rust on trucks" →
+   SELECT so.zone, so.label, so.confidence, vi.image_url FROM surface_observations so JOIN vehicle_images vi ON vi.id = so.vehicle_image_id JOIN vehicles v ON v.id = so.vehicle_id WHERE so.label = 'rust' AND so.observation_type = 'condition' LIMIT ${limit}
+2. "Compare fender condition across K10s" →
+   SELECT v.year, so.zone, avg(so.confidence) AS avg_conf, count(*) FROM surface_observations so JOIN vehicles v ON v.id = so.vehicle_id WHERE v.model ILIKE '%K10%' AND so.zone IN ('fender_front_driver','fender_front_passenger','fender_rear_driver','fender_rear_passenger') GROUP BY v.year, so.zone ORDER BY v.year
+3. "Which zones have the most observations?" →
+   SELECT zone, count(*) AS cnt FROM surface_observations GROUP BY zone ORDER BY cnt DESC LIMIT ${limit}
+4. "Surface coverage for vehicle X" →
+   SELECT * FROM vehicle_surface_coverage WHERE vehicle_id = 'uuid' ORDER BY observation_count DESC
 `.trim()
 }
 
@@ -176,7 +197,7 @@ function validateSql(sql: string): { ok: boolean; error?: string } {
     return { ok: false, error: `Table not allowed: ${raw}` }
   }
   if (!sawAllowed) {
-    return { ok: false, error: "Query must read from public.vehicles" }
+    return { ok: false, error: "Query must read from an allowed table" }
   }
   return { ok: true }
 }
