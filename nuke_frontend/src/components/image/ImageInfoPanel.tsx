@@ -491,6 +491,258 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
         </>
       )}
 
+      {/* Deep Analysis — Reference Catalog forensic data (supersedes tier_1 when present) */}
+      {imageMetadata?.ai_scan_metadata?.deep_analysis && (() => {
+        const deep = imageMetadata.ai_scan_metadata.deep_analysis;
+        const cond = deep.condition_detail;
+        const surf = deep.surface_analysis;
+        const deg = deep.degradation;
+        const color = deep.color_data;
+        const mods = deep.modifications;
+        const subj = deep.subject;
+        const env = deep.light_and_environment;
+
+        const scoreColor = (s: number) =>
+          s >= 7 ? '#4ade80' : s >= 4 ? '#facc15' : '#f87171';
+
+        return (
+          <>
+            <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
+            <div style={{ color: 'var(--gulf-orange, #F37021)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: '8px' }}>
+              FORENSIC ANALYSIS
+            </div>
+
+            {/* Subject */}
+            {subj?.primary_focus && (
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: '2px' }}>SUBJECT</div>
+                <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11px', color: '#fff', lineHeight: 1.4 }}>
+                  {subj.primary_focus}
+                </div>
+              </div>
+            )}
+
+            {/* Condition */}
+            {cond && (
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  {cond.overall_score != null && (
+                    <span style={{
+                      padding: '2px 7px',
+                      fontFamily: "'Courier New', Courier, monospace",
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: '#000',
+                      backgroundColor: scoreColor(cond.overall_score),
+                    }}>
+                      {cond.overall_score}/10
+                    </span>
+                  )}
+                  {cond.restoration_state && (
+                    <span style={{
+                      padding: '1px 5px',
+                      fontSize: '9px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase' as const,
+                      color: 'rgba(255,255,255,0.7)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                    }}>
+                      {cond.restoration_state.replace(/_/g, ' ')}
+                    </span>
+                  )}
+                  {cond.structural_integrity && (
+                    <span style={{
+                      padding: '1px 5px',
+                      fontSize: '9px',
+                      color: cond.structural_integrity.includes('concern') ? '#facc15' : 'rgba(255,255,255,0.6)',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                    }}>
+                      {cond.structural_integrity.replace(/_/g, ' ')}
+                    </span>
+                  )}
+                </div>
+                {cond.condition_notes && (
+                  <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11px', color: 'rgba(255,255,255,0.8)', lineHeight: 1.4 }}>
+                    {cond.condition_notes}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Surface */}
+            {surf && (surf.primary_material || surf.paint_observations) && (
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: '2px' }}>SURFACE</div>
+                <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11px', color: 'rgba(255,255,255,0.8)', lineHeight: 1.4 }}>
+                  {[surf.primary_material?.replace(/_/g, ' '), surf.surface_finish?.replace(/_/g, ' ')].filter(Boolean).join(' / ')}
+                </div>
+                {surf.paint_observations && (
+                  <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '10px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.4, marginTop: '2px' }}>
+                    {surf.paint_observations}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Degradation */}
+            {deg && (deg.lifecycle_state || deg.degradation_narrative) && (
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: '2px' }}>DEGRADATION</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '4px' }}>
+                  {deg.lifecycle_state && (
+                    <span style={{
+                      padding: '1px 5px',
+                      fontSize: '9px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase' as const,
+                      color: deg.lifecycle_state === 'archaeological' || deg.lifecycle_state === 'terminal' ? '#f87171' :
+                             deg.lifecycle_state === 'active_decay' ? '#facc15' : 'rgba(255,255,255,0.7)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                    }}>
+                      {deg.lifecycle_state.replace(/_/g, ' ')}
+                    </span>
+                  )}
+                  {deg.mechanisms?.map((m: string, i: number) => (
+                    <span key={i} style={{
+                      padding: '1px 4px',
+                      fontSize: '8px',
+                      fontFamily: "'Courier New', Courier, monospace",
+                      color: 'rgba(255,255,255,0.6)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                    }}>
+                      {m.replace(/_/g, ' ')}
+                    </span>
+                  ))}
+                </div>
+                {deg.degradation_narrative && (
+                  <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '10px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>
+                    {deg.degradation_narrative}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Color */}
+            {color && (color.dominant_colors?.length > 0 || color.paint_color_name) && (
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: '2px' }}>COLOR</div>
+                {color.dominant_colors?.length > 0 && (
+                  <div style={{ display: 'flex', gap: '3px', marginBottom: '4px', alignItems: 'center' }}>
+                    {color.dominant_colors.map((hex: string, i: number) => (
+                      <span key={i} title={hex} style={{
+                        display: 'inline-block',
+                        width: '16px',
+                        height: '16px',
+                        backgroundColor: hex,
+                        border: '1px solid rgba(255,255,255,0.3)',
+                      }} />
+                    ))}
+                    {color.paint_color_name && (
+                      <span style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11px', color: '#fff', marginLeft: '6px' }}>
+                        {color.paint_color_name}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {color.color_narrative && (
+                  <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '10px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>
+                    {color.color_narrative}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Modifications */}
+            {mods?.detected?.length > 0 && (
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: '2px' }}>MODIFICATIONS</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  {mods.detected.map((m: string, i: number) => (
+                    <span key={i} style={{
+                      padding: '1px 5px',
+                      fontSize: '9px',
+                      fontFamily: "'Courier New', Courier, monospace",
+                      color: 'rgba(255,255,255,0.8)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                    }}>
+                      {m.replace(/_/g, ' ')}
+                    </span>
+                  ))}
+                </div>
+                {mods.period_correct != null && (
+                  <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
+                    Period correct: {mods.period_correct ? 'Yes' : 'No'}
+                    {mods.modification_quality ? ` / Quality: ${mods.modification_quality.replace(/_/g, ' ')}` : ''}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Components & Hardware */}
+            {subj?.components_visible?.length > 0 && (
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: '2px' }}>COMPONENTS</div>
+                <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '10px', color: 'rgba(255,255,255,0.7)' }}>
+                  {subj.components_visible.map((c: string) => c.replace(/_/g, ' ')).join(' / ')}
+                </div>
+              </div>
+            )}
+
+            {subj?.hardware_visible?.length > 0 && (
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: '2px' }}>HARDWARE</div>
+                <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '10px', color: 'rgba(255,255,255,0.7)' }}>
+                  {subj.hardware_visible.map((h: string) => h.replace(/_/g, ' ')).join(' / ')}
+                </div>
+              </div>
+            )}
+
+            {/* Text Visible */}
+            {subj?.text_visible?.length > 0 && (
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: '2px' }}>TEXT VISIBLE</div>
+                <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11px', color: '#fff' }}>
+                  {subj.text_visible.join(', ')}
+                </div>
+              </div>
+            )}
+
+            {/* Environment & Fabrication */}
+            {(deep.fabrication_stage || env) && (
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: '2px' }}>ENVIRONMENT</div>
+                <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '10px', color: 'rgba(255,255,255,0.6)' }}>
+                  {[
+                    deep.fabrication_stage ? `Stage: ${deep.fabrication_stage.replace(/_/g, ' ')}` : null,
+                    env?.lighting ? `Light: ${env.lighting.replace(/_/g, ' ')}` : null,
+                    env?.environment ? `Env: ${env.environment}` : null,
+                    env?.photo_quality_score != null ? `Quality: ${env.photo_quality_score}/10` : null,
+                  ].filter(Boolean).join(' / ')}
+                </div>
+              </div>
+            )}
+
+            {/* Forensic Observations */}
+            {deep.forensic_observations && (
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: '2px' }}>FORENSIC NOTES</div>
+                <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '10px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>
+                  {deep.forensic_observations}
+                </div>
+              </div>
+            )}
+
+            {/* Analysis metadata */}
+            {deep._meta && (
+              <div style={{ fontSize: '8px', color: 'rgba(255,255,255,0.25)', marginTop: '4px' }}>
+                {deep._meta.model} / {deep._meta.prompt_version}
+                {deep._meta.analyzed_at ? ` / ${new Date(deep._meta.analyzed_at).toLocaleDateString()}` : ''}
+              </div>
+            )}
+          </>
+        );
+      })()}
+
       {/* Engine Bay Analysis — deep component breakdown from analyze-engine-bay */}
       {imageMetadata?.components?.engine_family && (
         <>

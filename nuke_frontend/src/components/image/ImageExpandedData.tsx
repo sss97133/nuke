@@ -271,6 +271,218 @@ export const ImageExpandedData: React.FC<ImageExpandedDataProps> = ({
         </Section>
       )}
 
+      {/* Deep Analysis (Reference Catalog forensic data) */}
+      {(() => {
+        const deep = meta.ai_scan_metadata?.deep_analysis || (imageRecord?.ai_scan_metadata?.deep_analysis);
+        if (!deep) return null;
+
+        const cond = deep.condition_detail;
+        const surf = deep.surface_analysis;
+        const deg = deep.degradation;
+        const color = deep.color_data;
+        const mods = deep.modifications;
+        const subj = deep.subject;
+        const env = deep.light_and_environment;
+
+        const scoreColor = (s: number) =>
+          s >= 7 ? '#4ade80' : s >= 4 ? '#facc15' : '#f87171';
+
+        return (
+          <>
+            {/* Condition */}
+            {cond && (
+              <Section title="Condition">
+                {cond.overall_score != null && (
+                  <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      fontFamily: "'Courier New', Courier, monospace",
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      color: '#000',
+                      backgroundColor: scoreColor(cond.overall_score),
+                      border: '2px solid ' + scoreColor(cond.overall_score),
+                    }}>
+                      {cond.overall_score}/10
+                    </span>
+                    {cond.restoration_state && (
+                      <span style={{
+                        padding: '2px 6px',
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        color: 'rgba(255,255,255,0.7)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                      }}>
+                        {cond.restoration_state.replace(/_/g, ' ')}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {cond.structural_integrity && <Field label="Structural integrity" value={cond.structural_integrity.replace(/_/g, ' ')} />}
+                {cond.condition_notes && <Field label="Notes" value={cond.condition_notes} />}
+              </Section>
+            )}
+
+            {/* Surface */}
+            {surf && (surf.primary_material || surf.surface_finish || surf.paint_observations) && (
+              <Section title="Surface">
+                {surf.primary_material && <Field label="Material" value={surf.primary_material.replace(/_/g, ' ')} />}
+                {surf.surface_finish && <Field label="Finish" value={surf.surface_finish.replace(/_/g, ' ')} />}
+                {surf.paint_observations && <Field label="Paint" value={surf.paint_observations} />}
+                {surf.coating_layers_visible && <Field label="Coating layers" value={surf.coating_layers_visible} />}
+              </Section>
+            )}
+
+            {/* Degradation */}
+            {deg && (deg.lifecycle_state || deg.degradation_narrative) && (
+              <Section title="Degradation">
+                {deg.lifecycle_state && (
+                  <div style={{ marginBottom: '6px' }}>
+                    <span style={{
+                      padding: '2px 6px',
+                      fontSize: '9px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      color: deg.lifecycle_state === 'archaeological' || deg.lifecycle_state === 'terminal' ? '#f87171' :
+                             deg.lifecycle_state === 'active_decay' ? '#facc15' : 'rgba(255,255,255,0.7)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                    }}>
+                      {deg.lifecycle_state.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                )}
+                {deg.mechanisms?.length > 0 && (
+                  <div style={{ marginBottom: '6px' }}>
+                    <div style={FIELD_LABEL_STYLE}>Mechanisms</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
+                      {deg.mechanisms.map((m: string, i: number) => (
+                        <span key={i} style={{
+                          padding: '1px 5px',
+                          fontSize: '9px',
+                          fontFamily: "'Courier New', Courier, monospace",
+                          color: 'rgba(255,255,255,0.7)',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                        }}>
+                          {m.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {deg.degradation_narrative && <Field label="Narrative" value={deg.degradation_narrative} />}
+              </Section>
+            )}
+
+            {/* Color */}
+            {color && (color.paint_color_name || color.dominant_colors?.length > 0) && (
+              <Section title="Color">
+                {color.dominant_colors?.length > 0 && (
+                  <div style={{ marginBottom: '6px' }}>
+                    <div style={FIELD_LABEL_STYLE}>Palette</div>
+                    <div style={{ display: 'flex', gap: '4px', marginTop: '3px' }}>
+                      {color.dominant_colors.map((hex: string, i: number) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span style={{
+                            display: 'inline-block',
+                            width: '14px',
+                            height: '14px',
+                            backgroundColor: hex,
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            flexShrink: 0,
+                          }} />
+                          <span style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '9px', color: 'rgba(255,255,255,0.5)' }}>
+                            {hex}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {color.paint_color_name && <Field label="Paint name" value={color.paint_color_name} />}
+                {color.color_narrative && <Field label="Narrative" value={color.color_narrative} />}
+              </Section>
+            )}
+
+            {/* Modifications */}
+            {mods && (mods.detected?.length > 0 || mods.period_correct != null) && (
+              <Section title="Modifications">
+                {mods.detected?.length > 0 && (
+                  <div style={{ marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {mods.detected.map((m: string, i: number) => (
+                        <span key={i} style={{
+                          padding: '1px 5px',
+                          fontSize: '9px',
+                          fontFamily: "'Courier New', Courier, monospace",
+                          color: 'rgba(255,255,255,0.8)',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                        }}>
+                          {m.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {mods.period_correct != null && <Field label="Period correct" value={mods.period_correct ? 'Yes' : 'No'} />}
+                {mods.modification_quality && <Field label="Quality" value={mods.modification_quality.replace(/_/g, ' ')} />}
+              </Section>
+            )}
+
+            {/* Subject Details */}
+            {subj && (subj.primary_focus || subj.components_visible?.length > 0) && (
+              <Section title="Subject">
+                {subj.primary_focus && <Field label="Focus" value={subj.primary_focus} />}
+                {subj.components_visible?.length > 0 && (
+                  <div style={{ marginBottom: '6px' }}>
+                    <div style={FIELD_LABEL_STYLE}>Components</div>
+                    <div style={{ ...FIELD_VALUE_STYLE, fontSize: '10px' }}>
+                      {subj.components_visible.map((c: string) => c.replace(/_/g, ' ')).join(' / ')}
+                    </div>
+                  </div>
+                )}
+                {subj.hardware_visible?.length > 0 && (
+                  <div style={{ marginBottom: '6px' }}>
+                    <div style={FIELD_LABEL_STYLE}>Hardware</div>
+                    <div style={{ ...FIELD_VALUE_STYLE, fontSize: '10px' }}>
+                      {subj.hardware_visible.map((h: string) => h.replace(/_/g, ' ')).join(' / ')}
+                    </div>
+                  </div>
+                )}
+                {subj.text_visible?.length > 0 && (
+                  <div style={{ marginBottom: '6px' }}>
+                    <div style={FIELD_LABEL_STYLE}>Text visible</div>
+                    <div style={FIELD_VALUE_STYLE}>
+                      {subj.text_visible.join(', ')}
+                    </div>
+                  </div>
+                )}
+              </Section>
+            )}
+
+            {/* Fabrication & Environment */}
+            {(deep.fabrication_stage || env) && (
+              <Section title="Environment">
+                {deep.fabrication_stage && <Field label="Fabrication stage" value={deep.fabrication_stage.replace(/_/g, ' ')} />}
+                {env?.lighting && <Field label="Lighting" value={env.lighting.replace(/_/g, ' ')} />}
+                {env?.environment && <Field label="Environment" value={env.environment.replace(/_/g, ' ')} />}
+                {env?.photo_quality_score != null && <Field label="Photo quality" value={`${env.photo_quality_score}/10`} />}
+              </Section>
+            )}
+
+            {/* Forensic Observations */}
+            {deep.forensic_observations && (
+              <Section title="Forensic Notes">
+                <div style={FIELD_VALUE_STYLE}>{deep.forensic_observations}</div>
+              </Section>
+            )}
+          </>
+        );
+      })()}
+
       <Section title="Tags">
         {tags.length > 0 ? (
           <div style={FIELD_VALUE_STYLE}>
