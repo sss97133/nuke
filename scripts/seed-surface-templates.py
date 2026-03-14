@@ -112,10 +112,14 @@ def make_zone_bounds(layout: dict, length: int, width: int, height: int) -> dict
     return bounds
 
 
-# Top 20 Y/M/M templates — OEM dimensions (inches)
+# 75+ Y/M/M templates — OEM dimensions (inches)
 # Sources: manufacturer spec sheets, edmunds.com, automobile-catalog.com
+# Template model names use SHORT prefix form for fuzzy matching in modal_batch.py
+# (e.g. template "Mustang" matches "Mustang Fastback", "Mustang Convertible 289")
 TEMPLATES = [
-    # GM Trucks (huge in the dataset)
+    # ══════════════════════════════════════════════════════════════════
+    # GM TRUCKS & SUVs
+    # ══════════════════════════════════════════════════════════════════
     {"year_start": 1973, "year_end": 1987, "make": "Chevrolet", "model": "K10", "body_style": "truck",
      "length_inches": 212, "width_inches": 79, "height_inches": 73, "wheelbase_inches": 131},
     {"year_start": 1973, "year_end": 1987, "make": "Chevrolet", "model": "K20", "body_style": "truck",
@@ -124,43 +128,320 @@ TEMPLATES = [
      "length_inches": 212, "width_inches": 79, "height_inches": 73, "wheelbase_inches": 131},
     {"year_start": 1973, "year_end": 1987, "make": "Chevrolet", "model": "Blazer", "body_style": "suv",
      "length_inches": 185, "width_inches": 79, "height_inches": 73, "wheelbase_inches": 106},
+    {"year_start": 1973, "year_end": 1987, "make": "GMC", "model": "Jimmy", "body_style": "suv",
+     "length_inches": 185, "width_inches": 79, "height_inches": 73, "wheelbase_inches": 106},
+    {"year_start": 1973, "year_end": 1987, "make": "Chevrolet", "model": "C10", "body_style": "truck",
+     "length_inches": 212, "width_inches": 79, "height_inches": 73, "wheelbase_inches": 131},
+
+    # ══════════════════════════════════════════════════════════════════
+    # FORD TRUCKS & SUVs
+    # ══════════════════════════════════════════════════════════════════
     {"year_start": 1966, "year_end": 1977, "make": "Ford", "model": "Bronco", "body_style": "suv",
      "length_inches": 152, "width_inches": 69, "height_inches": 72, "wheelbase_inches": 92},
-    # Mercedes SL
+    {"year_start": 1978, "year_end": 1996, "make": "Ford", "model": "Bronco", "body_style": "suv",
+     "length_inches": 180, "width_inches": 79, "height_inches": 75, "wheelbase_inches": 105},
+    {"year_start": 1999, "year_end": 2007, "make": "Ford", "model": "F-250", "body_style": "truck",
+     "length_inches": 228, "width_inches": 80, "height_inches": 79, "wheelbase_inches": 137},
+
+    # ══════════════════════════════════════════════════════════════════
+    # JEEP
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1976, "year_end": 1986, "make": "Jeep", "model": "CJ-7", "body_style": "suv",
+     "length_inches": 150, "width_inches": 69, "height_inches": 68, "wheelbase_inches": 94},
+    {"year_start": 1987, "year_end": 1995, "make": "Jeep", "model": "Wrangler", "body_style": "suv",
+     "length_inches": 152, "width_inches": 66, "height_inches": 72, "wheelbase_inches": 94},
+    {"year_start": 1984, "year_end": 2001, "make": "Jeep", "model": "Cherokee", "body_style": "suv",
+     "length_inches": 168, "width_inches": 71, "height_inches": 64, "wheelbase_inches": 102},
+
+    # ══════════════════════════════════════════════════════════════════
+    # TOYOTA LAND CRUISER
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1960, "year_end": 1983, "make": "Toyota", "model": "Land Cruiser FJ40", "body_style": "suv",
+     "length_inches": 152, "width_inches": 66, "height_inches": 74, "wheelbase_inches": 90},
+    {"year_start": 1980, "year_end": 1990, "make": "Toyota", "model": "Land Cruiser FJ60", "body_style": "suv",
+     "length_inches": 184, "width_inches": 72, "height_inches": 74, "wheelbase_inches": 108},
+    {"year_start": 1988, "year_end": 1990, "make": "Toyota", "model": "Land Cruiser FJ62", "body_style": "suv",
+     "length_inches": 184, "width_inches": 72, "height_inches": 74, "wheelbase_inches": 108},
+
+    # ══════════════════════════════════════════════════════════════════
+    # LAND ROVER
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1983, "year_end": 2016, "make": "Land Rover", "model": "Defender", "body_style": "suv",
+     "length_inches": 175, "width_inches": 71, "height_inches": 80, "wheelbase_inches": 110},
+
+    # ══════════════════════════════════════════════════════════════════
+    # MERCEDES-BENZ
+    # ══════════════════════════════════════════════════════════════════
     {"year_start": 1963, "year_end": 1971, "make": "Mercedes-Benz", "model": "230SL", "body_style": "roadster",
      "length_inches": 169, "width_inches": 69, "height_inches": 52, "wheelbase_inches": 94},
     {"year_start": 1967, "year_end": 1971, "make": "Mercedes-Benz", "model": "280SL", "body_style": "roadster",
      "length_inches": 169, "width_inches": 69, "height_inches": 52, "wheelbase_inches": 94},
+    {"year_start": 1955, "year_end": 1963, "make": "Mercedes-Benz", "model": "190SL", "body_style": "roadster",
+     "length_inches": 166, "width_inches": 67, "height_inches": 52, "wheelbase_inches": 94},
     {"year_start": 1971, "year_end": 1989, "make": "Mercedes-Benz", "model": "350SL", "body_style": "roadster",
      "length_inches": 180, "width_inches": 71, "height_inches": 51, "wheelbase_inches": 96},
     {"year_start": 1971, "year_end": 1989, "make": "Mercedes-Benz", "model": "450SL", "body_style": "roadster",
      "length_inches": 180, "width_inches": 71, "height_inches": 51, "wheelbase_inches": 96},
     {"year_start": 1986, "year_end": 1989, "make": "Mercedes-Benz", "model": "560SL", "body_style": "roadster",
      "length_inches": 180, "width_inches": 71, "height_inches": 51, "wheelbase_inches": 96},
-    # Porsche
+    {"year_start": 2001, "year_end": 2011, "make": "Mercedes-Benz", "model": "SL500", "body_style": "roadster",
+     "length_inches": 179, "width_inches": 72, "height_inches": 51, "wheelbase_inches": 101},
+    {"year_start": 2003, "year_end": 2012, "make": "Mercedes-Benz", "model": "SL55", "body_style": "roadster",
+     "length_inches": 179, "width_inches": 72, "height_inches": 51, "wheelbase_inches": 101},
+    {"year_start": 2009, "year_end": 2012, "make": "Mercedes-Benz", "model": "SL63", "body_style": "roadster",
+     "length_inches": 182, "width_inches": 72, "height_inches": 51, "wheelbase_inches": 101},
+    {"year_start": 2007, "year_end": 2012, "make": "Mercedes-Benz", "model": "SL550", "body_style": "roadster",
+     "length_inches": 182, "width_inches": 72, "height_inches": 51, "wheelbase_inches": 101},
+
+    # ══════════════════════════════════════════════════════════════════
+    # PORSCHE
+    # ══════════════════════════════════════════════════════════════════
     {"year_start": 1964, "year_end": 1973, "make": "Porsche", "model": "911", "body_style": "coupe",
      "length_inches": 164, "width_inches": 64, "height_inches": 52, "wheelbase_inches": 87},
     {"year_start": 1974, "year_end": 1989, "make": "Porsche", "model": "911", "body_style": "coupe",
      "length_inches": 169, "width_inches": 65, "height_inches": 52, "wheelbase_inches": 90},
+    {"year_start": 1989, "year_end": 1994, "make": "Porsche", "model": "911", "body_style": "coupe",
+     "length_inches": 168, "width_inches": 65, "height_inches": 52, "wheelbase_inches": 89},
     {"year_start": 1997, "year_end": 2004, "make": "Porsche", "model": "911", "body_style": "coupe",
      "length_inches": 175, "width_inches": 69, "height_inches": 51, "wheelbase_inches": 93},
-    # Muscle cars
-    {"year_start": 1967, "year_end": 1969, "make": "Chevrolet", "model": "Camaro", "body_style": "coupe",
-     "length_inches": 185, "width_inches": 73, "height_inches": 51, "wheelbase_inches": 108},
+    {"year_start": 1965, "year_end": 1969, "make": "Porsche", "model": "912", "body_style": "coupe",
+     "length_inches": 164, "width_inches": 64, "height_inches": 52, "wheelbase_inches": 87},
+    {"year_start": 1955, "year_end": 1965, "make": "Porsche", "model": "356", "body_style": "coupe",
+     "length_inches": 156, "width_inches": 66, "height_inches": 48, "wheelbase_inches": 83},
+    {"year_start": 2006, "year_end": 2012, "make": "Porsche", "model": "Cayman", "body_style": "coupe",
+     "length_inches": 171, "width_inches": 71, "height_inches": 51, "wheelbase_inches": 95},
+    {"year_start": 1996, "year_end": 2004, "make": "Porsche", "model": "Boxster", "body_style": "roadster",
+     "length_inches": 171, "width_inches": 70, "height_inches": 50, "wheelbase_inches": 95},
+
+    # ══════════════════════════════════════════════════════════════════
+    # FORD MUSCLE / CLASSICS
+    # ══════════════════════════════════════════════════════════════════
     {"year_start": 1964, "year_end": 1973, "make": "Ford", "model": "Mustang", "body_style": "coupe",
      "length_inches": 182, "width_inches": 68, "height_inches": 51, "wheelbase_inches": 108},
-    {"year_start": 1966, "year_end": 1972, "make": "Chevrolet", "model": "Chevelle", "body_style": "coupe",
-     "length_inches": 197, "width_inches": 75, "height_inches": 53, "wheelbase_inches": 112},
-    # Classics
-    {"year_start": 1953, "year_end": 1962, "make": "Chevrolet", "model": "Corvette", "body_style": "convertible",
-     "length_inches": 168, "width_inches": 73, "height_inches": 52, "wheelbase_inches": 102},
     {"year_start": 1955, "year_end": 1957, "make": "Ford", "model": "Thunderbird", "body_style": "convertible",
      "length_inches": 175, "width_inches": 70, "height_inches": 52, "wheelbase_inches": 102},
-    {"year_start": 1981, "year_end": 1983, "make": "DeLorean", "model": "DMC-12", "body_style": "coupe",
-     "length_inches": 169, "width_inches": 79, "height_inches": 45, "wheelbase_inches": 95},
-    # Italian
+    {"year_start": 1928, "year_end": 1934, "make": "Ford", "model": "Hot Rod", "body_style": "roadster",
+     "length_inches": 156, "width_inches": 62, "height_inches": 60, "wheelbase_inches": 106},
+
+    # ══════════════════════════════════════════════════════════════════
+    # CHEVROLET MUSCLE / CLASSICS
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1967, "year_end": 1969, "make": "Chevrolet", "model": "Camaro", "body_style": "coupe",
+     "length_inches": 185, "width_inches": 73, "height_inches": 51, "wheelbase_inches": 108},
+    {"year_start": 1970, "year_end": 1981, "make": "Chevrolet", "model": "Camaro", "body_style": "coupe",
+     "length_inches": 188, "width_inches": 75, "height_inches": 50, "wheelbase_inches": 108},
+    {"year_start": 1966, "year_end": 1972, "make": "Chevrolet", "model": "Chevelle", "body_style": "coupe",
+     "length_inches": 197, "width_inches": 75, "height_inches": 53, "wheelbase_inches": 112},
+    {"year_start": 1953, "year_end": 1962, "make": "Chevrolet", "model": "Corvette", "body_style": "convertible",
+     "length_inches": 168, "width_inches": 73, "height_inches": 52, "wheelbase_inches": 102},
+    {"year_start": 1963, "year_end": 1967, "make": "Chevrolet", "model": "Corvette", "body_style": "coupe",
+     "length_inches": 176, "width_inches": 70, "height_inches": 50, "wheelbase_inches": 98},
+    {"year_start": 1968, "year_end": 1982, "make": "Chevrolet", "model": "Corvette", "body_style": "coupe",
+     "length_inches": 183, "width_inches": 69, "height_inches": 48, "wheelbase_inches": 98},
+
+    # ══════════════════════════════════════════════════════════════════
+    # PONTIAC
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1964, "year_end": 1974, "make": "Pontiac", "model": "GTO", "body_style": "coupe",
+     "length_inches": 201, "width_inches": 75, "height_inches": 53, "wheelbase_inches": 112},
+    {"year_start": 1967, "year_end": 1969, "make": "Pontiac", "model": "Firebird", "body_style": "coupe",
+     "length_inches": 188, "width_inches": 73, "height_inches": 50, "wheelbase_inches": 108},
+    {"year_start": 1984, "year_end": 1988, "make": "Pontiac", "model": "Fiero", "body_style": "coupe",
+     "length_inches": 161, "width_inches": 69, "height_inches": 47, "wheelbase_inches": 94},
+
+    # ══════════════════════════════════════════════════════════════════
+    # FERRARI
+    # ══════════════════════════════════════════════════════════════════
     {"year_start": 1969, "year_end": 1974, "make": "Ferrari", "model": "Dino 246", "body_style": "coupe",
      "length_inches": 167, "width_inches": 67, "height_inches": 44, "wheelbase_inches": 92},
+    {"year_start": 1968, "year_end": 1973, "make": "Ferrari", "model": "365", "body_style": "coupe",
+     "length_inches": 189, "width_inches": 70, "height_inches": 52, "wheelbase_inches": 105},
+    {"year_start": 1975, "year_end": 1985, "make": "Ferrari", "model": "308", "body_style": "coupe",
+     "length_inches": 167, "width_inches": 68, "height_inches": 44, "wheelbase_inches": 92},
+    {"year_start": 1984, "year_end": 1989, "make": "Ferrari", "model": "328", "body_style": "coupe",
+     "length_inches": 167, "width_inches": 68, "height_inches": 44, "wheelbase_inches": 92},
+
+    # ══════════════════════════════════════════════════════════════════
+    # JAGUAR
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1961, "year_end": 1975, "make": "Jaguar", "model": "XKE", "body_style": "coupe",
+     "length_inches": 176, "width_inches": 65, "height_inches": 48, "wheelbase_inches": 96},
+    {"year_start": 1961, "year_end": 1975, "make": "Jaguar", "model": "E-Type", "body_style": "coupe",
+     "length_inches": 176, "width_inches": 65, "height_inches": 48, "wheelbase_inches": 96},
+
+    # ══════════════════════════════════════════════════════════════════
+    # BMW
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1968, "year_end": 1976, "make": "BMW", "model": "2002", "body_style": "sedan",
+     "length_inches": 166, "width_inches": 63, "height_inches": 55, "wheelbase_inches": 98},
+    {"year_start": 1956, "year_end": 1962, "make": "BMW", "model": "Isetta", "body_style": "coupe",
+     "length_inches": 90, "width_inches": 55, "height_inches": 53, "wheelbase_inches": 59},
+    {"year_start": 2000, "year_end": 2006, "make": "BMW", "model": "M3", "body_style": "coupe",
+     "length_inches": 177, "width_inches": 70, "height_inches": 54, "wheelbase_inches": 108},
+    {"year_start": 1996, "year_end": 2003, "make": "BMW", "model": "525", "body_style": "wagon",
+     "length_inches": 189, "width_inches": 72, "height_inches": 56, "wheelbase_inches": 111},
+
+    # ══════════════════════════════════════════════════════════════════
+    # HONDA / ACURA
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1999, "year_end": 2009, "make": "Honda", "model": "S2000", "body_style": "roadster",
+     "length_inches": 162, "width_inches": 69, "height_inches": 50, "wheelbase_inches": 95},
+    {"year_start": 1990, "year_end": 2005, "make": "Acura", "model": "NSX", "body_style": "coupe",
+     "length_inches": 174, "width_inches": 71, "height_inches": 46, "wheelbase_inches": 100},
+
+    # ══════════════════════════════════════════════════════════════════
+    # MAZDA
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1990, "year_end": 1997, "make": "Mazda", "model": "MX-5", "body_style": "roadster",
+     "length_inches": 156, "width_inches": 66, "height_inches": 49, "wheelbase_inches": 90},
+    {"year_start": 1978, "year_end": 1985, "make": "Mazda", "model": "RX-7", "body_style": "coupe",
+     "length_inches": 170, "width_inches": 66, "height_inches": 49, "wheelbase_inches": 96},
+
+    # ══════════════════════════════════════════════════════════════════
+    # DELOREAN
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1981, "year_end": 1983, "make": "DeLorean", "model": "DMC-12", "body_style": "coupe",
+     "length_inches": 169, "width_inches": 79, "height_inches": 45, "wheelbase_inches": 95},
+
+    # ══════════════════════════════════════════════════════════════════
+    # ROLLS-ROYCE / BENTLEY
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1955, "year_end": 1966, "make": "Rolls-Royce", "model": "Silver Cloud", "body_style": "sedan",
+     "length_inches": 212, "width_inches": 75, "height_inches": 64, "wheelbase_inches": 127},
+    {"year_start": 1955, "year_end": 1965, "make": "Bentley", "model": "S1", "body_style": "sedan",
+     "length_inches": 212, "width_inches": 75, "height_inches": 64, "wheelbase_inches": 127},
+
+    # ══════════════════════════════════════════════════════════════════
+    # CADILLAC
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1954, "year_end": 1958, "make": "Cadillac", "model": "Series 62", "body_style": "convertible",
+     "length_inches": 224, "width_inches": 80, "height_inches": 60, "wheelbase_inches": 129},
+    {"year_start": 1957, "year_end": 1961, "make": "Cadillac", "model": "Fleetwood", "body_style": "sedan",
+     "length_inches": 225, "width_inches": 80, "height_inches": 60, "wheelbase_inches": 130},
+
+    # ══════════════════════════════════════════════════════════════════
+    # LINCOLN
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1977, "year_end": 1979, "make": "Lincoln", "model": "Mark V", "body_style": "coupe",
+     "length_inches": 233, "width_inches": 80, "height_inches": 54, "wheelbase_inches": 121},
+    {"year_start": 1984, "year_end": 1992, "make": "Lincoln", "model": "Mark VII", "body_style": "coupe",
+     "length_inches": 203, "width_inches": 71, "height_inches": 54, "wheelbase_inches": 109},
+
+    # ══════════════════════════════════════════════════════════════════
+    # AUSTIN-HEALEY
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1959, "year_end": 1967, "make": "Austin-Healey", "model": "3000", "body_style": "roadster",
+     "length_inches": 157, "width_inches": 60, "height_inches": 50, "wheelbase_inches": 92},
+    {"year_start": 1956, "year_end": 1959, "make": "Austin-Healey", "model": "100", "body_style": "roadster",
+     "length_inches": 151, "width_inches": 60, "height_inches": 49, "wheelbase_inches": 90},
+
+    # ══════════════════════════════════════════════════════════════════
+    # ALFA ROMEO
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1963, "year_end": 1976, "make": "Alfa Romeo", "model": "Giulia", "body_style": "coupe",
+     "length_inches": 161, "width_inches": 62, "height_inches": 53, "wheelbase_inches": 93},
+
+    # ══════════════════════════════════════════════════════════════════
+    # DE TOMASO
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1971, "year_end": 1992, "make": "De Tomaso", "model": "Pantera", "body_style": "coupe",
+     "length_inches": 168, "width_inches": 72, "height_inches": 43, "wheelbase_inches": 99},
+
+    # ══════════════════════════════════════════════════════════════════
+    # SAAB
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1979, "year_end": 1993, "make": "Saab", "model": "900", "body_style": "coupe",
+     "length_inches": 183, "width_inches": 67, "height_inches": 56, "wheelbase_inches": 99},
+
+    # ══════════════════════════════════════════════════════════════════
+    # SHELBY
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1965, "year_end": 1970, "make": "Shelby", "model": "Mustang", "body_style": "coupe",
+     "length_inches": 182, "width_inches": 68, "height_inches": 51, "wheelbase_inches": 108},
+
+    # ══════════════════════════════════════════════════════════════════
+    # LEXUS
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 2001, "year_end": 2006, "make": "Lexus", "model": "LS430", "body_style": "sedan",
+     "length_inches": 197, "width_inches": 72, "height_inches": 58, "wheelbase_inches": 115},
+    {"year_start": 1998, "year_end": 2007, "make": "Lexus", "model": "LX470", "body_style": "suv",
+     "length_inches": 193, "width_inches": 77, "height_inches": 74, "wheelbase_inches": 112},
+
+    # ══════════════════════════════════════════════════════════════════
+    # PACKARD / NASH (pre-war / early postwar)
+    # ══════════════════════════════════════════════════════════════════
+    {"year_start": 1955, "year_end": 1958, "make": "Packard", "model": "400", "body_style": "sedan",
+     "length_inches": 218, "width_inches": 78, "height_inches": 60, "wheelbase_inches": 127},
+    {"year_start": 1954, "year_end": 1957, "make": "Nash", "model": "Rambler", "body_style": "wagon",
+     "length_inches": 186, "width_inches": 73, "height_inches": 60, "wheelbase_inches": 108},
+
+    # ══════════════════════════════════════════════════════════════════
+    # WAVE 2: FILL GAPS IDENTIFIED BY SPATIAL BACKFILL AUDIT
+    # ══════════════════════════════════════════════════════════════════
+
+    # Porsche modern 911 generations
+    {"year_start": 2005, "year_end": 2012, "make": "Porsche", "model": "911", "body_style": "coupe",
+     "length_inches": 177, "width_inches": 72, "height_inches": 51, "wheelbase_inches": 93},
+    {"year_start": 2012, "year_end": 2019, "make": "Porsche", "model": "911", "body_style": "coupe",
+     "length_inches": 178, "width_inches": 72, "height_inches": 51, "wheelbase_inches": 97},
+    {"year_start": 2019, "year_end": 2026, "make": "Porsche", "model": "911", "body_style": "coupe",
+     "length_inches": 178, "width_inches": 73, "height_inches": 51, "wheelbase_inches": 97},
+    {"year_start": 1970, "year_end": 1976, "make": "Porsche", "model": "914", "body_style": "coupe",
+     "length_inches": 159, "width_inches": 65, "height_inches": 48, "wheelbase_inches": 96},
+    {"year_start": 1982, "year_end": 1995, "make": "Porsche", "model": "944", "body_style": "coupe",
+     "length_inches": 168, "width_inches": 69, "height_inches": 50, "wheelbase_inches": 95},
+    {"year_start": 1978, "year_end": 1995, "make": "Porsche", "model": "928", "body_style": "coupe",
+     "length_inches": 178, "width_inches": 72, "height_inches": 50, "wheelbase_inches": 99},
+    {"year_start": 2003, "year_end": 2026, "make": "Porsche", "model": "Cayenne", "body_style": "suv",
+     "length_inches": 191, "width_inches": 76, "height_inches": 67, "wheelbase_inches": 114},
+    {"year_start": 2014, "year_end": 2026, "make": "Porsche", "model": "Macan", "body_style": "suv",
+     "length_inches": 184, "width_inches": 76, "height_inches": 64, "wheelbase_inches": 111},
+
+    # Ferrari extended range
+    {"year_start": 1959, "year_end": 1968, "make": "Ferrari", "model": "250", "body_style": "coupe",
+     "length_inches": 172, "width_inches": 67, "height_inches": 49, "wheelbase_inches": 95},
+    {"year_start": 1994, "year_end": 1999, "make": "Ferrari", "model": "F355", "body_style": "coupe",
+     "length_inches": 167, "width_inches": 75, "height_inches": 46, "wheelbase_inches": 96},
+    {"year_start": 1999, "year_end": 2005, "make": "Ferrari", "model": "360", "body_style": "coupe",
+     "length_inches": 176, "width_inches": 75, "height_inches": 47, "wheelbase_inches": 102},
+    {"year_start": 2004, "year_end": 2009, "make": "Ferrari", "model": "F430", "body_style": "coupe",
+     "length_inches": 177, "width_inches": 76, "height_inches": 47, "wheelbase_inches": 102},
+
+    # MG
+    {"year_start": 1962, "year_end": 1980, "make": "MG", "model": "MGB", "body_style": "roadster",
+     "length_inches": 154, "width_inches": 60, "height_inches": 50, "wheelbase_inches": 91},
+    {"year_start": 1955, "year_end": 1962, "make": "MG", "model": "MGA", "body_style": "roadster",
+     "length_inches": 156, "width_inches": 58, "height_inches": 50, "wheelbase_inches": 94},
+
+    # Triumph
+    {"year_start": 1955, "year_end": 1981, "make": "Triumph", "model": "TR", "body_style": "roadster",
+     "length_inches": 153, "width_inches": 58, "height_inches": 50, "wheelbase_inches": 88},
+    {"year_start": 1962, "year_end": 1980, "make": "Triumph", "model": "Spitfire", "body_style": "roadster",
+     "length_inches": 148, "width_inches": 57, "height_inches": 48, "wheelbase_inches": 83},
+
+    # Mercedes extended
+    {"year_start": 1976, "year_end": 1995, "make": "Mercedes-Benz", "model": "300", "body_style": "sedan",
+     "length_inches": 187, "width_inches": 70, "height_inches": 56, "wheelbase_inches": 110},
+    {"year_start": 1979, "year_end": 1991, "make": "Mercedes-Benz", "model": "380", "body_style": "sedan",
+     "length_inches": 197, "width_inches": 72, "height_inches": 56, "wheelbase_inches": 116},
+    {"year_start": 1991, "year_end": 1998, "make": "Mercedes-Benz", "model": "S", "body_style": "sedan",
+     "length_inches": 205, "width_inches": 74, "height_inches": 59, "wheelbase_inches": 121},
+    {"year_start": 1998, "year_end": 2006, "make": "Mercedes-Benz", "model": "S", "body_style": "sedan",
+     "length_inches": 203, "width_inches": 73, "height_inches": 57, "wheelbase_inches": 121},
+    {"year_start": 2013, "year_end": 2026, "make": "Mercedes-Benz", "model": "SL", "body_style": "roadster",
+     "length_inches": 183, "width_inches": 73, "height_inches": 51, "wheelbase_inches": 102},
+
+    # Bentley extended
+    {"year_start": 2003, "year_end": 2018, "make": "Bentley", "model": "Continental", "body_style": "coupe",
+     "length_inches": 189, "width_inches": 76, "height_inches": 55, "wheelbase_inches": 108},
+
+    # BMW extended
+    {"year_start": 1975, "year_end": 1983, "make": "BMW", "model": "320", "body_style": "coupe",
+     "length_inches": 172, "width_inches": 64, "height_inches": 54, "wheelbase_inches": 101},
+    {"year_start": 1982, "year_end": 1994, "make": "BMW", "model": "325", "body_style": "sedan",
+     "length_inches": 176, "width_inches": 67, "height_inches": 55, "wheelbase_inches": 101},
+    {"year_start": 1988, "year_end": 1996, "make": "BMW", "model": "535", "body_style": "sedan",
+     "length_inches": 186, "width_inches": 70, "height_inches": 56, "wheelbase_inches": 109},
 ]
 
 

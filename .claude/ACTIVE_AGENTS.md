@@ -41,5 +41,7 @@
 2026-03-13 20:31 | vehicle-taxonomy-normalization | scripts/mass-vin-decode.ts, scripts/build-canonical-models.ts, scripts/backfill-from-vin.ts, scripts/retrigger-normalization.ts
 - 2026-03-13 21:40 | vehicle-dossier-implementation | COMPLETE — committed `43230ea65`
 
-- 2026-03-13 22:00 | platform-health-remediation | P0-P2 fixes: auto-dedup-check removal, vehicle_timeline_events fix, bat_extraction_queue NULL vehicle_id, extract-vehicle-data-ai 400s, duplicate index drops, VACUUM | touching: photo-pipeline-orchestrator, ingest-observation, extract-bat-profile-vehicles, process-bat-extraction-queue, timelineEventService.ts, profileService.ts
+- 2026-03-13 22:30 | platform-health-remediation | COMPLETE — committed `ba0248148`
 
+
+- 2026-03-13 23:00 | training-data-quality-hardening | Tier 1+2a: confidence recalibration, template expansion, condition scoring, broken trigger fix | touching: yono/, scripts/, DB triggers, surface_observations, vehicle_condition_scores
