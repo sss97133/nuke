@@ -13,6 +13,9 @@ export interface FeedStatsStripProps {
   isLoading?: boolean;
   searchText?: string;
   onSearchChange?: (text: string) => void;
+  resultCount?: number;
+  hasActiveFilters?: boolean;
+  onResetFilters?: () => void;
 }
 
 const labelStyle: CSSProperties = {
@@ -48,7 +51,7 @@ function formatCompact(n: number): string {
   return n.toLocaleString();
 }
 
-export function FeedStatsStrip({ stats, isLoading, searchText, onSearchChange }: FeedStatsStripProps) {
+export function FeedStatsStrip({ stats, isLoading, searchText, onSearchChange, resultCount, hasActiveFilters, onResetFilters }: FeedStatsStripProps) {
   if (isLoading || !stats) {
     return (
       <div style={{
@@ -87,6 +90,33 @@ export function FeedStatsStrip({ stats, isLoading, searchText, onSearchChange }:
       <Stat label="FOR SALE" value={formatCompact(stats.for_sale_count)} />
       {stats.active_auctions > 0 && (
         <Stat label="LIVE" value={String(stats.active_auctions)} color="#ef4444" />
+      )}
+
+      {/* Filter result count + clear */}
+      {hasActiveFilters && resultCount != null && (
+        <>
+          <div style={{ width: '1px', height: '16px', background: 'var(--border)' }} />
+          <span style={{
+            fontFamily: "'Courier New', monospace",
+            fontSize: '9px',
+            fontWeight: 700,
+            color: 'var(--text)',
+          }}>
+            {resultCount.toLocaleString()}
+          </span>
+          <button
+            type="button"
+            onClick={onResetFilters}
+            style={{
+              fontFamily: 'Arial, sans-serif', fontSize: '7px', fontWeight: 700,
+              textTransform: 'uppercase', padding: '1px 4px',
+              border: '1px solid #ef4444', background: 'transparent',
+              color: '#ef4444', cursor: 'pointer', borderRadius: 0,
+            }}
+          >
+            CLEAR
+          </button>
+        </>
       )}
 
       {/* Inline search — right-aligned */}

@@ -773,100 +773,65 @@ export default function HomePage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - var(--header-height, 40px))' }}>
-      {/* Tab bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          background: 'var(--surface)',
-          flexShrink: 0,
-          borderBottom: '2px solid var(--border)',
-          height: 30,
-        }}
-      >
-        {TABS.map((tab) => {
-          const active = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => switchTab(tab.id)}
-              aria-selected={active}
-              style={{
-                padding: '0 16px',
-                height: 30,
-                fontSize: 9,
-                fontFamily: 'Arial, sans-serif',
-                fontWeight: 700,
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase',
-                border: 'none',
-                borderBottom: active ? '2px solid var(--text)' : '2px solid transparent',
-                background: active ? 'var(--bg)' : 'transparent',
-                color: active ? 'var(--text)' : 'var(--text-disabled)',
-                cursor: 'pointer',
-                transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1), background 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-                borderRadius: 0,
-              }}
-              onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)'; }}
-              onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-disabled)'; }}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-
-        {/* Right-aligned links */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 2, paddingRight: 8 }}>
-          <Link
-            to="/api"
-            style={{
-              padding: '0 10px',
-              fontSize: 9,
-              fontFamily: 'Arial, sans-serif',
-              fontWeight: 700,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              textDecoration: 'none',
-              color: 'var(--text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              height: 30,
-              transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-          >
-            API
-          </Link>
-          <Link
-            to="/developers"
-            style={{
-              padding: '0 10px',
-              fontSize: 9,
-              fontFamily: 'Arial, sans-serif',
-              fontWeight: 700,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              textDecoration: 'none',
-              color: 'var(--text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              height: 30,
-              transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-          >
-            SDK
-          </Link>
+    <div>
+      {/* Tab bar — only show for non-feed tabs (feed uses its own chrome) */}
+      {activeTab !== 'feed' && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            background: 'var(--surface)',
+            flexShrink: 0,
+            borderBottom: '2px solid var(--border)',
+            height: 30,
+          }}
+        >
+          {TABS.map((tab) => {
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => switchTab(tab.id)}
+                aria-selected={active}
+                style={{
+                  padding: '0 16px',
+                  height: 30,
+                  fontSize: 9,
+                  fontFamily: 'Arial, sans-serif',
+                  fontWeight: 700,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  border: 'none',
+                  borderBottom: active ? '2px solid var(--text)' : '2px solid transparent',
+                  background: active ? 'var(--bg)' : 'transparent',
+                  color: active ? 'var(--text)' : 'var(--text-disabled)',
+                  cursor: 'pointer',
+                  transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1), background 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+                  borderRadius: 0,
+                }}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-disabled)'; }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
-      </div>
+      )}
 
-      {/* Tab content */}
-      <div style={{ flex: 1, overflow: activeTab === 'map' ? 'hidden' : 'auto', background: 'var(--bg)', position: 'relative' }}>
+      {/* Tab content — feed scrolls with window, map needs fixed height */}
+      {activeTab === 'map' ? (
+        <div style={{ height: 'calc(100vh - var(--header-height, 40px) - 30px)', overflow: 'hidden', position: 'relative' }}>
+          <Suspense fallback={<TabSkeleton />}>
+            <UnifiedMap />
+          </Suspense>
+        </div>
+      ) : (
         <Suspense fallback={<TabSkeleton />}>
           {activeTab === 'garage' && <GarageTab dashboard={garage} />}
           {activeTab === 'feed' && <FeedPage />}
-          {activeTab === 'map' && <UnifiedMap />}
         </Suspense>
-      </div>
+      )}
     </div>
   );
 }

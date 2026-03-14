@@ -91,12 +91,15 @@ export default function FeedPage() {
   return (
     <AuctionClockProvider>
       <div className="fullscreen-content" style={feedStyle}>
-        {/* Stats strip — full width, includes inline search */}
+        {/* Stats strip — full width, includes inline search + filter result count */}
         <FeedStatsStrip
           stats={stats}
           isLoading={feedQuery.isLoading}
           searchText={searchText}
           onSearchChange={setSearchText}
+          resultCount={vehicles.length}
+          hasActiveFilters={hasActiveFilters}
+          onResetFilters={resetAll}
         />
 
         {/* Toolbar — full width */}
@@ -114,36 +117,6 @@ export default function FeedPage() {
           onFontSizeChange={setFontSize}
           onToggleScores={() => setShowScores(!showScores)}
         />
-
-        {/* Active filter indicator */}
-        {hasActiveFilters && (
-          <div style={{
-            padding: '3px 12px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}>
-            <span style={{
-              fontFamily: 'Arial, sans-serif', fontSize: '8px', fontWeight: 700,
-              textTransform: 'uppercase', color: 'var(--text-disabled)',
-            }}>
-              SHOWING {vehicles.length.toLocaleString()} RESULTS
-            </span>
-            <button
-              type="button"
-              onClick={resetAll}
-              style={{
-                fontFamily: 'Arial, sans-serif', fontSize: '7px', fontWeight: 700,
-                textTransform: 'uppercase', padding: '1px 4px',
-                border: '1px solid #ef4444', background: 'transparent',
-                color: '#ef4444', cursor: 'pointer',
-              }}
-            >
-              CLEAR ALL
-            </button>
-          </div>
-        )}
 
         {/* Sidebar + Content */}
         <div style={{ display: 'flex', minHeight: 'calc(100vh - 72px)' }}>
