@@ -202,7 +202,8 @@ interface VehicleEnrichment {
 }
 
 async function matchOrCreateVehicle(
-  parsed: ParsedVehicle & VehicleEnrichment
+  parsed: ParsedVehicle & VehicleEnrichment,
+  platform?: string | null,
 ): Promise<MatchResult> {
   // 1. VIN match
   if (parsed.vin) {
@@ -244,6 +245,7 @@ async function matchOrCreateVehicle(
     vin: parsed.vin || null,
     status: "discovered",
     primary_image_url: parsed.imageUrl || (parsed.imageUrls?.[0]) || null,
+    source: platform && platform !== "unknown" ? platform : null,
   };
 
   // Populate everything we have
@@ -544,7 +546,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       color: input.color,
       condition: input.condition,
       sellerName: input.seller_name,
-    });
+    }, platform);
 
     // If this is a marketplace listing, upsert it and get the listing ID
     let marketplaceListingId: string | null = null;

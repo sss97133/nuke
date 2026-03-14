@@ -172,6 +172,7 @@ serve(async (req) => {
       sale_price: salePrice ?? undefined,
       title: title || undefined,
       profile_origin: "barnfinds",
+      source: "barnfinds",
       is_public: true,
       status: "active",
     };

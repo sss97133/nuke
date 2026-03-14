@@ -1276,6 +1276,7 @@ serve(async (req) => {
         // Set primary image from extracted gallery
         primary_image_url: images.length > 0 ? images[0] : null,
         extractor_version: EXTRACTOR_VERSION,
+        source: 'bat',
       };
 
       const { data: inserted, error } = await supabase.from("vehicles").insert(insertPayload).select("id").maybeSingle();

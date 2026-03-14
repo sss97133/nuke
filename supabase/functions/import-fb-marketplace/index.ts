@@ -587,6 +587,7 @@ Deno.serve(async (req) => {
           discovery_url: listing.url,
           discovery_source: 'facebook_marketplace',
           profile_origin: 'facebook_marketplace',
+          source: 'facebook_marketplace',
           description: listing.description,
           primary_image_url: null, // Set after download to storage (CDN URLs expire)
           city,
