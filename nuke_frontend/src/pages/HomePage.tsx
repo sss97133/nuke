@@ -651,7 +651,6 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
         <Link to="/developers" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>SDK</Link>
         <Link to="/about" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>About</Link>
         <Link to="/search" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Search</Link>
-        <Link to="/offering" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Investors</Link>
       </div>
 
     </div>

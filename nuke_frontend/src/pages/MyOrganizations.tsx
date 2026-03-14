@@ -222,7 +222,7 @@ const MyOrganizations: React.FC = () => {
 
         <button
           className="cursor-button"
-          onClick={() => navigate('/organizations')}
+          onClick={() => navigate('/org')}
           style={{
             padding: '6px 12px',
             fontSize: '12px',
@@ -256,7 +256,7 @@ const MyOrganizations: React.FC = () => {
           </div>
           <button
             className="cursor-button"
-            onClick={() => navigate('/organizations')}
+            onClick={() => navigate('/org')}
             style={{ padding: '10px 20px' }}
           >
             Browse Organizations

@@ -94,7 +94,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
         e.currentTarget.style.transform = 'translateY(0)';
         e.currentTarget.style.boxShadow = 'none';
       }}
-      onClick={() => navigate(`/organizations/${organization.organization_id}`)}
+      onClick={() => navigate(`/org/${organization.organization_id}`)}
     >
       <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
@@ -250,7 +250,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/organizations/${organization.organization_id}`);
+                navigate(`/org/${organization.organization_id}`);
               }}
             >
               VIEW PROFILE

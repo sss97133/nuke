@@ -95,7 +95,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
     if (listing.scope === 'organization' && listing.organization_id) {
       return {
         label: listing.organization_name || 'Organization',
-        href: `/organizations/${listing.organization_id}`,
+        href: `/org/${listing.organization_id}`,
         iconUrl: undefined,
         kind: 'organization' as const,
       };
