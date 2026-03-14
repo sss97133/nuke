@@ -269,6 +269,23 @@ scripts/prompts/*.md
 scripts/data/*.md
 scripts/tools/*.md
 
+# Agent circuit breaker / state files
+.call_count
+.circuit_breaker_*
+.claude_session_id
+.exit_signals
+.last_reset
+.env.keys
+
+# Session analysis artifacts
+analysis-reports/
+photo-analysis.json
+photo-manifest.json
+vehicle-analysis.*
+blazer-analysis.html
+windsurf_parser.py
+export_windsurf.sh
+
 # Misc generated
 overnight-batch.log
 osxphotos_crash.log

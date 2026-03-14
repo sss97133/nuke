@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nuke Widgets — Developer Tools</title>
+  <style>
+    /* Simulate a typical Squarespace/Shopify dealer site */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #fafafa;
+      color: #333;
+      padding: 40px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+    .subtitle { font-size: 13px; color: #888; margin-bottom: 40px; }
+    h2 { font-size: 15px; font-weight: 600; color: #222; margin-top: 48px; margin-bottom: 6px; }
+    .desc { font-size: 12px; color: #666; margin-bottom: 16px; line-height: 1.5; }
+    code {
+      background: #f0f0f0;
+      padding: 2px 6px;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 11px;
+      color: #c00;
+    }
+    .widget-box { max-width: 420px; margin: 0 0 24px 0; }
+    .widget-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+
+    /* Embed snippet display */
+    .snippet {
+      background: #1a1a1a;
+      color: #ccc;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 11px;
+      padding: 12px 16px;
+      margin: 12px 0 20px;
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.6;
+      border-left: 3px solid #444;
+    }
+    .snippet .tag { color: #e06c75; }
+    .snippet .attr { color: #d19a66; }
+    .snippet .val { color: #98c379; }
+
+    /* Event log */
+    .event-log {
+      background: #111;
+      color: #0f0;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 11px;
+      padding: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      margin: 12px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>@nuke1/widgets</h1>
+  <div class="subtitle">3 embeddable tools for any website. Paste the snippet, get vehicle intelligence.</div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <h2>1. Vision — AI Vehicle Identification</h2>
+  <p class="desc">
+    Drop a photo of any vehicle. YONO identifies make/model/year, assesses condition,
+    and returns market value — in under 5 seconds. Zero cost per image.
+  </p>
+  <div class="snippet"><span class="tag">&lt;nuke-vision</span> <span class="attr">api-key</span>=<span class="val">"nk_pub_..."</span><span class="tag">&gt;&lt;/nuke-vision&gt;</span></div>
+
+  <div class="widget-box">
+    <nuke-vision
+      api-key="nk_live_widget_test_key_2026"
+      mode="identify"
+      show-top5="true"
+    ></nuke-vision>
+  </div>
+
+  <p class="desc">Full analysis mode (condition + damage + modifications):</p>
+  <div class="widget-box">
+    <nuke-vision
+      api-key="nk_live_widget_test_key_2026"
+      mode="full"
+      show-top5="true"
+      theme="dark"
+    ></nuke-vision>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <h2>2. Valuation — "What's Your Car Worth?"</h2>
+  <p class="desc">
+    Visitors enter a VIN or year/make/model. They get an instant valuation with
+    comparable sales. You get demand signals and inventory intelligence.
+  </p>
+  <div class="snippet"><span class="tag">&lt;nuke-valuation</span> <span class="attr">api-key</span>=<span class="val">"nk_pub_..."</span> <span class="attr">mode</span>=<span class="val">"vin"</span><span class="tag">&gt;&lt;/nuke-valuation&gt;</span></div>
+
+  <p class="desc">VIN mode — enter a 17-character VIN:</p>
+  <div class="widget-box">
+    <nuke-valuation
+      api-key="nk_live_widget_test_key_2026"
+      mode="vin"
+    ></nuke-valuation>
+  </div>
+
+  <p class="desc">Search mode — year/make/model dropdowns:</p>
+  <div class="widget-box">
+    <nuke-valuation
+      api-key="nk_live_widget_test_key_2026"
+      mode="search"
+      theme="dark"
+    ></nuke-valuation>
+  </div>
+
+  <p class="desc">Pre-loaded with a VIN (1984 Chevrolet K10):</p>
+  <div class="widget-box">
+    <nuke-valuation
+      api-key="nk_live_widget_test_key_2026"
+      vin="1GCEK14L9EJ147915"
+    ></nuke-valuation>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <h2>3. Vehicle Card — Market Intelligence</h2>
+  <p class="desc">
+    Paste a VIN. Get a rich card with photo, specs, valuation, and market activity.
+    Works by VIN (primary) or internal vehicle-id (fallback).
+  </p>
+  <div class="snippet"><span class="tag">&lt;nuke-vehicle</span> <span class="attr">api-key</span>=<span class="val">"nk_pub_..."</span> <span class="attr">vin</span>=<span class="val">"1GCEK14L9EJ147915"</span><span class="tag">&gt;&lt;/nuke-vehicle&gt;</span></div>
+
+  <p class="desc">By VIN (1984 Chevrolet K10):</p>
+  <div class="widget-box">
+    <nuke-vehicle
+      api-key="nk_live_widget_test_key_2026"
+      vin="1GCEK14L9EJ147915"
+    ></nuke-vehicle>
+  </div>
+
+  <p class="desc">By vehicle-id (1970 Pontiac GTO Judge, dark + gulf accent):</p>
+  <div class="widget-box">
+    <nuke-vehicle
+      api-key="nk_live_widget_test_key_2026"
+      vehicle-id="c6d6d7b1-f358-4b7d-b039-183d85ed42bf"
+      theme="dark"
+      accent="gulf"
+    ></nuke-vehicle>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <h2>Event Log</h2>
+  <p class="desc">Every widget interaction emits CustomEvents that cross the Shadow DOM:</p>
+  <div class="event-log" id="event-log"></div>
+
+  <!-- Load all widgets -->
+  <script type="module" src="../dist/nuke-widgets.js"></script>
+
+  <script>
+    const log = document.getElementById('event-log');
+    function logEvent(e) {
+      const time = new Date().toISOString().slice(11, 19);
+      const line = document.createElement('div');
+      const detail = JSON.stringify(e.detail);
+      line.textContent = `[${time}] ${e.type}: ${detail.slice(0, 150)}${detail.length > 150 ? '...' : ''}`;
+      log.prepend(line);
+    }
+
+    [
+      'nuke-vehicle:loaded', 'nuke-vehicle:click',
+      'nuke-vision:result', 'nuke-vision:error', 'nuke-vision:upload-start',
+      'nuke-valuation:result', 'nuke-valuation:error',
+    ].forEach(name => document.addEventListener(name, logEvent));
+  </script>
+</body>
+</html>
