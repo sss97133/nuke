@@ -290,8 +290,11 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
           {images.map((image) => {
             const globalIndex = globalIndexMap.get(String(image.id || '')) ?? -1;
             const isSelected = selectMode && selectedImages?.has(image.id);
+            const deepScore = image.ai_scan_metadata?.deep_analysis?.condition_detail?.overall_score;
             const conditionScore =
+              typeof deepScore === 'number' ? deepScore :
               typeof image.condition_score === 'number' ? image.condition_score : null;
+            const isDeepScore = typeof deepScore === 'number';
             const damageFlags: string[] = Array.isArray(image.damage_flags)
               ? image.damage_flags
               : [];
@@ -382,9 +385,9 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
                       zIndex: 10,
                       lineHeight: '14px',
                     }}
-                    title={`Condition: ${conditionScore}/5`}
+                    title={`Condition: ${conditionScore}/${isDeepScore ? 10 : 5}`}
                   >
-                    {'\u2605'}{conditionScore}
+                    {'\u2605'}{conditionScore}{isDeepScore ? '' : ''}
                   </div>
                 )}
 
@@ -404,6 +407,30 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
                     }}
                     title={`Damage: ${damageFlags.join(', ')}`}
                   />
+                )}
+
+                {/* Fabrication Stage Badge (bottom-right) */}
+                {image.ai_scan_metadata?.deep_analysis?.fabrication_stage && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '4px',
+                      right: '4px',
+                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                      color: 'rgba(255, 255, 255, 0.85)',
+                      padding: '1px 5px',
+                      fontSize: '8px',
+                      fontWeight: 700,
+                      fontFamily: 'Arial, Helvetica, sans-serif',
+                      textTransform: 'uppercase' as const,
+                      letterSpacing: '0.03em',
+                      zIndex: 10,
+                      lineHeight: '12px',
+                    }}
+                    title={`Stage: ${image.ai_scan_metadata.deep_analysis.fabrication_stage.replace(/_/g, ' ')}`}
+                  >
+                    {image.ai_scan_metadata.deep_analysis.fabrication_stage.replace(/_/g, ' ')}
+                  </div>
                 )}
 
                 {/* Photo Quality Badge (top-right, subtle) */}
