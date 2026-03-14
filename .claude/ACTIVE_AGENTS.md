@@ -22,18 +22,17 @@
 
 ## CURRENTLY ACTIVE
 
-- **Night shift agent** (2026-03-13 ~midnight–6am) — Vehicle profile context integration, VehicleProfile.tsx slimming, frontend cleanup. Touching: `src/pages/VehicleProfile.tsx`, `src/pages/vehicle-profile/`, `src/components/vehicle/`
+(none — all Mar 13 sessions complete)
 
-- **YONO training pipeline agent** (2026-03-13 ~morning) — DONE. Autonomous daily training pipeline implemented.
+---
 
-- **Modal rearchitecture agent** (2026-03-13 09:30 UTC) — YONO Modal rearchitecture: batch-first, scale-to-zero. Touching: `yono/modal_batch.py`, `yono/modal_api.py`, `yono/modal_serve.py`, edge functions (yono-*), pg_cron jobs.
+## COMPLETED (Mar 13)
 
-- **Feed rebuild agent** (2026-03-13 ~afternoon) — DONE. Brand Heartbeat + Chrome Collapse complete. Build passes.
-
-- **Vehicle profile quality agent** (2026-03-13 ~afternoon) — Junk image filtering, source attribution, angle display, timeline fixes. Touching: `ImageGallery.tsx`, `ImageExpandedData.tsx`, `ImageLightbox.tsx`, `BarcodeTimeline.tsx`, new `resolveAngle.ts`
-
-- **Image sessions agent** (2026-03-13 ~afternoon) — DONE. All 6 phases complete: DB schema, session detection, descriptions, narratives, YONO classifier, frontend. Committed `266bb6193`.
-
-- **Surface mapping agent** (2026-03-13 ~evening) — DONE. Schema + backfill + pipeline + templates + NLQ all deployed.
-
-- **Platform health remediation agent** (2026-03-13 ~late evening) — Fixing critical: listing_page_snapshots column errors, dead cron jobs, discover-from-observations 500s, release_stale_locks 400s. Then commits, index cleanup. Touching: `_shared/archiveFetch.ts`, cron jobs, DB indexes.
+- Night shift: Vehicle profile context integration — committed
+- YONO training pipeline: Autonomous daily training — committed
+- Modal rearchitecture: Batch-first, scale-to-zero — committed
+- Feed rebuild: Brand Heartbeat + Chrome Collapse — committed `1cda47f06`
+- Vehicle profile quality: Image filtering, source attribution — committed
+- Image sessions: DB schema through frontend — committed `266bb6193`
+- Surface mapping: Schema + backfill + pipeline + NLQ — committed
+- Platform health: Column fixes, index cleanup, 643 MB reclaimed — committed
