@@ -32,8 +32,8 @@ _MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 _STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 
-def _preprocess(image_path: str) -> np.ndarray:
-    """Load, convert HEIC if needed, resize to 224x224, normalize."""
+def _preprocess(image_path: str, size: int = 260) -> np.ndarray:
+    """Load, convert HEIC if needed, resize to size x size, normalize."""
     path = Path(image_path)
 
     if path.suffix.lower() == ".heic":
@@ -45,10 +45,10 @@ def _preprocess(image_path: str) -> np.ndarray:
         )
         path = Path(tmp.name)
 
-    img = Image.open(path).convert("RGB").resize((224, 224), Image.BILINEAR)
+    img = Image.open(path).convert("RGB").resize((size, size), Image.BILINEAR)
     arr = np.array(img, dtype=np.float32) / 255.0
     arr = (arr - _MEAN) / _STD
-    return arr.transpose(2, 0, 1)[np.newaxis]  # (1, 3, 224, 224)
+    return arr.transpose(2, 0, 1)[np.newaxis]  # (1, 3, size, size)
 
 
 def _softmax(x: np.ndarray) -> np.ndarray:

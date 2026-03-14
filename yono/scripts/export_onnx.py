@@ -47,7 +47,7 @@ def load_pytorch_model(phase_name, device="cpu"):
         labels = json.load(f)  # {"0": "Porsche", "1": "BMW", ...}
 
     num_classes = len(labels)
-    model = timm.create_model("efficientnet_b0", pretrained=False, num_classes=num_classes)
+    model = timm.create_model("efficientnet_b2", pretrained=False, num_classes=num_classes)
 
     ckpt = torch.load(model_path, map_location=device, weights_only=False)
     state_dict = ckpt["model_state_dict"] if isinstance(ckpt, dict) and "model_state_dict" in ckpt else ckpt
@@ -75,8 +75,8 @@ def export_onnx(phase_name=None, verify=False):
     model, labels, meta = load_pytorch_model(phase_name)
     print(f"  Loaded: {meta['num_classes']} classes, epoch {meta['epoch']}, val_acc={meta['val_acc']:.1f}%")
 
-    # Dummy input: batch=1, RGB, 224x224
-    dummy = torch.randn(1, 3, 224, 224)
+    # Dummy input: batch=1, RGB, 260x260 (EfficientNet-B2)
+    dummy = torch.randn(1, 3, 260, 260)
 
     onnx_path = MODELS_DIR / "yono_make_v1.onnx"
     labels_path = MODELS_DIR / "yono_labels.json"

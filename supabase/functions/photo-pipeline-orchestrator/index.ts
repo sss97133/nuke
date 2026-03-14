@@ -318,7 +318,7 @@ async function classifyImage(imageUrl: string): Promise<ClassificationResult> {
     const mimeType = imageResponse.headers.get("content-type") || "image/jpeg";
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -352,8 +352,10 @@ image_medium definitions:
           }],
           generationConfig: {
             temperature: 0.1,
-            maxOutputTokens: 500,
+            maxOutputTokens: 1024,
             responseMimeType: "application/json",
+            // Disable thinking for classification — it's unnecessary and consumes output tokens
+            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
       },
@@ -364,7 +366,11 @@ image_medium definitions:
     }
 
     const result = await response.json();
-    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    // Gemini 2.5+ may include thinking parts before the actual response
+    // Find the last text part (thinking parts come first, JSON response last)
+    const parts = result.candidates?.[0]?.content?.parts || [];
+    const text = parts.filter((p: any) => p.text && !p.thought).pop()?.text
+      || parts[parts.length - 1]?.text;
 
     if (!text) throw new Error("No classification response");
 
