@@ -114,7 +114,20 @@ function dnsFetch(url, options = {}) {
 
     req.on("error", reject);
     req.setTimeout(30000, () => { req.destroy(new Error("Request timeout")); });
-    if (options.body) req.write(typeof options.body === "string" ? options.body : options.body.toString());
+    if (options.body) {
+      // Handle different body types without corrupting binary data.
+      // Buffer.toString() defaults to UTF-8 which destroys 0xFF bytes in JPEGs.
+      if (Buffer.isBuffer(options.body)) {
+        req.write(options.body);
+      } else if (options.body instanceof Uint8Array || options.body instanceof ArrayBuffer) {
+        req.write(Buffer.from(options.body));
+      } else if (typeof options.body === "string") {
+        req.write(options.body);
+      } else {
+        // FormData, URLSearchParams, or other objects — convert to string safely
+        req.write(String(options.body));
+      }
+    }
     req.end();
   });
 }
@@ -145,8 +158,8 @@ const GROUP = args.includes("--group")
   : 0; // 0 = all cities (no grouping)
 const TOTAL_GROUPS = 4;
 
-const YEAR_MIN = 1960;
-const YEAR_MAX = 1999;
+const YEAR_MIN = 1920;
+const YEAR_MAX = 2006;
 
 /**
  * Download an image from a URL and upload it to Supabase storage.
@@ -344,21 +357,37 @@ const NON_AUTO_MAKES_LC = new Set([
   // Powersports / UTV / ATV
   'polaris','arctic cat','can-am','ski-doo',
   // Marine
-  'sea-doo','sea ray','bayliner','boston whaler','mastercraft',
-  'chris-craft','wellcraft','chaparral','cobalt','malibu boats',
+  'sea-doo','sea ray','searay','searey','bayliner','boston whaler','mastercraft',
+  'chris-craft','wellcraft','chaparral','cobalt','malibu boats','malibu',
   'correct craft','riva','rinker','lund','crestliner','bennington',
-  'grumman','glastron','skeeter','tracker',
+  'grumman','glastron','glasstron','skeeter','tracker','stratos','checkmate',
+  'mako','alumacraft','crownline','cajun','ebbtide','stingray','key west',
+  'key','polar','marlin','landau','silverton','larson','mariah','procraft',
+  'proline','reinell','robalo','sylvan','tidecraft','caravelle','cobia',
+  'moomba','bass','angler','aquasport','fiberform','monterey','monteray',
+  'duracraft','lyman','sailfish','seaswirl','seanymph','sleekcraft',
+  'tahiti','tollycraft','triton','nautique','sunbird','gregor','alumaweld',
+  'hewes','klamath','valco','whitewater','trophy','macgregor','hobie',
+  'pearson','oday','irwin','ericson','columbia','hunter','precision',
+  'schock','lowe','crest','harris','pontoon','jon','vip','invader',
+  'sea','boston','hydra','baja','sanger','tige','centurion',
   // RV / Camper
   'fleetwood','winnebago','airstream','coachmen','jayco','keystone',
   'forest river','thor','newmar','tiffin','starcraft','heartland',
   'dutchmen','grand design','entegra','gulf stream','coleman',
-  'holiday rambler','monaco','flagstaff',
+  'holiday rambler','monaco','flagstaff','itasca','shasta','casita',
+  'scamp','a-liner','palomino','foretravel','safari','pace-arrow',
+  'terry','layton','skyline','nuwa','avion','lance','kit',
   // Farm / Heavy Equipment
   'john deere','kubota','caterpillar','bobcat','case ih','new holland',
   'massey ferguson','farmall','allis-chalmers','oliver','agco',
+  'case','yanmar','komatsu','deere','deutz','cub','long',
   // Heavy Duty / Commercial
   'freightliner','peterbilt','kenworth','mack','hino','western star',
-  'autocar','navistar',
+  'autocar','navistar','peterbuilt','frieghtliner','mci',
+  // Trailers / Misc non-auto
+  'wabash','dorsey','trailmobile','sooner','shorelander','zieman',
+  'gooseneck','load','flatbed','utility','enclosed','dump',
   // Golf Carts
   'ezgo','club car','cushman','gem',
   // Aircraft
@@ -857,7 +886,7 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
       listing_location: location,
       gps_latitude: listingLat,
       gps_longitude: listingLng,
-      status: isAuto ? "discovered" : "rejected",
+      status: isAuto ? "active" : "rejected",
       source: "facebook_marketplace",
       auction_source: "facebook_marketplace",
       discovery_source: "facebook_marketplace",
@@ -913,6 +942,7 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
           source_url: originalUrl, // Preserve original URL for dedup
           source: "facebook_marketplace",
           display_order: (existingSourceUrls.size || 0) + idx,
+          position: (existingSourceUrls.size || 0) + idx, // Must set position — queries ORDER BY position, not display_order
         });
       }
 

@@ -227,7 +227,7 @@ async function processSnapshots(
             ...parsed,
             bat_auction_url: opts.platform === "bat" ? normalizeUrl(snapshot.listing_url) : null,
             listing_url: snapshot.listing_url,
-            source: "User Submission",
+            source: opts.platform || null,
             extractor_version: VERSION,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
