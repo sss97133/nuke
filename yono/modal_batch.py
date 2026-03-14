@@ -590,15 +590,12 @@ def _get_supabase_client():
 
 
 def _fetch_pending(supabase, limit: int = MAX_PENDING) -> list[dict]:
-    """Fetch pending vehicle_images for processing."""
-    resp = (
-        supabase.table("vehicle_images")
-        .select("id, vehicle_id, image_url")
-        .eq("ai_processing_status", "pending")
-        .not_.is_("image_url", "null")
-        .limit(limit)
-        .execute()
-    )
+    """Fetch pending images from BaT vehicles with 100+ images and complete Y/M/M.
+
+    Only processes high-context vehicles — no point training on shit data.
+    Uses DB function for the heavy filtering.
+    """
+    resp = supabase.rpc("fetch_pending_bat_rich_images", {"batch_limit": limit}).execute()
     return resp.data or []
 
 
