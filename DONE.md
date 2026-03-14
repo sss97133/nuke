@@ -2,6 +2,39 @@
 
 ## 2026-03-14
 
+### [yono] Make Classifier v2 — Full Training Pipeline Rewrite
+- Rewrote `yono/modal_train_hierarchical.py`: 650 → 1,594 lines
+- **Label cleaning**: MAKE_ALIASES expanded 14 → ~200 entries, EXCLUDED_MAKES set (~400 entries) for motorcycles/boats/memorabilia/junk. 2,171 unique makes → ~100 clean makes
+- **Image caching**: New `cache-images` action — async downloads (aiohttp, 100 concurrent) to Modal volume. Zero HTTP during training
+- **CachedDataset**: Replaces StreamingDataset (was downloading every image via urllib per epoch). Loads from local SSD, corrupt files skip to next valid item
+- **JSONL loading**: Replaces 982 Supabase REST API round-trips. Two-pass: count makes, then filter (min_samples threshold)
+- **EfficientNet-B2**: Upgraded from B0 (224→260 input, 5.3M→9.2M params). Updated yono.py `_preprocess()` and `scripts/export_onnx.py`
+- **Augmentations**: Added RandAugment, RandomPerspective, RandomErasing. Wider crop scale (0.6-1.0)
+- **Training**: LR warmup (5 epochs, 0.1x→1x) + cosine decay, gradient accumulation (4 steps, effective batch 256), early stopping (patience=7), weight decay 1e-2, grad clipping max_norm=1.0
+- **ONNX export**: Reads model_name/img_size from checkpoint metadata — no hardcoded architecture
+- Removed `supabase` pip dependency from training image
+
+### [fb-marketplace] Pipeline Repair + National Scrape
+- Fixed broken `trg_auto_work_detection` trigger (empty search_path caused ALL vehicle_images inserts to fail silently)
+- Fixed 3 more broken triggers: `auto_group_photos_into_events`, `auto_tag_organization_from_gps`, `handle_image_activity`
+- Fixed 1,880/1,883 corrupted FB images (dnsFetch binary bug had corrupted 90.5% of stored images)
+- Improved non-auto filter: added ~80 boat/RV/trailer/equipment makes
+- Added image insert error logging (was silently swallowing errors)
+- National scrape: 58 US metros, 6,336 scanned, 2,070 vehicles created, 2,066 images stored
+- FB active vehicles: 1,148 → 2,179 (+90%)
+
+### [taxonomy] Vehicle Taxonomy Normalization Pipeline — Complete
+- **Phase 1**: Mass VIN decode — 115,872 of 118,486 VINs decoded (97.8%) via NHTSA batch API
+- **Phase 2a**: Added NHTSA body type aliases to canonical_body_styles (migration)
+- **Phase 2b**: Built canonical_models from NHTSA + ECR: 247 → 3,454 entries
+- **Phase 3**: Backfilled trim/body_style/engine/transmission/drivetrain from vin_decoded_data
+- **Phase 4**: Model normalization — exact match, partial match, VIN cross-ref, suffix-stripped passthrough
+- **Body style normalization**: Added hardtop/speedster/phaeton/limousine aliases, re-normalized
+- **Results**: model_pct 54% → 98.4%, body_pct 66.5% → 74%, decoded_vins 131 → 115,872
+- Scripts: `mass-vin-decode.ts`, `build-canonical-models.ts`, `backfill-from-vin.ts`, `retrigger-normalization.ts`
+- Index: `idx_vehicles_vin_upper` on upper(vin) for fast VIN joins
+- body_pct/trim_pct below target due to data availability (no source data for 85K vehicles)
+
 ### [yono] Training Data Quality Hardening (Tier 1)
 - Expanded vehicle_surface_templates: 20 → 102 entries (30+ makes, pre-war through 2026)
 - Spatial coverage: 19.2% → 62.3% of surface_observations have physical inch coords
@@ -3551,3 +3584,7 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - Increased FeedToolbar chip padding (3px 6px → 5px 8px) for better mobile tap targets
 - Filtered 0-vehicle segments from MarketDashboard segments strip
 - Added dismissible first-visit context banner on /market
+
+## 2026-03-14
+
+[frontend] Deep image analysis UI — forensic analysis rendering in ImageExpandedData (condition, surface, degradation, color swatches, modifications, subject, environment, forensic notes), ImageInfoPanel (compact forensic block in tags tab), ImageZoneSection (fabrication_stage badge + deep score support on thumbnails). Commit `80de4709b`.
