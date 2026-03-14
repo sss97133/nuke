@@ -2,6 +2,27 @@
 
 ## 2026-03-14
 
+### [yono] Training Data Quality Hardening (Tier 1)
+- Expanded vehicle_surface_templates: 20 → 102 entries (30+ makes, pre-war through 2026)
+- Spatial coverage: 19.2% → 62.3% of surface_observations have physical inch coords
+- Confidence recalibration: 107K NULL confidence values backfilled, zero NULLs remain
+- Built `yono/training_sampler.py`: stratified zone sampler (stats/sample/validate CLI)
+- Condition scoring: 100% of available data scored (362 vehicles), limited by paused pipeline
+- Created `backfill_surface_coords()` DB function for ongoing spatial resolution
+- Porsche alias matching: 991/997/964/Carrera/Turbo/Targa → 911 template
+- Trigger audit: `auto_update_primary_focus_on_org_vehicles` already patched (not broken)
+- Snapshot retention: all 358K snapshots <90 days old, no cleanup possible yet
+
+### [platform-health] P0 Error Fixes + Performance Cleanup
+- Removed dead `auto-dedup-check` call from photo-pipeline-orchestrator (every image upload was 404ing)
+- Created `vehicle_timeline_events` view over `timeline_events` (fixes ingest-observation 500s + 7 broken DB functions + frontend reads)
+- Fixed `enrich-vehicles-cron` sending unsupported `re_enrich` action to `extract-vehicle-data-ai` (400s)
+- Made `bat_extraction_queue.vehicle_id` nullable (queue_only inserts were silently failing)
+- Dropped 25 duplicate indexes (~700 MB reclaimed)
+- VACUUM FULL `vehicle_builder_attribution` (75 MB → 120 kB — 179 rows)
+- Deployed: photo-pipeline-orchestrator, enrich-vehicles-cron
+- DB migrations: vehicle_timeline_events view, nullable vehicle_id, duplicate index cleanup
+
 ### [vehicle-profile] Vehicle Dossier Panel — Provenance-Rich Field Evidence
 - Fixed critical bug: useFieldEvidence.ts mapped wrong DB columns (proposed_value→field_value, source_confidence/100→confidence) — was causing em-dashes and 0% bars for 7,728 vehicles
 - Created ensure_field_evidence(UUID) SQL function — on-demand backfill from vin_decoded_data, vehicles table, vehicle_field_sources
