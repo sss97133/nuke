@@ -33,6 +33,7 @@ const SOURCE_LABELS: Record<string, string> = {
   nhtsa_vin_decode: 'NHTSA',
   vin_decode: 'VIN',
   user_input: 'USER',
+  user_input_unverified: 'USER',
   image_vision: 'VISION',
   title_document: 'TITLE',
   receipt: 'RECEIPT',
@@ -52,17 +53,11 @@ function getSourceLabel(sourceType: string): string {
 /* ------------------------------------------------------------------ */
 
 function getConfidenceColor(confidence: number): string {
-  if (confidence >= 0.9) return '#222';
-  if (confidence >= 0.7) return '#555';
-  if (confidence >= 0.5) return '#888';
-  return '#bbb';
+  if (confidence >= 0.85) return '#1a5c1a';  // green
+  if (confidence >= 0.50) return '#8a6b1a';  // gold
+  return '#8a1a1a';                          // red
 }
 
-function getVerificationLabel(row: FieldEvidenceRow): string | null {
-  if (row.verified) return 'VERIFIED';
-  if (row.verification_type) return row.verification_type.toUpperCase();
-  return null;
-}
 
 /* ------------------------------------------------------------------ */
 /*  Styles (inline, Nuke design system)                                */
@@ -179,17 +174,6 @@ const S = {
     flexShrink: 0,
   } as React.CSSProperties,
 
-  verifiedTag: {
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    fontSize: '8px',
-    fontWeight: 700,
-    letterSpacing: '0.06em',
-    padding: '0px 3px',
-    border: '1px solid #090',
-    color: '#060',
-    background: '#efe',
-  } as React.CSSProperties,
-
   chevron: {
     fontFamily: 'Arial, Helvetica, sans-serif',
     fontSize: '9px',
@@ -198,24 +182,6 @@ const S = {
     transition: 'transform 0.15s ease-out',
   } as React.CSSProperties,
 
-  sourceLink: {
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    fontSize: '8px',
-    color: '#666',
-    textDecoration: 'underline',
-    cursor: 'pointer',
-  } as React.CSSProperties,
-
-  primaryIndicator: {
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    fontSize: '8px',
-    fontWeight: 700,
-    letterSpacing: '0.06em',
-    padding: '0px 3px',
-    border: '1px solid #333',
-    color: '#111',
-    background: '#ddd',
-  } as React.CSSProperties,
 };
 
 /* ------------------------------------------------------------------ */
@@ -297,12 +263,17 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
         {/* Source rows */}
         {sources.map((row, idx) => {
           const isPrimary = row.id === primary.id;
-          const vLabel = getVerificationLabel(row);
+          const primaryValue = (primary.field_value || '').toLowerCase().trim();
+          const thisValue = (row.field_value || '').toLowerCase().trim();
+          const isConflict = !isPrimary && primaryValue && thisValue && thisValue !== primaryValue;
 
           return (
             <div key={row.id} style={{
               ...S.row,
               borderBottom: idx === sources.length - 1 ? 'none' : '1px solid #eee',
+              borderLeft: isPrimary ? '2px solid #000' : '2px solid transparent',
+              paddingLeft: isPrimary ? '4px' : '0',
+              ...(isConflict ? { border: '1px solid #e8c0c0', background: '#fef8f8' } : {}),
             }}>
               {/* Source badge */}
               <span style={{
@@ -312,9 +283,6 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
               }}>
                 {getSourceLabel(row.source_type)}
               </span>
-
-              {/* Primary indicator */}
-              {isPrimary && <span style={S.primaryIndicator}>PRIMARY</span>}
 
               {/* Value */}
               <span style={{
@@ -332,25 +300,28 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
                 {Math.round(row.confidence * 100)}%
               </span>
 
-              {/* Verified tag */}
-              {vLabel && <span style={S.verifiedTag}>{vLabel}</span>}
-
-              {/* Source link */}
-              {row.source_url && (
-                <a
-                  href={row.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={S.sourceLink}
-                  title={row.source_url}
+              {/* Extraction context */}
+              {row.extraction_context && (
+                <span
+                  style={{
+                    fontFamily: 'Arial, Helvetica, sans-serif',
+                    fontSize: '8px',
+                    color: '#888',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap' as const,
+                    maxWidth: '200px',
+                    flex: '0 1 auto',
+                  }}
+                  title={row.extraction_context}
                 >
-                  SRC
-                </a>
+                  {row.extraction_context}
+                </span>
               )}
 
               {/* Timestamp */}
               <span style={S.timestamp}>
-                {formatDate(row.updated_at || row.created_at)}
+                {formatDate(row.extracted_at || row.created_at)}
               </span>
             </div>
           );

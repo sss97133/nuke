@@ -4,7 +4,7 @@ import { useVehicleProfile } from './VehicleProfileContext';
 
 // Lazy-load heavy components
 const WorkMemorySection = React.lazy(() => import('./WorkMemorySection'));
-const VehicleBasicInfo = React.lazy(() => import('./VehicleBasicInfo'));
+const VehicleDossierPanel = React.lazy(() => import('./VehicleDossierPanel'));
 const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/vehicle/VehicleLedgerDocumentsCard').then(m => ({ default: m.VehicleLedgerDocumentsCard })));
 const VehicleDealJacketForensicsCard = React.lazy(() => import('../../components/vehicle/VehicleDealJacketForensicsCard'));
 import WiringQueryContextBar from '../../components/wiring/WiringQueryContextBar';
@@ -167,16 +167,9 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             </React.Suspense>
           )}
 
-          {/* Vehicle Information */}
+          {/* Vehicle Dossier — provenance-rich field panel */}
           <React.Suspense fallback={<div className="widget__label" style={{ padding: '10px 16px' }}>Loading...</div>}>
-            <VehicleBasicInfo
-              vehicle={vehicle}
-              session={session}
-              permissions={permissions}
-              onDataPointClick={onDataPointClick}
-              onEditClick={onEditClick}
-              onOpenVINProofImages={onOpenVINProofImages}
-            />
+            <VehicleDossierPanel />
           </React.Suspense>
 
           {/* Description */}
