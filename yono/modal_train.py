@@ -349,6 +349,20 @@ def train_make_classifier(
         # Commit volume to persist data
         volume.commit()
 
+    # Save metadata for continuous pipeline to read
+    run_id = os.path.basename(output_dir)
+    metadata = {
+        "run_id": run_id,
+        "best_val_acc": best_val_acc,
+        "num_classes": num_classes,
+        "total_samples": len(filtered_records),
+        "epochs": epochs,
+        "completed_at": datetime.now().isoformat(),
+    }
+    with open(f"{output_dir}/metadata.json", "w") as f:
+        json.dump(metadata, f, indent=2)
+    volume.commit()
+
     print("\n" + "=" * 60)
     print("Training complete!")
     print(f"Best validation accuracy: {best_val_acc:.2f}%")
@@ -360,6 +374,7 @@ def train_make_classifier(
         "output_dir": output_dir,
         "num_classes": num_classes,
         "total_samples": len(filtered_records),
+        "run_id": run_id,
     }
 
 
