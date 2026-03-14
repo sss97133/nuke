@@ -9,6 +9,7 @@
  * ALL CAPS labels, 9-10px body, zero radius/shadows/gradients.
  */
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
 import { useFieldEvidence, type FieldEvidenceMap, type FieldEvidenceGroup } from './hooks/useFieldEvidence';
@@ -33,6 +34,54 @@ const FIELD_LABELS: Record<string, string> = {
   mileage: 'MILEAGE', body_style: 'BODY STYLE',
   sale_price: 'SALE PRICE', trim: 'TRIM',
 };
+
+const EXTENDED_FIELDS: Array<{ key: string; label: string; formatter?: (val: any) => string }> = [
+  { key: 'doors', label: 'DOORS' },
+  { key: 'seats', label: 'SEATS' },
+  { key: 'horsepower', label: 'HORSEPOWER', formatter: (v) => `${Number(v).toLocaleString()} HP` },
+  { key: 'torque', label: 'TORQUE', formatter: (v) => `${Number(v).toLocaleString()} LB-FT` },
+  { key: 'weight_lbs', label: 'WEIGHT', formatter: (v) => `${Number(v).toLocaleString()} LBS` },
+  { key: 'wheelbase_inches', label: 'WHEELBASE', formatter: (v) => `${v}"` },
+  { key: 'length_inches', label: 'LENGTH', formatter: (v) => `${v}"` },
+  { key: 'width_inches', label: 'WIDTH', formatter: (v) => `${v}"` },
+  { key: 'height_inches', label: 'HEIGHT', formatter: (v) => `${v}"` },
+  { key: 'mpg_city', label: 'MPG CITY' },
+  { key: 'mpg_highway', label: 'MPG HIGHWAY' },
+  { key: 'mpg_combined', label: 'MPG COMBINED' },
+];
+
+function sanitizeInlineValue(val: any): string {
+  const s = (val ?? '').toString();
+  if (!s) return '';
+  if (s.length > 200) return s.substring(0, 197) + '...';
+  if (s.includes('{') || s.includes('}') || s.includes(';') || s.includes('}.') || s.includes('/*') || s.includes('*/')) return '';
+  if (/^[,;]\s+/.test(s) || /^,?\s*(and|or|but|with|the)\s+/i.test(s)) return '';
+  const batPatterns = [
+    /\s*for sale on BaT Auctions?\s*/gi,
+    /\s*sold for \$[\d,]+ on [A-Z][a-z]+ \d{1,2}, \d{4}\s*/gi,
+    /\s*\(Lot\s*#[\d,]+\s*\)\s*/gi,
+    /\s*\|\s*Bring a Trailer\s*/gi,
+    /\s*on bringatrailer\.com\s*/gi,
+  ];
+  let cleaned = s;
+  let hasBat = false;
+  for (const p of batPatterns) {
+    if (p.test(cleaned)) { hasBat = true; cleaned = cleaned.replace(p, ' '); }
+  }
+  if (hasBat && (cleaned.includes(' for sale') || /sold for \$/i.test(cleaned) || /Lot\s*#/i.test(cleaned))) {
+    if (cleaned.trim().length === 0 || cleaned.length > 100) return '';
+  }
+  cleaned = cleaned.trim().replace(/\s+/g, ' ');
+  if (cleaned.includes(' - $') || (cleaned.includes(' - ') && /\$[\d,]+/.test(cleaned))) {
+    const parts = cleaned.split(/\s*-\s*(?=\$|\()/);
+    if (parts.length > 0) {
+      let pc = parts[0].trim().replace(/\s*\(\d+of\d+\)\s*$/i, '').replace(/[-\u2013\u2014]\s*$/, '').replace(/\s*-\s*(BLACK|WHITE|RED|BLUE|GREEN|SILVER|GRAY|GREY|YELLOW|ORANGE|PURPLE|BROWN|BEIGE|TAN)\s*$/i, '').replace(/\s*\([A-Z][a-z]+\)\s*$/, '').trim();
+      if (pc.length > 0 && pc.length < cleaned.length && pc.length < 60) cleaned = pc;
+    }
+  }
+  if (cleaned.length > 80 && (/for sale/i.test(cleaned) || /auction/i.test(cleaned) || /listing/i.test(cleaned))) return '';
+  return cleaned;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Source badge classification (matching reference HTML)               */
@@ -150,6 +199,7 @@ const FieldRow: React.FC<{
   isOpen: boolean;
   onToggle: () => void;
 }> = ({ field, label, displayValue, group, isMod, isOpen, onToggle }) => {
+  const [hovered, setHovered] = useState(false);
   // Deduplicated source badges
   const sourceBadges = useMemo(() => {
     if (!group) return [];
@@ -162,9 +212,12 @@ const FieldRow: React.FC<{
   }, [group]);
 
   return (
-    <div style={{ borderBottom: '1px solid #e0e0e0' }}>
+    <div style={{ borderBottom: '1px solid #e0e0e0' }} data-field={field}>
       <div
         onClick={group && group.sources.length > 0 ? onToggle : undefined}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className="dossier-field-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: '120px 1fr auto 20px',
@@ -172,7 +225,7 @@ const FieldRow: React.FC<{
           padding: '4px 10px',
           minHeight: '28px',
           cursor: group && group.sources.length > 0 ? 'pointer' : 'default',
-          background: isOpen ? '#f5f5f0' : 'transparent',
+          background: isOpen ? '#f5f5f0' : (hovered && !isOpen ? '#fafafa' : 'transparent'),
           transition: 'background 0.1s',
         }}
       >
@@ -241,12 +294,39 @@ const FieldRow: React.FC<{
 /* ------------------------------------------------------------------ */
 
 const VehicleDossierPanel: React.FC = () => {
-  const { vehicle } = useVehicleProfile();
+  const { vehicle, canEdit, isVerifiedOwner, isMobile } = useVehicleProfile();
+  const navigate = useNavigate();
   const { evidence, loading } = useFieldEvidence(vehicle?.id);
-  const [openDrawer, setOpenDrawer] = useState<string | null>(null);
+
+  // Auto-expand fields with multi-source evidence
+  const autoExpandFields = useMemo(() => {
+    const candidates = ['drivetrain', 'engine_type', 'fuel_system_type'];
+    const set = new Set<string>();
+    for (const f of candidates) {
+      const g = evidence[f];
+      if (g && g.sources.length > 1) set.add(f);
+    }
+    return set;
+  }, [evidence]);
+
+  const [openDrawers, setOpenDrawers] = useState<Set<string>>(new Set());
+  const [initialized, setInitialized] = useState(false);
+
+  // Initialize auto-expanded drawers once evidence loads
+  React.useEffect(() => {
+    if (!initialized && autoExpandFields.size > 0) {
+      setOpenDrawers(new Set(autoExpandFields));
+      setInitialized(true);
+    }
+  }, [autoExpandFields, initialized]);
 
   const toggleDrawer = (field: string) => {
-    setOpenDrawer(prev => prev === field ? null : field);
+    setOpenDrawers(prev => {
+      const next = new Set(prev);
+      if (next.has(field)) next.delete(field);
+      else next.add(field);
+      return next;
+    });
   };
 
   const modFields = useMemo(() => detectModifications(evidence), [evidence]);
@@ -306,18 +386,40 @@ const VehicleDossierPanel: React.FC = () => {
         }}>
           VEHICLE DOSSIER
         </span>
-        <span style={{
-          fontFamily: "'Courier New', Courier, monospace",
-          fontSize: '8px',
-          fontWeight: 700,
-          letterSpacing: '0.5px',
-          textTransform: 'uppercase',
-          padding: '2px 6px',
-          border: `2px solid ${verificationClass === 'verified' ? '#1a5c1a' : '#8a6b1a'}`,
-          color: verificationClass === 'verified' ? '#1a5c1a' : '#8a6b1a',
-          background: '#fff',
-        }}>
-          {verificationLabel}
+        <span style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <span style={{
+            fontFamily: "'Courier New', Courier, monospace",
+            fontSize: '8px',
+            fontWeight: 700,
+            letterSpacing: '0.5px',
+            textTransform: 'uppercase',
+            padding: '2px 6px',
+            border: `2px solid ${verificationClass === 'verified' ? '#1a5c1a' : '#8a6b1a'}`,
+            color: verificationClass === 'verified' ? '#1a5c1a' : '#8a6b1a',
+            background: '#fff',
+          }}>
+            {verificationLabel}
+          </span>
+          {canEdit && (
+            <button
+              onClick={() => navigate(`/vehicle/${vehicle!.id}/edit`)}
+              style={{
+                border: '2px solid #000',
+                background: '#000',
+                color: '#fff',
+                fontSize: '9px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                padding: '2px 8px',
+                cursor: 'pointer',
+                fontFamily: 'Arial, Helvetica, sans-serif',
+                lineHeight: 1.4,
+              }}
+            >
+              EDIT
+            </button>
+          )}
         </span>
       </div>
 
@@ -329,7 +431,7 @@ const VehicleDossierPanel: React.FC = () => {
         padding: '10px 12px 8px',
         marginBottom: '8px',
       }}>
-        <div style={{
+        <div className="dossier-identity-ymm" style={{
           fontFamily: 'Arial, Helvetica, sans-serif',
           fontSize: '16px',
           fontWeight: 700,
@@ -350,6 +452,52 @@ const VehicleDossierPanel: React.FC = () => {
             {v.vin}
           </div>
         )}
+        {isVerifiedOwner && (() => {
+          const ownerName = (v.sale_status === 'sold' || v.sale_price > 0)
+            ? (v.bat_buyer?.trim() || null)
+            : (v.bat_seller?.trim() || null);
+          if (!ownerName) return null;
+          return (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              marginTop: '4px',
+            }}>
+              <span style={{
+                fontFamily: 'Arial, Helvetica, sans-serif',
+                fontSize: '9px',
+                fontWeight: 700,
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+                color: '#666',
+              }}>
+                OWNER
+              </span>
+              <span style={{
+                fontFamily: "'Courier New', Courier, monospace",
+                fontSize: '10px',
+                color: '#1a5c1a',
+              }}>
+                @{ownerName}
+              </span>
+              <span style={{
+                display: 'inline-block',
+                fontFamily: "'Courier New', Courier, monospace",
+                fontSize: '8px',
+                fontWeight: 700,
+                letterSpacing: '0.5px',
+                padding: '1px 5px',
+                border: '2px solid #1a5c1a',
+                background: '#1a5c1a',
+                color: '#fff',
+                lineHeight: 1.4,
+              }}>
+                VERIFIED
+              </span>
+            </div>
+          );
+        })()}
         {badges.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
             {badges.map((b, i) => {
@@ -399,7 +547,9 @@ const VehicleDossierPanel: React.FC = () => {
         </div>
 
         {FIELD_ORDER.map(field => {
-          const group = evidence[field];
+          // Evidence lookup with normalization fallback
+          const normalized = field.replace(/[\s-]/g, '_').toLowerCase();
+          const group = evidence[field] || (normalized !== field ? evidence[normalized] : undefined);
           // Primary value: prefer vehicle table, then highest-confidence evidence
           let pv = v[field];
           if ((pv == null || pv === '') && group && group.sources.length > 0) {
@@ -415,11 +565,56 @@ const VehicleDossierPanel: React.FC = () => {
               displayValue={displayValue}
               group={group}
               isMod={modFields.has(field)}
-              isOpen={openDrawer === field}
+              isOpen={openDrawers.has(field)}
               onToggle={() => toggleDrawer(field)}
             />
           );
         })}
+
+        {/* Extended Specifications */}
+        {(() => {
+          const extFields = EXTENDED_FIELDS.filter(({ key }) => {
+            const val = v[key];
+            return val != null && val !== '';
+          });
+          if (extFields.length === 0) return null;
+          return (
+            <>
+              <div style={{
+                fontFamily: 'Arial, Helvetica, sans-serif',
+                fontSize: '9px',
+                fontWeight: 700,
+                letterSpacing: '1px',
+                textTransform: 'uppercase',
+                padding: '6px 10px',
+                background: '#f0f0f0',
+                borderTop: '1px solid #ccc',
+                borderBottom: '1px solid #ccc',
+              }}>
+                EXTENDED SPECIFICATIONS
+              </div>
+              {extFields.map(({ key, label, formatter }) => {
+                const raw = formatter ? formatter(v[key]) : String(v[key]);
+                const displayValue = sanitizeInlineValue(raw);
+                if (!displayValue) return null;
+                const normalized = key.replace(/[\s-]/g, '_').toLowerCase();
+                const group = evidence[key] || (normalized !== key ? evidence[normalized] : undefined);
+                return (
+                  <FieldRow
+                    key={key}
+                    field={key}
+                    label={label}
+                    displayValue={displayValue}
+                    group={group}
+                    isMod={modFields.has(key)}
+                    isOpen={openDrawers.has(key)}
+                    onToggle={() => toggleDrawer(key)}
+                  />
+                );
+              })}
+            </>
+          );
+        })()}
       </div>
 
       {/* Verification Summary */}
@@ -462,6 +657,49 @@ const VehicleDossierPanel: React.FC = () => {
           {withEvidence}/{FIELD_ORDER.length} FIELDS WITH PROVENANCE
         </div>
       </div>
+
+      {/* Data Quality Score */}
+      {typeof (v as any).data_quality_score === 'number' && (
+        <div style={{
+          background: '#fff',
+          border: '2px solid #000',
+          padding: '8px 10px',
+          marginBottom: '8px',
+        }}>
+          <div style={{
+            fontFamily: 'Arial, Helvetica, sans-serif',
+            fontSize: '9px',
+            fontWeight: 700,
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+            marginBottom: '4px',
+          }}>
+            DATA QUALITY
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{
+              fontFamily: "'Courier New', Courier, monospace",
+              fontSize: '12px',
+              fontWeight: 700,
+              color: (v as any).data_quality_score >= 70 ? '#1a5c1a' : (v as any).data_quality_score >= 40 ? '#8a6b1a' : '#8a1a1a',
+            }}>
+              {Math.round((v as any).data_quality_score)}/100
+            </span>
+            <div style={{
+              flex: 1,
+              height: '4px',
+              background: '#e0e0e0',
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${Math.min(100, Math.max(0, (v as any).data_quality_score))}%`,
+                background: (v as any).data_quality_score >= 70 ? '#1a5c1a' : (v as any).data_quality_score >= 40 ? '#8a6b1a' : '#8a1a1a',
+                transition: 'width 0.3s',
+              }} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Condition Score (if available) */}
       <ConditionScoreSection vehicleId={vehicle.id} />
