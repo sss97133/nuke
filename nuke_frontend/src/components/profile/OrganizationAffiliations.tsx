@@ -180,7 +180,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
         )}
         {isOwnProfile && (
           <button
-            onClick={() => navigate('/organizations')}
+            onClick={() => navigate('/org')}
             className="cursor-button"
             style={{ padding: '10px 20px' }}
           >
@@ -221,7 +221,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
                   borderBottom: '1px solid var(--border)',
                   cursor: !isEditing ? 'pointer' : 'default'
                 }}
-                onClick={() => !isEditing && navigate(`/organizations/${affiliation.organization_id}`)}
+                onClick={() => !isEditing && navigate(`/org/${affiliation.organization_id}`)}
               >
                 <td style={{ padding: '12px 8px' }}>
                   <div style={{ fontWeight: 600, fontSize: '14px' }}>

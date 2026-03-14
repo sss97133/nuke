@@ -12,7 +12,6 @@ export const AppFooter: React.FC = () => (
       <Link to="/data-deletion" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Data Deletion</Link>
       <span style={{ color: 'var(--border)', userSelect: 'none' }}>·</span>
       <Link to="/api" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>API</Link>
-      <Link to="/offering" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Investors</Link>
     </div>
   </footer>
 );
