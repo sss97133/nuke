@@ -177,7 +177,7 @@ async function executeActions(
         case 'extract-images':
           if (vehicle.discovery_url) {
             // Try to extract images from source
-            const { error: scrapeError } = await supabase.functions.invoke('simple-scraper', {
+            const { error: scrapeError } = await supabase.functions.invoke('extract-vehicle-data-ai', {
               body: {
                 url: vehicle.discovery_url,
                 extract_images: true,

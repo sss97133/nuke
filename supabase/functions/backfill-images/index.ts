@@ -715,7 +715,7 @@ serve(async (req: Request) => {
         if (run_analysis && imageRecord) {
           try {
             const analysisResponse = await fetch(
-              `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-image`,
+              `${Deno.env.get('SUPABASE_URL')}/functions/v1/yono-analyze`,
               {
                 method: 'POST',
                 headers: {

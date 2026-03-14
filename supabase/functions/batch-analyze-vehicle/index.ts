@@ -109,7 +109,7 @@ serve(async (req) => {
         batch.map(async (image) => {
           try {
             // Call analyze-image function
-            const { data, error } = await supabase.functions.invoke('analyze-image', {
+            const { data, error } = await supabase.functions.invoke('yono-analyze', {
               body: {
                 image_url: image.image_url,
                 vehicle_id: image.vehicle_id,

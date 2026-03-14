@@ -366,7 +366,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichedDat
 
   // Map platform to extractor edge function
   const extractors: Record<string, string> = {
-    bring_a_trailer: "bat-simple-extract",
+    bring_a_trailer: "complete-bat-import",
     cars_and_bids: "extract-cars-and-bids-core",
     hagerty: "extract-hagerty-listing",
   };

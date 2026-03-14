@@ -339,8 +339,8 @@ serve(async (req) => {
       try {
         const { storeTeamData } = await import('../_shared/storeTeamData.ts');
         
-        // Use extract-using-catalog to get team data from website
-        const { data: extractResult } = await supabase.functions.invoke('extract-using-catalog', {
+        // Use extract-vehicle-data-ai to get team data from website
+        const { data: extractResult } = await supabase.functions.invoke('extract-vehicle-data-ai', {
           body: {
             url: sanitizedDealerData.website,
             use_catalog: true,
