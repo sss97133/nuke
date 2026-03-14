@@ -296,3 +296,4 @@ osxphotos_crash.log
 deno.lock
 Dockerfile.ksl-scraper
 fly.toml
+docs/spec/data/
