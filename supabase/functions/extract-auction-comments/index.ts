@@ -871,18 +871,15 @@ serve(async (req) => {
     }
 
     // Trigger AI analysis on comments (async, don't wait)
-    if (comments.length > 0) {
-      const anonJwt = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('ANON_KEY') ?? ''
-      const inboundAuth = req.headers.get('Authorization') || ''
-      const authToUse = inboundAuth || (anonJwt.startsWith('eyJ') ? `Bearer ${anonJwt}` : '')
-      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-auction-comments`, {
+    if (comments.length > 0 && vehicleId) {
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/discover-from-observations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // analyze-auction-comments is deployed with verify_jwt enabled.
-          ...(authToUse ? { 'Authorization': authToUse } : {})
+          'Authorization': `Bearer ${serviceKey}`,
         },
-        body: JSON.stringify({ auction_event_id: eventId }),
+        body: JSON.stringify({ vehicle_id: vehicleId, kinds: ['comment'], discovery_types: ['sentiment', 'themes'] }),
         signal: AbortSignal.timeout(30000),
       }).then(res => res.text().catch(() => {})).catch(e => console.error('Failed to trigger analysis:', e instanceof Error ? e.message : String(e)))
     }

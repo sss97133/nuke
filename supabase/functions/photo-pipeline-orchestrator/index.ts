@@ -660,7 +660,7 @@ async function callAnalyzeImage(
   userId: string | null,
 ): Promise<RouteResult> {
   try {
-    const data = await callEdgeFunction("analyze-image", {
+    const data = await callEdgeFunction("yono-analyze", {
       image_id: imageId,
       image_url: imageUrl,
       vehicle_id: vehicleId,

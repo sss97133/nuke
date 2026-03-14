@@ -176,39 +176,9 @@ serve(async (req) => {
           }
         }
 
-        // Step 3: Multisignal postprocess (repairs + provenance helpers)
-        // Non-critical: if it fails we still keep the core extraction results.
-        if (vehicleId) {
-          console.log(`  Step 3: Multisignal postprocess (repairs/provenance)...`);
-          try {
-            const postResponse = await fetch(
-              `${supabaseUrl}/functions/v1/bat-multisignal-postprocess`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${invokeJwt}`,
-                  'apikey': invokeJwt,
-                },
-                body: JSON.stringify({
-                  listing_url: item.bat_url,
-                  vehicle_id: vehicleId,
-                }),
-              }
-            );
-
-            if (!postResponse.ok) {
-              const errorText = await postResponse.text().catch(() => 'Unknown error');
-              console.warn(`  Step 3 warning: bat-multisignal-postprocess failed: HTTP ${postResponse.status}: ${errorText}`);
-            } else {
-              const postResult = await postResponse.json().catch(() => null);
-              const repairsCreated = postResult?.created?.repairs ?? 0;
-              console.log(`  Step 3 complete: created ${repairsCreated} repair events`);
-            }
-          } catch (e: any) {
-            console.warn(`  Step 3 warning: bat-multisignal-postprocess exception: ${e.message}`);
-          }
-        }
+        // Step 3: Multisignal postprocess — SKIPPED (bat-multisignal-postprocess not deployed)
+        // Repairs/provenance extraction was non-critical and the function was never deployed.
+        // Core extraction results from Steps 1-2 are sufficient.
 
         const extractionResult = { success: true, vehicle_id: vehicleId };
 

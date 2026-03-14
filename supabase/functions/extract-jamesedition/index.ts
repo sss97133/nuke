@@ -212,7 +212,9 @@ serve(async (req: Request) => {
 
     // ── EXTRACT: Single listing ─────────────────────────────────────
     if (action === 'extract') {
-      const url = body.url;
+      // Sanitize URL — import_queue may have markdown title appended (e.g., 'url "Title"')
+      const rawUrl = (body.url || '').split(/\s+/)[0].replace(/["']/g, '');
+      const url = rawUrl;
       if (!url?.includes('jamesedition.com')) {
         return new Response(JSON.stringify({ success: false, error: 'URL must be from jamesedition.com' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -283,13 +285,25 @@ serve(async (req: Request) => {
         primary_image_url: extracted.image_urls[0] || null,
       };
 
-      // Check for existing vehicle by URL
-      const { data: existing } = await supabase
+      // Check for existing vehicle by URL or VIN
+      let existing: { id: string } | null = null;
+      const { data: byUrl } = await supabase
         .from('vehicles')
         .select('id')
         .or(`listing_url.eq.${url},discovery_url.eq.${url}`)
         .limit(1)
         .maybeSingle();
+      existing = byUrl;
+
+      if (!existing && extracted.vin) {
+        const { data: byVin } = await supabase
+          .from('vehicles')
+          .select('id')
+          .eq('vin', extracted.vin)
+          .limit(1)
+          .maybeSingle();
+        existing = byVin;
+      }
 
       let vehicleId: string;
       if (existing) {

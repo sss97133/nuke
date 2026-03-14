@@ -17,7 +17,7 @@ serve(async (req) => {
   try {
     const { image_url, vehicle_id, timeline_event_id, trigger_source } = await req.json()
 
-    console.log(`[auto-analyze-upload] Forwarding to analyze-image: ${image_url} for vehicle ${vehicle_id}`)
+    console.log(`[auto-analyze-upload] Forwarding to yono-analyze: ${image_url} for vehicle ${vehicle_id}`)
 
     const serviceRoleKey =
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ||
@@ -27,7 +27,7 @@ serve(async (req) => {
       ''
 
     const resp = await fetch(
-      `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-image`,
+      `${Deno.env.get('SUPABASE_URL')}/functions/v1/yono-analyze`,
       {
         method: 'POST',
         headers: {
