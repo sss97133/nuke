@@ -779,16 +779,6 @@ serve(async (req) => {
 
           // Photo coaching: evaluate and append tips
           try {
-            // Kick off YONO analysis + session detection in background (non-blocking)
-            fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/auto-detect-sessions`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-              },
-              body: JSON.stringify({ vehicle_id: vehicleId }),
-            }).catch(() => {});
-
             // Build coaching context from available analysis data
             const coachingCtx: PhotoCoachingContext = {
               currentPhoto: {

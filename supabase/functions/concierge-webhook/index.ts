@@ -91,24 +91,6 @@ serve(async (req) => {
         console.error('Failed to update quote:', updateError)
       }
 
-      // Trigger notifications to guest and concierge team
-      const notifyUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/concierge-notify`
-
-      const notifyResponse = await fetch(notifyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-        },
-        body: JSON.stringify({
-          quote_id: quoteId,
-          type: 'deposit_received',
-        }),
-      })
-
-      const notifyResult = await notifyResponse.json()
-      console.log('Notification result:', notifyResult)
-
       return new Response(
         JSON.stringify({
           received: true,
