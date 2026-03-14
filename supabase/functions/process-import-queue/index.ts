@@ -69,7 +69,7 @@ serve(async (req) => {
         } else if (normalizedUrl.includes('classic.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/import-classic-auction';
         } else if (normalizedUrl.includes('collectingcars.com')) {
-          extractorUrl = supabaseUrl + '/functions/v1/extract-collecting-cars';
+          extractorUrl = supabaseUrl + '/functions/v1/extract-vehicle-data-ai';
         } else if (normalizedUrl.includes('barnfinds.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-barn-finds-listing';
         } else if (normalizedUrl.includes('craigslist.org')) {

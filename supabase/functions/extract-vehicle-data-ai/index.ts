@@ -661,7 +661,7 @@ function getDedicatedExtractor(url: string): string | null {
       'craigslist.org': 'extract-craigslist',
       'bonhams.com': 'extract-bonhams',
       'goodingco.com': 'extract-gooding',
-      'collectingcars.com': 'extract-collecting-cars-simple',
+      'collectingcars.com': 'extract-vehicle-data-ai',
       'gaaclassiccars.com': 'extract-gaa-classics',
       'facebook.com': 'extract-facebook-marketplace',
       'broadarrowauctions.com': 'extract-broad-arrow',
