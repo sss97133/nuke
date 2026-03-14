@@ -38,4 +38,3 @@
 - Platform health: Column fixes, index cleanup, 643 MB reclaimed — committed
 
 - Market section research & planning — 2026-03-13 — touching: src/*market*, routes, DB queries for market data
-2026-03-13 20:01 | platform-health-remediation | touching: DB functions, 11 edge functions, crons
