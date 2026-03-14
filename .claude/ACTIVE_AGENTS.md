@@ -38,3 +38,8 @@
 - Platform health: Column fixes, index cleanup, 643 MB reclaimed — committed
 
 - Market section research & planning — 2026-03-13 — touching: src/*market*, routes, DB queries for market data
+2026-03-13 20:31 | vehicle-taxonomy-normalization | scripts/mass-vin-decode.ts, scripts/build-canonical-models.ts, scripts/backfill-from-vin.ts, scripts/retrigger-normalization.ts
+- 2026-03-13 21:40 | vehicle-dossier-implementation | COMPLETE — committed `43230ea65`
+
+- 2026-03-13 22:00 | platform-health-remediation | P0-P2 fixes: auto-dedup-check removal, vehicle_timeline_events fix, bat_extraction_queue NULL vehicle_id, extract-vehicle-data-ai 400s, duplicate index drops, VACUUM | touching: photo-pipeline-orchestrator, ingest-observation, extract-bat-profile-vehicles, process-bat-extraction-queue, timelineEventService.ts, profileService.ts
+

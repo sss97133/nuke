@@ -247,7 +247,7 @@ export default function MarketCompetitors() {
             >
               {copied ? 'Copied!' : 'Share link'}
             </button>
-            <button className="button button-secondary" onClick={() => navigate('/market/exchange')}>
+            <button className="button button-secondary" onClick={() => navigate('/market/segments')}>
               Exchange
             </button>
             <button className="button button-secondary" onClick={() => navigate('/market')}>
@@ -545,7 +545,7 @@ export default function MarketCompetitors() {
               Invest in segment ETFs (PORS, TRUK, SQBD, Y79) or browse individual vehicle offerings \u2014 priced with real auction data, not appraisals.
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button className="button button-primary" onClick={() => navigate('/market/exchange')}>
+              <button className="button button-primary" onClick={() => navigate('/market/segments')}>
                 Go to Exchange
               </button>
               <button className="button button-secondary" onClick={() => navigate('/market/portfolio')}>

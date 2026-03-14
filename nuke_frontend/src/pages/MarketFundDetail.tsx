@@ -279,7 +279,7 @@ export default function MarketFundDetail() {
           <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)', marginBottom: '24px' }}>
             The fund "{symbol}" doesn't exist or is no longer active.
           </div>
-          <button className="button button-primary" onClick={() => navigate('/market/exchange')}>
+          <button className="button button-primary" onClick={() => navigate('/market/segments')}>
             Back to Exchange
           </button>
         </div>
@@ -302,7 +302,7 @@ export default function MarketFundDetail() {
             <button className="button button-primary" onClick={() => window.location.reload()}>
               Try Again
             </button>
-            <button className="button button-secondary" onClick={() => navigate('/market/exchange')}>
+            <button className="button button-secondary" onClick={() => navigate('/market/segments')}>
               Back to Exchange
             </button>
           </div>
@@ -346,7 +346,7 @@ export default function MarketFundDetail() {
           </div>
 
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="button button-secondary" onClick={() => navigate('/market/exchange')}>
+            <button className="button button-secondary" onClick={() => navigate('/market/segments')}>
               Back
             </button>
             <button className="button button-secondary" onClick={() => navigate('/market/portfolio')}>

@@ -37,6 +37,8 @@ type ImageType =
   | "progress_shot"
   | "other";
 
+type ImageMedium = 'photograph' | 'render' | 'drawing' | 'screenshot';
+
 interface ClassificationResult {
   image_type: ImageType;
   confidence: number;
@@ -44,6 +46,8 @@ interface ClassificationResult {
   description: string;
   detected_text?: string[];
   vin_detected?: string;
+  image_medium?: ImageMedium;
+  medium_context?: string;
   vehicle_hints?: {
     make?: string;
     model?: string;
@@ -234,21 +238,16 @@ Deno.serve(async (req) => {
     if (resolvedVehicleId && !vehicle_id) {
       updatePayload.vehicle_id = resolvedVehicleId;
     }
+    // Write image_medium from Gemini classification (Gemini is the authority for this field)
+    if (classification.image_medium) {
+      updatePayload.image_medium = classification.image_medium;
+    }
     await supabase
       .from("vehicle_images")
       .update(updatePayload)
       .eq("id", image_id);
 
     console.log(`[photo-pipeline] Completed in ${durationMs}ms`);
-
-    // Step 8: Fire-and-forget auto-dedup check (non-blocking)
-    // Runs after pipeline completion to detect cross-source duplicates and establish provenance
-    if (resolvedVehicleId || vehicle_id) {
-      callEdgeFunction("auto-dedup-check", {
-        image_id,
-        vehicle_id: resolvedVehicleId || vehicle_id,
-      }).catch((e: any) => console.warn("[photo-pipeline] auto-dedup-check:", e.message));
-    }
 
     return new Response(
       JSON.stringify({
@@ -327,16 +326,24 @@ async function classifyImage(imageUrl: string): Promise<ClassificationResult> {
           contents: [{
             parts: [
               {
-                text: `Classify this automotive photo. Respond in JSON only:
+                text: `Classify this automotive image. Respond in JSON only:
 {
   "image_type": one of ["vehicle_exterior", "vehicle_interior", "engine_bay", "undercarriage", "detail_closeup", "vin_plate", "part_closeup", "receipt_document", "progress_shot", "other"],
+  "image_medium": one of ["photograph", "render", "drawing", "screenshot"],
+  "medium_context": "brief explanation (e.g. '3D render of planned build', 'pencil sketch', 'screenshot from parts catalog', 'real photograph')",
   "confidence": 0.0-1.0,
   "is_automotive": true/false,
   "description": "brief description",
   "detected_text": ["any visible text/numbers"],
   "vin_detected": "17-char VIN if visible or null",
   "vehicle_hints": {"make": "...", "model": "...", "year_range": "...", "color": "..."}
-}`,
+}
+
+image_medium definitions:
+- "photograph": real camera photo of a physical vehicle
+- "render": 3D render, CGI, digital mockup, or AI-generated image of a vehicle
+- "drawing": hand-drawn sketch, pencil drawing, technical illustration, blueprint
+- "screenshot": screenshot from a website, app, parts catalog, or software`,
               },
               {
                 inlineData: { mimeType, data: base64Image },
@@ -369,6 +376,8 @@ async function classifyImage(imageUrl: string): Promise<ClassificationResult> {
       description: parsed.description || "",
       detected_text: parsed.detected_text,
       vin_detected: parsed.vin_detected,
+      image_medium: parsed.image_medium || "photograph",
+      medium_context: parsed.medium_context,
       vehicle_hints: parsed.vehicle_hints,
     };
   } catch (error: any) {

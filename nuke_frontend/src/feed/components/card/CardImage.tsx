@@ -5,7 +5,7 @@
  * instead of a useless dark placeholder.
  */
 
-import type { ReactNode, CSSProperties } from 'react';
+import { useState, type ReactNode, type CSSProperties } from 'react';
 import ResilientImage from '../../../components/images/ResilientImage';
 
 export interface CardImageProps {
@@ -143,23 +143,29 @@ export function CardImage({
   noImageData,
 }: CardImageProps) {
   const hasImage = !!thumbnailUrl;
+  const [hovered, setHovered] = useState(false);
+
+  // Technical mode uses contain so cars aren't awkwardly cropped at 48x36
+  const effectiveFit = viewMode === 'technical' ? 'contain' : fit;
 
   return (
     <div
       style={{
         ...ASPECT[viewMode],
         background: 'var(--surface-hover)',
-        overflow: 'hidden',
+        overflow: viewMode === 'technical' ? 'visible' : 'hidden',
         border: viewMode !== 'grid' ? '1px solid var(--border)' : undefined,
       }}
+      onMouseEnter={viewMode === 'technical' && hasImage ? () => setHovered(true) : undefined}
+      onMouseLeave={viewMode === 'technical' && hasImage ? () => setHovered(false) : undefined}
     >
       {hasImage ? (
-        <div style={{ position: 'absolute', inset: 0 }}>
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
           <ResilientImage
             sources={[thumbnailUrl]}
             alt={alt}
             fill
-            objectFit={fit}
+            objectFit={effectiveFit}
             placeholderSrc="/nuke.png"
             placeholderOpacity={0.2}
             optimizeSize="small"
@@ -168,6 +174,34 @@ export function CardImage({
         </div>
       ) : (
         <NoImageBlock data={noImageData} viewMode={viewMode} />
+      )}
+      {/* Hover preview for technical (table) view */}
+      {viewMode === 'technical' && hasImage && hovered && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -4,
+            left: 52,
+            width: 240,
+            height: 180,
+            zIndex: 100,
+            border: '2px solid var(--border)',
+            background: 'var(--surface)',
+            overflow: 'hidden',
+            pointerEvents: 'none',
+          }}
+        >
+          <ResilientImage
+            sources={[thumbnailUrl]}
+            alt={alt}
+            fill
+            objectFit="cover"
+            placeholderSrc="/nuke.png"
+            placeholderOpacity={0.2}
+            optimizeSize="small"
+            loading="lazy"
+          />
+        </div>
       )}
       {children}
     </div>

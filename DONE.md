@@ -2,6 +2,14 @@
 
 ## 2026-03-14
 
+### [vehicle-profile] Vehicle Dossier Panel — Provenance-Rich Field Evidence
+- Fixed critical bug: useFieldEvidence.ts mapped wrong DB columns (proposed_value→field_value, source_confidence/100→confidence) — was causing em-dashes and 0% bars for 7,728 vehicles
+- Created ensure_field_evidence(UUID) SQL function — on-demand backfill from vin_decoded_data, vehicles table, vehicle_field_sources
+- On-demand backfill in useFieldEvidence hook — extends coverage to ~50K vehicles on first page load
+- Upgraded FieldProvenanceDrawer: color-coded confidence bars (green/gold/red), conflict highlighting, extraction context, dates
+- Built VehicleDossierPanel replacing VehicleBasicInfo: dossier header, identity block with badges, 16 field rows with provenance drawers, verification summary bar, condition spectrometer section
+- Modification detection: compares VIN/NHTSA evidence vs other sources, flags MOD badge
+
 ### [platform] Health Remediation Pass 2
 - P0: Fixed analyze_organization_data_signals trigger — removed receipt_links reference causing cascading failures (9 cron failures/24h → fixed)
 - P1: Rerouted 9 dead edge function references (analyze-image→yono-analyze ×4, analyze-auction-comments→discover-from-observations, extract-using-catalog→extract-vehicle-data-ai, bat-simple-extract→complete-bat-import, simple-scraper→extract-vehicle-data-ai, bat-multisignal-postprocess removed)
@@ -3512,3 +3520,13 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 [data-quality] Added aliases for truncated makes (American→AMC, Aston→Aston Martin, Rolls→Rolls-Royce, Diamond→Diamond T, etc.)
 [data-quality] Distinct makes reduced from 6,553 → 5,061 (22.7% reduction). Target: ~300.
 [data-quality] Remaining: garbage make cleanup (~2,500 vehicles), non-vehicle reclassification (~405), last 108 duplicate pairs
+
+### [frontend] /market route tree cleanup
+- Fixed /market/exchange 404: 7 navigate calls across 3 files → /market/segments, added redirect route
+- Fixed mobile search input clipping: overflow:hidden → overflowX:auto on FeedStatsStrip, flexShrink:0 on search wrapper
+- Deleted MarketMovement.tsx (28-line stub), old MarketSegmentDetail.tsx (admin page), SimpleETFDetails.tsx, marketSystemIntegration.ts (565-line dead service)
+- Renamed DebugMarketSegment.tsx → MarketSegmentDetail.tsx (feed-based segment detail)
+- Removed /market/dashboard alias, /market/movement route, /market/competitors route (kept file for internal reference)
+- Increased FeedToolbar chip padding (3px 6px → 5px 8px) for better mobile tap targets
+- Filtered 0-vehicle segments from MarketDashboard segments strip
+- Added dismissible first-visit context banner on /market

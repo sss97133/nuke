@@ -703,7 +703,7 @@ export default function Portfolio() {
                     </span>
                   </div>
                   <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    <button className="button button-primary" style={{ fontSize: 'var(--fs-9)' }} onClick={() => navigate('/market/exchange')}>
+                    <button className="button button-primary" style={{ fontSize: 'var(--fs-9)' }} onClick={() => navigate('/market/segments')}>
                       Browse Funds
                     </button>
                     <button className="button button-secondary" style={{ fontSize: 'var(--fs-9)' }} onClick={() => navigate('/vehicles')}>
@@ -869,7 +869,7 @@ export default function Portfolio() {
                   <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-secondary)', marginBottom: '20px' }}>
                     Invest in collector vehicle ETF funds to start building your portfolio.
                   </div>
-                  <button className="button button-primary" onClick={() => navigate('/market/exchange')}>
+                  <button className="button button-primary" onClick={() => navigate('/market/segments')}>
                     Browse Funds
                   </button>
                 </div>

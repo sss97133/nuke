@@ -554,6 +554,29 @@ class VisionAnalyzer:
                 if p >= 0.4
             ]
 
+        # Generate quick caption for medium detection
+        caption = None
+        try:
+            with torch.no_grad():
+                gen_ids = self.model.generate(
+                    input_ids=inputs["input_ids"].to(self.device) if "input_ids" in inputs else self.processor(
+                        text="<DETAILED_CAPTION>", images=image, return_tensors="pt"
+                    )["input_ids"].to(self.device),
+                    pixel_values=pixel_values,
+                    max_new_tokens=100,
+                    do_sample=False,
+                    num_beams=2,
+                )
+            raw = self.processor.batch_decode(gen_ids, skip_special_tokens=False)[0]
+            parsed = self.processor.post_process_generation(
+                raw, task="<DETAILED_CAPTION>", image_size=(image.width, image.height)
+            )
+            caption = parsed.get("<DETAILED_CAPTION>", "")
+        except Exception:
+            pass
+
+        image_medium = self._detect_medium(image_path, caption)
+
         return {
             "condition_score": cond_score,
             "damage_flags": damage_flags,
@@ -561,6 +584,7 @@ class VisionAnalyzer:
             "interior_quality": interior_quality,
             "photo_quality": photo_qual,
             "photo_type": photo_type,
+            "image_medium": image_medium,
             "model": "finetuned_v2",
         }
 
@@ -597,6 +621,7 @@ class VisionAnalyzer:
 
         # Extract structured fields from caption via keyword matching
         result = self._extract_from_caption(caption, image)
+        result["image_medium"] = self._detect_medium(image_path, caption)
         result["model"] = "zeroshot_florence2"
         return result
 
@@ -685,6 +710,154 @@ class VisionAnalyzer:
             "photo_quality": photo_quality,
             "photo_type": photo_type,
         }
+
+    def _detect_medium(self, image_path: str, caption: str | None = None) -> str:
+        """
+        Detect image medium: photograph, render, drawing, or screenshot.
+
+        Uses a combination of:
+          1. Caption keywords (if available)
+          2. Image statistics (color variance, edge patterns, noise)
+          3. EXIF presence (real photos have EXIF, renders/drawings don't)
+
+        Returns one of: 'photograph', 'render', 'drawing', 'screenshot'
+        """
+        from PIL import Image
+        import numpy as np
+
+        score = {"photograph": 0.0, "render": 0.0, "drawing": 0.0, "screenshot": 0.0}
+
+        # --- 1. Caption-based detection ---
+        if caption:
+            c = caption.lower()
+
+            render_kw = [
+                "3d render", "3d model", "rendering", "cgi", "computer generated",
+                "computer-generated", "digital render", "virtual", "ray trac",
+                "unreal engine", "blender", "photorealistic render", "3d illustration",
+                "studio render", "concept render", "white background", "grey background",
+                "gray background", "isolated on", "floating", "no background",
+            ]
+            drawing_kw = [
+                "sketch", "drawing", "illustration", "pencil", "ink drawing",
+                "hand drawn", "hand-drawn", "blueprint", "technical drawing",
+                "line art", "line drawing", "artwork", "painting", "watercolor",
+                "charcoal", "pen and ink", "comic", "cartoon", "artistic",
+                "graphite", "colored pencil",
+            ]
+            screenshot_kw = [
+                "screenshot", "screen capture", "webpage", "browser", "catalog",
+                "listing page", "price tag", "website", "ebay", "craigslist",
+                "facebook", "text overlay", "watermark", "forum post", "ad ",
+                "advertisement", "classified", "online listing", "product page",
+                "shopping", "summit racing", "rockauto", "amazon",
+            ]
+
+            for kw in render_kw:
+                if kw in c:
+                    score["render"] += 3.0
+            for kw in drawing_kw:
+                if kw in c:
+                    score["drawing"] += 3.0
+            for kw in screenshot_kw:
+                if kw in c:
+                    score["screenshot"] += 3.0
+
+        # --- 2. Image statistics ---
+        try:
+            img = Image.open(image_path).convert("RGB")
+            arr = np.array(img, dtype=np.float32)
+
+            # Check for EXIF data (real photos almost always have some)
+            exif = img.getexif()
+            has_exif = len(exif) > 3  # more than just basic orientation
+            if has_exif:
+                score["photograph"] += 2.0
+            else:
+                # No EXIF slightly favors non-photo
+                score["render"] += 0.5
+                score["drawing"] += 0.5
+                score["screenshot"] += 0.5
+
+            # Color channel statistics
+            h, w = arr.shape[:2]
+
+            # Noise estimation: real photos have sensor noise, renders are clean
+            # Use Laplacian variance as noise proxy
+            gray = np.mean(arr, axis=2)
+            # Simple edge kernel approximation
+            dx = np.diff(gray, axis=1)
+            dy = np.diff(gray, axis=0)
+            edge_var = float(np.var(dx) + np.var(dy))
+
+            # Very low edge variance = smooth render or drawing
+            if edge_var < 500:
+                score["render"] += 1.5
+                score["drawing"] += 1.0
+            elif edge_var > 5000:
+                score["photograph"] += 1.0
+
+            # Unique color count (sample center crop for speed)
+            ch, cw = h // 2, w // 2
+            crop_size = min(100, ch, cw)
+            if crop_size > 10:
+                center = arr[ch-crop_size:ch+crop_size, cw-crop_size:cw+crop_size]
+                # Quantize to reduce noise
+                quantized = (center / 16).astype(np.uint8)
+                flat = quantized.reshape(-1, 3)
+                unique_colors = len(np.unique(flat, axis=0))
+                total_pixels = flat.shape[0]
+                color_ratio = unique_colors / total_pixels
+
+                # Drawings: very few unique colors (line art)
+                if color_ratio < 0.05:
+                    score["drawing"] += 2.0
+                # Screenshots: moderate colors, lots of flat regions
+                elif color_ratio < 0.15:
+                    score["screenshot"] += 1.0
+                # Photos: rich, varied colors
+                elif color_ratio > 0.4:
+                    score["photograph"] += 1.5
+
+            # Check for large uniform background regions (common in renders)
+            # Sample corners
+            corner_size = min(30, h // 8, w // 8)
+            if corner_size > 5:
+                corners = [
+                    arr[:corner_size, :corner_size],
+                    arr[:corner_size, -corner_size:],
+                    arr[-corner_size:, :corner_size],
+                    arr[-corner_size:, -corner_size:],
+                ]
+                uniform_corners = 0
+                for corner in corners:
+                    if np.std(corner) < 8.0:  # very uniform
+                        uniform_corners += 1
+                if uniform_corners >= 3:
+                    score["render"] += 2.5  # isolated object on solid background
+                elif uniform_corners == 0:
+                    score["photograph"] += 1.0  # natural environment in all corners
+
+            # Check for text-like patterns (horizontal runs of high contrast)
+            # Screenshots have lots of horizontal sharp edges (text)
+            if h > 50 and w > 50:
+                # Sample horizontal line in upper third (where UI/titles usually are)
+                sample_y = h // 5
+                line = gray[sample_y, :]
+                line_diff = np.abs(np.diff(line))
+                sharp_transitions = np.sum(line_diff > 40)
+                if sharp_transitions > w * 0.15:
+                    score["screenshot"] += 1.5
+
+        except Exception:
+            pass  # Image stats failed, rely on caption alone
+
+        # --- 3. Default bias toward photograph ---
+        score["photograph"] += 1.5  # prior: most images are real photos
+
+        # Pick highest scoring medium
+        medium = max(score, key=score.get)
+        return medium
 
     def analyze_batch(self, image_paths: list[str]) -> list[dict]:
         """Analyze multiple images."""
