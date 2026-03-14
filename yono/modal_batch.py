@@ -604,7 +604,12 @@ def _fetch_pending(supabase, limit: int = MAX_PENDING) -> list[dict]:
 _template_cache = {}  # {(make, year): zone_bounds dict or None}
 
 def _get_template_bounds(supabase, make: str, model: str, year: int) -> dict:
-    """Look up vehicle_surface_templates for coordinate resolution. Returns zone_bounds or {}."""
+    """Look up vehicle_surface_templates for coordinate resolution.
+
+    Uses fuzzy model matching: exact first, then prefix match
+    (e.g. template "K10" matches vehicle "K10 SWB", "K10 Scottsdale").
+    Returns zone_bounds dict or {}.
+    """
     if not make or not year:
         return {}
     cache_key = (make, model, year)
@@ -612,6 +617,7 @@ def _get_template_bounds(supabase, make: str, model: str, year: int) -> dict:
         return _template_cache[cache_key]
 
     try:
+        # Exact match first
         resp = (
             supabase.table("vehicle_surface_templates")
             .select("zone_bounds")
@@ -621,8 +627,27 @@ def _get_template_bounds(supabase, make: str, model: str, year: int) -> dict:
             .limit(1)
             .execute()
         )
-        if resp.data:
-            bounds = resp.data[0].get("zone_bounds", {})
+        # Filter for model match (supabase client doesn't support ILIKE on model easily)
+        matches = [r for r in (resp.data or []) if r.get("zone_bounds")]
+        if not matches and model:
+            # Fetch all templates for this make/year range and fuzzy match
+            resp = (
+                supabase.table("vehicle_surface_templates")
+                .select("model, zone_bounds")
+                .eq("make", make)
+                .lte("year_start", year)
+                .gte("year_end", year)
+                .execute()
+            )
+            # Prefix match: vehicle "K10 SWB" starts with template "K10"
+            for r in (resp.data or []):
+                tmpl_model = r.get("model", "")
+                if model.lower().startswith(tmpl_model.lower()):
+                    matches = [r]
+                    break
+
+        if matches:
+            bounds = matches[0].get("zone_bounds", {})
             if isinstance(bounds, str):
                 bounds = json.loads(bounds)
             _template_cache[cache_key] = bounds
