@@ -858,6 +858,7 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
       gps_latitude: listingLat,
       gps_longitude: listingLng,
       status: isAuto ? "discovered" : "rejected",
+      source: "facebook_marketplace",
       auction_source: "facebook_marketplace",
       discovery_source: "facebook_marketplace",
     };
