@@ -602,8 +602,8 @@ def _fetch_pending(supabase, limit: int = MAX_PENDING) -> list[dict]:
 
 
 def _write_results(supabase, results: list[dict]) -> dict:
-    """Write full vision results back to vehicle_images + image_descriptions."""
-    stats = {"written": 0, "errors": 0, "skipped": 0, "descriptions": 0}
+    """Write full vision results back to vehicle_images + image_descriptions + surface_observations."""
+    stats = {"written": 0, "errors": 0, "skipped": 0, "descriptions": 0, "surface_obs": 0}
 
     for r in results:
         image_id = r.get("id")
@@ -659,6 +659,57 @@ def _write_results(supabase, results: list[dict]) -> dict:
 
             supabase.table("vehicle_images").update(update).eq("id", image_id).execute()
             stats["written"] += 1
+
+            # Write surface_observations (spatial layer)
+            vehicle_id = r.get("vehicle_id")
+            if r.get("vehicle_zone") and vehicle_id:
+                try:
+                    obs = {
+                        "vehicle_image_id": image_id,
+                        "vehicle_id": vehicle_id,
+                        "zone": r["vehicle_zone"],
+                        "observation_type": "zone_classify",
+                        "label": r["vehicle_zone"],
+                        "confidence": r.get("zone_confidence"),
+                        "model_version": r.get("vision_model_version"),
+                        "pass_name": "zone_classify",
+                        "resolution_level": 0,
+                        "bbox_x": 0.0,
+                        "bbox_y": 0.0,
+                        "bbox_w": 1.0,
+                        "bbox_h": 1.0,
+                    }
+                    # Add damage observations as separate rows
+                    obs_rows = [obs]
+                    for dmg in (r.get("damage_flags") or []):
+                        obs_rows.append({
+                            "vehicle_image_id": image_id,
+                            "vehicle_id": vehicle_id,
+                            "zone": r["vehicle_zone"],
+                            "observation_type": "condition",
+                            "label": dmg,
+                            "confidence": r.get("zone_confidence"),
+                            "model_version": r.get("vision_model_version"),
+                            "pass_name": "damage_scan",
+                            "resolution_level": 0,
+                        })
+                    # Add modification observations
+                    for mod in (r.get("modification_flags") or []):
+                        obs_rows.append({
+                            "vehicle_image_id": image_id,
+                            "vehicle_id": vehicle_id,
+                            "zone": r["vehicle_zone"],
+                            "observation_type": "modification",
+                            "label": mod,
+                            "confidence": r.get("zone_confidence"),
+                            "model_version": r.get("vision_model_version"),
+                            "pass_name": "mod_scan",
+                            "resolution_level": 0,
+                        })
+                    supabase.table("surface_observations").insert(obs_rows).execute()
+                    stats["surface_obs"] += len(obs_rows)
+                except Exception as so_err:
+                    print(f"[YONO-BATCH] Surface obs write error for {image_id}: {so_err}")
 
             # Write caption to image_descriptions (Pass 1: raw Florence-2)
             caption = r.get("caption", "")
@@ -800,7 +851,8 @@ def poll_and_dispatch():
 
     elapsed = round(time.time() - t0, 1)
     print(f"[YONO-BATCH] Done in {elapsed}s — written={stats['written']}, errors={stats['errors']}, "
-          f"skipped={stats['skipped']}, descriptions={stats.get('descriptions', 0)}")
+          f"skipped={stats['skipped']}, descriptions={stats.get('descriptions', 0)}, "
+          f"surface_obs={stats.get('surface_obs', 0)}")
     return stats
 
 
