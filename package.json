@@ -79,7 +79,14 @@
     "yono:daily": "dotenvx run -- node yono/daily_progress.mjs",
     "yono:daily:dry": "dotenvx run -- node yono/daily_progress.mjs --dry-run",
     "yono:daily:report": "dotenvx run -- node yono/daily_progress.mjs --report-only",
-    "yono:daily:unstick": "dotenvx run -- node yono/daily_progress.mjs --unstick"
+    "yono:daily:unstick": "dotenvx run -- node yono/daily_progress.mjs --unstick",
+    "sync:photos": "dotenvx run -- node scripts/photo-sync.mjs",
+    "condition:ingest": "dotenvx run -- python3 scripts/ingest-service-manual.py",
+    "condition:extract": "dotenvx run -- python3 scripts/extract-condition-knowledge.py",
+    "condition:expand": "dotenvx run -- python3 scripts/expand-condition-taxonomy.py",
+    "condition:bridge": "dotenvx run -- python3 -m yono.condition_spectrometer bridge",
+    "condition:score-all": "dotenvx run -- python3 -m yono.condition_spectrometer score-all",
+    "condition:distribute": "dotenvx run -- python3 -m yono.condition_spectrometer distribute --all"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",

@@ -101,7 +101,32 @@ def get_connection():
             raise RuntimeError("SUPABASE_DB_PASSWORD not set")
     elif "sslmode" not in db_url:
         db_url += "?sslmode=require" if "?" not in db_url else "&sslmode=require"
-    return psycopg2.connect(db_url, connect_timeout=30)
+    # Quick DNS probe with 2s timeout — fall back to IP if down
+    import socket
+    _orig_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(2)
+    dns_ok = False
+    try:
+        socket.getaddrinfo("aws-0-us-west-1.pooler.supabase.com", 6543)
+        dns_ok = True
+    except (socket.gaierror, socket.timeout, OSError):
+        pass
+    finally:
+        socket.setdefaulttimeout(_orig_timeout)
+
+    if dns_ok:
+        return psycopg2.connect(db_url, connect_timeout=15)
+
+    # DNS down — use resolved pooler IP directly
+    db_pass = os.environ.get("SUPABASE_DB_PASSWORD")
+    if not db_pass:
+        raise RuntimeError("DNS down and no SUPABASE_DB_PASSWORD")
+    return psycopg2.connect(
+        host="52.8.172.168", port=6543,
+        user="postgres.qkgaybvrernstplzjaam",
+        password=db_pass, dbname="postgres",
+        sslmode="require", connect_timeout=15,
+    )
 
 
 # ─── Pass 0: 5W Context (free metadata) ────────────────────────────
@@ -353,15 +378,77 @@ def write_surface_observation(conn, image_id: str, vehicle_id: str,
 # ─── Observation Writer Bridge ──────────────────────────────────────
 
 def _load_alias_map(conn) -> dict:
-    """Load condition_aliases → descriptor_id mapping."""
+    """Load condition_aliases → descriptor_id mapping with case-insensitive support."""
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("""
         SELECT ca.alias_key, ca.descriptor_id
         FROM condition_aliases ca
     """)
-    aliases = {r["alias_key"]: str(r["descriptor_id"]) for r in cur.fetchall()}
+    aliases = {}
+    for r in cur.fetchall():
+        did = str(r["descriptor_id"])
+        key = r["alias_key"]
+        aliases[key] = did
+        # Also index the lowercase version for case-insensitive matching
+        aliases[key.lower()] = did
     cur.close()
     return aliases
+
+
+def _resolve_flag(flag: str, alias_map: dict) -> str:
+    """Resolve a YONO flag to a descriptor_id with fallback matching.
+
+    Try: exact → lowercase → underscore-to-space → prefix match.
+    """
+    # Exact match
+    if flag in alias_map:
+        return alias_map[flag]
+    # Lowercase match
+    if flag.lower() in alias_map:
+        return alias_map[flag.lower()]
+    # Underscore to space
+    spaced = flag.replace("_", " ")
+    if spaced in alias_map:
+        return alias_map[spaced]
+    if spaced.lower() in alias_map:
+        return alias_map[spaced.lower()]
+    # Prefix match (e.g., "rust_heavy" → "rust")
+    for alias_key, did in alias_map.items():
+        if flag.lower().startswith(alias_key.lower()) and len(alias_key) >= 3:
+            return did
+    return None
+
+
+def _zone_to_domain(zone: str) -> str:
+    """Infer condition domain from zone prefix."""
+    if not zone:
+        return "exterior"
+    z = zone.lower()
+    if z.startswith("int_"):
+        return "interior"
+    elif z.startswith("mech_"):
+        return "mechanical"
+    elif z.startswith("ext_") or z.startswith("panel_") or z.startswith("wheel_"):
+        return "exterior"
+    elif z == "detail_odometer":
+        return "interior"
+    elif z.startswith("detail_"):
+        return "exterior"
+    elif z.startswith("structural_"):
+        return "structural"
+    return "exterior"
+
+
+def _severity_from_score(condition_score: int) -> float:
+    """Infer severity from per-image condition_score (1-5).
+
+    Score 1 = worst condition → severity 0.9 (high damage)
+    Score 5 = best condition  → severity 0.1 (trace damage)
+    """
+    if condition_score is None:
+        return 0.5
+    severity_map = {1: 0.9, 2: 0.7, 3: 0.5, 4: 0.3, 5: 0.1}
+    return severity_map.get(condition_score, 0.5)
 
 
 def bridge_yono_output(conn, image_id: str, vehicle_id: str,
@@ -372,6 +459,12 @@ def bridge_yono_output(conn, image_id: str, vehicle_id: str,
 
     Takes YONO output (zone, condition_score, damage_flags, modification_flags)
     and writes structured observations using the condition taxonomy.
+
+    Improvements (v2):
+    - Case-insensitive flag matching with fallback chain
+    - Severity inference from condition_score (not always NULL)
+    - Zone-aware domain assignment (int_* → interior, mech_* → mechanical)
+    - Baseline observations per domain present in zones (not just exterior)
 
     Returns count of observations written.
     """
@@ -400,9 +493,15 @@ def bridge_yono_output(conn, image_id: str, vehicle_id: str,
         else:
             lifecycle = "archaeological"
 
+    # Infer severity from condition_score (v2: no longer always NULL)
+    severity = _severity_from_score(condition_score) if damage_flags else None
+
+    # Infer domain from zone (v2: zone-aware domain assignment)
+    zone_domain = _zone_to_domain(zone)
+
     # Write damage flag observations
     for flag in damage_flags:
-        descriptor_id = alias_map.get(flag)
+        descriptor_id = _resolve_flag(flag, alias_map)
         if not descriptor_id:
             continue
         cur.execute("""
@@ -412,7 +511,7 @@ def bridge_yono_output(conn, image_id: str, vehicle_id: str,
             VALUES (%s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s)
         """, (
             image_id, vehicle_id, descriptor_id,
-            None,  # severity unknown from binary flags
+            severity,  # v2: inferred from condition_score
             lifecycle, zone,
             yono_result.get("confidence"),
             source, source_version,
@@ -424,7 +523,7 @@ def bridge_yono_output(conn, image_id: str, vehicle_id: str,
 
     # Write modification flag observations
     for flag in modification_flags:
-        descriptor_id = alias_map.get(flag)
+        descriptor_id = _resolve_flag(flag, alias_map)
         if not descriptor_id:
             continue
         cur.execute("""
@@ -443,48 +542,58 @@ def bridge_yono_output(conn, image_id: str, vehicle_id: str,
         ))
         written += 1
 
-    # If no flags but we have condition_score → write a baseline lifecycle observation
-    # This ensures every analyzed image produces at least one observation
-    if written == 0 and condition_score is not None and lifecycle:
-        # Use a general "assessed" descriptor — create one if needed
-        baseline_key = f"exterior.assessed.condition_{condition_score}"
-        descriptor_id = alias_map.get(baseline_key)
-        if not descriptor_id:
-            # Look up or create a general exterior state descriptor
-            cur2 = conn.cursor(cursor_factory=RealDictCursor)
+    # v2: Write baseline observations per domain derived from zone
+    # Instead of only writing ONE exterior baseline, write a domain-appropriate baseline
+    if condition_score is not None and lifecycle:
+        baseline_domain = zone_domain if zone else "exterior"
+        baseline_key = f"{baseline_domain}.assessed.baseline"
+
+        # Look up or create the domain-specific baseline descriptor
+        cur2 = conn.cursor(cursor_factory=RealDictCursor)
+        cur2.execute("""
+            SELECT descriptor_id FROM condition_taxonomy
+            WHERE canonical_key = %s
+        """, (baseline_key,))
+        row = cur2.fetchone()
+        if not row:
             cur2.execute("""
-                SELECT descriptor_id FROM condition_taxonomy
-                WHERE canonical_key = 'exterior.assessed.baseline'
-            """)
+                INSERT INTO condition_taxonomy
+                    (canonical_key, domain, descriptor_type, display_label, taxonomy_version)
+                VALUES (%s, %s, 'state', %s, 'v2_2026_03')
+                ON CONFLICT (canonical_key) DO NOTHING
+                RETURNING descriptor_id
+            """, (baseline_key, baseline_domain,
+                  f"{baseline_domain.title()} Assessed Baseline"))
             row = cur2.fetchone()
             if not row:
+                # ON CONFLICT hit — re-fetch
                 cur2.execute("""
-                    INSERT INTO condition_taxonomy
-                        (canonical_key, domain, descriptor_type, display_label, taxonomy_version)
-                    VALUES ('exterior.assessed.baseline', 'exterior', 'state', 'Assessed Baseline', 'v1_2026_03')
-                    RETURNING descriptor_id
-                """)
+                    SELECT descriptor_id FROM condition_taxonomy
+                    WHERE canonical_key = %s
+                """, (baseline_key,))
                 row = cur2.fetchone()
-            descriptor_id = str(row["descriptor_id"])
-            cur2.close()
+        baseline_descriptor_id = str(row["descriptor_id"]) if row else None
+        cur2.close()
 
-        # Map condition_score 1-5 to severity 0-1 (5=1.0 best, 1=0.0 worst)
-        severity = (condition_score - 1) / 4.0 if condition_score else 0.5
+        if baseline_descriptor_id:
+            # Map condition_score 1-5 to severity 0-1 (5=1.0 best, 1=0.0 worst)
+            baseline_severity = (condition_score - 1) / 4.0 if condition_score else 0.5
 
-        cur.execute("""
-            INSERT INTO image_condition_observations
-                (image_id, vehicle_id, descriptor_id, severity, lifecycle_state,
-                 zone, pass_number, confidence, source, source_version, evidence)
-            VALUES (%s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s)
-        """, (
-            image_id, vehicle_id, descriptor_id,
-            severity, lifecycle, zone,
-            yono_result.get("confidence", 0.5),
-            source, source_version,
-            json.dumps({"baseline": True, "condition_score": condition_score,
-                        "zone": zone, "lifecycle": lifecycle}),
-        ))
-        written += 1
+            cur.execute("""
+                INSERT INTO image_condition_observations
+                    (image_id, vehicle_id, descriptor_id, severity, lifecycle_state,
+                     zone, pass_number, confidence, source, source_version, evidence)
+                VALUES (%s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s)
+            """, (
+                image_id, vehicle_id, baseline_descriptor_id,
+                baseline_severity, lifecycle, zone,
+                yono_result.get("confidence", 0.5),
+                source, source_version,
+                json.dumps({"baseline": True, "condition_score": condition_score,
+                            "zone": zone, "lifecycle": lifecycle,
+                            "domain": baseline_domain}),
+            ))
+            written += 1
 
     # ── Spatial surface bridge ──────────────────────────────────
     # Every condition observation also becomes a spatially-anchored
@@ -515,12 +624,12 @@ def bridge_yono_output(conn, image_id: str, vehicle_id: str,
         )
         # Damage observations (spatially located)
         for flag in damage_flags:
-            d_id = alias_map.get(flag)
+            d_id = _resolve_flag(flag, alias_map)
             write_surface_observation(
                 conn, image_id, vehicle_id,
                 zone=zone, observation_type="condition", label=flag,
                 confidence=yono_result.get("confidence"),
-                severity=None,  # binary flag → severity unknown
+                severity=severity,  # v2: inferred from condition_score
                 lifecycle_state=lifecycle, descriptor_id=d_id,
                 pass_number=1, model_version=source_version or source,
                 pass_name="damage_scan",
@@ -529,7 +638,7 @@ def bridge_yono_output(conn, image_id: str, vehicle_id: str,
             )
         # Modification observations (spatially located)
         for flag in modification_flags:
-            d_id = alias_map.get(flag)
+            d_id = _resolve_flag(flag, alias_map)
             write_surface_observation(
                 conn, image_id, vehicle_id,
                 zone=zone, observation_type="modification", label=flag,
@@ -546,15 +655,50 @@ def bridge_yono_output(conn, image_id: str, vehicle_id: str,
     return written
 
 
-def bridge_vehicle_images(conn, vehicle_id: str = None, limit: int = 1000) -> dict:
+def bridge_vehicle_images(conn, vehicle_id: str = None, limit: int = 1000,
+                          rebridge: bool = False) -> dict:
     """
     Bridge existing vehicle_images flags → image_condition_observations for
     all images of a vehicle (or a batch of unprocessed images).
 
-    Returns {processed, observations_written, skipped}.
+    If rebridge=True, deletes existing yono_v1 observations first and processes
+    all images regardless of whether they've been bridged before.
+
+    Returns {processed, observations_written, skipped, deleted}.
     """
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SET statement_timeout = '60s'")
+    cur.execute("SET statement_timeout = '120s'")
+
+    deleted = 0
+    if rebridge:
+        # Delete existing yono_v1 observations for this vehicle (or all)
+        if vehicle_id:
+            cur.execute("""
+                DELETE FROM image_condition_observations
+                WHERE source = 'yono_v1' AND vehicle_id = %s
+            """, (vehicle_id,))
+        else:
+            # Batch delete for all vehicles
+            while True:
+                cur.execute("""
+                    DELETE FROM image_condition_observations
+                    WHERE id IN (
+                        SELECT id FROM image_condition_observations
+                        WHERE source = 'yono_v1'
+                        LIMIT 1000
+                    )
+                """)
+                batch = cur.rowcount
+                deleted += batch
+                conn.commit()
+                if batch < 1000:
+                    break
+                if deleted % 5000 == 0:
+                    print(f"  Deleted {deleted} old observations...")
+        deleted += cur.rowcount
+        conn.commit()
+        if deleted:
+            print(f"  Deleted {deleted} existing yono_v1 observations")
 
     if vehicle_id:
         cur.execute("""
@@ -566,10 +710,11 @@ def bridge_vehicle_images(conn, vehicle_id: str = None, limit: int = 1000) -> di
               AND (vi.condition_score IS NOT NULL
                    OR vi.damage_flags IS NOT NULL
                    OR vi.modification_flags IS NOT NULL)
+            """ + ("" if rebridge else """
               AND NOT EXISTS (
                   SELECT 1 FROM image_condition_observations ico
                   WHERE ico.image_id = vi.id AND ico.source = 'yono_v1'
-              )
+              )""") + """
             LIMIT %s
         """, (vehicle_id, limit))
     else:
@@ -581,10 +726,11 @@ def bridge_vehicle_images(conn, vehicle_id: str = None, limit: int = 1000) -> di
             WHERE (vi.condition_score IS NOT NULL
                    OR vi.damage_flags IS NOT NULL
                    OR vi.modification_flags IS NOT NULL)
+            """ + ("" if rebridge else """
               AND NOT EXISTS (
                   SELECT 1 FROM image_condition_observations ico
                   WHERE ico.image_id = vi.id AND ico.source = 'yono_v1'
-              )
+              )""") + """
             LIMIT %s
         """, (limit,))
 
@@ -615,7 +761,11 @@ def bridge_vehicle_images(conn, vehicle_id: str = None, limit: int = 1000) -> di
         else:
             skipped += 1
 
-    return {"processed": processed, "observations_written": total_obs, "skipped": skipped}
+        if processed % 500 == 0 and processed > 0:
+            print(f"  Bridged {processed} images, {total_obs} observations...")
+
+    return {"processed": processed, "observations_written": total_obs,
+            "skipped": skipped, "deleted": deleted}
 
 
 # ─── Condition Score Aggregator (0-100) ─────────────────────────────
@@ -1583,6 +1733,8 @@ def main():
     bridge_parser = subparsers.add_parser("bridge", help="Bridge YONO output to observations")
     bridge_parser.add_argument("--vehicle-id", help="Bridge for specific vehicle")
     bridge_parser.add_argument("--limit", type=int, default=1000, help="Max images to bridge")
+    bridge_parser.add_argument("--rebridge", action="store_true",
+                               help="Delete existing yono_v1 observations and re-bridge all")
 
     # Compute condition score
     score_parser = subparsers.add_parser("score", help="Compute condition score")
@@ -1627,8 +1779,10 @@ def main():
         print(json.dumps(ctx, indent=2, default=str))
 
     elif args.command == "bridge":
-        result = bridge_vehicle_images(conn, vehicle_id=args.vehicle_id, limit=args.limit)
-        print(f"Bridged: {result['processed']} images, {result['observations_written']} observations, {result['skipped']} skipped")
+        result = bridge_vehicle_images(conn, vehicle_id=args.vehicle_id,
+                                       limit=args.limit, rebridge=args.rebridge)
+        print(f"Bridged: {result['processed']} images, {result['observations_written']} observations, "
+              f"{result['skipped']} skipped, {result.get('deleted', 0)} old observations deleted")
 
     elif args.command == "score":
         score_data = compute_condition_score(conn, args.vehicle_id)
