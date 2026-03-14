@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NUKE — Widget Garage</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --gulf: #F37021; --martini: #E62E37; --brg: #004225; --jps: #FFD700; --papaya: #FF8C00;
+  --bg: #f5f5f5; --bg-card: #fff; --border: #e0e0e0; --code-bg: #e8e8e8;
+  --text: #1a1a1a; --text-muted: #777; --text-disabled: #aaa;
+  --error: #e4002b; --success: #16a34a; --warning: #f59e0b;
+  --warning-dim: rgba(245, 158, 11, 0.08);
+  --heat-0: #eee; --heat-1: #c6e48b; --heat-2: #7bc96f; --heat-3: #239a3b; --heat-4: #196127; --heat-5: #0e3a18;
+}
+
+body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+/* FILM GRAIN */
+body::after { content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; opacity: 0.04; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E"); }
+
+/* HEADER */
+.header { position: sticky; top: 0; z-index: 1000; background: #000; color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 12px 24px; border-bottom: 2px solid #222; }
+.header-logo { font-family: Arial, Helvetica, sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; }
+.header-subtitle { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.6; }
+
+/* MAIN */
+.main { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; }
+
+/* INTRO */
+.intro { margin-bottom: 48px; padding-bottom: 32px; border-bottom: 2px solid var(--border); }
+.intro h1 { font-family: 'Instrument Serif', serif; font-size: 42px; font-weight: 400; line-height: 1.1; margin-bottom: 12px; }
+.intro p { font-size: 13px; max-width: 65ch; color: #555; }
+
+/* TOOL SECTION */
+.tool-section { margin-bottom: 56px; padding: 24px; border: 2px solid var(--border); border-left-width: 4px; background: #fff; }
+.tool-section:nth-child(8n+1) { border-left-color: var(--gulf); }
+.tool-section:nth-child(8n+2) { border-left-color: var(--martini); }
+.tool-section:nth-child(8n+3) { border-left-color: var(--brg); }
+.tool-section:nth-child(8n+4) { border-left-color: var(--jps); }
+.tool-section:nth-child(8n+5) { border-left-color: var(--papaya); }
+.tool-section:nth-child(8n+6) { border-left-color: var(--gulf); }
+.tool-section:nth-child(8n+7) { border-left-color: var(--martini); }
+.tool-section:nth-child(8n+8) { border-left-color: var(--brg); }
+
+.tool-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.tool-number { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #999; font-weight: 700; }
+.tool-title { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.tool-desc { font-size: 12px; color: #777; margin-bottom: 16px; }
+.tool-derived { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #aaa; margin-bottom: 20px; }
+
+/* PREVIEW AREA */
+.preview-area { background: var(--bg); border: 2px solid var(--border); padding: 24px; margin-bottom: 20px; min-height: 140px; overflow: visible; position: relative; }
+.preview-area.dark-bg { background: #111; }
+
+/* PRESETS */
+.presets { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.preset-btn { font-family: Arial, Helvetica, sans-serif; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 12px; border: 2px solid var(--border); background: #fff; cursor: pointer; font-weight: 700; color: #555; transition: background 0.15s, color 0.15s; }
+.preset-btn:hover { background: var(--text); color: #fff; }
+.preset-btn.active { background: var(--text); color: #fff; }
+
+/* CODE BLOCK */
+.code-block { background: var(--code-bg); border: 2px solid var(--border); padding: 16px; overflow-x: auto; }
+.code-block pre { font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; color: #333; }
+
+/* FAVICON */
+.favicon { width: 14px; height: 14px; vertical-align: middle; display: inline-block; }
+.favicon-20 { width: 20px; height: 20px; vertical-align: middle; }
+
+/* FLYOUT */
+.drill { position: relative; cursor: pointer; border-bottom: 1px dashed var(--text-muted); }
+.drill:hover { color: var(--text); }
+.drill .flyout { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%) translateY(4px); opacity: 0; pointer-events: none; transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1); background: #111; color: #fff; padding: 10px 14px; font-size: 11px; line-height: 1.5; white-space: nowrap; z-index: 100; border: 1px solid #333; min-width: 180px; }
+.drill:hover .flyout { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(-4px); }
+.drill .flyout.down { bottom: auto; top: 100%; transform: translateX(-50%) translateY(-4px); }
+.drill:hover .flyout.down { transform: translateX(-50%) translateY(4px); }
+.drill .flyout.left-align { left: 0; transform: translateX(0) translateY(4px); }
+.drill:hover .flyout.left-align { transform: translateX(0) translateY(-4px); }
+.drill .flyout.down.left-align { transform: translateX(0) translateY(-4px); }
+.drill:hover .flyout.down.left-align { transform: translateX(0) translateY(4px); }
+.flyout-label { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 4px; }
+.flyout-row { display: flex; justify-content: space-between; gap: 16px; }
+.flyout-val { font-family: 'Courier New', monospace; font-weight: 700; }
+.flyout-trend-up { color: #22c55e; }
+.flyout-trend-down { color: var(--error); }
+
+/* STAT PILL */
+.stat-pill { flex: 1 1 0; min-width: 80px; }
+.stat-pill-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-pill-value { font-size: 17px; font-weight: 700; }
+.stat-pill-sub { font-size: 9px; color: var(--text-muted); }
+
+/* BID FEED */
+.bid-feed { max-height: 320px; overflow-y: auto; font-size: 12px; }
+.bid-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); animation: bidSlideIn 300ms ease-out; }
+.bid-row.is-bid { border-left: 3px solid var(--warning); padding-left: 8px; }
+.bid-row.is-comment { padding-left: 11px; }
+.bid-row.is-seller { border-left: 3px solid var(--success); padding-left: 8px; background: rgba(22, 163, 74, 0.04); }
+.bid-badge { font-size: 8px; font-weight: 700; text-transform: uppercase; padding: 1px 5px; letter-spacing: 0.5px; }
+.bid-badge-bid { background: var(--warning-dim); color: #92400e; }
+.bid-badge-seller { background: rgba(22, 163, 74, 0.08); color: var(--success); }
+.bid-amount { font-family: 'Courier New', monospace; font-weight: 700; margin-left: auto; }
+.bid-jump { font-size: 10px; color: var(--success); font-family: 'Courier New', monospace; }
+.bid-user { font-weight: 600; cursor: pointer; }
+.bid-user:hover { text-decoration: underline; }
+.bid-time { font-size: 10px; color: var(--text-disabled); }
+.avatar-circle { width: 18px; height: 18px; border-radius: 50%; background: #ddd; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #666; flex-shrink: 0; }
+
+@keyframes bidSlideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* URGENCY */
+.urgency-normal { color: var(--text-muted); }
+.urgency-gettingClose { color: #e07960; }
+.urgency-urgent { color: #ea580c; }
+.urgency-critical { color: var(--error); }
+.urgency-lastMinute { color: var(--error); animation: pulse 300ms infinite alternate; }
+@keyframes pulse { from { opacity: 1; } to { opacity: 0.6; } }
+
+/* BARCODE */
+.bid-barcode { display: flex; height: 4px; gap: 1px; margin-top: 8px; }
+.bid-barcode-bar { flex: 1; min-width: 2px; }
+
+/* PHOTO GALLERY */
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 3px; max-height: 280px; overflow-y: auto; }
+.gallery-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; cursor: pointer; border: 2px solid transparent; transition: border-color 180ms; }
+.gallery-thumb:hover { border-color: var(--text); }
+.gallery-thumb.active { border-color: var(--gulf); }
+
+/* LIGHTBOX */
+.lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 2000; align-items: center; justify-content: center; }
+.lightbox.open { display: flex; }
+.lightbox img { max-width: 85vw; max-height: 85vh; object-fit: contain; }
+.lightbox-close { position: absolute; top: 20px; right: 24px; color: #fff; font-size: 24px; cursor: pointer; background: none; border: none; }
+.lightbox-counter { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: #888; font-size: 12px; font-family: 'Courier New', monospace; }
+.lightbox-nav { position: absolute; top: 50%; transform: translateY(-50%); color: #fff; font-size: 32px; cursor: pointer; background: none; border: none; padding: 20px; }
+.lightbox-nav.prev { left: 10px; }
+.lightbox-nav.next { right: 10px; }
+
+/* CARD VARIANTS */
+.card-compact { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 2px solid var(--border); background: var(--bg-card); }
+.card-compact-thumb { width: 40px; height: 40px; object-fit: cover; flex-shrink: 0; }
+.card-compact-info { display: flex; align-items: center; gap: 8px; flex: 1; font-size: 12px; }
+.card-compact-title { font-weight: 700; }
+.card-compact-price { font-family: 'Courier New', monospace; font-weight: 700; }
+
+.card-standard { width: 300px; border: 2px solid var(--border); background: var(--bg-card); flex-shrink: 0; }
+.card-standard-img { width: 100%; height: auto; display: block; cursor: pointer; }
+.card-standard-body { padding: 12px; }
+.card-standard-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.card-standard-price { font-size: 20px; font-weight: 700; font-family: 'Courier New', monospace; }
+.card-standard-specs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.spec-pill { font-size: 10px; padding: 2px 7px; border: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.3px; }
+
+.card-expanded { border: 2px solid var(--border); background: var(--bg-card); }
+.card-expanded-top { display: flex; gap: 0; }
+.card-expanded-hero { flex: 1; min-width: 0; }
+.card-expanded-hero img { width: 100%; height: auto; display: block; cursor: pointer; }
+.card-expanded-gallery { width: 200px; flex-shrink: 0; border-left: 1px solid var(--border); padding: 4px; overflow-y: auto; max-height: 360px; }
+.card-expanded-body { padding: 16px 20px; border-top: 1px solid var(--border); }
+
+/* HEATMAP */
+.heatmap { display: grid; grid-template-rows: repeat(7, 10px); grid-template-columns: repeat(26, 10px); gap: 2px; grid-auto-flow: column; }
+.heatmap-cell { width: 10px; height: 10px; border-radius: 1px; position: relative; cursor: pointer; }
+.heatmap-cell:hover::after { content: attr(data-tip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #111; color: #fff; padding: 3px 8px; font-size: 10px; white-space: nowrap; z-index: 10; pointer-events: none; }
+
+/* VISION */
+.vision-play { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; padding: 16px 40px; border: 2px solid var(--text); background: none; cursor: pointer; transition: all 180ms; }
+.vision-play:hover { background: var(--text); color: #fff; }
+/* Vision analysis — Provenance System patterns */
+.va-pass { font-size:9px; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:6px 10px; background:#f0f0f0; border-bottom:1px solid var(--border); color:#666; }
+.va-pass .va-pass-num { color:#111; }
+.va-thumbs { display:flex; gap:4px; padding:8px 10px; background:#fafafa; border-bottom:1px solid var(--border); }
+.va-thumb-wrap { text-align:center; }
+.va-thumb { width:80px; height:60px; object-fit:cover; border:2px solid var(--border); opacity:0.3; transition:all 300ms; display:block; }
+.va-thumb.active { opacity:1; border-color:var(--jps); }
+.va-thumb.done { opacity:1; border-color:#1a5c1a; }
+.va-thumb-label { font-size:7px; text-transform:uppercase; letter-spacing:0.3px; color:var(--text-muted); margin-top:2px; height:12px; font-weight:700; }
+.va-field { display:grid; grid-template-columns:90px 1fr auto; align-items:center; padding:4px 10px; border-bottom:1px solid #f0f0f0; opacity:0; transition:opacity 250ms; }
+.va-field.show { opacity:1; }
+.va-label { font-size:9px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; color:#666; }
+.va-value { font-size:10px; color:#111; }
+.va-sources { display:flex; align-items:center; gap:4px; }
+.va-badge { font-size:7px; padding:1px 3px; font-weight:700; letter-spacing:0.3px; text-transform:uppercase; font-family:'Courier New',monospace; border:1.5px solid; display:inline-block; }
+.va-badge-ai { border-color:#8a6b1a; color:#8a6b1a; }
+.va-badge-vin { border-color:#1a5c1a; color:#1a5c1a; }
+.va-badge-img { border-color:#3b82f6; color:#3b82f6; }
+.va-conf { width:40px; height:3px; background:#e0e0e0; position:relative; display:inline-block; vertical-align:middle; margin-left:4px; }
+.va-conf-fill { height:100%; position:absolute; left:0; width:0; transition:width 600ms cubic-bezier(0.16,1,0.3,1); }
+.va-conf-fill.high { background:#1a5c1a; }
+.va-conf-fill.mid { background:#8a6b1a; }
+.va-conf-fill.low { background:#8a1a1a; }
+.va-cond { display:flex; align-items:center; gap:8px; padding:4px 10px; border-bottom:1px solid #f0f0f0; opacity:0; transition:opacity 250ms; }
+.va-cond.show { opacity:1; }
+.va-cond-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#666; width:80px; }
+.va-cond-bar { flex:1; height:5px; background:#e0e0e0; position:relative; }
+.va-cond-fill { height:100%; position:absolute; left:0; width:0; transition:width 800ms cubic-bezier(0.16,1,0.3,1); }
+.va-cond-score { font-size:10px; font-weight:700; font-family:'Courier New',monospace; width:28px; text-align:right; }
+.va-cond-note { font-size:8px; color:#888; flex:1; min-width:120px; }
+.va-feature { display:flex; align-items:center; gap:6px; padding:2px 10px; font-size:10px; opacity:0; transition:opacity 200ms; }
+.va-feature.show { opacity:1; }
+.va-feature-icon { font-size:9px; width:12px; text-align:center; font-weight:700; }
+.va-feature-icon.ok { color:#1a5c1a; }
+.va-feature-icon.warn { color:#8a6b1a; }
+.va-feature-icon.mod { color:#8a1a1a; }
+.va-comp { display:grid; grid-template-columns:1fr auto; padding:3px 10px; border-bottom:1px solid #f0f0f0; font-size:10px; opacity:0; transition:opacity 250ms; }
+.va-comp.show { opacity:1; }
+.va-comp-price { font-family:'Courier New',monospace; font-weight:700; text-align:right; }
+
+/* TRANSFER */
+.transfer-step { padding: 8px 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+.transfer-step-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+.transfer-step-done { background: var(--success); color: #fff; }
+.transfer-step-active { background: var(--warning); color: #fff; animation: pulse 500ms infinite alternate; }
+.transfer-step-pending { background: var(--border); color: var(--text-muted); }
+.transfer-progress { height: 4px; background: var(--border); margin-top: 8px; }
+.transfer-progress-fill { height: 100%; background: var(--success); transition: width 300ms; }
+
+/* ACTIVITY STREAM */
+.activity-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.activity-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.activity-text { flex: 1; }
+.activity-time { color: var(--text-disabled); font-size: 10px; }
+
+/* MOMENTUM */
+.momentum-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+.momentum-fire { background: rgba(239, 68, 68, 0.1); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.2); }
+
+/* LIVE INDICATOR */
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--error); display: inline-block; animation: pulse 1s infinite alternate; }
+.live-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--error); }
+
+/* SVG CHART */
+.bid-chart { width: 100%; }
+
+/* SCANLINE */
+.scanline-overlay { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px); }
+
+/* STREAM VIDEO */
+.stream-video { position: relative; background: #111; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.stream-video-text { color: #333; font-size: 48px; font-family: 'Courier New', monospace; font-weight: 700; }
+
+/* MAP */
+.map-placeholder { background: #1a1a2e; height: 360px; position: relative; overflow: hidden; }
+.map-dot { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--gulf); opacity: 0.7; cursor: pointer; }
+.map-dot:hover { opacity: 1; transform: scale(2); }
+.map-cluster { position: absolute; border-radius: 50%; background: rgba(255, 95, 0, 0.2); border: 1px solid rgba(255, 95, 0, 0.4); display: flex; align-items: center; justify-content: center; color: var(--gulf); font-size: 11px; font-weight: 700; cursor: pointer; }
+
+/* ORG */
+.org-cap { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; padding: 2px 6px; border: 1px solid var(--border); }
+.org-tag { font-size: 10px; padding: 2px 8px; background: #f0f0f0; cursor: pointer; transition: background 180ms; }
+.org-tag:hover { background: #ddd; }
+
+/* HELPERS */
+.flex { display: flex; }
+.flex-wrap { flex-wrap: wrap; }
+.gap-4 { gap: 4px; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+.gap-24 { gap: 24px; }
+.mt-8 { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.mb-8 { margin-bottom: 8px; }
+.mono { font-family: 'Courier New', monospace; }
+.bold { font-weight: 700; }
+.muted { color: var(--text-muted); }
+.disabled { color: var(--text-disabled); }
+.upper { text-transform: uppercase; }
+.ls { letter-spacing: 0.5px; }
+.fs-9 { font-size: 9px; }
+.fs-10 { font-size: 10px; }
+.fs-11 { font-size: 11px; }
+.fs-12 { font-size: 12px; }
+.fs-14 { font-size: 14px; }
+.fs-20 { font-size: 20px; }
+
+/* FOOTER */
+.footer { text-align: center; padding: 32px 24px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #bbb; border-top: 2px solid var(--border); margin-top: 48px; }
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .intro h1 { font-size: 28px; }
+  .tool-section { padding: 16px; }
+  .preview-area { padding: 16px; min-height: 100px; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-logo">NUKE</div>
+  <div class="header-subtitle">WIDGET GARAGE</div>
+</header>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="intro">
+    <h1>Widget Garage</h1>
+    <p>Every service on the Nuke platform, independently embeddable. Drop a single script tag on any website — WordPress, Squarespace, React, plain HTML. Shadow DOM isolation, real-time data, zero dependencies.</p>
+  </div>
+
+  <!-- ========== WIDGET 01 — VEHICLE CARD ========== -->
+  <div class="tool-section" id="vehicle">
+    <div class="tool-header">
+      <span class="tool-number">WIDGET 01</span>
+      <span class="tool-title">Vehicle Card</span>
+    </div>
+    <p class="tool-desc">Embeddable vehicle info card with three layout variants — compact strip, standard card, and expanded panel with interactive photo gallery. Hover on year, make, or model for market drill-downs.</p>
+    <p class="tool-derived">DEPENDS ON: api-v1-vehicles &middot; api-v1-market-data &middot; ~3 KB GZIPPED</p>
+
+    <div class="presets" id="vehicle-presets">
+      <button class="preset-btn" onclick="setVehicleVariant('compact')">COMPACT</button>
+      <button class="preset-btn" onclick="setVehicleVariant('standard')">STANDARD</button>
+      <button class="preset-btn active" onclick="setVehicleVariant('expanded')">EXPANDED</button>
+    </div>
+
+    <div class="preview-area" id="vehicle-preview"></div>
+
+    <div class="code-block"><pre>&lt;nuke-vehicle vehicle-id="6442df03-9cac-43a8-b89e-e4fb4c08ee99"
+              variant="expanded"&gt;&lt;/nuke-vehicle&gt;
+
+&lt;!-- Variants: compact | standard | expanded --&gt;
+&lt;!-- Attributes: vehicle-id, variant, theme, show-gallery --&gt;</pre></div>
+  </div>
+
+  <!-- ========== WIDGET 02 — AUCTION REPLAY ========== -->
+  <div class="tool-section" id="auction">
+    <div class="tool-header">
+      <span class="tool-number">WIDGET 02</span>
+      <span class="tool-title">Auction</span>
+    </div>
+    <p class="tool-desc">Replaying <a href="https://bringatrailer.com/listing/1970-pontiac-gto-judge-ram-air-iii-convertible/" target="_blank" style="color:var(--text);font-weight:700;">a real Bring a Trailer auction</a> that ended November 5, 2022. 81 bids from 12 bidders over 7 days. $1,970 opening to $231,000 final sale.</p>
+    <p class="tool-derived">DEPENDS ON: api-v1-auctions &middot; REALTIME SUBSCRIPTIONS &middot; <img class="favicon" src="https://www.google.com/s2/favicons?domain=bringatrailer.com&sz=14" alt="BaT"> BRING A TRAILER &middot; ~4 KB GZIPPED</p>
+
+    <div class="presets">
+      <button class="preset-btn active" id="auction-speed-1" onclick="setAuctionSpeed(500)">1&times;</button>
+      <button class="preset-btn" id="auction-speed-2" onclick="setAuctionSpeed(250)">2&times;</button>
+      <button class="preset-btn" id="auction-speed-5" onclick="setAuctionSpeed(100)">5&times;</button>
+      <button class="preset-btn" id="auction-speed-10" onclick="setAuctionSpeed(50)">10&times;</button>
+    </div>
+
+    <div class="preview-area">
+      <div style="width:100%;">
+        <div class="flex gap-8" style="align-items:center;margin-bottom:12px;">
+          <img class="favicon-20" src="https://www.google.com/s2/favicons?domain=bringatrailer.com&sz=20" alt="BaT">
+          <a href="https://bringatrailer.com/listing/1970-pontiac-gto-judge-ram-air-iii-convertible/" target="_blank" style="font-weight:700;color:var(--text);text-decoration:none;font-size:14px;">1970 Pontiac GTO Judge Ram Air III Convertible</a>
+          <span id="auction-status" style="margin-left:auto;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);display:flex;align-items:center;gap:5px;">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--warning);"></span> REPLAYING &middot; OCT 29 — NOV 5, 2022
+          </span>
+        </div>
+        <div id="auction-stats" class="flex flex-wrap gap-12 mb-8"></div>
+        <div class="flex gap-24" style="flex-wrap:wrap;">
+          <div style="flex:1;min-width:340px;">
+            <svg id="bid-chart" class="bid-chart" viewBox="0 0 600 180" preserveAspectRatio="none" style="border:1px solid var(--border);background:#fafafa;">
+              <defs>
+                <linearGradient id="bidGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stop-color="#3b82f6" stop-opacity="0.25"/>
+                  <stop offset="95%" stop-color="#3b82f6" stop-opacity="0.02"/>
+                </linearGradient>
+              </defs>
+              <!-- Market average reference lines (will be shown progressively as bid crosses them) -->
+              <line id="ref-gto" x1="0" y1="0" x2="600" y2="0" stroke="#aaa" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>
+              <text id="ref-gto-label" x="4" y="0" font-size="7" fill="#888" font-family="Arial" text-anchor="start" opacity="0">GTO AVG $62,750</text>
+              <line id="ref-judge" x1="0" y1="0" x2="600" y2="0" stroke="#8a6b1a" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>
+              <text id="ref-judge-label" x="4" y="0" font-size="7" fill="#8a6b1a" font-family="Arial" text-anchor="start" opacity="0">JUDGE AVG $90,352</text>
+              <line id="ref-ramair" x1="0" y1="0" x2="600" y2="0" stroke="#F37021" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>
+              <text id="ref-ramair-label" x="4" y="0" font-size="7" fill="#F37021" font-family="Arial" text-anchor="start" opacity="0">RAM AIR AVG $113,312</text>
+              <path id="bid-area" fill="url(#bidGrad)" d=""/>
+              <path id="bid-line" fill="none" stroke="#3b82f6" stroke-width="2" d=""/>
+            </svg>
+            <div id="bid-barcode" class="bid-barcode"></div>
+            <div class="flex mt-8" style="align-items:center;justify-content:space-between;">
+              <div id="auction-bid-count" class="fs-11 muted"></div>
+            </div>
+          </div>
+          <div style="flex:0 0 320px;">
+            <div class="fs-10 upper ls bold muted mb-8">Bid History</div>
+            <div id="bid-feed" class="bid-feed"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="code-block"><pre>&lt;nuke-auction vehicle-id="c6d6d7b1-f358-4b7d-b039-183d85ed42bf"
+             show-chart show-feed
+             speed="1x"&gt;&lt;/nuke-auction&gt;
+
+&lt;!-- Attributes: vehicle-id, show-chart, show-feed, speed, theme --&gt;</pre></div>
+  </div>
+
+  <!-- ========== WIDGET 03 — LIVESTREAM ========== -->
+  <div class="tool-section" id="livestream">
+    <div class="tool-header">
+      <span class="tool-number">WIDGET 03</span>
+      <span class="tool-title">Livestream</span>
+    </div>
+    <p class="tool-desc">Video player with differentiated chat feed — bids get amber borders and BID badges, seller responses get green borders and SELLER badges, regular comments are plain. Platform branding via favicons.</p>
+    <p class="tool-derived">DEPENDS ON: REALTIME SUBSCRIPTIONS &middot; HLS.js (LAZY) &middot; <img class="favicon" src="https://www.google.com/s2/favicons?domain=barrett-jackson.com&sz=14" alt="BJ"> BARRETT-JACKSON</p>
+
+    <div class="preview-area dark-bg" style="padding:0;">
+      <div style="width:100%;display:flex;border:1px solid #333;">
+        <!-- VIDEO -->
+        <div style="flex:2;min-width:0;">
+          <div class="stream-video">
+            <div class="scanline-overlay"></div>
+            <div class="stream-video-text">NUKE</div>
+            <div style="position:absolute;top:12px;left:12px;" class="live-badge"><span class="live-dot"></span> LIVE</div>
+            <div style="position:absolute;top:12px;right:12px;display:flex;align-items:center;gap:8px;">
+              <img class="favicon-20" src="https://www.google.com/s2/favicons?domain=barrett-jackson.com&sz=20" alt="BJ">
+              <span style="color:#fff;font-size:12px;font-weight:700;">Barrett-Jackson <span class="drill" style="color:#aaa;border-color:#666;">Scottsdale<span class="flyout" style="text-align:left;"><div class="flyout-label">LOCATION</div><div>Scottsdale, AZ</div><div class="fs-10 muted">WestWorld of Scottsdale</div><div class="fs-10 muted">Jan 18-26, 2025</div></span></span></span>
+            </div>
+            <div style="position:absolute;bottom:12px;left:12px;color:#888;font-size:10px;">LOT #412 — 1970 Pontiac GTO Judge</div>
+            <div style="position:absolute;bottom:12px;right:12px;color:#666;font-size:10px;display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:#22c55e;"></span> 2,847 watching</div>
+          </div>
+        </div>
+        <!-- CHAT -->
+        <div style="flex:1;min-width:260px;max-height:340px;overflow-y:auto;border-left:1px solid #333;background:#fff;" id="stream-chat"></div>
+      </div>
+    </div>
+
+    <div class="code-block"><pre>&lt;nuke-livestream auction-id="bj-scottsdale-2025-412"
+                show-chat show-bids
+                platform="barrett-jackson"&gt;&lt;/nuke-livestream&gt;
+
+&lt;!-- Attributes: auction-id, show-chat, show-bids, platform, theme --&gt;</pre></div>
+  </div>
+
+  <!-- ========== WIDGET 04 — VISION ========== -->
+  <div class="tool-section" id="vision">
+    <div class="tool-header">
+      <span class="tool-number">WIDGET 04</span>
+      <span class="tool-title">Vision</span>
+    </div>
+    <p class="tool-desc">YONO multipass analysis — processes a series of vehicle images to build a complete identification and condition assessment. Five analysis passes: classification, identification, condition scoring across 5 domains, feature detection, and market positioning.</p>
+    <p class="tool-derived">DEPENDS ON: api-v1-vision &middot; YONO CLASSIFIER &middot; CONDITION SPECTROMETER &middot; EFFICIENTNET-B0 &middot; ONNX RUNTIME</p>
+
+    <div class="preview-area" id="vision-preview">
+      <div style="width:100%;text-align:center;">
+        <button class="vision-play" id="vision-play" onclick="runVisionDemo()">ANALYZE 6 IMAGES</button>
+        <div class="fs-10 muted mt-8">Processes 6 photos of a 1984 Chevrolet K10 through 5 analysis passes</div>
+      </div>
+    </div>
+
+    <div class="code-block"><pre>&lt;nuke-vision vehicle-id="6442df03-9cac-43a8-b89e-e4fb4c08ee99"
+            mode="full-analysis"
+            passes="classify,identify,condition,features,market"&gt;&lt;/nuke-vision&gt;
+
+&lt;!-- Modes: classify | identify | condition | full-analysis --&gt;
+&lt;!-- Accepts: vehicle-id (batch), or drop images directly --&gt;</pre></div>
+  </div>
+
+  <!-- ========== WIDGET 05 — USER PROFILE ========== -->
+  <div class="tool-section" id="profile">
+    <div class="tool-header">
+      <span class="tool-number">WIDGET 05</span>
+      <span class="tool-title">User Profile</span>
+    </div>
+    <p class="tool-desc">Activity heatmap, momentum indicators, and live event stream. Shows whether a user is active, on fire, or going quiet — not just raw numbers. GitHub-style contribution grid with hover details.</p>
+    <p class="tool-derived">DEPENDS ON: api-v1-profiles &middot; api-v1-activity &middot; ~3 KB GZIPPED</p>
+
+    <div class="preview-area" style="padding:0;">
+      <div style="width:100%;">
+        <!-- Profile header -->
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
+          <div class="avatar-circle" style="width:36px;height:36px;font-size:14px;background:#333;color:#fff;">M</div>
+          <div style="flex:1;">
+            <div class="bold fs-14">Musclecars79</div>
+            <div class="fs-10 muted">BaT member &middot; Active bidder since Oct 2022</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="momentum-badge momentum-fire">ON FIRE</div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;">
+          <!-- LEFT: Heatmap + Stats -->
+          <div style="flex:1;min-width:300px;padding:16px 20px;border-right:1px solid var(--border);">
+            <div class="fs-10 upper ls bold muted mb-8">6-Month Activity</div>
+            <div id="heatmap" class="heatmap"></div>
+            <div class="flex mt-8 gap-16 fs-10 muted" id="heatmap-stats"></div>
+
+            <div class="mt-16 fs-10 upper ls bold muted mb-8">GTO Judge Auction — Bidding Profile</div>
+            <div class="flex gap-12 flex-wrap" id="profile-auction-stats"></div>
+
+            <div class="mt-16 fs-10 upper ls bold muted mb-8">Bid Progression</div>
+            <div id="profile-bid-progression" style="height:60px;display:flex;align-items:flex-end;gap:1px;"></div>
+          </div>
+          <!-- RIGHT: Activity stream derived from real bids -->
+          <div style="flex:0 0 320px;padding:16px 20px;max-height:420px;overflow-y:auto;">
+            <div class="fs-10 upper ls bold muted mb-8">Bid Timeline — GTO Judge</div>
+            <div id="activity-stream"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="code-block"><pre>&lt;nuke-profile user-id="musclecars79"
+             show-heatmap show-activity
+             show-momentum&gt;&lt;/nuke-profile&gt;
+
+&lt;!-- Attributes: user-id, show-heatmap, show-activity, show-momentum, theme --&gt;</pre></div>
+  </div>
+
+  <!-- ========== WIDGET 06 — ORGANIZATION ========== -->
+  <div class="tool-section" id="organization">
+    <div class="tool-header">
+      <span class="tool-number">WIDGET 06</span>
+      <span class="tool-title">Organization</span>
+    </div>
+    <p class="tool-desc">Dealer and shop storefronts — business type badges, location drill-downs, clickable specialization tags, capability icons (lift, paint booth, dyno), and external website links. Real data below.</p>
+    <p class="tool-derived">DEPENDS ON: api-v1-organizations &middot; ~3 KB GZIPPED</p>
+
+    <div class="preview-area" id="org-preview"></div>
+
+    <div class="code-block"><pre>&lt;nuke-org org-id="motoexotica"
+         show-inventory show-services
+         show-capabilities&gt;&lt;/nuke-org&gt;
+
+&lt;!-- Attributes: org-id, show-inventory, show-services, show-capabilities, theme --&gt;</pre></div>
+  </div>
+
+  <!-- ========== WIDGET 07 — VEHICLE MAP ========== -->
+  <div class="tool-section" id="map">
+    <div class="tool-header">
+      <span class="tool-number">WIDGET 07</span>
+      <span class="tool-title">Vehicle Map</span>
+    </div>
+    <p class="tool-desc">DeckGL-powered map with vehicle pins, density heatmap, and cluster aggregation. Three viewing modes. MapLibre GL loaded lazily only when the widget enters the viewport.</p>
+    <p class="tool-derived">DEPENDS ON: api-v1-map-vehicles &middot; MAPLIBRE GL (LAZY) &middot; DECKGL</p>
+
+    <div class="presets">
+      <button class="preset-btn active" onclick="setMapMode('points')">POINTS</button>
+      <button class="preset-btn" onclick="setMapMode('density')">DENSITY</button>
+      <button class="preset-btn" onclick="setMapMode('thermal')">THERMAL</button>
+    </div>
+
+    <div class="preview-area dark-bg" style="padding:0;">
+      <div class="map-placeholder" id="map-demo">
+        <div style="position:absolute;top:12px;right:12px;background:rgba(0,0,0,0.7);padding:8px 12px;z-index:10;">
+          <div class="fs-9 upper ls" style="color:#888;margin-bottom:4px;">Filters</div>
+          <div class="fs-10" style="color:#fff;">Year: 1960-1980</div>
+          <div class="fs-10" style="color:#fff;">Status: Active</div>
+          <div class="fs-10" style="color:var(--gulf);">247 vehicles</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="code-block"><pre>&lt;nuke-map center="-111.94,33.49"
+         zoom="10"
+         mode="points"
+         filter-year="1960-1980"&gt;&lt;/nuke-map&gt;
+
+&lt;!-- Modes: points | density | thermal --&gt;
+&lt;!-- Attributes: center, zoom, mode, filter-year, filter-make, filter-status --&gt;</pre></div>
+  </div>
+
+  <!-- ========== WIDGET 08 — BULK IMPORT & EXPORT ========== -->
+  <div class="tool-section" id="transfer">
+    <div class="tool-header">
+      <span class="tool-number">WIDGET 08</span>
+      <span class="tool-title">Bulk Import & Export</span>
+    </div>
+    <p class="tool-desc">Fleet data pipeline — CSV/JSON import with automatic column mapping and duplicate matching. Configurable export builder with format selection and field picker. Below: animated pipeline demo.</p>
+    <p class="tool-derived">DEPENDS ON: api-v1-batch &middot; api-v1-export &middot; ~2 KB GZIPPED</p>
+
+    <div class="preview-area">
+      <div style="width:100%;">
+        <div class="flex gap-24" style="flex-wrap:wrap;">
+          <!-- IMPORT DEMO -->
+          <div style="flex:1;min-width:280px;">
+            <div class="fs-10 upper ls bold muted mb-8">Import Pipeline</div>
+            <div id="transfer-import"></div>
+          </div>
+          <!-- EXPORT DEMO -->
+          <div style="flex:1;min-width:280px;">
+            <div class="fs-10 upper ls bold muted mb-8">Export Builder</div>
+            <div id="transfer-export"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="code-block"><pre>&lt;nuke-transfer mode="import"
+              accept=".csv,.json,.ndjson"
+              auto-map&gt;&lt;/nuke-transfer&gt;
+
+&lt;!-- Modes: import | export --&gt;
+&lt;!-- Attributes: mode, accept, auto-map, fields, format --&gt;</pre></div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">NUKE &middot; WIDGET GARAGE &middot; V1.0</div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+  <button class="lightbox-nav prev" onclick="lightboxNav(-1)">&lsaquo;</button>
+  <img id="lightbox-img" src="" alt="">
+  <button class="lightbox-nav next" onclick="lightboxNav(1)">&rsaquo;</button>
+  <div class="lightbox-counter" id="lightbox-counter"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- DATA + LOGIC -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<script>
+// === REAL DATA FROM DATABASE ===
+const MAKE_COUNTS = { 'Chevrolet':'136,494', 'Pontiac':'20,532', 'Mercedes-Benz':'37,154', 'Volkswagen':'13,224', 'Pegaso':'26' };
+
+const DATA = {
+  vehicles: [
+    { year:1970, make:'Pontiac', model:'GTO Judge Ram Air III Convertible', price:231000, bids:100, platform:'bat', engine:'400ci Ram Air III V8', trans:'4-Speed Manual', miles:78420, color:'Orbit Orange', img:'https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_2481.jpg' },
+    { year:1984, make:'Chevrolet', model:'K10 Scottsdale', price:null, bids:0, platform:'nuke', engine:'350ci V8', trans:'TH350 Automatic', miles:87650, color:'Desert Tan', img:'https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_2481.jpg' },
+    { year:1961, make:'Mercedes-Benz', model:'190SL', price:175000, bids:210, platform:'bat', engine:'1.9L I4', trans:'4-Speed Manual', miles:45200, color:'Silver', img:null },
+    { year:1965, make:'Volkswagen', model:'Type 2 21-Window Deluxe', price:134000, bids:228, platform:'bat', engine:'1.5L Flat-4', trans:'4-Speed Manual', miles:62100, color:'Sealing Wax Red/Beige Grey', img:null },
+  ],
+  orgs: [
+    { name:"Motoexotica", type:"auction_house", city:"St. Louis", state:"MO", specs:["European classics","American muscle","Pre-war"], services:["Consignment","Appraisal","Transport"], website:"motoexotica.com", lift:true, booth:false, dyno:false },
+    { name:"TopGear Imports", type:"dealer", city:"Saddle Brook", state:"NJ", specs:["Japanese imports","European sports"], services:["Sales","Service","Parts"], website:"topgearimports.com", lift:true, booth:false, dyno:true },
+    { name:"Koenigsegg Automotive Ab", type:"manufacturer", city:"Angelholm", state:"Sweden", specs:["Hypercars","Carbon fiber","Megacar"], services:["Manufacturing","Service","Customization"], website:"koenigsegg.com", lift:true, booth:true, dyno:true },
+  ]
+};
+
+const BIDS = [
+  {a:1970,u:"sda24237",t:"2022-10-29T19:08:52Z"},
+  {a:20000,u:"Phillip_Shaffer",t:"2022-10-29T19:21:13Z"},
+  {a:25000,u:"crashproof",t:"2022-10-29T20:00:34Z"},
+  {a:26500,u:"Carman82",t:"2022-10-29T22:49:34Z"},
+  {a:77777,u:"georgepehanick",t:"2022-10-29T23:47:13Z"},
+  {a:79000,u:"RobA1967",t:"2022-10-30T23:30:56Z"},
+  {a:80000,u:"carsrodman",t:"2022-11-01T00:17:25Z"},
+  {a:80500,u:"crashproof",t:"2022-11-01T16:48:23Z"},
+  {a:82000,u:"carsrodman",t:"2022-11-01T22:32:55Z"},
+  {a:82500,u:"crashproof",t:"2022-11-03T00:34:18Z"},
+  {a:85000,u:"carsrodman",t:"2022-11-03T01:38:18Z"},
+  {a:85500,u:"crashproof",t:"2022-11-03T02:02:15Z"},
+  {a:90000,u:"carsrodman",t:"2022-11-03T02:51:36Z"},
+  {a:91000,u:"squarephillips",t:"2022-11-03T17:48:39Z"},
+  {a:91500,u:"3daveg",t:"2022-11-04T04:47:11Z"},
+  {a:92000,u:"squarephillips",t:"2022-11-04T05:09:08Z"},
+  {a:95000,u:"carsrodman",t:"2022-11-05T02:22:22Z"},
+  {a:95500,u:"squarephillips",t:"2022-11-05T02:35:34Z"},
+  {a:100000,u:"carsrodman",t:"2022-11-05T12:21:25Z"},
+  {a:101000,u:"RobA1967",t:"2022-11-05T12:34:15Z"},
+  {a:102000,u:"carsrodman",t:"2022-11-05T12:37:13Z"},
+  {a:103000,u:"squarephillips",t:"2022-11-05T13:34:33Z"},
+  {a:105000,u:"carsrodman",t:"2022-11-05T14:11:35Z"},
+  {a:106000,u:"squarephillips",t:"2022-11-05T14:31:10Z"},
+  {a:107000,u:"Musclecars79",t:"2022-11-05T16:35:45Z"},
+  {a:110000,u:"carsrodman",t:"2022-11-05T17:18:53Z"},
+  {a:120000,u:"Keeleyconst",t:"2022-11-05T17:57:29Z"},
+  {a:125000,u:"Twdblackbelt",t:"2022-11-05T18:02:10Z"},
+  {a:126000,u:"squarephillips",t:"2022-11-05T18:04:12Z"},
+  {a:130000,u:"Twdblackbelt",t:"2022-11-05T18:17:30Z"},
+  {a:131000,u:"squarephillips",t:"2022-11-05T18:51:38Z"},
+  {a:133000,u:"Twdblackbelt",t:"2022-11-05T19:08:14Z"},
+  {a:134000,u:"squarephillips",t:"2022-11-05T19:09:05Z"},
+  {a:142000,u:"Keeleyconst",t:"2022-11-05T19:17:49Z"},
+  {a:143000,u:"Musclecars79",t:"2022-11-05T19:18:02Z"},
+  {a:144000,u:"squarephillips",t:"2022-11-05T19:18:10Z"},
+  {a:145000,u:"Musclecars79",t:"2022-11-05T19:18:26Z"},
+  {a:146000,u:"squarephillips",t:"2022-11-05T19:18:39Z"},
+  {a:147000,u:"Musclecars79",t:"2022-11-05T19:18:51Z"},
+  {a:151000,u:"Keeleyconst",t:"2022-11-05T19:19:03Z"},
+  {a:152000,u:"Musclecars79",t:"2022-11-05T19:19:13Z"},
+  {a:153000,u:"squarephillips",t:"2022-11-05T19:19:19Z"},
+  {a:155000,u:"Musclecars79",t:"2022-11-05T19:19:30Z"},
+  {a:156000,u:"3daveg",t:"2022-11-05T19:20:38Z"},
+  {a:160000,u:"Keeleyconst",t:"2022-11-05T19:20:48Z"},
+  {a:162000,u:"Musclecars79",t:"2022-11-05T19:21:05Z"},
+  {a:163000,u:"3daveg",t:"2022-11-05T19:22:02Z"},
+  {a:164000,u:"Musclecars79",t:"2022-11-05T19:22:12Z"},
+  {a:165000,u:"3daveg",t:"2022-11-05T19:22:25Z"},
+  {a:167000,u:"Musclecars79",t:"2022-11-05T19:22:46Z"},
+  {a:168000,u:"3daveg",t:"2022-11-05T19:24:12Z"},
+  {a:169000,u:"Musclecars79",t:"2022-11-05T19:24:21Z"},
+  {a:170000,u:"3daveg",t:"2022-11-05T19:25:37Z"},
+  {a:171000,u:"Musclecars79",t:"2022-11-05T19:25:44Z"},
+  {a:172000,u:"3daveg",t:"2022-11-05T19:26:31Z"},
+  {a:173000,u:"Musclecars79",t:"2022-11-05T19:26:42Z"},
+  {a:174000,u:"3daveg",t:"2022-11-05T19:27:11Z"},
+  {a:175000,u:"Musclecars79",t:"2022-11-05T19:27:21Z"},
+  {a:176000,u:"3daveg",t:"2022-11-05T19:28:06Z"},
+  {a:177000,u:"Musclecars79",t:"2022-11-05T19:28:14Z"},
+  {a:178000,u:"3daveg",t:"2022-11-05T19:28:40Z"},
+  {a:180000,u:"Musclecars79",t:"2022-11-05T19:28:52Z"},
+  {a:181000,u:"squarephillips",t:"2022-11-05T19:30:43Z"},
+  {a:182000,u:"Musclecars79",t:"2022-11-05T19:32:10Z"},
+  {a:183000,u:"squarephillips",t:"2022-11-05T19:33:37Z"},
+  {a:185000,u:"Musclecars79",t:"2022-11-05T19:33:49Z"},
+  {a:186000,u:"squarephillips",t:"2022-11-05T19:34:46Z"},
+  {a:187000,u:"Musclecars79",t:"2022-11-05T19:34:53Z"},
+  {a:190000,u:"Musclecars79",t:"2022-11-05T19:36:45Z"},
+  {a:193000,u:"squarephillips",t:"2022-11-05T19:39:51Z"},
+  {a:195000,u:"squarephillips",t:"2022-11-05T19:41:32Z"},
+  {a:197000,u:"squarephillips",t:"2022-11-05T19:43:20Z"},
+  {a:200000,u:"Musclecars79",t:"2022-11-05T19:45:37Z"},
+  {a:205000,u:"Musclecars79",t:"2022-11-05T19:48:54Z"},
+  {a:210000,u:"Musclecars79",t:"2022-11-05T19:49:57Z"},
+  {a:215000,u:"Musclecars79",t:"2022-11-05T19:50:50Z"},
+  {a:220000,u:"Musclecars79",t:"2022-11-05T19:52:08Z"},
+  {a:222000,u:"Keeleyconst",t:"2022-11-05T19:54:05Z"},
+  {a:225000,u:"Keeleyconst",t:"2022-11-05T19:56:12Z"},
+  {a:230000,u:"Keeleyconst",t:"2022-11-05T19:58:18Z"},
+  {a:231000,u:"Musclecars79",t:"2022-11-05T19:58:27Z"},
+];
+
+const COMMENTS = [
+  {u:"boaboyoz",txt:"Dear Lord, is this The Promised Land? For this One-Owner 1970 Pontiac GTO Judge Ram Air III Convertible...",seller:false},
+  {u:"mcorrallo",txt:"Lord, I'm trying hard to reduce my collection and spend less time on my cars and now you tempt me with THIS?",seller:false},
+  {u:"e9er",txt:"Speechless!!!!!",seller:false},
+  {u:"stevenanastos",txt:"Engine stamp ends in '526' - but VIN ends in '525'? Any info on this discrepancy?",seller:false},
+  {u:"Phillip_Shaffer",txt:"I have a 69 Conv Judge, Would love to have a 70!!! Beautiful Car,",seller:false},
+  {u:"mcorrallo",txt:"I'm looking forward to the Pontiac experts dissection of this car.",seller:false},
+  {u:"Phillip_Shaffer",txt:"One of the most Thorough Restorations I have seen!!!",seller:false},
+  {u:"honda50",txt:"Just looked at all the pictures, WOW!!!!",seller:false},
+  {u:"stevenanastos",txt:"Great looking Goat! I would really like to hear from the seller regarding the VIN stamp discrepancy.",seller:false},
+  {u:"georgepehanick",txt:"Remarkably car on many levels. I look forward to the cold start and driving videos.",seller:false},
+  {u:"georgepehanick",txt:"Hood Tach added during the restoration? Oddly ordered without Rally Gauges?",seller:false},
+  {u:"4stroke",txt:"Another high level restoration, all the paint marks and tags, and the trunk plugs are installed upside down. Maddening!",seller:false},
+  {u:"Phillip_Shaffer",txt:"Love the Documentation this car has, This car is going to require loans to be taken out!!!",seller:false},
+  {u:"seller_gto70",txt:"Thank you all for the kind words. To address the VIN question — the engine was date-coded 1 day after the body, which is consistent with Norwood assembly line sequencing.",seller:true},
+  {u:"honda50",txt:"Real beauty here!!",seller:false},
+];
+
+const PHOTOS = [
+  // HD archive full-vehicle shots first
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/hd-archive/1984_K20_BROWN_01.JPG",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/hd-archive/1984_K20_BROWN_02.JPG",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/hd-archive/1984_K20_BROWN_07.JPG",
+  // iPhoto shots
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7939.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7942.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7941.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7940.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_2481.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_2475.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7952.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7946.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7951.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7944.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7947.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7945.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7950.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7948.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7943.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7949.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7953.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7954.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7955.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7960.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7959.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7961.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7956.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7958.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7957.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7970.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7968.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7971.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7965.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7964.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7969.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7967.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7963.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7966.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7962.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7979.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7977.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7978.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7980.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7976.jpg",
+  "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/IMG_7975.jpg",
+];
+
+// === UTILITY FUNCTIONS ===
+const $ = id => document.getElementById(id);
+const fmt = n => n >= 1000 ? '$' + n.toLocaleString() : '$' + n;
+const thumbUrl = url => url.replace('/object/public/', '/render/image/public/') + '?width=160&quality=60';
+const medUrl = url => url.replace('/object/public/', '/render/image/public/') + '?width=600&quality=75';
+
+// === LIGHTBOX ===
+let lbIdx = 0, lbPhotos = [];
+function openLightbox(photos, idx) { lbPhotos = photos; lbIdx = idx; $('lightbox-img').src = medUrl(photos[idx]); $('lightbox-counter').textContent = (idx+1) + ' / ' + photos.length; $('lightbox').classList.add('open'); }
+function closeLightbox() { $('lightbox').classList.remove('open'); }
+function lightboxNav(d) { lbIdx = (lbIdx + d + lbPhotos.length) % lbPhotos.length; $('lightbox-img').src = medUrl(lbPhotos[lbIdx]); $('lightbox-counter').textContent = (lbIdx+1) + ' / ' + lbPhotos.length; }
+document.addEventListener('keydown', e => { if (!$('lightbox').classList.contains('open')) return; if (e.key==='Escape') closeLightbox(); if (e.key==='ArrowRight') lightboxNav(1); if (e.key==='ArrowLeft') lightboxNav(-1); });
+
+// === PRESET BUTTON HELPERS ===
+function activatePreset(container, btn) {
+  container.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// === 1. VEHICLE CARDS ===
+let currentVariant = 'expanded';
+function setVehicleVariant(variant) {
+  currentVariant = variant;
+  const btns = $('vehicle-presets').querySelectorAll('.preset-btn');
+  btns.forEach(b => b.classList.remove('active'));
+  btns[variant === 'compact' ? 0 : variant === 'standard' ? 1 : 2].classList.add('active');
+  buildVehicleCards();
+}
+
+function buildVehicleCards() {
+  const preview = $('vehicle-preview');
+  const v = DATA.vehicles;
+
+  if (currentVariant === 'compact') {
+    // Header row
+    preview.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px;padding:6px 12px;border-bottom:2px solid var(--border);font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#999;font-weight:700;">
+        <span style="width:40px;"></span>
+        <span style="flex:1;">Vehicle</span>
+        <span style="width:80px;text-align:right;">Sale Price</span>
+        <span style="width:60px;text-align:right;">Bids</span>
+        <span style="width:80px;text-align:right;">Platform</span>
+        <span style="width:80px;text-align:right;">Status</span>
+      </div>
+    `;
+    v.forEach(veh => {
+      const statusLabel = veh.price ? 'SOLD' : 'OWNED';
+      const statusColor = veh.price ? 'var(--success)' : 'var(--text-muted)';
+      const d = document.createElement('div');
+      d.className = 'card-compact';
+      d.style.marginBottom = '0';
+      d.style.borderTop = 'none';
+      d.innerHTML = `
+        ${veh.img ? `<img class="card-compact-thumb" src="${thumbUrl(veh.img)}" alt="">` : `<div class="card-compact-thumb" style="background:#ddd;"></div>`}
+        <span style="flex:1;font-weight:700;font-size:12px;">
+          <span class="drill">${veh.year}<span class="flyout down left-align"><div class="flyout-label">${veh.year} AT A GLANCE</div><div class="flyout-row"><span>Avg sale price</span><span class="flyout-val">$84,200</span></div><div class="flyout-row"><span>${veh.year} ${veh.make}</span><span class="flyout-val flyout-trend-up">+12%</span></div></span></span>
+          ${veh.make} ${veh.model}
+        </span>
+        <span style="width:80px;text-align:right;font-family:'Courier New',monospace;font-weight:700;font-size:12px;">${veh.price ? fmt(veh.price) : '—'}</span>
+        <span style="width:60px;text-align:right;font-size:11px;color:var(--text-muted);">${veh.bids || '—'}</span>
+        <span style="width:80px;text-align:right;">${veh.platform !== 'nuke' ? `<img class="favicon" src="https://www.google.com/s2/favicons?domain=bringatrailer.com&sz=14" alt="BaT"> <span class="fs-10 muted">BaT</span>` : '<span class="fs-10 muted">Nuke</span>'}</span>
+        <span style="width:80px;text-align:right;"><span style="font-size:9px;font-weight:700;padding:2px 6px;border:1px solid ${statusColor};color:${statusColor};letter-spacing:0.5px;">${statusLabel}</span></span>
+      `;
+      preview.appendChild(d);
+    });
+  }
+
+  else if (currentVariant === 'standard') {
+    preview.innerHTML = '<div class="flex gap-16" style="overflow-x:auto;padding-bottom:8px;"></div>';
+    const container = preview.firstChild;
+    v.slice(0,3).forEach(veh => {
+      const d = document.createElement('div');
+      d.className = 'card-standard';
+      d.innerHTML = `
+        ${veh.img ? `<img class="card-standard-img" src="${medUrl(veh.img)}" alt="" onclick="openLightbox(PHOTOS,0)">` : `<div class="card-standard-img" style="background:#ddd;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:24px;">NO IMG</div>`}
+        <div class="card-standard-body">
+          <div class="card-standard-title">
+            <span class="drill">${veh.year}<span class="flyout"><div class="flyout-label">${veh.year} AT A GLANCE</div><div class="flyout-row"><span>Avg sale price</span><span class="flyout-val">$84,200</span></div><div class="flyout-row"><span>${veh.year} ${veh.make}</span><span class="flyout-val flyout-trend-up">+12%</span></div><div class="flyout-row"><span>${veh.year} muscle cars</span><span class="flyout-val flyout-trend-up">+8%</span></div></span></span>
+            <span class="drill">${veh.make}<span class="flyout"><div class="flyout-label">${veh.make.toUpperCase()} MARKET</div><div class="flyout-row"><span>Tracked vehicles</span><span class="flyout-val">${MAKE_COUNTS[veh.make]||'—'}</span></div><div class="flyout-row"><span>Avg appreciation</span><span class="flyout-val flyout-trend-up">+6.2%</span></div><div class="flyout-row"><span>Avg sale price</span><span class="flyout-val">$127K</span></div></span></span>
+            ${veh.model}
+          </div>
+          ${veh.price ? `<div class="card-standard-price">${fmt(veh.price)}</div>` : '<div class="card-standard-price muted">Not for sale</div>'}
+          <div class="card-standard-specs">
+            ${veh.engine ? `<span class="spec-pill">${veh.engine}</span>` : ''}
+            ${veh.trans ? `<span class="spec-pill">${veh.trans}</span>` : ''}
+            ${veh.miles ? `<span class="spec-pill">${veh.miles.toLocaleString()} mi</span>` : ''}
+            ${veh.color ? `<span class="spec-pill">${veh.color}</span>` : ''}
+          </div>
+        </div>
+      `;
+      container.appendChild(d);
+    });
+  }
+
+  else { // expanded
+    const k10 = v[1];
+    preview.innerHTML = `
+      <div class="card-expanded" style="width:100%;">
+        <div class="card-expanded-top">
+          <div class="card-expanded-hero">
+            <img id="hero-img" src="${medUrl(PHOTOS[0])}" alt="" style="width:100%;height:auto;display:block;cursor:pointer;" onclick="openLightbox(PHOTOS,0)">
+          </div>
+          <div class="card-expanded-gallery">
+            <div class="gallery-grid" id="gallery-grid"></div>
+          </div>
+        </div>
+        <div class="card-expanded-body">
+          <div class="flex" style="justify-content:space-between;align-items:flex-start;">
+            <div>
+              <div style="font-size:20px;font-weight:700;">
+                <span class="drill">${k10.year}<span class="flyout down left-align"><div class="flyout-label">1984 AT A GLANCE</div><div class="flyout-row"><span>1984 overall</span><span class="flyout-val">$31,400 avg</span></div><div class="flyout-row"><span>1984 Chevrolet</span><span class="flyout-val flyout-trend-up">+4%</span></div><div class="flyout-row"><span>1984 trucks</span><span class="flyout-val flyout-trend-up">+18%</span></div><div class="flyout-row"><span>1984 K-series</span><span class="flyout-val flyout-trend-up">+22%</span></div></span></span>
+                <span class="drill">${k10.make}<span class="flyout down"><div class="flyout-label">CHEVROLET MARKET</div><div class="flyout-row"><span>Tracked vehicles</span><span class="flyout-val">136,494</span></div><div class="flyout-row"><span>Avg sale price</span><span class="flyout-val">$38,600</span></div><div class="flyout-row"><span>Avg appreciation</span><span class="flyout-val flyout-trend-up">+9.1%/yr</span></div><div class="flyout-row"><span>Most active segment</span><span class="flyout-val">C10/K10</span></div><div class="flyout-row"><span>Top auction house</span><span class="flyout-val">BaT (62%)</span></div></span></span>
+                <span class="drill">K10<span class="flyout down"><div class="flyout-label">K10 MARKET</div><div class="flyout-row"><span>Tracked vehicles</span><span class="flyout-val">1,167</span></div><div class="flyout-row"><span>Avg sale (2024)</span><span class="flyout-val">$24,800</span></div><div class="flyout-row"><span>YoY trend</span><span class="flyout-val flyout-trend-up">+14%</span></div><div class="flyout-row"><span>Most valuable trim</span><span class="flyout-val">Silverado</span></div><div class="flyout-row"><span>This truck vs avg</span><span class="flyout-val flyout-trend-up">+8%</span></div></span></span>
+                <span class="drill">Scottsdale<span class="flyout down"><div class="flyout-label">SCOTTSDALE TRIM</div><div class="flyout-row"><span>Production run</span><span class="flyout-val">1975-1987</span></div><div class="flyout-row"><span>Known survivors</span><span class="flyout-val">~340</span></div><div class="flyout-row"><span>Avg sale price</span><span class="flyout-val">$19,200</span></div><div class="flyout-row"><span>vs Custom Deluxe</span><span class="flyout-val flyout-trend-up">+22%</span></div></span></span>
+              </div>
+              <div class="fs-11 muted"><span class="drill">VIN: 1GCEK14L9EJ147915<span class="flyout down left-align"><div class="flyout-label">VIN DECODE</div><div class="flyout-row"><span>1</span><span class="flyout-val">Chevrolet USA</span></div><div class="flyout-row"><span>G</span><span class="flyout-val">Conventional cab</span></div><div class="flyout-row"><span>C/K</span><span class="flyout-val">C=2WD, K=4WD</span></div><div class="flyout-row"><span>EK14</span><span class="flyout-val">K10 3/4 ton 4x4</span></div><div class="flyout-row"><span>L9</span><span class="flyout-val">Flint MI assembly</span></div><div class="flyout-row"><span>E</span><span class="flyout-val">1984 model year</span></div><div class="flyout-row"><span>J147915</span><span class="flyout-val">Sequential #147,915</span></div></span></span></div>
+            </div>
+            <div style="text-align:right;">
+              <div class="fs-10 muted"><span class="drill" style="border:none;cursor:default;">419 PHOTOS<span class="flyout" style="text-align:left;"><div class="flyout-label">PHOTO SOURCES</div><div class="flyout-row"><span>iPhoto library</span><span class="flyout-val">402</span></div><div class="flyout-row"><span>HD archive</span><span class="flyout-val">17</span></div><div class="flyout-row"><span>AI analyzed</span><span class="flyout-val">0 (queued)</span></div></span></span></div>
+              <div class="drill" style="border:none;"><span id="mileage-ticker" class="mono bold fs-20">${k10.miles.toLocaleString()}</span><span class="flyout" style="text-align:left;"><div class="flyout-label">ODOMETER</div><div class="flyout-row"><span>Last recorded</span><span class="flyout-val">87,650 mi</span></div><div class="flyout-row"><span>Avg for 1984 K10</span><span class="flyout-val">124,300 mi</span></div><div class="flyout-row"><span>Below average by</span><span class="flyout-val flyout-trend-up">-29%</span></div><div class="flyout-row"><span>Est. annual miles</span><span class="flyout-val">2,191/yr</span></div></span></div>
+              <div class="fs-9 muted">MILES</div>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-12 mt-12">
+            <div class="stat-pill"><div class="stat-pill-label">Engine</div><div class="stat-pill-value drill" style="font-size:13px;border:none;">${k10.engine}<span class="flyout down left-align"><div class="flyout-label">350CI V8 (5.7L)</div><div class="flyout-row"><span>Block</span><span class="flyout-val">Cast iron SBC</span></div><div class="flyout-row"><span>Output (est.)</span><span class="flyout-val">165 hp / 275 lb-ft</span></div><div class="flyout-row"><span>Fuel system</span><span class="flyout-val">Rochester Q-jet</span></div><div class="flyout-row"><span>Most common swap</span><span class="flyout-val">TBI 350 (1987+)</span></div></span></div></div>
+            <div class="stat-pill"><div class="stat-pill-label">Transmission</div><div class="stat-pill-value drill" style="font-size:13px;border:none;">${k10.trans}<span class="flyout down"><div class="flyout-label">TH350 3-SPEED AUTO</div><div class="flyout-row"><span>Type</span><span class="flyout-val">Turbo Hydra-Matic</span></div><div class="flyout-row"><span>Gears</span><span class="flyout-val">3-speed automatic</span></div><div class="flyout-row"><span>Transfer case</span><span class="flyout-val">NP205 (part-time)</span></div><div class="flyout-row"><span>Common upgrade</span><span class="flyout-val">TH400 or 700R4</span></div></span></div></div>
+            <div class="stat-pill"><div class="stat-pill-label">Color</div><div class="stat-pill-value drill" style="font-size:13px;border:none;">${k10.color}<span class="flyout down"><div class="flyout-label">EXTERIOR COLOR</div><div class="flyout-row"><span>GM code</span><span class="flyout-val">63 (Light Tan)</span></div><div class="flyout-row"><span>Rarity (1984 K10)</span><span class="flyout-val">~8% of production</span></div><div class="flyout-row"><span>Most common 1984</span><span class="flyout-val">White (26%)</span></div></span></div></div>
+            <div class="stat-pill"><div class="stat-pill-label">Body</div><div class="stat-pill-value drill" style="font-size:13px;border:none;">Short Bed Pickup<span class="flyout down"><div class="flyout-label">BODY STYLE</div><div class="flyout-row"><span>Bed length</span><span class="flyout-val">6.5 ft (short)</span></div><div class="flyout-row"><span>Cab</span><span class="flyout-val">Regular cab</span></div><div class="flyout-row"><span>Short vs long bed</span><span class="flyout-val flyout-trend-up">+15% value</span></div><div class="flyout-row"><span>GVWR</span><span class="flyout-val">6,100 lbs</span></div></span></div></div>
+          </div>
+        </div>
+      </div>
+    `;
+    // Gallery thumbnails
+    const gg = $('gallery-grid');
+    PHOTOS.forEach((p, i) => {
+      const img = document.createElement('img');
+      img.className = 'gallery-thumb' + (i === 0 ? ' active' : '');
+      img.src = thumbUrl(p);
+      img.loading = 'lazy';
+      img.onclick = () => {
+        $('hero-img').src = medUrl(p);
+        gg.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
+        img.classList.add('active');
+      };
+      img.ondblclick = () => openLightbox(PHOTOS, i);
+      gg.appendChild(img);
+    });
+    // Mileage ticker
+    let miles = k10.miles;
+    setInterval(() => { miles += 0.01; const el = $('mileage-ticker'); if(el) el.textContent = miles.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }, 3000);
+  }
+}
+
+// === 2. AUCTION BID REPLAY ===
+let auctionInterval = null;
+let auctionSpeed = 500;
+
+function setAuctionSpeed(speed) {
+  auctionSpeed = speed;
+  document.querySelectorAll('#auction .presets .preset-btn').forEach(b => b.classList.remove('active'));
+  $('auction-speed-' + (speed === 500 ? '1' : speed === 250 ? '2' : speed === 100 ? '5' : '10')).classList.add('active');
+  // Restart with new speed
+  if (auctionInterval) { clearInterval(auctionInterval); startAuctionReplayAt(window._bidIdx || 0); }
+}
+
+function startAuctionReplay() {
+  const auctionEnd = new Date('2022-11-05T20:00:00Z');
+  const maxBid = 231000;
+  const feed = $('bid-feed');
+  const points = [];
+  let bidIdx = 0;
+  let commentIdx = 0;
+  window._bidIdx = 0;
+
+  // Build barcode
+  const barcode = $('bid-barcode');
+  const buckets = new Array(80).fill(0);
+  const tStart = new Date(BIDS[0].t).getTime();
+  const tEnd = new Date(BIDS[BIDS.length-1].t).getTime();
+  BIDS.forEach(b => { const pct = (new Date(b.t).getTime() - tStart) / (tEnd - tStart); buckets[Math.min(79, Math.floor(pct * 80))]++; });
+  const maxBucket = Math.max(...buckets);
+  buckets.forEach(v => {
+    const bar = document.createElement('div');
+    bar.className = 'bid-barcode-bar';
+    const intensity = v / maxBucket;
+    bar.style.background = intensity === 0 ? '#eee' : `rgba(59, 130, 246, ${0.2 + intensity * 0.8})`;
+    barcode.appendChild(bar);
+  });
+
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[d.getUTCMonth()] + ' ' + d.getUTCDate() + ', ' + d.getUTCHours().toString().padStart(2,'0') + ':' + d.getUTCMinutes().toString().padStart(2,'0');
+  }
+
+  // Market comparison data (real from DB)
+  const MKT = { gtoAvg:62750, judgeAvg:90352, ramAirAvg:113312, gtoCount:5544, judgeCount:733, ramAirCount:254, gtoOver200k:30 };
+  // Track which reference lines have been shown
+  const refsShown = { gto:false, judge:false, ramair:false };
+
+  function pctVs(price, avg) {
+    const pct = Math.round(((price - avg) / avg) * 100);
+    return pct > 0 ? '+' + pct + '%' : pct + '%';
+  }
+  function refY(price) { return 170 - (price / maxBid) * 160; }
+
+  // Position reference lines in SVG
+  function initRefLines() {
+    const refs = [
+      { id:'ref-gto', labelId:'ref-gto-label', price:MKT.gtoAvg },
+      { id:'ref-judge', labelId:'ref-judge-label', price:MKT.judgeAvg },
+      { id:'ref-ramair', labelId:'ref-ramair-label', price:MKT.ramAirAvg },
+    ];
+    refs.forEach(r => {
+      const y = refY(r.price);
+      $(r.id).setAttribute('y1', y); $(r.id).setAttribute('y2', y);
+      $(r.labelId).setAttribute('y', y - 3);
+    });
+  }
+  initRefLines();
+
+  function updateStats(bid, idx) {
+    const price = bid.a;
+    // Show reference lines as bid crosses each threshold
+    if (!refsShown.gto && price >= MKT.gtoAvg) { refsShown.gto = true; $('ref-gto').setAttribute('opacity','1'); $('ref-gto-label').setAttribute('opacity','1'); }
+    if (!refsShown.judge && price >= MKT.judgeAvg) { refsShown.judge = true; $('ref-judge').setAttribute('opacity','1'); $('ref-judge-label').setAttribute('opacity','1'); }
+    if (!refsShown.ramair && price >= MKT.ramAirAvg) { refsShown.ramair = true; $('ref-ramair').setAttribute('opacity','1'); $('ref-ramair-label').setAttribute('opacity','1'); }
+
+    // Market comparison stats
+    const vsGto = price > MKT.gtoAvg ? pctVs(price, MKT.gtoAvg) : '—';
+    const vsJudge = price > MKT.judgeAvg ? pctVs(price, MKT.judgeAvg) : '—';
+    const vsRamAir = price > MKT.ramAirAvg ? pctVs(price, MKT.ramAirAvg) : '—';
+    // Percentile among GTOs over $200k
+    const isTop = price >= 200000;
+
+    $('auction-stats').innerHTML = `
+      <div class="stat-pill"><div class="stat-pill-label">Current Bid</div><div class="stat-pill-value">${fmt(price)}</div></div>
+      <div class="stat-pill"><div class="stat-pill-label">vs GTO Avg</div><div class="stat-pill-value" style="font-size:14px;${price > MKT.gtoAvg ? 'color:var(--success);' : ''}">${vsGto}</div><div class="stat-pill-sub">${fmt(MKT.gtoAvg)} across ${MKT.gtoCount.toLocaleString()}</div></div>
+      <div class="stat-pill"><div class="stat-pill-label">vs Judge Avg</div><div class="stat-pill-value" style="font-size:14px;${price > MKT.judgeAvg ? 'color:var(--success);' : ''}">${vsJudge}</div><div class="stat-pill-sub">${fmt(MKT.judgeAvg)} across ${MKT.judgeCount}</div></div>
+      <div class="stat-pill"><div class="stat-pill-label">vs Ram Air Avg</div><div class="stat-pill-value" style="font-size:14px;${price > MKT.ramAirAvg ? 'color:var(--success);' : ''}">${vsRamAir}</div><div class="stat-pill-sub">${fmt(MKT.ramAirAvg)} across ${MKT.ramAirCount}</div></div>
+      ${isTop ? `<div class="stat-pill"><div class="stat-pill-label">$200K+ Club</div><div class="stat-pill-value" style="font-size:14px;color:var(--jps);">Top ${MKT.gtoOver200k}</div><div class="stat-pill-sub">of ${MKT.gtoCount.toLocaleString()} GTOs tracked</div></div>` : ''}
+    `;
+
+    $('auction-bid-count').textContent = (idx+1) + ' of ' + BIDS.length + ' bids';
+
+    const remaining = auctionEnd - new Date(bid.t);
+    const remainSec = Math.max(0, remaining / 1000);
+    if (remainSec <= 0) {
+      $('auction-status').innerHTML = '<span style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--success);"><span style="width:6px;height:6px;border-radius:50%;background:var(--success);"></span> SOLD &middot; NOV 5, 2022 &middot; $231,000</span>';
+    }
+  }
+
+  function updateChart(idx) {
+    const x = (idx / (BIDS.length - 1)) * 580 + 10;
+    const y = 170 - (BIDS[idx].a / maxBid) * 160;
+    points.push({ x, y });
+    const lineD = points.map((p, i) => (i === 0 ? 'M' : 'L') + p.x + ',' + p.y).join(' ');
+    const areaD = lineD + ' L' + points[points.length-1].x + ',170 L' + points[0].x + ',170 Z';
+    $('bid-line').setAttribute('d', lineD);
+    $('bid-area').setAttribute('d', areaD);
+  }
+
+  function addBidToFeed(bid, idx) {
+    const prev = idx > 0 ? BIDS[idx-1].a : 0;
+    const jump = bid.a - prev;
+    // Check for sniping (bids within 2 min of each other near end)
+    const remaining = auctionEnd - new Date(bid.t);
+    const isSniping = remaining < 300000 && idx > 0 && (new Date(bid.t) - new Date(BIDS[idx-1].t)) < 120000;
+    const row = document.createElement('div');
+    row.className = 'bid-row is-bid';
+    row.innerHTML = `
+      <div class="avatar-circle">${bid.u[0].toUpperCase()}</div>
+      <span class="bid-badge bid-badge-bid">BID</span>
+      <span class="bid-user">${bid.u}</span>
+      <span class="bid-time">${fmtDate(bid.t)}</span>
+      <span class="bid-amount">${fmt(bid.a)}</span>
+      ${jump > 0 ? `<span class="bid-jump">+${fmt(jump)}</span>` : ''}
+      ${isSniping ? '<span style="font-size:8px;padding:1px 4px;background:rgba(228,0,43,0.1);color:var(--error);font-weight:700;letter-spacing:0.5px;">SNIPE</span>' : ''}
+    `;
+    feed.insertBefore(row, feed.firstChild);
+    if (feed.children.length > 30) feed.removeChild(feed.lastChild);
+  }
+
+  // Comments are sprinkled in at natural-feeling intervals (not rigid)
+  const commentSchedule = [2, 5, 8, 14, 19, 25, 32, 40, 48, 55, 60, 65, 70, 73, 78];
+  function maybeAddComment(bidIdx) {
+    if (commentIdx < COMMENTS.length && commentSchedule.includes(bidIdx)) {
+      const c = COMMENTS[commentIdx++];
+      const row = document.createElement('div');
+      row.className = 'bid-row ' + (c.seller ? 'is-seller' : 'is-comment');
+      row.innerHTML = `
+        <div class="avatar-circle">${c.u[0].toUpperCase()}</div>
+        ${c.seller ? '<span class="bid-badge bid-badge-seller">SELLER</span>' : ''}
+        <span class="bid-user">${c.u}</span>
+        <span class="muted fs-11" style="flex:1;">${c.txt.slice(0,90)}${c.txt.length>90?'...':''}</span>
+      `;
+      feed.insertBefore(row, feed.firstChild);
+    }
+  }
+
+  window.startAuctionReplayAt = function(startIdx) {
+    bidIdx = startIdx;
+    auctionInterval = setInterval(() => {
+      if (bidIdx >= BIDS.length) { clearInterval(auctionInterval); return; }
+      const bid = BIDS[bidIdx];
+      addBidToFeed(bid, bidIdx);
+      maybeAddComment(bidIdx);
+      updateChart(bidIdx);
+      updateStats(bid, bidIdx);
+      window._bidIdx = bidIdx;
+      bidIdx++;
+    }, auctionSpeed);
+  };
+
+  startAuctionReplayAt(0);
+}
+
+// === 3. LIVESTREAM CHAT ===
+function buildStreamChat() {
+  const chat = $('stream-chat');
+  const messages = [];
+  let bIdx = 0, cIdx = 0;
+  for (let i = 0; i < 25; i++) {
+    if (i % 3 === 0 && bIdx < BIDS.length) {
+      const b = BIDS[bIdx++];
+      messages.push({ type:'bid', user:b.u, text: fmt(b.a), amount:b.a });
+    } else if (cIdx < COMMENTS.length) {
+      const c = COMMENTS[cIdx++];
+      messages.push({ type: c.seller ? 'seller' : 'comment', user:c.u, text:c.txt });
+    }
+  }
+
+  let msgIdx = 0;
+  const addMsg = () => {
+    if (msgIdx >= messages.length) msgIdx = 0;
+    const m = messages[msgIdx++];
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:6px 10px;border-bottom:1px solid var(--border);animation:bidSlideIn 300ms ease-out;' +
+      (m.type === 'bid' ? 'border-left:3px solid var(--warning);background:var(--warning-dim);' : '') +
+      (m.type === 'seller' ? 'border-left:3px solid var(--success);background:rgba(22,163,74,0.04);' : '');
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
+        <div class="avatar-circle">${m.user[0].toUpperCase()}</div>
+        <span class="bold fs-11">${m.user}</span>
+        ${m.type === 'bid' ? '<span class="bid-badge bid-badge-bid">BID</span>' : ''}
+        ${m.type === 'seller' ? '<span class="bid-badge bid-badge-seller">SELLER</span>' : ''}
+        ${m.type === 'bid' ? `<span class="bid-amount">${m.text}</span>` : ''}
+      </div>
+      ${m.type !== 'bid' ? `<div class="fs-11">${m.text.slice(0,100)}${m.text.length>100?'...':''}</div>` : ''}
+    `;
+    chat.insertBefore(div, chat.firstChild);
+    if (chat.children.length > 20) chat.removeChild(chat.lastChild);
+  };
+  for (let i = 0; i < 5; i++) addMsg();
+  setInterval(addMsg, 2500);
+}
+
+// === 4. VISION DEMO — MULTIPASS ANALYSIS ENGINE ===
+function runVisionDemo() {
+  const preview = $('vision-preview');
+  // 6 images from different angles of the K10
+  const demoPhotos = PHOTOS.slice(0, 6);
+  const classifications = ['3/4 FRONT','DRIVER SIDE','REAR 3/4','FRONT GRILLE','WHEEL DETAIL','BED \u00b7 TAILGATE'];
+
+  // Identification fields (Provenance-style)
+  const idFields = [
+    { label:'YEAR', value:'1984', badges:['AI','IMG'], conf:97 },
+    { label:'MAKE', value:'Chevrolet', badges:['AI','VIN'], conf:99 },
+    { label:'MODEL', value:'K10', badges:['AI','IMG'], conf:94 },
+    { label:'TRIM', value:'Scottsdale', badges:['AI','IMG'], conf:88 },
+    { label:'BODY', value:'Pickup Truck', badges:['AI','IMG'], conf:96 },
+    { label:'ENGINE', value:'350ci V8 (5.7L)', badges:['AI','VIN'], conf:91 },
+    { label:'TRANS', value:'SM465 4-Speed Manual', badges:['AI'], conf:84 },
+    { label:'DRIVETRAIN', value:'4WD \u2014 NP205 Transfer Case', badges:['VIN'], conf:98 },
+  ];
+
+  // Condition domains (5 domains, 0-100)
+  const condDomains = [
+    { label:'BODY', score:72, color:'#8a6b1a', note:'Minor dents, surface rust at wheel wells' },
+    { label:'PAINT', score:65, color:'#8a6b1a', note:'Fading, some oxidation, touchup visible on hood' },
+    { label:'INTERIOR', score:58, color:'#8a1a1a', note:'Seat wear, dash cracking, headliner intact' },
+    { label:'MECHANICAL', score:78, color:'#1a5c1a', note:'Engine runs, exhaust patina, fluid seepage' },
+    { label:'GLASS/TRIM', score:70, color:'#8a6b1a', note:'All glass intact, chrome pitting on bumpers' },
+  ];
+
+  // Features
+  const features = [
+    { icon:'\u2713', cls:'ok', text:'Original 350 V8 \u2014 matching numbers' },
+    { icon:'\u2713', cls:'ok', text:'SM465 4-speed manual transmission' },
+    { icon:'\u2713', cls:'ok', text:'NP205 transfer case with locking hubs' },
+    { icon:'!', cls:'warn', text:'Aftermarket exhaust system (not original)' },
+    { icon:'\u2717', cls:'mod', text:'Factory A/C deleted' },
+    { icon:'\u2713', cls:'ok', text:'Dual fuel tanks \u2014 both functional' },
+    { icon:'\u2713', cls:'ok', text:'Scottsdale trim package with chrome accents' },
+    { icon:'!', cls:'warn', text:'Non-original radio (aftermarket AM/FM)' },
+  ];
+
+  // Comparable sales
+  const comps = [
+    { text:'1984 K10 Scottsdale 4x4 \u00b7 BaT \u00b7 Sep 2024', price:'$22,500' },
+    { text:'1985 K10 Custom Deluxe 4x4 \u00b7 BaT \u00b7 Jul 2024', price:'$19,000' },
+    { text:'1983 K10 Silverado 4x4 \u00b7 C&B \u00b7 Aug 2024', price:'$26,750' },
+  ];
+
+  // Build the full analysis container
+  preview.innerHTML = `
+    <div style="border:2px solid #000;background:#fff;">
+      <!-- Status bar -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#000;color:#fff;">
+        <span id="va-status" style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">INITIALIZING YONO PIPELINE...</span>
+        <span id="va-time" style="font-size:8px;font-family:'Courier New',monospace;opacity:0.6;"></span>
+      </div>
+
+      <!-- Thumbnail strip -->
+      <div class="va-thumbs" id="va-thumbs">
+        ${demoPhotos.map((p,i) => `
+          <div class="va-thumb-wrap">
+            <img class="va-thumb" id="va-t${i}" src="${thumbUrl(p)}" alt="">
+            <div class="va-thumb-label" id="va-tl${i}"></div>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- Results panels -->
+      <div id="va-results"></div>
+    </div>
+  `;
+
+  const results = $('va-results');
+  const status = $('va-status');
+  const timeEl = $('va-time');
+  let t = 0;
+  const q = []; // animation queue
+  const after = (ms, fn) => { t += ms; q.push({ t, fn }); };
+  const at = (ms, fn) => { q.push({ t: ms, fn }); };
+
+  // Helper: add a pass header
+  const addPass = (num, label) => {
+    results.insertAdjacentHTML('beforeend',
+      `<div class="va-pass"><span class="va-pass-num">PASS ${num}/5</span> \u2014 ${label}</div>`);
+  };
+
+  // Helper: confidence color class
+  const confCls = pct => pct >= 85 ? 'high' : pct >= 60 ? 'mid' : 'low';
+  // Helper: condition bar color
+  const condColor = score => score >= 75 ? '#1a5c1a' : score >= 60 ? '#8a6b1a' : '#8a1a1a';
+
+  // === PASS 1: CLASSIFICATION (0ms - 3600ms) ===
+  at(300, () => {
+    status.textContent = 'PASS 1/5 \u2014 CLASSIFICATION';
+    addPass(1, 'IMAGE CLASSIFICATION');
+  });
+  demoPhotos.forEach((p, i) => {
+    at(600 + i * 500, () => {
+      // Highlight current thumbnail
+      demoPhotos.forEach((_, j) => {
+        const el = document.getElementById('va-t'+j);
+        if (j < i) el.className = 'va-thumb done';
+        else if (j === i) el.className = 'va-thumb active';
+        else el.className = 'va-thumb';
+      });
+      timeEl.textContent = ((i+1)*0.7).toFixed(1) + 'ms';
+    });
+    at(900 + i * 500, () => {
+      document.getElementById('va-t'+i).className = 'va-thumb done';
+      document.getElementById('va-tl'+i).textContent = classifications[i];
+    });
+  });
+
+  // === PASS 2: IDENTIFICATION (3600ms - 5600ms) ===
+  at(3800, () => {
+    status.textContent = 'PASS 2/5 \u2014 IDENTIFICATION';
+    addPass(2, 'VEHICLE IDENTIFICATION');
+  });
+  idFields.forEach((f, i) => {
+    at(4000 + i * 200, () => {
+      const id = 'va-f'+i;
+      const badgeHtml = f.badges.map(b =>
+        `<span class="va-badge va-badge-${b.toLowerCase()}">${b}</span>`
+      ).join('');
+      results.insertAdjacentHTML('beforeend', `
+        <div class="va-field" id="${id}">
+          <div class="va-label">${f.label}</div>
+          <div class="va-value">${f.value}</div>
+          <div class="va-sources">
+            ${badgeHtml}
+            <span class="va-conf"><span class="va-conf-fill ${confCls(f.conf)}" id="${id}-bar"></span></span>
+            <span style="font-size:8px;font-family:'Courier New',monospace;color:#888;">${f.conf}%</span>
+          </div>
+        </div>
+      `);
+      requestAnimationFrame(() => {
+        document.getElementById(id).classList.add('show');
+        requestAnimationFrame(() => {
+          const bar = document.getElementById(id+'-bar');
+          if (bar) bar.style.width = f.conf + '%';
+        });
+      });
+      timeEl.textContent = (4.2 + i*0.3).toFixed(1) + 'ms';
+    });
+  });
+
+  // === PASS 3: CONDITION ASSESSMENT (5800ms - 7600ms) ===
+  at(5800, () => {
+    status.textContent = 'PASS 3/5 \u2014 CONDITION ASSESSMENT';
+    addPass(3, 'CONDITION SPECTROMETER \u2014 5 DOMAINS');
+  });
+  condDomains.forEach((d, i) => {
+    at(6000 + i * 300, () => {
+      const id = 'va-c'+i;
+      results.insertAdjacentHTML('beforeend', `
+        <div class="va-cond" id="${id}">
+          <div class="va-cond-label">${d.label}</div>
+          <div class="va-cond-score">${d.score}</div>
+          <div class="va-cond-bar"><div class="va-cond-fill" id="${id}-bar" style="background:${condColor(d.score)};"></div></div>
+          <div class="va-cond-note">${d.note}</div>
+        </div>
+      `);
+      requestAnimationFrame(() => {
+        document.getElementById(id).classList.add('show');
+        requestAnimationFrame(() => {
+          document.getElementById(id+'-bar').style.width = d.score + '%';
+        });
+      });
+    });
+  });
+  // Overall score
+  at(7600, () => {
+    const overall = Math.round(condDomains.reduce((s,d) => s+d.score, 0) / condDomains.length);
+    results.insertAdjacentHTML('beforeend', `
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--border);background:#fafaf0;">
+        <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#666;width:80px;">OVERALL</span>
+        <span style="font-size:16px;font-weight:700;font-family:'Courier New',monospace;">${overall}</span>
+        <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${condColor(overall)};">DRIVER</span>
+        <span style="font-size:8px;color:#888;">62nd percentile for 1984 K10</span>
+      </div>
+    `);
+  });
+
+  // === PASS 4: FEATURE DETECTION (7800ms - 9200ms) ===
+  at(7800, () => {
+    status.textContent = 'PASS 4/5 \u2014 FEATURE DETECTION';
+    addPass(4, 'DETECTED FEATURES & MODIFICATIONS');
+  });
+  features.forEach((f, i) => {
+    at(8000 + i * 150, () => {
+      const id = 'va-ft'+i;
+      results.insertAdjacentHTML('beforeend', `
+        <div class="va-feature" id="${id}">
+          <span class="va-feature-icon ${f.cls}">${f.icon}</span>
+          <span>${f.text}</span>
+        </div>
+      `);
+      requestAnimationFrame(() => document.getElementById(id).classList.add('show'));
+    });
+  });
+
+  // === PASS 5: MARKET POSITION (9400ms - 10600ms) ===
+  at(9400, () => {
+    status.textContent = 'PASS 5/5 \u2014 MARKET POSITIONING';
+    addPass(5, 'MARKET POSITION & VALUATION');
+  });
+  at(9600, () => {
+    results.insertAdjacentHTML('beforeend', `
+      <div class="va-field show">
+        <div class="va-label">EST. VALUE</div>
+        <div class="va-value" style="font-weight:700;font-family:'Courier New',monospace;">$18,500 \u2014 $24,000</div>
+        <div class="va-sources"><span class="va-badge va-badge-ai">YONO</span></div>
+      </div>
+      <div class="va-field show">
+        <div class="va-label">PERCENTILE</div>
+        <div class="va-value">
+          <span style="font-family:'Courier New',monospace;font-weight:700;">62nd</span>
+          <span style="font-size:9px;color:#888;margin-left:4px;">of 1,167 K10s tracked</span>
+        </div>
+        <div class="va-sources">
+          <span class="va-conf" style="width:60px;"><span class="va-conf-fill mid" id="va-pct-bar"></span></span>
+        </div>
+      </div>
+    `);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const bar = document.getElementById('va-pct-bar');
+      if (bar) bar.style.width = '62%';
+    }));
+    timeEl.textContent = '6.1ms';
+  });
+  // Comparable sales
+  at(9800, () => {
+    results.insertAdjacentHTML('beforeend',
+      `<div style="font-size:8px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#888;padding:4px 10px;border-bottom:1px solid #f0f0f0;">COMPARABLE SALES</div>`);
+  });
+  comps.forEach((c, i) => {
+    at(10000 + i * 200, () => {
+      const id = 'va-cp'+i;
+      results.insertAdjacentHTML('beforeend', `
+        <div class="va-comp" id="${id}">
+          <span style="color:#666;">${c.text}</span>
+          <span class="va-comp-price">${c.price}</span>
+        </div>
+      `);
+      requestAnimationFrame(() => document.getElementById(id).classList.add('show'));
+    });
+  });
+
+  // === COMPLETE ===
+  at(10800, () => {
+    const overall = Math.round(condDomains.reduce((s,d) => s+d.score, 0) / condDomains.length);
+    status.textContent = 'COMPLETE \u2014 6 IMAGES \u00b7 5 PASSES \u00b7 8 FIELDS \u00b7 5 DOMAINS';
+    timeEl.textContent = '6.1ms total';
+    results.insertAdjacentHTML('beforeend', `
+      <div style="padding:8px 10px;background:#fafafa;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;gap:12px;">
+          <div class="stat-pill"><div class="stat-pill-label">Score</div><div class="stat-pill-value">${overall}/100</div></div>
+          <div class="stat-pill"><div class="stat-pill-label">Grade</div><div class="stat-pill-value">DRIVER</div></div>
+          <div class="stat-pill"><div class="stat-pill-label">Inference</div><div class="stat-pill-value mono">6.1ms</div></div>
+        </div>
+        <button class="vision-play" style="padding:6px 16px;font-size:10px;letter-spacing:1px;" onclick="runVisionDemo()">REPLAY</button>
+      </div>
+    `);
+  });
+
+  // Run the animation queue
+  q.forEach(item => setTimeout(item.fn, item.t));
+}
+
+// === 5. HEATMAP ===
+function buildHeatmap() {
+  const hm = $('heatmap');
+  const colors = ['var(--heat-0)','var(--heat-1)','var(--heat-2)','var(--heat-3)','var(--heat-4)','var(--heat-5)'];
+  const seed = 42;
+  for (let i = 0; i < 182; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'heatmap-cell';
+    const rand = Math.sin(seed + i * 0.7) * 0.5 + 0.5;
+    const recent = i > 140 ? 0.3 : 0;
+    const val = Math.max(0, rand + recent - 0.3);
+    const level = val <= 0 ? 0 : val < 0.2 ? 1 : val < 0.4 ? 2 : val < 0.6 ? 3 : val < 0.8 ? 4 : 5;
+    cell.style.background = colors[level];
+    cell.setAttribute('data-tip', level === 0 ? 'No activity' : Math.ceil(val*8) + ' contributions');
+    cell.style.opacity = '0';
+    setTimeout(() => { cell.style.transition = 'opacity 100ms'; cell.style.opacity = '1'; }, i * 15);
+    hm.appendChild(cell);
+  }
+}
+
+// === 6. ACTIVITY STREAM + PROFILE STATS (derived from real BIDS data) ===
+function buildProfileStats() {
+  // Compute Musclecars79's real stats from the bid data
+  const myBids = BIDS.filter(b => b.u === 'Musclecars79');
+  const totalBids = myBids.length;
+  const firstBid = myBids[0];
+  const lastBid = myBids[myBids.length - 1];
+  const won = lastBid.a === BIDS[BIDS.length - 1].a; // did they place the final bid?
+  const bidRange = fmt(firstBid.a) + ' \u2014 ' + fmt(lastBid.a);
+  const totalCommitted = myBids.reduce((s, b) => s + b.a, 0);
+  // Time span of their bidding
+  const spanMs = new Date(lastBid.t) - new Date(firstBid.t);
+  const spanHrs = Math.round(spanMs / 3600000 * 10) / 10;
+  // Bid frequency in the sniping phase (last 30 min)
+  const snipeStart = new Date(BIDS[BIDS.length-1].t).getTime() - 1800000;
+  const snipeBids = myBids.filter(b => new Date(b.t).getTime() >= snipeStart).length;
+  // Competitors they outbid
+  const allBidders = [...new Set(BIDS.map(b => b.u))];
+  const beaten = allBidders.filter(u => u !== 'Musclecars79' && BIDS.filter(b => b.u === u).slice(-1)[0].a < lastBid.a).length;
+
+  $('profile-auction-stats').innerHTML = `
+    <div class="stat-pill"><div class="stat-pill-label">Bids Placed</div><div class="stat-pill-value">${totalBids}</div></div>
+    <div class="stat-pill"><div class="stat-pill-label">Bid Range</div><div class="stat-pill-value" style="font-size:12px;">${bidRange}</div></div>
+    <div class="stat-pill"><div class="stat-pill-label">Result</div><div class="stat-pill-value" style="color:${won ? 'var(--success)' : 'var(--error)'};">${won ? 'WON' : 'LOST'}</div></div>
+    <div class="stat-pill"><div class="stat-pill-label">Bidders Outbid</div><div class="stat-pill-value">${beaten} of ${allBidders.length - 1}</div></div>
+    <div class="stat-pill"><div class="stat-pill-label">Active Span</div><div class="stat-pill-value">${spanHrs}h</div></div>
+    <div class="stat-pill"><div class="stat-pill-label">Snipe Phase</div><div class="stat-pill-value">${snipeBids} bids in 30m</div></div>
+  `;
+
+  // Bid progression mini-chart (bar for each bid, height = bid amount)
+  const prog = $('profile-bid-progression');
+  const maxA = lastBid.a;
+  myBids.forEach(b => {
+    const bar = document.createElement('div');
+    const pct = (b.a / maxA) * 100;
+    bar.style.cssText = `flex:1;background:var(--gulf);min-width:2px;height:${pct}%;opacity:0;transition:opacity 200ms, height 400ms;`;
+    bar.title = fmt(b.a) + ' \u2014 ' + new Date(b.t).toLocaleString();
+    prog.appendChild(bar);
+    setTimeout(() => { bar.style.opacity = '1'; }, 100);
+  });
+
+  // Heatmap stats
+  $('heatmap-stats').innerHTML = `
+    <span>${totalBids} bids in this auction</span>
+    <span>${spanHrs}h active window</span>
+    <span>${snipeBids} bids in final 30 min</span>
+  `;
+}
+
+function buildActivityStream() {
+  const stream = $('activity-stream');
+  // Build from REAL Musclecars79 bids — reversed (most recent first)
+  const myBids = BIDS.filter(b => b.u === 'Musclecars79').reverse();
+  const won = myBids[0].a === BIDS[BIDS.length - 1].a;
+
+  // Add "WON" event at top if they won
+  if (won) {
+    stream.innerHTML += `
+      <div class="activity-item" style="border-left:3px solid var(--success);padding-left:8px;">
+        <div class="activity-dot" style="background:var(--success);"></div>
+        <div class="activity-text"><span class="bold">Won auction</span> for ${fmt(myBids[0].a)}<div class="activity-time">${fmtBidTime(myBids[0].t)}</div></div>
+      </div>`;
+  }
+
+  myBids.forEach((b, i) => {
+    const prev = i < myBids.length - 1 ? myBids[i+1].a : 0;
+    const jump = b.a - prev;
+    stream.innerHTML += `
+      <div class="activity-item">
+        <div class="activity-dot" style="background:var(--warning);"></div>
+        <div class="activity-text">Bid <span class="mono bold">${fmt(b.a)}</span>${jump > 0 ? ` <span class="muted fs-10">+${fmt(jump)}</span>` : ''}<div class="activity-time">${fmtBidTime(b.t)}</div></div>
+      </div>`;
+  });
+}
+
+function fmtBidTime(iso) {
+  const d = new Date(iso);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[d.getUTCMonth()] + ' ' + d.getUTCDate() + ', ' + d.getUTCHours().toString().padStart(2,'0') + ':' + d.getUTCMinutes().toString().padStart(2,'0');
+}
+
+// === 7. ORGANIZATION ===
+function buildOrgs() {
+  const body = $('org-preview');
+  const orgs = DATA.orgs;
+  body.innerHTML = `<div class="flex gap-16" style="flex-wrap:wrap;">${orgs.map(o => `
+    <div style="flex:1;min-width:280px;border:2px solid var(--border);padding:16px;background:#fff;">
+      <div class="flex" style="align-items:center;gap:8px;margin-bottom:8px;">
+        ${o.website ? `<img class="favicon" src="https://www.google.com/s2/favicons?domain=${o.website}&sz=14" alt="">` : ''}
+        <div class="bold fs-14">${o.name}</div>
+      </div>
+      <div class="flex gap-8 mb-8">
+        <span style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;padding:3px 8px;border:1px solid var(--border);font-weight:700;font-family:'Courier New',monospace;">${o.type.replace('_',' ')}</span>
+        <span class="drill muted fs-11">${o.city}, ${o.state}<span class="flyout"><div class="flyout-label">LOCATION</div><div>${o.city}, ${o.state}</div><div class="fs-10 muted">3 other shops nearby</div></span></span>
+      </div>
+      <div class="fs-10 upper ls bold muted mb-8">Specializations</div>
+      <div class="flex flex-wrap gap-4 mb-8">${(o.specs||[]).map(s => `<span class="org-tag">${s}</span>`).join('')}</div>
+      <div class="fs-10 upper ls bold muted mb-8">Capabilities</div>
+      <div class="flex gap-8 mb-8">
+        ${o.lift ? '<span class="org-cap"><span class="org-cap-icon">&#9650;</span> Lift</span>' : ''}
+        ${o.booth ? '<span class="org-cap"><span class="org-cap-icon">&#9632;</span> Paint Booth</span>' : ''}
+        ${o.dyno ? '<span class="org-cap"><span class="org-cap-icon">&#9675;</span> Dyno</span>' : ''}
+      </div>
+      ${o.website ? `<a href="https://${o.website}" target="_blank" class="fs-11" style="color:var(--text-muted);">${o.website}</a>` : ''}
+    </div>
+  `).join('')}</div>`;
+}
+
+// === 8. MAP ===
+function buildMap() {
+  const map = $('map-demo');
+  const dots = [
+    [25,45],[30,50],[35,42],[40,55],[45,48],[50,40],[55,52],[60,46],
+    [28,60],[33,58],[38,52],[43,65],[48,58],[53,54],[58,60],[63,50],
+    [20,55],[65,42],[70,48],[75,55],[32,38],[42,35],[52,30],[62,38],
+    [22,48],[27,42],[37,60],[47,42],[57,48],[67,55],[72,45],[77,50],
+  ];
+  dots.forEach(([x,y]) => {
+    const dot = document.createElement('div');
+    dot.className = 'map-dot';
+    dot.style.left = x+'%'; dot.style.top = y+'%';
+    map.appendChild(dot);
+  });
+  [[35,50,12,'48'],[55,45,16,'73'],[45,55,10,'31']].forEach(([x,y,sz,cnt]) => {
+    const c = document.createElement('div');
+    c.className = 'map-cluster';
+    c.style.cssText = `left:${x}%;top:${y}%;width:${sz*2}px;height:${sz*2}px;transform:translate(-50%,-50%);`;
+    c.textContent = cnt;
+    map.appendChild(c);
+  });
+}
+function setMapMode(mode) {
+  const section = document.getElementById('map');
+  const btns = section.querySelectorAll('.preset-btn');
+  btns.forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+// === 9. TRANSFER ===
+function buildTransfer() {
+  const imp = $('transfer-import');
+  const steps = [
+    { label:'Upload inventory.csv', status:'done' },
+    { label:'Parse 247 rows', status:'done' },
+    { label:'Map columns: Year, Make, Model, VIN, Price', status:'done' },
+    { label:'Match existing vehicles', status:'active' },
+    { label:'Insert new records', status:'pending' },
+  ];
+  imp.innerHTML = steps.map(s => `
+    <div class="transfer-step">
+      <div class="transfer-step-icon transfer-step-${s.status}">${s.status==='done'?'&#10003;':s.status==='active'?'&#8987;':'&#8226;'}</div>
+      <span class="fs-12">${s.label}</span>
+    </div>
+  `).join('') + `
+    <div class="transfer-progress"><div class="transfer-progress-fill" style="width:65%;"></div></div>
+    <div class="flex gap-16 mt-12">
+      <div class="stat-pill"><div class="stat-pill-label">Matched</div><div class="stat-pill-value" style="color:var(--success);">189</div></div>
+      <div class="stat-pill"><div class="stat-pill-label">New</div><div class="stat-pill-value" style="color:#3b82f6;">43</div></div>
+      <div class="stat-pill"><div class="stat-pill-label">Errors</div><div class="stat-pill-value" style="color:var(--error);">15</div></div>
+    </div>
+    <div class="mt-12 fs-10 upper ls muted">Column Mapping</div>
+    <div class="mono fs-10 mt-8" style="background:#f8f8f8;padding:8px;border:1px solid var(--border);">
+      "Price" &rarr; sale_price<br>
+      "Year" &rarr; year<br>
+      "VIN" &rarr; vin<br>
+      "Make" &rarr; make<br>
+      "Model" &rarr; model
+    </div>
+  `;
+
+  let progress = 65;
+  const fill = imp.querySelector('.transfer-progress-fill');
+  const progressInterval = setInterval(() => {
+    progress += 1;
+    if (progress >= 100) clearInterval(progressInterval);
+    fill.style.width = progress + '%';
+  }, 300);
+
+  const exp = $('transfer-export');
+  exp.innerHTML = `
+    <div class="fs-10 upper ls muted mb-8">Select Fields</div>
+    <div class="flex flex-wrap gap-4 mb-8">
+      ${['Year','Make','Model','VIN','Sale Price','Mileage','Images','Auction History'].map(f =>
+        `<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:3px 8px;border:1px solid var(--border);">
+          <input type="checkbox" ${['Year','Make','Model','VIN','Sale Price'].includes(f)?'checked':''} style="margin:0;"> ${f}
+        </label>`
+      ).join('')}
+    </div>
+    <div class="fs-10 upper ls muted mb-8">Format</div>
+    <div class="flex gap-4 mb-8">
+      <button class="preset-btn active" style="padding:4px 10px;">CSV</button>
+      <button class="preset-btn" style="padding:4px 10px;">JSON</button>
+      <button class="preset-btn" style="padding:4px 10px;">NDJSON</button>
+    </div>
+    <div class="fs-10 upper ls muted mb-8">Preview (first 5 rows)</div>
+    <div class="mono fs-9" style="background:#f8f8f8;padding:8px;border:1px solid var(--border);overflow-x:auto;white-space:nowrap;">
+      Year,Make,Model,VIN,Sale_Price<br>
+      1970,Pontiac,GTO Judge,242370N100525,231000<br>
+      1984,Chevrolet,K10,1GCEK14L9EJ147915,<br>
+      1961,Mercedes-Benz,190SL,12104210017892,175000<br>
+      1965,Volkswagen,Type 2 21-Window,1152017283,134000<br>
+      1953,Pegaso,Z 102,,43250
+    </div>
+    <button class="vision-play mt-12" style="padding:8px 20px;font-size:11px;">EXPORT 247 VEHICLES</button>
+  `;
+}
+
+// === INIT ===
+document.addEventListener('DOMContentLoaded', () => {
+  buildVehicleCards();
+  startAuctionReplay();
+  buildStreamChat();
+  buildHeatmap();
+  buildProfileStats();
+  buildActivityStream();
+  buildOrgs();
+  buildMap();
+  buildTransfer();
+});
+</script>
+
+</body>
+</html>
