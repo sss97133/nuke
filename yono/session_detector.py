@@ -162,7 +162,13 @@ def temporal_cluster(images: list[dict], gap_minutes: float = 30) -> list[list[d
 # ─── Step 3: GPS sub-splitting ─────────────────────────────────────
 
 def gps_subsplit(cluster: list[dict], max_distance_m: float = 500) -> list[list[dict]]:
-    """Within a temporal cluster, split if GPS distance > threshold."""
+    """Within a temporal cluster, split if GPS distance > threshold.
+
+    Includes velocity sanity check: if consecutive photos show impossible
+    travel speed (> 200 m/s ≈ 720 km/h), GPS data is unreliable — skip split.
+    Also validates overall GPS quality: if median consecutive distance exceeds
+    5km for photos taken within minutes, the GPS data is junk — skip entirely.
+    """
     if len(cluster) <= 1:
         return [cluster]
 
@@ -171,17 +177,59 @@ def gps_subsplit(cluster: list[dict], max_distance_m: float = 500) -> list[list[
     if len(gps_images) < 2:
         return [cluster]
 
+    # GPS quality check: compute median consecutive distance vs time span
+    # If photos span < 30 min but median distance is > 5km, GPS is unreliable
+    time_span = 0
+    distances = []
+    for i in range(1, len(gps_images)):
+        p, c = gps_images[i - 1], gps_images[i]
+        if p.get("effective_time") and c.get("effective_time"):
+            time_span = max(time_span, abs((c["effective_time"] - p["effective_time"]).total_seconds()))
+        try:
+            d = _haversine_m(float(p["latitude"]), float(p["longitude"]),
+                             float(c["latitude"]), float(c["longitude"]))
+            distances.append(d)
+        except (ValueError, TypeError):
+            pass
+
+    if distances:
+        sorted_d = sorted(distances)
+        median_d = sorted_d[len(sorted_d) // 2]
+        # If photos span < 30 min but median jump is > 5km, GPS is bogus
+        if time_span < 1800 and median_d > 5000:
+            return [cluster]
+        # If > 50% of consecutive pairs show > 2km jumps, GPS is unreliable
+        big_jumps = sum(1 for d in distances if d > 2000)
+        if big_jumps > len(distances) * 0.5:
+            return [cluster]
+
     subclusters = []
     current = [cluster[0]]
+
+    MAX_VELOCITY_MS = 200  # 720 km/h — faster than commercial aviation
 
     for img in cluster[1:]:
         prev = current[-1]
         if (prev.get("latitude") and prev.get("longitude") and
                 img.get("latitude") and img.get("longitude")):
-            dist = _haversine_m(
-                float(prev["latitude"]), float(prev["longitude"]),
-                float(img["latitude"]), float(img["longitude"])
-            )
+            try:
+                dist = _haversine_m(
+                    float(prev["latitude"]), float(prev["longitude"]),
+                    float(img["latitude"]), float(img["longitude"])
+                )
+            except (ValueError, TypeError):
+                current.append(img)
+                continue
+
+            # Velocity sanity check
+            dt = 0
+            if prev.get("effective_time") and img.get("effective_time"):
+                dt = abs((img["effective_time"] - prev["effective_time"]).total_seconds())
+            if dt > 0 and dist / dt > MAX_VELOCITY_MS:
+                # Impossible velocity — GPS data is unreliable, don't split
+                current.append(img)
+                continue
+
             if dist > max_distance_m:
                 subclusters.append(current)
                 current = [img]
@@ -285,6 +333,84 @@ def merge_singletons(clusters: list[list[dict]], max_merge_gap_minutes: float = 
     return merged
 
 
+# ─── Step 5B: Same-day consolidation ─────────────────────────────
+
+def merge_same_day(clusters: list[list[dict]], max_intraday_gap_hours: float = 4) -> list[list[dict]]:
+    """
+    Merge clusters that fall on the same calendar day (local timezone).
+    Sessions spanning midnight with < max_intraday_gap_hours are merged.
+    This prevents over-fragmentation from GPS noise or tight temporal gaps.
+    """
+    if len(clusters) <= 1:
+        return clusters
+
+    def _day_key(img):
+        """Get calendar date key (local time, not UTC)."""
+        t = img.get("effective_time")
+        if not t:
+            return None
+        # Use local timezone approximation (UTC offset doesn't matter for grouping)
+        return t.strftime("%Y-%m-%d")
+
+    def _cluster_day_keys(cluster):
+        """Get set of unique day keys for a cluster."""
+        keys = set()
+        for img in cluster:
+            k = _day_key(img)
+            if k:
+                keys.add(k)
+        return keys
+
+    def _cluster_end_time(cluster):
+        times = [img["effective_time"] for img in cluster if img.get("effective_time")]
+        return max(times) if times else None
+
+    def _cluster_start_time(cluster):
+        times = [img["effective_time"] for img in cluster if img.get("effective_time")]
+        return min(times) if times else None
+
+    max_gap = timedelta(hours=max_intraday_gap_hours)
+    merged = []
+
+    for cluster in clusters:
+        if not merged:
+            merged.append(cluster)
+            continue
+
+        prev = merged[-1]
+        prev_days = _cluster_day_keys(prev)
+        curr_days = _cluster_day_keys(cluster)
+
+        # Same day: merge unconditionally
+        if prev_days & curr_days:
+            merged[-1] = prev + cluster
+            continue
+
+        # Adjacent days: merge if gap < max_intraday_gap_hours (midnight spanning)
+        prev_end = _cluster_end_time(prev)
+        curr_start = _cluster_start_time(cluster)
+        if prev_end and curr_start:
+            gap = curr_start - prev_end
+            if timedelta(0) <= gap <= max_gap:
+                # Check if they're on adjacent calendar days
+                prev_max_day = max(prev_days) if prev_days else ""
+                curr_min_day = min(curr_days) if curr_days else ""
+                if prev_max_day and curr_min_day:
+                    from datetime import date as date_cls
+                    try:
+                        d1 = date_cls.fromisoformat(prev_max_day)
+                        d2 = date_cls.fromisoformat(curr_min_day)
+                        if (d2 - d1).days <= 1:
+                            merged[-1] = prev + cluster
+                            continue
+                    except ValueError:
+                        pass
+
+        merged.append(cluster)
+
+    return merged
+
+
 # ─── Step 6: Rule-based type classification ────────────────────────
 
 def classify_session_type(cluster: list[dict], vehicle_info: dict = None) -> tuple[str, float]:
@@ -305,28 +431,60 @@ def classify_session_type(cluster: list[dict], vehicle_info: dict = None) -> tup
 
     ext_zones = {"ext_front", "ext_rear", "ext_driver_side", "ext_passenger_side",
                  "ext_front_quarter_driver", "ext_front_quarter_passenger",
-                 "ext_rear_quarter_driver", "ext_rear_quarter_passenger"}
+                 "ext_rear_quarter_driver", "ext_rear_quarter_passenger",
+                 "ext_front_driver", "ext_front_passenger",
+                 "ext_rear_driver", "ext_rear_passenger"}
     int_zones = {"int_dashboard", "int_front_seats", "int_rear_seats",
                  "int_steering_wheel", "int_center_console", "int_door_panel",
-                 "int_headliner", "int_trunk"}
+                 "int_door_panel_fl", "int_door_panel_fr", "int_door_panel_rl", "int_door_panel_rr",
+                 "int_headliner", "int_trunk", "int_cargo"}
     mech_zones = {"mech_engine_bay", "mech_underside", "mech_suspension"}
+    detail_zones = {"detail_badge", "detail_damage", "detail_vin", "detail_tire",
+                    "wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr",
+                    "ext_undercarriage"}
 
-    ext_coverage = len(ext_zones & set(zones))
-    int_coverage = len(int_zones & set(zones))
-    mech_coverage = len(mech_zones & set(zones))
+    zone_set = set(zones)
+    ext_coverage = len(ext_zones & zone_set)
+    int_coverage = len(int_zones & zone_set)
+    mech_coverage = len(mech_zones & zone_set)
+    detail_coverage = len(detail_zones & zone_set)
+    total_zone_diversity = len(zone_set)
 
-    # Has GPS movement over time?
-    gps_imgs = [(float(img["latitude"]), float(img["longitude"]), img["effective_time"])
-                for img in cluster
-                if img.get("latitude") and img.get("longitude") and img.get("effective_time")]
+    # Has GPS movement over time? (with quality validation)
+    gps_imgs = []
+    for img in cluster:
+        if img.get("latitude") and img.get("longitude") and img.get("effective_time"):
+            try:
+                gps_imgs.append((float(img["latitude"]), float(img["longitude"]), img["effective_time"]))
+            except (ValueError, TypeError):
+                pass
+
     has_gps_movement = False
+    gps_reliable = False
     if len(gps_imgs) >= 2:
-        first = gps_imgs[0]
-        last = gps_imgs[-1]
-        dist = _haversine_m(first[0], first[1], last[0], last[1])
-        time_diff = (last[2] - first[2]).total_seconds()
-        if dist > 1000 and time_diff > 300:  # 1km+ over 5+ min
-            has_gps_movement = True
+        # Check GPS quality: if consecutive pairs show impossible velocity, GPS is junk
+        impossible_count = 0
+        for i in range(1, min(len(gps_imgs), 20)):
+            d = _haversine_m(gps_imgs[i-1][0], gps_imgs[i-1][1], gps_imgs[i][0], gps_imgs[i][1])
+            dt = abs((gps_imgs[i][2] - gps_imgs[i-1][2]).total_seconds())
+            if dt > 0 and d / dt > 200:  # > 720 km/h
+                impossible_count += 1
+        total_checked = min(len(gps_imgs) - 1, 19)
+        gps_reliable = impossible_count < total_checked * 0.3  # < 30% impossible
+
+        if gps_reliable:
+            first = gps_imgs[0]
+            last = gps_imgs[-1]
+            dist = _haversine_m(first[0], first[1], last[0], last[1])
+            time_diff = (last[2] - first[2]).total_seconds()
+            if dist > 1000 and time_diff > 300:  # 1km+ over 5+ min
+                has_gps_movement = True
+
+    # Time span of session
+    times = [img["effective_time"] for img in cluster if img.get("effective_time")]
+    session_span_hours = 0
+    if len(times) >= 2:
+        session_span_hours = (max(times) - min(times)).total_seconds() / 3600
 
     # Classification rules (ordered by specificity)
 
@@ -335,9 +493,21 @@ def classify_session_type(cluster: list[dict], vehicle_info: dict = None) -> tup
     if source_counter and any(s in auction_sources for s in source_counter):
         return ("auction_listing", 0.9)
 
-    # GPS movement → driving/road trip
-    if has_gps_movement:
+    # Walkaround: many photos in short time + diverse zones (takes priority over GPS)
+    # A burst of 10+ photos in < 30 min with diverse zone coverage is a walkaround
+    if n >= 10 and session_span_hours < 0.5 and total_zone_diversity >= 3:
+        return ("walkaround", 0.85)
+    # Slightly fewer photos but still systematic coverage
+    if n >= 5 and session_span_hours < 1 and ext_coverage >= 2 and total_zone_diversity >= 4:
+        return ("walkaround", 0.75)
+
+    # GPS movement + extended time span → driving/road trip
+    if has_gps_movement and session_span_hours > 1:
         return ("road_trip_driving", 0.8)
+
+    # Multi-day session → likely a road trip or extended documentation
+    if session_span_hours > 12:
+        return ("road_trip_driving", 0.7)
 
     # Damage documentation: >50% images have damage flags
     if n >= 2 and damage_count / n > 0.5:
@@ -352,7 +522,7 @@ def classify_session_type(cluster: list[dict], vehicle_info: dict = None) -> tup
         return ("interior_restoration", 0.7)
 
     # Walkaround: good exterior coverage + 5+ images
-    if ext_coverage >= 3 and n >= 5:
+    if (ext_coverage >= 2 and n >= 5) or (total_zone_diversity >= 4 and n >= 5):
         return ("walkaround", 0.75)
 
     # Before-after: exactly 2 images with matching zones
@@ -534,6 +704,7 @@ def detect_sessions(conn, vehicle_id: str, gap_minutes: float = 30) -> dict:
         expanded.extend(gps_subsplit(c))
     clusters = source_batch_group(expanded)
     clusters = merge_singletons(clusters)
+    clusters = merge_same_day(clusters)
 
     # Persist
     sessions = persist_sessions(conn, vehicle_id, clusters, profile_id,
