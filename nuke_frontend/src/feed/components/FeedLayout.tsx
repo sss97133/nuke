@@ -18,6 +18,10 @@ export interface FeedLayoutProps {
   isFetchingNextPage?: boolean;
   fetchNextPage?: () => void;
   renderCard: (vehicle: FeedVehicle, index: number) => ReactNode;
+  /** Optional stat card injected every `statCardInterval` vehicle rows in grid mode */
+  renderStatCard?: (index: number) => ReactNode;
+  /** How many vehicle rows between stat cards (default 5) */
+  statCardInterval?: number;
 }
 
 const ROW_HEIGHTS: Record<string, number> = {
@@ -38,13 +42,41 @@ export function FeedLayout({
   isFetchingNextPage = false,
   fetchNextPage,
   renderCard,
+  renderStatCard,
+  statCardInterval = 5,
 }: FeedLayoutProps) {
   const tableGrid = showScores ? TABLE_GRID_SCORES : TABLE_GRID;
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const cols = viewMode === 'grid' ? cardsPerRow : 1;
-  const rowCount = Math.ceil(vehicles.length / cols) + (hasNextPage ? 1 : 0);
-  const estimateSize = useCallback(() => ROW_HEIGHTS[viewMode] ?? 320, [viewMode]);
+  const vehicleRowCount = Math.ceil(vehicles.length / cols);
+
+  // In grid mode with stat cards, inject a stat row every N vehicle rows
+  const useStatCards = viewMode === 'grid' && !!renderStatCard && statCardInterval > 0;
+  const statCardCount = useStatCards ? Math.floor(vehicleRowCount / statCardInterval) : 0;
+  const rowCount = vehicleRowCount + statCardCount + (hasNextPage ? 1 : 0);
+
+  /** Map virtual row index → { type, vehicleRowIndex, statCardIndex } */
+  const resolveRow = useCallback((virtualIdx: number) => {
+    if (!useStatCards) return { type: 'vehicle' as const, vehicleRowIdx: virtualIdx };
+    // Every (statCardInterval + 1) rows, one is a stat card (at position statCardInterval)
+    const groupSize = statCardInterval + 1;
+    const group = Math.floor(virtualIdx / groupSize);
+    const offset = virtualIdx % groupSize;
+    if (offset === statCardInterval) {
+      return { type: 'stat' as const, statCardIdx: group };
+    }
+    return { type: 'vehicle' as const, vehicleRowIdx: group * statCardInterval + offset };
+  }, [useStatCards, statCardInterval]);
+
+  const STAT_CARD_HEIGHT = 48;
+  const estimateSize = useCallback((idx: number) => {
+    if (useStatCards) {
+      const row = resolveRow(idx);
+      if (row.type === 'stat') return STAT_CARD_HEIGHT;
+    }
+    return ROW_HEIGHTS[viewMode] ?? 320;
+  }, [viewMode, useStatCards, resolveRow]);
 
   const virtualizer = useWindowVirtualizer({
     count: rowCount,
@@ -171,7 +203,27 @@ export function FeedLayout({
   return (
     <div style={{ position: 'relative', width: '100%', height: `${virtualizer.getTotalSize()}px` }}>
       {items.map((virtualRow) => {
-        const startIdx = virtualRow.index * cols;
+        const resolved = resolveRow(virtualRow.index);
+
+        // Stat card row
+        if (resolved.type === 'stat' && renderStatCard) {
+          return (
+            <div
+              key={`stat-${virtualRow.key}`}
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: 'absolute', top: 0, left: 0, width: '100%',
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              {renderStatCard(resolved.statCardIdx!)}
+            </div>
+          );
+        }
+
+        const vehicleRowIdx = resolved.vehicleRowIdx!;
+        const startIdx = vehicleRowIdx * cols;
         const isLoaderRow = startIdx >= vehicles.length;
 
         return (

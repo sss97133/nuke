@@ -19,7 +19,7 @@ export interface MakeMarketStats {
   avg_price: number;
   median_price: number;
   sell_through_pct: number;
-  top_models: { model: string; count: number }[];
+  top_models: { model: string; count: number; avg_price: number }[];
   sentiment_score: number | null;
   demand_high_pct: number | null;
 }
@@ -28,8 +28,8 @@ export interface ModelMarketStats {
   total_listings: number;
   avg_price: number;
   median_price: number;
-  p25_price: number;
-  p75_price: number;
+  p25_price: number | null;
+  p75_price: number | null;
   avg_days_on_market: number;
   trend_direction: 'up' | 'down' | 'stable';
   heat_score_avg: number | null;

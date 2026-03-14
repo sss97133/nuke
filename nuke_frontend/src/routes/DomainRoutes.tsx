@@ -58,8 +58,7 @@ const InvoiceManager = React.lazy(() => import('../pages/InvoiceManager'));
 const ImportDataPage = React.lazy(() => import('../pages/ImportDataPage'));
 const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
 
-// Feed v2 (new composable feed)
-const FeedPage = React.lazy(() => import('../feed/components/FeedPage'));
+// Feed v2 now promoted to main feed (served via HomePage feed tab)
 
 // Acquisition Pipeline
 const AcquisitionPipeline = React.lazy(() => import('../pages/AcquisitionPipeline'));
@@ -129,8 +128,8 @@ export const DomainRoutes = () => {
         <Route path="/test-contributions" element={<Navigate to="/admin/test-contributions" replace />} />
 
         {/* ── Public pages ─────────────────────────────────────────────── */}
-        {/* Feed v2 — new composable feed (testing route) */}
-        <Route path="/feed-v2" element={<FeedPage />} />
+        {/* /feed-v2 promoted to main feed tab — redirect for any bookmarks */}
+        <Route path="/feed-v2" element={<Navigate to="/?tab=feed" replace />} />
 
         {/* Search + Browse: public */}
         <Route path="/search" element={<Search />} />
