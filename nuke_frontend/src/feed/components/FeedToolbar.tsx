@@ -48,7 +48,7 @@ const chipBase: CSSProperties = {
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '0.3px',
-  padding: '3px 6px',
+  padding: '5px 8px',
   border: '1px solid var(--border)',
   background: 'transparent',
   color: 'var(--text-secondary)',

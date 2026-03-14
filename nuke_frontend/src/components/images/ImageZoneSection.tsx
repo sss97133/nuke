@@ -26,23 +26,7 @@ export interface ZoneSectionDef {
  * HIGHLIGHTS is virtual and computed separately.
  */
 export const ZONE_SECTIONS: ZoneSectionDef[] = [
-  // Medium-based sections — match first to pull non-photos out of zone sections
-  {
-    key: 'renders',
-    label: 'RENDERS',
-    match: (img) => img?.image_medium === 'render',
-  },
-  {
-    key: 'drawings',
-    label: 'DRAWINGS',
-    match: (img) => img?.image_medium === 'drawing',
-  },
-  {
-    key: 'screenshots',
-    label: 'SCREENSHOTS',
-    match: (img) => img?.image_medium === 'screenshot',
-  },
-  // Zone sections — only photographs reach here (renders/drawings/screenshots already consumed above)
+  // HIGHLIGHTS removed — highlights should be human-curated, not auto-scored
   {
     key: 'exterior',
     label: 'EXTERIOR',

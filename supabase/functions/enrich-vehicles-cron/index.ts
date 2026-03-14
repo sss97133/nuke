@@ -36,13 +36,13 @@ function okJson(data: unknown, status = 200) {
   });
 }
 
-const SOURCES = ["mecum", "barrett-jackson", "bonhams", "collecting_cars"] as const;
+const SOURCES = ["mecum", "barrett-jackson", "bonhams"] as const;
 
 const SOURCE_TO_EXTRACTOR: Record<string, string> = {
   mecum: "extract-mecum",
   "barrett-jackson": "extract-barrett-jackson",
   bonhams: "extract-bonhams",
-  collecting_cars: "extract-vehicle-data-ai",
+  // collecting_cars removed — extract-vehicle-data-ai has no batch re_enrich action
 };
 
 serve(async (req) => {

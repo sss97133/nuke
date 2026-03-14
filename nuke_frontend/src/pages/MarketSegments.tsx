@@ -298,36 +298,9 @@ export default function MarketSegments() {
                       <div style={{ fontWeight: 900 }}>{formatPct(r.change_30d_pct)}</div>
                     </div>
 
-                    <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '14px' }}>
-                      <div>
-                        <strong>Year</strong>: {r.year_min ?? '—'} to {r.year_max ?? '—'}
-                      </div>
-                      <div>
-                        <strong>Makes</strong>: {r.makes?.length ? r.makes.join(', ') : 'Any'}
-                      </div>
-                      <div>
-                        <strong>Keywords</strong>: {r.model_keywords?.length ? r.model_keywords.join(', ') : 'None'}
-                      </div>
-                      <div>
-                        <strong>Subcategories</strong>:{' '}
-                        {r.subcategory_count && r.subcategory_count > 0 ? (
-                          <span>
-                            {(r.subcategories || []).slice(0, 3).map((sc) => sc.name).join(', ')}
-                            {r.subcategory_count > 3 ? ` (+${r.subcategory_count - 3} more)` : ''}
-                          </span>
-                        ) : (
-                          'None'
-                        )}
-                      </div>
-                    </div>
-
                     {r.description && (
-                      <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text-muted)' }}>{r.description}</div>
+                      <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '16px' }}>{r.description}</div>
                     )}
-
-                    <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                      Slug: <strong style={{ color: 'var(--text)' }}>{r.slug}</strong>
-                    </div>
                   </button>
                 ))}
               </div>

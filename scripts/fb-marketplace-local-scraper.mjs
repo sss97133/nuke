@@ -394,6 +394,26 @@ const NON_AUTO_MAKES_LC = new Set([
   'cessna','piper','beechcraft','mooney','cirrus',
   // Trailers
   'featherlite','sundowner','big tex','load trail','pj trailers',
+  'wells cargo','wells','cargo','haulmark','interstate','pace american',
+  'carry-on','diamond cargo','continental cargo','look','bravo',
+  // More boats that slipped through
+  'shallow sport','hallett','grady white','grady','pro sports',
+  'nitro','ranger boats','blazer boats','skeater','javelin','prodigy',
+  'haynie','dargel','shoalwater','yellowfin','pathfinder','sportsman',
+  'xpress','war eagle','g3','crevalle','tidewater','parker','regulator',
+  'blue wave','carolina skiff','kenner','fountain','sea hunt','sea fox',
+  'sea pro','sea chaser','pioneer','bulls bay','blackjack','blazer bay',
+  'nautic star','nauticstar','scout','everglades','pursuit','albemarle',
+  'grady-white','whaler','flxible','flexible',
+  // More RVs
+  'cardinal','montana','cougar','outback','sprinter','hideout',
+  'rockwood','wildwood','surveyor','salem','puma','catalina',
+  'vogue','georgie boy','prevost','blue bird','bluebird',
+  'country coach','damon','rexhall','american coach',
+  // Construction / Industrial
+  'vermeer','ditch witch','genie','jlg','skyjack','terex',
+  'volvo ce','hyundai ce','daewoo','takeuchi','gehl',
+  'multiquip','wacker','bomag','hamm','dynapac',
 ]);
 
 /**
@@ -417,11 +437,16 @@ const MOTORCYCLE_MODEL_PATTERNS = [
   // Triumph motorcycle models
   /^Bonneville/i, /^Thruxton/i, /^Tiger\b/i, /^Trident/i, /^Trophy/i,
   /^Daytona\b/i, /^Speed\s?Triple/i, /^Sprint/i, /^Scrambler/i, /^Rocket/i,
+  // Malibu boat models (vs Chevrolet Malibu car)
+  /^Wakesetter/i, /^Sunsetter/i, /^Sunscape/i, /^Response/i, /^Tantrum/i,
+  /^VLX/i, /^LSV/i, /^TXi/i, /^M\d{2}/i,
   // Generic non-auto keywords in model field
   /Motorcycle/i, /Dirt\s?Bike/i, /Sport\s?Bike/i, /Chopper/i, /Bobber/i,
   /\bATV\b/i, /\bUTV\b/i, /\bQuad\b/i, /Scooter/i, /Moped/i,
   /Jet\s?Ski/i, /Wave\s?Runner/i, /Golf\s?Cart/i,
   /Motorhome/i, /Camper\b/i, /\bRV\b/i, /Trailer\b/i, /Tractor\b/i,
+  /\bPontoon\b/i, /\bBass\s?Boat\b/i, /\bSki\s?Boat\b/i, /\bDeck\s?Boat\b/i,
+  /\bBow\s?Rider\b/i, /\bCenter\s?Console\b/i, /\bFlats?\s?Boat\b/i,
 ];
 
 /**
@@ -436,13 +461,13 @@ function classifyVehicle(make, model) {
   if (NON_AUTO_MAKES_LC.has(makeLc)) {
     let vtype = 'MOTORCYCLE'; // default for moto brands
     if (['polaris','arctic cat','can-am','ski-doo'].includes(makeLc)) vtype = 'ATV';
-    if (['sea-doo','sea ray','bayliner','boston whaler','mastercraft','chris-craft','wellcraft','chaparral','cobalt','malibu boats','correct craft','riva','rinker','lund','crestliner','bennington','grumman','glastron','skeeter','tracker'].includes(makeLc)) vtype = 'BOAT';
-    if (['fleetwood','winnebago','airstream','coachmen','jayco','keystone','forest river','thor','newmar','tiffin','starcraft','heartland','dutchmen','grand design','entegra','gulf stream','coleman','holiday rambler','monaco','flagstaff'].includes(makeLc)) vtype = 'RV';
-    if (['john deere','kubota','caterpillar','bobcat','case ih','new holland','massey ferguson','farmall','allis-chalmers','oliver','agco'].includes(makeLc)) vtype = 'FARM_EQUIPMENT';
-    if (['freightliner','peterbilt','kenworth','mack','hino','western star','autocar','navistar'].includes(makeLc)) vtype = 'COMMERCIAL_TRUCK';
+    if (['sea-doo','sea ray','bayliner','boston whaler','mastercraft','chris-craft','wellcraft','chaparral','cobalt','malibu boats','malibu','correct craft','riva','rinker','lund','crestliner','bennington','grumman','glastron','skeeter','tracker','shallow sport','hallett','grady white','grady','pro sports','nitro','javelin','haynie','dargel','shoalwater','yellowfin','pathfinder','sportsman','xpress','war eagle','g3','crevalle','tidewater','parker','regulator','blue wave','carolina skiff','kenner','fountain','sea hunt','sea fox','sea pro','sea chaser','pioneer','bulls bay','blackjack','blazer bay','nautic star','nauticstar','scout','everglades','pursuit','albemarle','grady-white','whaler','stratos','checkmate','mako','alumacraft','crownline','cajun','ebbtide','stingray','key west','procraft','proline','reinell','robalo','seaswirl','sleekcraft','tollycraft','triton','nautique','prodigy','sea','boston','hydra','baja','sanger','tige','centurion'].includes(makeLc)) vtype = 'BOAT';
+    if (['fleetwood','winnebago','airstream','coachmen','jayco','keystone','forest river','thor','newmar','tiffin','starcraft','heartland','dutchmen','grand design','entegra','gulf stream','coleman','holiday rambler','monaco','flagstaff','itasca','shasta','casita','scamp','a-liner','palomino','foretravel','safari','cardinal','montana','cougar','outback','hideout','rockwood','wildwood','surveyor','salem','puma','catalina','vogue','georgie boy','prevost','blue bird','bluebird','country coach','damon','rexhall','american coach','flxible','flexible'].includes(makeLc)) vtype = 'RV';
+    if (['john deere','kubota','caterpillar','bobcat','case ih','new holland','massey ferguson','farmall','allis-chalmers','oliver','agco','case','yanmar','komatsu','deere','deutz','vermeer','ditch witch','genie','jlg','skyjack','terex','takeuchi','gehl'].includes(makeLc)) vtype = 'FARM_EQUIPMENT';
+    if (['freightliner','peterbilt','kenworth','mack','hino','western star','autocar','navistar','peterbuilt','frieghtliner','mci'].includes(makeLc)) vtype = 'COMMERCIAL_TRUCK';
     if (['ezgo','club car','cushman','gem'].includes(makeLc)) vtype = 'GOLF_CART';
     if (['cessna','piper','beechcraft','mooney','cirrus'].includes(makeLc)) vtype = 'AIRCRAFT';
-    if (['featherlite','sundowner','big tex','load trail','pj trailers'].includes(makeLc)) vtype = 'TRAILER';
+    if (['featherlite','sundowner','big tex','load trail','pj trailers','wells cargo','wells','haulmark','interstate','pace american','carry-on','diamond cargo','continental cargo','look','bravo','wabash','dorsey','trailmobile','sooner','shorelander','zieman'].includes(makeLc)) vtype = 'TRAILER';
     return { isAuto: false, vehicleType: vtype };
   }
 
@@ -950,8 +975,10 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
         .from("vehicle_images")
         .insert(imgRows);
 
-      if (!imgErr) {
-        result.imagesInserted = newImages.length;
+      if (imgErr) {
+        console.error(`    vehicle_images insert error: ${imgErr.message}`);
+      } else {
+        result.imagesInserted = imgRows.length;
       }
     }
   }

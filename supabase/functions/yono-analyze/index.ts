@@ -74,6 +74,7 @@ interface AnalysisResult {
   modification_flags: string[];
   interior_quality: number | null;
   photo_quality: number;
+  image_medium?: string; // photograph, render, drawing, screenshot
   ms: number;
   model: string;
   image_url: string;
@@ -131,6 +132,9 @@ async function writeToDb(
       damage_flags: result.damage_flags,
       modification_flags: result.modification_flags,
       photo_quality_score: result.photo_quality,
+      // image_medium is NOT written here — Gemini Flash (photo-pipeline-orchestrator) is
+      // the authority for this field. YONO's _detect_medium() stays in server.py for
+      // standalone /analyze calls but the edge function defers to Gemini.
       vision_analyzed_at: new Date().toISOString(),
       vision_model_version: result.model,
     })

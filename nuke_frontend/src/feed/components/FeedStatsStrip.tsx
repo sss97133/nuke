@@ -75,7 +75,7 @@ export function FeedStatsStrip({ stats, isLoading, searchText, onSearchChange, r
         position: 'sticky',
         top: 'var(--header-height, 48px)',
         zIndex: 20,
-        overflow: 'hidden',
+        overflowX: 'auto',
       }}
     >
       <Stat label="VEHICLES" value={formatCompact(stats.total_vehicles)} />
@@ -121,7 +121,7 @@ export function FeedStatsStrip({ stats, isLoading, searchText, onSearchChange, r
 
       {/* Inline search — right-aligned */}
       {onSearchChange && (
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
           <input
             type="text"
             value={searchText ?? ''}
