@@ -346,8 +346,9 @@ _MOD_KEYWORDS = {
     image=image,
     volumes={"/data": volume},
     secrets=[modal.Secret.from_name("nuke-sidecar-secrets")],
-    min_containers=2,        # keep 2 warm — handles concurrent worker batches without cold start
-    scaledown_window=600,    # keep warm 10 min after last request
+    min_containers=1,        # 1 warm container — keepalive pings every 5min keep it alive
+    max_containers=4,        # cap to prevent container leak
+    scaledown_window=300,    # 5 min — matches keepalive interval
     timeout=600,             # 10 min — batch of 20 images @ ~10s each needs ~200s
 )
 @modal.asgi_app()
@@ -676,6 +677,21 @@ def fastapi_app():
             "zone_classes": len(_zone["zone_codes"]) if _zone else 0,
             "uptime_s": round(time.time() - started_at, 1),
         }
+
+    @api.post("/reload")
+    async def reload_models():
+        """Hot-swap ONNX models from volume without redeploying the app."""
+        nonlocal flat_sess, flat_labels, flat_input, tier1_sess, tier1_input
+        nonlocal family_labels, tier2, tier2_labels, tier2_input
+        try:
+            volume.reload()
+            (flat_sess, flat_labels, flat_input,
+             tier1_sess, tier1_input, family_labels,
+             tier2, tier2_labels, tier2_input) = _load_onnx_models()
+            return {"status": "ok", "flat_classes": len(flat_labels) if flat_labels else 0,
+                    "tier2_families": list(tier2.keys())}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
 
     _FETCH_HEADERS = {
         "User-Agent": "Mozilla/5.0 (compatible; NukeVision/1.0; +https://nuke.ag)",
