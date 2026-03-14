@@ -55,13 +55,13 @@ image = (
         "numpy<2",
         "httpx",
         "supabase",
-        # Florence-2 / vision deps
+        # Florence-2 / vision deps (CUDA build for T4 GPU)
         "torch==2.2.2",
         "transformers==4.49.0",
         "safetensors",
         "einops",
         "timm",
-    ])
+    ], extra_index_url="https://download.pytorch.org/whl/cu121")
     .run_function(_download_florence2)
 )
 
@@ -136,9 +136,10 @@ PHOTO_TYPE_TO_ZONE = {
     image=image,
     volumes={"/data": volume},
     secrets=[modal.Secret.from_name("nuke-sidecar-secrets")],
+    gpu="T4",
     cpu=2,
     memory=4096,  # Florence-2 needs more memory
-    max_containers=20,
+    max_containers=10,
     scaledown_window=60,
     timeout=600,
 )
@@ -197,7 +198,7 @@ class BatchWorker:
         # --- Florence-2 base model ---
         self.florence_model = None
         self.florence_processor = None
-        self.device = torch.device("cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         try:
             from transformers import AutoProcessor, AutoModelForCausalLM
