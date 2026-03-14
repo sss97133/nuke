@@ -97,39 +97,51 @@ export default function VehicleROISummaryCard({ vehicleId }: { vehicleId: string
         <div className="text-small text-muted">ROI unavailable: {error}</div>
       ) : (
         <div className="vehicle-details">
+          {data?.spend?.attributed_spend_usd != null && (
           <div className="vehicle-detail">
             <span>Attributed spend</span>
-            <span className="text font-bold">{formatUSD2(data?.spend?.attributed_spend_usd)}</span>
+            <span className="text font-bold">{formatUSD2(data.spend.attributed_spend_usd)}</span>
           </div>
+          )}
+          {data?.value?.current_value_usd != null && (
           <div className="vehicle-detail">
             <span>Current value</span>
-            <span className="text">{formatUSD0(data?.value?.current_value_usd ?? null)}</span>
+            <span className="text">{formatUSD0(data.value.current_value_usd)}</span>
           </div>
+          )}
+          {data?.value?.value_30d_ago_usd != null && (
           <div className="vehicle-detail">
             <span>Value 30d ago</span>
-            <span className="text">{formatUSD0(data?.value?.value_30d_ago_usd ?? null)}</span>
+            <span className="text">{formatUSD0(data.value.value_30d_ago_usd)}</span>
           </div>
+          )}
+          {data?.value?.delta_30d_usd != null && (
           <div className="vehicle-detail">
             <span>Δ 30d</span>
             <span
               className="text"
               style={{
-                color: (data?.value?.delta_30d_usd ?? 0) >= 0 ? '#008000' : '#800000'
+                color: data.value.delta_30d_usd >= 0 ? '#008000' : '#800000'
               }}
             >
-              {formatUSD0(data?.value?.delta_30d_usd ?? null)}
+              {formatUSD0(data.value.delta_30d_usd)}
             </span>
           </div>
+          )}
+          {data?.roi?.roi_30d != null && (
           <div className="vehicle-detail">
             <span>ROI (30d)</span>
             <span className="text" style={{ fontFamily: 'var(--font-mono, monospace)' }}>
-              {formatPct2(data?.roi?.roi_30d ?? null)}
+              {formatPct2(data.roi.roi_30d)}
             </span>
           </div>
+          )}
+          {data?.roi?.event_value_impact_sum != null && (
           <div className="vehicle-detail">
             <span>Event value impact (sum)</span>
-            <span className="text">{formatUSD0(data?.roi?.event_value_impact_sum ?? null)}</span>
+            <span className="text">{formatUSD0(data.roi.event_value_impact_sum)}</span>
           </div>
+          )}
           <div className="text-small text-muted" style={{ marginTop: '8px' }}>
             Derived from receipts/work orders (spend) and valuation series (value delta). This is best-effort until all costs are attributed.
           </div>

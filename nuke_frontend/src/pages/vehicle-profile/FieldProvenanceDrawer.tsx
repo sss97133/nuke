@@ -181,7 +181,7 @@ const S = {
 
   verifiedTag: {
     fontFamily: 'Arial, Helvetica, sans-serif',
-    fontSize: '7px',
+    fontSize: '8px',
     fontWeight: 700,
     letterSpacing: '0.06em',
     padding: '0px 3px',
@@ -208,7 +208,7 @@ const S = {
 
   primaryIndicator: {
     fontFamily: 'Arial, Helvetica, sans-serif',
-    fontSize: '7px',
+    fontSize: '8px',
     fontWeight: 700,
     letterSpacing: '0.06em',
     padding: '0px 3px',

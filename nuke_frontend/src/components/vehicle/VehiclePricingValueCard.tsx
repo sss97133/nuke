@@ -116,11 +116,14 @@ export function VehiclePricingValueCard(props: {
     return { rate, amount: Math.round(base * rate) };
   }, [nukeValue, readinessSnapshot?.readiness_score, (valuationIntel as any)?.confidence_score]);
 
-  const sub = (left: string, right: React.ReactNode, onClick?: () => void) => (
-    <div 
-      style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+  const sub = (left: string, right: React.ReactNode, onClick?: () => void) => {
+    // Hide rows that only show a dash placeholder
+    if (right === '—' || right === '--') return null;
+    return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
         gap: 10,
         cursor: onClick ? 'pointer' : 'default',
         padding: '2px 4px',
@@ -143,6 +146,7 @@ export function VehiclePricingValueCard(props: {
       <div style={{ fontSize: '11px' }}>{right}</div>
     </div>
   );
+  };
 
   return (
     <>
@@ -164,6 +168,7 @@ export function VehiclePricingValueCard(props: {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {/* Market lane */}
+          {(liveBid || highBid || (sold && salePrice) || auctionPulse?.bid_count) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ fontSize: '12px', fontWeight: 800 }}>Market (observed)</div>
             {sub('Live bid', liveBid ? (
@@ -189,20 +194,23 @@ export function VehiclePricingValueCard(props: {
 
             {sub('Outcome', sold ? 'sold' : (auctionOutcome || listingStatus || '—'), () => listingUrl && window.open(listingUrl, '_blank'))}
 
-            {/* Auction stats */}
             {sub('Bids', typeof auctionPulse?.bid_count === 'number' ? auctionPulse.bid_count.toLocaleString() : '—')}
             {sub('Comments', typeof auctionPulse?.comment_count === 'number' ? auctionPulse.comment_count.toLocaleString() : '—')}
             {sub('Views', typeof auctionPulse?.view_count === 'number' && auctionPulse.view_count > 0 ? auctionPulse.view_count.toLocaleString() : '—')}
             {sub('Watchers', typeof auctionPulse?.watcher_count === 'number' && auctionPulse.watcher_count > 0 ? auctionPulse.watcher_count.toLocaleString() : '—')}
           </div>
+          )}
 
           {/* Owner lane */}
+          {askingPrice && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ fontSize: '12px', fontWeight: 800 }}>Owner (intent)</div>
-            {sub('Asking', askingPrice ? <span style={{ fontWeight: 700 }}>{formatUsd(askingPrice)}</span> : '—', () => askingPrice && setShowHistory(true))}
+            {sub('Asking', <span style={{ fontWeight: 700 }}>{formatUsd(askingPrice)}</span>, () => setShowHistory(true))}
           </div>
+          )}
 
           {/* Nuke lane */}
+          {(nukeValue || typeof (valuationIntel as any)?.confidence_score === 'number') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ fontSize: '12px', fontWeight: 800 }}>Nuke (marks)</div>
             {sub('Nuke value', nukeValue ? <span style={{ fontWeight: 800 }}>{formatUsd(nukeValue)}</span> : '—', () => nukeValue && setShowAnalysis(true))}
@@ -213,21 +221,19 @@ export function VehiclePricingValueCard(props: {
               ? `${readinessSnapshot!.missing_items!.length} items`
               : '—', () => readinessSnapshot?.missing_items && readinessSnapshot.missing_items.length > 0 && window.scrollTo({ top: document.getElementById('vehicle-proof-tasks')?.offsetTop || 0, behavior: 'smooth' }))}
           </div>
+          )}
 
           {/* Finance preview */}
+          {financePreview && (financePreview.rate > 0 || financePreview.amount) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ fontSize: '12px', fontWeight: 800 }}>Finance (preview)</div>
-            {sub('Advance rate', financePreview ? `${Math.round((financePreview.rate || 0) * 100)}%` : '—', () => financePreview && setShowAnalysis(true))}
-            {sub('Max loan', (financePreview && financePreview.amount) ? <span style={{ fontWeight: 800 }}>{formatUsd(financePreview.amount)}</span> : '—', () => financePreview?.amount && setShowAnalysis(true))}
+            {sub('Advance rate', `${Math.round((financePreview.rate || 0) * 100)}%`, () => setShowAnalysis(true))}
+            {sub('Max loan', financePreview.amount ? <span style={{ fontWeight: 800 }}>{formatUsd(financePreview.amount)}</span> : '—', () => financePreview?.amount && setShowAnalysis(true))}
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               Preview only. Final finance policy will key off inspection/evidence + market liquidity + borrower history.
             </div>
           </div>
-
-          {/* Debug / provenance hint */}
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            Tip: click the main price in the header to view provenance. Live bid is sourced from `vehicle_events` and cached to `vehicles.high_bid`.
-          </div>
+          )}
         </div>
       </CollapsibleWidget>
 

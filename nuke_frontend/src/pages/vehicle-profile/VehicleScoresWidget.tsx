@@ -59,7 +59,7 @@ const VehicleScoresWidget: React.FC = () => {
           <span className="widget__db">
             DB
             <span className="widget__db-tooltip">
-              vehicles.condition_rating · vehicles.value_score · vehicles.investment_quality_score · vehicles.provenance_score · vehicles.overall_desirability_score
+              Condition · Value · Investment Quality · Provenance · Desirability
             </span>
           </span>
         </div>
@@ -85,7 +85,6 @@ const VehicleScoresWidget: React.FC = () => {
               </div>
               <div
                 className={`score-row__value ${val == null ? 'score-row__value--null' : ''}`}
-                data-field={score.field}
               >
                 {val != null ? score.format(val) : '--'}
               </div>

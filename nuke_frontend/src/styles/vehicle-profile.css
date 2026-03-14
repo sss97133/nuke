@@ -272,7 +272,7 @@
   margin-top: 4px;
   padding-top: 4px;
   border-top: 1px solid #f0f0f0;
-  font-size: 7px;
+  font-size: 8px;
   color: var(--vp-text-faint);
   font-family: var(--vp-font-mono);
   letter-spacing: 0.02em;
@@ -335,7 +335,7 @@
 .badge-dropdown--visible { display: block; }
 .badge-dropdown__name { font-weight: 700; font-size: 10px; margin-bottom: 4px; text-transform: none; letter-spacing: 0; }
 .badge-dropdown__row { display: flex; justify-content: space-between; font-size: 8px; padding: 1px 0; gap: 8px; text-transform: none; letter-spacing: 0.02em; }
-.badge-dropdown__label { color: var(--vp-pencil); text-transform: uppercase; letter-spacing: 0.08em; font-size: 7px; }
+.badge-dropdown__label { color: var(--vp-pencil); text-transform: uppercase; letter-spacing: 0.08em; font-size: 8px; }
 .badge-dropdown__value { font-weight: 600; text-align: right; }
 
 @keyframes vp-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -364,7 +364,7 @@
   padding: 0 12px;
 }
 .barcode-bar__label-left {
-  font-size: 7px;
+  font-size: 8px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -377,7 +377,7 @@
   pointer-events: none;
 }
 .barcode-bar__label-right {
-  font-size: 7px;
+  font-size: 8px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -465,7 +465,7 @@
 }
 .hm-day-labels span {
   height: 11px;
-  font-size: 7px;
+  font-size: 8px;
   color: var(--vp-pencil);
   display: flex;
   align-items: center;
@@ -496,7 +496,7 @@
 }
 .hm-months span {
   position: absolute;
-  font-size: 7px;
+  font-size: 8px;
   color: var(--vp-pencil);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -531,7 +531,7 @@
   justify-content: space-between;
   margin-top: 6px;
   font-family: var(--vp-font-sans);
-  font-size: 7px;
+  font-size: 8px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -655,7 +655,7 @@
 }
 .widget__count {
   font-family: var(--vp-font-mono);
-  font-size: 7px;
+  font-size: 8px;
   color: var(--vp-text-faint);
   letter-spacing: 0.04em;
 }
@@ -680,7 +680,7 @@
   background: var(--vp-surface);
   border: 1px solid var(--vp-ghost);
   padding: 4px 6px;
-  font-size: 7px;
+  font-size: 8px;
   font-family: var(--vp-font-mono);
   white-space: nowrap;
   z-index: 950;
@@ -730,7 +730,7 @@
 /* View toggle buttons */
 .widget-view-btn {
   font-family: var(--vp-font-sans);
-  font-size: 7px;
+  font-size: 8px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -900,7 +900,7 @@
 .feed-filters { display: flex; gap: 2px; }
 .feed-filter {
   font-family: var(--vp-font-sans);
-  font-size: 7px;
+  font-size: 8px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -955,7 +955,7 @@
 .feed-item__user { font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
 .feed-item__time { color: var(--vp-pencil); }
 .feed-item__source {
-  font-size: 7px;
+  font-size: 8px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 1px 3px;
@@ -963,7 +963,7 @@
   color: var(--vp-text-faint);
 }
 .feed-item__bid-label {
-  font-size: 7px;
+  font-size: 8px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   padding: 1px 4px;
@@ -1000,9 +1000,9 @@
   gap: 2px;
 }
 .aa-arc-stage:last-child { border-right: 1px solid #f0f0f0; }
-.aa-arc-stage__label { font-size: 7px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--vp-pencil); }
+.aa-arc-stage__label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--vp-pencil); }
 .aa-arc-stage__text { font-size: 8px; line-height: 1.4; color: var(--vp-ink); }
-.aa-arc-stage__sentiment { font-size: 7px; font-family: var(--vp-font-mono); color: var(--vp-text-faint); }
+.aa-arc-stage__sentiment { font-size: 8px; font-family: var(--vp-font-mono); color: var(--vp-text-faint); }
 
 .aa-moment {
   display: flex;
@@ -1017,7 +1017,7 @@
 .aa-moment__body { flex: 1; }
 .aa-moment__event { font-weight: 600; color: var(--vp-ink); }
 .aa-moment__impact { color: var(--vp-pencil); font-size: 8px; margin-top: 1px; }
-.aa-moment__shift { font-family: var(--vp-font-mono); font-size: 7px; color: var(--vp-text-faint); }
+.aa-moment__shift { font-family: var(--vp-font-mono); font-size: 8px; color: var(--vp-text-faint); }
 
 .aa-contributor {
   display: flex;
@@ -1043,7 +1043,7 @@
 .service-record__shop { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .service-record__location { font-size: 8px; color: var(--vp-pencil); }
 .service-record__work { font-size: 9px; line-height: 1.5; margin-top: 3px; }
-.service-record__conf { font-size: 7px; color: var(--vp-text-faint); font-family: var(--vp-font-mono); margin-top: 2px; }
+.service-record__conf { font-size: 8px; color: var(--vp-text-faint); font-family: var(--vp-font-mono); margin-top: 2px; }
 
 /* ============ VEHICLE SCORES ============ */
 
@@ -1097,7 +1097,7 @@
 .gallery-toolbar { display: flex; flex-wrap: wrap; gap: 2px; }
 .gallery-btn {
   font-family: var(--vp-font-sans);
-  font-size: 7px;
+  font-size: 8px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1112,7 +1112,7 @@
 .gallery-btn--active { background: var(--vp-ink); color: #fff; border-color: var(--vp-ink); }
 
 .gallery-slider-row { display: flex; align-items: center; gap: 6px; }
-.gallery-slider-label { font-size: 7px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--vp-text-faint); }
+.gallery-slider-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--vp-text-faint); }
 .gallery-slider {
   -webkit-appearance: none;
   appearance: none;
