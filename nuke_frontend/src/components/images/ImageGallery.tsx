@@ -1056,7 +1056,7 @@ const ImageGallery = ({
       // Refresh DB-backed gallery view immediately
       const { data: refreshed, error: refreshErr } = await supabase
         .from('vehicle_images')
-        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags')
+        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags, image_medium')
         .eq('vehicle_id', vehicleId)
         .not('is_document', 'is', true)
         .not('is_duplicate', 'is', true)
@@ -1659,7 +1659,7 @@ const ImageGallery = ({
         const [imageResult, dupCountResult] = await Promise.all([
           supabase
             .from('vehicle_images')
-            .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags')
+            .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags, image_medium')
             .eq('vehicle_id', vehicleId)
             // Filter out documents (treat NULL as false for legacy rows)
             .not('is_document', 'is', true)
@@ -1759,7 +1759,7 @@ const ImageGallery = ({
             console.log(`Refresh attempt ${index + 1}/${refreshAttempts.length} after ${delay}ms...`);
             const { data: refreshedImages, error } = await supabase
               .from('vehicle_images')
-              .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags')
+              .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags, image_medium')
               .eq('vehicle_id', vehicleId)
               .not('is_document', 'is', true)
               .not('is_duplicate', 'is', true)
@@ -1978,7 +1978,7 @@ const ImageGallery = ({
       // Refresh images and notify parent
       const { data: refreshedImages } = await supabase
         .from('vehicle_images')
-        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags')
+        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags, image_medium')
         .eq('vehicle_id', vehicleId)
         // Filter out documents (treat NULL as false)
         .not('is_document', 'is', true)
@@ -3000,6 +3000,81 @@ const ImageGallery = ({
           <p className="text text-muted" style={{ fontSize: '9px' }}>
             Images load progressively for better performance
           </p>
+        </div>
+      )}
+
+      {/* Bulk Medium Tagging Toolbar (select mode) */}
+      {selectMode && selectedImages && selectedImages.size > 0 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '6px 12px',
+          backgroundColor: 'var(--grey-900, #1a1a1a)',
+          borderBottom: '2px solid var(--border)',
+        }}>
+          <span style={{
+            fontSize: '9px',
+            fontWeight: 700,
+            fontFamily: 'Arial, Helvetica, sans-serif',
+            color: 'var(--text-muted)',
+            letterSpacing: '0.5px',
+            marginRight: '4px',
+          }}>
+            MEDIUM
+          </span>
+          {(['photograph', 'render', 'drawing', 'screenshot'] as const).map((m) => {
+            const labels: Record<string, string> = { photograph: 'PHOTO', render: 'RENDER', drawing: 'DRAWING', screenshot: 'SCREEN' };
+            return (
+              <button
+                key={m}
+                onClick={async () => {
+                  if (!selectedImages || selectedImages.size === 0) return;
+                  const ids = Array.from(selectedImages);
+                  const { error } = await supabase
+                    .from('vehicle_images')
+                    .update({ image_medium: m })
+                    .in('id', ids);
+                  if (error) {
+                    console.error('Bulk medium update failed:', error);
+                    return;
+                  }
+                  // Refresh gallery
+                  window.dispatchEvent(new CustomEvent('vehicle_images_updated', { detail: { vehicleId } } as any));
+                  // Update local state
+                  setAllImages(prev => prev.map(img =>
+                    ids.includes(img.id) ? { ...img, image_medium: m } : img
+                  ));
+                  setDisplayedImages(prev => prev.map(img =>
+                    ids.includes(img.id) ? { ...img, image_medium: m } : img
+                  ));
+                  // Clear selection
+                  onSelectionChange?.(new Set());
+                }}
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  fontFamily: 'Arial, Helvetica, sans-serif',
+                  letterSpacing: '0.3px',
+                  border: '2px solid var(--grey-600)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--white, #fff)',
+                  cursor: 'pointer',
+                }}
+              >
+                {labels[m]}
+              </button>
+            );
+          })}
+          <span style={{
+            fontSize: '9px',
+            fontFamily: 'Courier New, monospace',
+            color: 'var(--text-muted)',
+            marginLeft: 'auto',
+          }}>
+            {selectedImages.size} selected
+          </span>
         </div>
       )}
 
