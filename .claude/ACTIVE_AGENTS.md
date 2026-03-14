@@ -45,3 +45,9 @@
 
 
 - 2026-03-13 23:00 | training-data-quality-hardening | Tier 1+2a: confidence recalibration, template expansion, condition scoring, broken trigger fix | touching: yono/, scripts/, DB triggers, surface_observations, vehicle_condition_scores
+
+- 2026-03-14 | full-codebase-audit-cleanup | P0 nav fixes + P1 dead code deletion | touching: src/components/organization/, src/pages/, src/services/, src/hooks/, routes
+
+
+
+- 2026-03-14 | condition-encyclopedia-rebuild | Phases 1-5: service manual ingest, condition knowledge extraction, taxonomy expansion, bridge fixes, re-scoring | touching: scripts/ingest-service-manual.py, scripts/extract-condition-knowledge.py, scripts/expand-condition-taxonomy.py, yono/condition_spectrometer.py, supabase/migrations/
