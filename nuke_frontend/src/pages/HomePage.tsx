@@ -165,7 +165,7 @@ function useSearchPreview(query: string) {
   return { results, loading, noResults };
 }
 
-const CursorHomepage = lazy(() => import('./CursorHomepage'));
+const FeedPage = lazy(() => import('../feed/components/FeedPage'));
 const GarageTab = lazy(() => import('../components/garage/GarageTab'));
 const UnifiedMap = lazy(() => import('../components/map/NukeMap'));
 
@@ -863,7 +863,7 @@ export default function HomePage() {
       <div style={{ flex: 1, overflow: activeTab === 'map' ? 'hidden' : 'auto', background: 'var(--bg)', position: 'relative' }}>
         <Suspense fallback={<TabSkeleton />}>
           {activeTab === 'garage' && <GarageTab dashboard={garage} />}
-          {activeTab === 'feed' && <CursorHomepage />}
+          {activeTab === 'feed' && <FeedPage />}
           {activeTab === 'map' && <UnifiedMap />}
         </Suspense>
       </div>

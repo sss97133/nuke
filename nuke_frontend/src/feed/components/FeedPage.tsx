@@ -16,6 +16,8 @@ import { FeedLayout } from './FeedLayout';
 import { FeedSkeleton } from './FeedSkeleton';
 import { FeedEmptyState } from './FeedEmptyState';
 import { VehicleCard } from './VehicleCard';
+import { BrandHeartbeat } from './heartbeat/BrandHeartbeat';
+import { FeedStatCard } from './FeedStatCard';
 import type { FeedVehicle } from '../types/feed';
 
 export default function FeedPage() {
@@ -30,6 +32,7 @@ export default function FeedPage() {
     setFilters,
     setSortBy,
     setSortDirection,
+    setSearchText,
     setViewMode,
     setCardsPerRow,
     resetAll,
@@ -62,6 +65,18 @@ export default function FeedPage() {
     [viewMode, cardsPerRow, showScores],
   );
 
+  // Brand heartbeat: show when exactly one make is selected
+  const singleMake = filters.makes.length === 1 ? filters.makes[0] : undefined;
+  const singleModel = singleMake && filters.models.length === 1 ? filters.models[0] : undefined;
+
+  // Stat card renderer for FeedLayout
+  const renderStatCard = useCallback(
+    (index: number) => (
+      <FeedStatCard index={index} stats={stats} vehicleCount={vehicles.length} />
+    ),
+    [stats, vehicles.length],
+  );
+
   // CSS custom property for font size control
   const feedStyle = useMemo(() => ({
     '--feed-font-size': `${fontSize}px`,
@@ -76,26 +91,29 @@ export default function FeedPage() {
   return (
     <AuctionClockProvider>
       <div className="fullscreen-content" style={feedStyle}>
-        {/* Stats strip — full width */}
-        <FeedStatsStrip stats={stats} isLoading={feedQuery.isLoading} />
+        {/* Stats strip — full width, includes inline search */}
+        <FeedStatsStrip
+          stats={stats}
+          isLoading={feedQuery.isLoading}
+          searchText={searchText}
+          onSearchChange={setSearchText}
+        />
 
         {/* Toolbar — full width */}
-        <div style={{ padding: '0 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <FeedToolbar
-            sort={sortBy}
-            direction={sortDirection}
-            viewMode={viewMode}
-            cardsPerRow={cardsPerRow}
-            fontSize={fontSize}
-            showScores={showScores}
-            onSortChange={setSortBy}
-            onDirectionChange={setSortDirection}
-            onViewModeChange={setViewMode}
-            onCardsPerRowChange={setCardsPerRow}
-            onFontSizeChange={setFontSize}
-            onToggleScores={() => setShowScores(!showScores)}
-          />
-        </div>
+        <FeedToolbar
+          sort={sortBy}
+          direction={sortDirection}
+          viewMode={viewMode}
+          cardsPerRow={cardsPerRow}
+          fontSize={fontSize}
+          showScores={showScores}
+          onSortChange={setSortBy}
+          onDirectionChange={setSortDirection}
+          onViewModeChange={setViewMode}
+          onCardsPerRowChange={setCardsPerRow}
+          onFontSizeChange={setFontSize}
+          onToggleScores={() => setShowScores(!showScores)}
+        />
 
         {/* Active filter indicator */}
         {hasActiveFilters && (
@@ -141,6 +159,11 @@ export default function FeedPage() {
 
           {/* Main content */}
           <div style={{ flex: 1, minWidth: 0, padding: viewMode === 'grid' ? '4px' : '0' }}>
+            {/* Brand heartbeat — shown when filtering by a single make */}
+            {singleMake && !feedQuery.isLoading && (
+              <BrandHeartbeat make={singleMake} model={singleModel} />
+            )}
+
             {feedQuery.isLoading ? (
               <FeedSkeleton cardsPerRow={cardsPerRow} rows={4} />
             ) : vehicles.length === 0 ? (
@@ -158,6 +181,8 @@ export default function FeedPage() {
                 isFetchingNextPage={feedQuery.isFetchingNextPage}
                 fetchNextPage={() => feedQuery.fetchNextPage()}
                 renderCard={renderCard}
+                renderStatCard={renderStatCard}
+                statCardInterval={5}
               />
             )}
           </div>

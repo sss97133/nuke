@@ -11,6 +11,8 @@ import type { FeedStats } from '../types/feed';
 export interface FeedStatsStripProps {
   stats: FeedStats | null | undefined;
   isLoading?: boolean;
+  searchText?: string;
+  onSearchChange?: (text: string) => void;
 }
 
 const labelStyle: CSSProperties = {
@@ -46,7 +48,7 @@ function formatCompact(n: number): string {
   return n.toLocaleString();
 }
 
-export function FeedStatsStrip({ stats, isLoading }: FeedStatsStripProps) {
+export function FeedStatsStrip({ stats, isLoading, searchText, onSearchChange }: FeedStatsStripProps) {
   if (isLoading || !stats) {
     return (
       <div style={{
@@ -85,6 +87,33 @@ export function FeedStatsStrip({ stats, isLoading }: FeedStatsStripProps) {
       <Stat label="FOR SALE" value={formatCompact(stats.for_sale_count)} />
       {stats.active_auctions > 0 && (
         <Stat label="LIVE" value={String(stats.active_auctions)} color="#ef4444" />
+      )}
+
+      {/* Inline search — right-aligned */}
+      {onSearchChange && (
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+          <input
+            type="text"
+            value={searchText ?? ''}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="SEARCH"
+            aria-label="Search vehicles"
+            style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: '10px',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              padding: '2px 6px',
+              height: '20px',
+              width: '120px',
+              border: '1px solid var(--border)',
+              background: 'var(--bg)',
+              color: 'var(--text)',
+              outline: 'none',
+              borderRadius: 0,
+            }}
+          />
+        </div>
       )}
     </div>
   );
