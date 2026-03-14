@@ -42,7 +42,7 @@ const SOURCE_TO_EXTRACTOR: Record<string, string> = {
   mecum: "extract-mecum",
   "barrett-jackson": "extract-barrett-jackson",
   bonhams: "extract-bonhams",
-  collecting_cars: "extract-collecting-cars",
+  collecting_cars: "extract-vehicle-data-ai",
 };
 
 serve(async (req) => {

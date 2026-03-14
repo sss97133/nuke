@@ -119,7 +119,7 @@ async function reviewSingle(
   let sourceContent = "";
   if (snapshot) {
     // Truncate to 8k chars for Sonnet — enough for review
-    sourceContent = (snapshot.markdown_content || snapshot.raw_html || "").slice(0, 8000);
+    sourceContent = (snapshot.markdown || snapshot.html || "").slice(0, 8000);
   }
 
   const userMessage = `## Extraction to Review
@@ -248,8 +248,8 @@ async function reviewBatch(batchSize: number): Promise<{
       // Get archived content for cross-reference
       const { data: snapshot } = await sb
         .from("listing_page_snapshots")
-        .select("raw_html, markdown_content")
-        .eq("url", item.listing_url)
+        .select("html, markdown")
+        .eq("listing_url", item.listing_url)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -683,8 +683,8 @@ Deno.serve(async (req) => {
 
         const { data: snapshot } = await sb
           .from("listing_page_snapshots")
-          .select("raw_html, markdown_content")
-          .eq("url", item.listing_url)
+          .select("html, markdown")
+          .eq("listing_url", item.listing_url)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();

@@ -414,13 +414,13 @@ async function processBatchFromQueue(
       // Try to get archived content first
       const { data: snapshot } = await sb
         .from("listing_page_snapshots")
-        .select("raw_html, markdown_content")
-        .eq("url", item.listing_url)
-        .order("created_at", { ascending: false })
+        .select("html, markdown")
+        .eq("listing_url", item.listing_url)
+        .order("fetched_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      const content = snapshot?.markdown_content || snapshot?.raw_html || "";
+      const content = snapshot?.markdown || snapshot?.html || "";
 
       let extraction: ExtractionResult;
 
@@ -429,7 +429,7 @@ async function processBatchFromQueue(
         extraction = await extractListing(
           content,
           item.listing_url,
-          snapshot?.markdown_content ? "markdown" : "html",
+          snapshot?.markdown ? "markdown" : "html",
         );
       } else if (item.listing_title) {
         // No archived content, but we have a title — parse that at least

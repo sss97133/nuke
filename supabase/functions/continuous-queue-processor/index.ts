@@ -50,7 +50,7 @@ const SOURCE_CONFIGS: Record<string, SourceConfig> = {
   },
   collectingcars: {
     pattern: "%collectingcars.com%",
-    extractor: "extract-collecting-cars",
+    extractor: "extract-vehicle-data-ai",
     minDelay: 1500,
     maxDelay: 3000,
     sourceIds: ["509ec9f8-fd66-4bde-8e07-a0aa198a6506"],
