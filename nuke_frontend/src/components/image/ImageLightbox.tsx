@@ -463,6 +463,30 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     }
   }, [imageId, isSensitive]);
 
+  // Update image medium (photograph, render, drawing, screenshot)
+  const updateImageMedium = useCallback(async (medium: string) => {
+    if (!imageId) return;
+    const prev = imageMetadata?.image_medium || 'photograph';
+    setImageMetadata((m: any) => m ? { ...m, image_medium: medium } : m);
+    try {
+      const { error } = await supabase
+        .from('vehicle_images')
+        .update({ image_medium: medium })
+        .eq('id', imageId);
+      if (error) {
+        console.error('Error updating image medium:', error);
+        setImageMetadata((m: any) => m ? { ...m, image_medium: prev } : m);
+        toast.error('Failed to update medium');
+      } else {
+        toast.success(`Tagged as ${medium}`);
+        window.dispatchEvent(new CustomEvent('vehicle_images_updated', { detail: { vehicleId } } as any));
+      }
+    } catch (err) {
+      console.error('Error updating image medium:', err);
+      setImageMetadata((m: any) => m ? { ...m, image_medium: prev } : m);
+    }
+  }, [imageId, imageMetadata, vehicleId]);
+
   // Set as primary image
   const setAsPrimary = useCallback(async () => {
     if (!imageId) return;
@@ -884,10 +908,10 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       if (!organizationInfo && imgData.user_id && imgData.source !== 'scraper' && imgData.source !== 'craigslist_scrape' && imgData.source !== 'bat_listing') {
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('id, full_name, username')
+          .select('id, full_name, username, avatar_url')
           .eq('id', imgData.user_id)
           .single();
-        
+
         uploaderInfo = profileData;
       }
       
@@ -936,16 +960,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       }
     }
 
-    // AI Angle - handle gracefully if table doesn't exist or query fails
+    // Resolve canonical angle via spectrum → observations → raw fallback
     try {
-      const { data: angle } = await supabase
-        .from('ai_angle_classifications_audit')
-        .select('*')
-        .eq('image_id', imageId)
-        .maybeSingle();
-      setAngleData(angle || null);
-    } catch (err) {
-      // Table might not exist or RLS might block - set to null
+      const { resolveAngle } = await import('../../utils/resolveAngle');
+      const resolved = await resolveAngle(imageId, imgData.angle);
+      setAngleData(resolved);
+    } catch {
       setAngleData(null);
     }
 
@@ -1414,6 +1434,31 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             SENS
           </button>
           
+          {/* Medium toggle */}
+          {(canEdit || isAdmin) && (
+            <>
+              <div className="h-6 w-[1px] bg-white/20"></div>
+              {(['photograph', 'render', 'drawing', 'screenshot'] as const).map((m) => {
+                const labels: Record<string, string> = { photograph: 'PHOTO', render: 'RENDER', drawing: 'DRAWING', screenshot: 'SCREEN' };
+                const active = (imageMetadata?.image_medium || 'photograph') === m;
+                return (
+                  <button
+                    key={m}
+                    onClick={() => updateImageMedium(m)}
+                    className={`px-2 py-1.5 border-2 text-[8px] font-bold uppercase tracking-wide transition-all duration-150 ${
+                      active
+                        ? 'bg-white text-black border-white'
+                        : 'bg-transparent border-white/20 text-white/50 hover:border-white/50 hover:text-white'
+                    }`}
+                    style={{ fontFamily: 'Arial, sans-serif' }}
+                  >
+                    {labels[m]}
+                  </button>
+                );
+              })}
+            </>
+          )}
+
           {/* AI status indicator - only show retry on failure, subtle status otherwise */}
           {(() => {
             const status = imageMetadata?.ai_processing_status;
@@ -1814,8 +1859,64 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     {isSensitive ? '✓ SENSITIVE (BLURRED)' : 'MARK AS SENSITIVE'}
                   </button>
 
+                  <button
+                    onClick={async () => {
+                      if (!imageId) return;
+                      const { error } = await supabase
+                        .from('vehicle_images')
+                        .update({ image_vehicle_match_status: 'unrelated' })
+                        .eq('id', imageId);
+                      if (error) {
+                        toast.error('Failed to flag image');
+                      } else {
+                        toast.success('Image flagged as junk — hidden from gallery');
+                        onClose();
+                      }
+                    }}
+                    className="w-full py-3 px-4 bg-[#1a1a1a] border-2 border-yellow-500/50 text-yellow-400 text-[10px] font-bold hover:bg-yellow-900/20"
+                    style={{ fontFamily: 'Arial, sans-serif' }}
+                  >
+                    FLAG AS JUNK
+                  </button>
+
+                  {/* Medium type selector */}
                   <div className="border-t-2 border-white/20 pt-3 mt-3">
-                    <button 
+                    <div
+                      style={{
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        fontFamily: 'Arial, sans-serif',
+                        color: 'rgba(255,255,255,0.5)',
+                        letterSpacing: '0.5px',
+                        marginBottom: '8px',
+                      }}
+                    >
+                      MEDIUM
+                    </div>
+                    <div className="grid grid-cols-4 gap-1">
+                      {(['photograph', 'render', 'drawing', 'screenshot'] as const).map((m) => {
+                        const labels: Record<string, string> = { photograph: 'PHOTO', render: 'RENDER', drawing: 'DRAWING', screenshot: 'SCREEN' };
+                        const active = (imageMetadata?.image_medium || 'photograph') === m;
+                        return (
+                          <button
+                            key={m}
+                            onClick={() => { updateImageMedium(m); }}
+                            className={`py-2 border-2 text-[9px] font-bold ${
+                              active
+                                ? 'bg-white text-black border-white'
+                                : 'bg-[#1a1a1a] border-white/30 text-white hover:bg-white/10'
+                            }`}
+                            style={{ fontFamily: 'Arial, sans-serif' }}
+                          >
+                            {labels[m]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="border-t-2 border-white/20 pt-3 mt-3">
+                    <button
                       onClick={() => {
                         if (confirm('Delete this image? This cannot be undone.')) {
                           deleteImage();
@@ -1837,6 +1938,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     imageRecord={imageRecord}
                     imageMetadata={imageMetadata}
                     attribution={attribution}
+                    resolvedAngle={angleData}
                     tags={tags}
                     commentsCount={comments.length}
                     dark
