@@ -835,6 +835,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
             )}
             </>
           )}
+          {vehicle.transmission && (
           <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span>Transmission</span>
             <span
@@ -846,16 +847,13 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               }}
               style={{ cursor: 'pointer' }}
             >
-              {vehicle.transmission ? (
-                vehicle.transmission
-              ) : (
-                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '11px' }}>Unknown</span>
-              )}
+              {vehicle.transmission}
               {resolvedEvidence?.['transmission'] && (
                 <SourceBadge group={resolvedEvidence['transmission']} onClick={() => toggleDrawer('transmission')} />
               )}
             </span>
           </div>
+          )}
           {resolvedEvidence?.['transmission'] && (
             <FieldProvenanceDrawer
               fieldName="transmission"
@@ -865,6 +863,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               onToggle={() => toggleDrawer('transmission')}
             />
           )}
+          {typeof vehicle.mileage === 'number' && Number.isFinite(vehicle.mileage) && vehicle.mileage > 0 && (
           <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span>Mileage</span>
             <span
@@ -876,16 +875,13 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               }}
               style={{ cursor: 'pointer' }}
             >
-              {typeof vehicle.mileage === 'number' && Number.isFinite(vehicle.mileage) && vehicle.mileage > 0 ? (
-                `${vehicle.mileage.toLocaleString()} miles`
-              ) : (
-                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '11px' }}>Unknown</span>
-              )}
+              {`${vehicle.mileage.toLocaleString()} miles`}
               {resolvedEvidence?.['mileage'] && (
                 <SourceBadge group={resolvedEvidence['mileage']} onClick={() => toggleDrawer('mileage')} />
               )}
             </span>
           </div>
+          )}
           {resolvedEvidence?.['mileage'] && (
             <FieldProvenanceDrawer
               fieldName="mileage"
@@ -929,6 +925,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               </span>
             </div>
           )}
+          {sanitizeInlineValue(vehicle.color) && (
           <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span>Color</span>
             <span
@@ -940,12 +937,13 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               }}
               style={{ cursor: 'pointer' }}
             >
-              {sanitizeInlineValue(vehicle.color) || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '11px' }}>Unknown</span>}
+              {sanitizeInlineValue(vehicle.color)}
               {resolvedEvidence?.['color'] && (
                 <SourceBadge group={resolvedEvidence['color']} onClick={() => toggleDrawer('color')} />
               )}
             </span>
           </div>
+          )}
           {resolvedEvidence?.['color'] && (
             <FieldProvenanceDrawer
               fieldName="color"

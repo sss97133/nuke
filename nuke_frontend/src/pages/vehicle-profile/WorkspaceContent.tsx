@@ -29,22 +29,33 @@ const ProfileGallery: React.FC<{
   vehicleId: string;
   vehicleImages: string[];
   fallbackListingImageUrls: string[];
+  leadImageUrl?: string | null;
   vehicle: any;
   onImagesUpdated: () => void;
   galleryView?: GalleryViewMode;
-}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, vehicle, onImagesUpdated, galleryView = 'CATEGORY' }) => (
+}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, leadImageUrl, vehicle, onImagesUpdated, galleryView = 'CATEGORY' }) => {
+  // Build fallback chain: context images → listing images → hero URL → primary_image_url
+  let fallback = vehicleImages.length > 0 ? vehicleImages : fallbackListingImageUrls;
+  if (fallback.length === 0 && leadImageUrl) {
+    fallback = [leadImageUrl];
+  }
+  if (fallback.length === 0 && vehicle?.primary_image_url) {
+    fallback = [vehicle.primary_image_url];
+  }
+  return (
   <React.Suspense fallback={<div className="widget__label" style={{ padding: '10px 16px' }}>Loading gallery...</div>}>
     <ImageGallery
       vehicleId={vehicleId}
       showUpload={false}
-      fallbackImageUrls={vehicleImages.length > 0 ? vehicleImages : fallbackListingImageUrls}
+      fallbackImageUrls={fallback}
       fallbackLabel="Listing"
       fallbackSourceUrl={vehicle?.discovery_url || vehicle?.bat_auction_url || vehicle?.listing_url || undefined}
       onImagesUpdated={onImagesUpdated}
       galleryView={galleryView}
     />
   </React.Suspense>
-);
+  );
+};
 
 // WorkspaceTabBar was removed — all sections render flat in left column.
 // Keep the type alias so WorkspaceContentProps still compiles.
@@ -63,7 +74,7 @@ export interface WorkspaceContentProps {
   onSetReferenceLibraryRefreshKey: (fn: (v: number) => number) => void;
 }
 
-const DEFAULT_LEFT_PCT = 30;
+const DEFAULT_LEFT_PCT = 38;
 
 const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   valuationIntel,
@@ -87,6 +98,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
     canEdit,
     vehicleImages,
     fallbackListingImageUrls,
+    leadImageUrl,
     totalCommentCount,
     isPublic,
     auctionPulse,
@@ -134,7 +146,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   const paneHeight = `calc(100vh - var(--vp-sticky-top))`;
 
   return (
-    <div style={{ paddingBottom: paneHeight }}>
+    <div style={{ paddingBottom: '200px' }}>
       <div
         className="vp-columns"
         style={{
@@ -366,6 +378,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             vehicleId={vehicle.id}
             vehicleImages={vehicleImages}
             fallbackListingImageUrls={fallbackListingImageUrls}
+            leadImageUrl={leadImageUrl}
             vehicle={vehicle}
             onImagesUpdated={() => { reloadVehicle(); reloadTimeline(); reloadImages(); }}
             galleryView={galleryView}

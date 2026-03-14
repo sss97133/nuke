@@ -137,7 +137,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                   borderRadius: '0',
                   padding: '2px 6px',
                   fontFamily: 'Arial, Helvetica, sans-serif',
-                  fontSize: '7px',
+                  fontSize: '8px',
                   fontWeight: 600,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase' as const,

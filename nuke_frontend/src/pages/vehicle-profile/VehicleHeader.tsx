@@ -1596,7 +1596,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       >
         <span style={{ width: 0, height: 0, ...triangleStyle, borderWidth: '4px', borderTopWidth: positive ? '0' : '5px', borderBottomWidth: positive ? '5px' : '0' }} />
         {`${positive ? '+' : ''}${trendPct.toFixed(1)}%`}
-        <span style={{ fontSize: '7px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.08em', textTransform: 'uppercase', color: mutedTextColor, marginLeft: '1px' }}>
+        <span style={{ fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.08em', textTransform: 'uppercase', color: mutedTextColor, marginLeft: '1px' }}>
           {periodLabel}
         </span>
       </span>
