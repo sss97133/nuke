@@ -18,6 +18,10 @@ const ALLOWED_TABLES = new Set([
   "vehicle_surface_templates", "public.vehicle_surface_templates",
   "vehicle_surface_coverage", "public.vehicle_surface_coverage",
   "vehicle_images", "public.vehicle_images",
+  "image_condition_observations", "public.image_condition_observations",
+  "condition_taxonomy", "public.condition_taxonomy",
+  "vehicle_condition_scores", "public.vehicle_condition_scores",
+  "condition_distributions", "public.condition_distributions",
 ])
 const DISALLOWED_TOKENS = [
   "insert",
@@ -134,30 +138,55 @@ Rules:
 - If the request is out of scope, use action="reject" and explain why.
 - Otherwise use action="run" and return SQL.
 - Only SELECT statements. Do not use WITH, INSERT, UPDATE, DELETE, or DDL.
-- Allowed tables: public.vehicles, public.surface_observations, public.vehicle_images, public.vehicle_surface_templates, public.vehicle_surface_coverage (view).
-- vehicles columns: id, year, make, model, status, created_at, updated_at, vin.
-- surface_observations columns: id, vehicle_image_id, vehicle_id, zone, u_min_inches, u_max_inches, v_min_inches, v_max_inches, h_min_inches, h_max_inches, resolution_level, bbox_x, bbox_y, bbox_w, bbox_h, observation_type, label, confidence, metadata, model_version, pass_name, created_at.
-  - observation_type values: 'zone_classify', 'condition', 'modification', 'part', 'damage', 'color', 'label'.
+- Allowed tables: public.vehicles, public.surface_observations, public.vehicle_images, public.vehicle_surface_templates, public.vehicle_surface_coverage (view), public.image_condition_observations, public.condition_taxonomy, public.vehicle_condition_scores, public.condition_distributions.
+
+VEHICLE TABLE:
+- vehicles: id, year, make, model, status, created_at, updated_at, vin.
+
+SURFACE MAPPING (spatial observations at any resolution):
+- surface_observations: id, vehicle_image_id, vehicle_id, zone, u_min_inches, u_max_inches, v_min_inches, v_max_inches, h_min_inches, h_max_inches, resolution_level (0=zone, 1=6x6, 2=2x2, 3=1x1), bbox_x, bbox_y, bbox_w, bbox_h, observation_type, label, confidence, severity (0-1 continuous), lifecycle_state, descriptor_id, region_detail, pass_number (1=broad, 2=contextual, 3=sequence), model_version, pass_name, evidence (jsonb), created_at.
+  - observation_type: 'zone_classify', 'condition', 'modification', 'part', 'damage', 'color', 'label'.
+  - lifecycle_state: 'fresh', 'worn', 'weathered', 'restored', 'palimpsest', 'ghost', 'archaeological'.
   - zone values: ext_front, ext_rear, ext_front_driver, ext_front_passenger, ext_rear_driver, ext_rear_passenger, ext_driver_side, ext_passenger_side, ext_roof, ext_undercarriage, fender_front_driver, fender_front_passenger, fender_rear_driver, fender_rear_passenger, door_driver, door_passenger, int_dashboard, int_steering, int_gauges, int_center_console, int_front_seats, int_rear_seats, int_headliner, int_cargo, int_door_panel_driver, int_door_panel_passenger, mech_engine_bay, mech_exhaust, mech_suspension, mech_transmission, wheel_fl, wheel_fr, wheel_rl, wheel_rr, detail_badge, detail_vin_plate, detail_damage, bed_floor, bed_side_driver, bed_side_passenger, tailgate, other.
-- vehicle_surface_coverage view columns: vehicle_id, year, make, model, zone, image_count, observation_count, max_resolution, observation_types.
-- vehicle_images columns: id, vehicle_id, image_url, vehicle_zone, zone_confidence, condition_score, damage_flags, modification_flags, photo_quality_score.
+- vehicle_surface_coverage (view): vehicle_id, year, make, model, zone, image_count, observation_count, max_resolution, observation_types, avg_severity, max_severity, lifecycle_states, passes_completed, condition_labels, has_physical_coords.
+- vehicle_surface_templates: id, year_start, year_end, make, model, body_style, length_inches, width_inches, height_inches, wheelbase_inches, zone_bounds (jsonb), source.
+
+CONDITION SPECTROMETER (spectral scoring, 0-100):
+- condition_taxonomy: descriptor_id, canonical_key (dot-notation: 'exterior.metal.oxidation'), domain ('exterior'|'interior'|'mechanical'|'structural'|'provenance'), descriptor_type ('adjective'|'mechanism'|'state'), display_label.
+- image_condition_observations: id, image_id, vehicle_id, descriptor_id (FK→condition_taxonomy), severity (0-1), lifecycle_state, zone, region_detail, pass_number, confidence, source, source_version, evidence (jsonb).
+- vehicle_condition_scores: id, vehicle_id, condition_score (0-100), condition_tier ('concours'|'excellent'|'good'|'driver'|'project'|'parts'), percentile_within_ymm, percentile_global, ymm_key, exterior_score (0-30), interior_score (0-20), mechanical_score (0-20), provenance_score (0-15), presentation_score (0-15), lifecycle_state, condition_rarity, zone_coverage.
+- condition_distributions: ymm_key, group_type, group_size, mean_score, median_score, std_dev, percentile_10 through percentile_90, lifecycle_distribution (jsonb).
+
+IMAGES:
+- vehicle_images: id, vehicle_id, image_url, vehicle_zone, zone_confidence, condition_score, damage_flags (text[]), modification_flags (text[]), photo_quality_score.
+
+QUERY RULES:
 - Prefer aggregated answers (COUNT, GROUP BY) when the user asks for totals/top/most.
-- Use btrim/coalesce for make/model:
-  COALESCE(NULLIF(btrim(make), ''), '[unknown]')
-  COALESCE(NULLIF(btrim(model), ''), '[unknown]')
+- Use btrim/coalesce for make/model: COALESCE(NULLIF(btrim(make), ''), '[unknown]'), COALESCE(NULLIF(btrim(model), ''), '[unknown]')
 - ${includeMerged ? "Include" : "Exclude"} vehicles with status = 'merged' by default.
 - If returning rows (not just a single scalar), include LIMIT ${limit}.
 - Today's date (UTC): ${today}
+- Condition is SPECTRAL (0-100 continuous), not binary. Damage is an ADJECTIVE, not an event.
+- Lifecycle states: fresh (new/restored) → worn → weathered → restored → palimpsest (layered history) → ghost (severe) → archaeological (salvage).
+- condition_rarity in vehicle_condition_scores = 1 - CDF(score, ymm_distribution). High rarity = unusual condition for this Y/M/M.
 
-Spatial query examples:
+QUERY EXAMPLES:
 1. "Show me all rust on trucks" →
-   SELECT so.zone, so.label, so.confidence, vi.image_url FROM surface_observations so JOIN vehicle_images vi ON vi.id = so.vehicle_image_id JOIN vehicles v ON v.id = so.vehicle_id WHERE so.label = 'rust' AND so.observation_type = 'condition' LIMIT ${limit}
+   SELECT so.zone, so.label, so.confidence, so.severity, so.lifecycle_state, vi.image_url FROM surface_observations so JOIN vehicle_images vi ON vi.id = so.vehicle_image_id JOIN vehicles v ON v.id = so.vehicle_id WHERE so.label = 'rust' AND so.observation_type = 'condition' LIMIT ${limit}
 2. "Compare fender condition across K10s" →
-   SELECT v.year, so.zone, avg(so.confidence) AS avg_conf, count(*) FROM surface_observations so JOIN vehicles v ON v.id = so.vehicle_id WHERE v.model ILIKE '%K10%' AND so.zone IN ('fender_front_driver','fender_front_passenger','fender_rear_driver','fender_rear_passenger') GROUP BY v.year, so.zone ORDER BY v.year
-3. "Which zones have the most observations?" →
-   SELECT zone, count(*) AS cnt FROM surface_observations GROUP BY zone ORDER BY cnt DESC LIMIT ${limit}
+   SELECT v.year, so.zone, avg(so.severity) AS avg_severity, count(*) FROM surface_observations so JOIN vehicles v ON v.id = so.vehicle_id WHERE v.model ILIKE '%K10%' AND so.zone IN ('fender_front_driver','fender_front_passenger','fender_rear_driver','fender_rear_passenger') GROUP BY v.year, so.zone ORDER BY v.year
+3. "Which zones have the most damage?" →
+   SELECT zone, count(*) AS cnt, avg(severity) AS avg_sev FROM surface_observations WHERE observation_type = 'condition' GROUP BY zone ORDER BY cnt DESC LIMIT ${limit}
 4. "Surface coverage for vehicle X" →
    SELECT * FROM vehicle_surface_coverage WHERE vehicle_id = 'uuid' ORDER BY observation_count DESC
+5. "Show archaeological-state observations on 1970s trucks" →
+   SELECT so.zone, so.label, so.severity, v.year, v.make, v.model FROM surface_observations so JOIN vehicles v ON v.id = so.vehicle_id WHERE so.lifecycle_state = 'archaeological' AND v.year BETWEEN 1970 AND 1979 LIMIT ${limit}
+6. "What's the condition score distribution for Camaros?" →
+   SELECT condition_score, condition_tier, percentile_within_ymm, condition_rarity FROM vehicle_condition_scores WHERE ymm_key ILIKE '%Camaro%' ORDER BY condition_score DESC LIMIT ${limit}
+7. "Which Y/M/M has the highest average condition?" →
+   SELECT ymm_key, mean_score, median_score, group_size FROM condition_distributions WHERE group_type = 'ymm' AND group_size >= 5 ORDER BY mean_score DESC LIMIT ${limit}
+8. "Show me all rust taxonomy descriptors" →
+   SELECT canonical_key, display_label, domain, descriptor_type FROM condition_taxonomy WHERE canonical_key ILIKE '%rust%' OR canonical_key ILIKE '%oxidation%'
 `.trim()
 }
 
