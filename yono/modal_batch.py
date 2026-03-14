@@ -601,9 +601,77 @@ def _fetch_pending(supabase, limit: int = MAX_PENDING) -> list[dict]:
     return resp.data or []
 
 
+_template_cache = {}  # {(make, year): zone_bounds dict or None}
+
+def _get_template_bounds(supabase, make: str, model: str, year: int) -> dict:
+    """Look up vehicle_surface_templates for coordinate resolution. Returns zone_bounds or {}."""
+    if not make or not year:
+        return {}
+    cache_key = (make, model, year)
+    if cache_key in _template_cache:
+        return _template_cache[cache_key]
+
+    try:
+        resp = (
+            supabase.table("vehicle_surface_templates")
+            .select("zone_bounds")
+            .eq("make", make)
+            .lte("year_start", year)
+            .gte("year_end", year)
+            .limit(1)
+            .execute()
+        )
+        if resp.data:
+            bounds = resp.data[0].get("zone_bounds", {})
+            if isinstance(bounds, str):
+                bounds = json.loads(bounds)
+            _template_cache[cache_key] = bounds
+            return bounds
+    except Exception:
+        pass
+
+    _template_cache[cache_key] = {}
+    return {}
+
+
+def _resolve_zone_to_coords(zone_bounds: dict, zone: str) -> dict:
+    """Resolve a zone code to physical inch coordinates."""
+    if not zone_bounds or not zone:
+        return {}
+    bounds = zone_bounds.get(zone)
+    if not bounds:
+        return {}
+    return {
+        "u_min_inches": bounds.get("u_min"),
+        "u_max_inches": bounds.get("u_max"),
+        "v_min_inches": bounds.get("v_min"),
+        "v_max_inches": bounds.get("v_max"),
+        "h_min_inches": bounds.get("h_min"),
+        "h_max_inches": bounds.get("h_max"),
+    }
+
+
+def _get_vehicle_ymm(supabase, vehicle_id: str) -> dict:
+    """Get year/make/model for a vehicle. Cached per batch."""
+    try:
+        resp = (
+            supabase.table("vehicles")
+            .select("year, make, model")
+            .eq("id", vehicle_id)
+            .limit(1)
+            .execute()
+        )
+        if resp.data:
+            return resp.data[0]
+    except Exception:
+        pass
+    return {}
+
+
 def _write_results(supabase, results: list[dict]) -> dict:
     """Write full vision results back to vehicle_images + image_descriptions + surface_observations."""
     stats = {"written": 0, "errors": 0, "skipped": 0, "descriptions": 0, "surface_obs": 0}
+    ymm_cache = {}  # vehicle_id → {year, make, model}
 
     for r in results:
         image_id = r.get("id")
@@ -661,51 +729,75 @@ def _write_results(supabase, results: list[dict]) -> dict:
             stats["written"] += 1
 
             # Write surface_observations (spatial layer)
+            # Every observation is spatially anchored. The spectrometer says WHAT,
+            # the surface map says WHERE. Physical coordinates resolve via templates.
             vehicle_id = r.get("vehicle_id")
             if r.get("vehicle_zone") and vehicle_id:
                 try:
-                    obs = {
+                    # Get Y/M/M for template lookup (cached per vehicle)
+                    if vehicle_id not in ymm_cache:
+                        ymm_cache[vehicle_id] = _get_vehicle_ymm(supabase, vehicle_id)
+                    ymm = ymm_cache[vehicle_id]
+                    v_make = ymm.get("make")
+                    v_model = ymm.get("model")
+                    v_year = ymm.get("year")
+
+                    # Resolve zone → physical inch coordinates
+                    zone_bounds = _get_template_bounds(supabase, v_make, v_model, v_year) if v_make else {}
+                    coords = _resolve_zone_to_coords(zone_bounds, r["vehicle_zone"])
+
+                    # Map condition_score (1-5) to lifecycle state
+                    cs = r.get("condition_score")
+                    lifecycle = None
+                    if cs is not None:
+                        if cs >= 5: lifecycle = "fresh"
+                        elif cs >= 4: lifecycle = "worn"
+                        elif cs >= 3: lifecycle = "weathered"
+                        elif cs >= 2: lifecycle = "ghost"
+                        else: lifecycle = "archaeological"
+
+                    # Base fields shared by all observations from this image
+                    base = {
                         "vehicle_image_id": image_id,
                         "vehicle_id": vehicle_id,
                         "zone": r["vehicle_zone"],
-                        "observation_type": "zone_classify",
-                        "label": r["vehicle_zone"],
                         "confidence": r.get("zone_confidence"),
                         "model_version": r.get("vision_model_version"),
-                        "pass_name": "zone_classify",
                         "resolution_level": 0,
-                        "bbox_x": 0.0,
-                        "bbox_y": 0.0,
-                        "bbox_w": 1.0,
-                        "bbox_h": 1.0,
+                        "bbox_x": 0.0, "bbox_y": 0.0, "bbox_w": 1.0, "bbox_h": 1.0,
+                        "lifecycle_state": lifecycle,
+                        "pass_number": 1,
+                        **coords,  # physical inch coordinates (empty dict if no template)
                     }
-                    # Add damage observations as separate rows
-                    obs_rows = [obs]
+
+                    # Zone classify observation
+                    obs_rows = [{
+                        **base,
+                        "observation_type": "zone_classify",
+                        "label": r["vehicle_zone"],
+                        "pass_name": "zone_classify",
+                    }]
+
+                    # Damage observations — each flag becomes a spatially-anchored condition observation
                     for dmg in (r.get("damage_flags") or []):
                         obs_rows.append({
-                            "vehicle_image_id": image_id,
-                            "vehicle_id": vehicle_id,
-                            "zone": r["vehicle_zone"],
+                            **base,
                             "observation_type": "condition",
                             "label": dmg,
-                            "confidence": r.get("zone_confidence"),
-                            "model_version": r.get("vision_model_version"),
                             "pass_name": "damage_scan",
-                            "resolution_level": 0,
+                            "evidence": json.dumps({"raw_flag": dmg}),
                         })
-                    # Add modification observations
+
+                    # Modification observations
                     for mod in (r.get("modification_flags") or []):
                         obs_rows.append({
-                            "vehicle_image_id": image_id,
-                            "vehicle_id": vehicle_id,
-                            "zone": r["vehicle_zone"],
+                            **base,
                             "observation_type": "modification",
                             "label": mod,
-                            "confidence": r.get("zone_confidence"),
-                            "model_version": r.get("vision_model_version"),
                             "pass_name": "mod_scan",
-                            "resolution_level": 0,
+                            "evidence": json.dumps({"raw_flag": mod}),
                         })
+
                     supabase.table("surface_observations").insert(obs_rows).execute()
                     stats["surface_obs"] += len(obs_rows)
                 except Exception as so_err:
