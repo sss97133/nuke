@@ -7,28 +7,30 @@
  *
  * Part of the Provenance UI shipped in the provenance-ui branch.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
+
+/** Track vehicles already backfilled this session to avoid repeat RPC calls */
+const backfilledVehicles = new Set<string>();
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
+/** Maps to actual field_evidence table columns */
 export interface FieldEvidenceRow {
   id: string;
   vehicle_id: string;
   field_name: string;
+  /** DB column: proposed_value — mapped to field_value for UI consumption */
   field_value: string;
   source_type: string;
-  source_id: string | null;
-  source_url: string | null;
+  /** 0-1 float — converted from DB source_confidence (0-100 int) */
   confidence: number;
-  verified: boolean;
-  verified_by: string | null;
-  verification_type: string | null;
-  notes: string | null;
+  extraction_context: string | null;
+  extracted_at: string | null;
+  status: string | null;
   created_at: string;
-  updated_at: string;
 }
 
 export interface FieldEvidenceGroup {
@@ -82,9 +84,9 @@ export function useFieldEvidence(vehicleId: string | undefined) {
     try {
       const { data, error: queryError } = await supabase
         .from('field_evidence')
-        .select('*')
+        .select('id, vehicle_id, field_name, proposed_value, source_type, source_confidence, extraction_context, extracted_at, status, created_at')
         .eq('vehicle_id', vehicleId)
-        .order('confidence', { ascending: false });
+        .order('source_confidence', { ascending: false });
 
       if (queryError) {
         console.warn('[useFieldEvidence] query error:', queryError.message);
@@ -93,14 +95,52 @@ export function useFieldEvidence(vehicleId: string | undefined) {
         return;
       }
 
-      if (!data || data.length === 0) {
-        setEvidence({});
-        return;
+      if (!data || data.length < 3) {
+        // Sparse or no evidence — trigger on-demand backfill
+        if (vehicleId && !backfilledVehicles.has(vehicleId)) {
+          backfilledVehicles.add(vehicleId);
+          try {
+            const { data: inserted } = await supabase.rpc('ensure_field_evidence', { p_vehicle_id: vehicleId });
+            if (inserted && inserted > 0) {
+              // Re-fetch after backfill populated new rows
+              const { data: refreshed } = await supabase
+                .from('field_evidence')
+                .select('id, vehicle_id, field_name, proposed_value, source_type, source_confidence, extraction_context, extracted_at, status, created_at')
+                .eq('vehicle_id', vehicleId)
+                .order('source_confidence', { ascending: false });
+              if (refreshed && refreshed.length > 0) {
+                // Replace data reference and continue to mapping below
+                (data as any[]).length = 0;
+                (data as any[]).push(...refreshed);
+              }
+            }
+          } catch (backfillErr) {
+            console.warn('[useFieldEvidence] backfill error (non-fatal):', backfillErr);
+          }
+        }
+        if (!data || data.length === 0) {
+          setEvidence({});
+          return;
+        }
       }
+
+      // Map DB columns to UI interface
+      const mapped: FieldEvidenceRow[] = (data as any[]).map((r) => ({
+        id: r.id,
+        vehicle_id: r.vehicle_id,
+        field_name: r.field_name,
+        field_value: r.proposed_value ?? '',
+        source_type: r.source_type,
+        confidence: (r.source_confidence ?? 0) / 100, // 0-100 int → 0-1 float
+        extraction_context: r.extraction_context ?? null,
+        extracted_at: r.extracted_at ?? null,
+        status: r.status ?? null,
+        created_at: r.created_at,
+      }));
 
       // Group by field_name
       const grouped: Record<string, FieldEvidenceRow[]> = {};
-      for (const row of data as FieldEvidenceRow[]) {
+      for (const row of mapped) {
         if (!grouped[row.field_name]) grouped[row.field_name] = [];
         grouped[row.field_name].push(row);
       }
@@ -113,7 +153,7 @@ export function useFieldEvidence(vehicleId: string | undefined) {
           if (b.confidence !== a.confidence) return b.confidence - a.confidence;
           const tw = trustWeight(b.source_type) - trustWeight(a.source_type);
           if (tw !== 0) return tw;
-          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
 
         const primary = rows[0];
