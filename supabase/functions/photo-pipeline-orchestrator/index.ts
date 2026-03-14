@@ -576,12 +576,7 @@ async function routeByType(
             }).catch((e: any) => console.warn("[photo-pipeline] escalation-router:", e.message));
           }
 
-          // 3. Auto-detect sessions
-          callEdgeFunction("auto-detect-sessions", {
-            vehicle_id: vehicleId,
-          }).catch((e: any) => console.warn("[photo-pipeline] auto-detect-sessions:", e.message));
-
-          // 4. Before/after detection (if prior zone images exist)
+          // 3. Before/after detection (if prior zone images exist)
           if (yonoResp?.vehicle_zone) {
             const { data: priorImages } = await supabase
               .from("vehicle_images")

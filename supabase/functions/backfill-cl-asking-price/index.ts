@@ -8,9 +8,8 @@
  *  1. Fetch individual CL listing pages
  *  2. Extract price from <span class="price">$N</span> OR JSON-LD "price" field
  *  3. Update acquisition_pipeline.asking_price
- *  4. After backfill, optionally trigger batch-market-proof to re-score
  *
- * Input:  { batch_size?: number, trigger_re_score?: boolean }
+ * Input:  { batch_size?: number }
  * Output: { success, stats: { attempted, updated, expired, failed } }
  */
 
@@ -180,33 +179,6 @@ serve(async (req) => {
 
       // Polite delay — CL rate limits aggressively
       await new Promise((r) => setTimeout(r, 500));
-    }
-
-    // Trigger re-scoring if we updated any and trigger_re_score is set
-    if (triggerReScore && updatedIds.length > 0) {
-      try {
-        console.log(`[re_score] Triggering batch-market-proof for ${updatedIds.length} updated entries...`);
-        const reScoreResp = await fetch(
-          `${supabaseUrl}/functions/v1/batch-market-proof`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${serviceRoleKey}`,
-            },
-            body: JSON.stringify({ stage_filter: 'market_proofed', ids: updatedIds }),
-          },
-        );
-
-        if (!reScoreResp.ok) {
-          console.warn(`[re_score] batch-market-proof returned ${reScoreResp.status}`);
-        } else {
-          const reScoreData = await reScoreResp.json().catch(() => ({}));
-          console.log(`[re_score] Result:`, JSON.stringify(reScoreData).slice(0, 200));
-        }
-      } catch (e) {
-        console.warn(`[re_score] Failed to call batch-market-proof: ${(e as Error).message}`);
-      }
     }
 
     return new Response(

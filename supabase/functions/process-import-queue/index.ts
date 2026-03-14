@@ -122,68 +122,6 @@ serve(async (req) => {
           const extractedVehicle = extractData.extracted || extractData;
           let vehicleId = extractedVehicle.vehicle_id || extractedVehicle.vehicleId || extractData.vehicle_id || extractData.vehicleId || null;
           const qualityScore = extractData.quality_score ?? extractedVehicle.quality_score ?? null;
-          let intelligenceDecision = null;
-
-          // INTELLIGENCE LAYER: Validate before accepting
-          if (use_intelligence && extractedVehicle) {
-            try {
-              const intelligenceResponse = await fetch(supabaseUrl + '/functions/v1/intelligence-evaluate', {
-                method: 'POST',
-                headers: {
-                  'Authorization': 'Bearer ' + Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  extracted_data: extractedVehicle,
-                  source_url: url,
-                  persist_decision: true
-                }),
-                signal: AbortSignal.timeout(30_000),
-              });
-              intelligenceDecision = await intelligenceResponse.json().catch(() => null);
-
-              // If DOUBT or REJECT, don't mark as complete
-              if (intelligenceDecision?.decision === 'REJECT') {
-                await supabase.from('import_queue').update({
-                  status: 'rejected',
-                  error_message: `Intelligence REJECT: ${(intelligenceDecision.reject_reasons || []).join(', ')}`,
-                  attempts: item.attempts + 1,
-                  locked_at: null,
-                  locked_by: null,
-                }).eq('id', item.id);
-                results.push({
-                  id: item.id,
-                  status: 'rejected',
-                  url,
-                  decision: 'REJECT',
-                  reasons: intelligenceDecision.reject_reasons
-                });
-                continue;
-              }
-
-              if (intelligenceDecision?.decision === 'DOUBT') {
-                await supabase.from('import_queue').update({
-                  status: 'pending_review',
-                  error_message: `Intelligence DOUBT: ${(intelligenceDecision.doubts || []).map((d: any) => d.reason).join(', ')}`,
-                  attempts: item.attempts + 1,
-                  locked_at: null,
-                  locked_by: null,
-                }).eq('id', item.id);
-                results.push({
-                  id: item.id,
-                  status: 'pending_review',
-                  url,
-                  decision: 'DOUBT',
-                  doubts: intelligenceDecision.doubts
-                });
-                continue;
-              }
-            } catch (intError: any) {
-              console.error('Intelligence evaluation failed:', intError?.message || intError);
-              // Continue without intelligence if it fails
-            }
-          }
-
           // If extractor returned a quality score, use it to flag low-quality extractions
           const queueStatus = (qualityScore !== null && qualityScore < 0.3) ? 'pending_review' : 'complete';
 
@@ -202,7 +140,7 @@ serve(async (req) => {
             url,
             vehicle_id: vehicleId,
             quality_score: qualityScore,
-            decision: intelligenceDecision?.decision || 'N/A'
+            decision: 'N/A'
           });
         } else {
           const errorMsg = typeof extractData.error === 'string' ? extractData.error : JSON.stringify(extractData.error) || 'Extraction failed';

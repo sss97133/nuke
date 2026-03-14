@@ -587,35 +587,7 @@ Deno.serve(async (req) => {
     // ── 5. Observation Generation ──
     let observationIds: string[] = [];
 
-    if (document_type === "deal_jacket" && vehicleId) {
-      // Use decompose-deal-jacket for rich deal jacket decomposition
-      try {
-        const decomposeResp = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/decompose-deal-jacket`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              extraction_data,
-              vehicle_id: vehicleId,
-              storage_path,
-              queue_id,
-            }),
-            signal: AbortSignal.timeout(30000),
-          }
-        );
-        const decomposeResult = await decomposeResp.json();
-        if (decomposeResult.observation_ids) {
-          observationIds = decomposeResult.observation_ids;
-        }
-      } catch (e) {
-        console.warn("Deal jacket decomposition failed, falling back to generic:", (e as Error).message);
-        observationIds = await generateObservations(vehicleId, document_type, data, storage_path);
-      }
-    } else {
+    if (vehicleId) {
       observationIds = await generateObservations(vehicleId, document_type, data, storage_path);
     }
 
