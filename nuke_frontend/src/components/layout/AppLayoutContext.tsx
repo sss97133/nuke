@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import type { ReactNode, ReactElement } from 'react';
 
 export type VehicleTab = {
@@ -16,6 +16,8 @@ interface AppLayoutContextValue {
   /** Contextual toolbar rendered inside the header-wrapper (sticky, auto-measured). */
   toolbarSlot: ReactElement | null;
   setToolbarSlot: (content: ReactElement | null) => void;
+  /** Stack of recently closed tabs (for reopen-last-closed) */
+  reopenLastClosedTab: () => VehicleTab | undefined;
 }
 
 const AppLayoutContext = createContext<AppLayoutContextValue>({
@@ -27,12 +29,14 @@ const AppLayoutContext = createContext<AppLayoutContextValue>({
   setActiveVehicleTab: () => undefined,
   toolbarSlot: null,
   setToolbarSlot: () => {},
+  reopenLastClosedTab: () => undefined,
 });
 
 export const AppLayoutProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [vehicleTabs, setVehicleTabs] = useState<VehicleTab[]>([]);
   const [activeVehicleId, setActiveVehicleId] = useState<string | undefined>(undefined);
   const [toolbarSlot, setToolbarSlot] = useState<ReactElement | null>(null);
+  const closedTabStackRef = useRef<VehicleTab[]>([]);
 
   const openVehicleTab = useCallback((tab: VehicleTab) => {
     const vid = String(tab.vehicleId || '').trim();
@@ -53,7 +57,13 @@ export const AppLayoutProvider: React.FC<{ children: ReactNode }> = ({ children 
     const vid = String(vehicleId || '').trim();
     if (!vid) return;
 
-    setVehicleTabs((prev) => prev.filter((t) => t.vehicleId !== vid));
+    setVehicleTabs((prev) => {
+      const closing = prev.find((t) => t.vehicleId === vid);
+      if (closing) {
+        closedTabStackRef.current = [closing, ...closedTabStackRef.current].slice(0, 20);
+      }
+      return prev.filter((t) => t.vehicleId !== vid);
+    });
     setActiveVehicleId((prevActive) => (prevActive === vid ? undefined : prevActive));
   }, []);
 
@@ -61,6 +71,14 @@ export const AppLayoutProvider: React.FC<{ children: ReactNode }> = ({ children 
     const vid = vehicleId ? String(vehicleId).trim() : undefined;
     setActiveVehicleId(vid || undefined);
   }, []);
+
+  const reopenLastClosedTab = useCallback(() => {
+    const tab = closedTabStackRef.current.shift();
+    if (tab) {
+      openVehicleTab(tab);
+    }
+    return tab;
+  }, [openVehicleTab]);
 
   const value = useMemo<AppLayoutContextValue>(() => {
     return {
@@ -72,8 +90,9 @@ export const AppLayoutProvider: React.FC<{ children: ReactNode }> = ({ children 
       setActiveVehicleTab,
       toolbarSlot,
       setToolbarSlot,
+      reopenLastClosedTab,
     };
-  }, [vehicleTabs, activeVehicleId, openVehicleTab, closeVehicleTab, setActiveVehicleTab, toolbarSlot]);
+  }, [vehicleTabs, activeVehicleId, openVehicleTab, closeVehicleTab, setActiveVehicleTab, toolbarSlot, reopenLastClosedTab]);
 
   return (
     <AppLayoutContext.Provider value={value}>

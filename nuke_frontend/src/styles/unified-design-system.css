@@ -1053,3 +1053,9 @@ select:focus {
 }
 
 
+
+/* Hover popup fade-in animation */
+@keyframes fadeIn180 {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

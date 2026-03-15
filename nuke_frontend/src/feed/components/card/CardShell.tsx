@@ -93,6 +93,7 @@ export function CardShell({
   return (
     <Link
       to={`/vehicle/${vehicleId}`}
+      state={{ fromFeed: true }}
       style={{ ...baseStyle, ...style }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}

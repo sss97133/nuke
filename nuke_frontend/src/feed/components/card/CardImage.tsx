@@ -5,7 +5,8 @@
  * instead of a useless dark placeholder.
  */
 
-import { useState, type ReactNode, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import ResilientImage from '../../../components/images/ResilientImage';
 
 export interface CardImageProps {
@@ -144,20 +145,50 @@ export function CardImage({
 }: CardImageProps) {
   const hasImage = !!thumbnailUrl;
   const [hovered, setHovered] = useState(false);
+  const [popupPos, setPopupPos] = useState<{ top: number; left: number; flipLeft: boolean } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Technical mode uses contain so cars aren't awkwardly cropped at 48x36
   const effectiveFit = viewMode === 'technical' ? 'contain' : fit;
 
+  const handleMouseEnter = useCallback(() => {
+    if (viewMode !== 'technical' || !hasImage) return;
+    setHovered(true);
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const flipLeft = rect.right + 248 > window.innerWidth;
+      setPopupPos({
+        top: rect.top,
+        left: flipLeft ? rect.left - 248 : rect.right + 8,
+        flipLeft,
+      });
+    }
+  }, [viewMode, hasImage]);
+
+  const handleMouseLeave = useCallback(() => {
+    setHovered(false);
+    setPopupPos(null);
+  }, []);
+
+  // Dismiss on scroll (position goes stale)
+  useEffect(() => {
+    if (!hovered) return;
+    const dismiss = () => { setHovered(false); setPopupPos(null); };
+    window.addEventListener('scroll', dismiss, { passive: true, capture: true });
+    return () => window.removeEventListener('scroll', dismiss, true);
+  }, [hovered]);
+
   return (
     <div
+      ref={containerRef}
       style={{
         ...ASPECT[viewMode],
         background: 'var(--surface-hover)',
         overflow: viewMode === 'technical' ? 'visible' : 'hidden',
         border: viewMode !== 'grid' ? '1px solid var(--border)' : undefined,
       }}
-      onMouseEnter={viewMode === 'technical' && hasImage ? () => setHovered(true) : undefined}
-      onMouseLeave={viewMode === 'technical' && hasImage ? () => setHovered(false) : undefined}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {hasImage ? (
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
@@ -175,20 +206,22 @@ export function CardImage({
       ) : (
         <NoImageBlock data={noImageData} viewMode={viewMode} />
       )}
-      {/* Hover preview for technical (table) view */}
-      {viewMode === 'technical' && hasImage && hovered && (
+      {/* Hover preview for technical (table) view — portaled to body */}
+      {viewMode === 'technical' && hasImage && hovered && popupPos && createPortal(
         <div
           style={{
-            position: 'absolute',
-            top: -4,
-            left: 52,
+            position: 'fixed',
+            top: popupPos.top,
+            left: popupPos.left,
             width: 240,
             height: 180,
-            zIndex: 100,
+            zIndex: 10000,
             border: '2px solid var(--border)',
             background: 'var(--surface)',
             overflow: 'hidden',
             pointerEvents: 'none',
+            opacity: 1,
+            animation: 'fadeIn180 180ms ease-out',
           }}
         >
           <ResilientImage
@@ -201,7 +234,8 @@ export function CardImage({
             optimizeSize="small"
             loading="lazy"
           />
-        </div>
+        </div>,
+        document.body,
       )}
       {children}
     </div>
