@@ -490,6 +490,18 @@ const results = await nuke.search.query('air-cooled porsche under 100k');
       <div style={s.section}>
         <div style={s.label}>SDK</div>
         <Code>{`npm install @nuke1/sdk`}</Code>
+        <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
+          <div style={s.prose}>Or use the REST API directly — no SDK required:</div>
+        </div>
+        <Code>{`# Search vehicles
+curl "https://api.nuke.ag/functions/v1/api-v1-vehicles?make=Porsche&limit=5" \\
+  -H "X-API-Key: nk_live_..."
+
+# Get comparable sales
+curl -X POST "https://api.nuke.ag/functions/v1/api-v1-comps" \\
+  -H "X-API-Key: nk_live_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{"make": "Porsche", "model": "911", "year": 1973}'`}</Code>
         <div style={{ marginTop: 'var(--space-3)' }}>
           <Link to="/developers" style={s.link}>Full API reference &rarr;</Link>
         </div>
@@ -535,7 +547,7 @@ curl -X POST https://api.nuke.ag/functions/v1/api-v1-vision \\
             Production: <span style={s.inlineCode}>nk_live_</span> —
             Sandbox: <span style={s.inlineCode}>nk_test_</span>
           </div>
-          <Link to="/settings/api-keys" style={s.btn}>
+          <Link to="/login?returnUrl=%2Fsettings%2Fapi-keys" style={s.btn}>
             Get API Key
           </Link>
         </div>
