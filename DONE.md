@@ -1,5 +1,17 @@
 # DONE — Completed Work Log
 
+## 2026-03-15
+
+### [pipeline] Vehicle Image Pipeline — Display & Scraping Fix
+- Fix 1: feed-query two-pass image resolution — primary image lookup + fallback RPC `get_first_images_for_vehicles` (DISTINCT ON vehicle_id)
+- Fix 1: Removed post-query thumbnail filter that dropped vehicles from feed results
+- Fix 1: Deployed updated feed-query edge function
+- Fix 2: Backfilled is_primary on ~15,500 vehicles (historical gap — BaT, Barrett-Jackson, FB Marketplace)
+- Fix 2: Synced vehicles.primary_image_url for 255 vehicles where trigger cascade failed
+- Fix 3: Tightened has_photos in vehicle_valuation_feed MV (now requires valid URL, not document, not duplicate)
+- Fix 3: Rebuilt MV with all 9 indexes, reloaded PostgREST schema cache
+- Result: 253,780 vehicles with primary images, 277,616 with usable photos in MV, 0 vehicles with images but missing primary
+
 ## 2026-03-14
 
 ### [pipeline] Image Medium Detection in Photo Pipeline
@@ -3614,3 +3626,49 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - Tiers: 127 excellent, 196 good, 46 driver, 4 project (was: all good/driver)
 - 25 descriptors in use (was: 3), 4 domains with observations (was: 1)
 - Commit: d57b4dc4e + bulk-bridge.py
+
+## 2026-03-15
+
+### [platform-audit] Full Platform Experience Audit
+- Tested all 12 API endpoints with real data. 10 work, 2 broken (vision offline, batch auth)
+- Published SDK v1.3.1 auth is broken (sends service key as X-API-Key). v2.0.0 fixes it.
+- Data quality: 58.5% of active vehicles are skeletons (no image/price/desc)
+- Comment sentiment (api-v1-vehicle-auction) rated 9/10 — only analysis tool that delivers answers
+- Makes list includes "Coca Cola", "The", "Pair" — data quality issues documented
+
+### [strategy] Extraction → Vision Pipeline Strategy
+- Created `extraction-vision-strategy.md` in memory — canonical reference doc
+- Phase 1: Documentation first (text-only). Phase 2: Vision blind + contextual. Phase 3: Discrepancy detection
+- Descriptions are testimony with half-lives, not data. Trim is forensic (SPID vs badges).
+- Comments are rhizomatic (vehicle + user + market + geography + temporal context)
+
+### [library] GM RPO Code Reference Library (15,511 entries)
+- Created `gm_rpo_library` table via migration
+- Parsed 188-page GM VPPS Nov 2002 PDF → 18,080 entries → 15,511 collector-relevant loaded
+- Scraped NastyZ28.com RPO directory → 1,904 unique codes with year ranges (1965-1989)
+- Enriched 1,521 RPO entries with first_year/last_year from NastyZ28 data
+- Categories: 390 engines, 270 transmissions, 487 primary colors, 654 trim combos, 277 wheels, etc.
+
+### [library] PaintRef.com GM Paint Codes (4,828 scraped)
+- Scraped PaintRef.com for 1967-1978 GM paint codes (rate-limited on later years)
+- 4,828 color entries with GM WA codes, color names, make/model, paint system cross-refs
+- Not yet loaded to DB — pending next session
+
+### [prompt] Description Extraction v2 Prompt
+- Wrote 862-line forensic extraction prompt at `prompts/description-extraction-v2.md`
+- Temporal decay model: mechanical (fast), cosmetic (medium), structural (slow), provenance (permanent)
+- Trim evidence extraction: badges, interior appointments, equipment lists, conflicts
+- Vague language detection: flags "recently serviced" with best/worst interpretations
+- Cost estimate: $239 Gemini Flash for all 137K BaT descriptions
+
+### [diagnosis] YMM Knowledge Brittleness
+- 60% of vehicles (339K of 567K) fail YMM profile lookup
+- Root cause: builder coalesces "Camaro Z28" → "Camaro" but runtime constructs "Camaro Z28" key
+- Top misses: 1957 Thunderbird Convertible (559 vehicles), 1965 Mustang Convertible (425)
+- Fix identified: use (year, make, model) columns with suffix-stripping instead of string key
+
+### [diagnosis] Library Raw Data Audit
+- Found 58,864 build posts from 42 forums, 4,922 forum snapshots (464 MB)
+- 365K listing page snapshots (48K pending extraction)
+- 6 GM service manuals (1,111 chunks), 9,649 LMC truck parts catalog
+- 31,585 reference library entries, 128 observation sources with trust scores

@@ -22,7 +22,9 @@
 
 ## CURRENTLY ACTIVE
 
-(none)
+| Agent | Task | Started | Files/Areas |
+|-------|------|---------|-------------|
+| Overnight Research+Build | Library expansion, description extraction, NastyZ28 scrape, BaT data processing strategy | 2026-03-15 01:00 | gm_rpo_library table, description extraction prompts, reference data tables, yono/ |
 
 ---
 
@@ -31,3 +33,4 @@
 | Agent | Task | Completed |
 |-------|------|-----------|
 | Condition Encyclopedia | Full rebuild: manual ingest, knowledge extraction, taxonomy expansion, bridge v2, score-all | 2026-03-14 |
+| Reference Data Auditor | Auditing all reference/library data tables in DB | 2026-03-15 01:30 | read-only audit, no writes |
