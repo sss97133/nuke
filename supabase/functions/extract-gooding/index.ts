@@ -22,6 +22,7 @@ import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
 import { qualityGate } from '../_shared/extractionQualityGate.ts';
 import { cleanVehicleFields, stripHtmlTags } from '../_shared/pollutionDetector.ts';
+import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 
 const EXTRACTOR_VERSION = '2.1.0';
 
@@ -630,8 +631,8 @@ async function saveToDatabase(
       .slice(0, 5000) || null;
   }
 
-  // Quality gate
-  const rawVehicleData: Record<string, any> = {
+  // Normalize fields before quality gate
+  const rawVehicleData: Record<string, any> = normalizeVehicleFields({
     year: extracted.year,
     make: extracted.make,
     model: extracted.model,
@@ -640,7 +641,7 @@ async function saveToDatabase(
     description,
     color: null, // Gooding doesn't provide color directly
     transmission: extracted.transmission,
-  };
+  });
   const cleanedData = cleanVehicleFields(rawVehicleData, { platform: 'gooding' });
   const gate = qualityGate(cleanedData, { source: 'gooding', sourceType: 'auction' });
 

@@ -17,6 +17,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { parseLocation } from "../_shared/parseLocation.ts";
+import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 
 // Extractor versioning - update on each significant change
 const EXTRACTOR_VERSION = 'extract-bat-core:3.0.0';
@@ -1279,6 +1280,9 @@ serve(async (req) => {
         source: 'bat',
       };
 
+      // Normalize fields (transmission, trim, model, body_style, colors)
+      normalizeVehicleFields(insertPayload);
+
       const { data: inserted, error } = await supabase.from("vehicles").insert(insertPayload).select("id").maybeSingle();
       if (error) throw new Error(`vehicles insert failed: ${error?.message || error}`);
       if (!inserted?.id) throw new Error("vehicles insert succeeded but no ID returned");
@@ -1605,6 +1609,9 @@ serve(async (req) => {
       if (!existing?.bat_watchers && essentials.watcher_count) updatePayload.bat_watchers = essentials.watcher_count;
       if (!existing?.bat_bids && essentials.bid_count) updatePayload.bat_bids = essentials.bid_count;
       if (!existing?.bat_comments && essentials.comment_count) updatePayload.bat_comments = essentials.comment_count;
+
+      // Normalize fields (transmission, trim, model, body_style, colors)
+      normalizeVehicleFields(updatePayload);
 
       const { error } = await supabase.from("vehicles").update(updatePayload).eq("id", vehicleId);
       if (error) {
