@@ -33,6 +33,7 @@ function toQueryParams(input: UseFeedQueryInput): FeedQueryParams {
   const sortMap: Record<string, FeedSortField> = {
     newest: 'newest',
     oldest: 'oldest',
+    updated: 'updated',
     deal_score: 'deal_score',
     heat_score: 'heat_score',
     price_high: 'price_high',
@@ -40,6 +41,7 @@ function toQueryParams(input: UseFeedQueryInput): FeedQueryParams {
     year: 'year',
     make: 'make',
     mileage: 'mileage',
+    finds: 'deal_score',
     popular: 'feed_rank',
     volume: 'feed_rank',
     images: 'feed_rank',
