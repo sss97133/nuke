@@ -408,6 +408,13 @@ export function FeedFilterSidebar({
           >
             HAS PHOTOS
           </button>
+          <button
+            type="button"
+            onClick={() => update({ dealer: !filters.dealer })}
+            style={filters.dealer ? chipActiveStyle : chipStyle}
+          >
+            DEALERS
+          </button>
         </div>
       </FilterSection>
 
