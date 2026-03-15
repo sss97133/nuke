@@ -24,13 +24,16 @@
 
 | Agent | Task | Started | Files/Areas |
 |-------|------|---------|-------------|
-| Overnight Research+Build | Library expansion, description extraction, NastyZ28 scrape, BaT data processing strategy | 2026-03-15 01:00 | gm_rpo_library table, description extraction prompts, reference data tables, yono/ |
+| BaT Ingestion Pipeline | Phase 1-6 BaT perfect ingestion — shared parser, test harness, quality gate, Tetris writes, price propagation | 2026-03-15 09:30 | _shared/batParser.ts, _shared/batUpsertWithProvenance.ts, _shared/extractionQualityGate.ts, extract-bat-core/, bat-snapshot-parser/, bat-extraction-test-harness/ |
 
 ---
 
-## COMPLETED (Mar 14)
+## COMPLETED (Mar 15)
 
 | Agent | Task | Completed |
 |-------|------|-----------|
-| Condition Encyclopedia | Full rebuild: manual ingest, knowledge extraction, taxonomy expansion, bridge v2, score-all | 2026-03-14 |
-| Reference Data Auditor | Auditing all reference/library data tables in DB | 2026-03-15 01:30 | read-only audit, no writes |
+| Overnight Research+Build | Library expansion, description extraction, NastyZ28 scrape, BaT data processing strategy | 2026-03-15 09:15 |
+| UI Debug Agent | Popups + vehicle loading investigation, search page debugging | 2026-03-15 08:19 |
+| Agent Ingestion Design | Plan/measure agent-first ingestion API | 2026-03-15 09:15 |
+| Data Quality Cleanup | Phase 1-6 data quality hardening — normalizeVehicle.ts, extractor wiring, batch SQL cleanup, merge guard, quality score | 2026-03-15 10:00 | _shared/normalizeVehicle.ts, import-pcarmarket-listing/, extract-gooding/, extract-barrett-jackson/, haiku-extraction-worker/, merge SQL |
+| BaT Description Analysis | Analyzing deterministic extraction potential from BaT descriptions — regex vs LLM | 2026-03-15 10:00 | /tmp/bat-* analysis scripts, read-only |

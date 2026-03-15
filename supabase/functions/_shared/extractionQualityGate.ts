@@ -15,8 +15,17 @@
  */
 
 import { containsHtml, isPollutedField, cleanFieldValue } from "./pollutionDetector.ts";
+import { validateVINChecksum } from "./intelligence-layer.ts";
+import { normalizeMake, normalizeVehicleFields } from "./normalizeVehicle.ts";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
+
+export interface FieldConfidence {
+  field: string;
+  value: any;
+  confidence: number; // 0-1
+  source: string; // 'json_ld' | 'stats_table' | 'url_slug' | 'essentials_block' | 'html_meta' | etc.
+}
 
 export interface QualityGateResult {
   /** Whether the data passes minimum quality threshold */
@@ -27,8 +36,10 @@ export interface QualityGateResult {
   issues: string[];
   /** Recommended action */
   action: "upsert" | "flag_for_review" | "reject";
-  /** Cleaned vehicle data (HTML stripped, polluted fields nulled) */
+  /** Cleaned vehicle data (HTML stripped, polluted fields nulled, make normalized) */
   cleaned: Record<string, any>;
+  /** Per-field confidence scores (populated when available) */
+  fieldConfidence?: FieldConfidence[];
 }
 
 export interface QualityGateOptions {
@@ -131,27 +142,97 @@ export function qualityGate(
     }
   }
 
+  // ── Check 3b: Make canonicalization ─────────────────────────────────
+  if (data.make && !options.scoreOnly) {
+    const normalized = normalizeMake(data.make);
+    if (normalized && normalized !== data.make) {
+      data.make = normalized;
+    }
+  }
+
+  // ── Check 3c: Apply normalizeVehicleFields ────────────────────────
+  if (!options.scoreOnly) {
+    const normalized = normalizeVehicleFields(data);
+    Object.assign(data, normalized);
+  }
+
+  // ── Check 3d: VIN checksum validation ──────────────────────────────
+  if (data.vin) {
+    const vinStr = String(data.vin).trim().toUpperCase();
+    if (vinStr.length === 17) {
+      // Post-1981 VIN: must pass MOD11 checksum
+      if (/[IOQ]/.test(vinStr)) {
+        issues.push(`vin_invalid_chars: contains I/O/Q`);
+        if (!options.scoreOnly) data.vin = null;
+      } else if (!validateVINChecksum(vinStr)) {
+        issues.push(`vin_checksum_fail: ${vinStr}`);
+        // DOUBT, not reject — could be transcription error. Keep the VIN but flag.
+      }
+    } else if (vinStr.length >= 6 && vinStr.length < 17) {
+      // Pre-1981 chassis number — acceptable, no checksum
+    } else if (vinStr.length < 6) {
+      issues.push(`vin_too_short: ${vinStr.length} chars`);
+      if (!options.scoreOnly) data.vin = null;
+    }
+  }
+
   // ── Check 4: Description presence ───────────────────────────────────
   const hasDescription = Boolean(
     data.description && String(data.description).trim().length > 20,
   );
 
-  // ── Check 5: Price sanity ───────────────────────────────────────────
+  // ── Check 5: Price sanity (era-based bounds) ────────────────────────
   let priceScore = 0;
   const priceFields = ["sale_price", "asking_price", "high_bid"];
+  const year = Number(data.year) || 0;
+
+  // Era-based price bounds: {min, typicalMax, absoluteMax}
+  const getPriceBounds = (yr: number): { min: number; typicalMax: number; absoluteMax: number } => {
+    if (yr >= 2020) return { min: 500, typicalMax: 500_000, absoluteMax: 5_000_000 };
+    if (yr >= 2000) return { min: 200, typicalMax: 500_000, absoluteMax: 5_000_000 };
+    if (yr >= 1970) return { min: 100, typicalMax: 2_000_000, absoluteMax: 20_000_000 };
+    if (yr >= 1950) return { min: 100, typicalMax: 5_000_000, absoluteMax: 50_000_000 };
+    if (yr >= 1920) return { min: 50, typicalMax: 10_000_000, absoluteMax: 100_000_000 };
+    return { min: 50, typicalMax: 20_000_000, absoluteMax: 100_000_000 }; // brass era
+  };
+
+  const bounds = year > 0 ? getPriceBounds(year) : { min: 10, typicalMax: 10_000_000, absoluteMax: 100_000_000 };
+
   for (const field of priceFields) {
     if (data[field] != null) {
       const price = Number(data[field]);
       if (price <= 0) {
         issues.push(`zero_or_negative_${field}: ${price}`);
-      } else if (price < 10 && options.sourceType === "auction") {
-        issues.push(`suspicious_low_${field}: $${price}`);
-      } else if (price > 100_000_000) {
-        issues.push(`unrealistic_${field}: $${price.toLocaleString()}`);
+      } else if (price < bounds.min && options.sourceType === "auction") {
+        issues.push(`suspicious_low_${field}: $${price} (min for era: $${bounds.min})`);
+      } else if (price > bounds.absoluteMax) {
+        issues.push(`unrealistic_${field}: $${price.toLocaleString()} (absolute max: $${bounds.absoluteMax.toLocaleString()})`);
+      } else if (price > bounds.typicalMax) {
+        issues.push(`atypical_high_${field}: $${price.toLocaleString()} (typical max: $${bounds.typicalMax.toLocaleString()})`);
+        priceScore = 0.5; // flag but don't reject
       } else {
         priceScore = 1;
       }
     }
+  }
+
+  // ── Check 5b: Cross-field consistency ──────────────────────────────
+  // Reserve not met + sale_price > 0 = conflict
+  if (
+    String(data.reserve_status || "").toLowerCase() === "reserve_not_met" &&
+    data.sale_price != null && Number(data.sale_price) > 0
+  ) {
+    issues.push("cross_field_conflict: reserve_not_met but sale_price > 0");
+  }
+
+  // Year < 1950 + mileage > 500K = suspicious
+  if (year > 0 && year < 1950 && data.mileage != null && Number(data.mileage) > 500_000) {
+    issues.push(`suspicious_mileage_for_era: ${data.mileage} miles for ${year} vehicle`);
+  }
+
+  // Mileage > 1M = suspicious for any vehicle
+  if (data.mileage != null && Number(data.mileage) > 1_000_000) {
+    issues.push(`extreme_mileage: ${data.mileage}`);
   }
 
   // ── Check 6: Spec completeness ──────────────────────────────────────
