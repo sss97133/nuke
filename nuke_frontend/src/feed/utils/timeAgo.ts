@@ -41,6 +41,7 @@ export function timeAgo(date: string | number | null | undefined): string | null
 export function vehicleTimeLabel(vehicle: {
   sale_date?: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
   auction_end_date?: string | null;
   listing_status?: string | null;
   is_for_sale?: boolean;
@@ -68,6 +69,16 @@ export function vehicleTimeLabel(vehicle: {
   if (vehicle.is_for_sale && vehicle.created_at) {
     const ago = timeAgo(vehicle.created_at);
     return ago ? `listed ${ago}` : null;
+  }
+
+  // If updated_at is significantly newer than created_at (>24h), show "updated"
+  if (vehicle.updated_at && vehicle.created_at) {
+    const updatedTs = new Date(vehicle.updated_at).getTime();
+    const createdTs = new Date(vehicle.created_at).getTime();
+    if (Number.isFinite(updatedTs) && Number.isFinite(createdTs) && updatedTs - createdTs > DAY) {
+      const ago = timeAgo(vehicle.updated_at);
+      return ago ? `updated ${ago}` : null;
+    }
   }
 
   // Default: show when added

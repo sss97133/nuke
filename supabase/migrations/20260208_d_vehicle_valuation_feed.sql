@@ -35,6 +35,17 @@ SELECT
     v.profile_origin,
     v.origin_organization_id,
 
+    -- Location columns
+    v.city,
+    v.state,
+    v.listing_location,
+
+    -- Vehicle type
+    v.canonical_vehicle_type,
+
+    -- Has photos flag
+    EXISTS(SELECT 1 FROM vehicle_images vi WHERE vi.vehicle_id = v.id LIMIT 1) AS has_photos,
+
     -- Price data
     cvp.best_price AS display_price,
     cvp.price_source,
@@ -61,13 +72,13 @@ SELECT
     CASE WHEN rp.record_vehicle_id = v.id THEN true ELSE false END AS is_record_price,
     rp.record_price AS segment_record_price,
 
-    -- Feed ranking
+    -- Feed ranking: use GREATEST(created_at, updated_at) so fresh extractions bubble up
     COALESCE(ne.deal_score, 0) *
         CASE
-            WHEN v.created_at > NOW() - INTERVAL '24 hours' THEN 1.0
-            WHEN v.created_at > NOW() - INTERVAL '3 days' THEN 0.95
-            WHEN v.created_at > NOW() - INTERVAL '7 days' THEN 0.85
-            WHEN v.created_at > NOW() - INTERVAL '30 days' THEN 0.50
+            WHEN GREATEST(v.created_at, v.updated_at) > NOW() - INTERVAL '24 hours' THEN 1.0
+            WHEN GREATEST(v.created_at, v.updated_at) > NOW() - INTERVAL '3 days' THEN 0.95
+            WHEN GREATEST(v.created_at, v.updated_at) > NOW() - INTERVAL '7 days' THEN 0.85
+            WHEN GREATEST(v.created_at, v.updated_at) > NOW() - INTERVAL '30 days' THEN 0.50
             ELSE 0.30
         END
     + COALESCE(ne.heat_score, 0) * 0.3
@@ -93,6 +104,7 @@ CREATE INDEX IF NOT EXISTS idx_vvf_heat_score ON vehicle_valuation_feed(heat_sco
 CREATE INDEX IF NOT EXISTS idx_vvf_make ON vehicle_valuation_feed(make);
 CREATE INDEX IF NOT EXISTS idx_vvf_year ON vehicle_valuation_feed(year);
 CREATE INDEX IF NOT EXISTS idx_vvf_is_record ON vehicle_valuation_feed(is_record_price) WHERE is_record_price = true;
+CREATE INDEX IF NOT EXISTS idx_vvf_updated_at ON vehicle_valuation_feed(updated_at DESC NULLS LAST);
 
 -- ============================================================================
 -- CRON JOB: Refresh materialized view every 15 minutes
