@@ -194,6 +194,7 @@ def _postprocess_entities(entities: list[dict]) -> list[dict]:
 @app.cls(
     image=gliner_image,
     gpu="T4",
+    max_containers=4,  # Max 4 T4 containers (~$3 for full 133K corpus)
     timeout=600,
     retries=1,
     scaledown_window=120,  # Keep warm for 2min between calls
@@ -335,24 +336,42 @@ def main(
         "Content-Type": "application/json",
     }
 
-    # Fetch descriptions from Supabase
-    print(f"[EXTRACT] Fetching {limit} descriptions (offset={offset})...")
-    query_url = (
-        f"{supabase_url}/rest/v1/vehicles"
-        f"?select=id,description,year,make,model"
-        f"&description=not.is.null"
-        f"&order=id"
-        f"&limit={limit}&offset={offset}"
-    )
+    # Fetch descriptions from Supabase with pagination (REST API caps at 1000/request)
+    vehicles = []
+    page_size = 1000
+    current_offset = offset
+    remaining = limit
 
-    req = urllib.request.Request(query_url, headers=headers)
-    resp_raw = urllib.request.urlopen(req, timeout=30)
-    resp_data = json.loads(resp_raw.read().decode())
-    vehicles = resp_data
+    while remaining > 0:
+        fetch_count = min(page_size, remaining)
+        print(f"[EXTRACT] Fetching page (offset={current_offset}, limit={fetch_count})...")
+        query_url = (
+            f"{supabase_url}/rest/v1/vehicles"
+            f"?select=id,description,year,make,model"
+            f"&auction_source=eq.bat"
+            f"&description=not.is.null"
+            f"&status=eq.active"
+            f"&order=id"
+            f"&limit={fetch_count}&offset={current_offset}"
+        )
 
-    # Filter out empty/short descriptions
-    vehicles = [v for v in vehicles if v.get("description") and len(v["description"]) > 50]
-    print(f"[EXTRACT] Got {len(vehicles)} vehicles with substantial descriptions")
+        req = urllib.request.Request(query_url, headers=headers)
+        resp_raw = urllib.request.urlopen(req, timeout=60)
+        page = json.loads(resp_raw.read().decode())
+
+        if not page:
+            break
+
+        # Filter out empty/short descriptions
+        good = [v for v in page if v.get("description") and len(v["description"]) > 50]
+        vehicles.extend(good)
+        current_offset += len(page)
+        remaining -= len(page)
+
+        if len(page) < fetch_count:
+            break  # No more data
+
+    print(f"[EXTRACT] Got {len(vehicles)} vehicles with substantial descriptions (from {current_offset - offset} rows)")
 
     if not vehicles:
         print("[EXTRACT] No descriptions to process.")
