@@ -18,6 +18,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { firecrawlScrape } from '../_shared/firecrawl.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
+import { qualityGate } from '../_shared/extractionQualityGate.ts';
 import { archiveFetch } from '../_shared/archiveFetch.ts';
 
 const VERSION = '1.1.0';
@@ -304,6 +305,19 @@ serve(async (req: Request) => {
           .maybeSingle();
         existing = byVin;
       }
+
+      // Quality gate: validate before writing to vehicles
+      const gateResult = qualityGate(vehicleData, { source: 'jamesedition', sourceType: 'dealer' });
+      if (gateResult.action === 'reject') {
+        console.warn(`[jamesedition] Quality gate rejected (score=${gateResult.score}): ${gateResult.issues.join(', ')}`);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Quality gate rejected extraction',
+          quality_score: gateResult.score,
+          quality_issues: gateResult.issues,
+        }), { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      Object.assign(vehicleData, gateResult.cleaned);
 
       let vehicleId: string;
       if (existing) {

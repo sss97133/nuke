@@ -15,6 +15,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { qualityGate } from "../_shared/extractionQualityGate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -236,6 +237,27 @@ async function processSnapshots(
           // Remove null fields
           for (const [k, v] of Object.entries(newVehicle)) {
             if (v === null || v === undefined) delete newVehicle[k];
+          }
+
+          // Quality gate: validate before creating vehicle
+          const gateResult = qualityGate(newVehicle, {
+            source: opts.platform || 'unknown',
+            sourceType: 'auction',
+          });
+          if (gateResult.action === 'reject') {
+            errors++;
+            if (sampleResults.length < 5) {
+              sampleResults.push({
+                action: "quality_rejected",
+                url: snapshot.listing_url.slice(0, 80),
+                error: `Quality gate rejected (score=${gateResult.score}): ${gateResult.issues.join(', ')}`,
+              });
+            }
+            continue;
+          }
+          Object.assign(newVehicle, gateResult.cleaned);
+          if (gateResult.action === 'flag_for_review') {
+            newVehicle.needs_review = true;
           }
 
           let { error: iErr } = await supabase

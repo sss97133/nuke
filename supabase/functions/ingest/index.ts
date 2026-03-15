@@ -567,10 +567,10 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     normalizeVehicleFields(candidateData);
 
     // 2) VIN cross-check: if VIN present, verify make against VIN prefix
-    // (checksum is already validated by qualityGate — only do make cross-check here)
+    // Handles both modern 17-char and pre-1981 shorter VINs
     const vinIssues: string[] = [];
     const suggestions: Record<string, string> = {};
-    if (candidateData.vin && typeof candidateData.vin === "string" && candidateData.vin.length === 17) {
+    if (candidateData.vin && typeof candidateData.vin === "string" && candidateData.vin.length >= 6) {
       const decoded = decodeVin(candidateData.vin);
       if (decoded.make && candidateData.make) {
         const vinMake = normalizeMake(decoded.make);
@@ -578,6 +578,24 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         if (vinMake && claimedMake && vinMake !== claimedMake) {
           vinIssues.push(`vin_make_mismatch: VIN prefix indicates ${vinMake}, claimed ${claimedMake}`);
           suggestions.make = `VIN indicates ${vinMake}, not ${claimedMake}`;
+        }
+      }
+      // Pre-1981: if VIN decoded a model, cross-check against claimed model
+      if (decoded.is_pre_1981 && decoded.model && candidateData.model) {
+        const vinModel = decoded.model.toLowerCase();
+        const claimedModel = String(candidateData.model).toLowerCase();
+        // Only flag if models are clearly different vehicle lines
+        // e.g. VIN says Corvette but claim says Camaro (or vice versa)
+        const conflictingModels = [
+          ['corvette', 'camaro'], ['corvette', 'chevelle'], ['corvette', 'nova'],
+          ['camaro', 'chevelle'], ['camaro', 'nova'], ['camaro', 'corvette'],
+        ];
+        for (const [a, b] of conflictingModels) {
+          if (vinModel.includes(a) && claimedModel.includes(b)) {
+            vinIssues.push(`vin_model_mismatch: VIN indicates ${decoded.model}, claimed ${candidateData.model}`);
+            suggestions.model = `VIN indicates ${decoded.model}, not ${candidateData.model}`;
+            break;
+          }
         }
       }
     }

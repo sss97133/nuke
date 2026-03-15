@@ -23,6 +23,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
+import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { parseLocation } from "../_shared/parseLocation.ts";
 
 const corsHeaders = {
@@ -735,6 +736,28 @@ serve(async (req) => {
         delete vehicleData[key];
       }
     });
+
+    // Quality gate: validate extraction before writing to vehicles
+    const gateResult = qualityGate(vehicleData, { source: 'carsandbids', sourceType: 'auction' });
+    if (gateResult.action === 'reject') {
+      console.warn(`[quality-gate] REJECTED C&B vehicle (score=${gateResult.score}): ${gateResult.issues.join(', ')}`);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Quality gate rejected extraction',
+        quality_score: gateResult.score,
+        quality_issues: gateResult.issues,
+        url: listingUrl,
+      }), {
+        status: 422,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // Apply cleaned data from quality gate (HTML stripped, fields normalized)
+    Object.assign(vehicleData, gateResult.cleaned);
+    if (gateResult.action === 'flag_for_review') {
+      vehicleData.needs_review = true;
+      vehicleData.quality_issues = gateResult.issues;
+    }
 
     // Check for existing vehicle by URL (use ilike for case-insensitive matching)
     let vehicleId = providedVehicleId;
