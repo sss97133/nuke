@@ -7,10 +7,25 @@
 - Fix 1: Removed post-query thumbnail filter that dropped vehicles from feed results
 - Fix 1: Deployed updated feed-query edge function
 - Fix 2: Backfilled is_primary on ~15,500 vehicles (historical gap — BaT, Barrett-Jackson, FB Marketplace)
-- Fix 2: Synced vehicles.primary_image_url for 255 vehicles where trigger cascade failed
-- Fix 3: Tightened has_photos in vehicle_valuation_feed MV (now requires valid URL, not document, not duplicate)
-- Fix 3: Rebuilt MV with all 9 indexes, reloaded PostgREST schema cache
-- Result: 253,780 vehicles with primary images, 277,616 with usable photos in MV, 0 vehicles with images but missing primary
+- Fix 2: Synced vehicles.primary_image_url for 255 vehicles where trigger cascade failed (check constraint on sibling rows)
+- Fix 3: MV definition change timed out (>120s) — applied non-concurrent REFRESH instead to clear 11K stale has_photos=true phantoms
+- Result: 253,780 vehicles with primary images, 0 vehicles with images but missing primary
+
+### [frontend] BrandHeartbeat crash fix + DEALERS toggle
+- Fixed BrandHeartbeat white-screen crash when filtering by make (PORSCHE etc.)
+  - Root cause: Recharts TreemapCell receives undefined `count` prop during layout — `count.toLocaleString()` crashed
+  - Also added null guard on `d.total_listings`/`d.avg_price` in BrandHeartbeat itself
+- Added DEALERS toggle button to FeedFilterSidebar STATUS section
+  - Wired to existing `filters.dealer` → `include_dealers` API param
+  - Backend already supported it (`origin_organization_id IS NULL` filter)
+- Year filter confirmed working (was blocked by BrandHeartbeat crash)
+
+### [known issues — NOT FIXED]
+- Popups (vehicle card hover/click detail) not working — needs investigation
+- Deep data stats panel not rendering — needs investigation
+- MV `has_photos` definition still uses simple EXISTS (no document/duplicate filter) — CREATE MV times out at 120s
+- 11,066 vehicles have `primary_image_url` set to expired FB CDN URLs but 0 `vehicle_images` rows
+- `vehicle_images_url_scheme_check` constraint blocks trigger cascades on rows with NULL `image_url` — affected ~255 vehicles during backfill
 
 ## 2026-03-14
 
