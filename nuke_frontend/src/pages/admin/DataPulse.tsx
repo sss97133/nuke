@@ -1,15 +1,15 @@
 /**
  * DataPulse — Platform ingestion telemetry page
  *
- * Shows platform health based on heartbeat-aware thresholds,
- * ingestion timelines, and data quality per source.
+ * An agent work queue disguised as a dashboard.
+ * Shows what's broken, what to fix, and where the data gaps are.
  */
 import React, { useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import { useDataPulse } from '../../components/admin/data-pulse/useDataPulse';
 import { CensusSummaryBar } from '../../components/admin/data-pulse/CensusSummaryBar';
+import { NeedsAttention } from '../../components/admin/data-pulse/NeedsAttention';
 import { HeartbeatGroup } from '../../components/admin/data-pulse/HeartbeatGroup';
-import { PlatformCard } from '../../components/admin/data-pulse/PlatformCard';
 import { IngestionTimeline } from '../../components/admin/data-pulse/IngestionTimeline';
 import { DataQualityGrid } from '../../components/admin/data-pulse/DataQualityGrid';
 import { getHeartbeatType, getHealthStatus, HEALTH_COLORS } from '../../components/admin/data-pulse/heartbeatConfig';
@@ -158,8 +158,17 @@ const DataPulse: React.FC = () => {
       {/* Summary Bar */}
       <CensusSummaryBar totals={data.totals} activePlatforms={activePlatforms} />
 
-      {/* Heartbeat Groups */}
+      {/* NEEDS ATTENTION — the agent work queue */}
       <div style={{ marginTop: '16px' }}>
+        <NeedsAttention
+          census={data.census}
+          lastIngested={data.last_ingested || {}}
+          velocity={data.velocity || {}}
+        />
+      </div>
+
+      {/* Heartbeat Groups */}
+      <div>
         {HEARTBEAT_ORDER.map((type) => (
           <HeartbeatGroup
             key={type}
@@ -167,6 +176,7 @@ const DataPulse: React.FC = () => {
             platforms={grouped[type]}
             timeSeries={data.time_series || []}
             lastIngested={data.last_ingested || {}}
+            velocity={data.velocity || {}}
           />
         ))}
       </div>

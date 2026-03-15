@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { PlatformCard } from './PlatformCard';
-import type { CensusRow, TimeSeriesRow } from './useDataPulse';
+import type { CensusRow, TimeSeriesRow, VelocityRow } from './useDataPulse';
 import type { HeartbeatType } from './heartbeatConfig';
 import { getHeartbeatLabel } from './heartbeatConfig';
 
@@ -52,6 +52,7 @@ interface HeartbeatGroupProps {
   platforms: CensusRow[];
   timeSeries: TimeSeriesRow[];
   lastIngested: Record<string, string>;
+  velocity: Record<string, VelocityRow>;
 }
 
 export const HeartbeatGroup: React.FC<HeartbeatGroupProps> = ({
@@ -59,6 +60,7 @@ export const HeartbeatGroup: React.FC<HeartbeatGroupProps> = ({
   platforms,
   timeSeries,
   lastIngested,
+  velocity,
 }) => {
   const [expanded, setExpanded] = useState(true);
 
@@ -87,6 +89,7 @@ export const HeartbeatGroup: React.FC<HeartbeatGroupProps> = ({
                   (t) => t.canonical_platform === census.canonical_platform
                 )}
                 lastIngested={lastIngested[census.canonical_platform] || null}
+                velocity={velocity[census.canonical_platform] || null}
               />
             ))}
         </div>

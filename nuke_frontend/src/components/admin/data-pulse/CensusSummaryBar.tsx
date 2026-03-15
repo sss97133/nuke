@@ -1,5 +1,5 @@
 /**
- * CensusSummaryBar — Top-line big numbers for the Data Pulse page
+ * CensusSummaryBar — Top-line numbers: scale, velocity, and fixable gaps
  */
 import type { CSSProperties } from 'react';
 import type { DataPulseResult } from './useDataPulse';
@@ -28,24 +28,14 @@ function fmt(n: number): string {
   return n.toLocaleString();
 }
 
-function fmtPrice(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
-  return `$${n.toLocaleString()}`;
-}
-
 export function CensusSummaryBar({ totals, activePlatforms }: {
   totals: DataPulseResult['totals'];
   activePlatforms: number;
 }) {
-  const qualityPct = totals.total_vehicles > 0
-    ? Math.round(((totals.with_vin + totals.with_description + totals.sold_with_price) / (totals.total_vehicles * 3)) * 100)
-    : 0;
-
   return (
     <div style={{
       display: 'flex',
-      gap: '24px',
+      gap: '20px',
       padding: '12px 16px',
       border: '2px solid #333',
       background: '#222',
@@ -57,22 +47,28 @@ export function CensusSummaryBar({ totals, activePlatforms }: {
         <div style={label}>TOTAL VEHICLES</div>
       </div>
       <div style={{ textAlign: 'center' }}>
+        <div style={{ ...bigNum, color: totals.added_7d > 0 ? '#16825d' : '#d13438' }}>
+          +{fmt(totals.added_7d)}
+        </div>
+        <div style={label}>THIS WEEK</div>
+      </div>
+      <div style={{ textAlign: 'center' }}>
         <div style={bigNum}>{activePlatforms}</div>
         <div style={label}>PLATFORMS ACTIVE</div>
       </div>
       <div style={{ textAlign: 'center' }}>
-        <div style={bigNum}>{fmt(totals.sold_with_price)}</div>
-        <div style={label}>SOLD W/ PRICE</div>
+        <div style={{ ...bigNum, color: '#d13438' }}>{fmt(totals.missing_vin)}</div>
+        <div style={label}>MISSING VIN</div>
       </div>
       <div style={{ textAlign: 'center' }}>
-        <div style={bigNum}>{fmtPrice(totals.median_sold_price)}</div>
-        <div style={label}>MEDIAN SOLD</div>
+        <div style={{ ...bigNum, color: '#d13438' }}>{fmt(totals.missing_desc)}</div>
+        <div style={label}>MISSING DESC</div>
       </div>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ ...bigNum, color: qualityPct >= 70 ? '#16825d' : qualityPct >= 45 ? '#b05a00' : '#d13438' }}>
-          {qualityPct}%
+        <div style={{ ...bigNum, color: totals.missing_price > 1000 ? '#d13438' : '#b05a00' }}>
+          {fmt(totals.missing_price)}
         </div>
-        <div style={label}>DATA QUALITY</div>
+        <div style={label}>SOLD NO PRICE</div>
       </div>
     </div>
   );
