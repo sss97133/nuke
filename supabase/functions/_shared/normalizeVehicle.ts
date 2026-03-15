@@ -291,7 +291,7 @@ const CANONICAL_BODY_STYLES = new Set([
   'coupe', 'sedan', 'convertible', 'wagon', 'hatchback', 'suv',
   'pickup', 'van', 'roadster', 'targa', 'fastback', 'minivan',
   'limousine', 'cab & chassis', 'suburban', 'truck', 'cabriolet',
-  'shooting brake',
+  'shooting brake', 'hardtop', 'bus',
 ]);
 
 /** Display form of body styles */
@@ -302,8 +302,11 @@ const BODY_STYLE_DISPLAY: Record<string, string> = {
   'targa': 'Targa', 'fastback': 'Fastback', 'minivan': 'Minivan',
   'limousine': 'Limousine', 'cab & chassis': 'Cab & Chassis',
   'suburban': 'Suburban', 'truck': 'Truck', 'cabriolet': 'Cabriolet',
-  'shooting brake': 'Shooting Brake',
+  'shooting brake': 'Shooting Brake', 'hardtop': 'Hardtop', 'bus': 'Bus',
 };
+
+/** Values that should be nulled out */
+const BODY_STYLE_NULLS = new Set(['n/a', 'n/a', 'none', 'other', 'unknown', 'custom', '--', '-']);
 
 /**
  * Normalize a body_style value against canonical list.
@@ -314,16 +317,59 @@ export function normalizeBodyStyle(bodyStyle: string | null | undefined): { body
   const trimmed = bodyStyle.trim();
   if (!trimmed) return { body_style: null };
 
-  // Check canonical match (case-insensitive)
-  const lower = trimmed.toLowerCase();
+  let lower = trimmed.toLowerCase();
+
+  // Null out known garbage values
+  if (BODY_STYLE_NULLS.has(lower)) return { body_style: null };
+
+  // Map Spider/Spyder → Convertible
+  if (lower === 'spider' || lower === 'spyder') return { body_style: 'Convertible' };
+
+  // Check direct canonical match first
   if (CANONICAL_BODY_STYLES.has(lower)) {
     return { body_style: BODY_STYLE_DISPLAY[lower] || trimmed };
   }
 
-  // Check if input contains a canonical style as a substring
+  // Strip slash alternatives: "Convertible/Cabriolet" → "Convertible", "Sedan/Saloon" → "Sedan"
+  if (lower.includes('/')) {
+    const firstPart = lower.split('/')[0].trim();
+    if (CANONICAL_BODY_STYLES.has(firstPart)) {
+      return { body_style: BODY_STYLE_DISPLAY[firstPart] || firstPart };
+    }
+  }
+
+  // Strip prefixes and re-match
+  let stripped = lower;
+  // "Custom 2 Door Coupe" → "2 Door Coupe" → "Coupe"
+  stripped = stripped.replace(/^custom\s+/i, '');
+  // "2 Door Coupe" / "4 Door Sedan" / "2-door Sedan"
+  stripped = stripped.replace(/^\d\s*-?\s*door\s+/i, '');
+  // "Station Wagon" → "Wagon"
+  stripped = stripped.replace(/^station\s+/i, '');
+  // "Sport Utility Vehicle..." → try SUV
+  stripped = stripped.replace(/^sport\s+utility.*$/i, 'suv');
+  // Retry after stripping "Custom" again (handles "Custom 2 Door" → "2 Door" → stripped again)
+  stripped = stripped.replace(/^custom\s+/i, '');
+  stripped = stripped.replace(/^\d\s*-?\s*door\s+/i, '');
+  stripped = stripped.trim();
+
+  if (stripped && CANONICAL_BODY_STYLES.has(stripped)) {
+    return { body_style: BODY_STYLE_DISPLAY[stripped] || stripped };
+  }
+
+  // Check if stripped contains a canonical style as a substring
   for (const canonical of CANONICAL_BODY_STYLES) {
-    if (lower.includes(canonical)) {
+    if (stripped.includes(canonical)) {
       return { body_style: BODY_STYLE_DISPLAY[canonical] || canonical };
+    }
+  }
+
+  // Also check original lower for substring match (e.g. "Woody Wagon" → "Wagon")
+  if (stripped !== lower) {
+    for (const canonical of CANONICAL_BODY_STYLES) {
+      if (lower.includes(canonical)) {
+        return { body_style: BODY_STYLE_DISPLAY[canonical] || canonical };
+      }
     }
   }
 
