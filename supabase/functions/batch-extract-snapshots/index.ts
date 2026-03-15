@@ -158,6 +158,19 @@ serve(async (req) => {
     let fieldsTotal = 0;
     const sampleResults: any[] = [];
 
+    // Helper: read HTML from Supabase Storage when inline html is null
+    async function readHtmlFromStorage(storagePath: string): Promise<string | null> {
+      try {
+        const { data, error } = await supabase.storage
+          .from("listing-snapshots")
+          .download(storagePath);
+        if (error || !data) return null;
+        return await data.text();
+      } catch {
+        return null;
+      }
+    }
+
     for (const vehicle of vehicles) {
       try {
         let snapshotHtml: string | null = null;
@@ -168,14 +181,15 @@ serve(async (req) => {
           if (snapUrl) {
             const { data: snaps } = await supabase
               .from("listing_page_snapshots")
-              .select("html")
+              .select("html, html_storage_path")
               .eq("listing_url", snapUrl)
               .eq("platform", platform)
               .eq("success", true)
-              .not("html", "is", null)
               .limit(1);
             if (snaps?.[0]?.html && snaps[0].html.length > 500) {
               snapshotHtml = snaps[0].html;
+            } else if (snaps?.[0]?.html_storage_path) {
+              snapshotHtml = await readHtmlFromStorage(snaps[0].html_storage_path);
             }
           }
         } else {
@@ -207,18 +221,20 @@ serve(async (req) => {
             }
           }
 
+          // First try inline HTML, then fall back to storage
           const { data: snaps } = await supabase
             .from("listing_page_snapshots")
-            .select("html")
+            .select("html, html_storage_path")
             .in("listing_url", [...normalizedUrls])
             .eq("platform", platform)
             .eq("success", true)
-            .not("html", "is", null)
             .order("fetched_at", { ascending: false })
             .limit(1);
 
           if (snaps?.[0]?.html && snaps[0].html.length > 500) {
             snapshotHtml = snaps[0].html;
+          } else if (snaps?.[0]?.html_storage_path) {
+            snapshotHtml = await readHtmlFromStorage(snaps[0].html_storage_path);
           }
         }
 
@@ -250,6 +266,12 @@ serve(async (req) => {
           continue;
         }
 
+        // Extract primary image URL from HTML (works for all platforms)
+        if (!parsed.primary_image_url && snapshotHtml) {
+          const img = extractPrimaryImage(snapshotHtml, platform);
+          if (img) parsed.primary_image_url = img;
+        }
+
         // Build update payload — only fill missing fields (unless force mode)
         const updatePayload: Record<string, any> = {};
         const fieldsUpdated: string[] = [];
@@ -273,6 +295,7 @@ serve(async (req) => {
           interior_color: "interior_color",
           description: "description",
           sale_price: "sale_price",
+          primary_image_url: "primary_image_url",
         };
 
         for (const [parsedKey, dbField] of Object.entries(fieldMap)) {
@@ -1318,6 +1341,44 @@ function parseBonhamsHtml(html: string): Record<string, any> {
   }
 
   return result;
+}
+
+/**
+ * Extract primary image URL from HTML via og:image, JSON-LD image, or gallery patterns.
+ * Works across all platforms.
+ */
+function extractPrimaryImage(html: string, platform: string): string | null {
+  // 1. og:image meta tag (universal, highest priority)
+  const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+  if (ogImage?.[1]) {
+    const url = ogImage[1].replace(/&amp;/g, '&');
+    if (url.startsWith('http') && !url.includes('logo') && !url.includes('favicon')) return url;
+  }
+
+  // 2. JSON-LD image
+  const ldMatch = html.match(/"image"\s*:\s*"(https?:\/\/[^"]+)"/);
+  if (ldMatch?.[1]) {
+    const url = ldMatch[1].replace(/\\\//g, '/');
+    if (!url.includes('logo') && !url.includes('favicon')) return url;
+  }
+
+  // 3. Platform-specific gallery image patterns
+  if (platform === 'bat') {
+    const batImg = html.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/\d{4}\/\d{2}\/[^"'\s]+\.(?:jpg|jpeg|png|webp)/i);
+    if (batImg?.[0]) return batImg[0];
+  } else if (platform === 'mecum') {
+    const mecumImg = html.match(/https:\/\/(?:www\.)?mecum\.com\/[^"'\s]*\/(?:images?|photos?|gallery)\/[^"'\s]+\.(?:jpg|jpeg|png|webp)/i);
+    if (mecumImg?.[0]) return mecumImg[0];
+  } else if (platform === 'bonhams') {
+    const bonImg = html.match(/https:\/\/[^"'\s]*bonhams[^"'\s]*\.(?:jpg|jpeg|png|webp)/i);
+    if (bonImg?.[0] && !bonImg[0].includes('logo')) return bonImg[0];
+  } else if (platform === 'barrett-jackson') {
+    const bjImg = html.match(/https:\/\/(?:www\.)?barrett-jackson\.com\/[^"'\s]+\.(?:jpg|jpeg|png|webp)/i);
+    if (bjImg?.[0] && !bjImg[0].includes('logo')) return bjImg[0];
+  }
+
+  return null;
 }
 
 // ============================================================
