@@ -854,23 +854,32 @@ Deno.serve(async (req: Request) => {
     }
 
     // Step 4: Create or update vehicle
-    const norm = normalizeVehicleFields({ make: listing.make!, model: listing.model!, year: listing.year });
+    const norm = normalizeVehicleFields({
+      make: listing.make!,
+      model: listing.model!,
+      year: listing.year,
+      trim: listing.trim || null,
+      vin: listing.vin ? listing.vin.toUpperCase() : null,
+      color: listing.color || null,
+      interior_color: listing.interiorColor || null,
+      transmission: listing.transmission || null,
+    });
     const vehicleData = {
       year: norm.year ?? listing.year,
       make: norm.make ?? listing.make!,
       model: norm.model ?? listing.model!,
-      trim: listing.trim || null,
-      vin: listing.vin ? listing.vin.toUpperCase() : null,
+      trim: norm.trim ?? null,
+      vin: norm.vin ?? null,
       mileage: listing.mileage || null,
       sale_price: listing.salePrice || null,
       sale_date: listing.saleDate || null,
       auction_end_date: listing.auctionEndDate || null,
       auction_outcome: listing.auctionOutcome || null,
       description: listing.description || listing.title || null,
-      color: listing.color || null,
-      interior_color: listing.interiorColor || null,
+      color: norm.color ?? null,
+      interior_color: norm.interior_color ?? null,
       engine_type: listing.engine || null,
-      transmission: listing.transmission || null,
+      transmission: norm.transmission ?? null,
       profile_origin: 'PCARMARKET_IMPORT',
       discovery_source: 'PCARMARKET',
       discovery_url: listing.url,

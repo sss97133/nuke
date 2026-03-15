@@ -28,6 +28,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
+import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";
 
@@ -933,8 +934,11 @@ async function saveVehicle(
     ...(vehicle.style ? { body_style: vehicle.style } : {}),
   };
 
+  // Normalize fields (transmission, trim, model, colors)
+  const normalized = normalizeVehicleFields(rawData);
+
   // Clean fields (strip HTML, reject polluted values)
-  const cleaned = cleanVehicleFields(rawData, { platform: "barrett-jackson" });
+  const cleaned = cleanVehicleFields(normalized, { platform: "barrett-jackson" });
 
   // Quality gate
   const gate = qualityGate(cleaned as Record<string, any>, {

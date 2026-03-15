@@ -31,6 +31,7 @@ import {
   QUALITY_THRESHOLDS,
   type AgentCallResult,
 } from "../_shared/agentTiers.ts";
+import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -473,6 +474,11 @@ async function processBatchFromQueue(
       }
 
       totalCostCents += extraction.cost.costCents;
+
+      // Normalize extracted fields before storing (prevents pollution propagation)
+      if (extraction.data) {
+        normalizeVehicleFields(extraction.data);
+      }
 
       if (extraction.needsEscalation) {
         // Mark for escalation — sonnet-supervisor will pick these up
