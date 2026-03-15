@@ -7,6 +7,7 @@
 
 import type { CSSProperties } from 'react';
 import type { SortBy, SortDirection, ViewMode } from '../../types/feedTypes';
+import type { ImageFit } from '../utils/feedUrlCodec';
 
 export interface FeedToolbarProps {
   sort: SortBy;
@@ -15,12 +16,14 @@ export interface FeedToolbarProps {
   cardsPerRow: number;
   fontSize: number;
   showScores: boolean;
+  imageFit: ImageFit;
   onSortChange: (sort: SortBy) => void;
   onDirectionChange: (dir: SortDirection) => void;
   onViewModeChange: (mode: ViewMode) => void;
   onCardsPerRowChange: (n: number) => void;
   onFontSizeChange: (n: number) => void;
   onToggleScores: () => void;
+  onImageFitChange: (fit: ImageFit) => void;
 }
 
 const SORT_OPTIONS: { value: SortBy; label: string }[] = [
@@ -63,6 +66,13 @@ const chipActive: CSSProperties = {
   background: 'var(--surface-hover)',
 };
 
+const FIT_CYCLE: ImageFit[] = ['auto', 'cover', 'contain'];
+const FIT_LABELS: Record<ImageFit, string> = {
+  auto: 'FIT: AUTO',
+  cover: 'FIT: FILL',
+  contain: 'FIT: FULL',
+};
+
 export function FeedToolbar({
   sort,
   direction,
@@ -70,13 +80,17 @@ export function FeedToolbar({
   cardsPerRow,
   fontSize,
   showScores,
+  imageFit,
   onSortChange,
   onDirectionChange,
   onViewModeChange,
   onCardsPerRowChange,
   onFontSizeChange,
   onToggleScores,
+  onImageFitChange,
 }: FeedToolbarProps) {
+  const isTableView = viewMode === 'technical';
+
   return (
     <div
       style={{
@@ -88,32 +102,34 @@ export function FeedToolbar({
         flexWrap: 'wrap',
       }}
     >
-      {/* Sort chips */}
-      <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
-        <span style={{
-          fontFamily: 'Arial, sans-serif', fontSize: '8px', fontWeight: 700,
-          textTransform: 'uppercase', color: 'var(--text-disabled)', marginRight: '4px',
-        }}>
-          SORT
-        </span>
-        {SORT_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => {
-              if (sort === opt.value) {
-                onDirectionChange(direction === 'asc' ? 'desc' : 'asc');
-              } else {
-                onSortChange(opt.value);
-              }
-            }}
-            style={sort === opt.value ? chipActive : chipBase}
-          >
-            {opt.label}
-            {sort === opt.value && (direction === 'asc' ? ' \u2191' : ' \u2193')}
-          </button>
-        ))}
-      </div>
+      {/* Sort chips — hidden in table view (columns are clickable) */}
+      {!isTableView && (
+        <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+          <span style={{
+            fontFamily: 'Arial, sans-serif', fontSize: '8px', fontWeight: 700,
+            textTransform: 'uppercase', color: 'var(--text-disabled)', marginRight: '4px',
+          }}>
+            SORT
+          </span>
+          {SORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                if (sort === opt.value) {
+                  onDirectionChange(direction === 'asc' ? 'desc' : 'asc');
+                } else {
+                  onSortChange(opt.value);
+                }
+              }}
+              style={sort === opt.value ? chipActive : chipBase}
+            >
+              {opt.label}
+              {sort === opt.value && (direction === 'asc' ? ' \u2191' : ' \u2193')}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />
@@ -156,6 +172,21 @@ export function FeedToolbar({
             title={`${cardsPerRow} columns`}
           />
         </div>
+      )}
+
+      {/* Image fit cycle (grid mode only) */}
+      {viewMode === 'grid' && (
+        <button
+          type="button"
+          onClick={() => {
+            const idx = FIT_CYCLE.indexOf(imageFit);
+            onImageFitChange(FIT_CYCLE[(idx + 1) % FIT_CYCLE.length]);
+          }}
+          style={{ ...chipBase, fontSize: '7px' }}
+          title="Cycle image fit: Auto (smart), Fill (crop to fill), Full (show entire image)"
+        >
+          {FIT_LABELS[imageFit]}
+        </button>
       )}
 
       {/* Score transparency toggle */}

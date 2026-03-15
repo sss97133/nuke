@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import type { FeedVehicle, FeedViewConfig } from '../types/feed';
+import type { SortBy, SortDirection } from '../../types/feedTypes';
 
 export interface FeedLayoutProps {
   vehicles: FeedVehicle[];
@@ -22,6 +23,14 @@ export interface FeedLayoutProps {
   renderStatCard?: (index: number) => ReactNode;
   /** How many vehicle rows between stat cards (default 5) */
   statCardInterval?: number;
+  /** Current sort key (for table column header highlighting) */
+  sort?: SortBy;
+  /** Current sort direction */
+  sortDirection?: SortDirection;
+  /** Called when user clicks a table column header */
+  onSortChange?: (sort: SortBy) => void;
+  /** Called when user toggles sort direction */
+  onDirectionChange?: (dir: SortDirection) => void;
 }
 
 const ROW_HEIGHTS: Record<string, number> = {
@@ -32,6 +41,22 @@ const ROW_HEIGHTS: Record<string, number> = {
 
 const TABLE_GRID = '42px 44px 90px 1fr 70px 80px 70px 50px minmax(60px, auto) minmax(60px, auto) 70px';
 const TABLE_GRID_SCORES = '42px 44px 90px 1fr 70px 80px 70px 50px minmax(60px, auto) minmax(60px, auto) 70px 50px';
+
+/** Column-to-sort mapping for table header clicks */
+const COLUMN_SORT_MAP: Record<string, SortBy> = {
+  YEAR: 'year',
+  MILES: 'mileage',
+  PRICE: 'price_high',
+  DEAL: 'deal_score',
+  HEAT: 'heat_score',
+  TIME: 'newest',
+};
+
+/** Columns that toggle between two sort keys */
+const COLUMN_TOGGLE_MAP: Record<string, [SortBy, SortBy]> = {
+  PRICE: ['price_high', 'price_low'],
+  TIME: ['newest', 'oldest'],
+};
 
 export function FeedLayout({
   vehicles,
@@ -44,6 +69,10 @@ export function FeedLayout({
   renderCard,
   renderStatCard,
   statCardInterval = 5,
+  sort,
+  sortDirection,
+  onSortChange,
+  onDirectionChange,
 }: FeedLayoutProps) {
   const tableGrid = showScores ? TABLE_GRID_SCORES : TABLE_GRID;
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -125,16 +154,73 @@ export function FeedLayout({
           }}
         >
           <span />
-          <span>YEAR</span>
-          <span>MAKE</span>
-          <span>MODEL</span>
-          <span style={{ textAlign: 'right' }}>MILES</span>
-          <span style={{ textAlign: 'right' }}>PRICE</span>
-          <span>BODY</span>
-          <span>TRANS</span>
-          <span>DEAL</span>
-          <span>HEAT</span>
-          <span style={{ textAlign: 'right' }}>TIME</span>
+          {(['YEAR', 'MAKE', 'MODEL', 'MILES', 'PRICE', 'BODY', 'TRANS', 'DEAL', 'HEAT', 'TIME'] as const).map((col) => {
+            const sortKey = COLUMN_SORT_MAP[col];
+            const isSortable = !!sortKey && !!onSortChange;
+            const togglePair = COLUMN_TOGGLE_MAP[col];
+            const isActive = sort && (sort === sortKey || (togglePair && togglePair.includes(sort)));
+            const align = ['MILES', 'PRICE', 'TIME'].includes(col) ? 'right' : 'left';
+
+            const handleClick = () => {
+              if (!onSortChange) return;
+              if (isActive) {
+                // Toggle direction, or toggle between paired sort keys
+                if (togglePair && onDirectionChange) {
+                  const currentIdx = togglePair.indexOf(sort!);
+                  if (currentIdx >= 0) {
+                    onSortChange(togglePair[(currentIdx + 1) % 2]);
+                  } else {
+                    onDirectionChange(sortDirection === 'asc' ? 'desc' : 'asc');
+                  }
+                } else if (onDirectionChange) {
+                  onDirectionChange(sortDirection === 'asc' ? 'desc' : 'asc');
+                }
+              } else {
+                onSortChange(sortKey);
+              }
+            };
+
+            // Arrow indicator for active column
+            let arrow = '';
+            if (isActive) {
+              if (togglePair) {
+                arrow = sort === togglePair[0] ? ' \u2193' : ' \u2191';
+              } else {
+                arrow = sortDirection === 'asc' ? ' \u2191' : ' \u2193';
+              }
+            }
+
+            if (!isSortable) {
+              return <span key={col} style={{ textAlign: align }}>{col}</span>;
+            }
+
+            return (
+              <button
+                key={col}
+                type="button"
+                onClick={handleClick}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  margin: 0,
+                  font: 'inherit',
+                  fontWeight: 'inherit',
+                  fontSize: 'inherit',
+                  letterSpacing: 'inherit',
+                  textTransform: 'inherit' as any,
+                  color: isActive ? 'var(--text)' : 'var(--text-disabled)',
+                  cursor: 'pointer',
+                  textAlign: align,
+                  textDecoration: 'none',
+                }}
+                onMouseEnter={(e) => { (e.currentTarget.style as any).textDecoration = 'underline'; }}
+                onMouseLeave={(e) => { (e.currentTarget.style as any).textDecoration = 'none'; }}
+              >
+                {col}{arrow}
+              </button>
+            );
+          })}
           {showScores && <span style={{ textAlign: 'right' }}>RANK</span>}
         </div>
 

@@ -72,9 +72,6 @@ export function FeedStatsStrip({ stats, isLoading, searchText, onSearchChange, r
         height: '32px',
         borderBottom: '1px solid var(--border)',
         background: 'var(--surface)',
-        position: 'sticky',
-        top: 'var(--header-height, 48px)',
-        zIndex: 20,
         overflowX: 'auto',
       }}
     >

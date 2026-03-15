@@ -5,9 +5,11 @@
  * virtualized rendering, and atomic cards.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFeedSearchParams } from '../hooks/useFeedSearchParams';
 import { useFeedQuery } from '../hooks/useFeedQuery';
+import { useFeedScrollRestore } from '../hooks/useFeedScrollRestore';
+import { useAppLayoutContext } from '../../components/layout/AppLayoutContext';
 import { AuctionClockProvider } from './AuctionClockProvider';
 import { FeedStatsStrip } from './FeedStatsStrip';
 import { FeedToolbar } from './FeedToolbar';
@@ -28,6 +30,7 @@ export default function FeedPage() {
     searchText,
     viewMode,
     cardsPerRow,
+    imageFit,
     hasActiveFilters,
     setFilters,
     setSortBy,
@@ -35,13 +38,21 @@ export default function FeedPage() {
     setSearchText,
     setViewMode,
     setCardsPerRow,
+    setImageFit,
     resetAll,
   } = useFeedSearchParams();
+
+  // Restore scroll position when returning via back navigation
+  useFeedScrollRestore();
 
   // Local display settings (not URL-persisted)
   const [fontSize, setFontSize] = useState(10);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const [showScores, setShowScores] = useState(false);
+
+  // Resolve 'auto' fit: contain for dense grids (>= 8 cols), cover otherwise
+  const resolvedFit: 'cover' | 'contain' =
+    imageFit === 'auto' ? (cardsPerRow >= 8 ? 'contain' : 'cover') : imageFit;
 
   const feedQuery = useFeedQuery({ filters, sortBy, sortDirection, searchText });
 
@@ -60,9 +71,10 @@ export default function FeedPage() {
         viewMode={viewMode}
         compact={viewMode === 'grid' && cardsPerRow > 8}
         showScores={showScores}
+        imageFit={resolvedFit}
       />
     ),
-    [viewMode, cardsPerRow, showScores],
+    [viewMode, cardsPerRow, showScores, resolvedFit],
   );
 
   // Brand heartbeat: show when exactly one make is selected
@@ -76,6 +88,23 @@ export default function FeedPage() {
     ),
     [stats, vehicles.length],
   );
+
+  // Inject stats strip into the header toolbar slot
+  const { setToolbarSlot } = useAppLayoutContext();
+  useEffect(() => {
+    setToolbarSlot(
+      <FeedStatsStrip
+        stats={stats}
+        isLoading={feedQuery.isLoading}
+        searchText={searchText}
+        onSearchChange={setSearchText}
+        resultCount={vehicles.length}
+        hasActiveFilters={hasActiveFilters}
+        onResetFilters={resetAll}
+      />
+    );
+    return () => setToolbarSlot(null);
+  }, [stats, feedQuery.isLoading, searchText, setSearchText, vehicles.length, hasActiveFilters, resetAll, setToolbarSlot]);
 
   // CSS custom property for font size control
   const feedStyle = useMemo(() => ({
@@ -91,17 +120,6 @@ export default function FeedPage() {
   return (
     <AuctionClockProvider>
       <div className="fullscreen-content" style={feedStyle}>
-        {/* Stats strip — full width, includes inline search + filter result count */}
-        <FeedStatsStrip
-          stats={stats}
-          isLoading={feedQuery.isLoading}
-          searchText={searchText}
-          onSearchChange={setSearchText}
-          resultCount={vehicles.length}
-          hasActiveFilters={hasActiveFilters}
-          onResetFilters={resetAll}
-        />
-
         {/* Toolbar — full width */}
         <FeedToolbar
           sort={sortBy}
@@ -110,12 +128,14 @@ export default function FeedPage() {
           cardsPerRow={cardsPerRow}
           fontSize={fontSize}
           showScores={showScores}
+          imageFit={imageFit}
           onSortChange={setSortBy}
           onDirectionChange={setSortDirection}
           onViewModeChange={setViewMode}
           onCardsPerRowChange={setCardsPerRow}
           onFontSizeChange={setFontSize}
           onToggleScores={() => setShowScores(!showScores)}
+          onImageFitChange={setImageFit}
         />
 
         {/* Sidebar + Content */}
@@ -156,6 +176,10 @@ export default function FeedPage() {
                 renderCard={renderCard}
                 renderStatCard={renderStatCard}
                 statCardInterval={5}
+                sort={sortBy}
+                sortDirection={sortDirection}
+                onSortChange={setSortBy}
+                onDirectionChange={setSortDirection}
               />
             )}
           </div>
