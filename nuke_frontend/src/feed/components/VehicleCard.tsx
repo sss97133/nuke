@@ -27,6 +27,7 @@ export interface VehicleCardProps {
   compact?: boolean;
   showActions?: boolean;
   showScores?: boolean;
+  imageFit?: 'cover' | 'contain';
   isFollowing?: boolean;
   isFollowLoading?: boolean;
   onToggleFollow?: () => void;
@@ -41,6 +42,7 @@ export function VehicleCard({
   compact = false,
   showActions = false,
   showScores = false,
+  imageFit,
   isFollowing = false,
   isFollowLoading = false,
   onToggleFollow,
@@ -67,70 +69,84 @@ export function VehicleCard({
   };
 
   if (viewMode === 'technical') {
-    // Table row — rendered by FeedLayout grid, shell uses display:contents
+    const DEAL_MAP: Record<string, { label: string; color: string; bg: string }> = {
+      plus_3: { label: 'STEAL', color: '#fff', bg: '#16825d' },
+      plus_2: { label: 'GREAT', color: '#fff', bg: '#1a7a54' },
+      plus_1: { label: 'GOOD', color: '#fff', bg: '#2d9d78' },
+      minus_1: { label: 'ABOVE', color: '#fff', bg: '#b05a00' },
+      minus_2: { label: 'OVER', color: '#fff', bg: '#d13438' },
+      minus_3: { label: 'WAY+', color: '#fff', bg: '#a4262c' },
+    };
+    const HEAT_MAP: Record<string, string> = {
+      volcanic: '#d13438', fire: '#ef4444', hot: '#f59e0b', warm: '#b05a00',
+    };
+
+    const deal = vehicle.deal_score_label && vehicle.deal_score_label !== 'fair'
+      ? DEAL_MAP[vehicle.deal_score_label] : null;
+    const heatColor = vehicle.heat_score_label ? HEAT_MAP[vehicle.heat_score_label] : null;
+
+    const mono = "'Courier New', monospace";
+    const sans = 'Arial, sans-serif';
+    const fs = 'var(--feed-font-size, 12px)';
+    const fsSm = 'var(--feed-font-size-sm, 10px)';
+
     return (
       <CardShell vehicleId={vehicle.id} viewMode="technical" style={style}>
+        {/* Thumbnail */}
         <CardImage thumbnailUrl={vehicle.thumbnail_url} alt={alt} viewMode="technical" />
-        <span style={{ fontFamily: 'Arial, sans-serif', fontSize: 'var(--feed-font-size, 10px)' }}>
+        {/* Year */}
+        <span style={{ fontFamily: mono, fontSize: fs, fontWeight: 700, color: 'var(--text-secondary)' }}>
           {vehicle.year ?? '—'}
         </span>
-        <span style={{ fontFamily: 'Arial, sans-serif', fontSize: 'var(--feed-font-size, 10px)' }}>
+        {/* Make */}
+        <span style={{ fontFamily: sans, fontSize: fsSm, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {vehicle.make ?? '—'}
         </span>
-        <span style={{ fontFamily: 'Arial, sans-serif', fontSize: 'var(--feed-font-size, 10px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {/* Model */}
+        <span style={{ fontFamily: sans, fontSize: fs, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {vehicle.model ?? '—'}
         </span>
-        <span style={{ fontFamily: "'Courier New', monospace", fontSize: 'var(--feed-font-size, 10px)', textAlign: 'right' }}>
-          {vehicle.mileage ? `${Math.floor(vehicle.mileage).toLocaleString()}` : '—'}
+        {/* Mileage */}
+        <span style={{ fontFamily: mono, fontSize: fs, textAlign: 'right', color: 'var(--text-secondary)' }}>
+          {vehicle.mileage ? Math.floor(vehicle.mileage).toLocaleString() : '—'}
         </span>
-        <span style={{ fontFamily: "'Courier New', monospace", fontSize: 'var(--feed-font-size, 10px)', textAlign: 'right', fontWeight: 700 }}>
+        {/* Price */}
+        <span style={{ fontFamily: mono, fontSize: fs, textAlign: 'right', fontWeight: 700 }}>
           {price.formatted}
         </span>
-        <span style={{ fontFamily: 'Arial, sans-serif', fontSize: 'var(--feed-font-size-sm, 8px)', color: 'var(--text-secondary)' }}>
+        {/* Body */}
+        <span style={{ fontFamily: sans, fontSize: fsSm, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {vehicle.canonical_body_style || '—'}
         </span>
-        <span style={{ fontFamily: 'Arial, sans-serif', fontSize: 'var(--feed-font-size-sm, 8px)', color: 'var(--text-secondary)' }}>
+        {/* Transmission */}
+        <span style={{ fontFamily: sans, fontSize: fsSm, color: 'var(--text-secondary)' }}>
           {vehicle.transmission ? (vehicle.transmission.toLowerCase().includes('manual') ? 'MAN' : 'AUTO') : '—'}
         </span>
-        {/* Deal column — inline pill, no wrapper padding */}
-        {vehicle.deal_score_label && vehicle.deal_score_label !== 'fair' ? (
+        {/* Deal */}
+        {deal ? (
           <span style={{
-            fontSize: 'var(--feed-font-size-xs, 7px)', fontWeight: 800,
-            fontFamily: 'Arial, sans-serif', textTransform: 'uppercase',
-            padding: '1px 3px', lineHeight: 1.4,
-            color: vehicle.deal_score_label.startsWith('plus') ? '#fff' : vehicle.deal_score_label.startsWith('minus') ? '#fff' : 'var(--text-secondary)',
-            background: vehicle.deal_score_label === 'plus_3' || vehicle.deal_score_label === 'plus_2' ? '#16825d'
-              : vehicle.deal_score_label === 'plus_1' ? '#2d9d78'
-              : vehicle.deal_score_label === 'minus_2' || vehicle.deal_score_label === 'minus_3' ? '#d13438'
-              : vehicle.deal_score_label === 'minus_1' ? '#b05a00'
-              : 'transparent',
+            fontFamily: sans, fontSize: '9px', fontWeight: 800,
+            textTransform: 'uppercase', letterSpacing: '0.04em',
+            padding: '2px 5px', lineHeight: 1,
+            color: deal.color, background: deal.bg,
+            display: 'inline-block', width: 'fit-content',
           }}>
-            {vehicle.deal_score_label === 'plus_3' ? 'STEAL'
-              : vehicle.deal_score_label === 'plus_2' ? 'GREAT'
-              : vehicle.deal_score_label === 'plus_1' ? 'GOOD'
-              : vehicle.deal_score_label === 'minus_1' ? 'ABOVE'
-              : vehicle.deal_score_label === 'minus_2' ? 'OVER'
-              : vehicle.deal_score_label === 'minus_3' ? 'WAY+'
-              : '—'}
+            {deal.label}
           </span>
         ) : <span />}
-        {/* Heat column */}
-        {vehicle.heat_score_label && vehicle.heat_score_label !== 'cold' ? (
+        {/* Heat */}
+        {heatColor ? (
           <span style={{
-            fontSize: 'var(--feed-font-size-xs, 7px)', fontWeight: 800,
-            fontFamily: 'Arial, sans-serif', textTransform: 'uppercase',
-            color: vehicle.heat_score_label === 'volcanic' ? '#d13438'
-              : vehicle.heat_score_label === 'fire' ? '#ef4444'
-              : vehicle.heat_score_label === 'hot' ? '#f59e0b'
-              : vehicle.heat_score_label === 'warm' ? '#b05a00'
-              : 'var(--text-disabled)',
+            fontFamily: sans, fontSize: '9px', fontWeight: 800,
+            textTransform: 'uppercase', letterSpacing: '0.04em',
+            color: heatColor,
           }}>
-            {vehicle.heat_score_label.toUpperCase()}
+            {vehicle.heat_score_label!.toUpperCase()}
           </span>
         ) : <span />}
-        {/* Time column */}
+        {/* Time */}
         <span style={{
-          fontFamily: "'Courier New', monospace", fontSize: 'var(--feed-font-size-sm, 8px)',
+          fontFamily: mono, fontSize: fsSm,
           color: timeLabel?.startsWith('sold') ? '#10b981'
             : timeLabel?.startsWith('ends') ? '#ef4444'
             : 'var(--text-disabled)',
@@ -138,10 +154,10 @@ export function VehicleCard({
         }}>
           {timeLabel || '—'}
         </span>
-        {/* Rank score column (only when showScores is on) */}
+        {/* Rank */}
         {showScores && (
           <span style={{
-            fontFamily: "'Courier New', monospace", fontSize: 'var(--feed-font-size-sm, 8px)',
+            fontFamily: mono, fontSize: fsSm,
             fontWeight: 700, textAlign: 'right',
             color: (vehicle.feed_rank_score ?? 0) > 60 ? '#16825d'
               : (vehicle.feed_rank_score ?? 0) > 30 ? '#b05a00'
@@ -265,7 +281,7 @@ export function VehicleCard({
       onHoverEnd={onHoverEnd}
       style={style}
     >
-      <CardImage thumbnailUrl={vehicle.thumbnail_url} alt={alt} viewMode="grid" noImageData={noImageData}>
+      <CardImage thumbnailUrl={vehicle.thumbnail_url} alt={alt} viewMode="grid" fit={imageFit} noImageData={noImageData}>
         {showScores && <CardRankScore vehicle={vehicle} compact={compact} />}
         <CardPrice price={price} compact={compact} />
         {price.isLive && vehicle.auction_end_date && (

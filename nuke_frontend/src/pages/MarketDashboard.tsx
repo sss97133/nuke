@@ -204,7 +204,7 @@ export default function MarketDashboard() {
   } = useFeedSearchParams();
 
   // Local display state
-  const [fontSize, setFontSize] = useState(10);
+  const [fontSize, setFontSize] = useState(12);
   const [filtersCollapsed, setFiltersCollapsed] = useState(() => window.innerWidth < 768);
   const [showScores, setShowScores] = useState(false);
   const [introVisible, setIntroVisible] = useState(() => !localStorage.getItem('nuke_market_intro_dismissed'));
@@ -385,6 +385,10 @@ export default function MarketDashboard() {
                 renderCard={renderCard}
                 renderStatCard={renderStatCard}
                 statCardInterval={5}
+                sort={effectiveSortBy}
+                sortDirection={sortDirection}
+                onSortChange={setSortBy}
+                onDirectionChange={setSortDirection}
               />
             )}
           </div>
