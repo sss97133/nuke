@@ -14,6 +14,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
+import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from "../_shared/resolveVehicleForListing.ts";
 
 const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36";
@@ -176,6 +177,19 @@ serve(async (req) => {
       is_public: true,
       status: "active",
     };
+
+    // Quality gate: validate before writing to vehicles
+    const gateResult = qualityGate(vehicleRow, { source: 'barnfinds', sourceType: 'marketplace' });
+    if (gateResult.action === 'reject') {
+      console.warn(`[barnfinds] Quality gate rejected (score=${gateResult.score}): ${gateResult.issues.join(', ')}`);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Quality gate rejected extraction',
+        quality_score: gateResult.score,
+        quality_issues: gateResult.issues,
+      }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    Object.assign(vehicleRow, gateResult.cleaned);
 
     let finalVehicleId: string;
     if (vehicleId) {
