@@ -430,7 +430,10 @@ def cmd_validate(args):
             if not record.get("year") or not record.get("make") or not record.get("model"):
                 null_ymm += 1
             else:
-                ymm_key = f"{record['year']} {record['make']} {record['model']}"
+                # Normalize with suffix stripping so variants coalesce in stats
+                from yono.contextual_training.build_ymm_knowledge import strip_model_suffix
+                base_model, _ = strip_model_suffix(str(record['model']))
+                ymm_key = f"{record['year']} {record['make']} {base_model}"
                 ymm_counts[ymm_key] += 1
 
             vehicle_ids.add(record["vehicle_id"])

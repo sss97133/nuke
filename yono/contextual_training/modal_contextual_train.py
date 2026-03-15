@@ -836,8 +836,14 @@ def stage_data_v3(limit: int = 100000, images_per_vehicle: int = 5):
                   AND vi2.image_url != ''
                 LIMIT {images_per_vehicle}
             ) vi ON true
-            LEFT JOIN ymm_knowledge yk
-                ON yk.year = v.year AND yk.make = v.make AND yk.model = v.model
+            LEFT JOIN LATERAL (
+                SELECT feature_vector, vehicle_count, source_comment_count
+                FROM ymm_knowledge
+                WHERE year = v.year AND make = v.make
+                  AND (model = v.model OR v.model LIKE model || ' %')
+                ORDER BY (model = v.model)::int DESC, vehicle_count DESC
+                LIMIT 1
+            ) yk ON true
             WHERE {tier_filter}
               AND v.make IS NOT NULL
               AND v.year IS NOT NULL

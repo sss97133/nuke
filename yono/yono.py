@@ -334,6 +334,7 @@ class ContextualYONOClassifier:
 
         # Load Y/M/M knowledge store (local Parquet or in-memory dict)
         self._ymm_store = {}
+        self._ymm_store_lower = {}
         ymm_path = ymm_store_path or str(YONO_DIR / "data" / "ymm_knowledge.parquet")
         if Path(ymm_path).exists():
             self._load_ymm_store(ymm_path)
@@ -345,7 +346,10 @@ class ContextualYONOClassifier:
             self._config = json.loads(config_path.read_text())
 
     def _load_ymm_store(self, path: str):
-        """Load Y/M/M profiles from Parquet into memory."""
+        """Load Y/M/M profiles from Parquet into memory.
+
+        Also builds a lowercase lookup index for case-insensitive fallback.
+        """
         try:
             import pyarrow.parquet as pq
             table = pq.read_table(path)
@@ -360,6 +364,15 @@ class ContextualYONOClassifier:
                 data = json.loads(json_path.read_text())
                 for entry in data:
                     self._ymm_store[entry["ymm_key"]] = entry
+        # Build lowercase index for case-insensitive fallback
+        self._ymm_store_lower = {k.lower(): v for k, v in self._ymm_store.items()}
+
+    def _ymm_lookup(self, key: str):
+        """Look up a YMM profile with case-insensitive fallback."""
+        profile = self._ymm_store.get(key)
+        if profile is None and hasattr(self, '_ymm_store_lower'):
+            profile = self._ymm_store_lower.get(key.lower())
+        return profile
 
     def _get_ymm_features(self, year: int, make: str, model: str) -> np.ndarray:
         """Get Y/M/M feature vector. Returns zeros if not found."""
@@ -367,7 +380,15 @@ class ContextualYONOClassifier:
             featurize_ymm_profile, default_ymm_profile, FEATURE_DIM_YMM
         )
         ymm_key = f"{year}_{make}_{model}"
-        profile = self._ymm_store.get(ymm_key, default_ymm_profile())
+        profile = self._ymm_lookup(ymm_key)
+        if profile is None:
+            # Fallback: try with suffix stripping (builder coalesces variants)
+            from yono.contextual_training.build_ymm_knowledge import strip_model_suffix
+            base_model, _ = strip_model_suffix(model or '')
+            alt_key = f"{year}_{make}_{base_model}"
+            profile = self._ymm_lookup(alt_key)
+        if profile is None:
+            profile = default_ymm_profile()
         return featurize_ymm_profile(profile)
 
     def analyze(
@@ -405,9 +426,18 @@ class ContextualYONOClassifier:
             make_result = self._make_clf.predict(image_path)
             make = make_result.get("make", "Unknown")
 
-        # 2. Get Y/M/M features
+        # 2. Get Y/M/M features (with suffix-stripping + case fallback)
         ymm_key = f"{year}_{make}_{model}"
-        profile = self._ymm_store.get(ymm_key, default_ymm_profile())
+        profile = self._ymm_lookup(ymm_key)
+        if profile is None:
+            from yono.contextual_training.build_ymm_knowledge import strip_model_suffix
+            base_model, _ = strip_model_suffix(model or '')
+            alt_key = f"{year}_{make}_{base_model}"
+            profile = self._ymm_lookup(alt_key)
+            if profile is not None:
+                ymm_key = alt_key  # Use coalesced key for reporting
+        if profile is None:
+            profile = default_ymm_profile()
         ymm_features = featurize_ymm_profile(profile)
 
         # 3. Vehicle instance features
