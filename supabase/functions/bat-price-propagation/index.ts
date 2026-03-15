@@ -77,53 +77,13 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Get bat_listings with valid prices
-    const { data: listings, error: listErr } = await supabase
-      .from("bat_listings")
-      .select("id, bat_listing_url, sale_price, final_bid, listing_status, sale_date")
-      .not("sale_price", "is", null)
-      .gt("sale_price", 100)
-      .lt("sale_price", 10000000)
-      .order("sale_price", { ascending: false })
-      .range(offset, offset + batchSize - 1);
+    // Bulk match bat_listings → vehicles via RPC (handles trailing-slash URL variants)
+    const { data: candidates, error: matchErr } = await supabase.rpc(
+      "match_bat_listings_for_propagation",
+      { batch_size: batchSize, batch_offset: offset },
+    );
 
-    if (listErr) throw new Error(`Listings query failed: ${listErr.message}`);
-
-    // Match to vehicles that need price propagation
-    const candidates: any[] = [];
-    for (const bl of (listings || [])) {
-      const urlCandidates = [bl.bat_listing_url];
-      const canon = canonicalUrl(bl.bat_listing_url);
-      if (canon !== bl.bat_listing_url) urlCandidates.push(canon);
-
-      const { data: vehicle } = await supabase
-        .from("vehicles")
-        .select("id, sale_price, high_bid, reserve_status, auction_end_date, bat_sold_price, bat_sale_date, year, make, model")
-        .eq("status", "active")
-        .or(`bat_auction_url.in.(${urlCandidates.map(u => `"${u}"`).join(",")}),discovery_url.in.(${urlCandidates.map(u => `"${u}"`).join(",")})`)
-        .limit(1)
-        .maybeSingle();
-
-      if (vehicle && (vehicle.sale_price == null || vehicle.bat_sold_price == null)) {
-        candidates.push({
-          listing_id: bl.id,
-          bat_listing_url: bl.bat_listing_url,
-          listing_sale_price: bl.sale_price,
-          final_bid: bl.final_bid,
-          listing_status: bl.listing_status,
-          listing_sale_date: bl.sale_date,
-          vehicle_id: vehicle.id,
-          vehicle_sale_price: vehicle.sale_price,
-          vehicle_high_bid: vehicle.high_bid,
-          vehicle_reserve_status: vehicle.reserve_status,
-          vehicle_auction_end_date: vehicle.auction_end_date,
-          vehicle_bat_sold_price: vehicle.bat_sold_price,
-          vehicle_bat_sale_date: vehicle.bat_sale_date,
-        });
-      }
-
-      if (candidates.length >= batchSize) break;
-    }
+    if (matchErr) throw new Error(`Match RPC failed: ${matchErr.message}`);
 
     const items = Array.isArray(candidates) ? candidates : [];
     if (!items.length) {
