@@ -342,8 +342,11 @@ function parseTitle(title: string): {
   }
 
   const cleaned = title
+    .replace(/[·•—–|]/g, " ")
+    .replace(/&#x[0-9a-fA-F]+;/g, " ")
     .replace(/^\$[\d,]+(?=\d{4})/g, "")
     .replace(/^\$[\d,]+\s*/g, "")
+    .replace(/\s+/g, " ")
     .trim();
   const yearMatch = cleaned.match(/\b(19[2-9]\d|20[0-3]\d)\b/);
   const year = yearMatch ? parseInt(yearMatch[1], 10) : null;

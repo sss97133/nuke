@@ -70,11 +70,14 @@
     const r = { year: null, make: null, model: null };
     if (!title) return r;
 
-    // Strip leading price junk
+    // Strip leading price junk and FB's middot/bullet separators
     const cleaned = title
+      .replace(/[·•—–|]/g, " ")
+      .replace(/&#x[0-9a-fA-F]+;/g, " ")
       .replace(/^\$[\d,]+\s*/g, "")
       .replace(/[A-Z][a-z]+,\s*[A-Z]{2}.*$/g, "")
       .replace(/\d+[Kk]\s*miles.*$/gi, "")
+      .replace(/\s+/g, " ")
       .trim();
 
     const yearMatch = cleaned.match(/\b(19[2-9]\d|20[0-3]\d)\b/);
