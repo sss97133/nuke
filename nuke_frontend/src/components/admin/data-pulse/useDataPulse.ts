@@ -25,17 +25,26 @@ export interface TimeSeriesRow {
   cnt: number;
 }
 
+export interface VelocityRow {
+  this_week: number;
+  last_week: number;
+}
+
 export interface DataPulseResult {
   census: CensusRow[];
   time_series: TimeSeriesRow[];
   last_ingested: Record<string, string>;
+  velocity: Record<string, VelocityRow>;
   totals: {
     total_vehicles: number;
     sold_with_price: number;
     with_vin: number;
     with_description: number;
     platforms_count: number;
-    median_sold_price: number;
+    added_7d: number;
+    missing_vin: number;
+    missing_desc: number;
+    missing_price: number;
   };
 }
 
