@@ -127,7 +127,8 @@ export const multiWordMakes: Record<string, string> = {
   austin: "Austin-Healey",
   de: "De Tomaso",
   am: "AM General",
-  range: "Range Rover",
+  el: "El Camino", // GM, but BaT treats as make in slug
+  ac: "AC Cars",
 };
 
 // ─── Title cleaning ─────────────────────────────────────────────────
@@ -539,8 +540,15 @@ export function extractEssentials(html: string): BatEssentials {
 
     for (const t of items) {
       if (!vin) {
-        const idMatch = t.match(/^(?:VIN|Chassis)\s*:\s*([A-HJ-NPR-Z0-9]{11,17})\b/i);
-        if (idMatch?.[1]) vin = idMatch[1].toUpperCase().trim();
+        // Modern VINs: 17 chars. Pre-1981 chassis: 3-16 chars. Both valid.
+        const idMatch = t.match(/^(?:VIN|Chassis)\s*:\s*([A-HJ-NPR-Z0-9]{3,17})\b/i);
+        if (idMatch?.[1]) {
+          const candidate = idMatch[1].toUpperCase().trim();
+          // Reject very short strings that are likely noise (e.g., "VIN: N/A")
+          if (candidate.length >= 5 || /^\d{3,4}$/.test(candidate)) {
+            vin = candidate;
+          }
+        }
       }
       if (!mileage) {
         const milesMatch = t.match(/\b([0-9,]+)\s*Miles?\b/i) || t.match(/\b~\s*([0-9,]+)\s*Miles?\b/i);
@@ -570,7 +578,7 @@ export function extractEssentials(html: string): BatEssentials {
             )
           );
         if (looksLikeTransmission) {
-          transmission = t.replace(/\s+Transmission\s*$/i, "").trim();
+          transmission = t.trim();
         }
       }
       if (!drivetrain) {
@@ -724,6 +732,15 @@ export function inferBodyStyleFromTitle(title: string | null): string | null {
   if (/\bsuv\b|\bsuburban\b|\btahoe\b|\byukon\b|\bwagoneer\b|\bblazer\b|\bbronco\b/.test(t)) return "SUV";
   if (/\bvan\b/.test(t)) return "Van";
   if (/\brv\b|\bmotor\s*home\b|\bmotor\s*coach\b/.test(t)) return "RV";
+  if (/\bspeedster\b/.test(t)) return "Speedster";
+  if (/\btarga\b/.test(t)) return "Targa";
+  if (/\btourer\b|\btouring\b/.test(t)) return "Touring";
+  if (/\blimousine\b/.test(t)) return "Limousine";
+  if (/\bphaeton\b/.test(t)) return "Phaeton";
+  if (/\btricycle\b|\btrike\b/.test(t)) return "Tricycle";
+  if (/\bbuggy\b/.test(t)) return "Buggy";
+  if (/\bbus\b/.test(t)) return "Bus";
+  if (/\bjeep\b|\bscout\b/.test(t)) return "SUV";
   return null;
 }
 
