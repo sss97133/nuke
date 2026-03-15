@@ -302,7 +302,8 @@ def _build_chunk(pages: list) -> dict:
 
 
 def register_document(conn, pdf_path: str, title: str, year: int = None,
-                       make_family: str = None, page_count: int = None) -> str:
+                       make_family: str = None, page_count: int = None,
+                       library_id: str = None) -> str:
     """Register a manual in library_documents. Returns document_id."""
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -316,18 +317,18 @@ def register_document(conn, pdf_path: str, title: str, year: int = None,
 
     file_size = os.path.getsize(pdf_path)
 
-    # Need a library_id — use existing reference library
-    cur.execute("SELECT id FROM reference_libraries LIMIT 1")
-    lib = cur.fetchone()
-    if not lib:
-        # Use a known existing library_id from library_documents
-        cur.execute("SELECT DISTINCT library_id FROM library_documents LIMIT 1")
-        lib_row = cur.fetchone()
-        library_id = str(lib_row["library_id"]) if lib_row else None
-        if not library_id:
-            raise RuntimeError("No reference_libraries or library_documents found")
-    else:
-        library_id = str(lib["id"])
+    # Use provided library_id or look one up
+    if not library_id:
+        cur.execute("SELECT id FROM reference_libraries LIMIT 1")
+        lib = cur.fetchone()
+        if not lib:
+            cur.execute("SELECT DISTINCT library_id FROM library_documents LIMIT 1")
+            lib_row = cur.fetchone()
+            library_id = str(lib_row["library_id"]) if lib_row else None
+            if not library_id:
+                raise RuntimeError("No reference_libraries or library_documents found")
+        else:
+            library_id = str(lib["id"])
 
     # We need an uploaded_by UUID — use a system account
     cur.execute("SELECT id FROM auth.users LIMIT 1")
@@ -449,6 +450,7 @@ def main():
     parser.add_argument("--year", type=int, help="Publication year")
     parser.add_argument("--make-family", help="Make/family (e.g., 'GM C/K')")
     parser.add_argument("--chunk-size", type=int, default=2, help="Pages per chunk (default: 2)")
+    parser.add_argument("--library-id", help="UUID of the reference_libraries entry to link to")
     parser.add_argument("--list", action="store_true", help="List existing documents")
     args = parser.parse_args()
 
@@ -515,6 +517,7 @@ def main():
         conn, pdf_path, title,
         year=args.year, make_family=args.make_family,
         page_count=page_count,
+        library_id=args.library_id,
     )
     written = ingest_chunks(conn, doc_id, chunks)
 

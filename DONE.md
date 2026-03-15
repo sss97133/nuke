@@ -2,6 +2,23 @@
 
 ## 2026-03-15
 
+### [library] GM Service Manual Ingestion — 6 New Manuals (2,295 chunks)
+- Ingested 6 GM Light Duty Truck service manuals (1974, 1975, 1976, 1978, 1979, 1980) into service_manual_chunks
+- Created 6 reference_libraries entries with proper make/model/series for trigger compatibility
+- Fixed ingest-service-manual.py: added --library-id parameter to avoid trigger NOT NULL violation on oem_vehicle_specs
+- Total library now: 12 service manuals, 3,406 chunks spanning 1973-1987
+- Per-manual breakdown: 1974 (488 chunks/978pg), 1975 (150/324pg), 1976 (199/400pg), 1978 (443/932pg), 1979 (517/1033pg), 1980 (498/1006pg)
+- Content types: ~1,334 procedure, ~514 specification, ~177 chart/diagnosis, ~270 reference
+- OCR quality: Good on 1974/1975/1976/1979/1980 (clear section detection, readable text). 1978 has weaker section detection (774/886 pages in "unknown" section) but text quality is still good
+- Avg chunk size: ~4,200 chars. Min: ~80 chars, Max: ~16K chars
+
+### [yono] YMM Knowledge Lookup — Suffix-Stripping + Case Fallback
+- Fixed 60% miss rate (339K of 567K vehicles) on YMM profile lookups
+- Root cause: builder coalesces "Camaro Z28" → "Camaro" but runtime constructs "Camaro Z28" key
+- Added suffix-stripping fallback to ALL lookup paths using `strip_model_suffix()` from build_ymm_knowledge.py
+- Added case-insensitive fallback (handles "chevrolet" vs "Chevrolet" mismatches)
+- Files fixed: `yono/yono.py` (2 in-memory store lookups + case index), `yono/condition_spectrometer.py` (3-tier DB fallback), `yono/description_generator.py` (normalized context_ymm_key), `yono/training_sampler.py` (coalesced stats), `yono/contextual_training/export_contextual_data.py` (LATERAL JOIN), `yono/contextual_training/modal_contextual_train.py` (LATERAL JOIN)
+
 ### [pipeline] Vehicle Image Pipeline — Display & Scraping Fix
 - Fix 1: feed-query two-pass image resolution — primary image lookup + fallback RPC `get_first_images_for_vehicles` (DISTINCT ON vehicle_id)
 - Fix 1: Removed post-query thumbnail filter that dropped vehicles from feed results
