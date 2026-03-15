@@ -2,6 +2,36 @@
 
 ## 2026-03-15
 
+### [admin] Data Pulse — Platform Ingestion Telemetry
+- `data_pulse()` RPC: census + 30-day time series + last_ingested + totals in one round-trip
+- Heartbeat classification: 55 platforms into 4 types (event_auction, continuous_auction, marketplace, dealer_other)
+- Health status: green/yellow/red/gray with type-appropriate thresholds
+- Frontend: summary bar, collapsible heartbeat groups, platform cards with sparklines, recharts timeline, data quality grid
+- Route: `/admin/data-pulse`, nav entry in Operations section
+- Files: `nuke_frontend/src/components/admin/data-pulse/` (7 files), `DataPulse.tsx` page
+
+### [data-sanity] Canonical Vehicle Identity — Source Rosetta Stone
+- Created `source_alias_mapping` table with 130+ raw→canonical slug mappings
+- Created `resolve_platform_slug(TEXT)` SQL function for source resolution
+- Added 3 trigger-computed columns to `vehicles`: `canonical_platform`, `canonical_sold_price`, `canonical_outcome`
+- Created `trg_resolve_canonical_columns` trigger (BEFORE INSERT/UPDATE on source/price/status columns)
+- Backfilled all 321K live vehicles (platform, outcome, price)
+- Created `mv_vehicle_census` materialized view — THE honest reporting view by platform
+- Created `v_vehicle_canonical` view with price_type, data_grade (A-F), platform trust scores
+- Registered 3 columns in `pipeline_registry` (do_not_write_directly = true)
+- Added `normalizeSource()` + `SOURCE_ALIASES` map to `_shared/normalizeVehicle.ts`
+- Added 6-hour cron (job 413) for census refresh
+- Key findings: 30 canonical platforms, 273K sold, 3.8K RNM, 5K for_sale, 1K active
+- BaT: 122K sold + 3.2K RNM. Gooding median $181K. Broad Arrow median $400K.
+
+### [data-quality] Data Quality Followup Audit (6 areas)
+- **Frankenrecord detection**: 12 definite frankenrecords found (wrong vehicle events merged), 0.004% of 270K active. Report: `reports/frankenrecord-detection-2026-03-15.md`
+- **Craigslist data quality**: 1,142 of 1,943 CL vehicles (59%) have garbled models (scraper concatenated model+date+mileage+city+price). Recoverable via regex + snapshots. Report: `reports/craigslist-data-quality-2026-03-15.md`
+- **Body style long tail**: 2,176 non-canonical values across 5 categories (case variants, new canonical types, composites, junk, non-vehicles). Full cleanup plan in `reports/body-style-cleanup-2026-03-15.md`
+- **Inactive vehicle audit**: 16,444 vehicles incorrectly inactivated (have images/events). Includes $2.5M Koenigsegg, McLaren P1, Ford GT. Promotion query ready. Report: `reports/inactive-vehicle-audit-2026-03-15.md`
+- **Backup verification**: 275 MB dump exists but can't verify (pg_restore v14 vs dump v1.16). Need Postgres 16+ tools.
+- **VACUUM FULL assessment**: NOT recommended for vehicle_images (0.3% dead). auction_comments needs regular VACUUM first (7.4% dead, NEVER vacuumed).
+
 ### [data-quality] VIN Decoder Expansion + Quality Gate Wiring
 - VIN decoder: GM passenger car support (Corvette, Camaro, Nova, Chevelle, Impala, Monte Carlo, Pontiac, Olds, Buick, Cadillac)
 - VIN decoder: Corvette disambiguation via series 9 + Z-prefix sequential detection
@@ -17,6 +47,18 @@
 - **7,697 listings backfilled** (of 9,695 candidates; ~2K had no valid image URLs in raw data)
 - **5,145 vehicles enriched** with propagated images (primary_image_url + vehicle_images rows)
 - 0 errors across 17 batches of 500, zero-cost data recovery from existing DB content
+
+### [data-recovery] Snapshot Image Extraction
+- Fixed batch-extract-snapshots: reads HTML from Supabase Storage (was only checking inline html — null for 99.99% of snapshots)
+- Added universal image extraction: og:image, JSON-LD, platform-specific gallery patterns
+- Added `primary_image_url` to field map (was missing entirely from batch extractor)
+- **Bonhams: 978 vehicles got images** (85% hit rate)
+- **Mecum: 793+ and running** (~30% hit rate)
+- Running across bat + carsandbids next
+
+### [diagnosis] Anthropic API credits depleted
+- Haiku worker returning 400: "credit balance is too low" — blocks 5,910 queue items
+- Needs credit top-up at console.anthropic.com
 
 ### [ingest] FB Marketplace End-to-End Wiring
 - Vehicle linking in `extract-facebook-marketplace` direct mode: VIN match → `vehicle_id`, YMM+State → `suggested_vehicle_id`
@@ -3775,3 +3817,9 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - 365K listing page snapshots (48K pending extraction)
 - 6 GM service manuals (1,111 chunks), 9,649 LMC truck parts catalog
 - 31,585 reference library entries, 128 observation sources with trust scores
+
+### 2026-03-15
+- [feed] Recreated vehicle_valuation_feed MV with 5 missing columns (city, state, listing_location, canonical_vehicle_type, has_photos) + all indexes including new idx_vvf_updated_at
+- [feed] Fixed FINDS sort button — added finds→deal_score mapping in useFeedQuery.ts
+- [feed] Time labels now show "updated Xd ago" when updated_at >> created_at (>24h delta)
+- [feed] Added error state UI to FeedPage with RETRY button (was infinite skeleton on failure)
