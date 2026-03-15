@@ -22,6 +22,7 @@ function shade(index: number, total: number): string {
 function TreemapCell(props: any) {
   const { x, y, width, height, model, count, avg_price, index, colors } = props;
   if (width < 2 || height < 2) return null;
+  if (count == null) return null;
 
   const showLabel = width > 40 && height > 28;
   const showCount = width > 55 && height > 40;
