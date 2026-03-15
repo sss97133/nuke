@@ -184,12 +184,12 @@ async function handleClassify(body: any, t0: number): Promise<Response> {
     family_confidence: null,
     confidence: 0,
     top5: [],
-    is_vehicle: false,
+    is_vehicle: null,
     source: "unavailable",
     cost_usd: 0,
-    error: "YONO sidecar not available",
+    error: "YONO vision service is temporarily unavailable. Retry later.",
     elapsed_ms: Date.now() - t0,
-  });
+  }, 503);
 }
 
 // ── /analyze ──────────────────────────────────────────────────────────────
@@ -222,9 +222,11 @@ async function handleAnalyze(
   const analyzeSource = analyzeResult?.model ?? null;
 
   let source = "unavailable";
+  let statusCode = 200;
   if (classifyResult && analyzeResult) source = "yono";
   else if (classifyResult) source = "yono_classify_only";
   else if (analyzeResult) source = "yono_analyze_only";
+  else statusCode = 503; // Both services unavailable
 
   return json({
     // Classification
@@ -258,7 +260,8 @@ async function handleAnalyze(
     cost_usd: 0,
     elapsed_ms: Date.now() - t0,
     image_url,
-  });
+    ...(statusCode === 503 ? { error: "YONO vision service is temporarily unavailable. Retry later." } : {}),
+  }, statusCode);
 }
 
 // ── /batch ────────────────────────────────────────────────────────────────

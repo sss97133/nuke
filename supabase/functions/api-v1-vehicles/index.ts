@@ -196,17 +196,18 @@ serve(async (req) => {
         const priceMaxFilter = url.searchParams.get("price_max");
         const transmissionFilter = url.searchParams.get("transmission");
         const mileageMaxFilter = url.searchParams.get("mileage_max");
-        const sortBy = url.searchParams.get("sort") || "created_at";
+        const sortBy = url.searchParams.get("sort") || "data_quality_score";
         const sortDir = url.searchParams.get("sort_dir") === "asc";
-        const allowedSortFields = ["created_at", "year", "sale_price", "mileage", "updated_at"];
-        const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "created_at";
+        const allowedSortFields = ["created_at", "year", "sale_price", "mileage", "updated_at", "data_quality_score"];
+        const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "data_quality_score";
 
         let query = supabase
           .from("vehicles")
           .select(`
             id, year, make, model, trim, series, vin, mileage,
             color, transmission, body_style, sale_price,
-            purchase_price, is_public, created_at, owner_id, primary_image_url
+            purchase_price, is_public, created_at, owner_id, primary_image_url,
+            data_quality_score
           `, { count: "estimated" })
           // Filter stub vehicles (no year/make/model) from inventory listings
           .not("year", "is", null)
@@ -261,7 +262,7 @@ serve(async (req) => {
         }
 
         const { data, error, count } = await query
-          .order(safeSortBy, { ascending: sortDir })
+          .order(safeSortBy, { ascending: sortDir, nullsFirst: false })
           .range(offset, offset + limit - 1);
 
         if (error) {
@@ -270,6 +271,7 @@ serve(async (req) => {
 
         return new Response(
           JSON.stringify({
+            data: data,
             vehicles: data,
             pagination: {
               page,
