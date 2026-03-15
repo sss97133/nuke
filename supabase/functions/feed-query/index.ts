@@ -196,12 +196,24 @@ serve(async (req) => {
       query = query.not("make", "in", `(${NON_AUTO_MAKES.join(",")})`);
     }
 
-    // Dealer penalty: hide dealer listings from default feed.
-    // When user is actively searching, show dealers in results.
-    // When user explicitly sets include_dealers=true, show them.
+    // Dealer penalty: hide actual dealer listings from default feed.
+    // Auction houses (BaT, Mecum, etc.) and marketplaces are NOT dealers.
+    // When user is actively searching or sets include_dealers=true, show all.
     const showDealers = body.include_dealers === true || isSearching;
     if (!showDealers) {
-      query = query.is("origin_organization_id", null);
+      // Fetch actual dealer org IDs (business_type = 'dealer'), then exclude them
+      const { data: dealerOrgs } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("business_type", "dealer");
+      const dealerIds = (dealerOrgs ?? []).map((o: any) => o.id);
+      if (dealerIds.length > 0) {
+        query = query.not(
+          "origin_organization_id",
+          "in",
+          `(${dealerIds.join(",")})`,
+        );
+      }
     }
 
     // Quality floor: skip scam-price listings (default $500 minimum)

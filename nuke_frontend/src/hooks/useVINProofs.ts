@@ -68,7 +68,10 @@ export function useVINProofs(vehicleId: string | undefined) {
         if (error) {
           const status = (error as any)?.status;
           const message = String((error as any)?.message || '');
-          if (status === 404 || message.includes('404')) {
+          const code = String((error as any)?.code || '');
+          // Table may not exist yet — PostgREST returns 404, 42P01, or "relation" errors
+          if (status === 404 || message.includes('404') || code === '42P01' ||
+              message.includes('relation') || message.includes('does not exist')) {
             setSummary(null);
             setLoading(false);
             return;
