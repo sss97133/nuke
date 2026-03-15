@@ -520,7 +520,9 @@ async function handleUrlMode(body: { url: string; user_id?: string }) {
     });
   }
 
-  // Scrape
+  // NOTE: Firecrawl blocks facebook.com (403). URL mode only works if a
+  // residential proxy is configured. For most use cases, prefer mode: "direct"
+  // with pre-extracted data from the DOM (Claude in Chrome, etc.).
   console.log(`Scraping FB Marketplace: ${normalizedUrl}`);
   const scrapeResult = await scrapeWithFirecrawl(normalizedUrl);
   const data = scrapeResult.data || scrapeResult;
