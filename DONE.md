@@ -2,6 +2,21 @@
 
 ## 2026-03-14
 
+### [pipeline] Image Medium Detection in Photo Pipeline
+- Added `image_medium` (photograph/render/drawing/screenshot) + `medium_context` to Gemini Flash classification prompt in `photo-pipeline-orchestrator`
+- Gemini is now the authority for `image_medium` — removed DB write from `yono-analyze` to prevent overwrites
+- Upgraded Gemini `2.0-flash` → `2.5-flash` (old model deprecated for new API keys)
+- Disabled thinking tokens for classification (was consuming output budget, truncating JSON)
+- Added thinking-aware response parsing (filter `thought` parts, take last text part)
+- Removed stale leaked `GOOGLE_AI_API_KEY` from Supabase secrets
+- Verified: 5 images correctly classified with `image_medium: photograph`, `medium_context: "real photograph"`
+
+### [images] Photo Sync Engine — Camera Roll → Vehicle Pipeline
+- Created `scripts/photo-sync.mjs` — scans macOS Photos by date, filters via Apple ML labels, clusters into sessions, uploads to storage, calls image-intake for Claude vision classification + vehicle matching
+- Migration: `photo_sync_log` table (per-run history), `pending_image_assignments` table (unmatched photo staging)
+- Registered in package.json (`sync:photos`) and TOOLS.md
+- Dry-run verified: 16 truck photos from Mar 13 correctly detected and clustered into 1 session at Boulder City, NV
+
 ### [yono] Make Classifier v2 — Full Training Pipeline Rewrite
 - Rewrote `yono/modal_train_hierarchical.py`: 650 → 1,594 lines
 - **Label cleaning**: MAKE_ALIASES expanded 14 → ~200 entries, EXCLUDED_MAKES set (~400 entries) for motorcycles/boats/memorabilia/junk. 2,171 unique makes → ~100 clean makes
@@ -3588,3 +3603,14 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 ## 2026-03-14
 
 [frontend] Deep image analysis UI — forensic analysis rendering in ImageExpandedData (condition, surface, degradation, color swatches, modifications, subject, environment, forensic notes), ImageInfoPanel (compact forensic block in tags tab), ImageZoneSection (fabrication_stage badge + deep score support on thumbnails). Commit `80de4709b`.
+
+### [condition] Condition Encyclopedia + Scoring System Rebuild (Complete)
+- Phase 1: Ingested 2 OEM service manuals (1982 GMC + 1973 Chevrolet) → 1,111 chunks in service_manual_chunks
+- Phase 2: Extracted 1,084 condition knowledge entries (614 failure modes, 470 specifications) into condition_knowledge table
+- Phase 3: Expanded taxonomy 69 → 202 descriptors, 45 → 299 aliases
+- Phase 4: Fixed condition bridge — zone-aware domain assignment, severity inference from condition_score, case-insensitive flag matching, multi-domain baselines
+- Phase 5: Bulk re-bridged 34,389 images → 18,923 ICOs across 4 domains (was: exterior only)
+- Scoring: Min=32.5, Max=85.0, Avg=73.7, StdDev=10.1 (was: 35-65, avg=61.7, stddev=7.4)
+- Tiers: 127 excellent, 196 good, 46 driver, 4 project (was: all good/driver)
+- 25 descriptors in use (was: 3), 4 domains with observations (was: 1)
+- Commit: d57b4dc4e + bulk-bridge.py

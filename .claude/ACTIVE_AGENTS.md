@@ -22,32 +22,12 @@
 
 ## CURRENTLY ACTIVE
 
-(none — all Mar 13 sessions complete)
+(none)
 
 ---
 
-## COMPLETED (Mar 13)
+## COMPLETED (Mar 14)
 
-- Night shift: Vehicle profile context integration — committed
-- YONO training pipeline: Autonomous daily training — committed
-- Modal rearchitecture: Batch-first, scale-to-zero — committed
-- Feed rebuild: Brand Heartbeat + Chrome Collapse — committed `1cda47f06`
-- Vehicle profile quality: Image filtering, source attribution — committed
-- Image sessions: DB schema through frontend — committed `266bb6193`
-- Surface mapping: Schema + backfill + pipeline + NLQ — committed
-- Platform health: Column fixes, index cleanup, 643 MB reclaimed — committed
-
-- Market section research & planning — 2026-03-13 — touching: src/*market*, routes, DB queries for market data
-2026-03-13 20:31 | vehicle-taxonomy-normalization | scripts/mass-vin-decode.ts, scripts/build-canonical-models.ts, scripts/backfill-from-vin.ts, scripts/retrigger-normalization.ts
-- 2026-03-13 21:40 | vehicle-dossier-implementation | COMPLETE — committed `43230ea65`
-
-- 2026-03-13 22:30 | platform-health-remediation | COMPLETE — committed `ba0248148`
-
-
-- 2026-03-13 23:00 | training-data-quality-hardening | Tier 1+2a: confidence recalibration, template expansion, condition scoring, broken trigger fix | touching: yono/, scripts/, DB triggers, surface_observations, vehicle_condition_scores
-
-- 2026-03-14 | full-codebase-audit-cleanup | P0 nav fixes + P1 dead code deletion | touching: src/components/organization/, src/pages/, src/services/, src/hooks/, routes
-
-
-
-- 2026-03-14 | condition-encyclopedia-rebuild | Phases 1-5: service manual ingest, condition knowledge extraction, taxonomy expansion, bridge fixes, re-scoring | touching: scripts/ingest-service-manual.py, scripts/extract-condition-knowledge.py, scripts/expand-condition-taxonomy.py, yono/condition_spectrometer.py, supabase/migrations/
+| Agent | Task | Completed |
+|-------|------|-----------|
+| Condition Encyclopedia | Full rebuild: manual ingest, knowledge extraction, taxonomy expansion, bridge v2, score-all | 2026-03-14 |
