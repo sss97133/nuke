@@ -42,6 +42,88 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+// ── Vehicle Linking ──────────────────────────────────────────────────────────
+
+/**
+ * Attempt to link a marketplace listing to an existing vehicle record.
+ *
+ * Strategy:
+ *   1. VIN exact match → vehicle_id (strong link)
+ *   2. Year + Make + Model + same state → suggested_vehicle_id (soft link)
+ *
+ * Returns { vehicle_id, suggested_vehicle_id } — one or both may be null.
+ */
+async function linkToVehicle(params: {
+  vin?: string | null;
+  parsed_year?: number | null;
+  parsed_make?: string | null;
+  parsed_model?: string | null;
+  location?: string | null;
+  description?: string | null;
+}): Promise<{ vehicle_id: string | null; suggested_vehicle_id: string | null }> {
+  const out = { vehicle_id: null as string | null, suggested_vehicle_id: null as string | null };
+
+  // Extract VIN from description if not provided directly
+  let vin = params.vin ?? null;
+  if (!vin && params.description) {
+    const vinMatch = params.description.match(/\b([A-HJ-NPR-Z0-9]{17})\b/i);
+    if (vinMatch) vin = vinMatch[1].toUpperCase();
+  }
+
+  // 1. VIN match — strongest signal
+  if (vin) {
+    const { data: vinHit } = await supabase
+      .from("vehicles")
+      .select("id")
+      .eq("vin", vin)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+
+    if (vinHit) {
+      out.vehicle_id = vinHit.id;
+      return out;
+    }
+  }
+
+  // 2. YMM + state match — soft link
+  const { parsed_year, parsed_make, parsed_model, location } = params;
+  if (!parsed_year || !parsed_make) return out;
+
+  // Parse state from "City, ST" format
+  const stateMatch = location?.match(/,\s*([A-Z]{2})$/);
+  const state = stateMatch ? stateMatch[1] : null;
+
+  let query = supabase
+    .from("vehicles")
+    .select("id")
+    .eq("year", parsed_year)
+    .ilike("make", parsed_make)
+    .eq("status", "active")
+    .limit(5);
+
+  if (parsed_model) {
+    query = query.ilike("model", parsed_model);
+  }
+
+  if (state) {
+    query = query.eq("state", state);
+  }
+
+  const { data: ymmHits } = await query;
+
+  if (ymmHits && ymmHits.length === 1) {
+    // Single match — high confidence suggestion
+    out.suggested_vehicle_id = ymmHits[0].id;
+  } else if (ymmHits && ymmHits.length > 1 && ymmHits.length <= 3) {
+    // Few matches — suggest the first (caller can review)
+    out.suggested_vehicle_id = ymmHits[0].id;
+  }
+  // 4+ matches = too ambiguous, don't suggest
+
+  return out;
+}
+
 // ── Direct Mode ──────────────────────────────────────────────────────────────
 
 interface DirectInput {
@@ -137,6 +219,26 @@ async function handleDirect(body: DirectInput) {
       };
     }
 
+    // Attempt vehicle linking if not already linked
+    let vehicleId = existing.vehicle_id;
+    if (!vehicleId) {
+      const link = await linkToVehicle({
+        vin: null,
+        parsed_year: body.parsed_year,
+        parsed_make: body.parsed_make,
+        parsed_model: body.parsed_model,
+        location: body.location,
+        description: body.description,
+      });
+      if (link.vehicle_id) {
+        updates.vehicle_id = link.vehicle_id;
+        vehicleId = link.vehicle_id;
+      }
+      if (link.suggested_vehicle_id) {
+        updates.suggested_vehicle_id = link.suggested_vehicle_id;
+      }
+    }
+
     await supabase
       .from("marketplace_listings")
       .update(updates)
@@ -145,13 +247,22 @@ async function handleDirect(body: DirectInput) {
     return jsonResponse({
       success: true,
       listing_id: existing.id,
-      vehicle_id: existing.vehicle_id,
+      vehicle_id: vehicleId,
       is_new: false,
       submission_count: (existing.submission_count || 1) + 1,
     });
   }
 
-  // New listing — insert
+  // New listing — attempt vehicle linking before insert
+  const link = await linkToVehicle({
+    vin: null,
+    parsed_year: body.parsed_year,
+    parsed_make: body.parsed_make,
+    parsed_model: body.parsed_model,
+    location: body.location,
+    description: body.description,
+  });
+
   const row: Record<string, unknown> = {
     facebook_id: facebookId,
     platform: "facebook_marketplace",
@@ -183,6 +294,10 @@ async function handleDirect(body: DirectInput) {
     },
   };
 
+  // Apply vehicle linking results
+  if (link.vehicle_id) row.vehicle_id = link.vehicle_id;
+  if (link.suggested_vehicle_id) row.suggested_vehicle_id = link.suggested_vehicle_id;
+
   const { data: inserted, error: insertError } = await supabase
     .from("marketplace_listings")
     .insert(row)
@@ -197,6 +312,7 @@ async function handleDirect(body: DirectInput) {
     vehicle_id: inserted!.vehicle_id,
     is_new: true,
     submission_count: 1,
+    linked_via: link.vehicle_id ? "vin" : link.suggested_vehicle_id ? "ymm_match" : null,
   });
 }
 
