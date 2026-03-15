@@ -2,6 +2,68 @@
 
 ## 2026-03-15
 
+### [data-quality] VIN Decoder Expansion + Quality Gate Wiring
+- VIN decoder: GM passenger car support (Corvette, Camaro, Nova, Chevelle, Impala, Monte Carlo, Pontiac, Olds, Buick, Cadillac)
+- VIN decoder: Corvette disambiguation via series 9 + Z-prefix sequential detection
+- VIN decoder: Modern WMI map expanded to 50+ prefixes (Porsche, BMW, Ferrari, Toyota, Honda, etc.)
+- VIN decoder: Fix prefix match ordering (3-char before 2-char) — fixes 1GC→null bug
+- Ingest VIN cross-check: extended from 17-char only to all VINs ≥6 chars (catches pre-1981 mismatches)
+- Ingest VIN cross-check: pre-1981 model mismatch detection (Corvette↔Camaro, Corvette↔Chevelle, etc.)
+- Quality gate wired into: extract-cars-and-bids-core, process-orphan-snapshots, extract-jamesedition, extract-barn-finds-listing
+- All 5 functions deployed to production, VIN rejection verified live
+
+### [data-recovery] FB Marketplace Image Backfill — COMPLETE
+- Backfill: extracted images from raw_scrape_data → marketplace_listings.all_images + vehicle_images
+- **7,697 listings backfilled** (of 9,695 candidates; ~2K had no valid image URLs in raw data)
+- **5,145 vehicles enriched** with propagated images (primary_image_url + vehicle_images rows)
+- 0 errors across 17 batches of 500, zero-cost data recovery from existing DB content
+
+### [ingest] FB Marketplace End-to-End Wiring
+- Vehicle linking in `extract-facebook-marketplace` direct mode: VIN match → `vehicle_id`, YMM+State → `suggested_vehicle_id`
+- DOM extraction snippet: `scripts/fb-marketplace-dom-extractor.js` — relay store + DOM + meta tag extraction for Claude in Chrome
+- MCP server v0.4.0: committed Tool 11 (`ingest_marketplace_listing`), pushed to GitHub, build passes
+- Legacy URL mode: confirmed Firecrawl returns 403 for facebook.com, documented as best-effort, direct mode preferred
+- README updated with `ingest_marketplace_listing` tool docs
+
+### [ingest] Direct Agent Ingest for FB Marketplace
+- Rewrote `extract-facebook-marketplace` edge function: added `mode: "direct"` for pre-extracted data from browser agents
+- Fixed legacy URL mode: removed 13 broken columns (`external_id`, `asking_price`, `location_city`, etc.), mapped to actual `marketplace_listings` schema
+- Idempotent on `facebook_id` — re-submissions bump `submission_count`, merge non-null fields
+- Agent provenance stored in `raw_scrape_data.agent_context`
+- Registered `claude-in-chrome` in `agent_registry` (trust_level: trusted)
+- Added `ingest_marketplace_listing` tool (Tool 11) to MCP server, bumped to v0.4.0
+- Deployed and tested (direct ingest + idempotency + cleanup)
+
+### [data-quality] Database Clean-Out — 7 Phase Plan
+- Phase 1: Body style canonicalization — 16,374 → 2,049 non-canonical active (87.5% reduction). Code: enhanced `normalizeBodyStyle()` with prefix stripping, slash handling, null mapping
+- Phase 2: Model cleanup — 407 → 0 active vehicles with model > 80 chars (Bonhams chassis numbers, Craigslist prices stripped)
+- Phase 3: YMM backfill — parsed year from URLs for BaT/Bonhams/Gooding/RM. Downgraded 1,442 memorabilia items (missing all three) to pending
+- Phase 4: Source attribution — 50,385 → 0 active vehicles with NULL discovery_source (46K from `source` column)
+- Phase 5: Rejected purge — DONE. 105K vehicles + 1.56M images + 103K observations + 9.7K surface_observations deleted
+- Phase 6: Discovered triage — 514 promoted to active, 290,665 downgraded to inactive, 3,357 kept as discovered
+- Phase 7: Empty tables — none droppable (previous sessions already cleaned)
+- VACUUM ANALYZE run on vehicles, vehicle_images, vehicle_observations, surface_observations
+- Frankenrecord fix: El Camino/Corvette/Nova II separated into 3 clean profiles (Corvette `f000e472` created)
+- Final: 633K vehicles (270K active, 311K inactive, 35K pending, 12.6K sold, 3.4K discovered)
+
+### [ingest] Validation Gate + Image Backfill + Schema Endpoint
+- Wired `normalizeVehicleFields`, `qualityGate`, VIN cross-check into `/ingest`
+- VIN-make mismatch → rejected (Ford VIN as Chevy caught), anachronistic fuel flagged
+- Quality score 0-1 returned on every response; rejected returns issues+suggestions
+- GET `/ingest` returns full schema docs (field types, examples, validation checks) for agent self-discovery
+- `refine-fb-listing`: new `backfill_images` action extracts images from `raw_scrape_data` JSONB → `all_images` + propagates to `vehicle_images` (10K+ recoverable)
+- `fb-marketplace-orchestrator`: cadence tracking per state in `brief` action — staleness alerts, recommended scrape command
+- All 3 functions deployed and verified
+
+### [data-quality] Data Quality Cleanup & Hardening — All 6 Phases Complete
+- **Phase 1:** Added `normalizeTrim()`, `normalizeModel()`, `normalizeBodyStyle()`, `normalizeColor()` to `_shared/normalizeVehicle.ts`. Enhanced `normalizeTransmission()` with regex word-to-number conversion.
+- **Phase 2:** Wired `normalizeVehicleFields()` into all extractors: barrett-jackson, bat-core, gooding, haiku-worker, pcarmarket.
+- **Phase 3 (SQL):** Cleaned 55K+ verbose transmissions, 100 polluted trims, 28 polluted models, 1.4K HTML entities in interior_color.
+- **Phase 4:** Hardened `merge_into_primary()` — cross-platform merges no longer blindly reassign images (prevents El Camino/Corvette contamination).
+- **Phase 5:** Added pollution penalties to `compute_vehicle_quality_score()`: trim>80 chars (-20pts), model with auction metadata (-30pts), transmission>40 chars (-5pts).
+- **Phase 6:** Created `data_quality_pollution_report` monitoring view.
+- Migrations: `harden_merge_into_primary_platform_guard`, `data_quality_score_pollution_penalties`, `create_data_quality_pollution_report_view`
+
 ### [extraction] BaT Perfect Ingestion Pipeline — Phases 1-5 Complete
 - **Phase 1 (Ground Truth):** Created `_shared/batParser.ts` (shared parsing module extracted from extract-bat-core + bat-snapshot-parser). Built `bat-extraction-test-harness` edge function — samples vehicles across price buckets, compares DB vs snapshot extraction field-by-field. Created `bat_test_results` + `bat_quarantine` tables.
 - **Phase 2 (Validation + Tetris):** Enhanced `extractionQualityGate.ts` with VIN MOD11 checksum, era-based price bounds, cross-field consistency, make canonicalization. Built `_shared/batUpsertWithProvenance.ts` (Tetris write layer: gap-fill + confirmation + conflict→quarantine). Wired quality gate + Tetris into `bat-snapshot-parser`.

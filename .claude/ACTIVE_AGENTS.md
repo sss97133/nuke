@@ -24,7 +24,7 @@
 
 | Agent | Task | Started | Files/Areas |
 |-------|------|---------|-------------|
-| (none) | | | |
+| (none) | | |  |
 
 ---
 
@@ -37,3 +37,8 @@
 | Agent Ingestion Design | Plan/measure agent-first ingestion API | 2026-03-15 09:15 |
 | Data Quality Cleanup | Phase 1-6 data quality hardening — normalizeVehicle.ts, extractor wiring, batch SQL cleanup, merge guard, quality score | 2026-03-15 10:00 | _shared/normalizeVehicle.ts, import-pcarmarket-listing/, extract-gooding/, extract-barrett-jackson/, haiku-extraction-worker/, merge SQL |
 | BaT Description Analysis | COMPLETED — deterministic extraction analysis, see /tmp/bat-deterministic-extraction-report.md | 2026-03-15 10:30 | /tmp/bat-* analysis scripts, read-only |
+
+| GLiNER Extraction | COMPLETED — Modal GLiNER deploy for BaT NER (Layer 3) | 2026-03-15 12:30 | yono/modal_extract.py |
+| Data Sanity Agent | Canonical Vehicle Identity (source_alias_mapping, canonical columns, trigger, census view) | 2026-03-15 12:48 | SQL migrations, _shared/normalizeVehicle.ts, pipeline_registry |
+| Backfill+VIN+QGate | DONE — 7,697 images backfilled, 5,145 vehicles enriched, VIN decoder expanded (pre-1981 GM cars+50 modern WMIs), quality gate in 4 extractors | 2026-03-15 15:30 | refine-fb-listing, _shared/vin-decoder.ts, extract-cars-and-bids-core, ingest |
+| Data-Quality-Followup | Frankenrecord detection, CL data quality, body style cleanup, inactive audit, backup verify | 2026-03-15 15:00 | SQL queries (read-only), vehicles, vehicle_events, origin_metadata |
