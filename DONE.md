@@ -2,6 +2,15 @@
 
 ## 2026-03-15
 
+### [extraction] BaT Perfect Ingestion Pipeline — Phases 1-5 Complete
+- **Phase 1 (Ground Truth):** Created `_shared/batParser.ts` (shared parsing module extracted from extract-bat-core + bat-snapshot-parser). Built `bat-extraction-test-harness` edge function — samples vehicles across price buckets, compares DB vs snapshot extraction field-by-field. Created `bat_test_results` + `bat_quarantine` tables.
+- **Phase 2 (Validation + Tetris):** Enhanced `extractionQualityGate.ts` with VIN MOD11 checksum, era-based price bounds, cross-field consistency, make canonicalization. Built `_shared/batUpsertWithProvenance.ts` (Tetris write layer: gap-fill + confirmation + conflict→quarantine). Wired quality gate + Tetris into `bat-snapshot-parser`.
+- **Phase 3 (Bug Fixes):** Fixed transmission stripping bug (5.6% → 67.9% accuracy), VIN length (36.8% → 86.7%), added body style patterns. Overall accuracy: 80.7% → 85.4%.
+- **Phase 4 (Price Propagation):** Built `bat-price-propagation` edge function — cross-validates bat_listings prices against snapshot HTML, propagates via Tetris write layer.
+- **Phase 5 (Discovery):** Daily discovery cron (`0 6 * * *`), weekly price propagation cron (`0 8 * * 0`). Ran discovery: 44 new URLs found in 5 pages.
+- Key files: `_shared/batParser.ts`, `_shared/batUpsertWithProvenance.ts`, `bat-extraction-test-harness/`, `bat-price-propagation/`
+- All functions deployed. Storage-aware (HTML in listing-snapshots bucket, not DB).
+
 ### [library] GM Service Manual Ingestion — 6 New Manuals (2,295 chunks)
 - Ingested 6 GM Light Duty Truck service manuals (1974, 1975, 1976, 1978, 1979, 1980) into service_manual_chunks
 - Created 6 reference_libraries entries with proper make/model/series for trigger compatibility

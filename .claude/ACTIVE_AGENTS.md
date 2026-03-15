@@ -24,7 +24,7 @@
 
 | Agent | Task | Started | Files/Areas |
 |-------|------|---------|-------------|
-| BaT Ingestion Pipeline | Phase 1-6 BaT perfect ingestion — shared parser, test harness, quality gate, Tetris writes, price propagation | 2026-03-15 09:30 | _shared/batParser.ts, _shared/batUpsertWithProvenance.ts, _shared/extractionQualityGate.ts, extract-bat-core/, bat-snapshot-parser/, bat-extraction-test-harness/ |
+| (none) | | | |
 
 ---
 
@@ -36,4 +36,4 @@
 | UI Debug Agent | Popups + vehicle loading investigation, search page debugging | 2026-03-15 08:19 |
 | Agent Ingestion Design | Plan/measure agent-first ingestion API | 2026-03-15 09:15 |
 | Data Quality Cleanup | Phase 1-6 data quality hardening — normalizeVehicle.ts, extractor wiring, batch SQL cleanup, merge guard, quality score | 2026-03-15 10:00 | _shared/normalizeVehicle.ts, import-pcarmarket-listing/, extract-gooding/, extract-barrett-jackson/, haiku-extraction-worker/, merge SQL |
-| BaT Description Analysis | Analyzing deterministic extraction potential from BaT descriptions — regex vs LLM | 2026-03-15 10:00 | /tmp/bat-* analysis scripts, read-only |
+| BaT Description Analysis | COMPLETED — deterministic extraction analysis, see /tmp/bat-deterministic-extraction-report.md | 2026-03-15 10:30 | /tmp/bat-* analysis scripts, read-only |
