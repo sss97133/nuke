@@ -7,6 +7,7 @@ import { useVehiclesDashboard } from '../hooks/useVehiclesDashboard';
 import { useAppLayoutContext } from '../components/layout/AppLayoutContext';
 import { GarageToolbar } from '../components/garage/GarageToolbar';
 import { applyNonAutoFilters } from '../lib/nonAutoExclusion';
+import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlideshow';
 
 /** Simple stats loader for the public landing page — no auth or complex fallbacks needed. */
 function useLandingStats() {
@@ -447,6 +448,31 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
         </div>
       </div>
 
+      {/* See an example CTA */}
+      <Link
+        to="/vehicle/b5f3087c-77cf-4000-bd14-b7a3ed42e5c1"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '8px 20px',
+          fontSize: 9,
+          fontWeight: 700,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          border: '2px solid var(--border)',
+          background: 'transparent',
+          color: 'var(--text-secondary)',
+          textDecoration: 'none',
+          marginBottom: 24,
+          transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+      >
+        See a vehicle profile in action &rarr;
+      </Link>
+
       {/* Live stats */}
       <div
         style={{
@@ -766,6 +792,19 @@ export default function HomePage() {
     setSearchParams(tab === 'garage' && user ? {} : { tab }, { replace: true });
   };
 
+  // Onboarding for first-time authenticated users
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  useEffect(() => {
+    if (!authLoading && user && !localStorage.getItem('nuke_onboarding_seen')) {
+      setShowOnboarding(true);
+    }
+  }, [authLoading, user]);
+
+  const handleOnboardingClose = () => {
+    setShowOnboarding(false);
+    localStorage.setItem('nuke_onboarding_seen', '1');
+  };
+
   // Logged-out users with no explicit tab request see the landing page
   if (!authLoading && !user && !showFeed) {
     return <LandingHero onBrowse={() => setShowFeed(true)} />;
@@ -773,6 +812,9 @@ export default function HomePage() {
 
   return (
     <div>
+      {showOnboarding && (
+        <OnboardingSlideshow isOpen={showOnboarding} onClose={handleOnboardingClose} />
+      )}
       {/* Tab bar — only show for non-feed tabs (feed uses its own chrome) */}
       {activeTab !== 'feed' && (
         <div

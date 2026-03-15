@@ -51,6 +51,10 @@ const VehicleScoresWidget: React.FC = () => {
   const { vehicle } = useVehicleProfile();
   const [collapsed, setCollapsed] = React.useState(false);
 
+  // Don't render if all scores are null
+  const hasAnyScore = SCORES.some((score) => score.getValue(vehicle) != null);
+  if (!hasAnyScore) return null;
+
   return (
     <div className={`widget ${collapsed ? 'widget--collapsed' : ''}`} id="widgetScores">
       <div className="widget__header">

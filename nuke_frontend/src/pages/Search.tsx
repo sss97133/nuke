@@ -658,14 +658,11 @@ export default function Search() {
         ]
       },
       {
-        title: 'Market & Money',
-        helper: 'Investment, trading, and contracts',
+        title: 'Market & Data',
+        helper: 'Pricing, comps, and market intelligence',
         actions: [
           { label: 'Market dashboard', href: '/market' },
-          { label: 'Browse investments', href: '/market/browse' },
-          { label: 'Market segments', href: '/market/segments' },
-          { label: 'Builder workspace', href: '/market/builder' },
-          { label: 'Contract station', href: '/market/contracts' }
+          { label: 'API & SDK', href: '/api' },
         ]
       },
       {
@@ -1145,7 +1142,7 @@ export default function Search() {
                     showPriceOverlay={true}
                     showDetailOverlay={true}
                     infoDense={true}
-                    thumbnailFit="cover"
+                    thumbnailFit="contain"
                   />
                 ))}
               </div>
