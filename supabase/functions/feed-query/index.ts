@@ -276,8 +276,9 @@ serve(async (req) => {
       query = query.or("is_sold.is.null,is_sold.eq.false");
     }
 
-    // Has images
-    if (body.has_images === true) {
+    // Has images — default to only showing vehicles with photos in feed
+    // Pass has_images=false explicitly to include vehicles without photos (e.g. search results)
+    if (body.has_images !== false) {
       query = query.eq("has_photos", true);
     }
 
@@ -363,6 +364,18 @@ serve(async (req) => {
     for (const img of thumbResult.data ?? []) {
       if (!thumbMap.has(img.vehicle_id)) {
         thumbMap.set(img.vehicle_id, img);
+      }
+    }
+
+    // Pass 2: For vehicles missing a primary image, fall back to first usable image
+    const missingThumbIds = vehicleIds.filter((id: string) => !thumbMap.has(id));
+    if (missingThumbIds.length > 0) {
+      const { data: fallbackImages } = await supabase
+        .rpc("get_first_images_for_vehicles", { vehicle_ids: missingThumbIds });
+      for (const img of fallbackImages ?? []) {
+        if (!thumbMap.has(img.vehicle_id)) {
+          thumbMap.set(img.vehicle_id, img);
+        }
       }
     }
 
@@ -454,6 +467,11 @@ serve(async (req) => {
       };
     });
 
+    // No longer filtering out vehicles without thumbnails — the two-pass
+    // image resolution (primary + fallback RPC) handles missing primaries,
+    // and CardImage.tsx renders "NO PHOTO" gracefully for any remaining edge cases.
+    const filteredFeedItems = feedItems;
+
     // ----- Build cursor for next page -----
     let next_cursor: string | null = null;
     if (hasMore && items.length > 0) {
@@ -464,7 +482,7 @@ serve(async (req) => {
 
     // ----- Stats -----
     let stats = {
-      total_vehicles: feedItems.length,
+      total_vehicles: filteredFeedItems.length,
       total_value: 0,
       for_sale_count: 0,
       active_auctions: 0,
@@ -499,7 +517,7 @@ serve(async (req) => {
     }
 
     return json({
-      items: feedItems,
+      items: filteredFeedItems,
       next_cursor,
       total_estimate: stats.total_vehicles,
       stats,
