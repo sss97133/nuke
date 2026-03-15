@@ -24,6 +24,23 @@ function jsonResponse(data: unknown, status = 200) {
   });
 }
 
+// ── Label translation ──────────────────────────────────────────────────────
+// Internal DB labels → consumer-facing SDK labels (matches api-v1-signal)
+const DEAL_LABEL_MAP: Record<string, string> = {
+  plus_3: "strong_buy",
+  plus_2: "buy",
+  plus_1: "buy",
+  fair:   "hold",
+  minus_1: "pass",
+  minus_2: "overpriced",
+  minus_3: "overpriced",
+};
+
+function toDealLabel(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  return DEAL_LABEL_MAP[raw] ?? raw;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -93,7 +110,7 @@ serve(async (req) => {
           estimated_value: vehicle.nuke_estimate || vehicle.current_value || vehicle.sale_price,
           confidence_score: vehicle.nuke_estimate_confidence || null,
           deal_score: vehicle.deal_score || null,
-          deal_score_label: vehicle.deal_score_label || null,
+          deal_score_label: toDealLabel(vehicle.deal_score_label) || null,
           heat_score: vehicle.heat_score || null,
           source: "vehicle_fields",
           vehicle_summary: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
@@ -119,7 +136,7 @@ serve(async (req) => {
           estimated_value: vehicle.nuke_estimate || vehicle.current_value || vehicle.sale_price,
           confidence_score: vehicle.nuke_estimate_confidence || null,
           deal_score: vehicle.deal_score || null,
-          deal_score_label: vehicle.deal_score_label || null,
+          deal_score_label: toDealLabel(vehicle.deal_score_label) || null,
           heat_score: vehicle.heat_score || null,
           source: "vehicle_fields",
           vehicle_summary: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
@@ -136,7 +153,7 @@ serve(async (req) => {
         confidence_score: estimate.confidence_score,
         price_tier: estimate.price_tier,
         deal_score: estimate.deal_score,
-        deal_score_label: estimate.deal_score_label,
+        deal_score_label: toDealLabel(estimate.deal_score_label),
         heat_score: estimate.heat_score,
         heat_score_label: estimate.heat_score_label,
         signal_weights: estimate.signal_weights,
