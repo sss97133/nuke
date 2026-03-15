@@ -18,6 +18,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { normalizeVehicleFields, normalizeMake } from "../_shared/normalizeVehicle.ts";
+import { qualityGate } from "../_shared/extractionQualityGate.ts";
+import { validateVINChecksum } from "../_shared/intelligence-layer.ts";
+import { decodeVin } from "../_shared/vin-decoder.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -95,6 +99,8 @@ function detectSource(url: string): SourceMatch {
 
 // ── Vehicle Title Parser ────────────────────────────────────────
 
+// Title-parsing make list — includes common aliases for matching.
+// normalizeMake() from normalizeVehicle.ts handles canonical form conversion.
 const MAKES = [
   "Toyota", "Ford", "Chevrolet", "Chevy", "Honda", "Nissan", "BMW",
   "Mercedes-Benz", "Mercedes", "Audi", "Porsche", "Volkswagen", "VW",
@@ -107,6 +113,8 @@ const MAKES = [
   "De Tomaso", "Jensen", "TVR", "Morgan", "Sunbeam", "Opel",
   "Willys", "Kaiser", "Nash", "Hudson", "Packard", "Lancia",
   "DeLorean", "Isuzu", "Mitsubishi", "Suzuki", "Eagle",
+  "Aston Martin", "Rolls-Royce", "Bentley", "McLaren", "Bugatti",
+  "Tesla", "Rivian", "Hummer", "International Harvester",
 ];
 
 interface ParsedVehicle {
@@ -141,7 +149,7 @@ function parseVehicleTitle(text: string): ParsedVehicle {
         .slice(0, 3)
         .join(" ")
         .trim() || null;
-      return { year, make: make === "Chevy" ? "Chevrolet" : make, model };
+      return { year, make: normalizeMake(make) || make, model };
     }
   }
 
@@ -443,13 +451,18 @@ interface IngestInput {
 }
 
 interface IngestResult {
-  status: "created" | "matched" | "duplicate" | "error";
-  vehicle_id?: string;
-  discovery_id?: string;
+  status: "created" | "matched" | "duplicate" | "rejected" | "error";
+  vehicle_id?: string | null;
+  discovery_id?: string | null;
   is_new_vehicle?: boolean;
-  source?: string;
-  external_id?: string;
+  source?: string | null;
+  external_id?: string | null;
   error?: string;
+  // Validation gate fields (present when status=rejected or flagged)
+  quality_score?: number;
+  issues?: string[];
+  suggestions?: Record<string, string>;
+  needs_review?: boolean;
 }
 
 async function ingestOne(input: IngestInput, userId: string | null): Promise<IngestResult> {
@@ -530,6 +543,96 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       }
     }
 
+    // ── VALIDATION GATE ─────────────────────────────────────────────
+    // Normalize + validate before writing to DB. Catches: wrong make from
+    // VIN, RPO codes in body_style, impossible fuel/year combos, garbage.
+    const candidateData: Record<string, any> = {
+      year: parsed.year ?? input.year,
+      make: parsed.make ?? input.make,
+      model: parsed.model ?? input.model,
+      vin: input.vin ?? null,
+      price: input.price ?? null,
+      asking_price: input.price ?? null,
+      description: input.description || input.notes || null,
+      mileage: input.mileage ?? null,
+      engine: input.engine ?? null,
+      transmission: input.transmission ?? null,
+      color: input.color ?? null,
+      body_style: (input as any).body_style ?? null,
+      fuel_type: (input as any).fuel_type ?? null,
+      condition: input.condition ?? null,
+    };
+
+    // 1) Normalize fields (make aliases, VIN cleanup, RPO→trim, etc.)
+    normalizeVehicleFields(candidateData);
+
+    // 2) VIN cross-check: if VIN present, verify make against VIN prefix
+    // (checksum is already validated by qualityGate — only do make cross-check here)
+    const vinIssues: string[] = [];
+    const suggestions: Record<string, string> = {};
+    if (candidateData.vin && typeof candidateData.vin === "string" && candidateData.vin.length === 17) {
+      const decoded = decodeVin(candidateData.vin);
+      if (decoded.make && candidateData.make) {
+        const vinMake = normalizeMake(decoded.make);
+        const claimedMake = normalizeMake(candidateData.make);
+        if (vinMake && claimedMake && vinMake !== claimedMake) {
+          vinIssues.push(`vin_make_mismatch: VIN prefix indicates ${vinMake}, claimed ${claimedMake}`);
+          suggestions.make = `VIN indicates ${vinMake}, not ${claimedMake}`;
+        }
+      }
+    }
+
+    // 3) Cross-field sanity checks
+    const crossFieldIssues: string[] = [];
+    const yr = Number(candidateData.year) || 0;
+    if (yr > 0 && yr < 1990 && candidateData.fuel_type &&
+        /^electric$/i.test(String(candidateData.fuel_type))) {
+      crossFieldIssues.push(`anachronistic_fuel: Electric fuel_type on ${yr} vehicle`);
+      suggestions.fuel_type = `Electric vehicles did not exist in ${yr}`;
+    }
+
+    // 4) Quality gate (uses normalizeVehicleFields internally, scores identity/specs/cleanliness)
+    const sourceType = platform === "facebook_marketplace" ? "marketplace" as const
+      : ["bring_a_trailer", "cars_and_bids", "hagerty"].includes(platform) ? "auction" as const
+      : "other" as const;
+
+    const gateResult = qualityGate(candidateData, {
+      source: platform,
+      sourceType,
+    });
+
+    // Merge VIN + cross-field issues into gate result
+    gateResult.issues.push(...vinIssues, ...crossFieldIssues);
+
+    // Determine if we should reject
+    if (gateResult.action === "reject" || vinIssues.some(i => i.startsWith("vin_make_mismatch"))) {
+      // VIN-make mismatch is a hard reject — the data is verifiably wrong
+      if (vinIssues.some(i => i.startsWith("vin_make_mismatch"))) {
+        gateResult.action = "reject";
+      }
+      return {
+        status: "rejected",
+        quality_score: gateResult.score,
+        issues: gateResult.issues,
+        suggestions: Object.keys(suggestions).length > 0 ? suggestions : undefined,
+        source: platform,
+        external_id: externalId,
+      };
+    }
+
+    // Apply cleaned/normalized data back to parsed + input
+    parsed = {
+      year: gateResult.cleaned.year ?? parsed.year,
+      make: gateResult.cleaned.make ?? parsed.make,
+      model: gateResult.cleaned.model ?? parsed.model,
+    };
+    if (gateResult.cleaned.vin) input.vin = gateResult.cleaned.vin;
+    if (gateResult.cleaned.transmission) input.transmission = gateResult.cleaned.transmission;
+    if (gateResult.cleaned.color) input.color = gateResult.cleaned.color;
+    if (gateResult.cleaned.engine) input.engine = gateResult.cleaned.engine;
+
+    const needsReview = gateResult.action === "flag_for_review";
+
     // Match or create vehicle with ALL available enrichment data
     const match = await matchOrCreateVehicle({
       ...parsed,
@@ -547,6 +650,13 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       condition: input.condition,
       sellerName: input.seller_name,
     }, platform);
+
+    // If flagged for review, mark the vehicle
+    if (needsReview && match.vehicleId) {
+      await supabaseAdmin.from("vehicles")
+        .update({ needs_review: true })
+        .eq("id", match.vehicleId);
+    }
 
     // If this is a marketplace listing, upsert it and get the listing ID
     let marketplaceListingId: string | null = null;
@@ -633,6 +743,9 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       is_new_vehicle: match.isNew,
       source: platform,
       external_id: externalId,
+      quality_score: gateResult.score,
+      issues: gateResult.issues.length > 0 ? gateResult.issues : undefined,
+      needs_review: needsReview || undefined,
     };
   } catch (err: any) {
     return {
@@ -649,8 +762,67 @@ serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // GET → return schema documentation for agent self-discovery
+  if (req.method === "GET") {
+    return new Response(JSON.stringify({
+      name: "nuke.ingest",
+      description: "Universal vehicle ingestion endpoint. Accepts structured data, URLs, or free text.",
+      methods: { POST: "Ingest vehicle(s)", GET: "This schema documentation" },
+      fields: {
+        url:          { type: "string",   required: false, example: "https://facebook.com/marketplace/item/123456", description: "Source listing URL — auto-detects platform" },
+        text:         { type: "string",   required: false, example: "1980 Chevy C10 $27,500 Greeneville TN", description: "Free-text vehicle description — parsed for year/make/model/price/location" },
+        year:         { type: "number",   required: false, example: 1978, description: "Model year (1885–current+2)" },
+        make:         { type: "string",   required: false, example: "Chevrolet", description: "Manufacturer. Aliases normalized: Chevy→Chevrolet, VW→Volkswagen, etc." },
+        model:        { type: "string",   required: false, example: "Caprice Classic", description: "Model name" },
+        vin:          { type: "string",   required: false, example: "1GCEK14L9EJ147915", description: "VIN — checksum validated, cross-checked against make" },
+        price:        { type: "number",   required: false, example: 10500, description: "Asking or sale price in USD" },
+        location:     { type: "string",   required: false, example: "Sun City, AZ", description: "Seller location (City, ST)" },
+        mileage:      { type: "number",   required: false, example: 83000, description: "Odometer reading in miles" },
+        engine:       { type: "string",   required: false, example: "5.7L V8", description: "Engine description" },
+        transmission: { type: "string",   required: false, example: "TH350 Automatic", description: "Normalized: auto→Automatic, 4x4→4WD, etc." },
+        color:        { type: "string",   required: false, example: "White", description: "Exterior color" },
+        condition:    { type: "string",   required: false, example: "Good", description: "Condition notes" },
+        title_status: { type: "string",   required: false, example: "clean", description: "Title status: clean, salvage, rebuilt, none" },
+        description:  { type: "string",   required: false, example: "Original paint, matching numbers 350", description: "Full listing description" },
+        image_url:    { type: "string",   required: false, description: "Primary image URL" },
+        image_urls:   { type: "string[]", required: false, description: "Array of image URLs" },
+        seller_name:  { type: "string",   required: false, description: "Seller display name" },
+        notes:        { type: "string",   required: false, description: "User notes about the vehicle" },
+        tags:         { type: "string[]", required: false, example: ["project", "barn find"], description: "User-defined tags" },
+        enrich:       { type: "boolean",  required: false, default: true, description: "Auto-enrich from source URL extractors" },
+        batch:        { type: "array",    required: false, description: "Array of up to 50 items (each an object with fields above)" },
+        user_id:      { type: "string",   required: false, description: "Explicit user ID (service role only)" },
+      },
+      validation: {
+        description: "All submissions pass through a quality gate before DB write",
+        checks: [
+          "Make normalization (107 aliases: Chevy→Chevrolet, merc→Mercedes-Benz, etc.)",
+          "VIN checksum validation (MOD11 for 17-char VINs)",
+          "VIN-make cross-check (rejects Corvette VIN filed as Camaro)",
+          "Year bounds (< 1885 or > currentYear+2 rejected)",
+          "RPO codes in body_style moved to trim (L79 Pickup → body_style=Pickup, trim=L79)",
+          "Transmission normalization (auto→Automatic, 4x4→4WD)",
+          "HTML/pollution detection in text fields",
+          "Cross-field sanity (year < 1990 + Electric fuel → flagged)",
+          "Quality score 0-1 (reject < 0.2, review < 0.5, accept ≥ 0.5)",
+        ],
+      },
+      responses: {
+        created:  { description: "New vehicle created", fields: ["vehicle_id", "quality_score", "issues"] },
+        matched:  { description: "Matched existing vehicle (enriched)", fields: ["vehicle_id", "quality_score"] },
+        duplicate:{ description: "Same user+URL already ingested", fields: ["vehicle_id", "discovery_id"] },
+        rejected: { description: "Failed validation gate", fields: ["quality_score", "issues", "suggestions"] },
+        error:    { description: "Server error", fields: ["error"] },
+      },
+      example_curl: 'curl -X POST .../functions/v1/ingest -H "Authorization: Bearer <key>" -H "Content-Type: application/json" -d \'{"year":1978,"make":"Chevrolet","model":"Caprice Classic","price":10500,"location":"Sun City, AZ"}\'',
+    }, null, 2), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "POST only" }), {
+    return new Response(JSON.stringify({ error: "GET or POST only" }), {
       status: 405,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -713,8 +885,12 @@ serve(async (req: Request) => {
   // Single mode
   const result = await ingestOne(body as IngestInput, userId);
 
+  const httpStatus = result.status === "error" ? 500
+    : result.status === "rejected" ? 422
+    : 200;
+
   return new Response(JSON.stringify(result), {
-    status: result.status === "error" ? 500 : 200,
+    status: httpStatus,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });

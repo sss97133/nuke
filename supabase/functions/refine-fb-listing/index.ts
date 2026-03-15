@@ -424,7 +424,108 @@ Deno.serve(async (req) => {
     );
 
     const body = await req.json().catch(() => ({}));
-    const { facebook_id, url, batch_size, debug } = body;
+    const { facebook_id, url, batch_size, debug, action } = body;
+
+    // ---- Backfill images from raw_scrape_data ----
+    if (action === "backfill_images") {
+      const limit = Math.min(batch_size || 500, 500);
+
+      // Find listings with raw_scrape_data containing image arrays but no all_images
+      const { data: candidates, error: findErr } = await supabase
+        .from("marketplace_listings")
+        .select("id, raw_scrape_data, vehicle_id")
+        .not("raw_scrape_data", "is", null)
+        .or("all_images.is.null,all_images.eq.{}")
+        .limit(limit);
+
+      if (findErr) throw findErr;
+      if (!candidates || candidates.length === 0) {
+        return new Response(
+          JSON.stringify({ message: "No listings need image backfill", count: 0 }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      let backfilled = 0;
+      let vehiclesPropagated = 0;
+      const errors: string[] = [];
+
+      for (const listing of candidates) {
+        try {
+          const raw = listing.raw_scrape_data as Record<string, any>;
+          // Try common field names for image arrays in raw scrape data
+          const imageArray =
+            raw?.all_image_urls ||
+            raw?.image_urls ||
+            raw?.images ||
+            raw?.listing_images ||
+            raw?.photo_urls;
+
+          if (!Array.isArray(imageArray) || imageArray.length === 0) continue;
+
+          // Filter to valid URL strings
+          const validImages = imageArray
+            .filter((u: any) => typeof u === "string" && u.startsWith("http"))
+            .slice(0, 20); // Cap at 20 images per listing
+
+          if (validImages.length === 0) continue;
+
+          // Update marketplace_listings.all_images
+          const { error: updateErr } = await supabase
+            .from("marketplace_listings")
+            .update({
+              all_images: validImages,
+              image_url: validImages[0], // Set primary image too
+            })
+            .eq("id", listing.id);
+
+          if (updateErr) {
+            errors.push(`listing ${listing.id}: ${updateErr.message}`);
+            continue;
+          }
+          backfilled++;
+
+          // Propagate to vehicle_images for linked vehicles that lack images
+          if (listing.vehicle_id) {
+            const { count: existingCount } = await supabase
+              .from("vehicle_images")
+              .select("*", { count: "exact", head: true })
+              .eq("vehicle_id", listing.vehicle_id);
+
+            if (!existingCount || existingCount === 0) {
+              const imageRows = validImages.map((imgUrl: string, i: number) => ({
+                vehicle_id: listing.vehicle_id,
+                image_url: imgUrl,
+                is_primary: i === 0,
+                source: "fb_marketplace_backfill",
+              }));
+              await supabase.from("vehicle_images").insert(imageRows);
+
+              // Also set primary_image_url on the vehicle
+              await supabase
+                .from("vehicles")
+                .update({ primary_image_url: validImages[0] })
+                .eq("id", listing.vehicle_id);
+
+              vehiclesPropagated++;
+            }
+          }
+        } catch (e: any) {
+          errors.push(`listing ${listing.id}: ${e.message}`);
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          action: "backfill_images",
+          candidates_found: candidates.length,
+          backfilled,
+          vehicles_propagated: vehiclesPropagated,
+          errors: errors.length > 0 ? errors : undefined,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // ---- Single listing ----
     if (facebook_id || url) {

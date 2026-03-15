@@ -127,6 +127,53 @@ async function getBrief(): Promise<Response> {
     .limit(1)
     .maybeSingle();
 
+  // ── Cadence tracking: staleness per state ──────────────────
+  const { data: staleLocations } = await supabase
+    .from("fb_marketplace_locations")
+    .select("id, name, last_sweep_at, state_code")
+    .eq("is_active", true)
+    .order("last_sweep_at", { ascending: true, nullsFirst: true })
+    .limit(200);
+
+  // Group by state_code, compute staleness
+  const now = Date.now();
+  const groupStaleness: Record<string, { oldest_sweep: string | null; hours_stale: number; locations: number }> = {};
+  const staleAlerts: string[] = [];
+
+  for (const loc of staleLocations || []) {
+    const group = loc.state_code || loc.name || "ungrouped";
+    const lastSweep = loc.last_sweep_at ? new Date(loc.last_sweep_at).getTime() : 0;
+    const hoursAgo = lastSweep ? Math.round((now - lastSweep) / (1000 * 60 * 60)) : 9999;
+
+    if (!groupStaleness[group] || hoursAgo > groupStaleness[group].hours_stale) {
+      groupStaleness[group] = {
+        oldest_sweep: loc.last_sweep_at || null,
+        hours_stale: hoursAgo,
+        locations: (groupStaleness[group]?.locations || 0) + 1,
+      };
+    } else {
+      groupStaleness[group].locations++;
+    }
+  }
+
+  // Find groups > 48h stale
+  for (const [group, info] of Object.entries(groupStaleness)) {
+    if (info.hours_stale > 48) {
+      staleAlerts.push(`${group}: ${info.hours_stale}h since last scrape (${info.locations} locations)`);
+    }
+  }
+
+  // Top 5 stalest groups for the brief
+  const stalestGroups = Object.entries(groupStaleness)
+    .sort((a, b) => b[1].hours_stale - a[1].hours_stale)
+    .slice(0, 5)
+    .map(([group, info]) => ({
+      group,
+      hours_stale: info.hours_stale,
+      last_sweep: info.oldest_sweep,
+      locations: info.locations,
+    }));
+
   return jsonResponse({
     status: "ok",
     collection: {
@@ -144,6 +191,13 @@ async function getBrief(): Promise<Response> {
       vintage: vintageListings || 0,
       sold: soldListings || 0,
       new_today: newToday || 0,
+    },
+    cadence: {
+      stalest_groups: stalestGroups,
+      stale_alerts: staleAlerts.length > 0 ? staleAlerts : undefined,
+      recommended_scrape: staleAlerts.length > 0
+        ? `dotenvx run -- node scripts/fb-marketplace-local-scraper.mjs --all --max-pages 50`
+        : null,
     },
     active_sweep: activeSweep ? {
       id: activeSweep.id,
