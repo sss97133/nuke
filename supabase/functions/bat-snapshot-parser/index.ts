@@ -22,6 +22,22 @@
  */
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  parseBaTHTML,
+  extractTitleIdentity,
+  extractEssentials,
+  extractDescription,
+  inferBodyStyleFromTitle,
+  inferColorsFromDescription,
+  type ParsedListing,
+  BAT_PARSER_VERSION,
+} from "../_shared/batParser.ts";
+import { qualityGate } from "../_shared/extractionQualityGate.ts";
+import {
+  batchUpsertWithProvenance,
+  quarantineRecord,
+  type ProvenanceMetadata,
+} from "../_shared/batUpsertWithProvenance.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,185 +50,6 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
-
-interface ParsedListing {
-  chassis: string | null;
-  vin_valid: boolean; // true if chassis is a valid 17-char VIN
-  mileage: number | null;
-  mileage_unit: string | null; // "miles" | "kilometers" | "TMU"
-  engine: string | null;
-  transmission: string | null;
-  exterior_color: string | null;
-  interior: string | null;
-  location_raw: string | null;
-  location_city: string | null;
-  location_state: string | null;
-  location_zip: string | null;
-  party_type: string | null; // "Private Party" | "Dealer"
-  lot_number: string | null;
-  views: number | null;
-  watchers: number | null;
-  comment_count: number | null;
-  sale_price: number | null;
-  sale_currency: string | null;
-  sale_date: string | null;
-  sale_status: string | null; // "sold" | "bid_to" | "unsold"
-  no_reserve: boolean;
-  features: string[];
-  item_title: string | null;
-}
-
-const VIN_REGEX = /^[A-HJ-NPR-Z0-9]{17}$/i;
-
-function parseBaTHTML(html: string): ParsedListing {
-  const result: ParsedListing = {
-    chassis: null, vin_valid: false,
-    mileage: null, mileage_unit: null,
-    engine: null, transmission: null,
-    exterior_color: null, interior: null,
-    location_raw: null, location_city: null, location_state: null, location_zip: null,
-    party_type: null, lot_number: null,
-    views: null, watchers: null, comment_count: null,
-    sale_price: null, sale_currency: null, sale_date: null, sale_status: null,
-    no_reserve: false, features: [], item_title: null,
-  };
-
-  // --- Chassis/VIN ---
-  const chassisMatch = html.match(/Chassis:?\s*(?:<[^>]*>)*\s*([A-Za-z0-9*-]+(?:\s[A-Za-z0-9*-]+)*)/i);
-  if (chassisMatch) {
-    result.chassis = chassisMatch[1].trim().replace(/\s+/g, "");
-    result.vin_valid = VIN_REGEX.test(result.chassis);
-  }
-
-  // --- Listing Details section (structured <li> items) ---
-  const detailsMatch = html.match(/Listing Details<\/strong>\s*<ul>(.*?)<\/ul>/s);
-  if (detailsMatch) {
-    const items = detailsMatch[1].match(/<li>(.*?)<\/li>/gs) || [];
-    for (const item of items) {
-      const text = item.replace(/<[^>]+>/g, "").trim();
-
-      // Chassis (already handled above but catch it here too)
-      if (text.startsWith("Chassis:") && !result.chassis) {
-        result.chassis = text.replace("Chassis:", "").trim();
-        result.vin_valid = VIN_REGEX.test(result.chassis);
-        continue;
-      }
-
-      // Mileage patterns
-      const mileMatch = text.match(/([\d,]+)k?\s*(Miles?\s*(?:Shown|Indicated)?|Kilometers?|TMU)/i);
-      if (mileMatch) {
-        let miles = parseInt(mileMatch[1].replace(/,/g, ""));
-        if (text.includes("k ") || text.includes("k\u00a0")) miles *= 1000;
-        result.mileage = miles;
-        result.mileage_unit = mileMatch[2].toLowerCase().includes("kilometer") ? "kilometers" :
-                              mileMatch[2].toLowerCase().includes("tmu") ? "TMU" : "miles";
-        continue;
-      }
-
-      // Exterior color — check BEFORE engine/interior to avoid false matches
-      if (/exterior/i.test(text)) {
-        result.exterior_color = text.replace(/exterior/i, "").trim();
-        continue;
-      }
-
-      // Interior — check BEFORE engine to avoid leather/upholstery matching engine patterns
-      if (/(?:interior|upholster)/i.test(text) && !result.interior) {
-        result.interior = text;
-        continue;
-      }
-
-      // Leather/cloth without "interior" keyword — still interior
-      if (/(?:leather|cloth|alcantara|vinyl|suede)\s/i.test(text) && !result.interior && !/(?:liter|ci|cc|V\d)/i.test(text)) {
-        result.interior = text;
-        continue;
-      }
-
-      // Engine — require at least one strong engine indicator
-      if (/(?:\d+[\.\d]*[-\s]*(?:liter|L\b)|(?:\d+)ci\b|\d+cc\b|(?:inline|flat|V)[-\s]*\d|turbo|supercharg)/i.test(text) && !result.engine) {
-        result.engine = text;
-        continue;
-      }
-
-      // Transmission
-      if (/(?:manual|automatic|speed|CVT|DCT|PDK|tiptronic|sequential|gearbox|transmission)/i.test(text) && !result.transmission) {
-        result.transmission = text;
-        continue;
-      }
-
-      // No Reserve
-      if (/no reserve/i.test(text)) {
-        result.no_reserve = true;
-        continue;
-      }
-
-      // Everything else is a feature
-      result.features.push(text);
-    }
-  }
-
-  // --- Location ---
-  const locMatch = html.match(/Location:\s*<a[^>]*>([^<]+)<\/a>/i);
-  if (locMatch) {
-    result.location_raw = locMatch[1].trim();
-    const locParts = result.location_raw.match(/^(.+?),\s*(\w[\w\s]*?)\s*(\d{5})?$/);
-    if (locParts) {
-      result.location_city = locParts[1].trim();
-      result.location_state = locParts[2].trim();
-      result.location_zip = locParts[3] || null;
-    }
-  }
-
-  // --- Private Party or Dealer ---
-  const partyMatch = html.match(/Private Party or Dealer:\s*(.*?)(?:<|$)/i);
-  if (partyMatch) {
-    result.party_type = partyMatch[1].replace(/<[^>]+>/g, "").trim();
-  }
-
-  // --- Lot number ---
-  const lotMatch = html.match(/Lot<\/strong>\s*#?(\d+)/i);
-  if (lotMatch) {
-    result.lot_number = lotMatch[1];
-  }
-
-  // --- Views and watchers ---
-  const viewsMatch = html.match(/data-stats-item="views"[^>]*>([\d,]+)\s*views/i);
-  if (viewsMatch) result.views = parseInt(viewsMatch[1].replace(/,/g, ""));
-
-  const watchMatch = html.match(/data-stats-item="watchers"[^>]*>([\d,]+)\s*watchers/i);
-  if (watchMatch) result.watchers = parseInt(watchMatch[1].replace(/,/g, ""));
-
-  // --- Comment count ---
-  const commentMatch = html.match(/comments_header_html[^>]*>.*?class="info-value"[^>]*>(\d+)/s);
-  if (commentMatch) result.comment_count = parseInt(commentMatch[1]);
-
-  // --- Sale info ---
-  const soldMatch = html.match(/Sold\s+for\s+<strong>(\w+)\s*\$?([\d,]+)<\/strong>\s*<span[^>]*>on\s+(\d+\/\d+\/\d+)/i);
-  if (soldMatch) {
-    result.sale_currency = soldMatch[1];
-    result.sale_price = parseInt(soldMatch[2].replace(/,/g, ""));
-    result.sale_date = soldMatch[3];
-    result.sale_status = "sold";
-  } else {
-    const bidMatch = html.match(/Bid\s+to\s+<strong>(\w+)\s*\$?([\d,]+)<\/strong>\s*<span[^>]*>on\s+(\d+\/\d+\/\d+)/i);
-    if (bidMatch) {
-      result.sale_currency = bidMatch[1];
-      result.sale_price = parseInt(bidMatch[2].replace(/,/g, ""));
-      result.sale_date = bidMatch[3];
-      result.sale_status = "bid_to";
-    }
-  }
-
-  // Check for unsold status
-  if (html.includes("status-unsold") || html.includes("Reserve Not Met")) {
-    result.sale_status = result.sale_status || "unsold";
-  }
-
-  // --- Item title ---
-  const titleMatch = html.match(/data-item-title="([^"]+)"/);
-  if (titleMatch) result.item_title = titleMatch[1];
-
-  return result;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -321,71 +158,113 @@ Deno.serve(async (req) => {
     const CONCURRENCY = 5;
     const allDetails: any[] = [];
 
+    // Tetris write stats
+    let tetrisGapFills = 0;
+    let tetrisConfirmations = 0;
+    let tetrisConflicts = 0;
+    let qualityRejections = 0;
+
     async function processItem(item: { snap: any; parsed: ParsedListing }) {
       const { snap, parsed } = item;
       const vehicle = vehicleMap.get(snap.listing_url);
 
       if (vehicle && !dryRun) {
-        const updates: Record<string, any> = {};
-        let fieldsUpdated = 0;
+        // Also run the full extractEssentials parser for richer extraction
+        const identity = extractTitleIdentity(snap.html, snap.listing_url);
+        const essentials = extractEssentials(snap.html);
+        const desc = extractDescription(snap.html);
+        const bodyStyle = essentials.body_style || inferBodyStyleFromTitle(identity.title);
+        const inferredColors = inferColorsFromDescription(desc);
 
-        if (parsed.vin_valid && parsed.chassis && !vehicle.vin) {
-          updates.vin = parsed.chassis.toUpperCase();
-          fieldsUpdated++;
-        }
-        if (parsed.mileage && !vehicle.mileage) {
-          updates.mileage = parsed.mileage_unit === "kilometers"
-            ? Math.round(parsed.mileage * 0.621371)
-            : parsed.mileage;
-          fieldsUpdated++;
-        }
-        if (parsed.engine && !vehicle.engine_type) {
-          updates.engine_type = parsed.engine;
-          fieldsUpdated++;
-        }
-        if (parsed.transmission && !vehicle.transmission) {
-          updates.transmission = parsed.transmission;
-          fieldsUpdated++;
-        }
-        if (parsed.exterior_color && !vehicle.color) {
-          updates.color = parsed.exterior_color;
-          fieldsUpdated++;
-        }
-        if (parsed.interior && !vehicle.interior_color) {
-          updates.interior_color = parsed.interior;
-          fieldsUpdated++;
-        }
-        if (parsed.sale_price && parsed.sale_status === "sold" && !vehicle.sale_price) {
-          updates.sale_price = parsed.sale_price;
-          fieldsUpdated++;
-        }
+        // Build proposed fields from BOTH parsers (core parser is higher quality)
+        const mileage = essentials.mileage || (parsed.mileage_unit === "kilometers" && parsed.mileage
+          ? Math.round(parsed.mileage * 0.621371)
+          : parsed.mileage);
 
-        // Always store full parsed data in origin_metadata
-        const meta = vehicle.origin_metadata || {};
-        meta.bat_snapshot_parsed = {
-          chassis: parsed.chassis, vin_valid: parsed.vin_valid,
-          mileage: parsed.mileage, mileage_unit: parsed.mileage_unit,
-          engine: parsed.engine, transmission: parsed.transmission,
-          exterior_color: parsed.exterior_color, interior: parsed.interior,
-          location: parsed.location_raw, location_city: parsed.location_city,
-          location_state: parsed.location_state, location_zip: parsed.location_zip,
-          party_type: parsed.party_type, lot_number: parsed.lot_number,
-          views: parsed.views, watchers: parsed.watchers,
-          comment_count: parsed.comment_count, sale_price: parsed.sale_price,
-          sale_currency: parsed.sale_currency, sale_date: parsed.sale_date,
-          sale_status: parsed.sale_status, no_reserve: parsed.no_reserve,
-          features: parsed.features, item_title: parsed.item_title,
-          parsed_at: new Date().toISOString(), snapshot_id: snap.id,
+        const proposedFields: Record<string, any> = {
+          vin: essentials.vin || (parsed.vin_valid ? parsed.chassis?.toUpperCase() : null),
+          mileage,
+          engine_size: essentials.engine || parsed.engine,
+          transmission: essentials.transmission || parsed.transmission,
+          color: essentials.exterior_color || inferredColors.exterior_color || parsed.exterior_color,
+          interior_color: essentials.interior_color || inferredColors.interior_color || parsed.interior,
+          body_style: bodyStyle,
+          drivetrain: essentials.drivetrain,
+          sale_price: essentials.sale_price || (parsed.sale_status === "sold" ? parsed.sale_price : null),
+          high_bid: essentials.high_bid || (parsed.sale_status === "bid_to" ? parsed.sale_price : null),
+          reserve_status: essentials.reserve_status || (parsed.no_reserve ? "no_reserve" : null),
         };
-        updates.origin_metadata = meta;
 
-        const { error: updateErr } = await supabase
-          .from("vehicles")
-          .update(updates)
-          .eq("id", vehicle.vehicle_id);
-        if (!updateErr && fieldsUpdated > 0) {
-          vehiclesUpdated++;
-          fieldsEnriched += fieldsUpdated;
+        // Run quality gate on proposed data
+        const gateInput = {
+          year: identity.year || vehicle.year,
+          make: identity.make || vehicle.make,
+          model: identity.model || vehicle.model,
+          ...proposedFields,
+        };
+
+        const gateResult = qualityGate(gateInput, { source: "bat", sourceType: "auction" });
+
+        if (gateResult.action === "reject") {
+          qualityRejections++;
+          await quarantineRecord(
+            supabase, vehicle.vehicle_id, snap.listing_url,
+            BAT_PARSER_VERSION, gateResult.score, gateResult.issues,
+          );
+        } else {
+          // Use Tetris write layer for gap-fill/confirm/conflict
+          const defaultMetadata: ProvenanceMetadata = {
+            extraction_version: BAT_PARSER_VERSION,
+            extraction_method: "html_parse",
+            source_url: snap.listing_url,
+            confidence_score: 0.8,
+            source_signal: "snapshot_parse",
+          };
+
+          // Filter out null proposed values before Tetris layer
+          const cleanProposed: Record<string, any> = {};
+          for (const [k, v] of Object.entries(proposedFields)) {
+            if (v !== null && v !== undefined) cleanProposed[k] = v;
+          }
+
+          const { updatePayload, stats } = await batchUpsertWithProvenance(
+            supabase, vehicle.vehicle_id, snap.listing_url,
+            BAT_PARSER_VERSION, vehicle, cleanProposed, {}, defaultMetadata,
+          );
+
+          tetrisGapFills += stats.gap_fills;
+          tetrisConfirmations += stats.confirmations;
+          tetrisConflicts += stats.conflicts;
+
+          // Also store full parsed data in origin_metadata
+          const meta = vehicle.origin_metadata || {};
+          meta.bat_snapshot_parsed = {
+            chassis: parsed.chassis, vin_valid: parsed.vin_valid,
+            mileage: parsed.mileage, mileage_unit: parsed.mileage_unit,
+            engine: parsed.engine, transmission: parsed.transmission,
+            exterior_color: parsed.exterior_color, interior: parsed.interior,
+            location: parsed.location_raw, location_city: parsed.location_city,
+            location_state: parsed.location_state, location_zip: parsed.location_zip,
+            party_type: parsed.party_type, lot_number: parsed.lot_number,
+            views: parsed.views, watchers: parsed.watchers,
+            comment_count: parsed.comment_count, sale_price: parsed.sale_price,
+            sale_currency: parsed.sale_currency, sale_date: parsed.sale_date,
+            sale_status: parsed.sale_status, no_reserve: parsed.no_reserve,
+            features: parsed.features, item_title: parsed.item_title,
+            parsed_at: new Date().toISOString(), snapshot_id: snap.id,
+          };
+          updatePayload.origin_metadata = meta;
+
+          if (Object.keys(updatePayload).length > 0) {
+            const { error: updateErr } = await supabase
+              .from("vehicles")
+              .update(updatePayload)
+              .eq("id", vehicle.vehicle_id);
+            if (!updateErr && stats.gap_fills > 0) {
+              vehiclesUpdated++;
+              fieldsEnriched += stats.gap_fills;
+            }
+          }
         }
       }
 
@@ -397,6 +276,7 @@ Deno.serve(async (req) => {
             metadata: {
               ...(snap.metadata || {}),
               parsed_at: new Date().toISOString(),
+              parser_version: BAT_PARSER_VERSION,
               chassis: parsed.chassis,
               vin_valid: parsed.vin_valid,
               vehicle_matched: !!vehicle,
@@ -426,6 +306,7 @@ Deno.serve(async (req) => {
 
     const results = {
       mode,
+      parser_version: BAT_PARSER_VERSION,
       total: snapshots.length,
       parsed: parsedItems.length,
       vins_found: vinsFound,
@@ -433,6 +314,12 @@ Deno.serve(async (req) => {
       vehicles_matched: vehicleMap.size,
       vehicles_updated: vehiclesUpdated,
       fields_enriched: fieldsEnriched,
+      tetris: {
+        gap_fills: tetrisGapFills,
+        confirmations: tetrisConfirmations,
+        conflicts: tetrisConflicts,
+        quality_rejections: qualityRejections,
+      },
       errors: parseErrors,
       details: allDetails.length <= 100 ? allDetails : allDetails.slice(0, 20).concat([{ note: `... and ${allDetails.length - 20} more` }]),
     };
