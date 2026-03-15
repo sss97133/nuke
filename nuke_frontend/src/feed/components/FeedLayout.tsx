@@ -36,15 +36,17 @@ export interface FeedLayoutProps {
 const ROW_HEIGHTS: Record<string, number> = {
   grid: 320,
   gallery: 84,
-  technical: 32,
+  technical: 36,
 };
 
-const TABLE_GRID = '42px 44px 90px 1fr 70px 80px 70px 50px minmax(60px, auto) minmax(60px, auto) 70px';
-const TABLE_GRID_SCORES = '42px 44px 90px 1fr 70px 80px 70px 50px minmax(60px, auto) minmax(60px, auto) 70px 50px';
+const TABLE_GRID = '60px 50px 100px 1fr 84px 100px 72px 56px 64px 64px 80px';
+const TABLE_GRID_SCORES = '60px 50px 100px 1fr 84px 100px 72px 56px 64px 64px 80px 56px';
 
 /** Column-to-sort mapping for table header clicks */
 const COLUMN_SORT_MAP: Record<string, SortBy> = {
   YEAR: 'year',
+  MAKE: 'make',
+  MODEL: 'model',
   MILES: 'mileage',
   PRICE: 'price_high',
   DEAL: 'deal_score',
@@ -129,6 +131,8 @@ export function FeedLayout({
 
   // Technical table view
   if (viewMode === 'technical') {
+    const COLS = ['YEAR', 'MAKE', 'MODEL', 'MILES', 'PRICE', 'BODY', 'TRANS', 'DEAL', 'HEAT', 'TIME'] as const;
+
     return (
       <div style={{ position: 'relative' }}>
         {/* Sticky header */}
@@ -136,25 +140,26 @@ export function FeedLayout({
           style={{
             display: 'grid',
             gridTemplateColumns: tableGrid,
-            gap: '0 4px',
-            padding: '4px 8px',
-            borderBottom: '2px solid var(--border)',
+            gap: '0 8px',
+            padding: '0 12px',
+            borderBottom: '2px solid var(--text)',
             position: 'sticky',
-            top: 'calc(var(--header-height, 48px) + 32px)',
+            top: 'var(--header-height, 48px)',
             background: 'var(--surface)',
             zIndex: 10,
             fontFamily: 'Arial, sans-serif',
-            fontSize: 'var(--feed-font-size-xs, 7px)',
+            fontSize: '9px',
             fontWeight: 800,
             textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            color: 'var(--text-disabled)',
+            letterSpacing: '0.08em',
+            color: 'var(--text-secondary)',
             alignItems: 'center',
-            height: '24px',
+            height: '32px',
           }}
         >
+          {/* Thumbnail column header — empty */}
           <span />
-          {(['YEAR', 'MAKE', 'MODEL', 'MILES', 'PRICE', 'BODY', 'TRANS', 'DEAL', 'HEAT', 'TIME'] as const).map((col) => {
+          {COLS.map((col) => {
             const sortKey = COLUMN_SORT_MAP[col];
             const isSortable = !!sortKey && !!onSortChange;
             const togglePair = COLUMN_TOGGLE_MAP[col];
@@ -164,7 +169,6 @@ export function FeedLayout({
             const handleClick = () => {
               if (!onSortChange) return;
               if (isActive) {
-                // Toggle direction, or toggle between paired sort keys
                 if (togglePair && onDirectionChange) {
                   const currentIdx = togglePair.indexOf(sort!);
                   if (currentIdx >= 0) {
@@ -180,7 +184,6 @@ export function FeedLayout({
               }
             };
 
-            // Arrow indicator for active column
             let arrow = '';
             if (isActive) {
               if (togglePair) {
@@ -209,13 +212,10 @@ export function FeedLayout({
                   fontSize: 'inherit',
                   letterSpacing: 'inherit',
                   textTransform: 'inherit' as any,
-                  color: isActive ? 'var(--text)' : 'var(--text-disabled)',
+                  color: isActive ? 'var(--text)' : 'inherit',
                   cursor: 'pointer',
                   textAlign: align,
-                  textDecoration: 'none',
                 }}
-                onMouseEnter={(e) => { (e.currentTarget.style as any).textDecoration = 'underline'; }}
-                onMouseLeave={(e) => { (e.currentTarget.style as any).textDecoration = 'none'; }}
               >
                 {col}{arrow}
               </button>
@@ -239,18 +239,21 @@ export function FeedLayout({
                   style={{
                     position: 'absolute', top: 0, left: 0, width: '100%',
                     transform: `translateY(${vRow.start}px)`,
-                    height: '32px', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', fontSize: '8px',
+                    height: '36px', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', fontSize: '10px',
                     fontFamily: 'Arial, sans-serif', color: 'var(--text-disabled)',
+                    textTransform: 'uppercase', letterSpacing: '0.05em',
                   }}
                 >
-                  {isFetchingNextPage ? 'Loading...' : ''}
+                  {isFetchingNextPage ? 'LOADING...' : ''}
                 </div>
               );
             }
 
             const vehicle = vehicles[startIdx];
             if (!vehicle) return null;
+
+            const stripe = vRow.index % 2 === 1 ? 'rgba(255,255,255,0.02)' : 'transparent';
 
             return (
               <div
@@ -262,15 +265,16 @@ export function FeedLayout({
                   transform: `translateY(${vRow.start}px)`,
                   display: 'grid',
                   gridTemplateColumns: tableGrid,
-                  gap: '0 4px',
+                  gap: '0 8px',
                   alignItems: 'center',
-                  height: '32px',
-                  padding: '0 8px',
+                  height: '36px',
+                  padding: '0 12px',
                   borderBottom: '1px solid var(--border)',
-                  background: vRow.index % 2 === 0 ? 'var(--surface)' : 'var(--surface-hover)',
-                  fontSize: 'var(--feed-font-size, 10px)',
-                  fontFamily: 'Arial, sans-serif',
+                  background: stripe,
+                  cursor: 'pointer',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = stripe; }}
               >
                 {renderCard(vehicle, startIdx)}
               </div>
