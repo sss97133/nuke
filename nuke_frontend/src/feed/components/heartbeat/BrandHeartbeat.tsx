@@ -40,6 +40,9 @@ export function BrandHeartbeat({ make, model }: BrandHeartbeatProps) {
 
   const d = makeStats.data;
 
+  // Guard against incomplete data
+  if (d.total_listings == null || d.avg_price == null) return null;
+
   if (collapsed) {
     return (
       <div
