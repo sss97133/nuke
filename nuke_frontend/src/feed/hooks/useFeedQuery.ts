@@ -74,7 +74,7 @@ function toQueryParams(input: UseFeedQueryInput): FeedQueryParams {
     for_sale: filters.forSale || undefined,
     sold_only: filters.showSoldOnly || undefined,
     hide_sold: filters.hideSold || undefined,
-    has_images: filters.hasImages || undefined,
+    has_images: filters.hasImages ? true : false,
     excluded_sources: excluded.length > 0 ? excluded : undefined,
     include_dealers: includeDealers,
     sort: sortMap[sortBy] || 'newest',
