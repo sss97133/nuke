@@ -47,9 +47,8 @@ gliner_image = (
     .pip_install([
         "gliner>=0.2",
         "torch==2.2.2",
-        "transformers>=4.40",
+        "transformers==4.44.2",
         "onnxruntime",
-        "httpx",
     ])
     .run_function(_download_gliner)
 )
@@ -318,7 +317,8 @@ def main(
         dry_run: If True, just print results without writing to DB
         write_back: If True, write extraction results to vehicle_observations
     """
-    import httpx
+    import urllib.request
+    import urllib.parse
 
     # Load Supabase credentials from environment
     supabase_url = os.environ.get("VITE_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
@@ -345,9 +345,10 @@ def main(
         f"&limit={limit}&offset={offset}"
     )
 
-    resp = httpx.get(query_url, headers=headers, timeout=30)
-    resp.raise_for_status()
-    vehicles = resp.json()
+    req = urllib.request.Request(query_url, headers=headers)
+    resp_raw = urllib.request.urlopen(req, timeout=30)
+    resp_data = json.loads(resp_raw.read().decode())
+    vehicles = resp_data
 
     # Filter out empty/short descriptions
     vehicles = [v for v in vehicles if v.get("description") and len(v["description"]) > 50]
@@ -418,7 +419,7 @@ def main(
 
 def _write_results_to_db(results: list[dict], supabase_url: str, headers: dict):
     """Write extraction results to vehicle_observations table."""
-    import httpx
+    import urllib.request
 
     observations = []
     for r in results:
@@ -463,17 +464,19 @@ def _write_results_to_db(results: list[dict], supabase_url: str, headers: dict):
     written = 0
     for i in range(0, len(observations), batch_size):
         batch = observations[i:i + batch_size]
-        resp = httpx.post(
+        post_req = urllib.request.Request(
             f"{supabase_url}/rest/v1/vehicle_observations",
+            data=json.dumps(batch).encode(),
             headers={**headers, "Prefer": "return=minimal"},
-            json=batch,
-            timeout=30,
+            method="POST",
         )
-        if resp.status_code in (200, 201):
+        try:
+            post_resp = urllib.request.urlopen(post_req, timeout=30)
             written += len(batch)
             print(f"[EXTRACT] Written {written}/{len(observations)} observations")
-        else:
-            print(f"[EXTRACT] Write error ({resp.status_code}): {resp.text[:200]}")
+        except Exception as e:
+            print(f"[EXTRACT] Write error: {e}")
+            break
             break
 
     print(f"[EXTRACT] Done — {written} observations written.")
@@ -486,7 +489,7 @@ def _write_results_to_db(results: list[dict], supabase_url: str, headers: dict):
 def run_local(limit: int = 10, offset: int = 0):
     """Run extraction locally on CPU. For testing without Modal billing."""
     import subprocess
-    import httpx
+    import urllib.request
     from gliner import GLiNER
 
     # Load credentials
