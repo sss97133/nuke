@@ -89,7 +89,12 @@ def generate_contextual_descriptions(conn, vehicle_id: str) -> dict:
         cur.close()
         return {"vehicle_id": vehicle_id, "status": "vehicle_not_found"}
 
-    ymm_key = vehicle["ymm_key"] if vehicle["year"] and vehicle["make"] else None
+    # Normalize ymm_key with suffix stripping (matches coalesced ymm_knowledge keys)
+    ymm_key = None
+    if vehicle["year"] and vehicle["make"]:
+        from yono.contextual_training.build_ymm_knowledge import strip_model_suffix
+        base_model, _ = strip_model_suffix(vehicle["model"] or '')
+        ymm_key = f"{vehicle['year']}_{vehicle['make']}_{base_model}"
     ymm_label = f"{vehicle['year'] or '?'} {vehicle['make'] or '?'} {vehicle['model'] or '?'}"
 
     # Get all auto-sessions with their images

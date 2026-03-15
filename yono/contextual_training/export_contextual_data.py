@@ -112,8 +112,14 @@ def export_contextual_packages(
 
     FROM vehicle_images vi
     JOIN vehicles v ON v.id = vi.vehicle_id
-    LEFT JOIN ymm_knowledge yk
-        ON yk.year = v.year AND yk.make = v.make AND yk.model = v.model
+    LEFT JOIN LATERAL (
+        SELECT feature_vector, vehicle_count, source_comment_count
+        FROM ymm_knowledge
+        WHERE year = v.year AND make = v.make
+          AND (model = v.model OR v.model LIKE model || ' %')
+        ORDER BY (model = v.model)::int DESC, vehicle_count DESC
+        LIMIT 1
+    ) yk ON true
     WHERE {' AND '.join(where)}
     ORDER BY RANDOM()
     LIMIT {limit}

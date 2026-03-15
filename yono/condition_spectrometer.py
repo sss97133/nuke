@@ -1230,21 +1230,35 @@ def contextual_pass(conn, vehicle_id: str) -> dict:
 
     ymm_key = vehicle["ymm_key"]
 
-    # Load Y/M/M knowledge profile
+    # Load Y/M/M knowledge profile — 3-tier fallback:
+    # 1. Exact match on CONCAT key
+    # 2. Case-insensitive match (handles "chevrolet" vs "Chevrolet")
+    # 3. Suffix-stripped base model (handles "Camaro Z28" → "Camaro")
     cur.execute("""
         SELECT profile FROM ymm_knowledge WHERE ymm_key = %s
     """, (ymm_key,))
     yk_row = cur.fetchone()
 
-    # Also try base model (coalesced)
     if not yk_row:
+        # Try case-insensitive match
+        cur.execute("SELECT profile, ymm_key FROM ymm_knowledge WHERE LOWER(ymm_key) = LOWER(%s)", (ymm_key,))
+        yk_row = cur.fetchone()
+        if yk_row:
+            ymm_key = yk_row["ymm_key"]
+
+    if not yk_row:
+        # Try base model (coalesced) with suffix stripping
         from yono.contextual_training.build_ymm_knowledge import strip_model_suffix
-        base_model, _ = strip_model_suffix(vehicle["model"])
+        base_model, _ = strip_model_suffix(vehicle["model"] or '')
         alt_key = f"{vehicle['year']}_{vehicle['make']}_{base_model}"
         cur.execute("SELECT profile FROM ymm_knowledge WHERE ymm_key = %s", (alt_key,))
         yk_row = cur.fetchone()
+        if not yk_row:
+            # Also try case-insensitive on the stripped key
+            cur.execute("SELECT profile, ymm_key FROM ymm_knowledge WHERE LOWER(ymm_key) = LOWER(%s)", (alt_key,))
+            yk_row = cur.fetchone()
         if yk_row:
-            ymm_key = alt_key
+            ymm_key = yk_row.get("ymm_key", alt_key)
 
     if not yk_row:
         cur.close()
