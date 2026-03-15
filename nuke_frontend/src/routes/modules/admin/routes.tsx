@@ -48,6 +48,7 @@ const TransfersDashboard = React.lazy(() => import('../../../pages/admin/Transfe
 const UserMetrics = React.lazy(() => import('../../../pages/admin/UserMetrics'));
 const SourcesDashboard = React.lazy(() => import('../../../pages/admin/SourcesDashboard'));
 const AdminPulse = React.lazy(() => import('../../../pages/admin/AdminPulse'));
+const DataPulse = React.lazy(() => import('../../../pages/admin/DataPulse'));
 
 const LazyFallback = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'var(--text-disabled)', fontSize: '12px' }}>
@@ -80,6 +81,7 @@ const AdminModuleRoutes = () => {
 
           {/* Ops */}
           <Route path="pulse" element={<AdminPulse />} />
+          <Route path="data-pulse" element={<DataPulse />} />
           <Route path="ralph" element={<AdminRalphBrief />} />
           <Route path="mission-control" element={<AdminMissionControl />} />
           <Route path="scripts" element={<ScriptControlCenter />} />
