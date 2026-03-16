@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { fetchVehicleImages } from '../../lib/fetchVehicleImages';
 import { ImageUploadService } from '../../services/imageUploadService';
 import { globalUploadStatusService } from '../../services/globalUploadStatusService';
 import { uploadQueueService } from '../../services/uploadQueueService';
@@ -29,9 +30,9 @@ interface ImageGalleryProps {
    */
   fallbackSourceUrl?: string;
   /**
-   * When set (e.g. from vehicle profile toolbar), drives view mode and sort/group.
-   * ZONES/CATEGORY → zones, GRID → grid, FULL → masonry, INFO → list, SESSIONS → bundles,
-   * CHRONO → chronological desc, SOURCE → group by source.
+ * When set (e.g. from vehicle profile toolbar), drives view mode and sort/group.
+ * ZONES → zone sections, GRID → grid, FULL → masonry, INFO → list, SESSIONS → bundles,
+ * CATEGORY/CHRONO/SOURCE → grid with the corresponding grouping/sort mode forced on.
    */
   galleryView?: GalleryViewMode;
   // NEW: Image Set features (optional - defaults maintain existing behavior)
@@ -59,6 +60,10 @@ const TAG_TYPES = [
   { value: 'modification', label: 'Modification' },
   { value: 'tool', label: 'Tool' }
 ];
+
+const GALLERY_IMAGE_SELECT =
+  'id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags, image_medium';
+const UNKNOWN_DEVICE_FINGERPRINT = 'Unknown-Unknown-Unknown-Unknown';
 
 // Convert a Supabase storage URL to an on-the-fly transform URL.
 // Uses Supabase Image Transformations: /render/image/public/{path}?width=N&quality=Q
@@ -243,9 +248,11 @@ const getEffectiveImageDate = (image: any, auctionStartDate: string | null = nul
 function galleryViewToViewMode(galleryView: GalleryViewMode): 'zones' | 'grid' | 'masonry' | 'list' | 'bundles' {
   switch (galleryView) {
     case 'ZONES':
-    case 'CATEGORY':
       return 'zones';
     case 'GRID':
+    case 'CATEGORY':
+    case 'CHRONO':
+    case 'SOURCE':
       return 'grid';
     case 'FULL':
       return 'masonry';
@@ -253,8 +260,6 @@ function galleryViewToViewMode(galleryView: GalleryViewMode): 'zones' | 'grid' |
       return 'list';
     case 'SESSIONS':
       return 'bundles';
-    case 'CHRONO':
-    case 'SOURCE':
     default:
       return 'zones';
   }
@@ -300,13 +305,14 @@ const ImageGallery = ({
   const [bundles, setBundles] = useState<any[]>([]);
   const [bundlesLoading, setBundlesLoading] = useState(false);
   const [bundleCollapsed, setBundleCollapsed] = useState<Record<string, boolean>>({});
-  const [bundleThumbnails, setBundleThumbnails] = useState<Record<string, string[]>>({});
+  const [receiptCountsByDate, setReceiptCountsByDate] = useState<Record<string, number>>({});
   const [showFilters, setShowFilters] = useState(false);
   const [showImages, setShowImages] = useState(false);
   const [imagesPerPage] = useState(25);
   // New sorting/grouping states — when galleryView is SOURCE/CHRONO, override from parent
-  const [groupByCategory, setGroupByCategory] = useState(false);
+  const [groupByCategoryInternal, setGroupByCategory] = useState(false);
   const [groupBySourceInternal, setGroupBySourceInternal] = useState(false);
+  const groupByCategory = galleryView === 'CATEGORY' ? true : groupByCategoryInternal;
   const groupBySource = galleryView === 'SOURCE' ? true : groupBySourceInternal;
   const setGroupBySource = useCallback((v: boolean) => setGroupBySourceInternal(v), []);
   const [chronologicalModeInternal, setChronologicalModeInternal] = useState<'off' | 'asc' | 'desc'>('off');
@@ -337,6 +343,25 @@ const ImageGallery = ({
   const [importingFallback, setImportingFallback] = useState(false);
   // NOTE: Must be declared before any hooks/callbacks reference it (avoids TDZ crashes in production builds).
   const [session, setSession] = useState<any>(null);
+  const allImagesById = useMemo(() => {
+    const next = new Map<string, any>();
+    for (const image of allImages || []) {
+      const id = String(image?.id || '').trim();
+      if (id) next.set(id, image);
+    }
+    return next;
+  }, [allImages]);
+  const sortedLegacyBundles = useMemo(() => {
+    return [...bundles].sort((a, b) => {
+      const startA = a?.session_start ? new Date(a.session_start).getTime() : 0;
+      const startB = b?.session_start ? new Date(b.session_start).getTime() : 0;
+      if (startA !== startB) return startB - startA;
+      const dayA = a?.bundle_date ? new Date(`${a.bundle_date}T12:00:00Z`).getTime() : 0;
+      const dayB = b?.bundle_date ? new Date(`${b.bundle_date}T12:00:00Z`).getTime() : 0;
+      if (dayA !== dayB) return dayB - dayA;
+      return Number(b?.image_count || 0) - Number(a?.image_count || 0);
+    });
+  }, [bundles]);
 
   // Prevent "polluted" galleries when navigating between vehicles: clear stale images immediately,
   // then the fetch effect for the new `vehicleId` will repopulate.
@@ -358,6 +383,42 @@ const ImageGallery = ({
     const t = window.setTimeout(() => setRecentUploadIds([]), 15_000);
     return () => window.clearTimeout(t);
   }, [recentUploadIds]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (!vehicleId) {
+        setReceiptCountsByDate({});
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('vehicle_documents')
+          .select('document_type, created_at')
+          .eq('vehicle_id', vehicleId)
+          .in('document_type', ['receipt', 'invoice']);
+
+        if (error) throw error;
+        if (cancelled) return;
+
+        const counts: Record<string, number> = {};
+        for (const row of data || []) {
+          const dayKey = String((row as any)?.created_at || '').slice(0, 10);
+          if (!dayKey) continue;
+          counts[dayKey] = (counts[dayKey] || 0) + 1;
+        }
+        setReceiptCountsByDate(counts);
+      } catch {
+        if (!cancelled) setReceiptCountsByDate({});
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [vehicleId]);
 
   // Vehicle meta (used to suppress "BaT homepage noise" images that were mistakenly attached to some vehicles)
   const [vehicleMeta, setVehicleMeta] = useState<any | null>(null);
@@ -566,24 +627,6 @@ const ImageGallery = ({
         const rows = (data || []) as any[];
         setBundles(rows);
         setBundlesLoading(false);
-        // Fetch 3 thumbnails per bundle
-        for (const bundle of rows) {
-          const dateStr = String(bundle.bundle_date);
-          const ids: string[] = (bundle.image_ids || []).slice(0, 3);
-          if (ids.length === 0) continue;
-          supabase
-            .from('vehicle_images')
-            .select('id, thumbnail_url, medium_url, image_url, variants')
-            .in('id', ids)
-            .then(({ data: imgs }) => {
-              if (!imgs) return;
-              const urls = imgs.map((img: any) => {
-                const v = img.variants as any;
-                return v?.thumbnail || img.thumbnail_url || img.medium_url || img.image_url;
-              }).filter(Boolean);
-              setBundleThumbnails(prev => ({ ...prev, [dateStr]: urls }));
-            });
-        }
       });
   }, [viewMode, vehicleId]);
 
@@ -1054,16 +1097,7 @@ const ImageGallery = ({
       }
 
       // Refresh DB-backed gallery view immediately
-      const { data: refreshed, error: refreshErr } = await supabase
-        .from('vehicle_images')
-        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags, image_medium')
-        .eq('vehicle_id', vehicleId)
-        .not('is_document', 'is', true)
-        .not('is_duplicate', 'is', true)
-        .order('is_primary', { ascending: false })
-        .order('position', { ascending: true, nullsFirst: false })
-        .order('created_at', { ascending: true });
-      if (refreshErr) throw refreshErr;
+      const refreshed = await fetchVehicleImages<any>(vehicleId, GALLERY_IMAGE_SELECT, { includeMismatchFilter: true });
 
       const images = filterBatNoiseRows(dedupeFetchedImages(refreshed || []));
       setUsingFallback(false);
@@ -1656,22 +1690,8 @@ const ImageGallery = ({
         }
 
         // Fetch images and duplicate count in parallel
-        const [imageResult, dupCountResult] = await Promise.all([
-          supabase
-            .from('vehicle_images')
-            .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags, image_medium')
-            .eq('vehicle_id', vehicleId)
-            // Filter out documents (treat NULL as false for legacy rows)
-            .not('is_document', 'is', true)
-            // Hide duplicate rows by default (treat NULL as false for legacy rows)
-            .not('is_duplicate', 'is', true)
-            // Additional filtering: ensure we have valid image URLs
-            .not('image_url', 'is', null)
-            // Hide AI-detected mismatched/unrelated images
-            .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
-            .order('is_primary', { ascending: false })
-            .order('position', { ascending: true, nullsFirst: false })
-            .order('created_at', { ascending: true }),
+        const [rawImages, dupCountResult] = await Promise.all([
+          fetchVehicleImages<any>(vehicleId, GALLERY_IMAGE_SELECT, { includeMismatchFilter: true }),
           // Count duplicates filtered out (for "dupes removed" display)
           supabase
             .from('vehicle_images')
@@ -1681,10 +1701,7 @@ const ImageGallery = ({
             .not('is_document', 'is', true),
         ]);
 
-        const { data: rawImages, error } = imageResult;
         setDuplicateCount(dupCountResult.count || 0);
-
-        if (error) throw error;
         const deduped = dedupeFetchedImages(rawImages || []);
         const cleaned = applyQuarantinePolicy(deduped);
         const images = applyBatCanonicalOverlay(filterBatNoiseRows(cleaned, meta), meta);
@@ -1757,18 +1774,9 @@ const ImageGallery = ({
         setTimeout(async () => {
           try {
             console.log(`Refresh attempt ${index + 1}/${refreshAttempts.length} after ${delay}ms...`);
-            const { data: refreshedImages, error } = await supabase
-              .from('vehicle_images')
-              .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags, image_medium')
-              .eq('vehicle_id', vehicleId)
-              .not('is_document', 'is', true)
-              .not('is_duplicate', 'is', true)
-              .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
-              .order('is_primary', { ascending: false })
-              .order('position', { ascending: true, nullsFirst: false })
-              .order('created_at', { ascending: true });
-            
-            if (!error && refreshedImages) {
+            const refreshedImages = await fetchVehicleImages<any>(vehicleId, GALLERY_IMAGE_SELECT, { includeMismatchFilter: true });
+
+            if (refreshedImages) {
               const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
               const refreshedCleaned = applyQuarantinePolicy(refreshedDeduped);
               const refreshedFiltered = applyBatCanonicalOverlay(filterBatNoiseRows(refreshedCleaned), vehicleMeta);
@@ -1890,7 +1898,7 @@ const ImageGallery = ({
     // Get existing images for deduplication check
     const { data: existingImages } = await supabase
       .from('vehicle_images')
-      .select('file_name, file_size')
+      .select('file_name, file_size, file_hash')
       .eq('vehicle_id', vehicleId);
     
     // Save files to persistent queue FIRST (with dedup check)
@@ -2311,6 +2319,58 @@ const ImageGallery = ({
     ].filter(Boolean);
     const joined = parts.join(', ');
     return (joined || loc.zip || '').toString();
+  };
+
+  const humanizeMetadataToken = (value: any): string => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    return raw
+      .replace(/^ext_|^int_|^mech_|^wheel_|^detail_|^panel_/, '')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const toTitleCase = (value: string): string =>
+    value.replace(/\b\w/g, (char) => char.toUpperCase());
+
+  const formatInfoDate = (dt?: string): string => {
+    if (!dt) return '';
+    try {
+      const d = new Date(dt);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return '';
+    }
+  };
+
+  const summarizeDamageFlags = (damageFlags: any): string => {
+    if (!Array.isArray(damageFlags) || damageFlags.length === 0) return '';
+    const sample = damageFlags
+      .slice(0, 2)
+      .map((flag: string) => humanizeMetadataToken(flag))
+      .filter(Boolean);
+    if (sample.length === 0) return '';
+    const extra = damageFlags.length - sample.length;
+    return `Damage: ${sample.join(', ')}${extra > 0 ? ` +${extra} more` : ''}`;
+  };
+
+  const getInfoTitle = (image: any): string => {
+    if ((image as any).__external) return 'Listing image';
+    const caption = String(image?.caption || '').trim();
+    if (caption) return caption;
+
+    const angle = humanizeMetadataToken(image?.angle);
+    if (angle) return toTitleCase(angle);
+
+    const zone = humanizeMetadataToken(image?.vehicle_zone);
+    if (zone) return toTitleCase(zone);
+
+    const category = humanizeMetadataToken(image?.category);
+    if (category) return `${toTitleCase(category)} image`;
+
+    return 'Vehicle image';
   };
 
   // Load tags for the current image (disabled - using new tagging system)
@@ -4110,11 +4170,11 @@ const ImageGallery = ({
                 })()}
               </div>
 
-              {/* Info - Primary + extensive metadata */}
+              {/* Info - Evidence-oriented summary instead of raw field dump */}
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {image.is_primary && <span style={{ backgroundColor: 'var(--grey-900)', color: 'var(--white)', padding: '1px 4px', marginRight: '4px', fontSize: '8px' }}>PRIMARY</span>}
-                  {(image as any).__external ? 'Listing image' : (image.caption || 'Vehicle Image')}
+                  {getInfoTitle(image)}
                 </div>
                 {(image as any).__external ? (
                   <>
@@ -4128,59 +4188,63 @@ const ImageGallery = ({
                   </>
                 ) : (
                   <>
-                <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
-                  {getDisplayDate(image)}
-                  {getTimeOfDayLabel(image.taken_at || image.created_at) && ` • ${getTimeOfDayLabel(image.taken_at || image.created_at)}`}
-                  {(() => {
-                    // Imported images (scraped listings) should NOT appear “authored” by the user who ran the import.
-                    const domain = getImportedSourceDomain(image);
-                    if (domain) return ` • Imported (${domain})`;
-                    return image.user_id ? ` • ${uploaderOrgNames[image.user_id] || imageUploaderNames[image.user_id] || 'user'}` : '';
-                  })()}
-                  {(() => {
-                    const metadata = image.ai_scan_metadata;
-                    const hasAnalysis = metadata && (
-                      metadata.appraiser?.primary_label ||
-                      metadata.tier_1_analysis ||
-                      metadata.appraiser ||
-                      image.ai_last_scanned ||
-                      image.angle
-                    );
-                    if (!hasAnalysis) return null;
-                    const angle = image.angle || metadata?.appraiser?.angle || metadata?.appraiser?.primary_label;
-                    return angle ? ` • ${angle}` : ' • Analyzed';
-                  })()}
-                </div>
-                {/* Everything else on one line */}
-                <div style={{ fontSize: '8px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {getCameraText(image.exif_data) && <span>{getCameraText(image.exif_data)}</span>}
-                  {(() => {
-                    const locationText = getLocationText(image.exif_data);
-                    const hasGps = image.exif_data?.gps && image.exif_data.gps.latitude && image.exif_data.gps.longitude;
-                    const gpsText = hasGps ? `${image.exif_data.gps.latitude.toFixed?.(2) || image.exif_data.gps.latitude}, ${image.exif_data.gps.longitude.toFixed?.(2) || image.exif_data.gps.longitude}` : null;
-                    const finalLocationText = locationText || gpsText;
-                    return (
-                      <>
-                        {getCameraText(image.exif_data) && finalLocationText && <span> • </span>}
-                        {finalLocationText && <span>{finalLocationText}</span>}
-                      </>
-                    );
-                  })()}
-                  {typeof imageViewCounts[image.id] === 'number' && imageViewCounts[image.id] > 0 && <span> · {imageViewCounts[image.id]}v</span>}
-                  {typeof imageCommentCounts[image.id] === 'number' && imageCommentCounts[image.id] > 0 && <span> · {imageCommentCounts[image.id]}c</span>}
-                  {imageTagCounts[image.id] && <span> · {imageTagCounts[image.id]}t</span>}
-                </div>
-                {/* Extended metadata: zone, quality, condition, angle, category, source */}
-                <div style={{ fontSize: '8px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {[image.vehicle_zone && `Zone: ${String(image.vehicle_zone).replace(/^ext_|^int_|^mech_|^wheel_|^detail_|^panel_/, '')}`,
-                    typeof image.photo_quality_score === 'number' && `Quality: ${image.photo_quality_score.toFixed(1)}`,
-                    typeof image.condition_score === 'number' && `Condition: ${image.condition_score.toFixed(1)}`,
-                    image.damage_flags && Array.isArray(image.damage_flags) && image.damage_flags.length > 0 && `Damage: ${(image.damage_flags as string[]).slice(0, 3).join(', ')}`,
-                    image.angle && `Angle: ${image.angle}`,
-                    image.category && `Category: ${image.category}`,
-                    image.source_url && `Source: ${truncateUrl(image.source_url, 35)}`].filter(Boolean).join(' · ')}
-                  {image.file_hash && <span title={image.file_hash}> · Hash: {String(image.file_hash).slice(0, 8)}…</span>}
-                </div>
+                    {(() => {
+                      const capturedDate = formatInfoDate(image.taken_at);
+                      const importedDate = formatInfoDate(image.created_at);
+                      const captureTimeOfDay = getTimeOfDayLabel(image.taken_at || image.created_at);
+                      const importedSourceDomain = getImportedSourceDomain(image);
+                      const contributor = importedSourceDomain
+                        ? `Imported from ${importedSourceDomain}`
+                        : (image.user_id ? `Added by ${uploaderOrgNames[image.user_id] || imageUploaderNames[image.user_id] || 'user'}` : '');
+                      const headerParts = [
+                        capturedDate && `Captured ${capturedDate}`,
+                        captureTimeOfDay,
+                        importedDate && importedDate !== capturedDate && `Imported ${importedDate}`,
+                        contributor,
+                      ].filter(Boolean);
+                      const classificationParts = [
+                        image.angle && `View: ${humanizeMetadataToken(image.angle)}`,
+                        image.vehicle_zone && `Zone: ${humanizeMetadataToken(image.vehicle_zone)}`,
+                        image.category && `Category: ${humanizeMetadataToken(image.category)}`,
+                        image.image_medium && image.image_medium !== 'photograph' && `Medium: ${humanizeMetadataToken(image.image_medium)}`,
+                      ].filter(Boolean);
+                      const analysisParts = [
+                        typeof image.photo_quality_score === 'number' && `Quality ${image.photo_quality_score.toFixed(1)}`,
+                        typeof image.condition_score === 'number' && `Condition ${image.condition_score.toFixed(1)}`,
+                        summarizeDamageFlags(image.damage_flags),
+                      ].filter(Boolean);
+                      const provenanceParts = [
+                        getCameraText(image.exif_data),
+                        getLocationText(image.exif_data),
+                        typeof imageViewCounts[image.id] === 'number' && imageViewCounts[image.id] > 0 && `${imageViewCounts[image.id]} views`,
+                        typeof imageCommentCounts[image.id] === 'number' && imageCommentCounts[image.id] > 0 && `${imageCommentCounts[image.id]} comments`,
+                      ].filter(Boolean);
+
+                      return (
+                        <>
+                          {headerParts.length > 0 && (
+                            <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
+                              {headerParts.join(' · ')}
+                            </div>
+                          )}
+                          {classificationParts.length > 0 && (
+                            <div style={{ fontSize: '8px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {classificationParts.join(' · ')}
+                            </div>
+                          )}
+                          {analysisParts.length > 0 && (
+                            <div style={{ fontSize: '8px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {analysisParts.join(' · ')}
+                            </div>
+                          )}
+                          {provenanceParts.length > 0 && (
+                            <div style={{ fontSize: '8px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {provenanceParts.join(' · ')}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </>
                 )}
               </div>
@@ -4207,10 +4271,12 @@ const ImageGallery = ({
           {[...sessions].sort((a, b) => {
             const ta = a.session_start ? new Date(a.session_start).getTime() : 0;
             const tb = b.session_start ? new Date(b.session_start).getTime() : 0;
-            return ta - tb;
+            return tb - ta;
           }).map(session => {
             const sid = session.session_id;
             const isCollapsed = sessionCollapsed[sid] ?? false;
+            const sessionDayKey = String(session?.session_start || '').slice(0, 10);
+            const receiptCount = receiptCountsByDate[sessionDayKey] || 0;
             const dateLabel = session.session_start
               ? new Date(session.session_start).toLocaleDateString('en-US', {
                   weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
@@ -4251,6 +4317,7 @@ const ImageGallery = ({
                       <span style={{ fontSize: '10px', fontFamily: "'Courier New', monospace", color: 'var(--text-muted)' }}>
                         {session.image_count} photos
                         {durationMin != null && durationMin > 0 ? ` · ${durationMin < 60 ? `${durationMin}m` : `${Math.round(durationMin / 60)}h`}` : ''}
+                        {receiptCount > 0 ? ` · ${receiptCount} receipt${receiptCount === 1 ? '' : 's'}` : ''}
                       </span>
                     </div>
                   </div>
@@ -4260,7 +4327,7 @@ const ImageGallery = ({
                 {!isCollapsed && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '2px', padding: '2px 12px 12px' }}>
                     {(session.image_ids || []).map((imgId: string) => {
-                      const img = allImages.find(i => i.id === imgId);
+                      const img = allImagesById.get(imgId);
                       if (!img) return null;
                       return (
                         <img
@@ -4282,14 +4349,22 @@ const ImageGallery = ({
           })}
 
           {/* Legacy bundles fallback (when no auto-sessions detected) */}
-          {sessions.length === 0 && bundles.map(bundle => {
+          {sessions.length === 0 && sortedLegacyBundles.map(bundle => {
             const dateStr = String(bundle.bundle_date);
             const isCollapsed = bundleCollapsed[dateStr] ?? false;
-            const thumbs: string[] = bundleThumbnails[dateStr] || [];
+            const previewImages = (bundle.image_ids || [])
+              .map((imgId: string) => allImagesById.get(imgId))
+              .filter(Boolean)
+              .slice(0, 3);
             const dateLabel = new Date(dateStr + 'T12:00:00Z').toLocaleDateString('en-US', {
               weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
             });
             const durationMin = bundle.duration_minutes ? Math.round(Number(bundle.duration_minutes)) : null;
+            const showDuration = Boolean(
+              durationMin &&
+              !(bundle.device_fingerprint === UNKNOWN_DEVICE_FINGERPRINT && durationMin >= 180)
+            );
+            const receiptCount = receiptCountsByDate[dateStr] || 0;
             return (
               <div key={dateStr} style={{ borderBottom: '1px solid var(--border)' }}>
                 <div
@@ -4297,16 +4372,17 @@ const ImageGallery = ({
                   onClick={() => setBundleCollapsed(prev => ({ ...prev, [dateStr]: !isCollapsed }))}
                 >
                   <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
-                    {thumbs.slice(0, 3).map((url, i) => (
-                      <img key={i} src={url} style={{ width: '40px', height: '40px', objectFit: 'cover', background: 'var(--grey-100)' }} />
+                    {previewImages.map((img: any, i: number) => (
+                      <img key={`${img.id}_${i}`} src={getOptimalImageUrl(img, 'thumbnail')} style={{ width: '40px', height: '40px', objectFit: 'cover', background: 'var(--grey-100)' }} />
                     ))}
-                    {thumbs.length === 0 && <div style={{ width: '40px', height: '40px', background: 'var(--grey-100)' }} />}
+                    {previewImages.length === 0 && <div style={{ width: '40px', height: '40px', background: 'var(--grey-100)' }} />}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{dateLabel}</p>
                     <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
                       {bundle.image_count} photos
-                      {durationMin ? ` · ${durationMin < 60 ? `${durationMin}m` : `${Math.round(durationMin / 60)}h`} session` : ''}
+                      {showDuration ? ` · ${durationMin! < 60 ? `${durationMin}m` : `${Math.round(durationMin! / 60)}h`} session` : ''}
+                      {receiptCount > 0 ? ` · ${receiptCount} receipt${receiptCount === 1 ? '' : 's'}` : ''}
                     </p>
                   </div>
                   <span style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0 }}>{isCollapsed ? '▶' : '▼'}</span>
@@ -4314,7 +4390,7 @@ const ImageGallery = ({
                 {!isCollapsed && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '2px', padding: '2px 12px 12px' }}>
                     {(bundle.image_ids || []).slice(0, 40).map((imgId: string) => {
-                      const img = allImages.find(i => i.id === imgId);
+                      const img = allImagesById.get(imgId);
                       if (!img) return null;
                       return (
                         <img key={imgId} src={getOptimalImageUrl(img, 'thumbnail')}
