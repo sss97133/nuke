@@ -28,10 +28,8 @@ export interface CardImageProps {
   };
 }
 
-const ASPECT_GRID_COVER: CSSProperties = { width: '100%', paddingTop: '75%', position: 'relative' }; // 4:3
-const ASPECT_GRID_CONTAIN: CSSProperties = { width: '100%', paddingTop: '56.25%', position: 'relative' }; // 16:9
 const ASPECT: Record<string, CSSProperties> = {
-  grid: ASPECT_GRID_COVER, // default, overridden per-fit in component
+  grid: { width: '100%', paddingTop: '75%', position: 'relative' }, // 4:3
   gallery: {
     width: '72px',
     height: '72px',
@@ -39,11 +37,10 @@ const ASPECT: Record<string, CSSProperties> = {
     position: 'relative',
   },
   technical: {
-    width: '52px',
-    height: '32px',
+    width: '48px',
+    height: '36px',
     flexShrink: 0,
     position: 'relative',
-    border: '1px solid var(--border)',
   },
 };
 
@@ -181,16 +178,11 @@ export function CardImage({
     return () => window.removeEventListener('scroll', dismiss, true);
   }, [hovered]);
 
-  // Use 16:9 for grid+contain to reduce letterboxing on landscape photos
-  const gridAspect = viewMode === 'grid'
-    ? (effectiveFit === 'contain' ? ASPECT_GRID_CONTAIN : ASPECT_GRID_COVER)
-    : ASPECT[viewMode];
-
   return (
     <div
       ref={containerRef}
       style={{
-        ...gridAspect,
+        ...ASPECT[viewMode],
         background: 'var(--surface-hover)',
         overflow: viewMode === 'technical' ? 'visible' : 'hidden',
         border: viewMode !== 'grid' ? '1px solid var(--border)' : undefined,
