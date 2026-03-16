@@ -204,7 +204,7 @@ export async function loadVehicleImpl({
       try {
         const { data, error } = await supabase
           .from('vehicles')
-          .select('id,year,make,model,vin,primary_image_url,sale_price,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,horsepower,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,purchase_price,msrp,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source')
+          .select('id,year,make,model,normalized_model,series,trim,vin,primary_image_url,sale_price,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,listing_url,listing_source,listing_location,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,engine_type,engine_displacement,horsepower,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,purchase_price,msrp,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source,profile_origin,listing_kind,reserve_status,origin_organization_id,origin_metadata')
           .eq('id', vehicleId)
           .single();
 
