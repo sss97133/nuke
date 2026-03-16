@@ -139,7 +139,7 @@ export default function FeedPage() {
         />
 
         {/* Sidebar + Content */}
-        <div style={{ display: 'flex', minHeight: 'calc(100vh - var(--header-height, 72px))' }}>
+        <div style={{ display: 'flex', minHeight: 'calc(100vh - 72px)' }}>
           {/* Filter sidebar */}
           <FeedFilterSidebar
             filters={filters}
@@ -157,42 +157,7 @@ export default function FeedPage() {
               <BrandHeartbeat make={singleMake} model={singleModel} />
             )}
 
-            {feedQuery.isError ? (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '12px',
-                padding: '80px 24px',
-                textAlign: 'center',
-              }}>
-                <span style={{ fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-muted, #888)' }}>
-                  FEED UNAVAILABLE
-                </span>
-                <span style={{ fontSize: '10px', color: 'var(--color-text-dim, #666)', maxWidth: '400px' }}>
-                  {(feedQuery.error as Error)?.message || 'Failed to load feed data'}
-                </span>
-                <button
-                  onClick={() => feedQuery.refetch()}
-                  style={{
-                    marginTop: '8px',
-                    padding: '6px 16px',
-                    fontSize: '9px',
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    border: '2px solid currentColor',
-                    borderRadius: '0',
-                    background: 'transparent',
-                    color: 'inherit',
-                    cursor: 'pointer',
-                    transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-                  }}
-                >
-                  RETRY
-                </button>
-              </div>
-            ) : feedQuery.isLoading ? (
+            {feedQuery.isLoading ? (
               <FeedSkeleton cardsPerRow={cardsPerRow} rows={4} />
             ) : vehicles.length === 0 ? (
               <FeedEmptyState

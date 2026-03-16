@@ -2,6 +2,17 @@
 
 ## 2026-03-15
 
+### [frontend] Public-Readiness — 6 User-Facing Fixes
+- Fix "Get API Key" redirect: CTA now passes `returnUrl=/settings/api-keys` to login
+- Hide VehicleScoresWidget when all 5 scores are null (no more "--" bars on every profile)
+- Wire OnboardingSlideshow for first-time authenticated users (localStorage check)
+- Remove 4 dead market links from search sidebar (browse/segments/builder/contracts — deleted in triage)
+- Add "See an example" CTA on landing hero → links to 1982 Porsche 911SC (9,936 images, $160K)
+- Add REST curl examples alongside `npm install @nuke1/sdk` on /api page
+- SDK v2.0.0 built and pack-verified (npm publish blocked — needs interactive `npm login`)
+- Entity backfill: GLiNER writeback already completed; fill rates 70-81% across all entity fields
+- Commit: 0f6df45b0
+
 ### [admin] Data Pulse — Platform Ingestion Telemetry
 - `data_pulse()` RPC: census + 30-day time series + last_ingested + totals in one round-trip
 - Heartbeat classification: 55 platforms into 4 types (event_auction, continuous_auction, marketplace, dealer_other)
@@ -48,13 +59,13 @@
 - **5,145 vehicles enriched** with propagated images (primary_image_url + vehicle_images rows)
 - 0 errors across 17 batches of 500, zero-cost data recovery from existing DB content
 
-### [data-recovery] Snapshot Image Extraction
+### [data-recovery] Snapshot Image Extraction — COMPLETE
 - Fixed batch-extract-snapshots: reads HTML from Supabase Storage (was only checking inline html — null for 99.99% of snapshots)
 - Added universal image extraction: og:image, JSON-LD, platform-specific gallery patterns
 - Added `primary_image_url` to field map (was missing entirely from batch extractor)
-- **Bonhams: 978 vehicles got images** (85% hit rate)
-- **Mecum: 793+ and running** (~30% hit rate)
-- Running across bat + carsandbids next
+- **Bonhams: 978** | **Mecum: 1,835** | **BaT: 39** | Barrett-Jackson: 0 | C&B: 0
+- **Total: 2,852 vehicles got images from stored snapshots**
+- Combined with FB backfill: **7,997 vehicles went from no image → image this session**
 
 ### [diagnosis] Anthropic API credits depleted
 - Haiku worker returning 400: "credit balance is too low" — blocks 5,910 queue items
@@ -3823,3 +3834,19 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - [feed] Fixed FINDS sort button — added finds→deal_score mapping in useFeedQuery.ts
 - [feed] Time labels now show "updated Xd ago" when updated_at >> created_at (>24h delta)
 - [feed] Added error state UI to FeedPage with RETRY button (was infinite skeleton on failure)
+
+### [admin] Data Pulse v2 — Agent Work Queue
+- Killed median prices everywhere (meaningless across mixed platforms)
+- Summary bar: +5.3K this week, 79K missing VIN, 41K missing desc, 2K sold no price
+- NEW: NEEDS ATTENTION section — ranked priority list of fixable issues by vehicle impact
+- Platform cards: velocity arrows, THIS WEEK counts, gap badges (NO VIN/NO DESC/STALE)
+- RPC v2: velocity (this_week/last_week per platform), gap counts
+
+### [ingest] FB Marketplace End-to-End Wiring (Session 2)
+- Vehicle linking deployed: VIN → vehicle_id, YMM+State → suggested_vehicle_id
+- DOM extraction snippet: `scripts/fb-marketplace-dom-extractor.js` (relay store + DOM + meta tags)
+- MCP server v0.4.0 committed + pushed to GitHub (npm publish deferred — not product-ready)
+- E2E test passed: bingbot fetch → extract → direct ingest → DB verified (1966 Ford Mustang)
+- Title parsing fix: strip FB middot/bullet separators before YMM parse
+- Legacy URL mode: Firecrawl returns 403 for facebook.com, documented as dead
+- **Remaining**: Chrome browser test on real listing page (extension disconnected)
