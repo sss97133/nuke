@@ -6,7 +6,7 @@
  * This function has side effects (state setters, supabase calls, navigation) but no React hooks.
  */
 import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
-import { isMismatchedVehicleImage } from './imageFilterUtils';
+import { isMismatchedVehicleImage, scoreMoneyShot } from './imageFilterUtils';
 
 // ----- Hero Image Auto-Selection -----
 
@@ -21,13 +21,72 @@ export interface HeroImageResult {
   meta: HeroImageMeta;
 }
 
+function parseExifData(raw: any): Record<string, any> | null {
+  if (!raw) return null;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  return typeof raw === 'object' ? raw : null;
+}
+
+function getImageAspectRatio(row: any): number | null {
+  const exif = parseExifData(row?.exif_data);
+  const width = Number(
+    exif?.dimensions?.width ??
+    exif?.ImageWidth ??
+    exif?.ExifImageWidth ??
+    exif?.PixelXDimension ??
+    exif?.width,
+  );
+  const height = Number(
+    exif?.dimensions?.height ??
+    exif?.ImageHeight ??
+    exif?.ExifImageHeight ??
+    exif?.PixelYDimension ??
+    exif?.height,
+  );
+
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return null;
+  }
+
+  return width / height;
+}
+
+function getHeroAspectScore(row: any): number {
+  const ratio = getImageAspectRatio(row);
+  if (!ratio) return 0;
+  if (ratio >= 1.5) return 18;
+  if (ratio >= 1.2) return 10;
+  if (ratio <= 0.72) return -30;
+  if (ratio <= 0.9) return -16;
+  return 0;
+}
+
+function getHeroCandidateUrl(row: any): string {
+  return String(row?.large_url || row?.medium_url || row?.image_url || '');
+}
+
+function scoreHeroCandidate(row: any, options: { frontExterior?: boolean } = {}): number {
+  const url = getHeroCandidateUrl(row);
+  const moneyShotScore = scoreMoneyShot(url, row);
+  const qualityScore = Number(row?.photo_quality_score || 0) * (options.frontExterior ? 2 : 1.5);
+  const zoneScore = Number(row?.zone_confidence || 0) * (options.frontExterior ? 3 : 2);
+  return moneyShotScore + qualityScore + zoneScore + getHeroAspectScore(row);
+}
+
 /**
- * Select the best hero image for a vehicle based on zone, quality, and confidence scores.
+ * Select the best hero image for a vehicle based on zone, quality, confidence,
+ * and banner fit.
  *
  * Priority:
- *  1. Front-facing exterior zones with completed AI processing, scored by
- *     (photo_quality_score * 2) + (zone_confidence * 3)
- *  2. Fallback: highest photo_quality_score from any zone
+ *  1. Front-facing exterior zones with completed AI processing, ranked by a
+ *     weighted hero score
+ *  2. Fallback: best "money shot" candidate from any analyzed zone
  *  3. Fallback: existing primary_image_url from the vehicle record
  *
  * Returns the best image URL (large > medium > image_url) and metadata
@@ -42,7 +101,7 @@ export async function selectBestHeroImage(
     // Attempt 1: front-facing exterior zones with completed AI processing
     const { data: frontImages, error: frontErr } = await supabase
       .from('vehicle_images')
-      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at')
+      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle')
       .eq('vehicle_id', vehicleId)
       .eq('ai_processing_status', 'completed')
       .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
@@ -51,27 +110,31 @@ export async function selectBestHeroImage(
       .limit(20);
 
     if (!frontErr && frontImages && frontImages.length > 0) {
-      // Score: (photo_quality_score * 2) + (zone_confidence * 3), highest wins
       const scored = frontImages.map((img: any) => ({
         ...img,
-        _score: ((img.photo_quality_score || 0) * 2) + ((img.zone_confidence || 0) * 3),
+        _score: scoreHeroCandidate(img, { frontExterior: true }),
       }));
       scored.sort((a: any, b: any) => b._score - a._score);
       return buildHeroResult(scored[0]);
     }
 
-    // Attempt 2: any zone, highest photo_quality_score
+    // Attempt 2: any zone, but still prefer true "money shot" exterior candidates
     const { data: anyImages, error: anyErr } = await supabase
       .from('vehicle_images')
-      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at')
+      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle')
       .eq('vehicle_id', vehicleId)
       .not('photo_quality_score', 'is', null)
       .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
       .order('photo_quality_score', { ascending: false })
-      .limit(1);
+      .limit(40);
 
     if (!anyErr && anyImages && anyImages.length > 0) {
-      return buildHeroResult(anyImages[0]);
+      const scored = anyImages.map((img: any) => ({
+        ...img,
+        _score: scoreHeroCandidate(img),
+      }));
+      scored.sort((a: any, b: any) => b._score - a._score);
+      return buildHeroResult(scored[0]);
     }
 
     // Attempt 3: fall back to primary_image_url
@@ -92,12 +155,12 @@ export async function selectBestHeroImage(
 
 /** Extract the best URL and metadata from a vehicle_images row. */
 function buildHeroResult(row: any): HeroImageResult {
-  const url = row.large_url || row.medium_url || row.image_url || '';
+  const url = getHeroCandidateUrl(row);
   const meta: HeroImageMeta = {};
+  const exif = parseExifData(row?.exif_data);
 
   // Camera model from EXIF
-  if (row.exif_data) {
-    const exif = typeof row.exif_data === 'string' ? JSON.parse(row.exif_data) : row.exif_data;
+  if (exif) {
     const cam = exif?.Model || exif?.model || exif?.camera_model || exif?.CameraModel;
     if (cam) meta.camera = String(cam);
 

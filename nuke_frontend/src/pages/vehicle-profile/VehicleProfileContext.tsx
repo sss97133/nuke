@@ -193,7 +193,20 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     if (!vehicle?.id) return;
     const result = await resolveVehicleImages(vehicle.id);
     setVehicleImages(result.urls);
-    if (result.leadUrl) setLeadImageUrl(result.leadUrl);
+    try {
+      const heroResult = await selectBestHeroImage(vehicle.id, supabase, result.leadUrl);
+      if (heroResult?.url) {
+        setLeadImageUrl(heroResult.url);
+        setHeroMeta(heroResult.meta);
+        return;
+      }
+    } catch {
+      // Ignore and fall back to the resolver lead below.
+    }
+    if (result.leadUrl) {
+      setLeadImageUrl(result.leadUrl);
+      setHeroMeta(null);
+    }
   }, [vehicle?.id]);
 
   const loadTimelineEvents = useCallback(async () => {
