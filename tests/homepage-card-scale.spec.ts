@@ -61,7 +61,11 @@ test.describe('Homepage card scale sweep', () => {
     for (let n = 1; n <= 16; n++) {
       await slider.evaluate((el, value) => {
         const input = el as HTMLInputElement;
-        input.value = String(value);
+        // Use native setter to trigger React's onChange detection.
+        const nativeSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype, 'value'
+        )!.set!;
+        nativeSetter.call(input, String(value));
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
       }, n);
