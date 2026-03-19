@@ -40,136 +40,62 @@ A **database**, a set of **analysis functions**, and **trained ML models** — b
 | Organizations | 4,973 dealers, shops, auction houses |
 | External identities | 510,086 seller/buyer/commenter profiles |
 
-## What you can do with it
+## How it works
 
-### Query the database
+Raw data goes in. Structured knowledge comes out. That's the whole idea.
 
-```bash
-# Search vehicles
-curl "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-search?q=porsche+911&year_from=1970&year_to=1995&limit=20" \
-  -H "X-API-Key: YOUR_KEY"
-
-# Get a vehicle by ID
-curl "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-vehicles?id=VEHICLE_UUID" \
-  -H "X-API-Key: YOUR_KEY"
-
-# Decode a VIN
-curl "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-vin-lookup?vin=WP0AB2966NS420575" \
-  -H "X-API-Key: YOUR_KEY"
-
-# Get comparable vehicles
-curl "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-comps?vehicle_id=VEHICLE_UUID" \
-  -H "X-API-Key: YOUR_KEY"
+```
+               ┌─────────────────────────────────────────────────┐
+               │                   raw inputs                    │
+               │                                                 │
+               │  listing URL    VIN string    photo set    text │
+               └────────┬───────────┬────────────┬──────────┬───┘
+                        │           │            │          │
+                        ▼           ▼            ▼          ▼
+               ┌────────────┐ ┌──────────┐ ┌─────────┐ ┌───────┐
+               │  scrape +  │ │ NHTSA +  │ │  YONO   │ │  LLM  │
+               │  archive   │ │ decode + │ │  make   │ │ field │
+               │  (never    │ │ build    │ │ zone    │ │ ext.  │
+               │  refetch)  │ │ sheet    │ │ damage  │ │ w/    │
+               │            │ │ lookup   │ │ cond.   │ │ cite  │
+               └─────┬──────┘ └────┬─────┘ └────┬────┘ └───┬───┘
+                     │             │             │          │
+                     └──────┬──────┴─────────────┴──────┬───┘
+                            │                           │
+                            ▼                           ▼
+               ┌─────────────────────┐  ┌──────────────────────┐
+               │   observation log   │  │   conflict detection │
+               │   (append-only,     │  │   (sources disagree? │
+               │    source-tagged,   │  │    flag it, score it,│
+               │    scored 0→1)      │  │    investigate)      │
+               └─────────┬───────────┘  └──────────┬───────────┘
+                         │                         │
+                         └────────┬────────────────┘
+                                  ▼
+               ┌─────────────────────────────────────────────────┐
+               │              vehicle as knowledge graph         │
+               │                                                 │
+               │  factory spec ── component state ── provenance  │
+               │  identity verification ── market position       │
+               │  visual inspection ── actor chain ── timeline   │
+               └─────────────────────────────────────────────────┘
 ```
 
-### Run analysis
+**Vision → SQL** is the core trick. A photo of an engine bay doesn't stay
+a photo. It becomes queryable fields: `air_cleaner_type`, `valve_cover_finish`,
+`exhaust_manifold_match`, `engine_stamp_visible`, `modification_detected`.
+YONO (EfficientNet-B0) classifies make in 4ms at $0. Florence-2 maps 41 zones.
+Google Vision reads stamps and tags. The image dissolves into structured data.
 
-```bash
-# Get deal health signals for a vehicle
-curl "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-analysis?vehicle_id=VEHICLE_UUID" \
-  -H "X-API-Key: YOUR_KEY"
+**Text → observations** works the same way. An auction comment saying
+"those aren't the right mirrors for a '70 SS" becomes a sourced observation
+on `component_state.mirrors` with `confidence: 0.50`, `source_type: forum`,
+and a citation back to the original comment.
 
-# Get market trends
-curl "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-market-trends?make=Porsche&model=911" \
-  -H "X-API-Key: YOUR_KEY"
-
-# Get valuations
-curl "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-valuations?vehicle_id=VEHICLE_UUID" \
-  -H "X-API-Key: YOUR_KEY"
-```
-
-### Classify images (free, zero cost)
-
-```bash
-# Classify make from a photo (YONO model, 4ms, $0)
-curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-vision" \
-  -H "X-API-Key: YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"image_url": "https://example.com/car.jpg", "mode": "classify"}'
-
-# Full vision analysis (make + condition + zone + damage)
-curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-vision" \
-  -H "X-API-Key: YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"image_url": "https://example.com/car.jpg", "mode": "analyze"}'
-```
-
-### Ingest vehicle data
-
-```bash
-# From a URL (auto-detects BaT, C&B, eBay, Craigslist, FB Marketplace, Hagerty, etc.)
-curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/ingest" \
-  -H "X-API-Key: YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://bringatrailer.com/listing/1974-chevrolet-c10/"}'
-
-# From freeform text
-curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/ingest" \
-  -H "X-API-Key: YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"text": "1980 Chevy C10 $27,500 Greeneville TN"}'
-
-# Structured JSON
-curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/ingest" \
-  -H "X-API-Key: YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"year": 1980, "make": "Chevrolet", "model": "C10", "price": 27500}'
-
-# Batch (up to 50)
-curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/ingest" \
-  -H "X-API-Key: YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"batch": [{"url": "..."}, {"url": "..."}, {"text": "1969 Camaro SS $45,000"}]}'
-
-# Bulk programmatic import (up to 1,000 vehicles)
-curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-batch" \
-  -H "X-API-Key: YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"vehicles": [{"year": 1974, "make": "Chevrolet", "model": "C10", "vin": "CCY144Z123456"}]}'
-```
-
-### Use the SDK
-
-```bash
-npm install @nuke1/sdk
-```
-
-```typescript
-import Nuke from '@nuke1/sdk';
-const nuke = new Nuke('nk_live_...');
-
-const results = await nuke.search.query({ q: 'porsche 911', year_from: 1970 });
-const vehicle = await nuke.vehicles.get('VEHICLE_UUID');
-const vision  = await nuke.vision.classify({ image_url: 'https://...' });
-
-await nuke.ingest({ url: 'https://bringatrailer.com/listing/...' });
-```
-
-## API reference
-
-Base URL: `https://qkgaybvrernstplzjaam.supabase.co/functions/v1`
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api-v1-search` | GET | Full-text vehicle search with filters |
-| `/api-v1-vehicles` | GET/POST/PATCH | Vehicle CRUD |
-| `/api-v1-vision` | POST | Image classification and analysis (YONO) |
-| `/api-v1-analysis` | GET/POST | Deal health signals and widgets |
-| `/api-v1-comps` | GET | Comparable vehicles |
-| `/api-v1-valuations` | GET | Market valuations |
-| `/api-v1-vin-lookup` | GET | VIN decoding (NHTSA) |
-| `/api-v1-makes` | GET | Make/model catalog |
-| `/api-v1-observations` | GET/POST | Source-attributed data points |
-| `/api-v1-vehicle-history` | GET | Event timeline |
-| `/api-v1-vehicle-auction` | GET | Auction-specific data |
-| `/api-v1-market-trends` | GET | Market analytics |
-| `/api-v1-listings` | GET | Listing status and events |
-| `/api-v1-batch` | POST | Bulk vehicle import (up to 1,000) |
-| `/api-v1-export` | POST | Data export |
-| `/api-v1-signal` | GET | Market signal scoring |
-| `/ingest` | POST | Universal intake (URL, text, JSON, batch) |
-
-**Auth**: `X-API-Key: nk_live_...` header or `Authorization: Bearer JWT` header.
+**Nothing is trusted. Everything is evidence.** Three independent sources
+confirming the same fact compounds confidence. One source contradicting
+the others triggers a flag. The system doesn't decide what's true —
+it shows you what the evidence supports.
 
 ## Data model
 
