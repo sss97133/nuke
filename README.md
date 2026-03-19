@@ -25,7 +25,7 @@ A **database**, a set of **analysis functions**, and **trained ML models** for c
 | What | Scale |
 |------|-------|
 | Vehicles | 141,000 entities with year, make, model, VIN, specs, provenance |
-| Auction comments | 11.5M from BaT, C&B, and others — sentiment-scored |
+| Auction comments | 11.5M  — sentiment-scored |
 | Images | 30M vehicle photos, classified by 41-zone taxonomy |
 | Valuations | 773K price observations across platforms |
 | Sale events | 170K deduplicated auction/listing records |
