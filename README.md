@@ -8,9 +8,9 @@ One person built a system of record for every collector vehicle
 in the world — from a garage in Boulder City, Nevada,
 between oil changes.
 
-141,000 vehicles. 11.5 million auction comments. 30 million images.
-773,000 valuations. A vision model that classifies vehicles
-from photos at zero cost per image.
+645,000 vehicles. 11.6 million auction comments. 32 million images.
+609,000 valuations. 510,000 identity seeds. A vision model that
+classifies vehicles from photos at zero cost per image.
 
 Every data point is an observation — source-attributed,
 confidence-scored, time-ordered. Nothing overwrites.
@@ -24,13 +24,13 @@ A **database**, a set of **analysis functions**, and **trained ML models** for c
 
 | What | Scale |
 |------|-------|
-| Vehicles | 141,000 entities with year, make, model, VIN, specs, provenance |
-| Auction comments | 11.5M  — sentiment-scored |
-| Images | 30M vehicle photos, classified by 41-zone taxonomy |
-| Valuations | 773K price observations across platforms |
-| Sale events | 170K deduplicated auction/listing records |
-| Organizations | 3,987 dealers, shops, auction houses |
-| External identities | 508K seller/buyer/commenter profiles |
+| Vehicles | 645,725 entities with year, make, model, VIN, specs, provenance |
+| Auction comments | 11.6M from BaT, C&B, and others — sentiment-scored |
+| Images | 32.7M vehicle photos, classified by 41-zone taxonomy |
+| Valuations | 609,433 nuke estimates (94.4% coverage) |
+| Sale events | 192,539 extracted across 10+ auction platforms |
+| Organizations | 4,973 dealers, shops, auction houses |
+| External identities | 510,086 seller/buyer/commenter profiles |
 
 ## What you can do with it
 
