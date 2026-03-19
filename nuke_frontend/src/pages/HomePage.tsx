@@ -9,51 +9,22 @@ import { GarageToolbar } from '../components/garage/GarageToolbar';
 import { applyNonAutoFilters } from '../lib/nonAutoExclusion';
 import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlideshow';
 
-/** Landing page stats: vehicles, sale prices, comments. */
-function useLandingStats() {
-  const [stats, setStats] = useState<{ totalVehicles: number | null; salePrices: number | null; totalComments: number | null }>({
-    totalVehicles: null,
-    salePrices: null,
-    totalComments: null,
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      supabase
-        .from('portfolio_stats_cache')
-        .select('total_vehicles')
-        .eq('id', 'global')
-        .maybeSingle(),
-      supabase
-        .from('vehicles')
-        .select('*', { count: 'estimated', head: true })
-        .not('sale_price', 'is', null),
-      supabase
-        .from('auction_comments')
-        .select('*', { count: 'estimated', head: true }),
-    ]).then(([cacheRes, pricesRes, commentsRes]) => {
-      if (cancelled) return;
-      setStats({
-        totalVehicles: cacheRes.data ? Number(cacheRes.data.total_vehicles) || null : null,
-        salePrices: pricesRes.count != null ? pricesRes.count : null,
-        totalComments: commentsRes.count != null ? commentsRes.count : null,
-      });
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  return stats;
+/** All landing page data in one RPC call. */
+interface LandingData {
+  decades: { decade: number; vehicle_count: number; avg_price: number }[] | null;
+  makes: { make: string; vehicle_count: number; avg_price: number }[] | null;
+  price_brackets: { bracket: string; vehicle_count: number; min_price: number }[] | null;
+  top_models: { make: string; model: string; vehicle_count: number; avg_price: number }[] | null;
+  year_range: { min_year: number; max_year: number; distinct_years: number } | null;
 }
 
-/** Market snapshot: top makes with vehicle counts and avg prices. */
-function useMarketSnapshot() {
-  const [data, setData] = useState<{ make: string; vehicle_count: number; avg_price: number }[]>([]);
+function useLandingData() {
+  const [data, setData] = useState<LandingData | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    supabase.rpc('landing_market_snapshot').then(({ data: rows }) => {
-      if (!cancelled && rows) setData(rows);
+    supabase.rpc('landing_page_data').then(({ data: result }) => {
+      if (!cancelled && result) setData(result as unknown as LandingData);
     });
     return () => { cancelled = true; };
   }, []);
@@ -196,11 +167,36 @@ const TABS: { id: TabId; label: string }[] = [
 
 const LS_KEY = 'nuke_hub_tab';
 
+/** Shared label styles */
+const sectionLabel: React.CSSProperties = {
+  fontSize: 9,
+  fontWeight: 700,
+  letterSpacing: '0.12em',
+  textTransform: 'uppercase',
+  color: 'var(--text-secondary)',
+  marginBottom: 12,
+};
+
+/** Shared clickable row styles */
+const rowButton: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  width: '100%',
+  padding: '10px 16px',
+  border: 'none',
+  background: 'transparent',
+  color: 'var(--text)',
+  cursor: 'pointer',
+  textAlign: 'left',
+  fontFamily: 'Arial, sans-serif',
+  gap: 12,
+  position: 'relative',
+};
+
 function LandingHero({ onBrowse }: { onBrowse: () => void }) {
   const navigate = useNavigate();
   usePageTitle('Nuke — Vehicle Intelligence');
-  const landingStats = useLandingStats();
-  const marketSnapshot = useMarketSnapshot();
+  const landingData = useLandingData();
   const [searchInput, setSearchInput] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -225,13 +221,6 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const formatNum = (n: number | null | undefined) => {
-    if (n == null) return '—';
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
-    return n.toLocaleString();
-  };
-
   const formatPrice = (v: { sale_price?: number | null; asking_price?: number | null }) => {
     const p = v.sale_price || v.asking_price;
     if (!p) return null;
@@ -246,13 +235,23 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
     return `$${n.toLocaleString()}`;
   };
 
-  const statItems = [
-    { value: formatNum(landingStats.totalVehicles), label: 'VEHICLES' },
-    { value: formatNum(landingStats.salePrices), label: 'SALE PRICES' },
-    { value: formatNum(landingStats.totalComments), label: 'COMMENTS' },
-  ];
-
   const showDropdown = searchFocused && searchInput.trim().length >= 2 && (searchResults.length > 0 || noResults);
+
+  // Compute maxes for proportional bars
+  const maxDecadeCount = landingData?.decades ? Math.max(...landingData.decades.map(d => d.vehicle_count)) : 1;
+  const maxMakeCount = landingData?.makes ? Math.max(...landingData.makes.map(m => m.vehicle_count)) : 1;
+  const maxBracketCount = landingData?.price_brackets ? Math.max(...landingData.price_brackets.map(p => p.vehicle_count)) : 1;
+
+  // Price bracket → search params mapping
+  const bracketParams: Record<string, string> = {
+    'Under $25K': 'priceMax=25000',
+    '$25K–$50K': 'priceMin=25000&priceMax=50000',
+    '$50K–$100K': 'priceMin=50000&priceMax=100000',
+    '$100K–$250K': 'priceMin=100000&priceMax=250000',
+    '$250K–$500K': 'priceMin=250000&priceMax=500000',
+    '$500K–$1M': 'priceMin=500000&priceMax=1000000',
+    '$1M+': 'priceMin=1000000',
+  };
 
   return (
     <div
@@ -266,7 +265,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
         fontFamily: 'Arial, sans-serif',
       }}
     >
-      {/* Hero — stripped */}
+      {/* Hero */}
       <div style={{ textAlign: 'center', maxWidth: 680, marginBottom: 40 }}>
         <h1
           style={{
@@ -415,104 +414,245 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
         </button>
       </div>
 
-      {/* Stats */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 0,
-          marginBottom: 48,
-          background: 'var(--surface)',
-          border: '2px solid var(--border)',
-          flexWrap: 'wrap',
-        }}
-      >
-        {statItems.map((s, i) => (
-          <div
-            key={s.label}
-            style={{
-              padding: '16px 32px',
-              textAlign: 'center',
-              borderRight: i < statItems.length - 1 ? '2px solid var(--border)' : 'none',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 'clamp(18px, 3vw, 24px)',
-                fontWeight: 700,
-                color: 'var(--text)',
-                letterSpacing: '-0.02em',
-                fontFamily: 'Courier New, monospace',
-              }}
-            >
-              {s.value}
-            </div>
-            <div style={{ fontSize: 8, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, marginTop: 4 }}>
-              {s.label}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Market Snapshot */}
-      {marketSnapshot.length > 0 && (
+      {/* Decade Timeline */}
+      {landingData?.decades && landingData.year_range && (
         <div style={{ width: '100%', maxWidth: 600, marginBottom: 48 }}>
-          <div style={{
-            fontSize: 9,
-            fontWeight: 700,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--text-secondary)',
-            marginBottom: 12,
-          }}>
-            MARKET
+          <div style={sectionLabel}>
+            {landingData.year_range.min_year}–{landingData.year_range.max_year} · {landingData.year_range.distinct_years} YEARS OF AUCTION DATA
           </div>
+          <div style={{ border: '2px solid var(--border)', background: 'var(--surface)' }}>
+            {landingData.decades.map((d, i) => {
+              const pct = (d.vehicle_count / maxDecadeCount) * 100;
+              return (
+                <button
+                  key={d.decade}
+                  onClick={() => navigate(`/search?yearMin=${d.decade}&yearMax=${d.decade + 9}`)}
+                  style={{
+                    ...rowButton,
+                    borderBottom: i < landingData.decades!.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    color: 'var(--text)',
+                    minWidth: 36,
+                    flexShrink: 0,
+                  }}>
+                    {d.decade}s
+                  </span>
+                  <div style={{ flex: 1, height: 4, background: 'var(--border)', position: 'relative' }}>
+                    <div style={{
+                      width: `${pct}%`,
+                      height: '100%',
+                      background: 'var(--text-secondary)',
+                      opacity: 0.4,
+                      transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    }} />
+                  </div>
+                  <span style={{
+                    fontSize: 10,
+                    color: 'var(--text-secondary)',
+                    fontFamily: 'Courier New, monospace',
+                    whiteSpace: 'nowrap',
+                    minWidth: 52,
+                    textAlign: 'right',
+                  }}>
+                    {d.vehicle_count.toLocaleString()}
+                  </span>
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: 'var(--text)',
+                    fontFamily: 'Courier New, monospace',
+                    whiteSpace: 'nowrap',
+                    minWidth: 50,
+                    textAlign: 'right',
+                  }}>
+                    {formatAvgPrice(d.avg_price)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Market */}
+      {landingData?.makes && (
+        <div style={{ width: '100%', maxWidth: 600, marginBottom: 48 }}>
+          <div style={sectionLabel}>MARKET</div>
+          <div style={{ border: '2px solid var(--border)', background: 'var(--surface)' }}>
+            {landingData.makes.map((row, i) => {
+              const pct = (row.vehicle_count / maxMakeCount) * 100;
+              return (
+                <button
+                  key={row.make}
+                  onClick={() => navigate(`/search?make=${encodeURIComponent(row.make)}`)}
+                  style={{
+                    ...rowButton,
+                    borderBottom: i < landingData.makes!.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {/* Background proportion bar */}
+                  <div style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: `${pct}%`,
+                    background: 'var(--text-secondary)',
+                    opacity: 0.06,
+                    pointerEvents: 'none',
+                  }} />
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    color: 'var(--text)',
+                    flex: 1,
+                    minWidth: 0,
+                    position: 'relative',
+                  }}>
+                    {row.make}
+                  </span>
+                  <span style={{
+                    fontSize: 10,
+                    color: 'var(--text-secondary)',
+                    fontFamily: 'Courier New, monospace',
+                    whiteSpace: 'nowrap',
+                    position: 'relative',
+                  }}>
+                    {Number(row.vehicle_count).toLocaleString()}
+                  </span>
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: 'var(--text)',
+                    fontFamily: 'Courier New, monospace',
+                    whiteSpace: 'nowrap',
+                    minWidth: 50,
+                    textAlign: 'right',
+                    position: 'relative',
+                  }}>
+                    {formatAvgPrice(Number(row.avg_price))}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Price Distribution */}
+      {landingData?.price_brackets && (
+        <div style={{ width: '100%', maxWidth: 600, marginBottom: 48 }}>
+          <div style={sectionLabel}>PRICE DISTRIBUTION</div>
+          <div style={{ border: '2px solid var(--border)', background: 'var(--surface)' }}>
+            {landingData.price_brackets.map((b, i) => {
+              const pct = (b.vehicle_count / maxBracketCount) * 100;
+              return (
+                <button
+                  key={b.bracket}
+                  onClick={() => navigate(`/search?${bracketParams[b.bracket] || ''}`)}
+                  style={{
+                    ...rowButton,
+                    borderBottom: i < landingData.price_brackets!.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    color: 'var(--text)',
+                    minWidth: 90,
+                    flexShrink: 0,
+                  }}>
+                    {b.bracket}
+                  </span>
+                  <div style={{ flex: 1, height: 4, background: 'var(--border)', position: 'relative' }}>
+                    <div style={{
+                      width: `${pct}%`,
+                      height: '100%',
+                      background: 'var(--text-secondary)',
+                      opacity: 0.4,
+                      transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    }} />
+                  </div>
+                  <span style={{
+                    fontSize: 10,
+                    color: 'var(--text-secondary)',
+                    fontFamily: 'Courier New, monospace',
+                    whiteSpace: 'nowrap',
+                    minWidth: 52,
+                    textAlign: 'right',
+                  }}>
+                    {b.vehicle_count.toLocaleString()}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Top Models */}
+      {landingData?.top_models && (
+        <div style={{ width: '100%', maxWidth: 600, marginBottom: 48 }}>
+          <div style={sectionLabel}>TOP MODELS</div>
           <div style={{
-            border: '2px solid var(--border)',
-            background: 'var(--surface)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: 8,
           }}>
-            {marketSnapshot.map((row, i) => (
-              <div
-                key={row.make}
+            {landingData.top_models.map((m) => (
+              <button
+                key={`${m.make}-${m.model}`}
+                onClick={() => navigate(`/search?make=${encodeURIComponent(m.make)}&model=${encodeURIComponent(m.model)}`)}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 16px',
-                  borderBottom: i < marketSnapshot.length - 1 ? '1px solid var(--border)' : 'none',
-                  gap: 12,
+                  padding: '12px 16px',
+                  border: '2px solid var(--border)',
+                  background: 'var(--surface)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  fontFamily: 'Arial, sans-serif',
+                  color: 'var(--text)',
+                  transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
               >
-                <span style={{
+                <div style={{
                   fontSize: 10,
                   fontWeight: 700,
                   letterSpacing: '0.06em',
                   textTransform: 'uppercase',
-                  color: 'var(--text)',
-                  flex: 1,
-                  minWidth: 0,
+                  marginBottom: 4,
                 }}>
-                  {row.make}
-                </span>
-                <span style={{
+                  {m.model}
+                </div>
+                <div style={{
+                  display: 'flex',
+                  gap: 12,
                   fontSize: 10,
-                  color: 'var(--text-secondary)',
                   fontFamily: 'Courier New, monospace',
-                  whiteSpace: 'nowrap',
                 }}>
-                  {Number(row.vehicle_count).toLocaleString()} vehicles
-                </span>
-                <span style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: 'var(--text)',
-                  fontFamily: 'Courier New, monospace',
-                  whiteSpace: 'nowrap',
-                  minWidth: 60,
-                  textAlign: 'right',
-                }}>
-                  {formatAvgPrice(Number(row.avg_price))}
-                </span>
-              </div>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    {m.vehicle_count.toLocaleString()}
+                  </span>
+                  <span style={{ fontWeight: 700 }}>
+                    {formatAvgPrice(m.avg_price)}
+                  </span>
+                </div>
+              </button>
             ))}
           </div>
         </div>
@@ -521,16 +661,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
       {/* Recent Sales */}
       {showcaseVehicles.length > 0 && (
         <div style={{ width: '100%', maxWidth: 900, marginBottom: 48 }}>
-          <div style={{
-            fontSize: 9,
-            fontWeight: 700,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--text-secondary)',
-            marginBottom: 12,
-          }}>
-            RECENT SALES
-          </div>
+          <div style={sectionLabel}>RECENT SALES</div>
           <div style={{
             display: 'flex',
             gap: 8,
