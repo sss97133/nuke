@@ -45,6 +45,7 @@ def _download_gliner():
 gliner_image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install([
+        "numpy<2",             # Pin NumPy 1.x — torch 2.2.2 compiled against it
         "gliner>=0.2",
         "torch==2.2.2",
         "transformers==4.44.2",
@@ -195,9 +196,9 @@ def _postprocess_entities(entities: list[dict]) -> list[dict]:
     image=gliner_image,
     gpu="T4",
     max_containers=4,  # Max 4 T4 containers (~$3 for full 133K corpus)
-    timeout=600,
-    retries=1,
-    scaledown_window=120,  # Keep warm for 2min between calls
+    timeout=900,       # 15 min per batch (100 descriptions)
+    retries=2,         # Retry on preemption
+    scaledown_window=180,  # Keep warm for 3min between calls
 )
 class GLiNERExtractor:
     """Stateful GLiNER extraction worker.
@@ -426,6 +427,17 @@ def main(
         print(f"\n  Vehicle {vid}... ({r['entity_count']} entities, {r.get('inference_ms',0):.0f}ms, {r.get('chunks',1)} chunks)")
         for e in r.get("entities", []):
             print(f"    [{e['label']:35s}] {e['score']:.3f}  \"{e['text']}\"")
+
+    # Save results to file (always — append to combined output)
+    output_file = f"/tmp/gliner-batch-{offset}-{offset+len(all_results)}.json"
+    with open(output_file, "w") as f:
+        json.dump(all_results, f)
+    print(f"\n[EXTRACT] Batch results saved to {output_file}")
+
+    # Append summary to log
+    with open("/tmp/gliner-extraction-log.txt", "a") as f:
+        f.write(f"offset={offset} count={len(all_results)} entities={total_entities} "
+                f"wall={elapsed:.1f}s throughput={len(all_results)/elapsed:.1f}/s\n")
 
     # Optionally write results back to DB
     if write_back and not dry_run:

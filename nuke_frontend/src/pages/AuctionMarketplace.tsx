@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getVehicleIdentityParts } from '../utils/vehicleIdentity';
 import { formatCurrencyFromCents, resolveCurrencyCode } from '../utils/currency';
 import ProxyBidModal from '../components/ProxyBidModal';
+import AuctionNetworkDirectory from '../components/auction/AuctionNetworkDirectory';
 import '../styles/unified-design-system.css';
 
 // Add pulse animation for LIVE badge + skeleton loading
@@ -796,7 +797,7 @@ export default function AuctionMarketplace() {
               <div>
                 <h1 style={{ margin: 0, fontSize: '19px', fontWeight: 700 }}>Auction Marketplace</h1>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Live auctions across the network.
+                  Collector vehicle auction platforms.
                 </div>
                 {!loading && debugCounts && debugCounts.total > 0 && (
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -816,6 +817,7 @@ export default function AuctionMarketplace() {
                 </button>
               )}
             </div>
+            {filteredListings.length > 0 && (
             <div className="card-body">
               {/* Search */}
               <div style={{ marginBottom: '12px' }}>
@@ -842,69 +844,12 @@ export default function AuctionMarketplace() {
                   alignItems: 'center'
                 }}
               >
-                {/* Include 0-bid toggle */}
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '11px',
-                    color: 'var(--text-secondary)',
-                    userSelect: 'none',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={includeNoBidAuctions}
-                    onChange={(e) => setIncludeNoBidAuctions(e.target.checked)}
-                    style={{ transform: 'translateY(0.5px)' }}
-                  />
-                  Include 0-bid auctions
-                </label>
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '11px',
-                    color: 'var(--text-secondary)',
-                    userSelect: 'none',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={includeBadDataListings}
-                    onChange={(e) => setIncludeBadDataListings(e.target.checked)}
-                    style={{ transform: 'translateY(0.5px)' }}
-                  />
-                  Include incomplete profiles
-                </label>
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '11px',
-                    color: 'var(--text-secondary)',
-                    userSelect: 'none',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={includeStaleAuctions}
-                    onChange={(e) => setIncludeStaleAuctions(e.target.checked)}
-                    style={{ transform: 'translateY(0.5px)' }}
-                  />
-                  Include stale auctions
-                </label>
-
                 {/* Filter buttons */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {[
                     { id: 'all', label: 'All Auctions' },
                     { id: 'ending_now', label: 'Ending Now (≤15m)' },
                     { id: 'ending_soon', label: 'Ending Soon (≤2h)' },
-                    { id: 'flash', label: 'Flash Auctions' },
                     { id: 'no_reserve', label: 'No Reserve' },
                     { id: 'new_listings', label: 'New Listings' }
                   ].map(option => (
@@ -948,6 +893,7 @@ export default function AuctionMarketplace() {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </section>
 
@@ -1004,38 +950,20 @@ export default function AuctionMarketplace() {
           </section>
         )}
 
-        {/* Listings */}
+        {/* Auction Network Directory — always shown */}
         <section className="section">
           <div className="card">
             <div className="card-body">
-              {loading ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px', padding: '8px 0' }}>
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <div key={i} style={{ border: '2px solid var(--border)', borderRadius: '4px', overflow: 'hidden', background: 'var(--surface)' }}>
-                      <div style={{ width: '100%', paddingBottom: '75%', background: 'var(--border)', animation: 'auction-skeleton-pulse 1.5s ease-in-out infinite', opacity: 0.6 }} />
-                      <div style={{ padding: '10px 12px' }}>
-                        <div style={{ height: 14, background: 'var(--border)', borderRadius: 2, marginBottom: 8, width: '70%', animation: 'auction-skeleton-pulse 1.5s ease-in-out infinite' }} />
-                        <div style={{ height: 10, background: 'var(--border)', borderRadius: 2, width: '45%', animation: 'auction-skeleton-pulse 1.5s ease-in-out infinite' }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : filteredListings.length === 0 ? (
-                <div className="text-center" style={{ padding: 'var(--space-6) 0' }}>
-                  <div style={{ fontSize: '13px', marginBottom: '8px' }}>
-                    {includeNoBidAuctions ? 'No live auctions found' : 'No auctions with bids found'}
-                  </div>
-                  {user && (
-                    <button
-                      onClick={() => navigate('/auctions/create')}
-                      className="button button-primary"
-                      style={{ fontSize: '12px' }}
-                    >
-                      List a Vehicle
-                    </button>
-                  )}
-                </div>
-              ) : (
+              <AuctionNetworkDirectory expanded={filteredListings.length === 0} />
+            </div>
+          </div>
+        </section>
+
+        {/* Aggregated listings (when available) */}
+        {!loading && filteredListings.length > 0 && (
+          <section className="section">
+            <div className="card">
+              <div className="card-body">
                 <div
                   style={{
                     display: 'grid',
@@ -1054,10 +982,10 @@ export default function AuctionMarketplace() {
                     />
                   ))}
                 </div>
-              )}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
       </div>
 
       {/* Proxy Bid Modal */}

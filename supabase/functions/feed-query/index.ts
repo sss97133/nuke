@@ -61,6 +61,7 @@ interface FeedRequest {
 const SORT_MAP: Record<string, { column: string; defaultDir: "asc" | "desc" }> = {
   newest:     { column: "created_at",  defaultDir: "desc" },
   oldest:     { column: "created_at",  defaultDir: "asc" },
+  updated:    { column: "updated_at",  defaultDir: "desc" },
   deal_score: { column: "deal_score",  defaultDir: "desc" },
   heat_score: { column: "heat_score",  defaultDir: "desc" },
   price_high: { column: "display_price", defaultDir: "desc" },

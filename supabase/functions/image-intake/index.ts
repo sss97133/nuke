@@ -268,7 +268,8 @@ serve(async (req) => {
     }
 
     // Require auth - either JWT or service role key
-    const isServiceRole = authHeader?.includes(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "NONE");
+    const serviceKey = Deno.env.get("SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "NONE";
+    const isServiceRole = authHeader?.includes(serviceKey);
     if (!authenticatedUserId && !isServiceRole) {
       return new Response(JSON.stringify({ error: "Authentication required" }), {
         status: 401,

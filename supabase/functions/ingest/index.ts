@@ -123,6 +123,38 @@ interface ParsedVehicle {
   model: string | null;
 }
 
+// Models/sub-brands that unambiguously identify a make when the title omits it.
+// Improves title parsing for facebook-saved and other sources with informal titles.
+const MODEL_IMPLIES_MAKE: Record<string, string> = {
+  // Chevrolet
+  "corvette": "Chevrolet", "camaro": "Chevrolet", "chevelle": "Chevrolet",
+  "nova": "Chevrolet", "el camino": "Chevrolet", "impala": "Chevrolet",
+  "bel air": "Chevrolet", "monte carlo": "Chevrolet", "blazer": "Chevrolet",
+  "silverado": "Chevrolet", "suburban": "Chevrolet",
+  "c10": "Chevrolet", "c-10": "Chevrolet", "c20": "Chevrolet", "c-20": "Chevrolet",
+  "c30": "Chevrolet", "c-30": "Chevrolet", "k10": "Chevrolet", "k-10": "Chevrolet",
+  "k20": "Chevrolet", "k-20": "Chevrolet", "k5": "Chevrolet",
+  "square body": "Chevrolet", "squarebody": "Chevrolet",
+  "stingray": "Chevrolet",
+  // GMC
+  "k15": "GMC", "k-15": "GMC",
+  // Ford
+  "mustang": "Ford", "bronco": "Ford", "thunderbird": "Ford",
+  "f-100": "Ford", "f100": "Ford", "f-150": "Ford", "f150": "Ford",
+  "f-250": "Ford", "f250": "Ford", "f-350": "Ford", "f350": "Ford",
+  "fairlane": "Ford", "galaxie": "Ford", "falcon": "Ford",
+  // Dodge / Plymouth
+  "charger": "Dodge", "challenger": "Dodge", "coronet": "Dodge",
+  "roadrunner": "Plymouth", "road runner": "Plymouth",
+  "barracuda": "Plymouth", "'cuda": "Plymouth", "cuda": "Plymouth",
+  "duster": "Plymouth", "satellite": "Plymouth", "gtx": "Plymouth",
+  // Pontiac
+  "firebird": "Pontiac", "trans am": "Pontiac", "gto": "Pontiac",
+  // Misc
+  "scout": "International Harvester",
+  "moke": "MINI",
+};
+
 function parseVehicleTitle(text: string): ParsedVehicle {
   if (!text) return { year: null, make: null, model: null };
 
@@ -150,6 +182,21 @@ function parseVehicleTitle(text: string): ParsedVehicle {
         .join(" ")
         .trim() || null;
       return { year, make: normalizeMake(make) || make, model };
+    }
+  }
+
+  // No explicit make found — check if a known model name implies the make
+  for (const [keyword, impliedMake] of Object.entries(MODEL_IMPLIES_MAKE)) {
+    const re = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+    if (re.test(lower)) {
+      // Extract model as the text starting from the keyword
+      const modelStart = lower.indexOf(keyword.toLowerCase());
+      const modelText = afterYear.slice(modelStart).split(/[\s·•|—,\-$]+/)
+        .filter(w => w && !/^\d+$/.test(w) && !/^\$/.test(w))
+        .slice(0, 3)
+        .join(" ")
+        .trim() || keyword;
+      return { year, make: impliedMake, model: modelText };
     }
   }
 
@@ -448,6 +495,8 @@ interface IngestInput {
   condition?: string;
   title_status?: string;
   enrich?: boolean; // attempt to auto-enrich from source URL
+  _source?: string; // source hint from caller (e.g. "facebook_saved")
+  sold?: boolean; // sold status from caller
 }
 
 interface IngestResult {
@@ -476,6 +525,11 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       const source = detectSource(input.url);
       platform = source.platform;
       externalId = source.externalId;
+    }
+
+    // Source hint override (e.g. from facebook_saved connector)
+    if (input._source === "facebook_saved") {
+      platform = "facebook-saved";
     }
 
     // Parse vehicle info from available data
@@ -668,6 +722,24 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       condition: input.condition,
       sellerName: input.seller_name,
     }, platform);
+
+    // Facebook Saved: set status based on sold flag
+    if (platform === "facebook-saved" && match.vehicleId) {
+      const isSold = !!(input as any).sold;
+      const fbUpdates: Record<string, any> = {
+        source: "facebook-saved",
+        discovery_source: "facebook-saved",
+        status: isSold ? "sold" : "discovered",
+        auction_status: isSold ? "ended" : null,
+        is_for_sale: !isSold,
+      };
+      if (input.seller_name) {
+        fbUpdates.seller_name = input.seller_name;
+      }
+      await supabaseAdmin.from("vehicles")
+        .update(fbUpdates)
+        .eq("id", match.vehicleId);
+    }
 
     // If flagged for review, mark the vehicle
     if (needsReview && match.vehicleId) {

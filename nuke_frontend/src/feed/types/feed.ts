@@ -160,6 +160,7 @@ export interface FeedQueryParams {
 export type FeedSortField =
   | 'newest'
   | 'oldest'
+  | 'updated'
   | 'deal_score'
   | 'heat_score'
   | 'price_high'

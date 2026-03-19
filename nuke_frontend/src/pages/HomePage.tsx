@@ -9,28 +9,46 @@ import { GarageToolbar } from '../components/garage/GarageToolbar';
 import { applyNonAutoFilters } from '../lib/nonAutoExclusion';
 import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlideshow';
 
-/** All landing page data in one RPC call. */
-interface LandingData {
-  decades: { decade: number; vehicle_count: number; avg_price: number }[] | null;
-  makes: { make: string; vehicle_count: number; avg_price: number }[] | null;
-  price_brackets: { bracket: string; vehicle_count: number; min_price: number }[] | null;
-  top_models: { make: string; model: string; vehicle_count: number; avg_price: number }[] | null;
-  year_range: { min_year: number; max_year: number; distinct_years: number } | null;
+/** v3 landing page data — single RPC, all sections. */
+interface LandingDataV3 {
+  vitals: { total_vehicles: number; total_with_price: number; min_year: number; max_year: number; distinct_years: number; distinct_makes: number } | null;
+  platform: { total_observations: number; total_images: number; total_comments: number; total_sources: number; schema_tables: number; schema_columns: number; vehicle_columns: number; pipeline_entries: number } | null;
+  makes: { make: string; vehicle_count: number; avg_price: number; model_count: number }[] | null;
+  make_models: { make: string; model: string; vehicle_count: number; avg_price: number }[] | null;
+  source_categories: { category: string; source_count: number; avg_trust: number; min_trust: number; max_trust: number }[] | null;
+  sources: { slug: string; display_name: string; category: string; base_trust_score: number }[] | null;
+  observation_kinds: { kind: string; cnt: number }[] | null;
+  pipeline_tables: { table_name: string; governed_columns: number; protected_columns: number; function_count: number }[] | null;
+  pipeline_columns: { table_name: string; column_name: string; owned_by: string; do_not_write_directly: boolean; description: string | null }[] | null;
 }
 
-function useLandingData() {
-  const [data, setData] = useState<LandingData | null>(null);
+function useLandingDataV3() {
+  const [data, setData] = useState<LandingDataV3 | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    supabase.rpc('landing_page_data').then(({ data: result }) => {
-      if (!cancelled && result) setData(result as unknown as LandingData);
+    supabase.rpc('landing_page_v3').then(({ data: result }) => {
+      if (!cancelled && result) setData(result as unknown as LandingDataV3);
     });
     return () => { cancelled = true; };
   }, []);
 
   return data;
 }
+
+const OBSERVATION_DESCRIPTIONS: Record<string, string> = {
+  media: 'Photographs, videos, and visual documentation. Each image is zone-classified (exterior, interior, engine bay, undercarriage, detail) and processed through multi-model vision analysis for condition assessment, component identification, and authenticity verification.',
+  comment: 'Auction comments, forum posts, and social discussions. Analyzed for sentiment, technical claims, provenance hints, ownership history, and market signals. Comments are rhizomatic — they reveal vehicle condition, commenter expertise, auction mood, and geographic patterns simultaneously.',
+  bid: 'Auction bid records with timestamps, amounts, and bidder identifiers. Used to reconstruct price discovery curves, identify bidding patterns, and calibrate market valuations across platforms and time periods.',
+  spec: 'Factory specifications, build sheet data, RPO/option codes, and technical documentation. Cross-referenced against registry databases and service manual data to verify claimed configurations.',
+  work_record: 'Service records, restoration logs, and maintenance history from shops and owners. Tied to actor records (shop/mechanic/owner) with location and timestamp for full provenance chains.',
+  listing: 'Marketplace and auction listings with full seller descriptions, asking prices, and claimed specifications. Descriptions are treated as testimony with category-specific half-lives — mechanical claims decay faster than body claims.',
+  provenance: 'Ownership chain documentation, title history, and registry records. Each transfer links to actor records with timestamps, creating a complete chain of custody from factory to present.',
+  ownership: 'Current and historical owner records tied to the actor system. Includes purchase dates, locations, and relationship to the vehicle (daily driver, show car, investment, project).',
+  sale: 'Completed transaction records with final prices, buyer/seller data, and sale conditions (reserve met, buy-it-now, negotiated). Used to build the definitive price history for each vehicle.',
+  valuation: 'Professional appraisals, insurance valuations, and algorithmic estimates. Each valuation is scored by source authority and recency. Multiple valuations create a confidence-weighted price envelope.',
+  condition: 'Structured condition assessments from inspections, vision analysis, and expert evaluations. Scored across body, mechanical, interior, and originality dimensions with photographic evidence links.',
+};
 
 interface ShowcaseVehicle {
   id: string;
@@ -193,13 +211,21 @@ const rowButton: React.CSSProperties = {
   position: 'relative',
 };
 
+const easeOut = '180ms cubic-bezier(0.16, 1, 0.3, 1)';
+
 function LandingHero({ onBrowse }: { onBrowse: () => void }) {
   const navigate = useNavigate();
   usePageTitle('Nuke — Vehicle Intelligence');
-  const landingData = useLandingData();
+  const d = useLandingDataV3();
   const [searchInput, setSearchInput] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  const [expandedMake, setExpandedMake] = useState<string | null>(null);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [expandedKind, setExpandedKind] = useState<string | null>(null);
+  const [expandedTable, setExpandedTable] = useState<string | null>(null);
+  const [showAllMakes, setShowAllMakes] = useState(false);
 
   const { vehicles: showcaseVehicles } = useLiveShowcase();
   const { results: searchResults, noResults } = useSearchPreview(searchInput);
@@ -230,28 +256,125 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
   };
 
   const formatAvgPrice = (n: number) => {
+    if (!n) return '--';
     if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
     if (n >= 1_000) return `$${Math.round(n / 1_000).toLocaleString()}K`;
     return `$${n.toLocaleString()}`;
   };
 
+  const fmtNum = (n: number) => n?.toLocaleString() ?? '--';
+
   const showDropdown = searchFocused && searchInput.trim().length >= 2 && (searchResults.length > 0 || noResults);
 
-  // Compute maxes for proportional bars
-  const maxDecadeCount = landingData?.decades ? Math.max(...landingData.decades.map(d => d.vehicle_count)) : 1;
-  const maxMakeCount = landingData?.makes ? Math.max(...landingData.makes.map(m => m.vehicle_count)) : 1;
-  const maxBracketCount = landingData?.price_brackets ? Math.max(...landingData.price_brackets.map(p => p.vehicle_count)) : 1;
+  // Treemap row slicing
+  const makes = d?.makes || [];
+  const row1 = makes.slice(0, 3);
+  const row2 = makes.slice(3, 8);
+  const row3 = makes.slice(8, 15);
+  const row4 = makes.slice(15);
 
-  // Price bracket → search params mapping
-  const bracketParams: Record<string, string> = {
-    'Under $25K': 'priceMax=25000',
-    '$25K–$50K': 'priceMin=25000&priceMax=50000',
-    '$50K–$100K': 'priceMin=50000&priceMax=100000',
-    '$100K–$250K': 'priceMin=100000&priceMax=250000',
-    '$250K–$500K': 'priceMin=250000&priceMax=500000',
-    '$500K–$1M': 'priceMin=500000&priceMax=1000000',
-    '$1M+': 'priceMin=1000000',
+  // Models for expanded make
+  const modelsForMake = expandedMake ? (d?.make_models || []).filter(m => m.make === expandedMake) : [];
+
+  // Sources for expanded category
+  const sourcesForCategory = expandedCategory ? (d?.sources || []).filter(s => s.category === expandedCategory) : [];
+
+  // Pipeline columns for expanded table
+  const columnsForTable = expandedTable ? (d?.pipeline_columns || []).filter(c => c.table_name === expandedTable) : [];
+
+  // Max observation count for bar widths
+  const maxObsCount = d?.observation_kinds ? Math.max(...d.observation_kinds.map(o => o.cnt)) : 1;
+
+  const renderTreemapCell = (m: typeof makes[0], minHeight: number) => (
+    <button
+      key={m.make}
+      onClick={() => setExpandedMake(expandedMake === m.make ? null : m.make)}
+      style={{
+        flex: m.vehicle_count,
+        minHeight,
+        padding: '8px 10px',
+        border: '2px solid var(--border)',
+        borderColor: expandedMake === m.make ? 'var(--text)' : 'var(--border)',
+        background: 'var(--surface)',
+        cursor: 'pointer',
+        textAlign: 'left',
+        fontFamily: 'Arial, sans-serif',
+        color: 'var(--text)',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        transition: `border-color ${easeOut}`,
+        overflow: 'hidden',
+        minWidth: 0,
+      }}
+    >
+      <div style={{
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      }}>
+        {m.make}
+      </div>
+      <div style={{ display: 'flex', gap: 8, fontSize: 10, fontFamily: 'Courier New, monospace', flexWrap: 'wrap' }}>
+        <span style={{ color: 'var(--text-secondary)' }}>{fmtNum(m.vehicle_count)}</span>
+        <span style={{ fontWeight: 700 }}>{formatAvgPrice(m.avg_price)}</span>
+      </div>
+    </button>
+  );
+
+  const renderMakeAccordion = () => {
+    if (!expandedMake || modelsForMake.length === 0) return null;
+    return (
+      <div style={{
+        width: '100%',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+        gap: 4,
+        padding: '8px 0',
+        animation: 'fadeIn 180ms ease-out',
+      }}>
+        {modelsForMake.map(mm => (
+          <button
+            key={`${mm.make}-${mm.model}`}
+            onClick={() => navigate(`/search?make=${encodeURIComponent(mm.make)}&model=${encodeURIComponent(mm.model)}`)}
+            style={{
+              padding: '8px 10px',
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              cursor: 'pointer',
+              textAlign: 'left',
+              fontFamily: 'Arial, sans-serif',
+              color: 'var(--text)',
+              transition: `border-color ${easeOut}`,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+          >
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {mm.model}
+            </div>
+            <div style={{ display: 'flex', gap: 8, fontSize: 10, fontFamily: 'Courier New, monospace' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>{fmtNum(mm.vehicle_count)}</span>
+              <span style={{ fontWeight: 700 }}>{formatAvgPrice(mm.avg_price)}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+    );
   };
+
+  // Which row is the expanded make in?
+  const expandedMakeRow = expandedMake
+    ? row1.some(m => m.make === expandedMake) ? 1
+    : row2.some(m => m.make === expandedMake) ? 2
+    : row3.some(m => m.make === expandedMake) ? 3
+    : row4.some(m => m.make === expandedMake) ? 4
+    : 0
+    : 0;
 
   return (
     <div
@@ -265,41 +388,25 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
         fontFamily: 'Arial, sans-serif',
       }}
     >
-      {/* Hero */}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
+      {/* ─── Hero ─── */}
       <div style={{ textAlign: 'center', maxWidth: 680, marginBottom: 40 }}>
-        <h1
-          style={{
-            fontSize: 'clamp(36px, 7vw, 64px)',
-            fontWeight: 700,
-            letterSpacing: '-0.03em',
-            lineHeight: 1.05,
-            margin: '0 0 8px',
-            color: 'var(--text)',
-          }}
-        >
+        <h1 style={{ fontSize: 'clamp(36px, 7vw, 64px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0 0 8px', color: 'var(--text)' }}>
           NUKE
         </h1>
-        <p
-          style={{
-            fontSize: 11,
-            lineHeight: 1.5,
-            color: 'var(--text-secondary)',
-            margin: '0 0 32px',
-          }}
-        >
+        <p style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-secondary)', margin: '0 0 32px' }}>
           Vehicle data intelligence.
         </p>
 
         {/* Search bar */}
         <div ref={searchContainerRef} style={{ position: 'relative', maxWidth: 520, margin: '0 auto 20px' }}>
-          <form
-            onSubmit={handleSearch}
-            style={{
-              display: 'flex',
-              gap: 0,
-              border: '2px solid var(--border)',
-            }}
-          >
+          <form onSubmit={handleSearch} style={{ display: 'flex', gap: 0, border: '2px solid var(--border)' }}>
             <input
               type="text"
               value={searchInput}
@@ -307,427 +414,310 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
               onFocus={() => setSearchFocused(true)}
               placeholder="Search: 1967 Porsche 911, VIN, make, model..."
               aria-label="Search vehicles"
-              style={{
-                flex: 1,
-                padding: '10px 16px',
-                fontSize: 11,
-                fontFamily: 'Arial, sans-serif',
-                border: 'none',
-                background: 'var(--surface)',
-                color: 'var(--text)',
-                outline: 'none',
-                minWidth: 0,
-              }}
+              style={{ flex: 1, padding: '10px 16px', fontSize: 11, fontFamily: 'Arial, sans-serif', border: 'none', background: 'var(--surface)', color: 'var(--text)', outline: 'none', minWidth: 0 }}
             />
-            <button
-              type="submit"
-              style={{
-                padding: '10px 24px',
-                fontSize: 9,
-                fontWeight: 700,
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase',
-                fontFamily: 'Arial, sans-serif',
-                border: 'none',
-                borderLeft: '2px solid var(--border)',
-                background: 'var(--surface)',
-                color: 'var(--text)',
-                cursor: 'pointer',
-                flexShrink: 0,
-                whiteSpace: 'nowrap',
-              }}
-            >
+            <button type="submit" style={{ padding: '10px 24px', fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'Arial, sans-serif', border: 'none', borderLeft: '2px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>
               Search
             </button>
           </form>
-
           {showDropdown && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              zIndex: 100,
-            }}>
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', zIndex: 100 }}>
               {searchResults.map((v) => (
                 <button
                   key={v.id}
-                  onClick={() => {
-                    setSearchFocused(false);
-                    navigate(`/vehicle/${v.id}`);
-                  }}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    width: '100%',
-                    padding: '10px 16px',
-                    border: 'none',
-                    borderBottom: '1px solid var(--border)',
-                    background: 'transparent',
-                    color: 'var(--text)',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    fontSize: 13,
-                    fontFamily: 'Arial, sans-serif',
-                  }}
+                  onClick={() => { setSearchFocused(false); navigate(`/vehicle/${v.id}`); }}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '10px 16px', border: 'none', borderBottom: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontFamily: 'Arial, sans-serif' }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <span>
-                    {[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown Vehicle'}
-                  </span>
-                  {formatPrice(v) && (
-                    <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)', fontSize: 12 }}>
-                      {formatPrice(v)}
-                    </span>
-                  )}
+                  <span>{[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown Vehicle'}</span>
+                  {formatPrice(v) && <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)', fontSize: 12 }}>{formatPrice(v)}</span>}
                 </button>
               ))}
-              {noResults && (
-                <div style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: 12 }}>
-                  No vehicles found for "{searchInput.trim()}"
-                </div>
-              )}
+              {noResults && <div style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: 12 }}>No vehicles found for "{searchInput.trim()}"</div>}
             </div>
           )}
         </div>
-
-        {/* Single CTA */}
-        <button
-          onClick={onBrowse}
-          style={{
-            padding: '10px 28px',
-            fontSize: 9,
-            fontWeight: 700,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            border: '2px solid var(--border)',
-            background: 'transparent',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-          }}
-        >
+        <button onClick={onBrowse} style={{ padding: '10px 28px', fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', border: '2px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>
           Browse
         </button>
       </div>
 
-      {/* Decade Timeline */}
-      {landingData?.decades && landingData.year_range && (
-        <div style={{ width: '100%', maxWidth: 600, marginBottom: 48 }}>
-          <div style={sectionLabel}>
-            {landingData.year_range.min_year}–{landingData.year_range.max_year} · {landingData.year_range.distinct_years} YEARS OF AUCTION DATA
-          </div>
-          <div style={{ border: '2px solid var(--border)', background: 'var(--surface)' }}>
-            {landingData.decades.map((d, i) => {
-              const pct = (d.vehicle_count / maxDecadeCount) * 100;
-              return (
-                <button
-                  key={d.decade}
-                  onClick={() => navigate(`/search?yearMin=${d.decade}&yearMax=${d.decade + 9}`)}
-                  style={{
-                    ...rowButton,
-                    borderBottom: i < landingData.decades!.length - 1 ? '1px solid var(--border)' : 'none',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <span style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    letterSpacing: '0.06em',
-                    color: 'var(--text)',
-                    minWidth: 36,
-                    flexShrink: 0,
-                  }}>
-                    {d.decade}s
-                  </span>
-                  <div style={{ flex: 1, height: 4, background: 'var(--border)', position: 'relative' }}>
-                    <div style={{
-                      width: `${pct}%`,
-                      height: '100%',
-                      background: 'var(--text-secondary)',
-                      opacity: 0.4,
-                      transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-                    }} />
-                  </div>
-                  <span style={{
-                    fontSize: 10,
-                    color: 'var(--text-secondary)',
-                    fontFamily: 'Courier New, monospace',
-                    whiteSpace: 'nowrap',
-                    minWidth: 52,
-                    textAlign: 'right',
-                  }}>
-                    {d.vehicle_count.toLocaleString()}
-                  </span>
-                  <span style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: 'var(--text)',
-                    fontFamily: 'Courier New, monospace',
-                    whiteSpace: 'nowrap',
-                    minWidth: 50,
-                    textAlign: 'right',
-                  }}>
-                    {formatAvgPrice(d.avg_price)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Market */}
-      {landingData?.makes && (
-        <div style={{ width: '100%', maxWidth: 600, marginBottom: 48 }}>
-          <div style={sectionLabel}>MARKET</div>
-          <div style={{ border: '2px solid var(--border)', background: 'var(--surface)' }}>
-            {landingData.makes.map((row, i) => {
-              const pct = (row.vehicle_count / maxMakeCount) * 100;
-              return (
-                <button
-                  key={row.make}
-                  onClick={() => navigate(`/search?make=${encodeURIComponent(row.make)}`)}
-                  style={{
-                    ...rowButton,
-                    borderBottom: i < landingData.makes!.length - 1 ? '1px solid var(--border)' : 'none',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                >
-                  {/* Background proportion bar */}
-                  <div style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: `${pct}%`,
-                    background: 'var(--text-secondary)',
-                    opacity: 0.06,
-                    pointerEvents: 'none',
-                  }} />
-                  <span style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                    color: 'var(--text)',
-                    flex: 1,
-                    minWidth: 0,
-                    position: 'relative',
-                  }}>
-                    {row.make}
-                  </span>
-                  <span style={{
-                    fontSize: 10,
-                    color: 'var(--text-secondary)',
-                    fontFamily: 'Courier New, monospace',
-                    whiteSpace: 'nowrap',
-                    position: 'relative',
-                  }}>
-                    {Number(row.vehicle_count).toLocaleString()}
-                  </span>
-                  <span style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: 'var(--text)',
-                    fontFamily: 'Courier New, monospace',
-                    whiteSpace: 'nowrap',
-                    minWidth: 50,
-                    textAlign: 'right',
-                    position: 'relative',
-                  }}>
-                    {formatAvgPrice(Number(row.avg_price))}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Price Distribution */}
-      {landingData?.price_brackets && (
-        <div style={{ width: '100%', maxWidth: 600, marginBottom: 48 }}>
-          <div style={sectionLabel}>PRICE DISTRIBUTION</div>
-          <div style={{ border: '2px solid var(--border)', background: 'var(--surface)' }}>
-            {landingData.price_brackets.map((b, i) => {
-              const pct = (b.vehicle_count / maxBracketCount) * 100;
-              return (
-                <button
-                  key={b.bracket}
-                  onClick={() => navigate(`/search?${bracketParams[b.bracket] || ''}`)}
-                  style={{
-                    ...rowButton,
-                    borderBottom: i < landingData.price_brackets!.length - 1 ? '1px solid var(--border)' : 'none',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <span style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    letterSpacing: '0.04em',
-                    color: 'var(--text)',
-                    minWidth: 90,
-                    flexShrink: 0,
-                  }}>
-                    {b.bracket}
-                  </span>
-                  <div style={{ flex: 1, height: 4, background: 'var(--border)', position: 'relative' }}>
-                    <div style={{
-                      width: `${pct}%`,
-                      height: '100%',
-                      background: 'var(--text-secondary)',
-                      opacity: 0.4,
-                      transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-                    }} />
-                  </div>
-                  <span style={{
-                    fontSize: 10,
-                    color: 'var(--text-secondary)',
-                    fontFamily: 'Courier New, monospace',
-                    whiteSpace: 'nowrap',
-                    minWidth: 52,
-                    textAlign: 'right',
-                  }}>
-                    {b.vehicle_count.toLocaleString()}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Top Models */}
-      {landingData?.top_models && (
-        <div style={{ width: '100%', maxWidth: 600, marginBottom: 48 }}>
-          <div style={sectionLabel}>TOP MODELS</div>
+      {/* ─── 2. Platform Vitals ─── */}
+      {d?.vitals && d?.platform && (
+        <div style={{ width: '100%', maxWidth: 900, marginBottom: 48, border: '2px solid var(--border)', padding: '16px 20px' }}>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: 8,
+            gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+            gap: '12px 16px',
+            textAlign: 'center',
           }}>
-            {landingData.top_models.map((m) => (
-              <button
-                key={`${m.make}-${m.model}`}
-                onClick={() => navigate(`/search?make=${encodeURIComponent(m.make)}&model=${encodeURIComponent(m.model)}`)}
-                style={{
-                  padding: '12px 16px',
-                  border: '2px solid var(--border)',
-                  background: 'var(--surface)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontFamily: 'Arial, sans-serif',
-                  color: 'var(--text)',
-                  transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
-              >
-                <div style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  marginBottom: 4,
-                }}>
-                  {m.model}
+            {[
+              ['VEHICLES', d.vitals.total_vehicles],
+              ['OBSERVATIONS', d.platform.total_observations],
+              ['IMAGES', d.platform.total_images],
+              ['COMMENTS', d.platform.total_comments],
+              ['SOURCES', d.platform.total_sources],
+              ['COLUMNS', d.platform.schema_columns],
+              ['TABLES', d.platform.schema_tables],
+              ['PIPELINES', d.platform.pipeline_entries],
+            ].map(([label, val]) => (
+              <div key={label as string}>
+                <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: 4 }}>
+                  {label}
                 </div>
-                <div style={{
-                  display: 'flex',
-                  gap: 12,
-                  fontSize: 10,
-                  fontFamily: 'Courier New, monospace',
-                }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>
-                    {m.vehicle_count.toLocaleString()}
-                  </span>
-                  <span style={{ fontWeight: 700 }}>
-                    {formatAvgPrice(m.avg_price)}
-                  </span>
+                <div style={{ fontSize: 14, fontFamily: 'Courier New, monospace', fontWeight: 700, color: 'var(--text)' }}>
+                  {fmtNum(val as number)}
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Recent Sales */}
+      {/* ─── 3. Market Treemap ─── */}
+      {makes.length > 0 && (
+        <div style={{ width: '100%', maxWidth: 900, marginBottom: 48 }}>
+          <div style={sectionLabel}>MARKET</div>
+          {/* Row 1: Top 3 */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+            {row1.map(m => renderTreemapCell(m, 80))}
+          </div>
+          {expandedMakeRow === 1 && renderMakeAccordion()}
+          {/* Row 2: Next 5 */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+            {row2.map(m => renderTreemapCell(m, 64))}
+          </div>
+          {expandedMakeRow === 2 && renderMakeAccordion()}
+          {/* Row 3: Next 7 */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+            {row3.map(m => renderTreemapCell(m, 52))}
+          </div>
+          {expandedMakeRow === 3 && renderMakeAccordion()}
+          {/* Row 4: Remaining — collapsed by default */}
+          {row4.length > 0 && (
+            <>
+              {showAllMakes ? (
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+                  {row4.map(m => renderTreemapCell(m, 44))}
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAllMakes(true)}
+                  style={{
+                    width: '100%', padding: '8px', border: '2px solid var(--border)',
+                    background: 'var(--surface)', cursor: 'pointer', fontFamily: 'Arial, sans-serif',
+                    fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+                    color: 'var(--text-secondary)', textAlign: 'center',
+                  }}
+                >
+                  +{row4.length} MORE MAKES
+                </button>
+              )}
+              {expandedMakeRow === 4 && renderMakeAccordion()}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ─── 4. Intelligence Network ─── */}
+      {d?.source_categories && (
+        <div style={{ width: '100%', maxWidth: 900, marginBottom: 48 }}>
+          <div style={sectionLabel}>INTELLIGENCE NETWORK</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 4 }}>
+            {d.source_categories.map(cat => (
+              <div key={cat.category}>
+                <button
+                  onClick={() => setExpandedCategory(expandedCategory === cat.category ? null : cat.category)}
+                  style={{
+                    width: '100%', padding: '12px 14px', border: '2px solid var(--border)',
+                    borderColor: expandedCategory === cat.category ? 'var(--text)' : 'var(--border)',
+                    background: 'var(--surface)', cursor: 'pointer', textAlign: 'left',
+                    fontFamily: 'Arial, sans-serif', color: 'var(--text)', transition: `border-color ${easeOut}`,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                      {cat.category}
+                    </span>
+                    <span style={{ fontSize: 10, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)' }}>
+                      {cat.source_count}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 9, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)', minWidth: 28 }}>
+                      {cat.min_trust}
+                    </span>
+                    <div style={{ flex: 1, height: 4, background: 'var(--border)', position: 'relative' }}>
+                      <div style={{
+                        position: 'absolute', left: `${cat.min_trust * 100}%`, right: `${(1 - cat.max_trust) * 100}%`,
+                        top: 0, bottom: 0, background: 'var(--text-secondary)', opacity: 0.4,
+                      }} />
+                      <div style={{
+                        position: 'absolute', left: `${cat.avg_trust * 100}%`, top: -2,
+                        width: 3, height: 8, background: 'var(--text)',
+                      }} />
+                    </div>
+                    <span style={{ fontSize: 9, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)', minWidth: 28, textAlign: 'right' }}>
+                      {cat.max_trust}
+                    </span>
+                  </div>
+                </button>
+                {expandedCategory === cat.category && sourcesForCategory.length > 0 && (
+                  <div style={{ border: '1px solid var(--border)', borderTop: 'none', background: 'var(--surface)', animation: 'fadeIn 180ms ease-out' }}>
+                    {sourcesForCategory.map(s => (
+                      <div key={s.slug} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderBottom: '1px solid var(--border)' }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {s.display_name}
+                        </span>
+                        <span style={{ fontSize: 10, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)', minWidth: 32, textAlign: 'right' }}>
+                          {s.base_trust_score}
+                        </span>
+                        <div style={{ width: 80, height: 4, background: 'var(--border)', flexShrink: 0 }}>
+                          <div style={{ width: `${s.base_trust_score * 100}%`, height: '100%', background: 'var(--text-secondary)', opacity: 0.4 }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── 5. Observation Graph ─── */}
+      {d?.observation_kinds && (
+        <div style={{ width: '100%', maxWidth: 900, marginBottom: 48 }}>
+          <div style={sectionLabel}>OBSERVATIONS</div>
+          <div style={{ border: '2px solid var(--border)', background: 'var(--surface)' }}>
+            {d.observation_kinds.map((ok, i) => (
+              <div key={ok.kind}>
+                <button
+                  onClick={() => setExpandedKind(expandedKind === ok.kind ? null : ok.kind)}
+                  style={{
+                    ...rowButton,
+                    borderBottom: i < d.observation_kinds!.length - 1 || expandedKind === ok.kind ? '1px solid var(--border)' : 'none',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text)', minWidth: 90, flexShrink: 0 }}>
+                    {ok.kind}
+                  </span>
+                  <div style={{ flex: 1, height: 4, background: 'var(--border)', position: 'relative' }}>
+                    <div style={{
+                      width: `${(ok.cnt / maxObsCount) * 100}%`, height: '100%',
+                      background: 'var(--text-secondary)', opacity: 0.4,
+                      transition: `width ${easeOut}`,
+                    }} />
+                  </div>
+                  <span style={{ fontSize: 10, color: 'var(--text-secondary)', fontFamily: 'Courier New, monospace', whiteSpace: 'nowrap', minWidth: 64, textAlign: 'right' }}>
+                    {fmtNum(ok.cnt)}
+                  </span>
+                </button>
+                {expandedKind === ok.kind && OBSERVATION_DESCRIPTIONS[ok.kind] && (
+                  <div style={{
+                    padding: '10px 16px 12px', fontSize: 10, lineHeight: 1.5,
+                    color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)',
+                    animation: 'fadeIn 180ms ease-out',
+                  }}>
+                    {OBSERVATION_DESCRIPTIONS[ok.kind]}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── 6. Schema Explorer ─── */}
+      {d?.pipeline_tables && (
+        <div style={{ width: '100%', maxWidth: 900, marginBottom: 48 }}>
+          <div style={sectionLabel}>SCHEMA GOVERNANCE</div>
+          <div style={{ border: '2px solid var(--border)', background: 'var(--surface)' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', padding: '8px 16px', borderBottom: '1px solid var(--border)', fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-secondary)', gap: 12 }}>
+              <span style={{ flex: 1 }}>TABLE</span>
+              <span style={{ minWidth: 64, textAlign: 'right' }}>GOVERNED</span>
+              <span style={{ minWidth: 64, textAlign: 'right' }}>PROTECTED</span>
+              <span style={{ minWidth: 64, textAlign: 'right' }}>FUNCTIONS</span>
+            </div>
+            {d.pipeline_tables.map((pt, i) => (
+              <div key={pt.table_name}>
+                <button
+                  onClick={() => setExpandedTable(expandedTable === pt.table_name ? null : pt.table_name)}
+                  style={{
+                    ...rowButton,
+                    borderBottom: i < d.pipeline_tables!.length - 1 || expandedTable === pt.table_name ? '1px solid var(--border)' : 'none',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span style={{ flex: 1, fontSize: 10, fontFamily: 'Courier New, monospace', fontWeight: 700 }}>
+                    {pt.table_name}
+                  </span>
+                  <span style={{ minWidth: 64, textAlign: 'right', fontSize: 10, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)' }}>
+                    {pt.governed_columns}
+                  </span>
+                  <span style={{ minWidth: 64, textAlign: 'right', fontSize: 10, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)' }}>
+                    {pt.protected_columns}
+                  </span>
+                  <span style={{ minWidth: 64, textAlign: 'right', fontSize: 10, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)' }}>
+                    {pt.function_count}
+                  </span>
+                </button>
+                {expandedTable === pt.table_name && columnsForTable.length > 0 && (
+                  <div style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', animation: 'fadeIn 180ms ease-out' }}>
+                    {columnsForTable.map(col => (
+                      <div key={col.column_name} style={{ display: 'flex', alignItems: 'center', padding: '5px 16px 5px 32px', gap: 12, borderBottom: '1px solid var(--border)', fontSize: 10 }}>
+                        <span style={{ fontFamily: 'Courier New, monospace', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {col.column_name}
+                        </span>
+                        <span style={{ fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)', fontSize: 9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>
+                          {col.owned_by}
+                        </span>
+                        {col.do_not_write_directly && (
+                          <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-secondary)', flexShrink: 0 }} title="Protected — writes only via owning function">
+                            PROTECTED
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── 7. Recent Sales ─── */}
       {showcaseVehicles.length > 0 && (
         <div style={{ width: '100%', maxWidth: 900, marginBottom: 48 }}>
           <div style={sectionLabel}>RECENT SALES</div>
-          <div style={{
-            display: 'flex',
-            gap: 8,
-            overflowX: 'auto',
-            paddingBottom: 8,
-            scrollbarWidth: 'thin',
-          }}>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, scrollbarWidth: 'thin' }}>
             {showcaseVehicles.map((v) => (
               <Link
                 key={v.id}
                 to={`/vehicle/${v.id}`}
                 style={{
-                  flexShrink: 0,
-                  width: 180,
-                  background: 'var(--surface)',
-                  border: '2px solid var(--border)',
-                  textDecoration: 'none',
-                  color: 'var(--text)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden',
-                  transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+                  flexShrink: 0, width: 180, background: 'var(--surface)', border: '2px solid var(--border)',
+                  textDecoration: 'none', color: 'var(--text)', display: 'flex', flexDirection: 'column',
+                  overflow: 'hidden', transition: `border-color ${easeOut}`,
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
               >
-                <div style={{
-                  width: '100%',
-                  height: 120,
-                  overflow: 'hidden',
-                  background: 'var(--bg)',
-                }}>
-                  <img
-                    src={v.primary_image_url || ''}
-                    alt={`${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim()}
-                    loading="lazy"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                    }}
-                  />
+                <div style={{ width: '100%', height: 120, overflow: 'hidden', background: 'var(--bg)' }}>
+                  <img src={v.primary_image_url || ''} alt={`${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim()} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <div style={{ padding: '8px 10px' }}>
-                  <div style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase' as const,
-                    lineHeight: 1.3,
-                    marginBottom: 4,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' as const, lineHeight: 1.3, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Vehicle'}
                   </div>
                   {formatPrice(v) && (
-                    <div style={{
-                      fontSize: 11,
-                      fontFamily: 'Courier New, monospace',
-                      fontWeight: 700,
-                      color: 'var(--text)',
-                    }}>
-                      {formatPrice(v)}
-                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'Courier New, monospace', fontWeight: 700, color: 'var(--text)' }}>{formatPrice(v)}</div>
                   )}
                 </div>
               </Link>
@@ -736,17 +726,8 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
         </div>
       )}
 
-      {/* Footer */}
-      <a
-        href="https://nuke.ag"
-        style={{
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: '0.08em',
-          color: 'var(--text-secondary)',
-          textDecoration: 'none',
-        }}
-      >
+      {/* ─── 8. Footer ─── */}
+      <a href="https://nuke.ag" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-secondary)', textDecoration: 'none' }}>
         nuke.ag
       </a>
     </div>

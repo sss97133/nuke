@@ -21,6 +21,7 @@ import {
   urlHasFeedParams,
   urlStatesEqual,
   type FeedUrlState,
+  type ImageFit,
 } from '../utils/feedUrlCodec';
 
 // ---------------------------------------------------------------------------
@@ -40,6 +41,8 @@ export interface FeedSearchParamsResult {
   viewMode: ViewMode;
   /** Cards per row */
   cardsPerRow: number;
+  /** Image fit mode */
+  imageFit: ImageFit;
   /** Whether any non-default filters are active */
   hasActiveFilters: boolean;
 
@@ -57,6 +60,8 @@ export interface FeedSearchParamsResult {
   setViewMode: (mode: ViewMode) => void;
   /** Set cards per row */
   setCardsPerRow: (cols: number) => void;
+  /** Set image fit mode */
+  setImageFit: (fit: ImageFit) => void;
   /** Reset all filters/sort to defaults */
   resetAll: () => void;
 }
@@ -89,6 +94,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
           searchText: legacySearch,
           viewMode: 'grid',
           cardsPerRow: 6,
+          imageFit: 'auto',
         };
 
         const newParams = serializeToUrl(state);
@@ -105,7 +111,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
     [searchParams],
   );
 
-  const { filters, sortBy, sortDirection, searchText, viewMode, cardsPerRow } = currentState;
+  const { filters, sortBy, sortDirection, searchText, viewMode, cardsPerRow, imageFit } = currentState;
 
   // --- Check if any non-default filters are active ---
   const hasActiveFilters = useMemo(() => {
@@ -215,6 +221,15 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
     [currentState, pushState],
   );
 
+  const setImageFit = useCallback(
+    (fit: ImageFit) => {
+      pushState({ ...currentState, imageFit: fit });
+      // Persist to shared localStorage so other views (auctions tab, etc.) stay in sync
+      try { localStorage.setItem('nuke_imageFit', fit); } catch {}
+    },
+    [currentState, pushState],
+  );
+
   const resetAll = useCallback(() => {
     pushState({
       filters: DEFAULT_FILTERS,
@@ -223,6 +238,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
       searchText: '',
       viewMode: 'grid',
       cardsPerRow: 6,
+      imageFit: 'auto',
     });
   }, [pushState]);
 
@@ -240,6 +256,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
     searchText,
     viewMode,
     cardsPerRow,
+    imageFit,
     hasActiveFilters,
     setFilters,
     updateFilters,
@@ -248,6 +265,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
     setSearchText,
     setViewMode,
     setCardsPerRow,
+    setImageFit,
     resetAll,
   };
 }

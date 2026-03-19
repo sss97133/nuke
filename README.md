@@ -165,16 +165,30 @@ Base URL: `https://qkgaybvrernstplzjaam.supabase.co/functions/v1`
 
 ## Data model
 
-Every vehicle is an entity. Every fact about that vehicle is an **observation** — immutable, source-attributed, confidence-scored, timestamped. Observations never overwrite each other. The current "truth" about a vehicle is derived by weighing all observations by source trust and recency.
+Entity-Attribute-Value Modeling at Total Resolution — a Knowledge Graph materialized as relational schema. The database doesn't describe the vehicle. The database IS the vehicle.
+
+The technical names:
+- **Domain Ontology Engineering**
+- **Canonical Data Model**
+- **Schema-Guided Generation with Evidential Grounding**
+- **Fully Normalized Domain Ontology at Component Resolution with Full Provenance Tracking**
 
 ```
-vehicle
-  -> observations (append-only event log from any source)
+vehicle (identity)
+  -> factory_specification (what it left the factory as — every bolt, every option, every part number)
+  -> component_state (what it is NOW — per-component condition, modifications, replacements)
+  -> observations (append-only evidence log — every claim traced to source with confidence)
+  -> field_evidence (multi-source provenance per field — agreement, conflict, citations)
+  -> component_events (work log — who did what, when, where, with what parts)
+  -> actors (builders, shops, inspectors, owners — reputation through evidence chain)
   -> images (classified by 41-zone taxonomy: exterior, interior, engine bay, undercarriage, detail)
-  -> events (auction listings, sales, price changes across platforms)
-  -> comments (auction discussion, sentiment-scored)
-  -> analysis_signals (computed deal health, pricing risk, market position)
+  -> market_intelligence (auctions, valuations, comparables, listings across platforms)
+  -> validation_results (clone detection, VIN cross-check, code verification, known issues)
 ```
+
+**Schema-Guided Generation with Evidential Grounding**: the SQL schema IS the specification. Hand the DDL to any LLM with source material (photos, descriptions, documents, comments), get back INSERT statements with citations. Every cell proves what it claims. Multi-model jury for verification — where models agree, fact emerges. Where they diverge, investigation begins.
+
+**Scale**: ~950 tables, ~5,000-8,000 columns per subsystem at bedrock. 10,000-100,000 data points per fully documented vehicle. 419 RPO codes, 63 validation rules, 107K evidence rows and growing.
 
 Source trust scores: NHTSA 0.95, major auctions 0.85, forums 0.50, AI extraction 0.70. Confidence decays over time.
 
