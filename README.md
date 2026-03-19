@@ -22,7 +22,6 @@ output: factory spec (every option code, every part number)
         source conflicts flagged, multi-model jury scored
 ```
 
-One person. Boulder City, Nevada. Between oil changes.
 
 ---
 
