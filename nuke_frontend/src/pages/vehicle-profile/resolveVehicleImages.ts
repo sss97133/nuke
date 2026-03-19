@@ -9,7 +9,7 @@
  * No origin_metadata fallback. No vehicle_events metadata. No storage bucket scan.
  * No window.__vehicleProfileRpcData. If images exist in the DB, we show them.
  */
-import { supabase } from '../../lib/supabase';
+import { fetchVehicleImages } from '../../lib/fetchVehicleImages';
 
 export interface ResolvedImages {
   /** Display-ready image URLs in order */
@@ -27,22 +27,12 @@ export async function resolveVehicleImages(vehicleId: string): Promise<ResolvedI
   if (!vehicleId) return empty;
 
   try {
-    const { data: rows, error } = await supabase
-      .from('vehicle_images')
-      .select('id, image_url, thumbnail_url, medium_url, storage_path, is_primary, is_document, is_duplicate, image_vehicle_match_status, position, created_at')
-      .eq('vehicle_id', vehicleId)
-      // Exclude documents (they belong in a separate section)
-      .not('is_document', 'is', true)
-      // Exclude duplicates
-      .or('is_duplicate.is.null,is_duplicate.eq.false')
-      // Exclude AI-detected mismatches
-      .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
-      // Order: primary first, then by position, then by insert order
-      .order('is_primary', { ascending: false })
-      .order('position', { ascending: true, nullsFirst: false })
-      .order('created_at', { ascending: true });
-
-    if (error || !rows || rows.length === 0) return empty;
+    const rows = await fetchVehicleImages<any>(
+      vehicleId,
+      'id, image_url, thumbnail_url, medium_url, storage_path, is_primary, is_document, is_duplicate, image_vehicle_match_status, position, created_at',
+      { includeMismatchFilter: true },
+    );
+    if (!rows || rows.length === 0) return empty;
 
     // Filter out import_queue and organization logos
     const filtered = rows.filter((r: any) => {

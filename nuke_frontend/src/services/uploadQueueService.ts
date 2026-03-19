@@ -8,6 +8,7 @@ interface QueuedFile {
   name: string;
   size: number;
   type: string;
+  fileHash?: string | null;
   vehicleId: string;
   status: 'pending' | 'uploading' | 'completed' | 'failed';
   error?: string;
@@ -19,6 +20,18 @@ class UploadQueueService {
   private dbName = 'nuke_upload_queue';
   private storeName = 'files';
   private db: IDBDatabase | null = null;
+
+  private async computeFileHash(file: File): Promise<string | null> {
+    try {
+      const buffer = await file.arrayBuffer();
+      const digest = await crypto.subtle.digest('SHA-256', buffer);
+      return Array.from(new Uint8Array(digest))
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join('');
+    } catch {
+      return null;
+    }
+  }
 
   async init() {
     if (this.db) return;
@@ -46,7 +59,11 @@ class UploadQueueService {
   /**
    * Add files to upload queue (with deduplication check)
    */
-  async addFiles(vehicleId: string, files: FileList | File[], existingImages: Array<{file_name: string, file_size: number}>): Promise<{added: number, skipped: number}> {
+  async addFiles(
+    vehicleId: string,
+    files: FileList | File[],
+    existingImages: Array<{file_name: string, file_size: number, file_hash?: string | null}>
+  ): Promise<{added: number, skipped: number}> {
     await this.init();
     if (!this.db) throw new Error('Database not initialized');
 
@@ -56,11 +73,26 @@ class UploadQueueService {
     const fileArray = Array.from(files);
     let added = 0;
     let skipped = 0;
+    const seenIncoming = new Set<string>();
     
     for (const file of fileArray) {
-      // Check if file already exists in database (by name and size)
+      const fileHash = await this.computeFileHash(file);
+      const dedupeKey = fileHash ? `hash:${fileHash}` : `name_size:${file.name}_${file.size}`;
+
+      if (seenIncoming.has(dedupeKey)) {
+        console.log(`Skipping duplicate in selection: ${file.name}`);
+        skipped++;
+        continue;
+      }
+
+      seenIncoming.add(dedupeKey);
+
+      // Check if file already exists in database (prefer content hash; fallback to name+size)
       const isDuplicate = existingImages.some(
-        img => img.file_name === file.name && img.file_size === file.size
+        img => (
+          Boolean(fileHash && img.file_hash && img.file_hash === fileHash) ||
+          (!fileHash && img.file_name === file.name && img.file_size === file.size)
+        )
       );
       
       if (isDuplicate) {
@@ -70,10 +102,11 @@ class UploadQueueService {
       }
       
       const queuedFile: QueuedFile = {
-        id: `${vehicleId}_${file.name}_${file.size}_${Date.now()}`,
+        id: `${vehicleId}_${fileHash || `${file.name}_${file.size}_${file.lastModified}`}`,
         name: file.name,
         size: file.size,
         type: file.type,
+        fileHash,
         vehicleId,
         status: 'pending',
         file // Store the actual File object
@@ -203,4 +236,3 @@ class UploadQueueService {
 }
 
 export const uploadQueueService = new UploadQueueService();
-
