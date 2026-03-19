@@ -4,10 +4,10 @@ Vehicle data intelligence.
 
 ---
 
-A listing has 10 data points. A VIN has 30. An auction thread
-has 400 comments. A photo set has 47 images across 41 classified zones.
+A vehicle listing has raw data points. An auction thread
+has comments. A photo set has images across classified zones.
 
-Nuke turns that into 10,000+ sourced observations per vehicle —
+Nuke turns minimal low signal data points lets say anywhere from 10-100 data points into 10,000+ sourced observations per vehicle —
 every claim traced to origin, confidence-scored, time-ordered.
 Nothing overwrites. Everything compounds.
 
