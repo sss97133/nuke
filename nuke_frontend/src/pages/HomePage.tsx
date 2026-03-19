@@ -9,12 +9,12 @@ import { GarageToolbar } from '../components/garage/GarageToolbar';
 import { applyNonAutoFilters } from '../lib/nonAutoExclusion';
 import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlideshow';
 
-/** Simple stats loader for the public landing page — no auth or complex fallbacks needed. */
+/** Landing page stats: vehicles, sale prices, comments. */
 function useLandingStats() {
-  const [stats, setStats] = useState<{ totalVehicles: number | null; totalImages: number | null; totalSources: number | null }>({
+  const [stats, setStats] = useState<{ totalVehicles: number | null; salePrices: number | null; totalComments: number | null }>({
     totalVehicles: null,
-    totalImages: null,
-    totalSources: null,
+    salePrices: null,
+    totalComments: null,
   });
 
   useEffect(() => {
@@ -26,23 +26,39 @@ function useLandingStats() {
         .eq('id', 'global')
         .maybeSingle(),
       supabase
-        .from('vehicle_images')
-        .select('*', { count: 'estimated', head: true }),
+        .from('vehicles')
+        .select('*', { count: 'estimated', head: true })
+        .not('sale_price', 'is', null),
       supabase
-        .from('observation_sources')
-        .select('*', { count: 'exact', head: true }),
-    ]).then(([cacheRes, imagesRes, sourcesRes]) => {
+        .from('auction_comments')
+        .select('*', { count: 'estimated', head: true }),
+    ]).then(([cacheRes, pricesRes, commentsRes]) => {
       if (cancelled) return;
       setStats({
         totalVehicles: cacheRes.data ? Number(cacheRes.data.total_vehicles) || null : null,
-        totalImages: imagesRes.count != null ? imagesRes.count : null,
-        totalSources: sourcesRes.count != null ? sourcesRes.count : null,
+        salePrices: pricesRes.count != null ? pricesRes.count : null,
+        totalComments: commentsRes.count != null ? commentsRes.count : null,
       });
     });
     return () => { cancelled = true; };
   }, []);
 
   return stats;
+}
+
+/** Market snapshot: top makes with vehicle counts and avg prices. */
+function useMarketSnapshot() {
+  const [data, setData] = useState<{ make: string; vehicle_count: number; avg_price: number }[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.rpc('landing_market_snapshot').then(({ data: rows }) => {
+      if (!cancelled && rows) setData(rows);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  return data;
 }
 
 interface ShowcaseVehicle {
@@ -184,6 +200,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
   const navigate = useNavigate();
   usePageTitle('Nuke — Vehicle Intelligence');
   const landingStats = useLandingStats();
+  const marketSnapshot = useMarketSnapshot();
   const [searchInput, setSearchInput] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -198,7 +215,6 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
     else navigate('/search');
   };
 
-  // Close search dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
@@ -224,29 +240,16 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
     return `$${p.toLocaleString()}`;
   };
 
-  const statItems = [
-    { value: formatNum(landingStats.totalVehicles), label: 'vehicles tracked' },
-    { value: formatNum(landingStats.totalImages), label: 'photos indexed' },
-    { value: formatNum(landingStats.totalSources), label: 'data sources' },
-  ];
+  const formatAvgPrice = (n: number) => {
+    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `$${Math.round(n / 1_000).toLocaleString()}K`;
+    return `$${n.toLocaleString()}`;
+  };
 
-  const features = [
-    {
-      title: 'Vehicle Identity',
-      desc: 'Canonical profiles built from every data source — auction results, service records, photos, VIN decodes.',
-    },
-    {
-      title: 'Market Intelligence',
-      desc: 'Real-time pricing across BaT, eBay, Craigslist, Hagerty, Cars & Bids, and dozens more platforms.',
-    },
-    {
-      title: 'Deal Scoring',
-      desc: 'Instant valuation estimates and deal scores so you know if a listing is priced right before you bid.',
-    },
-    {
-      title: 'API & SDK',
-      desc: `Programmatic access to ${formatNum(landingStats.totalVehicles)} vehicle profiles. Build your own tools on top of the Nuke dataset.`,
-    },
+  const statItems = [
+    { value: formatNum(landingStats.totalVehicles), label: 'VEHICLES' },
+    { value: formatNum(landingStats.salePrices), label: 'SALE PRICES' },
+    { value: formatNum(landingStats.totalComments), label: 'COMMENTS' },
   ];
 
   const showDropdown = searchFocused && searchInput.trim().length >= 2 && (searchResults.length > 0 || noResults);
@@ -257,13 +260,13 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        padding: '40px 24px',
+        padding: '48px 24px 40px',
         background: 'var(--bg)',
         color: 'var(--text)',
         fontFamily: 'Arial, sans-serif',
       }}
     >
-      {/* Hero */}
+      {/* Hero — stripped */}
       <div style={{ textAlign: 'center', maxWidth: 680, marginBottom: 40 }}>
         <h1
           style={{
@@ -271,7 +274,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
             fontWeight: 700,
             letterSpacing: '-0.03em',
             lineHeight: 1.05,
-            margin: '0 0 12px',
+            margin: '0 0 8px',
             color: 'var(--text)',
           }}
         >
@@ -282,31 +285,14 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
             fontSize: 11,
             lineHeight: 1.5,
             color: 'var(--text-secondary)',
-            margin: '0 0 6px',
-            fontWeight: 700,
-            letterSpacing: '0.15em',
-            textTransform: 'uppercase' as const,
-          }}
-        >
-          Vehicle Intelligence for Collectors
-        </p>
-        <p
-          style={{
-            fontSize: 11,
-            lineHeight: 1.7,
-            color: 'var(--text-secondary)',
             margin: '0 0 32px',
-            maxWidth: 520,
-            marginLeft: 'auto',
-            marginRight: 'auto',
           }}
         >
-          The definitive database for collector cars. Market data, deal scoring,
-          auction history, and provenance across hundreds of thousands of vehicles.
+          Vehicle data intelligence.
         </p>
 
-        {/* Search bar with inline preview */}
-        <div ref={searchContainerRef} style={{ position: 'relative', maxWidth: 520, margin: '0 auto 24px' }}>
+        {/* Search bar */}
+        <div ref={searchContainerRef} style={{ position: 'relative', maxWidth: 520, margin: '0 auto 20px' }}>
           <form
             onSubmit={handleSearch}
             style={{
@@ -356,7 +342,6 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
             </button>
           </form>
 
-          {/* Inline search preview dropdown */}
           {showDropdown && (
             <div style={{
               position: 'absolute',
@@ -411,76 +396,34 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
           )}
         </div>
 
-        {/* CTAs */}
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => navigate('/signup')}
-            style={{
-              padding: '10px 28px',
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              border: '2px solid var(--text)',
-              background: 'var(--text)',
-              color: 'var(--bg)',
-              cursor: 'pointer',
-            }}
-          >
-            Get started free
-          </button>
-          <button
-            onClick={onBrowse}
-            style={{
-              padding: '10px 28px',
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              border: '2px solid var(--border)',
-              background: 'transparent',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-            }}
-          >
-            Browse the feed
-          </button>
-        </div>
+        {/* Single CTA */}
+        <button
+          onClick={onBrowse}
+          style={{
+            padding: '10px 28px',
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            border: '2px solid var(--border)',
+            background: 'transparent',
+            color: 'var(--text-secondary)',
+            cursor: 'pointer',
+          }}
+        >
+          Browse
+        </button>
       </div>
 
-      {/* See an example CTA */}
-      <Link
-        to="/vehicle/b5f3087c-77cf-4000-bd14-b7a3ed42e5c1"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '8px 20px',
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          border: '2px solid var(--border)',
-          background: 'transparent',
-          color: 'var(--text-secondary)',
-          textDecoration: 'none',
-          marginBottom: 24,
-          transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
-      >
-        See a vehicle profile in action &rarr;
-      </Link>
-
-      {/* Live stats */}
+      {/* Stats */}
       <div
         style={{
           display: 'flex',
           gap: 0,
-          marginBottom: 40,
+          marginBottom: 48,
           background: 'var(--surface)',
           border: '2px solid var(--border)',
+          flexWrap: 'wrap',
         }}
       >
         {statItems.map((s, i) => (
@@ -510,31 +453,83 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
         ))}
       </div>
 
-      {/* Live Vehicle Showcase */}
-      {showcaseVehicles.length > 0 && (
-        <div style={{ width: '100%', maxWidth: 900, marginBottom: 40 }}>
+      {/* Market Snapshot */}
+      {marketSnapshot.length > 0 && (
+        <div style={{ width: '100%', maxWidth: 600, marginBottom: 48 }}>
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: 'var(--text-secondary)',
             marginBottom: 12,
           }}>
-            <div style={{
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              background: 'var(--success)',
-              animation: 'livePulse 2s ease-in-out infinite',
-            }} />
-            <span style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.5px',
-              textTransform: 'uppercase',
-              color: 'var(--text-secondary)',
-            }}>
-              LIVE FEED — LATEST ARRIVALS
-            </span>
+            MARKET
+          </div>
+          <div style={{
+            border: '2px solid var(--border)',
+            background: 'var(--surface)',
+          }}>
+            {marketSnapshot.map((row, i) => (
+              <div
+                key={row.make}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 16px',
+                  borderBottom: i < marketSnapshot.length - 1 ? '1px solid var(--border)' : 'none',
+                  gap: 12,
+                }}
+              >
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: 'var(--text)',
+                  flex: 1,
+                  minWidth: 0,
+                }}>
+                  {row.make}
+                </span>
+                <span style={{
+                  fontSize: 10,
+                  color: 'var(--text-secondary)',
+                  fontFamily: 'Courier New, monospace',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {Number(row.vehicle_count).toLocaleString()} vehicles
+                </span>
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: 'var(--text)',
+                  fontFamily: 'Courier New, monospace',
+                  whiteSpace: 'nowrap',
+                  minWidth: 60,
+                  textAlign: 'right',
+                }}>
+                  {formatAvgPrice(Number(row.avg_price))}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent Sales */}
+      {showcaseVehicles.length > 0 && (
+        <div style={{ width: '100%', maxWidth: 900, marginBottom: 48 }}>
+          <div style={{
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: 'var(--text-secondary)',
+            marginBottom: 12,
+          }}>
+            RECENT SALES
           </div>
           <div style={{
             display: 'flex',
@@ -607,78 +602,22 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
               </Link>
             ))}
           </div>
-          <style>{`
-            @keyframes livePulse {
-              0%, 100% { opacity: 1; }
-              50% { opacity: 0.3; }
-            }
-          `}</style>
         </div>
       )}
 
-      {/* Feature grid */}
-      <div
+      {/* Footer */}
+      <a
+        href="https://nuke.ag"
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: 2,
-          maxWidth: 720,
-          width: '100%',
-          background: 'var(--border)',
-          border: '2px solid var(--border)',
-          marginBottom: 32,
-        }}
-      >
-        {features.map((feature) => (
-          <div
-            key={feature.title}
-            style={{
-              padding: '20px 16px',
-              background: 'var(--surface)',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 9,
-                fontWeight: 700,
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase',
-                color: 'var(--text)',
-                marginBottom: 6,
-              }}
-            >
-              {feature.title}
-            </div>
-            <div
-              style={{
-                fontSize: 10,
-                lineHeight: 1.6,
-                color: 'var(--text-secondary)',
-              }}
-            >
-              {feature.desc}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Bottom links */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 16,
-          fontSize: 8,
+          fontSize: 9,
           fontWeight: 700,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          color: 'var(--text-secondary)',
+          textDecoration: 'none',
         }}
       >
-        <Link to="/api" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>API</Link>
-        <Link to="/developers" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>SDK</Link>
-        <Link to="/about" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>About</Link>
-        <Link to="/search" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Search</Link>
-      </div>
-
+        nuke.ag
+      </a>
     </div>
   );
 }
