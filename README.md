@@ -4,34 +4,25 @@ Vehicle data intelligence.
 
 ---
 
-Some vehicles accumulate knowledge. People photograph them,
-argue about them, notice things wrong with them, remember
-what they looked like ten years ago. That attention is real
-and it's scattered everywhere — auction comments, forum posts,
-listing photos, build sheets, VIN stamps, conversations
-between strangers who've never met the car.
+A listing has 10 data points. A VIN has 30. An auction thread
+has 400 comments. A photo set has 47 images across 41 classified zones.
 
-Nuke collects that attention. Every observation is sourced,
-scored, and stacked. Nothing overwrites. The picture just
-gets sharper.
+Nuke turns that into 10,000+ sourced observations per vehicle —
+every claim traced to origin, confidence-scored, time-ordered.
+Nothing overwrites. Everything compounds.
 
 ```
-What the seller says:              What Nuke knows:
-
-  "1970 Chevelle SS 396"           VIN decode → Malibu, not SS
-  "Matching numbers"               Engine stamp visible → truck block
-  "Frame-off restoration"          Fender tag → base trim, not Super Sport
-  "$67,500"                        8 commenters flagged the air cleaner
-                                   Paint depth inconsistent in photo 31
-                                   Sold 2019 as Malibu for $23,000
-
-                                   Confidence: 0.23
+input:  1 auction listing, 1 VIN, 47 photos, 312 comments
+output: factory spec (every option code, every part number)
+        component state (per-part condition, mods, replacements)
+        identity verification (VIN decode ↔ stamps ↔ tags ↔ build sheet)
+        market position (comps, valuations, price trajectory)
+        provenance chain (who built it, who owned it, who worked on it)
+        visual inspection (41-zone classification, damage, paint, gaps)
+        source conflicts flagged, multi-model jury scored
 ```
 
-Pick any vehicle people care about. We probably know
-more about it than the person selling it.
-
-One person. A garage in Boulder City, Nevada. Between oil changes.
+One person. Boulder City, Nevada. Between oil changes.
 
 ---
 
