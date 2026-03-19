@@ -56,6 +56,7 @@ const ClaimExternalIdentity = React.lazy(() => import('../pages/ClaimExternalIde
 const BaTMembers = React.lazy(() => import('../pages/BaTMembers'));
 const InvoiceManager = React.lazy(() => import('../pages/InvoiceManager'));
 const ImportDataPage = React.lazy(() => import('../pages/ImportDataPage'));
+const PhotoSyncPage = React.lazy(() => import('../pages/PhotoSyncPage'));
 const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
 
 // Feed v2 now promoted to main feed (served via HomePage feed tab)
@@ -182,6 +183,7 @@ export const DomainRoutes = () => {
           <Route path="/team-inbox" element={<TeamInbox />} />
 
           {/* Content / data management */}
+          <Route path="/photos" element={<PhotoSyncPage />} />
           <Route path="/import" element={<ImportDataPage />} />
           <Route path="/invoices" element={<InvoiceManager />} />
           <Route path="/curation-queue" element={<CurationQueue />} />
