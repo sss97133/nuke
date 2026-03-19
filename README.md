@@ -9,7 +9,7 @@ every claim traced to origin, confidence-scored, time-ordered.
 Nothing overwrites. Everything compounds.
 
 ```
-input:  1 auction listing, 1 VIN, 47 photos, 312 comments
+input:  1 auction listing, 1 VIN, 247 photos, 32 comments
 output: factory spec (every option code, every part number)
         component state (per-part condition, mods, replacements)
         identity verification (VIN decode ↔ stamps ↔ tags ↔ build sheet)
