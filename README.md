@@ -1,49 +1,43 @@
 # nuke
 
-Vehicle data infrastructure. We turn scattered car history into structured, tradable intelligence.
+Vehicle data intelligence.
 
-## What it does
+---
 
-Vehicle history reports only capture what's formally reported — title transfers, accidents, dealer service. They miss what's actually known: the forum threads documenting a rebuild, the auction comments debating originality, the shop records from independent mechanics.
+One person built a system of record for every collector vehicle
+in the world — from a garage in Boulder City, Nevada,
+between oil changes.
 
-Nuke captures the institutional knowledge that lives outside the paperwork.
+141,000 vehicles. 11.5 million auction comments. 30 million images.
+773,000 valuations. A vision model that classifies vehicles
+from photos at zero cost per image.
 
-**Aggregate** — Pull history from auctions, forums, registries, service records.
-**Structure** — Normalize into verified timelines with confidence scores.
-**Connect** — Owners, shops, buyers, insurers share one source of truth.
+Every data point is an observation — source-attributed,
+confidence-scored, time-ordered. Nothing overwrites.
+Everything compounds.
 
-## Stack
+---
 
-| Layer | Tech |
-|-------|------|
-| Frontend | React + TypeScript |
-| Edge Functions | Deno (Supabase) |
-| Backend | Elixir/Phoenix |
-| Database | PostgreSQL (Supabase) |
-| Vision | YONO — local vehicle classification model |
+## The writing
 
-## Project structure
+This project generated a body of writing about how
+systems get built, what data reveals about itself,
+and what happens when one person talks to AI for
+13,758 prompts across 141 days.
 
-```
-nuke_frontend/     React app
-nuke_api/          Elixir/Phoenix backend
-supabase/          Edge functions + migrations
-  functions/       180+ edge functions (extractors, APIs, pipelines)
-scripts/           CLI tools, scrapers, batch jobs
-yono/              Vehicle vision model (EfficientNet, ONNX)
-src/               Shared frontend components
-tools/             SDK, utilities
-```
+- [The conceptual foundation](VISION.md)
+- [Rhizomatic analysis](docs/writing/RHIZOME.md) —
+  11 machines mapped from the prompt corpus
+- [Concept genealogy](docs/writing/CONCEPT_GENEALOGY.md) —
+  biography of 8 load-bearing ideas
+- [The narrative arc](docs/writing/NARRATIVE_ARC.md) —
+  the 20-week story
+- [Vocabulary evolution](docs/writing/VOCABULARY_EVOLUTION.md) —
+  how the language changed
+- [Dead features](docs/writing/DEAD_FEATURES.md) —
+  archaeology of abandoned ideas
+- [All 23 documents](docs/writing/)
 
-## Setup
+---
 
-```bash
-npm install
-cd nuke_frontend && npm run dev
-```
-
-Edge functions require [Supabase CLI](https://supabase.com/docs/guides/cli) and `.env` configuration.
-
-## License
-
-Proprietary.
+[nuke.ag](https://nuke.ag)
