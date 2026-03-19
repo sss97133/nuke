@@ -1,3 +1,21 @@
+# Root agent debris
+.ralph_session*
+.response_analysis
+.tmux-nuke.conf
+.vercel-redeploy
+.audit-config.example.json
+nastyz28-rpo-codes*.json
+
+# Untracked directories (local-only)
+archive/
+screenshots/
+agents/
+data/
+.claude/
+
+# Binary reference documents
+reference_documents/**/*.pdf
+
 # Dependencies
 node_modules/
 */node_modules/
@@ -26,33 +44,7 @@ out/
 # Dead backends
 nuke_backend/
 
-# Claude Code internals (keep CLAUDE.md, ignore everything else)
-.claude/agents/
-.claude/screenshots/
-.claude/directives/
-.claude/prompts/
-.claude/hooks/
-.claude/*.json
-.claude/*.mjs
-.claude/*.cjs
-.claude/*.png
-.claude/*.py
-.claude/*_STATUS*.md
-.claude/*_REPORT*.md
-.claude/*_BRIEF*.md
-.claude/*_RESEARCH*.md
-.claude/*_AUDIT*.md
-.claude/*_FIX*.md
-.claude/*_LOG*.md
-.claude/*_PLAN*.md
-.claude/*_OVERHAUL*.md
-.claude/*_ARCHITECTURE*.md
-.claude/*_CHECKLIST*.md
-.claude/HANDOFF.md
-.claude/NEXT_SESSION.md
-.claude/TELEGRAM.md
-.claude/agent-sessions.json
-.claude/settings.local.json
+# Claude Code internals (entire .claude/ dir ignored above)
 
 # OS files
 .DS_Store
@@ -167,15 +159,12 @@ extraction-agent
 playwright-report/
 
 # Extraction data dumps (large JSON output from scrapers)
-data/conceptcarz/
-data/sources/*.json
 scripts/data/
 
 # Large geo/map data files
 nuke_frontend/public/data/*.json
 
-# Bot screenshots (auto-generated, not useful in repo)
-screenshots/bot-findings/
+# Bot screenshots (screenshots/ dir ignored above)
 test-screenshots/
 nuke_frontend/test-screenshots/
 
@@ -251,13 +240,11 @@ priv/
 ops/
 audit/
 
-# Agent working files (ralph is retired)
+# Agent working files (ralph is retired, agents/ dir ignored above)
 .ralph/
-agents/*/digests/
 
 # Internal docs (keep locally, don't track)
 PITCH.md
-VISION.md
 NUKE_COMPANY_BRIEF.md
 YC_*.md
 
