@@ -130,6 +130,7 @@ private_key*
 
 # Large data directories
 yono/.image_cache/
+yono/.scan_cache/
 yono/.venv/
 training-data/
 
@@ -227,6 +228,8 @@ hd-*.html
 
 # Stale directories
 dealerscan/
+.playwright-mcp/
+src/components/ui/
 mcp/
 mcp-server/
 nuke-local/
