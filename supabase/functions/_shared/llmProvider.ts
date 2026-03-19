@@ -35,14 +35,14 @@ export const PROVIDER_MODELS: Record<LLMProvider, ProviderModel[]> = {
     { name: 'claude-opus-4-5', costPer1kTokens: 15.00, maxTokens: 200000, supportsVision: true, speed: 'slow', quality: 'excellent' },
   ],
   google: [
-    { name: 'gemini-1.5-flash', costPer1kTokens: 0.00, maxTokens: 1000000, supportsVision: true, speed: 'fast', quality: 'good' }, // FREE
+    { name: 'gemini-2.0-flash-lite', costPer1kTokens: 0.00, maxTokens: 1000000, supportsVision: true, speed: 'fast', quality: 'good' }, // FREE
     { name: 'gemini-1.5-pro', costPer1kTokens: 0.00, maxTokens: 2000000, supportsVision: true, speed: 'medium', quality: 'excellent' }, // FREE
   ],
 };
 
 export const TIER_CONFIGS: Record<AnalysisTier, { provider: LLMProvider; model: string; description: string }> = {
-  tier1: { provider: 'google', model: 'gemini-1.5-flash', description: 'Fast, free basic analysis' },
-  tier2: { provider: 'google', model: 'gemini-1.5-flash', description: 'Good quality, free' },
+  tier1: { provider: 'google', model: 'gemini-2.0-flash-lite', description: 'Fast, free basic analysis' },
+  tier2: { provider: 'google', model: 'gemini-2.0-flash-lite', description: 'Good quality, free' },
   tier3: { provider: 'openai', model: 'gpt-4o', description: 'High quality, balanced cost' },
   expert: { provider: 'anthropic', model: 'claude-sonnet-4-5', description: 'Highest quality, comprehensive analysis' },
 };

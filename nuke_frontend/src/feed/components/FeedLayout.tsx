@@ -39,8 +39,8 @@ const ROW_HEIGHTS: Record<string, number> = {
   technical: 32,
 };
 
-const TABLE_GRID = '42px 44px 90px 1fr 70px 80px 70px 50px minmax(60px, auto) minmax(60px, auto) 70px';
-const TABLE_GRID_SCORES = '42px 44px 90px 1fr 70px 80px 70px 50px minmax(60px, auto) minmax(60px, auto) 70px 50px';
+const TABLE_GRID = '42px 44px 80px minmax(100px, 1fr) 62px 76px 62px 46px 52px 52px 62px';
+const TABLE_GRID_SCORES = '42px 44px 80px minmax(100px, 1fr) 62px 76px 62px 46px 52px 52px 62px 46px';
 
 /** Column-to-sort mapping for table header clicks */
 const COLUMN_SORT_MAP: Record<string, SortBy> = {
@@ -130,7 +130,7 @@ export function FeedLayout({
   // Technical table view
   if (viewMode === 'technical') {
     return (
-      <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative', overflowX: 'auto', minWidth: 0 }}>
         {/* Sticky header */}
         <div
           style={{
@@ -140,7 +140,7 @@ export function FeedLayout({
             padding: '4px 8px',
             borderBottom: '2px solid var(--border)',
             position: 'sticky',
-            top: 'calc(var(--header-height, 48px) + 32px)',
+            top: 'var(--header-height, 48px)',
             background: 'var(--surface)',
             zIndex: 10,
             fontFamily: 'Arial, sans-serif',

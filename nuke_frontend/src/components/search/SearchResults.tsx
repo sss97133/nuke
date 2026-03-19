@@ -620,7 +620,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       showPriceOverlay={true}
                       showDetailOverlay={true}
                       infoDense={true}
-                      thumbnailFit="cover"
+                      thumbnailFit="contain"
                     />
                   </div>
                 ) : (

@@ -80,8 +80,13 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
   });
   const [thumbFitMode, setThumbFitMode] = useState<'square' | 'original'>(() => {
     try {
-      const saved = localStorage.getItem('nuke_auctions_thumbFitMode');
-      return saved === 'original' ? 'original' : 'square';
+      // Read from shared preference (written by feed toolbar and auctions tab)
+      const shared = localStorage.getItem('nuke_imageFit');
+      if (shared === 'contain') return 'original';
+      if (shared === 'cover') return 'square';
+      // Fallback to legacy key
+      const legacy = localStorage.getItem('nuke_auctions_thumbFitMode');
+      return legacy === 'original' ? 'original' : 'square';
     } catch {
       return 'square';
     }
@@ -100,6 +105,9 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
 
   useEffect(() => {
     try {
+      // Write to shared key so feed toolbar and other views stay in sync
+      localStorage.setItem('nuke_imageFit', thumbFitMode === 'original' ? 'contain' : 'cover');
+      // Keep legacy key for backwards compat
       localStorage.setItem('nuke_auctions_thumbFitMode', thumbFitMode);
     } catch (err) {
       console.warn('Failed to save thumbFitMode:', err);

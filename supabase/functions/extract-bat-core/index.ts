@@ -18,6 +18,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { parseLocation } from "../_shared/parseLocation.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
+import { qualityGate } from "../_shared/extractionQualityGate.ts";
+import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } from "../_shared/batUpsertWithProvenance.ts";
 
 // Extractor versioning - update on each significant change
 const EXTRACTOR_VERSION = 'extract-bat-core:3.0.0';
@@ -1283,6 +1285,22 @@ serve(async (req) => {
       // Normalize fields (transmission, trim, model, body_style, colors)
       normalizeVehicleFields(insertPayload);
 
+      // Quality gate: validate extraction before writing new vehicle
+      const gateResult = qualityGate(insertPayload, { source: 'bat', sourceType: 'auction' });
+      if (gateResult.action === 'reject') {
+        console.warn(`[quality-gate] REJECTED new vehicle (score=${gateResult.score}): ${gateResult.issues.join(', ')}`);
+        await quarantineRecord(supabase, null, listingUrlCanonical, EXTRACTOR_VERSION, gateResult.score, gateResult.issues);
+        return new Response(JSON.stringify({
+          ok: false,
+          error: 'quality_gate_reject',
+          score: gateResult.score,
+          issues: gateResult.issues,
+          listing_url: listingUrlCanonical,
+        }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      // Apply cleaned data from quality gate (strips HTML, nulls polluted fields, normalizes make)
+      Object.assign(insertPayload, gateResult.cleaned);
+
       const { data: inserted, error } = await supabase.from("vehicles").insert(insertPayload).select("id").maybeSingle();
       if (error) throw new Error(`vehicles insert failed: ${error?.message || error}`);
       if (!inserted?.id) throw new Error("vehicles insert succeeded but no ID returned");
@@ -1612,6 +1630,68 @@ serve(async (req) => {
 
       // Normalize fields (transmission, trim, model, body_style, colors)
       normalizeVehicleFields(updatePayload);
+
+      // ── Tetris provenance layer: write extraction_metadata receipts ──
+      // Fields that carry provenance-trackable values (excludes meta/timestamp fields)
+      const provenanceFields: Record<string, any> = {};
+      const metadataPerField: Record<string, ProvenanceMetadata> = {};
+      const defaultProvenance: ProvenanceMetadata = {
+        extraction_version: EXTRACTOR_VERSION,
+        extraction_method: 'html_match',
+        source_url: listingUrlCanonical,
+        confidence_score: 0.8,
+        source_signal: 'essentials_block',
+      };
+
+      // Map updatePayload fields to provenance tracking (only data fields, not meta)
+      const skipForProvenance = new Set([
+        'bat_auction_url', 'discovery_url', 'listing_url', 'listing_source',
+        'listing_kind', 'updated_at', 'extractor_version',
+        // *_source columns are set BY provenance, not tracked themselves
+        'mileage_source', 'color_source', 'transmission_source', 'engine_source',
+        'description_source', 'listing_location_source', 'listing_location_raw',
+        'listing_location_confidence', 'listing_location_observed_at',
+      ]);
+
+      for (const [field, value] of Object.entries(updatePayload)) {
+        if (skipForProvenance.has(field)) continue;
+        if (value === undefined) continue;
+
+        provenanceFields[field] = value;
+
+        // Assign per-field signal/method where we know specifics
+        if (['year', 'make', 'model'].includes(field)) {
+          metadataPerField[field] = { ...defaultProvenance, source_signal: 'url_slug', extraction_method: 'url_slug', confidence_score: 0.9 };
+        } else if (['listing_title', 'bat_listing_title'].includes(field)) {
+          metadataPerField[field] = { ...defaultProvenance, source_signal: 'title', extraction_method: 'html_match', confidence_score: 0.95 };
+        } else if (['sale_price', 'high_bid', 'reserve_status', 'auction_outcome', 'sale_status'].includes(field)) {
+          metadataPerField[field] = { ...defaultProvenance, source_signal: 'auction_result', extraction_method: 'regex', confidence_score: 0.95 };
+        } else if (['bat_views', 'bat_watchers', 'bat_bids', 'bat_comments'].includes(field)) {
+          metadataPerField[field] = { ...defaultProvenance, source_signal: 'stats_table', extraction_method: 'regex', confidence_score: 0.9 };
+        } else if (['bat_seller', 'bat_buyer', 'bat_location', 'bat_lot_number'].includes(field)) {
+          metadataPerField[field] = { ...defaultProvenance, source_signal: 'essentials_block', extraction_method: 'table_parse', confidence_score: 0.85 };
+        }
+      }
+
+      // Write provenance receipts (gap-fill / confirmation / conflict tracking)
+      if (vehicleId && Object.keys(provenanceFields).length > 0) {
+        try {
+          const tetrisResult = await batchUpsertWithProvenance(
+            supabase,
+            vehicleId,
+            listingUrlCanonical,
+            EXTRACTOR_VERSION,
+            existing || {},
+            provenanceFields,
+            metadataPerField,
+            defaultProvenance,
+          );
+          console.log(`[tetris] vehicle=${vehicleId}: ${tetrisResult.stats.gap_fills} gap-fills, ${tetrisResult.stats.confirmations} confirmations, ${tetrisResult.stats.conflicts} conflicts`);
+        } catch (tetrisErr: any) {
+          // Non-fatal: provenance tracking should never block the vehicle update
+          console.warn(`[tetris] provenance write failed (non-fatal): ${tetrisErr?.message}`);
+        }
+      }
 
       const { error } = await supabase.from("vehicles").update(updatePayload).eq("id", vehicleId);
       if (error) {

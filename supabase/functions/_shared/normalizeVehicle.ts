@@ -481,5 +481,161 @@ export function normalizeVehicleFields(data: Record<string, any>): Record<string
   if (data.color !== undefined) {
     data.color = normalizeColor(data.color);
   }
+
+  // Source normalization — resolve to canonical platform slug
+  for (const field of ['source', 'listing_source', 'discovery_source', 'auction_source'] as const) {
+    if (data[field]) {
+      data[field] = normalizeSource(data[field]);
+    }
+  }
+
   return data;
+}
+
+/** Canonical source platform aliases. Maps raw values → canonical slugs matching source_alias_mapping table. */
+const SOURCE_ALIASES: Record<string, string> = {
+  // BaT
+  'bat': 'bat',
+  'bat_simple_extract': 'bat',
+  'bat_core': 'bat',
+  'bring a trailer': 'bat',
+  'bringatrailer': 'bat',
+  'bat_listing': 'bat',
+  'bat_profile_extraction': 'bat',
+  'bat_import': 'bat',
+  'bat-extract:2.0.0': 'bat',
+  'bring a trailer_agent_extraction': 'bat',
+  'bat_seller_monitor': 'bat',
+
+  // Mecum
+  'mecum': 'mecum',
+  'mecum-checkpoint-discover': 'mecum',
+  'mecum-fast-discover': 'mecum',
+  'mecum auctions': 'mecum',
+  'mecum auctions_agent_extraction': 'mecum',
+
+  // Cars & Bids
+  'cars_and_bids': 'cars-and-bids',
+  'carsandbids': 'cars-and-bids',
+  'extract-cars-and-bids-core': 'cars-and-bids',
+  'cab-fast-discover': 'cars-and-bids',
+  'cab-local-extract': 'cars-and-bids',
+  'cars & bids': 'cars-and-bids',
+  'cars & bids_agent_extraction': 'cars-and-bids',
+  'extract-cab-vehicles-pw': 'cars-and-bids',
+
+  // Barrett-Jackson
+  'barrett-jackson': 'barrett-jackson',
+  'barrett-jackson_agent_extraction': 'barrett-jackson',
+
+  // Gooding
+  'gooding': 'gooding',
+  'gooding_extract': 'gooding',
+
+  // PCarMarket
+  'pcarmarket': 'pcarmarket',
+  'PCARMARKET': 'pcarmarket',
+  'import-pcarmarket-listing': 'pcarmarket',
+  'pcarmarket-fast-discover': 'pcarmarket',
+
+  // Facebook Marketplace
+  'facebook_marketplace': 'facebook-marketplace',
+  'facebook-marketplace': 'facebook-marketplace',
+
+  // Facebook Saved Items
+  'facebook-saved': 'facebook-saved',
+  'facebook_saved': 'facebook-saved',
+  'facebook_saved_items': 'facebook-saved',
+
+  // Bonhams
+  'bonhams': 'bonhams',
+  'bh_auction': 'bonhams',
+
+  // RM Sotheby's
+  'rm-sothebys': 'rm-sothebys',
+  'rmsothebys': 'rm-sothebys',
+
+  // Broad Arrow
+  'broad_arrow': 'broad-arrow',
+  'broadarrow': 'broad-arrow',
+  'broadarrowauctions': 'broad-arrow',
+  'broad arrow auctions': 'broad-arrow',
+
+  // Craigslist
+  'craigslist': 'craigslist',
+  'craigslist_scrape': 'craigslist',
+
+  // Collecting Cars
+  'collecting_cars': 'collecting-cars',
+
+  // GAA Classic Cars
+  'gaa-classic-cars': 'gaa-classic-cars',
+  'gaa_classic_cars': 'gaa-classic-cars',
+
+  // Classic.com
+  'classic-com': 'classic-com',
+  'CLASSIC_COM_AUCTION': 'classic-com',
+  'www.classic.com': 'classic-com',
+
+  // ClassicCars.com
+  'ClassicCars.com': 'classiccars-com',
+  'classiccars_com': 'classiccars-com',
+
+  // SBX Cars
+  'sbx-cars': 'sbx-cars',
+  'sbxcars': 'sbx-cars',
+
+  // Hagerty
+  'hagerty': 'hagerty',
+  'hagerty_extract': 'hagerty',
+  'hagerty-fast-discover': 'hagerty',
+
+  // Hemmings
+  'hemmings': 'hemmings',
+  'hemmings-fast-discover': 'hemmings',
+
+  // eBay
+  'ebay': 'ebay',
+  'ebay_motors_extract': 'ebay',
+  'ebay-motors': 'ebay',
+
+  // KSL
+  'ksl': 'ksl',
+  'ksl_automated_import': 'ksl',
+
+  // TBTFW
+  'TBTFW': 'tbtfw',
+  'tbtfw.com': 'tbtfw',
+
+  // User submission
+  'user-submission': 'user-submission',
+  'user_import': 'user-submission',
+  'owner_import': 'user-submission',
+  'owner': 'user-submission',
+  'manual': 'user-submission',
+
+  // Deal jacket OCR
+  'deal_jacket_ocr': 'deal-jacket-ocr',
+};
+
+/**
+ * Normalize a source string to its canonical platform slug.
+ * Mirrors the SQL resolve_platform_slug() function.
+ */
+export function normalizeSource(source: string | null | undefined): string | null {
+  if (!source || typeof source !== 'string') return null;
+  const trimmed = source.trim();
+  if (!trimmed) return null;
+
+  // Direct lookup
+  if (SOURCE_ALIASES[trimmed]) return SOURCE_ALIASES[trimmed];
+
+  // Case-insensitive lookup
+  const lower = trimmed.toLowerCase();
+  for (const [key, val] of Object.entries(SOURCE_ALIASES)) {
+    if (key.toLowerCase() === lower) return val;
+  }
+
+  // Fallback: basic slug normalization (matches SQL function behavior)
+  return lower.replace(/[_\s]+/g, '-').replace(/[^a-z0-9-]/g, '');
 }

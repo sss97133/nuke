@@ -2,7 +2,7 @@
  * identify-vehicle-from-image
  *
  * Uses AI vision to identify vehicle year, make, model, and trim from an image.
- * Tiered approach: Gemini Flash (free) -> GPT-4o-mini -> GPT-4o
+ * Tiered approach: Gemini 2.0 Flash Lite (free) -> Claude Haiku -> GPT-4o (last resort)
  *
  * Input: { image_url, context?: { title?, description? }, vehicle_id? }
  * Output: { year, make, model, trim, body_style, confidence, reasoning, model_used }
@@ -11,6 +11,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getLLMConfig, callLLM, type AnalysisTier } from '../_shared/llmProvider.ts'
+import { callTierVision, parseJsonResponse } from '../_shared/agentTiers.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -268,6 +269,90 @@ async function identifyWithTier(
   }
 }
 
+const HAIKU_SYSTEM_PROMPT = `You are an expert automotive appraiser and vehicle identifier. You will be shown an image of a vehicle. Identify it as precisely as possible.
+
+Look for: body style, grille design, headlight shape, side profile, roofline, rear design, taillights, wheels, badges, emblems, model names, and era/generation indicators.
+
+Respond ONLY with valid JSON (no markdown, no code blocks):
+{
+  "year": <4-digit year or null>,
+  "year_range": "<e.g. '1973-1987' if uncertain>",
+  "make": "<manufacturer>",
+  "model": "<model name>",
+  "trim": "<trim level or null>",
+  "body_style": "<sedan|coupe|hatchback|wagon|convertible|truck|suv|van|other>",
+  "generation": "<generation name/number or null>",
+  "confidence": <0.0-1.0>,
+  "reasoning": "<brief explanation of identifying features>"
+}
+
+Confidence scale: 0.9+ very certain (badges visible), 0.7-0.9 confident (strong visual match), 0.5-0.7 moderate (body style clear but model uncertain), <0.5 low (only general class). If no vehicle visible, confidence below 0.3.`
+
+/**
+ * Identify vehicle using Claude Haiku via the shared agentTiers callTierVision.
+ * This is the middle tier: cheaper than OpenAI but higher quality than Gemini for vehicle ID.
+ */
+async function identifyWithHaiku(
+  imageBase64: string | null,
+  imageMimeType: string,
+  imageUrl: string,
+  context: { title?: string; description?: string } | null,
+): Promise<VehicleIdentification | null> {
+  try {
+    if (!imageBase64) {
+      throw new Error('Claude Haiku requires base64 image data - no URL pass-through')
+    }
+
+    let contextString = ''
+    if (context?.title) {
+      contextString += `\nListing title: "${context.title}"`
+    }
+    if (context?.description) {
+      const truncatedDesc = context.description.substring(0, 500)
+      contextString += `\nListing description excerpt: "${truncatedDesc}..."`
+    }
+
+    const textMessage = contextString
+      ? `Identify this vehicle.${contextString}`
+      : 'Identify this vehicle from the image.'
+
+    // Build data URI for callTierVision
+    const dataUri = `data:${imageMimeType};base64,${imageBase64}`
+
+    console.log(`[identify-vehicle] haiku: calling callTierVision...`)
+    const startMs = Date.now()
+    const result = await callTierVision(
+      'haiku',
+      HAIKU_SYSTEM_PROMPT,
+      textMessage,
+      [dataUri],
+      { maxTokens: 1000, temperature: 0.3 }
+    )
+    console.log(`[identify-vehicle] haiku: responded in ${result.durationMs}ms, content length=${result.content?.length || 0}`)
+
+    const parsed = parseJsonResponse(result.content)
+
+    return {
+      year: parsed.year || null,
+      make: parsed.make || null,
+      model: parsed.model || null,
+      trim: parsed.trim || null,
+      body_style: parsed.body_style || null,
+      generation: parsed.generation || null,
+      confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.5,
+      reasoning: parsed.reasoning || '',
+      model_used: result.model,
+      provider: 'anthropic',
+      duration_ms: result.durationMs,
+      tier_used: 'haiku'
+    }
+  } catch (error: any) {
+    console.error(`[identify-vehicle] haiku FAILED: ${error.message}`)
+    tierErrors['haiku'] = error.message
+    return null
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -319,19 +404,22 @@ serve(async (req) => {
       imageFetchFailed = true
     }
 
-    // Tiered approach: try cheaper models first, escalate if confidence is low
-    const tiers: AnalysisTier[] = ['tier1', 'tier2', 'tier3', 'expert']
-    const maxTierIndex = tiers.indexOf(max_tier as AnalysisTier)
-    let allowedTiers = tiers.slice(0, maxTierIndex + 1)
+    // Tiered approach: Gemini (free) -> Claude Haiku (cheap) -> OpenAI (last resort)
+    // Steps: tier1=Gemini, haiku=Claude Haiku, tier3=OpenAI GPT-4o
+    type TierStep = { name: string; kind: 'llmProvider' | 'haiku'; analysisTier?: AnalysisTier }
+    const allSteps: TierStep[] = [
+      { name: 'tier1-gemini', kind: 'llmProvider', analysisTier: 'tier1' },
+      { name: 'haiku', kind: 'haiku' },
+      { name: 'tier3-openai', kind: 'llmProvider', analysisTier: 'tier3' },
+    ]
 
-    // If image fetch failed, prioritize OpenAI tiers (can use URL pass-through)
-    // tier2 and tier3 use OpenAI, so start with tier2 when we don't have base64
+    // If image fetch failed, only OpenAI can do URL pass-through
+    let steps = allSteps
     if (imageFetchFailed) {
-      console.log(`[identify-vehicle] Image fetch failed - prioritizing OpenAI tiers (URL pass-through)`)
-      // Reorder: OpenAI tiers first (tier2=gpt-4o-mini, tier3=gpt-4o), then others
-      allowedTiers = allowedTiers.filter(t => t === 'tier2' || t === 'tier3')
-      if (allowedTiers.length === 0) {
-        allowedTiers = ['tier2'] // Fallback to at least tier2
+      console.log(`[identify-vehicle] Image fetch failed - only OpenAI supports URL pass-through`)
+      steps = allSteps.filter(s => s.analysisTier === 'tier3')
+      if (steps.length === 0) {
+        steps = [{ name: 'tier3-openai', kind: 'llmProvider', analysisTier: 'tier3' }]
       }
     }
 
@@ -339,27 +427,36 @@ serve(async (req) => {
     const attempts: Array<{ tier: string; result: VehicleIdentification | null; error?: string }> = []
 
     // Clear tier errors
-    for (const t of allowedTiers) { tierErrors[t] = '' }
+    for (const s of steps) { tierErrors[s.name] = '' }
 
-    for (const tier of allowedTiers) {
-      console.log(`[identify-vehicle] Trying ${tier}...`)
+    for (const step of steps) {
+      console.log(`[identify-vehicle] Trying ${step.name}...`)
 
-      const result = await identifyWithTier(
-        supabase, user_id || null,
-        imageBase64, imageMimeType, normalizedImageUrl,
-        context || null, tier
-      )
+      let result: VehicleIdentification | null = null
+
+      if (step.kind === 'haiku') {
+        result = await identifyWithHaiku(
+          imageBase64, imageMimeType, normalizedImageUrl,
+          context || null
+        )
+      } else {
+        result = await identifyWithTier(
+          supabase, user_id || null,
+          imageBase64, imageMimeType, normalizedImageUrl,
+          context || null, step.analysisTier!
+        )
+      }
 
       attempts.push({
-        tier,
+        tier: step.name,
         result,
-        error: result ? undefined : (tierErrors[tier] || 'Failed to get result')
+        error: result ? undefined : (tierErrors[step.name] || tierErrors[step.analysisTier || ''] || 'Failed to get result')
       })
 
       if (result) {
         if (result.confidence >= min_confidence) {
           bestResult = result
-          console.log(`[identify-vehicle] ${tier} succeeded with confidence ${result.confidence}`)
+          console.log(`[identify-vehicle] ${step.name} succeeded with confidence ${result.confidence}`)
           break
         }
 
@@ -368,11 +465,11 @@ serve(async (req) => {
         }
 
         if (result.confidence < 0.4) {
-          console.log(`[identify-vehicle] ${tier} confidence ${result.confidence} too low, escalating...`)
+          console.log(`[identify-vehicle] ${step.name} confidence ${result.confidence} too low, escalating...`)
           continue
         }
 
-        console.log(`[identify-vehicle] ${tier} confidence ${result.confidence} acceptable`)
+        console.log(`[identify-vehicle] ${step.name} confidence ${result.confidence} acceptable`)
         break
       }
     }

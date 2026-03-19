@@ -19,6 +19,8 @@ import { DEFAULT_FILTERS } from '../../lib/filterPersistence';
 // Types
 // ---------------------------------------------------------------------------
 
+export type ImageFit = 'cover' | 'contain' | 'auto';
+
 export interface FeedUrlState {
   filters: FilterState;
   sortBy: SortBy;
@@ -26,6 +28,7 @@ export interface FeedUrlState {
   searchText: string;
   viewMode: ViewMode;
   cardsPerRow: number;
+  imageFit: ImageFit;
 }
 
 const DEFAULT_SORT_BY: SortBy = 'popular';
@@ -34,12 +37,14 @@ const DEFAULT_VIEW_MODE: ViewMode = 'grid';
 const DEFAULT_CARDS_PER_ROW = 6;
 
 const VALID_SORT_BY: Set<string> = new Set([
-  'year', 'make', 'model', 'mileage', 'newest', 'oldest', 'popular',
+  'year', 'make', 'model', 'mileage', 'newest', 'oldest', 'updated', 'popular',
   'price_high', 'price_low', 'volume', 'images', 'events', 'views',
   'deal_score', 'heat_score',
 ]);
 const VALID_SORT_DIR: Set<string> = new Set(['asc', 'desc']);
 const VALID_VIEW_MODE: Set<string> = new Set(['grid', 'gallery', 'technical']);
+const VALID_IMAGE_FIT: Set<string> = new Set(['cover', 'contain', 'auto']);
+const DEFAULT_IMAGE_FIT: ImageFit = 'auto';
 
 // ---------------------------------------------------------------------------
 // Deserialize: URLSearchParams -> FeedUrlState
@@ -53,6 +58,7 @@ export function deserializeFromUrl(params: URLSearchParams): FeedUrlState {
     searchText: params.get('q') || '',
     viewMode: deserializeViewMode(params),
     cardsPerRow: deserializeCardsPerRow(params),
+    imageFit: deserializeImageFit(params),
   };
 }
 
@@ -141,6 +147,11 @@ function deserializeCardsPerRow(params: URLSearchParams): number {
   return DEFAULT_CARDS_PER_ROW;
 }
 
+function deserializeImageFit(params: URLSearchParams): ImageFit {
+  const val = params.get('fit') || '';
+  return VALID_IMAGE_FIT.has(val) ? (val as ImageFit) : DEFAULT_IMAGE_FIT;
+}
+
 // ---------------------------------------------------------------------------
 // Serialize: FeedUrlState -> URLSearchParams
 // ---------------------------------------------------------------------------
@@ -195,6 +206,7 @@ export function serializeToUrl(state: FeedUrlState): URLSearchParams {
   // View (omit defaults)
   if (viewMode !== DEFAULT_VIEW_MODE) params.set('view', viewMode);
   if (cardsPerRow !== DEFAULT_CARDS_PER_ROW) params.set('cols', String(cardsPerRow));
+  if (state.imageFit !== DEFAULT_IMAGE_FIT) params.set('fit', state.imageFit);
 
   return params;
 }
@@ -236,7 +248,7 @@ export function urlHasFeedParams(params: URLSearchParams): boolean {
     'q', 'year_min', 'year_max', 'make', 'model', 'body',
     'price_min', 'price_max', '4x4', 'for_sale', 'sold', 'hide_sold',
     'images', 'today', 'pending', 'private', 'dealer', 'sources',
-    'zip', 'radius', 'sort', 'dir', 'view', 'cols',
+    'zip', 'radius', 'sort', 'dir', 'view', 'cols', 'fit',
   ]);
   for (const key of params.keys()) {
     if (feedKeys.has(key)) return true;
