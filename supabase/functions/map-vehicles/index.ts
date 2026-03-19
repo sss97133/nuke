@@ -251,8 +251,17 @@ Deno.serve(async (req) => {
           LIMIT $${vp}
         `;
         vArgs.push(limit);
-        // deno-lint-ignore no-explicit-any
-        const { rows } = await conn.queryObject<any>({ text: sql, args: vArgs });
+        const { rows } = await conn.queryObject<{
+          observation_id: string; vehicle_id: string;
+          lng: number; lat: number;
+          event_type: string; source: string | null;
+          confidence: number; loc_precision: string | null;
+          observed_at: string; location: string | null;
+          metadata: Record<string, unknown>;
+          year: number | null; make: string | null; model: string | null;
+          price: number | null; thumbnail: string | null;
+          vehicle_status: string | null;
+        }>({ text: sql, args: vArgs });
 
         totalMatched = rows.length;
         features = rows.map((r: any) => ({
@@ -267,7 +276,7 @@ Deno.serve(async (req) => {
             precision: r.loc_precision,
             observed_at: r.observed_at,
             location: r.location,
-            event_label: r.metadata?.event_type ?? r.event_type,
+            event_label: (r.metadata as Record<string, unknown>)?.event_type ?? r.event_type,
             year: r.year, make: r.make, model: r.model,
             price: r.price,
             thumbnail: r.thumbnail,
