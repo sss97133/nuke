@@ -4,23 +4,40 @@ Vehicle data intelligence.
 
 ---
 
-One person built a system of record for every collector vehicle
-in the world — from a garage in Boulder City, Nevada,
-between oil changes.
+Some vehicles accumulate knowledge. People photograph them,
+argue about them, notice things wrong with them, remember
+what they looked like ten years ago. That attention is real
+and it's scattered everywhere — auction comments, forum posts,
+listing photos, build sheets, VIN stamps, conversations
+between strangers who've never met the car.
 
-645,000 vehicles. 11.6 million auction comments. 32 million images.
-609,000 valuations. 510,000 identity seeds. A vision model that
-classifies vehicles from photos at zero cost per image.
+Nuke collects that attention. Every observation is sourced,
+scored, and stacked. Nothing overwrites. The picture just
+gets sharper.
 
-Every data point is an observation — source-attributed,
-confidence-scored, time-ordered. Nothing overwrites.
-Everything compounds.
+```
+What the seller says:              What Nuke knows:
+
+  "1970 Chevelle SS 396"           VIN decode → Malibu, not SS
+  "Matching numbers"               Engine stamp visible → truck block
+  "Frame-off restoration"          Fender tag → base trim, not Super Sport
+  "$67,500"                        8 commenters flagged the air cleaner
+                                   Paint depth inconsistent in photo 31
+                                   Sold 2019 as Malibu for $23,000
+
+                                   Confidence: 0.23
+```
+
+Pick any vehicle people care about. We probably know
+more about it than the person selling it.
+
+One person. A garage in Boulder City, Nevada. Between oil changes.
 
 ---
 
 ## What this is
 
-A **database**, a set of **analysis functions**, and **trained ML models** for collector vehicles.
+A **database**, a set of **analysis functions**, and **trained ML models** — built around vehicles people care about.
 
 | What | Scale |
 |------|-------|
@@ -165,13 +182,11 @@ Base URL: `https://qkgaybvrernstplzjaam.supabase.co/functions/v1`
 
 ## Data model
 
-Entity-Attribute-Value Modeling at Total Resolution — a Knowledge Graph materialized as relational schema. The database doesn't describe the vehicle. The database IS the vehicle.
+The database doesn't describe the vehicle. The database **is** the vehicle.
 
-The technical names:
-- **Domain Ontology Engineering**
-- **Canonical Data Model**
-- **Schema-Guided Generation with Evidential Grounding**
-- **Fully Normalized Domain Ontology at Component Resolution with Full Provenance Tracking**
+Every component, every modification, every claim anyone's ever made —
+sourced, scored, and stacked. Where three independent sources agree,
+a fact emerges. Where they disagree, an investigation begins.
 
 ```
 vehicle (identity)
@@ -186,11 +201,13 @@ vehicle (identity)
   -> validation_results (clone detection, VIN cross-check, code verification, known issues)
 ```
 
-**Schema-Guided Generation with Evidential Grounding**: the SQL schema IS the specification. Hand the DDL to any LLM with source material (photos, descriptions, documents, comments), get back INSERT statements with citations. Every cell proves what it claims. Multi-model jury for verification — where models agree, fact emerges. Where they diverge, investigation begins.
+The schema is the spec. Hand the DDL to any LLM with source material —
+photos, descriptions, build sheets, comments — and it fills in the record
+with citations. Every cell knows where it came from.
 
-**Scale**: ~950 tables, ~5,000-8,000 columns per subsystem at bedrock. 10,000-100,000 data points per fully documented vehicle. 419 RPO codes, 63 validation rules, 107K evidence rows and growing.
-
-Source trust scores: NHTSA 0.95, major auctions 0.85, forums 0.50, AI extraction 0.70. Confidence decays over time.
+Sources carry trust: factory data (0.95), major auctions (0.85),
+forums (0.50), AI extraction (0.70). Confidence decays over time.
+Nothing is certain. Everything is evidence.
 
 ## Architecture
 
