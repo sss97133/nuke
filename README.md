@@ -4,9 +4,6 @@ Vehicle data intelligence.
 
 ---
 
-A vehicle listing has raw data points. An auction thread
-has comments. A photo set has images across classified zones.
-
 Nuke turns minimal low signal data points lets say anywhere from 10-100 data points into 10,000+ sourced observations per vehicle —
 every claim traced to origin, confidence-scored, time-ordered.
 Nothing overwrites. Everything compounds.
