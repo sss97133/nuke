@@ -13,7 +13,7 @@
   - Modal vLLM: https://sss97133--nuke-vllm-serve.modal.run (2x T4 containers, $0.59/hr each)
   Post-processing: Run `dotenvx run -- bash scripts/overnight-run.sh --post-only` after streams complete
 
-20:XX | MODAL-CONSOLIDATION | Building modal_description_discovery.py | yono/modal_description_discovery.py, TOOLS.md
+20:XX | MODAL-CONSOLIDATION | DONE — modal_description_discovery.py built + tested (10 rows written) | yono/modal_description_discovery.py, TOOLS.md
 09:05 | OVERNIGHT-OPS | DONE — Album intake running unattended (PID 34560, 3,194 iphoto images so far). Photo ingest MVP deployed (MCP + CLI).
 09:00 | UNIVERSAL-EXTRACTOR | AI extraction pipeline: snapshot-to-markdown bridge + Haiku fallback extractor | scripts/snapshot-to-markdown.mjs, supabase/functions/batch-extract-snapshots/index.ts, scripts/mass-extract-snapshots.mjs
   - BJ markdown bridge running in background (PID 38616)

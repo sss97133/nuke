@@ -1,41 +1,239 @@
-# Session Handoff — 2026-03-20 08:00 AM
+# Session Handoff — 2026-03-20
 
-## STILL RUNNING — Do Not Kill
+## COMPLETED THIS SESSION
 
-### Album Intake (PID 34560)
-- 25/72 albums started, 16 completed, on "1971 K15 GMC Suburban"
-- **1,261 photos uploaded**, 450 skipped, 3 errors | iphoto: 1,686 → **2,949**
-- ETA ~11 AM | Monitor: `tail -f /tmp/album-intake.log`
+### Data Quality (DONE)
+- 139,581 vehicle_events backfilled (0 orphans remaining)
+- 19 NULL models fixed from URL slugs
+- Design system 52% → 87% compliance (2,700+ violations fixed, build passes)
+- idx_vehicles_api_list index created (fixes API timeout)
+- All merged to main and pushed to origin
 
-### 4 Background Streams (PIDs 15389/15436/15499/15546)
-- Snapshots, library mining, description discovery, enrichment sweep
-- Running until ~3 PM
+### Still Running
+- Ollama local discovery: PID 15508, ~3,400 qwen2.5:7b discoveries so far
+- Kill it once Modal is deployed: `kill $(ps aux | grep local-description-discovery | grep -v grep | awk '{print $2}')`
 
-## Overnight Ops Agent (01:00-08:00)
+---
 
-1. **CRITICAL FIX:** Disabled `refresh_tier_on_image_upload` trigger on vehicle_images — references dropped `vehicle_receipts` table. Was silently killing ALL photo uploads with `documented_by_user_id`. Fix: `calculate_daily_engagement_layer`, `calculate_doc_quality_layer`, `calculate_material_quality_layer` all query `vehicle_receipts` — need to be updated, then re-enable trigger.
+## COMPLETED: Modal Description Discovery
 
-2. **Design system:** 430+ component files committed (border-radius, boxShadow, font enforcement). Merged to main, pushed. Build verified.
+### Built
+**File:** `yono/modal_description_discovery.py` — TESTED AND WORKING
+- Qwen2.5-7B-Instruct with 4-bit quantization on T4 GPUs
+- 4 max containers, batch size 50, 500-row upsert batches
+- Prompt matches `local-description-discovery.mjs` DISCOVERY_PROMPT exactly
+- Writes to `description_discoveries` with `model_used='qwen2.5:7b-modal'`
+- Upserts on `(vehicle_id, model_used)` unique constraint
+- Test: 10 vehicles extracted + written, avg 36 fields / 8 keys per description
+- TOOLS.md updated with Modal GPU jobs section
 
-3. **Deployed:** `db-stats`, `extract-mecum`, `refine-fb-listing`
+### Run Commands
+```bash
+modal run yono/modal_description_discovery.py --limit 100      # small test
+modal run yono/modal_description_discovery.py --limit 235000   # full 235K backlog (~$14-20)
+modal run yono/modal_description_discovery.py --limit 5000 --min-price 10000  # high-value first
+```
 
-4. **DB health:** 0 lock waiters, all vehicles triggers enabled, VACUUM deferred
+### After launching full run, kill local Ollama:
+```bash
+kill $(ps aux | grep local-description-discovery | grep -v grep | awk '{print $2}')
+```
 
-5. **Error logging:** Added to iphoto-intake.mjs (upload + insert errors were completely silent)
+### Future: Step 2 — Unified Modal Agent
+10+ Modal apps deployed independently. Consider consolidation into `modal_workload_agent.py` after this job proves out.
 
-## Overnight Autonomous Agent (midnight-08:00)
+---
+# Auto-Checkpoint — 2026-03-20 08:55:26
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
 
-- Deployed db-stats, extract-mecum, refine-fb-listing, mcp-connector
-- 1,800+ design violations → 0 across 400+ files
-- 260 edge functions Deno-modernized, 35+ deployed
-- 1,312 new library extractions (1,161 → 2,473 items)
-- 200 hardcoded colors → CSS variables
-- ARS system built: 3 tables, 3 functions, 3 triggers, 2,142 vehicles scored
+## Recent Commits (last 30 min)
+none
 
-## Next Steps
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+package.json
+scripts/local-description-discovery.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/mcp-connector/index.ts
+yono/modal_nuke_agent_train.py
 
-1. Wait for album intake (~11 AM), then run Phase 2 bulk sync
-2. VACUUM ANALYZE vehicle_images after inserts complete
-3. Fix 3 broken tier functions (replace `vehicle_receipts` refs), re-enable trigger
-4. Commit iphoto-intake.mjs error logging changes
-5. Batch compute ARS for ~182K remaining vehicles
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 08:59:08
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+772d95af1 feat: add ingest_photos MCP tool + nuke-photo-drop CLI
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/local-description-discovery.mjs
+scripts/mine-comments-for-library.mjs
+yono/modal_nuke_agent_train.py
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 08:59:42
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+772d95af1 feat: add ingest_photos MCP tool + nuke-photo-drop CLI
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/local-description-discovery.mjs
+scripts/mine-comments-for-library.mjs
+yono/modal_nuke_agent_train.py
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 09:03:14
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+772d95af1 feat: add ingest_photos MCP tool + nuke-photo-drop CLI
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/local-description-discovery.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/batch-extract-snapshots/index.ts
+yono/modal_nuke_agent_train.py
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 09:04:24
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+772d95af1 feat: add ingest_photos MCP tool + nuke-photo-drop CLI
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/local-description-discovery.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/batch-extract-snapshots/index.ts
+yono/modal_nuke_agent_train.py
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 09:05:53
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+772d95af1 feat: add ingest_photos MCP tool + nuke-photo-drop CLI
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/local-description-discovery.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/batch-extract-snapshots/index.ts
+yono/modal_nuke_agent_train.py
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 09:10:40
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+c983a2d92 feat: universal AI extraction pipeline + snapshot-to-markdown bridge
+772d95af1 feat: add ingest_photos MCP tool + nuke-photo-drop CLI
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+scripts/local-description-discovery.mjs
+scripts/mine-comments-for-library.mjs
+yono/modal_nuke_agent_train.py
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 09:18:44
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+7fcafd742 feat: local LLM infrastructure — Modelfiles, Modal fine-tuning pipeline, training data exporter
+c983a2d92 feat: universal AI extraction pipeline + snapshot-to-markdown bridge
+772d95af1 feat: add ingest_photos MCP tool + nuke-photo-drop CLI
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+scripts/local-description-discovery.mjs
+scripts/mine-comments-for-library.mjs
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
