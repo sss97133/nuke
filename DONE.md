@@ -1,5 +1,39 @@
 # DONE — Completed Work Log
 
+## 2026-03-21
+
+### [overnight] Autonomous Overnight Session (2026-03-21 00:00-08:00)
+
+**Stabilize + Commit:**
+- [git] Committed 12 files: overnight scripts, listing package generator, MCP connector, mining scripts, package.json updates
+- [cron] Fixed job 413 (refresh-vehicle-census): created `idx_vehicles_canonical_platform_v2` including `pending_backfill` status, dropped old index. Matview refresh now <7s (was timing out at 120s)
+- [cron] Job 414 (review-agent-submissions): verified already succeeding — no action needed
+
+**Database Cleanup:**
+- [vacuum] VACUUM ANALYZE on 11 tables: vehicles (11.7%→0.1%), vehicle_agents (15.1%→0%), listing_page_snapshots (10.3%→0%), transfer_milestones (10.4%→0%), snapshot_extraction_queue (12.1%→0%), ownership_transfers (13.0%→0%), vehicle_live_metrics (10.9%→0.2%), external_identities (6.2%→0%), bat_crawl_state (10.1%→0%), vehicle_status_metadata (8.3%→0%), vehicle_reference_links (7.8%→0%)
+- [indexes] Dropped 607 unused indexes (zero scans in 3 weeks): 2548→1942 total indexes. Remaining 1123 zero-scan are PKs/unique constraints (cannot drop). Reclaimed ~450+ MB
+- [tables] Audited 115 empty tables: all are digital twin ontology placeholders (engine_blocks, brake_calipers, etc.) — correctly kept
+
+**Data Enrichment:**
+- [price] Backfilled sale_price from canonical_sold_price for active vehicles
+- [vin] Created `validate_vin_check_digit()` SQL function. Extracted and validated 48 VINs from vehicle descriptions using check digit verification. Skipped duplicates and false positives
+- [extraction] Reset 28,129 failed extractions to pending (all had good snapshots — Mecum 18.7K, BaT 7.6K, Bonhams 1.6K). Queue: 26,868 failed → 1 failed
+- [extraction] Released 597 stale processing locks (claimed >30min ago)
+
+**Reference Library Expansion:**
+- [rpo] Mined 41 new RPO codes from BaT descriptions: Z06, ZR1, ZR2, F41, B4C, FX3, etc. (802→843)
+- [library] Promoted 272 staging entries: 58 RPO codes (→901), 38 paint codes (→3,497), 15 trim packages (→594)
+- [library] Background Ollama mining stream produced 2,754 new entries in 24h (513 option codes, 244 paint codes, 764 known issues, etc.)
+
+**Final Health Check:**
+- Lock waiters: 0
+- Dead tuple peak: <5% across all tables (was 17.8%)
+- Failed crons (last 6h): 0
+- Extraction queue failed: 1 (was 26,868)
+- Indexes: 1942 (was 2548)
+- DB size: 71 GB (index space reclaimed, but new data from running streams offset savings)
+- 4 background streams still running (mining, extraction, snapshots, enrichment)
+
 ### [extraction] Overnight Pipeline Infrastructure + Launch (2026-03-20 07:30-08:00)
 - [scripts] Added Ollama/Gemini multi-provider support to `mine-comments-for-library.mjs` (--provider ollama|gemini|anthropic)
 - [scripts] Created `scripts/run-mine-library.sh` — mining loop wrapper with auto-stop after 5 zero runs
