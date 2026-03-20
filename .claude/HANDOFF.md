@@ -1,118 +1,41 @@
-# Session Handoff — 2026-03-20 Overnight Autonomous
+# Session Handoff — 2026-03-20 08:00 AM
 
-**Branch:** `overnight-data-quality` (10 commits ahead of main)
+## STILL RUNNING — Do Not Kill
 
----
+### Album Intake (PID 34560)
+- 25/72 albums started, 16 completed, on "1971 K15 GMC Suburban"
+- **1,261 photos uploaded**, 450 skipped, 3 errors | iphoto: 1,686 → **2,949**
+- ETA ~11 AM | Monitor: `tail -f /tmp/album-intake.log`
 
-## Overnight Autonomous Agent — 6 Blocks Complete
+### 4 Background Streams (PIDs 15389/15436/15499/15546)
+- Snapshots, library mining, description discovery, enrichment sweep
+- Running until ~3 PM
 
-### BLOCK 1: Flush & Ship ✅
+## Overnight Ops Agent (01:00-08:00)
+
+1. **CRITICAL FIX:** Disabled `refresh_tier_on_image_upload` trigger on vehicle_images — references dropped `vehicle_receipts` table. Was silently killing ALL photo uploads with `documented_by_user_id`. Fix: `calculate_daily_engagement_layer`, `calculate_doc_quality_layer`, `calculate_material_quality_layer` all query `vehicle_receipts` — need to be updated, then re-enable trigger.
+
+2. **Design system:** 430+ component files committed (border-radius, boxShadow, font enforcement). Merged to main, pushed. Build verified.
+
+3. **Deployed:** `db-stats`, `extract-mecum`, `refine-fb-listing`
+
+4. **DB health:** 0 lock waiters, all vehicles triggers enabled, VACUUM deferred
+
+5. **Error logging:** Added to iphoto-intake.mjs (upload + insert errors were completely silent)
+
+## Overnight Autonomous Agent (midnight-08:00)
+
 - Deployed db-stats, extract-mecum, refine-fb-listing, mcp-connector
-- nuke.ag 200 OK, MCP connector 200 OK
+- 1,800+ design violations → 0 across 400+ files
+- 260 edge functions Deno-modernized, 35+ deployed
+- 1,312 new library extractions (1,161 → 2,473 items)
+- 200 hardcoded colors → CSS variables
+- ARS system built: 3 tables, 3 functions, 3 triggers, 2,142 vehicles scored
 
-### BLOCK 2: Design System Border-Radius Purge ✅
-- **1,800+ violations → 0** across 400+ files (3 parallel agents)
-- JSX borderRadius, Tailwind rounded-*, CSS border-radius all fixed
-- Preserved borderRadius: '50%' for circles. TypeScript clean.
+## Next Steps
 
-### BLOCK 3: Deno Import Modernization ✅
-- **260 edge functions** cleaned of ALL deno.land/std@ imports
-- serve/crypto/base64 removed, serve() → Deno.serve()
-- 35+ functions deployed in 3 batches
-
-### BLOCK 4: Data Quality Enrichment ✅
-- 73 vehicles enriched, profile_origin backfilled, strategies mostly exhausted
-
-### BLOCK 5: Comment Mining ✅
-- **1,312 new extractions** across 71 groups for $1.08
-- Library doubled: 1,161 → 2,473 items, 142 make/model groups
-
-### BLOCK 6: Hardcoded Colors ✅
-- **200 replacements** across 71 files, hex → CSS variables
-- 1,675 → 499 remaining (chart/brand-specific colors)
-
----
-
-## ARS-BUILD Agent — Auction Readiness System (Sprint 1+2)
-
-- 3 tables: auction_readiness, ars_tier_transitions, photo_coverage_requirements
-- 3 SQL functions: compute/persist/recompute (~65ms/vehicle)
-- 3 triggers on image/observation/evidence insert
-- 3 MCP tools + generate-listing-package edge function
-- 2,142 vehicles scored: 3 NEEDS_WORK, 279 EARLY_STAGE, 1860 DISCOVERY_ONLY
-
----
-
-## What's Next
-
-1. **Merge overnight-data-quality → main** (10 commits)
-2. Deploy remaining ~220 modernized functions
-3. Continue color migration (499 remaining)
-4. Batch compute ARS for ~182K vehicles
-5. YONO zone classifier on unclassified images
-6. Expand library: GM makes, pre-war era
-
----
-# Auto-Checkpoint — 2026-03-20 08:00:42
-*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
-
-## Recent Commits (last 30 min)
-1004d7426 ARS build session handoff: Sprint 1+2 complete
-01aaea724 chore: overnight session infrastructure + listing package + library mining
-
-## Uncommitted Changes
-.claude/ACTIVE_AGENTS.md
-.claude/HANDOFF.md
-DONE.md
-
-## Staged
-none
-
-## On Next Session
-1. `cat PROJECT_STATE.md` — sprint focus
-2. `tail -40 DONE.md` — what exists
-3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
-4. Register in `.claude/ACTIVE_AGENTS.md`
-
----
-# Auto-Checkpoint — 2026-03-20 08:00:42
-*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
-
-## Recent Commits (last 30 min)
-1004d7426 ARS build session handoff: Sprint 1+2 complete
-01aaea724 chore: overnight session infrastructure + listing package + library mining
-
-## Uncommitted Changes
-.claude/ACTIVE_AGENTS.md
-.claude/HANDOFF.md
-DONE.md
-
-## Staged
-none
-
-## On Next Session
-1. `cat PROJECT_STATE.md` — sprint focus
-2. `tail -40 DONE.md` — what exists
-3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
-4. Register in `.claude/ACTIVE_AGENTS.md`
-
----
-# Auto-Checkpoint — 2026-03-20 08:00:57
-*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
-
-## Recent Commits (last 30 min)
-8d100a39d Final overnight closeout: 530 additional orphans backfilled, handoff written
-1004d7426 ARS build session handoff: Sprint 1+2 complete
-01aaea724 chore: overnight session infrastructure + listing package + library mining
-
-## Uncommitted Changes
-none
-
-## Staged
-none
-
-## On Next Session
-1. `cat PROJECT_STATE.md` — sprint focus
-2. `tail -40 DONE.md` — what exists
-3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
-4. Register in `.claude/ACTIVE_AGENTS.md`
+1. Wait for album intake (~11 AM), then run Phase 2 bulk sync
+2. VACUUM ANALYZE vehicle_images after inserts complete
+3. Fix 3 broken tier functions (replace `vehicle_receipts` refs), re-enable trigger
+4. Commit iphoto-intake.mjs error logging changes
+5. Batch compute ARS for ~182K remaining vehicles
