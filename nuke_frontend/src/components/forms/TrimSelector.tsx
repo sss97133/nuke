@@ -19,7 +19,7 @@ const TrimSelector: React.FC<TrimSelectorProps> = ({
   trim,
   onTrimChange,
   disabled = false,
-  className = '',
+  className ='',
   placeholder = 'e.g., Silverado, Cheyenne, Scottsdale'
 }) => {
   const [trimQuery, setTrimQuery] = useState(trim);
@@ -115,7 +115,7 @@ const TrimSelector: React.FC<TrimSelectorProps> = ({
         {showSuggestions && hasHierarchyData && filteredSuggestions.length > 0 && (
           <div
             ref={suggestionsRef}
-            className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
+            className="absolute z-50 mt-1 w-full bg-white border border-gray-300 max-h-60 overflow-auto"
           >
             {filteredSuggestions.map((opt, index) => (
               <button

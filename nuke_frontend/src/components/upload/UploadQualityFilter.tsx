@@ -152,7 +152,7 @@ export function UploadQualityFilter({ files, onApprove, onCancel }: UploadQualit
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8">
+        <div className="bg-white p-8">
           <div className="text-center">
             <div className="text-lg font-bold mb-2">Analyzing {files.length} images...</div>
             <div className="text-gray-600">Checking quality, size, and format</div>
@@ -167,7 +167,7 @@ export function UploadQualityFilter({ files, onApprove, onCancel }: UploadQualit
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
-      <div className="bg-white rounded-lg shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6">
@@ -209,7 +209,7 @@ export function UploadQualityFilter({ files, onApprove, onCancel }: UploadQualit
                     key={item.file.name}
                     onClick={() => toggleFile(item.file)}
                     className={`
-                      relative cursor-pointer rounded-lg overflow-hidden
+                      relative cursor-pointer  overflow-hidden
                       border-2 transition-all hover:scale-105
                       ${selectedFiles.has(item.file) 
                         ? 'border-blue-500 ring-2 ring-blue-300' 
@@ -223,7 +223,7 @@ export function UploadQualityFilter({ files, onApprove, onCancel }: UploadQualit
                       className="w-full h-32 object-cover"
                     />
                     {selectedFiles.has(item.file) && (
-                      <div className="absolute top-1 right-1 bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">
+                      <div className="absolute top-1 right-1 bg-blue-600 text-white w-6 h-6 flex items-center justify-center text-sm">
                         ✓
                       </div>
                     )}
@@ -249,7 +249,7 @@ export function UploadQualityFilter({ files, onApprove, onCancel }: UploadQualit
                   <div
                     key={item.file.name}
                     className={`
-                      border-2 rounded-lg p-4 flex items-start space-x-4
+                      border-2  p-4 flex items-start space-x-4
                       ${selectedFiles.has(item.file)
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-yellow-300 bg-yellow-50'
@@ -265,7 +265,7 @@ export function UploadQualityFilter({ files, onApprove, onCancel }: UploadQualit
                     <img
                       src={item.url}
                       alt={item.file.name}
-                      className="w-24 h-24 object-cover rounded"
+                      className="w-24 h-24 object-cover"
                     />
                     <div className="flex-1">
                       <div className="font-medium">{item.file.name}</div>
@@ -285,8 +285,7 @@ export function UploadQualityFilter({ files, onApprove, onCancel }: UploadQualit
                       )}
                       <div className="mt-2">
                         <span className={`
-                          text-xs px-2 py-1 rounded
-                          ${item.quality_score >= 7 ? 'bg-green-100 text-green-700' : ''}
+                          text-xs px-2 py-1  ${item.quality_score >= 7 ? 'bg-green-100 text-green-700' : ''}
                           ${item.quality_score >= 4 && item.quality_score < 7 ? 'bg-yellow-100 text-yellow-700' : ''}
                           ${item.quality_score < 4 ? 'bg-red-100 text-red-700' : ''}
                         `}>
@@ -307,13 +306,13 @@ export function UploadQualityFilter({ files, onApprove, onCancel }: UploadQualit
             <div className="space-x-3">
               <button
                 onClick={selectRecommended}
-                className="text-sm px-4 py-2 border-2 border-gray-300 rounded hover:bg-gray-50"
+                className="text-sm px-4 py-2 border-2 border-gray-300 hover:bg-gray-50"
               >
                 Select Recommended Only
               </button>
               <button
                 onClick={selectAll}
-                className="text-sm px-4 py-2 border-2 border-gray-300 rounded hover:bg-gray-50"
+                className="text-sm px-4 py-2 border-2 border-gray-300 hover:bg-gray-50"
               >
                 Select All
               </button>
@@ -322,13 +321,13 @@ export function UploadQualityFilter({ files, onApprove, onCancel }: UploadQualit
             <div className="flex items-center space-x-3">
               <button
                 onClick={onCancel}
-                className="px-6 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-100 font-medium"
+                className="px-6 py-2 border-2 border-gray-300 hover:bg-gray-100 font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={handleApprove}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                className="px-6 py-2 bg-blue-600 text-white hover:bg-blue-700 font-medium"
               >
                 Upload {selectedFiles.size} Image{selectedFiles.size !== 1 ? 's' : ''}
               </button>

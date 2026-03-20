@@ -272,14 +272,14 @@ export default function DrillDown({ concept, value, children, inline = true }: D
   if (!def) return <>{children}</>;
 
   const categoryColors: Record<string, string> = {
-    regulatory: '#3b82f6',
+    regulatory: 'var(--info)',
     entity: '#8b5cf6',
-    contract_type: '#10b981',
-    transparency: '#f59e0b',
-    financial: '#ef4444',
-    risk: '#f97316',
+    contract_type: 'var(--success)',
+    transparency: 'var(--warning)',
+    financial: 'var(--error)',
+    risk: 'var(--orange)',
   };
-  const color = categoryColors[def.category] || '#6b7280';
+  const color = categoryColors[def.category] || 'var(--text-secondary)';
 
   return (
     <span ref={ref} style={{ position: 'relative', display: inline ? 'inline' : 'inline-flex' }}>
@@ -306,10 +306,7 @@ export default function DrillDown({ concept, value, children, inline = true }: D
             zIndex: 10001,
             width: '350px',
             background: 'var(--bg, #fff)',
-            border: `2px solid ${color}`,
-            borderRadius: '6px',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.2)',
-            overflow: 'hidden',
+            border: `2px solid ${color}`, overflow: 'hidden',
             fontSize: '12px',
           }}
           onClick={(e) => e.stopPropagation()}

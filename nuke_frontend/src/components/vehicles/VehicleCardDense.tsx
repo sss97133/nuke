@@ -132,16 +132,16 @@ interface VehicleCardDenseProps {
 
 const getTierColor = (tier: string) => {
   switch (tier) {
-    case 'SSS': return '#7c3aed';
-    case 'SS': return '#8b5cf6';
-    case 'S': return '#ef4444';
-    case 'A': return '#f59e0b';
-    case 'B': return '#3b82f6';
-    case 'C': return '#10b981';
-    case 'D': return '#6b7280';
-    case 'E': return '#9ca3af';
-    case 'F': return '#a855f7';
-    default: return '#6b7280';
+    case 'SSS': return 'var(--accent)';
+    case 'SS': return 'var(--accent)';
+    case 'S': return 'var(--error)';
+    case 'A': return 'var(--warning)';
+    case 'B': return 'var(--info)';
+    case 'C': return 'var(--success)';
+    case 'D': return 'var(--text-secondary)';
+    case 'E': return 'var(--text-disabled)';
+    case 'F': return 'var(--accent)';
+    default: return 'var(--text-secondary)';
   }
 };
 
@@ -912,14 +912,14 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     if (currentValue) {
       const ratio = displayPriceValue / currentValue;
       // Good deal: < 1.0 (red), Bad price: > 1.2 (purple), Neutral: in between
-      if (ratio < 0.95) return '#ef4444'; // Red - good deal
-      if (ratio > 1.2) return '#a855f7'; // Purple - bad price
+      if (ratio < 0.95) return 'var(--error)'; // Red - good deal
+      if (ratio > 1.2) return 'var(--accent)'; // Purple - bad price
     }
-    
+
     if (purchasePrice && purchasePrice > 0) {
       const ratio = displayPriceValue / purchasePrice;
-      if (ratio < 0.95) return '#ef4444'; // Red - good deal
-      if (ratio > 1.3) return '#a855f7'; // Purple - bad price
+      if (ratio < 0.95) return 'var(--error)'; // Red - good deal
+      if (ratio > 1.3) return 'var(--accent)'; // Purple - bad price
     }
     
     return undefined; // Neutral/no color
@@ -977,7 +977,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       outcome === 'ended' ||
       outcome === 'no_sale' ||
       externalStatus === 'ended';
-    const statusBorderColor = isSoldLike ? '#10b981' : isResultLike ? '#f59e0b' : undefined;
+    const statusBorderColor = isSoldLike ? 'var(--success)' : isResultLike ? 'var(--warning)' : undefined;
     const borderColor = thermalPriceColor || statusBorderColor;
 
     const base: React.CSSProperties = {
@@ -986,9 +986,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       right: '6px',
       background: 'rgba(0, 0, 0, 0.75)',
       backdropFilter: 'blur(6px)',
-      color: thermalPriceColor || 'white',
+      color: thermalPriceColor || 'var(--surface-elevated)',
       padding: isCompactCard ? '3px 6px' : '4px 8px',
-      borderRadius: isCompactCard ? '5px' : '6px',
       display: 'inline-flex',
       alignItems: 'center',
       gap: isCompactCard ? '4px' : '6px',
@@ -1027,9 +1026,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
     // Heat: subtle border shift (cold -> hot) as listing ages.
     const border =
-      auctionProgress01 > 0.9 ? 'rgba(239,68,68,0.55)' :
-      auctionProgress01 > 0.7 ? 'rgba(245,158,11,0.45)' :
-      'rgba(59,130,246,0.35)';
+      auctionProgress01 > 0.9 ? 'color-mix(in srgb, var(--error) 55%, transparent)' :
+      auctionProgress01 > 0.7 ? 'color-mix(in srgb, var(--warning) 45%, transparent)' :
+      'color-mix(in srgb, var(--info) 35%, transparent)';
 
     const pulse = badgePulseSeconds ? `nuke-auction-pulse ${badgePulseSeconds.toFixed(2)}s ease-in-out infinite` : '';
     const pop = badgeExplode ? 'nuke-badge-pop 650ms cubic-bezier(0.2, 1.2, 0.2, 1) 1' : '';
@@ -1438,7 +1437,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           padding: '6px 8px',
           background: 'var(--surface)',
           border: '1px solid var(--border)',
-          borderRadius: '0px',
           textDecoration: 'none',
           color: 'inherit',
           transition: 'all 0.12s ease',
@@ -1460,7 +1458,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             width: '60px',
             height: '60px',
             flexShrink: 0,
-            borderRadius: '0px',
             border: '1px solid var(--border)',
             background: 'var(--grey-200)',
             overflow: 'hidden',
@@ -1564,22 +1561,19 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         state={{ vehicleTitle }}
         style={{
           display: 'block',
-          background: 'var(--surface)',
-          borderRadius: '8px',
-          overflow: 'hidden',
+          background: 'var(--surface)', overflow: 'hidden',
           textDecoration: 'none',
           color: 'inherit',
-          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-          marginBottom: '0px',
-          boxShadow: '0 1px 4px var(--shadow-color, rgba(0,0,0,0.08))',
+          transition: 'transform 0.15s ease',
+          marginBottom: '0px', border: '1px solid var(--border)',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = 'translateY(-3px)';
-          e.currentTarget.style.boxShadow = '0 8px 24px var(--shadow-color, rgba(0,0,0,0.18))';
+          e.currentTarget.style.borderColor = 'var(--border-focus)';
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 1px 4px var(--shadow-color, rgba(0,0,0,0.08))';
+          e.currentTarget.style.borderColor = 'var(--border)';
         }}
       >
         {/* Image preview with overlays */}
@@ -1628,14 +1622,12 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   {vehicle.is_streaming && (
                     <div
                       style={{
-                        background: '#ef4444',
-                        color: 'white',
+                        background: 'var(--error)',
+                        color: 'var(--surface-elevated)',
                         padding: '4px 10px',
-                        borderRadius: '4px',
                         fontSize: '9px',
                         fontWeight: 700,
                         letterSpacing: '0.5px',
-                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)',
                       }}
                     >
                       LIVE
@@ -1647,12 +1639,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       style={{
                         background: 'rgba(0, 0, 0, 0.75)',
                         backdropFilter: 'blur(6px)',
-                        color: 'white',
+                        color: 'var(--surface-elevated)',
                         padding: '4px 8px',
-                        borderRadius: '6px',
                         fontSize: '9px',
                         fontWeight: 700,
-                        fontFamily: 'monospace',
+                        fontFamily: 'Courier New, monospace',
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '4px',
@@ -1700,13 +1691,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     onMouseEnter={(e) => {
                       if (isSold && shouldShowSoldBadge) {
                         e.currentTarget.style.transform = 'scale(1.05)';
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (isSold && shouldShowSoldBadge) {
                         e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.boxShadow = undefined;
                       }
                     }}
                   >
@@ -1757,9 +1746,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                             lineHeight: 1,
                             color:
                               badgeParts.label === 'SOLD'
-                                ? '#10b981'
+                                ? 'var(--success)'
                                 : badgeParts.label === 'RESULT'
-                                ? '#f59e0b'
+                                ? 'var(--warning)'
                                 : 'rgba(255,255,255,0.92)',
                           }}
                         >
@@ -1789,9 +1778,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               bottom: showDetailOverlay ? '52px' : '8px', // Above detail overlay if visible
               left: '8px',
               background: 'transparent',
-              padding: 0,
-              borderRadius: 0,
-              display: 'inline-flex',
+              padding: 0, display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '6px',
@@ -1811,8 +1798,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 right: 0,
                 bottom: 0,
                 padding: '10px 12px',
-                background: 'linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.45))',
-                color: '#fff',
+                background: 'rgba(0,0,0,0.75)',
+                color: 'var(--surface-elevated)',
               }}
             >
               {/* Vehicle name */}
@@ -1905,10 +1892,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         fontWeight: 700,
                         color:
                           vehicle.condition_rating >= 8
-                            ? '#10b981'
+                            ? 'var(--success)'
                             : vehicle.condition_rating >= 6
-                            ? '#f59e0b'
-                            : '#ef4444',
+                            ? 'var(--warning)'
+                            : 'var(--error)',
                       }}
                     >
                       Grade{' '}
@@ -1992,9 +1979,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 bottom: '8px',
                 left: '8px',
                 background: 'rgba(0, 0, 0, 0.75)',
-                color: 'white',
+                color: 'var(--surface-elevated)',
                 padding: '3px 8px',
-                borderRadius: '12px',
                 fontSize: '9px',
                 fontWeight: 600,
               }}
@@ -2174,9 +2160,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       style={{
         display: 'block',
         background: 'transparent',
-        border: 'none',
-        borderRadius: '0',
-        overflow: 'hidden',
+        border: 'none', overflow: 'hidden',
         textDecoration: 'none',
         color: 'inherit',
         transition: 'all 0.12s ease',
@@ -2247,14 +2231,14 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '6px',
-              background: '#222',
+              background: 'var(--surface)',
               padding: '12px',
             }}
           >
             <div style={{
               fontSize: '13px',
               fontWeight: 700,
-              color: '#fff',
+              color: 'var(--text)',
               textAlign: 'center',
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
@@ -2264,7 +2248,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             </div>
             <div style={{
               fontSize: '9px',
-              color: '#666',
+              color: 'var(--text-secondary)',
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
             }}>
@@ -2278,7 +2262,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               if (vehicle.discovery_source) sources.push(vehicle.discovery_source);
               if (vehicle.profile_origin) sources.push(vehicle.profile_origin.replace(/_/g, ' '));
               return (
-                <div style={{ fontSize: '9px', color: '#888', textAlign: 'center', lineHeight: 1.5 }}>
+                <div style={{ fontSize: '9px', color: 'var(--text-disabled)', textAlign: 'center', lineHeight: 1.5 }}>
                   {dataPoints > 0 && <div>{dataPoints} data point{dataPoints !== 1 ? 's' : ''}</div>}
                   {sources.length > 0 && <div>{sources.join(', ')}</div>}
                 </div>
@@ -2306,10 +2290,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 {vehicle.is_streaming && (
                   <div
                     style={{
-                      background: '#ef4444',
-                      color: 'white',
+                      background: 'var(--error)',
+                      color: 'var(--surface-elevated)',
                       padding: '3px 8px',
-                      borderRadius: '3px',
                       fontSize: '9px',
                       fontWeight: 700,
                       letterSpacing: '0.5px',
@@ -2325,12 +2308,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     style={{
                       background: 'rgba(0, 0, 0, 0.75)',
                       backdropFilter: 'blur(6px)',
-                      color: 'white',
+                      color: 'var(--surface-elevated)',
                       padding: '4px 8px',
-                      borderRadius: '6px',
                       fontSize: '6.5pt',
                       fontWeight: 700,
-                      fontFamily: 'monospace',
+                      fontFamily: 'Courier New, monospace',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '4px',
@@ -2347,9 +2329,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     style={{
                       background: 'rgba(0, 0, 0, 0.5)',
                       backdropFilter: 'blur(4px)',
-                      padding: '3px 5px',
-                      borderRadius: '4px',
-                      display: 'inline-flex',
+                      padding: '3px 5px', display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '4px',
@@ -2401,13 +2381,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     onMouseEnter={(e) => {
                       if (isSold && shouldShowSoldBadge) {
                         e.currentTarget.style.transform = 'scale(1.05)';
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (isSold && shouldShowSoldBadge) {
                         e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.boxShadow = undefined;
                       }
                     }}
                   >
@@ -2468,9 +2446,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                             lineHeight: 1,
                             color:
                               badgeParts.label === 'SOLD'
-                                ? '#10b981'
+                                ? 'var(--success)'
                                 : badgeParts.label === 'RESULT'
-                                ? '#f59e0b'
+                                ? 'var(--warning)'
                                 : 'rgba(255,255,255,0.92)',
                           }}
                         >
@@ -2500,11 +2478,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       background: DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel].colorRgba,
                       backdropFilter: 'blur(4px)',
                       border: '1px solid rgba(255,255,255,0.2)',
-                      color: 'white',
+                      color: 'var(--surface-elevated)',
                       padding: '2px 6px',
-                      borderRadius: '4px',
                       fontSize: '11px',
-                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                      fontFamily: 'Courier New, monospace',
                       fontWeight: 800,
                       letterSpacing: '0.3px',
                       lineHeight: 1.2,
@@ -2527,9 +2504,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         : 'rgba(234,179,8,0.92)',
                       backdropFilter: 'blur(4px)',
                       border: '1px solid rgba(255,255,255,0.2)',
-                      color: 'white',
+                      color: 'var(--surface-elevated)',
                       padding: '2px 5px',
-                      borderRadius: '4px',
                       fontSize: '9px',
                       fontWeight: 800,
                       lineHeight: 1,
@@ -2548,10 +2524,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       background: 'rgba(234,179,8,0.92)',
                       backdropFilter: 'blur(4px)',
                       border: '1px solid rgba(255,255,255,0.2)',
-                      color: 'white',
-                      padding: '2px 5px',
-                      borderRadius: '4px',
-                      fontSize: '9px',
+                      color: 'var(--surface-elevated)',
+                      padding: '2px 5px', fontSize: '9px',
                       fontWeight: 800,
                       lineHeight: 1,
                       animation: 'badgeFadeIn 0.2s ease-in',
@@ -2648,11 +2622,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       border: isFollowing
                         ? '1px solid rgba(59, 130, 246, 0.5)'
                         : '1px solid rgba(255,255,255,0.2)',
-                      color: 'white',
+                      color: 'var(--surface-elevated)',
                       padding: isCompactCard ? '0' : '4px 8px',
                       width: isCompactCard ? '22px' : undefined,
                       height: isCompactCard ? '22px' : undefined,
-                      borderRadius: isCompactCard ? '999px' : '4px',
                       fontSize: isCompactCard ? '10pt' : '7pt',
                       fontWeight: 700,
                       cursor: followLoading ? 'wait' : 'pointer',
@@ -2664,12 +2637,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     onMouseEnter={(e) => {
                       if (!followLoading) {
                         e.currentTarget.style.transform = 'scale(1.05)';
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
                       }
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'scale(1)';
-                      e.currentTarget.style.boxShadow = 'none';
                     }}
                     title={
                       isFollowing && followROI
@@ -2685,7 +2656,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                           '★'
                         ) : followROI && followROI.hypothetical_roi_pct !== null ? (
                           <span style={{
-                            color: followROI.hypothetical_roi_pct > 0 ? '#10b981' : followROI.hypothetical_roi_pct < 0 ? '#ef4444' : 'inherit',
+                            color: followROI.hypothetical_roi_pct > 0 ? 'var(--success)' : followROI.hypothetical_roi_pct < 0 ? 'var(--error)' : 'inherit',
                             fontWeight: 800,
                           }}>
                             {followROI.hypothetical_roi_pct > 0 ? '+' : ''}{followROI.hypothetical_roi_pct.toFixed(1)}%
@@ -2717,7 +2688,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             right: 0,
             bottom: 0,
             padding: '8px',
-            background: 'linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.4))',
+            background: 'rgba(0,0,0,0.7)',
             color: '#fff',
           }}
         >
@@ -2809,10 +2780,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   fontWeight: 700,
                   color:
                     vehicle.condition_rating >= 8
-                      ? '#10b981'
+                      ? 'var(--success)'
                       : vehicle.condition_rating >= 6
-                      ? '#f59e0b'
-                      : '#ef4444',
+                      ? 'var(--warning)'
+                      : 'var(--error)',
                 }}
               >
                 {vehicle.condition_rating >= 9
@@ -2933,9 +2904,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               display: 'inline-flex',
               alignItems: 'center',
               height: 18,
-              padding: '0 5px', // Reduced padding for more compact badges
-              borderRadius: 3,
-              border: '1px solid var(--border)',
+              padding: '0 5px', // Reduced padding for more compact badges border: '1px solid var(--border)',
               background: 'var(--grey-50)',
               color: 'var(--text)',
               fontSize: '6.5pt', // Slightly smaller font
@@ -3020,11 +2989,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               }),
               width: 'min(360px, calc(100vw - 24px))',
               background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              boxShadow: '2px 2px 10px rgba(0,0,0,0.25)',
-              padding: '10px',
-              borderRadius: 6,
-              color: 'var(--text)',
+              border: '1px solid var(--border)', padding: '10px', color: 'var(--text)',
             }}
             ref={specPopoverRef}
             onClick={(e) => {
@@ -3121,9 +3086,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                           style={{
                             border: '1px solid var(--border)',
                             background: 'var(--grey-50)',
-                            padding: 0,
-                            borderRadius: 4,
-                            overflow: 'hidden',
+                            padding: 0, overflow: 'hidden',
                             cursor: img.image_url ? 'pointer' : 'default',
                           }}
                         >

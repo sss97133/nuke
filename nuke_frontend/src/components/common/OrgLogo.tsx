@@ -30,46 +30,46 @@ interface OrgLogoProps {
 // Type-based color palettes
 const typeColors: Record<string, { bg: string; icon: string; gradient: string }> = {
   auction_house: {
-    bg: 'rgba(220, 38, 38, 0.15)',
-    icon: '#ef4444',
-    gradient: 'linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%)'
+    bg: 'var(--error-dim)',
+    icon: 'var(--error)',
+    gradient: '#7f1d1d'
   },
   dealership: {
-    bg: 'rgba(59, 130, 246, 0.15)',
-    icon: '#3b82f6',
-    gradient: 'linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)'
+    bg: 'var(--info-dim)',
+    icon: 'var(--info)',
+    gradient: '#1e3a5f'
   },
   collection: {
     bg: 'rgba(168, 85, 247, 0.15)',
-    icon: '#a855f7',
-    gradient: 'linear-gradient(135deg, #4c1d95 0%, #1e1b4b 100%)'
+    icon: 'var(--purple)',
+    gradient: '#4c1d95'
   },
   manufacturer: {
-    bg: 'rgba(34, 197, 94, 0.15)',
-    icon: '#22c55e',
-    gradient: 'linear-gradient(135deg, #14532d 0%, #052e16 100%)'
+    bg: 'var(--success-dim)',
+    icon: 'var(--success)',
+    gradient: '#14532d'
   },
   service_shop: {
-    bg: 'rgba(245, 158, 11, 0.15)',
-    icon: '#f59e0b',
-    gradient: 'linear-gradient(135deg, #78350f 0%, #451a03 100%)'
+    bg: 'var(--warning-dim)',
+    icon: 'var(--warning)',
+    gradient: '#78350f'
   },
   museum: {
     bg: 'rgba(236, 72, 153, 0.15)',
     icon: '#ec4899',
-    gradient: 'linear-gradient(135deg, #831843 0%, #500724 100%)'
+    gradient: '#831843'
   },
   club: {
-    bg: 'rgba(14, 165, 233, 0.15)',
-    icon: '#0ea5e9',
-    gradient: 'linear-gradient(135deg, #0c4a6e 0%, #082f49 100%)'
+    bg: 'var(--info-dim)',
+    icon: 'var(--info)',
+    gradient: '#0c4a6e'
   },
 };
 
 const defaultColors = {
-  bg: 'rgba(100, 116, 139, 0.15)',
-  icon: '#64748b',
-  gradient: 'linear-gradient(135deg, var(--surface) 0%, var(--border) 100%)'
+  bg: 'var(--accent-dim)',
+  icon: 'var(--text-secondary)',
+  gradient: 'var(--surface)'
 };
 
 // Type-based icons
@@ -256,9 +256,7 @@ export const OrgLogo: React.FC<OrgLogoProps> = ({
           justifyContent: 'center',
           width: `${size}px`,
           height: `${size}px`,
-          backgroundColor: colors.bg,
-          borderRadius: '4px',
-          ...style,
+          backgroundColor: colors.bg, ...style,
         }}
       >
         <IconComponent size={size * 0.6} color={colors.icon} />
@@ -276,9 +274,7 @@ export const OrgLogo: React.FC<OrgLogoProps> = ({
         style={{
           width: `${size}px`,
           height: `${size}px`,
-          objectFit: 'contain',
-          borderRadius: '2px',
-          display: 'block',
+          objectFit: 'contain', display: 'block',
           ...style,
         }}
         onError={handleError}
@@ -296,9 +292,7 @@ export const OrgLogo: React.FC<OrgLogoProps> = ({
         justifyContent: 'center',
         width: `${size}px`,
         height: `${size}px`,
-        backgroundColor: colors.bg,
-        borderRadius: '2px',
-        ...style,
+        backgroundColor: colors.bg, ...style,
       }}
     >
       <IconComponent size={size * 0.6} color={colors.icon} />

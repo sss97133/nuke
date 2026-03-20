@@ -101,9 +101,7 @@ const GlobalUploadIndicator: React.FC = () => {
           padding: '4px',
           fontSize: '10px',
           fontFamily: 'monospace',
-          zIndex: 10001,
-          boxShadow: '2px 2px 0px var(--overlay)'
-        }}>
+          zIndex: 10001}}>
           <div style={{ 
             backgroundColor: 'var(--accent)',
             color: 'var(--bg)',

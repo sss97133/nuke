@@ -1515,7 +1515,7 @@ Redirecting to vehicle profile...`);
 
     return mode === 'modal' ? (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg max-w-md w-full p-6">
+        <div className="bg-white max-w-md w-full p-6">
           {authContent}
         </div>
       </div>
@@ -1851,9 +1851,7 @@ Redirecting to vehicle profile...`);
                         marginBottom: 'var(--space-2)',
                         padding: 'var(--space-2)',
                         backgroundColor: 'var(--success-bg)',
-                        border: '1px solid var(--border-success)',
-                        borderRadius: 'var(--radius)'
-                      }}>
+                        border: '1px solid var(--border-success)'}}>
                         ✓ {extractedImages.length} image{extractedImages.length !== 1 ? 's' : ''} ready to upload
                         {extractedImages.length > 20 && ' (showing first 20)'}
                       </div>
@@ -1934,9 +1932,7 @@ Redirecting to vehicle profile...`);
                     onDragLeave={handleDragLeave}
                     onClick={() => !extracting && fileInputRef.current?.click()}
                     style={{ 
-                      marginTop: 'var(--space-2)',
-                      borderRadius: '0px',
-                      minHeight: '120px',
+                      marginTop: 'var(--space-2)', minHeight: '120px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1945,7 +1941,7 @@ Redirecting to vehicle profile...`);
                   >
                     {extracting ? (
                       <div className="flex flex-col items-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
+                        <div className="animate-spin h-8 w-8 border-b-2 border-primary mb-2"></div>
                         <p className="text-small font-bold text-primary">
                           {extractProgress 
                             ? `Processing ${extractProgress.current}/${extractProgress.total} images...` 
@@ -2163,7 +2159,7 @@ Redirecting to vehicle profile...`);
         }}
       >
         <div 
-          className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto"
+          className="bg-white max-w-6xl w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Modal Header */}

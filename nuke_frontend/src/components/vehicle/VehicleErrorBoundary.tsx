@@ -18,9 +18,7 @@ const VehicleErrorFallback: React.FC<{
     padding: '16px',
     margin: '8px 0',
     border: '1px solid var(--warning)',
-    backgroundColor: 'var(--warning-dim)',
-    borderRadius: '4px',
-    fontFamily: 'Arial, sans-serif',
+    backgroundColor: 'var(--warning-dim)', fontFamily: 'Arial, sans-serif',
     fontSize: '11px'
   }}>
     <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
@@ -58,9 +56,7 @@ const VehicleErrorFallback: React.FC<{
             padding: '4px 8px',
             backgroundColor: 'var(--warning)',
             color: 'var(--bg)',
-            border: 'none',
-            borderRadius: '3px',
-            fontSize: '10px',
+            border: 'none', fontSize: '10px',
             cursor: 'pointer',
             gap: '3px'
           }}

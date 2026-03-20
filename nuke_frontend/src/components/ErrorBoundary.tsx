@@ -123,9 +123,7 @@ class ErrorBoundary extends Component<Props, State> {
           padding: '24px',
           margin: '16px',
           border: '1px solid var(--error)',
-          backgroundColor: 'var(--error-dim)',
-          borderRadius: '8px',
-          fontFamily: 'Arial, sans-serif',
+          backgroundColor: 'var(--error-dim)', fontFamily: 'Arial, sans-serif',
           fontSize: '12px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
@@ -141,7 +139,7 @@ class ErrorBoundary extends Component<Props, State> {
             </p>
             {eventId && (
               <p style={{ margin: '0 0 8px 0', color: 'var(--text-secondary)', fontSize: '11px' }}>
-                Error ID: <code style={{ backgroundColor: 'var(--bg)', padding: '2px 4px', borderRadius: '3px' }}>{eventId}</code>
+                Error ID: <code style={{ backgroundColor: 'var(--bg)', padding: '2px 4px'}}>{eventId}</code>
               </p>
             )}
           </div>
@@ -155,9 +153,7 @@ class ErrorBoundary extends Component<Props, State> {
                 padding: '6px 12px',
                 backgroundColor: 'var(--accent)',
                 color: 'var(--bg)',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '11px',
+                border: 'none', fontSize: '11px',
                 cursor: 'pointer',
                 gap: '4px'
               }}
@@ -174,9 +170,7 @@ class ErrorBoundary extends Component<Props, State> {
                 padding: '6px 12px',
                 backgroundColor: 'var(--text-secondary)',
                 color: 'var(--bg)',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '11px',
+                border: 'none', fontSize: '11px',
                 cursor: 'pointer',
                 gap: '4px'
               }}
@@ -193,9 +187,7 @@ class ErrorBoundary extends Component<Props, State> {
                 padding: '6px 12px',
                 backgroundColor: 'var(--success)',
                 color: 'var(--bg)',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '11px',
+                border: 'none', fontSize: '11px',
                 cursor: 'pointer',
                 gap: '4px'
               }}
@@ -209,7 +201,7 @@ class ErrorBoundary extends Component<Props, State> {
             <details style={{ marginTop: '16px' }}>
               <summary style={{
                 cursor: 'pointer',
-                color: '#dc2626',
+                color: 'var(--error)',
                 fontSize: '11px',
                 fontWeight: 'bold',
                 display: 'flex',
@@ -222,10 +214,8 @@ class ErrorBoundary extends Component<Props, State> {
               <div style={{
                 marginTop: '8px',
                 padding: '12px',
-                backgroundColor: '#111827',
-                color: '#f9fafb',
-                borderRadius: '4px',
-                fontSize: '10px',
+                backgroundColor: 'var(--text)',
+                color: 'var(--bg-secondary)', fontSize: '10px',
                 fontFamily: 'monospace',
                 whiteSpace: 'pre-wrap',
                 overflow: 'auto',

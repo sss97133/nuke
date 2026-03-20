@@ -36,7 +36,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
   onModelChange,
   disabled = false,
   required = false,
-  className = '',
+  className ='',
   variant = 'autocomplete'
 }) => {
   const [makeQuery, setMakeQuery] = useState(make);
@@ -451,7 +451,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
               value={makeButtonsFilter}
               onChange={(e) => setMakeButtonsFilter(e.target.value)}
               placeholder={loadingMakes ? 'Loading makes…' : 'Filter makes…'}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              className="block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               disabled={disabled || loadingMakes}
             />
 
@@ -459,7 +459,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
               type="button"
               onClick={() => setShowAllMakeButtons((v) => !v)}
               disabled={disabled || loadingMakes}
-              className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 dark:text-gray-500 dark:text-gray-400"
+              className="shrink-0 border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 dark:text-gray-500 dark:text-gray-400"
               title={showAllMakeButtons ? 'Collapse' : 'Show all makes'}
             >
               {showAllMakeButtons ? '–' : '+'}
@@ -481,7 +481,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
                   disabled={disabled}
                   onClick={() => handleMakeSelect(m)}
                   onMouseEnter={() => ensureVehicleCountForMake(m)}
-                  className={`group relative flex items-center gap-2 rounded-full border px-3 py-2 text-sm shadow-sm transition-colors ${
+                  className={`group relative flex items-center gap-2  border px-3 py-2 text-sm  transition-colors ${
                     isSelected
                       ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
                       : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-50'
@@ -495,12 +495,12 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
                       loading="lazy"
                     />
                   ) : (
-                    <div className="h-5 w-5 rounded bg-gray-100 border border-gray-200" />
+                    <div className="h-5 w-5 bg-gray-100 border border-gray-200" />
                   )}
                   <span className="max-w-[11rem] truncate">{m.make_name}</span>
 
                   {/* Hover tooltip */}
-                  <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+                  <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
                     {tooltip}
                   </span>
                 </button>
@@ -533,7 +533,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
                     ? 'Loading models…'
                     : `Filter ${selectedMake.make_name} models…`
               }
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              className="block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               disabled={disabled || loadingModels || !selectedMake}
             />
 
@@ -541,7 +541,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
               type="button"
               onClick={() => setShowAllModelButtons((v) => !v)}
               disabled={disabled || loadingModels || !selectedMake}
-              className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 dark:text-gray-500 dark:text-gray-400"
+              className="shrink-0 border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 dark:text-gray-500 dark:text-gray-400"
               title={!selectedMake ? 'Select make first' : showAllModelButtons ? 'Collapse' : 'Show all models'}
             >
               {showAllModelButtons ? '–' : '+'}
@@ -567,7 +567,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
                     disabled={disabled}
                     onClick={() => handleModelSelect(m)}
                     onMouseEnter={() => ensureVehicleCountForModel(m)}
-                    className={`group relative rounded-full border px-3 py-2 text-sm shadow-sm transition-colors ${
+                    className={`group relative  border px-3 py-2 text-sm  transition-colors ${
                       isSelected
                         ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
                         : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-50'
@@ -576,7 +576,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
                     <span className="max-w-[12rem] truncate">{m.model_name}</span>
 
                     {/* Hover tooltip */}
-                    <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+                    <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
                       {tooltip}
                     </span>
                   </button>
@@ -642,14 +642,14 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
             disabled={disabled}
             required={required}
             placeholder="e.g., Chevrolet, Ford, Toyota"
-            className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${selectedMake?.logo_url ? 'pl-9' : ''}`}
+            className={`block w-full  border-gray-300  focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${selectedMake?.logo_url ? 'pl-9' : ''}`}
           />
           
           {/* Make Suggestions Dropdown */}
           {showMakeSuggestions && makeSuggestions.length > 0 && (
             <div
               ref={makeSuggestionsRef}
-              className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
+              className="absolute z-50 mt-1 w-full bg-white border border-gray-300 max-h-60 overflow-auto"
             >
               {makeSuggestions.map((make) => (
                 <button
@@ -683,7 +683,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
           )}
 
           {showMakeSuggestions && makeSuggestions.length === 0 && (
-            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg p-3 text-xs text-gray-500 dark:text-gray-400">
+            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 p-3 text-xs text-gray-500 dark:text-gray-400">
               {loadingMakes ? 'Loading makes…' : 'No makes found.'}
             </div>
           )}
@@ -712,14 +712,14 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
             disabled={disabled || !makeQuery.trim()}
             required={required}
             placeholder={selectedMake ? "e.g., Suburban, Corvette, F-150" : "Select make (or type one) first"}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100 disabled:text-gray-500 dark:text-gray-400"
+            className="block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100 disabled:text-gray-500 dark:text-gray-400"
           />
           
           {/* Model Suggestions Dropdown */}
           {showModelSuggestions && modelSuggestions.length > 0 && (
             <div
               ref={modelSuggestionsRef}
-              className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
+              className="absolute z-50 mt-1 w-full bg-white border border-gray-300 max-h-60 overflow-auto"
             >
               {modelSuggestions.map((model) => (
                 <button
@@ -754,7 +754,7 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
           )}
 
           {showModelSuggestions && modelSuggestions.length === 0 && selectedMake && (
-            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg p-3 text-xs text-gray-500 dark:text-gray-400">
+            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 p-3 text-xs text-gray-500 dark:text-gray-400">
               {loadingModels ? 'Loading models…' : 'No models found for this make.'}
             </div>
           )}

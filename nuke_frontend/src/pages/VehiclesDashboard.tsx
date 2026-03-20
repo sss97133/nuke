@@ -76,9 +76,7 @@ const EmptyDashboard: React.FC = () => (
         fontWeight: 600,
         background: 'var(--primary)',
         color: 'var(--bg)',
-        textDecoration: 'none',
-        borderRadius: '4px'
-      }}
+        textDecoration: 'none'}}
     >
       + Add Vehicle
     </Link>
@@ -159,9 +157,7 @@ const VehiclesDashboard: React.FC = () => {
             fontWeight: 600,
             background: 'var(--primary)',
             color: 'var(--bg)',
-            textDecoration: 'none',
-            borderRadius: '4px'
-          }}
+            textDecoration: 'none'}}
         >
           Sign In
         </Link>
@@ -200,9 +196,7 @@ const VehiclesDashboard: React.FC = () => {
               fontWeight: 600,
               background: 'var(--surface)',
               border: '1px solid var(--error)',
-              color: 'var(--error)',
-              borderRadius: '2px',
-              cursor: 'pointer'
+              color: 'var(--error)', cursor: 'pointer'
             }}
           >
             Retry
@@ -251,9 +245,7 @@ const VehiclesDashboard: React.FC = () => {
               background: 'var(--surface-hover)',
               color: 'var(--text-muted)',
               textDecoration: 'none',
-              border: '1px solid var(--border)',
-              borderRadius: '2px'
-            }}
+              border: '1px solid var(--border)'}}
           >
             From my photos
           </Link>
@@ -266,9 +258,7 @@ const VehiclesDashboard: React.FC = () => {
               background: 'var(--surface-hover)',
               color: 'var(--text-muted)',
               textDecoration: 'none',
-              border: '1px solid var(--border)',
-              borderRadius: '2px'
-            }}
+              border: '1px solid var(--border)'}}
           >
             Legacy View
           </Link>
@@ -281,9 +271,7 @@ const VehiclesDashboard: React.FC = () => {
               fontWeight: 600,
               background: 'var(--surface-hover)',
               color: 'var(--text-muted)',
-              border: '1px solid var(--border)',
-              borderRadius: '2px',
-              cursor: 'pointer'
+              border: '1px solid var(--border)', cursor: 'pointer'
             }}
           >
             Refresh

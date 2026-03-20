@@ -724,13 +724,9 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       <div 
         style={{
           background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: '8px',
-          minWidth: '700px',
+          border: '1px solid var(--border)', minWidth: '700px',
           maxWidth: '900px',
-          fontFamily: 'Arial, sans-serif',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.25)'
-        }}
+          fontFamily: 'Arial, sans-serif'}}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -860,9 +856,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                     <span
                       style={{
                         width: 14,
-                        height: 14,
-                        borderRadius: 999,
-                        border: '1px solid var(--border)',
+                        height: 14, border: '1px solid var(--border)',
                         background: 'var(--surface)',
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -918,9 +912,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                     <div
                       key={a.url}
                       style={{
-                        border: '1px solid var(--border)',
-                        borderRadius: 8,
-                        background: 'var(--bg)',
+                        border: '1px solid var(--border)', background: 'var(--bg)',
                         padding: '8px 10px',
                       }}
                     >
@@ -1060,9 +1052,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                         color: 'var(--text)',
                         textDecoration: 'none',
                         cursor: 'pointer',
-                        padding: '2px 8px',
-                        borderRadius: '3px',
-                        background: 'var(--grey-100)',
+                        padding: '2px 8px', background: 'var(--grey-100)',
                         border: '1px solid var(--border)',
                         fontWeight: 600,
                         transition: 'background 0.2s'
@@ -1091,9 +1081,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                         color: 'var(--text)',
                         textDecoration: 'none',
                         cursor: 'pointer',
-                        padding: '2px 8px',
-                        borderRadius: '3px',
-                        background: 'var(--grey-100)',
+                        padding: '2px 8px', background: 'var(--grey-100)',
                         border: '1px solid var(--border)',
                         fontWeight: 600,
                         transition: 'background 0.2s'
@@ -1122,9 +1110,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                         color: 'var(--text)',
                         textDecoration: 'none',
                         cursor: 'pointer',
-                        padding: '2px 8px',
-                        borderRadius: '3px',
-                        background: 'var(--grey-100)',
+                        padding: '2px 8px', background: 'var(--grey-100)',
                         border: '1px solid var(--border)',
                         fontWeight: 600,
                         transition: 'background 0.2s'
@@ -1164,12 +1150,8 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                 <span
                   style={{
                     width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: 'var(--success)',
-                    animation: 'pulse 1.5s ease-in-out infinite',
-                    boxShadow: '0 0 6px var(--success)',
-                  }}
+                    height: '8px', background: 'var(--success)',
+                    animation: 'pulse 1.5s ease-in-out infinite', }}
                 />
                 Live Auction Activity
               </div>
@@ -1181,9 +1163,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                   marginBottom: '8px',
                   padding: '6px 10px',
                   background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  display: 'flex',
+                  border: '1px solid var(--border)', display: 'flex',
                   alignItems: 'center',
                   gap: '8px'
                 }}>
@@ -1195,9 +1175,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
               {/* Recent bids */}
               {recentBids.length > 0 && (
                 <div style={{
-                  background: 'var(--grey-100)',
-                  borderRadius: '4px',
-                  padding: '8px',
+                  background: 'var(--grey-100)', padding: '8px',
                   maxHeight: '180px',
                   overflowY: 'auto'
                 }}>
@@ -1220,9 +1198,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                         <span
                           style={{
                             width: 18,
-                            height: 18,
-                            borderRadius: 999,
-                            background: idx === 0 ? 'var(--primary)' : 'var(--surface)',
+                            height: 18, background: idx === 0 ? 'var(--primary)' : 'var(--surface)',
                             border: '1px solid var(--border)',
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -1305,9 +1281,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             <div style={{
               padding: '12px',
               background: 'var(--warning-dim)',
-              border: '1px solid var(--warning)',
-              borderRadius: '4px',
-              marginBottom: '16px'
+              border: '1px solid var(--warning)', marginBottom: '16px'
             }}>
               <div style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--warning)', marginBottom: '4px' }}>
                 NO EVIDENCE FOUND

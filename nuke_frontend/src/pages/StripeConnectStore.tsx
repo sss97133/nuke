@@ -51,9 +51,7 @@ function fmtPrice(cents: number | null | undefined, currency = 'usd') {
 
 const cardStyle: React.CSSProperties = {
   background: 'var(--surface)',
-  border: '1px solid var(--border)',
-  borderRadius: '8px',
-  padding: '20px',
+  border: '1px solid var(--border)', padding: '20px',
   display: 'flex',
   flexDirection: 'column',
   gap: '12px',
@@ -63,9 +61,7 @@ const btnPrimary: React.CSSProperties = {
   padding: '10px 20px',
   background: 'var(--primary)',
   color: '#fff',
-  border: 'none',
-  borderRadius: '4px',
-  fontSize: '14px',
+  border: 'none', fontSize: '14px',
   fontWeight: 600,
   cursor: 'pointer',
   width: '100%',
@@ -119,9 +115,7 @@ export default function StripeConnectStore() {
         <div
           style={{
             background: '#d4edda',
-            border: '1px solid #c3e6cb',
-            borderRadius: '6px',
-            padding: '16px 20px',
+            border: '1px solid #c3e6cb', padding: '16px 20px',
             marginBottom: '24px',
             color: '#155724',
             fontWeight: 600,
@@ -145,9 +139,7 @@ export default function StripeConnectStore() {
         <div
           style={{
             background: '#fdecea',
-            border: '1px solid #f5c6cb',
-            borderRadius: '6px',
-            padding: '12px 16px',
+            border: '1px solid #f5c6cb', padding: '12px 16px',
             color: '#721c24',
             fontSize: '13px',
           }}
@@ -164,9 +156,7 @@ export default function StripeConnectStore() {
         <div
           style={{
             background: '#fdecea',
-            border: '1px solid #f5c6cb',
-            borderRadius: '6px',
-            padding: '12px 16px',
+            border: '1px solid #f5c6cb', padding: '12px 16px',
             color: '#721c24',
             fontSize: '13px',
             marginBottom: '16px',

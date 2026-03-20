@@ -277,9 +277,7 @@ export default function TechCapture() {
             fontFamily: 'monospace',
             fontWeight: 700,
             fontSize: '0.9rem',
-            textDecoration: 'none',
-            borderRadius: '0.5rem',
-          }}
+            textDecoration: 'none', }}
         >
           Sign In
         </a>
@@ -330,9 +328,7 @@ export default function TechCapture() {
             width: '100%',
             padding: '0.75rem',
             backgroundColor: 'var(--text)',
-            border: '1px solid var(--surface)',
-            borderRadius: '0.5rem',
-            color: 'var(--border)',
+            border: '1px solid var(--surface)', color: 'var(--border)',
             fontSize: '0.95rem',
             fontFamily: 'monospace',
             appearance: 'auto',
@@ -372,9 +368,7 @@ export default function TechCapture() {
           disabled={isUploading}
           style={{
             width: '180px',
-            height: '180px',
-            borderRadius: '50%',
-            border: isUploading ? '3px solid var(--warning)' : '3px solid var(--border)',
+            height: '180px', border: isUploading ? '3px solid var(--warning)' : '3px solid var(--border)',
             backgroundColor: isUploading ? 'var(--text)' : 'transparent',
             color: isUploading ? 'var(--warning)' : 'var(--border)',
             fontSize: '1rem',
@@ -437,18 +431,14 @@ export default function TechCapture() {
                   alt=""
                   style={{
                     width: '40px',
-                    height: '40px',
-                    borderRadius: '0.25rem',
-                    objectFit: 'cover',
+                    height: '40px', objectFit: 'cover',
                     opacity: event.status === 'failed' ? 0.4 : 1,
                   }}
                 />
               ) : (
                 <div style={{
                   width: '40px',
-                  height: '40px',
-                  borderRadius: '0.25rem',
-                  backgroundColor: 'var(--text)',
+                  height: '40px', backgroundColor: 'var(--text)',
                 }} />
               )}
 

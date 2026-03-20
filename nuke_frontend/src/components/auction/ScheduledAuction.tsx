@@ -300,11 +300,11 @@ export const ScheduledAuction: React.FC<ScheduledAuctionProps> = ({
 
   if (loading) {
     return (
-      <div className="bg-gray-950 rounded-xl p-6">
+      <div className="bg-gray-950 p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-gray-800 rounded w-2/3"></div>
-          <div className="h-24 bg-gray-800 rounded"></div>
-          <div className="h-48 bg-gray-800 rounded"></div>
+          <div className="h-6 bg-gray-800 w-2/3"></div>
+          <div className="h-24 bg-gray-800"></div>
+          <div className="h-48 bg-gray-800"></div>
         </div>
       </div>
     );
@@ -312,7 +312,7 @@ export const ScheduledAuction: React.FC<ScheduledAuctionProps> = ({
 
   if (!auction) {
     return (
-      <div className="bg-gray-950 rounded-xl p-6">
+      <div className="bg-gray-950 p-6">
         <p className="text-red-400">Auction not found</p>
       </div>
     );
@@ -324,7 +324,7 @@ export const ScheduledAuction: React.FC<ScheduledAuctionProps> = ({
   const canBid = isActive && userId && auction.seller_id !== userId;
 
   return (
-    <div className="bg-gray-950 rounded-xl overflow-hidden">
+    <div className="bg-gray-950 overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-4 border-b border-gray-700">
         <div className="flex items-center justify-between">
@@ -339,7 +339,7 @@ export const ScheduledAuction: React.FC<ScheduledAuctionProps> = ({
 
           {/* Status Badge */}
           <div
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
+            className={`px-3 py-1  text-sm font-medium ${
               auction.status === 'active' || auction.status === 'extended'
                 ? 'bg-green-900/50 text-green-400 border border-green-700'
                 : auction.status === 'settled'
@@ -408,7 +408,7 @@ export const ScheduledAuction: React.FC<ScheduledAuctionProps> = ({
       <div className="p-6 space-y-6">
         {/* Price Info */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <div className="bg-gray-900 rounded-lg p-4">
+          <div className="bg-gray-900 p-4">
             <p className="text-xs text-gray-400 uppercase">Starting Price</p>
             <p className="text-lg font-semibold text-white">
               {formatCurrency(auction.starting_price)}
@@ -416,7 +416,7 @@ export const ScheduledAuction: React.FC<ScheduledAuctionProps> = ({
           </div>
 
           {auction.reserve_price && (
-            <div className="bg-gray-900 rounded-lg p-4">
+            <div className="bg-gray-900 p-4">
               <p className="text-xs text-gray-400 uppercase">Reserve</p>
               <p className="text-lg font-semibold text-yellow-400">
                 {bidStack?.reserve_met ? '✓ Met' : 'Not Met'}
@@ -425,7 +425,7 @@ export const ScheduledAuction: React.FC<ScheduledAuctionProps> = ({
           )}
 
           {auction.buy_now_price && isActive && (
-            <div className="bg-gray-900 rounded-lg p-4">
+            <div className="bg-gray-900 p-4">
               <p className="text-xs text-gray-400 uppercase">Buy Now</p>
               <p className="text-lg font-semibold text-green-400">
                 {formatCurrency(auction.buy_now_price)}
@@ -436,7 +436,7 @@ export const ScheduledAuction: React.FC<ScheduledAuctionProps> = ({
 
         {/* Schedule Info (for preview) */}
         {isPreview && (
-          <div className="bg-gray-900 rounded-lg p-4">
+          <div className="bg-gray-900 p-4">
             <h4 className="text-sm font-medium text-gray-300 mb-3">Auction Schedule</h4>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -469,7 +469,7 @@ export const ScheduledAuction: React.FC<ScheduledAuctionProps> = ({
         {/* Bid Form Modal */}
         {showBidForm && canBid && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-            <div className="bg-gray-900 rounded-xl p-6 max-w-md w-full mx-4">
+            <div className="bg-gray-900 p-6 max-w-md w-full mx-4">
               <h3 className="text-lg font-semibold text-white mb-4">
                 {userBidId ? 'Update Your Bid' : 'Place Committed Bid'}
               </h3>
@@ -485,7 +485,7 @@ export const ScheduledAuction: React.FC<ScheduledAuctionProps> = ({
                     onChange={(e) => setBidAmount(e.target.value)}
                     min={auction.starting_price / 100}
                     step="0.01"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-gray-800 border border-gray-700 px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder={`Min: ${formatCurrency(auction.starting_price)}`}
                     autoFocus
                   />
@@ -502,7 +502,7 @@ export const ScheduledAuction: React.FC<ScheduledAuctionProps> = ({
                       onChange={(e) => setSharesRequested(parseInt(e.target.value) || 1)}
                       min={1}
                       max={auction.shares_offered}
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-gray-800 border border-gray-700 px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 )}
@@ -522,14 +522,14 @@ export const ScheduledAuction: React.FC<ScheduledAuctionProps> = ({
                       setShowBidForm(false);
                       setError(null);
                     }}
-                    className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                    className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white transition-colors"
                     disabled={submitting}
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handlePlaceBid}
-                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-50"
                     disabled={submitting || !bidAmount}
                   >
                     {submitting ? 'Placing...' : 'Place Bid'}
@@ -554,7 +554,7 @@ export const ScheduledAuction: React.FC<ScheduledAuctionProps> = ({
         {(auction.description || auction.terms) && (
           <div className="space-y-4">
             {auction.description && (
-              <div className="bg-gray-900 rounded-lg p-4">
+              <div className="bg-gray-900 p-4">
                 <h4 className="text-sm font-medium text-gray-300 mb-2">Description</h4>
                 <p className="text-sm text-gray-400 whitespace-pre-wrap">
                   {auction.description}
@@ -563,7 +563,7 @@ export const ScheduledAuction: React.FC<ScheduledAuctionProps> = ({
             )}
 
             {auction.terms && (
-              <div className="bg-gray-900 rounded-lg p-4">
+              <div className="bg-gray-900 p-4">
                 <h4 className="text-sm font-medium text-gray-300 mb-2">Terms & Conditions</h4>
                 <p className="text-xs text-gray-500 whitespace-pre-wrap">
                   {auction.terms}

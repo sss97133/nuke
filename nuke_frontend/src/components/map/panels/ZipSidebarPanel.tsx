@@ -142,7 +142,7 @@ export default function ZipSidebarPanel({ zip, onClose, onNavigate }: Props) {
                     id: 'listings',
                     label: 'Listings',
                     data: monthlyData,
-                    color: '#4ade80',
+                    color: 'var(--success)',
                     showArea: true,
                   }]}
                   width={280}

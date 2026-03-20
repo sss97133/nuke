@@ -82,9 +82,7 @@ export const ProfileBidsTab: React.FC<ProfileBidsTabProps> = ({ bids, profileTyp
               gap: 'var(--space-3)',
               padding: 'var(--space-3)',
               background: isWinner ? 'var(--success-light)' : 'var(--surface)',
-              border: `1px solid ${isWinner ? 'var(--success)' : 'var(--border)'}`,
-              borderRadius: '4px',
-              transition: 'all 0.12s ease',
+              border: `1px solid ${isWinner ? 'var(--success)' : 'var(--border)'}`, transition: 'all 0.12s ease',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = isWinner ? 'var(--success-light)' : 'var(--surface-hover)';
@@ -159,9 +157,7 @@ export const ProfileBidsTab: React.FC<ProfileBidsTabProps> = ({ bids, profileTyp
                     fontSize: '9px',
                     padding: '2px 6px',
                     background: 'var(--success)',
-                    color: 'var(--white)',
-                    borderRadius: '2px',
-                    fontWeight: 'bold',
+                    color: 'var(--white)', fontWeight: 'bold',
                   }}>
                     Winner
                   </span>

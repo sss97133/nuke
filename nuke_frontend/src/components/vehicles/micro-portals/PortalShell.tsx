@@ -61,9 +61,7 @@ export default function PortalShell({
             width: '12px',
             height: '12px',
             border: '2px solid var(--border)',
-            borderTopColor: 'var(--primary, #3b82f6)',
-            borderRadius: '50%',
-            animation: 'spin 0.6s linear infinite',
+            borderTopColor: 'var(--primary, #3b82f6)', animation: 'spin 0.6s linear infinite',
           }} />
           Loading...
         </div>
@@ -73,11 +71,9 @@ export default function PortalShell({
       {!isLoading && error && (
         <div style={{
           padding: '8px',
-          background: '#fef2f2',
-          border: '1px solid #fecaca',
-          borderRadius: '4px',
-          fontSize: '11px',
-          color: '#dc2626',
+          background: 'var(--error-dim)',
+          border: '1px solid #fecaca', fontSize: '11px',
+          color: 'var(--error)',
         }}>
           {error}
         </div>

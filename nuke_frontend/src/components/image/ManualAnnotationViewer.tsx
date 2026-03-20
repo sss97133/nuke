@@ -74,7 +74,7 @@ export const ManualAnnotationViewer: React.FC<ManualAnnotationViewerProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col m-4">
+      <div className="bg-white w-full max-w-6xl max-h-[90vh] flex flex-col m-4">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-xl font-semibold">Manual References</h2>
@@ -95,7 +95,7 @@ export const ManualAnnotationViewer: React.FC<ManualAnnotationViewerProps> = ({
             )}
 
             {error && (
-              <div className="text-red-500 text-sm p-4 bg-red-50 rounded">
+              <div className="text-red-500 text-sm p-4 bg-red-50">
                 {error}
               </div>
             )}
@@ -116,7 +116,7 @@ export const ManualAnnotationViewer: React.FC<ManualAnnotationViewerProps> = ({
                   <div
                     key={`${page.manual_id}-${page.page_number || idx}`}
                     onClick={() => setSelectedPage(page)}
-                    className={`p-3 rounded border cursor-pointer transition-colors ${
+                    className={`p-3  border cursor-pointer transition-colors ${
                       selectedPage?.manual_id === page.manual_id &&
                       selectedPage?.page_number === page.page_number
                         ? 'border-blue-500 bg-blue-50'
@@ -191,7 +191,7 @@ export const ManualAnnotationViewer: React.FC<ManualAnnotationViewerProps> = ({
                       <img
                         src={selectedPage.diagram_image_url}
                         alt={selectedPage.section_title || 'Manual diagram'}
-                        className="max-w-full max-h-full object-contain shadow-lg"
+                        className="max-w-full max-h-full object-contain"
                       />
                     </div>
                   ) : selectedPage.manual_url ? (
@@ -209,7 +209,7 @@ export const ManualAnnotationViewer: React.FC<ManualAnnotationViewerProps> = ({
                             href={selectedPage.manual_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                            className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700"
                           >
                             Open Manual
                           </a>
@@ -239,7 +239,7 @@ export const ManualAnnotationViewer: React.FC<ManualAnnotationViewerProps> = ({
                     {/* Future: "Buy Replacement Part" button */}
                     {selectedPage.part_name && (
                       <button
-                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+                        className="px-4 py-2 bg-green-600 text-white hover:bg-green-700 text-sm"
                         onClick={() => {
                           // TODO: Open parts marketplace modal
                           console.log('Buy part:', selectedPage.part_name);
@@ -252,7 +252,7 @@ export const ManualAnnotationViewer: React.FC<ManualAnnotationViewerProps> = ({
                       href={selectedPage.manual_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                      className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 text-sm"
                     >
                       Open Full Manual
                     </a>

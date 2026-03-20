@@ -226,9 +226,7 @@ export default function VehicleCritiqueMode({
       padding: '12px',
       zIndex: 1000,
       maxHeight: '400px',
-      overflowY: 'auto',
-      boxShadow: '2px 2px 8px color-mix(in srgb, var(--text) 20%, transparent)'
-    }}>
+      overflowY: 'auto'}}>
       <form onSubmit={handleSubmit}>
         <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' }}>
           Vehicle Critique & Business Impact
@@ -254,7 +252,7 @@ export default function VehicleCritiqueMode({
             style={{
               width: '100%',
               fontSize: '11px',
-              fontFamily: '"MS Sans Serif", sans-serif',
+              fontFamily: 'Arial, sans-serif',
               border: '1px solid var(--border)',
               padding: '2px'
             }}
@@ -277,7 +275,7 @@ export default function VehicleCritiqueMode({
             style={{
               width: '100%',
               fontSize: '11px',
-              fontFamily: '"MS Sans Serif", sans-serif',
+              fontFamily: 'Arial, sans-serif',
               border: '1px solid var(--border)',
               padding: '2px'
             }}
@@ -301,7 +299,7 @@ export default function VehicleCritiqueMode({
             style={{
               width: '100%',
               fontSize: '11px',
-              fontFamily: '"MS Sans Serif", sans-serif',
+              fontFamily: 'Arial, sans-serif',
               border: '1px solid var(--border)',
               padding: '2px'
             }}
@@ -379,7 +377,7 @@ export default function VehicleCritiqueMode({
             style={{
               width: '100%',
               fontSize: '11px',
-              fontFamily: '"MS Sans Serif", sans-serif',
+              fontFamily: 'Arial, sans-serif',
               border: '1px solid var(--border)',
               padding: '4px',
               resize: 'vertical'

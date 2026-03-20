@@ -121,7 +121,7 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
           table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 10pt; }
           th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
           th { background: #f0f0f0; font-weight: bold; }
-          code { font-family: 'SF Mono', 'Cascadia Code', monospace; font-size: 9pt; background: #f5f5f5; padding: 1px 4px; }
+          code { font-family: 'Courier New', monospace; font-size: 9pt; background: #f5f5f5; padding: 1px 4px; }
           pre { background: #f5f5f5; padding: 12px; font-size: 9pt; overflow-x: auto; border: 1px solid #ddd; }
           hr { border: none; border-top: 1px solid #ccc; margin: 20px 0; }
           .header-stamp {
@@ -239,13 +239,13 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
     code: ({ children, className }: { children?: React.ReactNode; className?: string }) => {
       if (className?.includes('language-')) {
         return (
-          <pre style={{ background: 'var(--grey-100)', border: '1px solid var(--border-light)', padding: 'var(--space-4)', fontSize: '11px', fontFamily: "'SF Mono', monospace", overflowX: 'auto', lineHeight: '1.5', marginBottom: 'var(--space-4)' }}>
+          <pre style={{ background: 'var(--grey-100)', border: '1px solid var(--border-light)', padding: 'var(--space-4)', fontSize: '11px', fontFamily: "'Courier New', monospace", overflowX: 'auto', lineHeight: '1.5', marginBottom: 'var(--space-4)' }}>
             <code>{children}</code>
           </pre>
         );
       }
       return (
-        <code style={{ background: 'var(--grey-100)', padding: '1px 4px', fontSize: '11px', fontFamily: "'SF Mono', monospace", border: '1px solid var(--border-light)' }}>{children}</code>
+        <code style={{ background: 'var(--grey-100)', padding: '1px 4px', fontSize: '11px', fontFamily: "'Courier New', monospace", border: '1px solid var(--border-light)' }}>{children}</code>
       );
     },
     pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,

@@ -6,17 +6,17 @@ import { SmartInvoiceUploader } from '../SmartInvoiceUploader';
 import CitationModal from '../valuation/CitationModal';
 
 const COLOR_PALETTE = [
-  '#0EA5E9',
+  'var(--info)',
   '#6366F1',
   '#22D3EE',
-  '#34D399',
-  '#FBBF24',
+  'var(--success)',
+  'var(--warning)',
   '#F472B6',
   '#FB7185',
   '#C084FC',
-  '#60A5FA',
+  'var(--info)',
   '#14B8A6',
-  '#F97316',
+  'var(--orange)',
   '#94A3B8'
 ] as const;
 
@@ -426,7 +426,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                 display: 'flex',
                 gap: '6px',
                 padding: '4px',
-                borderRadius: '999px',
+                borderRadius: 0,
                 border: '1px solid var(--border)'
               }}
             >
@@ -437,7 +437,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                   style={{
                     fontSize: '10px',
                     padding: '4px 10px',
-                    borderRadius: '999px',
+                    borderRadius: 0,
                     backgroundColor: chartMode === mode ? 'var(--text)' : 'transparent',
                     color: chartMode === mode ? 'var(--surface)' : 'var(--text)'
                   }}
@@ -465,7 +465,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                 padding: '24px',
                 textAlign: 'center',
                 border: '1px dashed var(--border)',
-                borderRadius: '8px',
+                borderRadius: 0,
                 color: 'var(--text-muted)'
               }}
             >
@@ -563,7 +563,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                         key={stat.label}
                         style={{
                           border: '1px solid var(--border)',
-                          borderRadius: '8px',
+                          borderRadius: 0,
                           padding: '12px',
                           textAlign: 'left'
                         }}
@@ -586,7 +586,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                       style={{
                         padding: '12px',
                         border: '1px solid var(--border)',
-                        borderRadius: '8px',
+                        borderRadius: 0,
                         background: 'var(--surface)',
                         fontSize: '11px',
                         whiteSpace: 'pre-wrap'
@@ -600,7 +600,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                     <div
                       style={{
                         padding: '12px',
-                        borderRadius: '8px',
+                        borderRadius: 0,
                         border: '1px solid var(--warning)',
                         background: 'var(--warning-dim)',
                         fontSize: '11px'
@@ -643,7 +643,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                         key={segment.id}
                         style={{
                           border: '1px solid var(--border)',
-                          borderRadius: '8px',
+                          borderRadius: 0,
                           padding: '12px',
                           background:
                             hoveredSegment && hoveredSegment === segment.id
@@ -756,7 +756,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                                   style={{
                                     width: '100%',
                                     paddingBottom: '100%',
-                                    borderRadius: '4px',
+                                    borderRadius: 0,
                                     border: '1px solid var(--border)',
                                     background: `url(${url}) center/cover`,
                                     cursor: 'pointer'
@@ -779,7 +779,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                     marginTop: '24px',
                     padding: '12px',
                     border: '1px solid var(--border)',
-                    borderRadius: '8px',
+                    borderRadius: 0,
                     background: 'var(--grey-50)',
                     fontSize: '11px'
                   }}
@@ -958,7 +958,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
               style={{ 
                 marginBottom: '8px',
                 border: '1px solid var(--border)',
-                borderRadius: '2px',
+                borderRadius: 0,
                 overflow: 'hidden'
               }}
             >
@@ -1006,7 +1006,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                     item.evidence.photoCount > 0 ? 'var(--warning)' :
                     'var(--error)'
                   ),
-                  borderRadius: '2px'
+                  borderRadius: 0
                 }}>
                   {item.evidence.photoCount} {item.evidence.photoCount === 1 ? 'photo' : 'photos'}
                 </div>
@@ -1066,7 +1066,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
         }}>
           <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Documentation Quality</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ flex: 1, background: 'var(--grey-300)', height: '20px', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{ flex: 1, background: 'var(--grey-300)', height: '20px', borderRadius: 0, overflow: 'hidden' }}>
               <div style={{ 
                 width: `${valuation.documentationScore}%`, 
                 height: '100%',

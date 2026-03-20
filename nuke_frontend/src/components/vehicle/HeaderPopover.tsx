@@ -76,12 +76,8 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
             right: 0,
             zIndex: 1000,
             background: 'var(--bg)',
-            borderTop: '2px solid var(--border)',
-            borderRadius: '12px 12px 0 0',
-            maxHeight: '70vh',
-            overflowY: 'auto',
-            boxShadow: '0 -4px 24px rgba(0,0,0,0.3)',
-          }}
+            borderTop: '2px solid var(--border)', maxHeight: '70vh',
+            overflowY: 'auto', }}
           onClick={(e) => e.stopPropagation()}
         >
           <div
@@ -133,9 +129,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
         marginTop: 4,
         zIndex: 1000,
         background: 'var(--bg)',
-        border: '2px solid var(--border)',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-        width,
+        border: '2px solid var(--border)', width,
         ...alignStyle,
       }}
       onClick={(e) => e.stopPropagation()}

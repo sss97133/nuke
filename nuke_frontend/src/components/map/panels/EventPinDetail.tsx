@@ -111,8 +111,7 @@ export default function EventPinDetail({ event, onBack, onViewVehicle }: Props) 
             display: 'block', width: '100%', textAlign: 'center', padding: '10px',
             background: 'transparent', color: colorStr, cursor: 'pointer',
             fontWeight: 700, fontSize: 10, fontFamily: MAP_FONT,
-            border: `1px solid ${colorStr}`, borderRadius: 0,
-            textTransform: 'uppercase', letterSpacing: '0.5px',
+            border: `1px solid ${colorStr}`, textTransform: 'uppercase', letterSpacing: '0.5px',
           }}
         >
           VIEW VEHICLE

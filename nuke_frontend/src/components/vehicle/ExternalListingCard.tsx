@@ -33,9 +33,9 @@ const platformNames: Record<string, string> = {
 
 const platformColors: Record<string, string> = {
   bat: '#1e40af',  // BaT blue
-  cars_and_bids: '#dc2626',
+  cars_and_bids: 'var(--error)',
   ebay_motors: '#e53e3e',
-  hemmings: '#059669',
+  hemmings: 'var(--success)',
   autotrader: '#7c3aed',
   facebook_marketplace: '#1877f2'
 };
@@ -184,9 +184,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
               style={{
                 padding: '12px',
                 marginBottom: '12px',
-                border: '2px solid var(--border)',
-                borderRadius: '4px',
-                background: isActive ? 'var(--surface-hover)' : 'var(--surface)'
+                border: '2px solid var(--border)', background: isActive ? 'var(--surface-hover)' : 'var(--surface)'
               }}
             >
               {/* Platform Header */}
@@ -195,9 +193,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                   <div style={{
                     padding: '4px 8px',
                     background: platformColor,
-                    color: '#fff',
-                    borderRadius: '2px',
-                    fontSize: '11px',
+                    color: '#fff', fontSize: '11px',
                     fontWeight: 700
                   }}>
                     {platformName.toUpperCase()}
@@ -205,9 +201,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                   <div style={{
                     padding: '4px 8px',
                     background: isActive ? 'var(--accent)' : isSold ? 'var(--success)' : 'var(--text-secondary)',
-                    color: '#fff',
-                    borderRadius: '2px',
-                    fontSize: '11px',
+                    color: '#fff', fontSize: '11px',
                     fontWeight: 700
                   }}>
                     {listing.event_status.toUpperCase().replace('_', ' ')}
@@ -216,9 +210,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                     <div style={{
                       padding: '4px 8px',
                       background: 'var(--warning)',
-                      color: '#fff',
-                      borderRadius: '2px',
-                      fontSize: '11px',
+                      color: '#fff', fontSize: '11px',
                       fontWeight: 700
                     }}>
                       RESERVE NOT MET
@@ -335,9 +327,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                   marginTop: '12px',
                   padding: '8px',
                   background: 'var(--warning-dim)',
-                  border: '1px solid var(--warning)',
-                  borderRadius: '4px',
-                  fontSize: '11px'
+                  border: '1px solid var(--warning)', fontSize: '11px'
                 }}>
                   This vehicle did not meet its reserve price on {platformName}. It may be available for direct purchase.
                 </div>
@@ -356,9 +346,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                         style={{
                           padding: '2px 6px',
                           background: 'var(--surface-hover)',
-                          border: '1px solid var(--border)',
-                          borderRadius: '2px',
-                          fontSize: '9px'
+                          border: '1px solid var(--border)', fontSize: '9px'
                         }}
                       >
                         {feature}
@@ -376,9 +364,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
           marginTop: '16px',
           padding: '12px',
           background: 'var(--accent-dim)',
-          border: '1px solid var(--border)',
-          borderRadius: '4px',
-          fontSize: '11px',
+          border: '1px solid var(--border)', fontSize: '11px',
           color: 'var(--text-secondary)'
         }}>
           <div style={{ fontWeight: 600, marginBottom: '4px' }}>Fair Play Policy:</div>

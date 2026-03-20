@@ -158,9 +158,7 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
               <div
                 key={item.id}
                 style={{
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  overflow: 'hidden',
+                  border: '1px solid var(--border)', overflow: 'hidden',
                   background: 'var(--white)',
                   transition: '0.12s',
                   cursor: 'pointer'
@@ -184,9 +182,7 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
                       left: '8px',
                       background: 'rgba(0,0,0,0.7)',
                       color: 'var(--bg)',
-                      padding: '4px 8px',
-                      borderRadius: '2px',
-                      fontSize: '9px',
+                      padding: '4px 8px', fontSize: '9px',
                       fontWeight: 700
                     }}>
                       {itemTypeLabels[item.item_type].toUpperCase()}
@@ -219,9 +215,7 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
                     gap: '8px',
                     marginTop: '8px',
                     padding: '8px',
-                    background: 'var(--surface)',
-                    borderRadius: '2px'
-                  }}>
+                    background: 'var(--surface)'}}>
                     {item.quantity && item.quantity > 1 && (
                       <div>
                         <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Quantity</div>
@@ -264,7 +258,7 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
                       <img
                         src={item.profiles?.avatar_url || '/default-avatar.png'}
                         alt={item.profiles?.full_name}
-                        style={{ width: '20px', height: '20px', borderRadius: '50%' }}
+                        style={{ width: '20px', height: '20px'}}
                       />
                       <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                         Added by {item.profiles?.full_name || item.profiles?.username}
@@ -439,10 +433,7 @@ function AddInventoryItemModal({ organizationId, onClose, onSaved }: AddInventor
           background: 'var(--white)',
           width: '100%',
           maxWidth: '500px',
-          border: '2px solid var(--border)',
-          borderRadius: '4px',
-          boxShadow: 'var(--shadow)',
-          maxHeight: '95vh',
+          border: '2px solid var(--border)', maxHeight: '95vh',
           overflow: 'auto',
           WebkitOverflowScrolling: 'touch'
         }}
@@ -777,10 +768,7 @@ function EditInventoryItemModal({ organizationId, item, onClose, onSaved }: Edit
           background: 'var(--white)',
           width: '100%',
           maxWidth: '500px',
-          border: '2px solid var(--border)',
-          borderRadius: '4px',
-          boxShadow: 'var(--shadow)',
-          maxHeight: '90vh',
+          border: '2px solid var(--border)', maxHeight: '90vh',
           overflow: 'auto'
         }}
       >

@@ -128,7 +128,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search contracts..."
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               />
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -140,9 +140,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                     padding: '8px 16px',
                     border: `2px solid ${filter === f ? 'var(--primary)' : 'var(--border)'}`,
                     background: filter === f ? 'var(--primary)' : 'transparent',
-                    color: filter === f ? 'var(--white)' : 'var(--text)',
-                    borderRadius: '4px',
-                    fontSize: '12px',
+                    color: filter === f ? 'var(--white)' : 'var(--text)', fontSize: '12px',
                     fontWeight: 700,
                     cursor: 'pointer',
                     textTransform: 'uppercase'
@@ -180,8 +178,8 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                 className="card"
                 style={{ cursor: 'pointer', transition: 'transform 0.12s ease, box-shadow 0.12s ease', overflow: 'hidden' }}
                 onClick={() => onSelectContract(contract.id)}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px color-mix(in srgb, var(--text) 12%, transparent)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
                 data-contract-id={contract.id}
                 data-contract-symbol={contract.contract_symbol}
                 data-contract-type={contract.contract_type}
@@ -205,7 +203,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                   }}>
                     {images.slice(0, 6).map((url, i) => (
                       <div key={i} style={{
-                        width: '40px', height: '30px', borderRadius: '3px', overflow: 'hidden',
+                        width: '40px', height: '30px', overflow: 'hidden',
                         border: '1px solid var(--border)', flexShrink: 0,
                       }}>
                         <img
@@ -245,9 +243,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                             padding: '2px 8px',
                             background: contract.status === 'active' ? 'var(--success, #10b981)' :
                                        contract.status === 'draft' ? 'var(--text-muted)' : 'var(--border)',
-                            color: 'var(--white)',
-                            borderRadius: '4px',
-                            fontSize: '9px',
+                            color: 'var(--white)', fontSize: '9px',
                             fontWeight: 700,
                             textTransform: 'uppercase'
                           }}>
@@ -280,7 +276,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                             {contract.curator_credentials?.length > 0 && (
                               <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                 {contract.curator_credentials.map((c: string, i: number) => (
-                                  <span key={i} style={{ padding: '1px 6px', background: 'var(--primary)', color: 'var(--bg)', borderRadius: '3px', fontSize: '9px', fontWeight: 700 }}>{c}</span>
+                                  <span key={i} style={{ padding: '1px 6px', background: 'var(--primary)', color: 'var(--bg)', fontSize: '9px', fontWeight: 700 }}>{c}</span>
                                 ))}
                               </div>
                             )}
@@ -419,9 +415,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                             style={{
                               padding: '2px 8px',
                               background: 'var(--surface)',
-                              border: '1px solid var(--border)',
-                              borderRadius: '4px',
-                              fontSize: '9px',
+                              border: '1px solid var(--border)', fontSize: '9px',
                               color: 'var(--text-muted)',
                               cursor: 'default',
                             }}

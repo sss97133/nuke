@@ -678,9 +678,7 @@ const DealerDropboxImport: React.FC = () => {
                   <div style={{
                     padding: '12px',
                     background: '#fff3cd',
-                    border: '1px solid #ffc107',
-                    borderRadius: '4px',
-                    marginBottom: '12px',
+                    border: '1px solid #ffc107', marginBottom: '12px',
                     fontSize: '12px'
                   }}>
                     Auto-syncing missing images for existing vehicles...
@@ -691,9 +689,7 @@ const DealerDropboxImport: React.FC = () => {
                   <div style={{
                     padding: '16px',
                     background: '#d1ecf1',
-                    border: '1px solid #bee5eb',
-                    borderRadius: '4px',
-                    marginBottom: '20px'
+                    border: '1px solid #bee5eb', marginBottom: '20px'
                   }}>
                     <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>
                       Importing...
@@ -738,9 +734,7 @@ const DealerDropboxImport: React.FC = () => {
                           onClick={() => toggleFolderSelection(folder.path)}
                           style={{
                             padding: '12px',
-                            border: selectedFolders.has(folder.path) ? '2px solid var(--accent)' : '1px solid var(--border)',
-                            borderRadius: '4px',
-                            background: selectedFolders.has(folder.path) ? 'var(--accent-dim)' : 'var(--white)',
+                            border: selectedFolders.has(folder.path) ? '2px solid var(--accent)' : '1px solid var(--border)', background: selectedFolders.has(folder.path) ? 'var(--accent-dim)' : 'var(--white)',
                             cursor: 'pointer',
                             transition: 'all 0.12s ease'
                           }}

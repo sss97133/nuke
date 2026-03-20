@@ -75,9 +75,7 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
         fontSize: '9px',
         padding: '2px 6px',
         background: platformColors[p] || 'var(--text-muted)',
-        color: 'var(--white)',
-        borderRadius: '2px',
-        fontWeight: 'bold',
+        color: 'var(--white)', fontWeight: 'bold',
         textTransform: 'uppercase',
       }}>
         {displayName}
@@ -146,9 +144,7 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
               gap: 'var(--space-3)',
               padding: 'var(--space-3)',
               background: 'var(--surface)',
-              border: '2px solid var(--border)',
-              borderRadius: '4px',
-              transition: 'all 0.12s ease',
+              border: '2px solid var(--border)', transition: 'all 0.12s ease',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'var(--surface-hover)';
@@ -166,9 +162,7 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
               flexShrink: 0, 
               width: '120px', 
               height: '80px',
-              overflow: 'hidden',
-              borderRadius: '4px',
-              border: '2px solid var(--border)',
+              overflow: 'hidden', border: '2px solid var(--border)',
             }}>
               {vehicle?.id ? (
                 <Link 

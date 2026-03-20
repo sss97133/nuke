@@ -162,9 +162,7 @@ export default function VehicleCritiqueManager({
         style={{
           ...styles[status as keyof typeof styles],
           padding: '2px 6px',
-          fontSize: '9px',
-          borderRadius: '2px',
-          textTransform: 'uppercase',
+          fontSize: '9px', textTransform: 'uppercase',
           fontWeight: 'bold'
         }}
       >
@@ -354,9 +352,7 @@ export default function VehicleCritiqueManager({
           padding: '20px'
         }}>
           <div style={{
-            backgroundColor: 'var(--surface)',
-            borderRadius: '8px',
-            maxWidth: '600px',
+            backgroundColor: 'var(--surface)', maxWidth: '600px',
             width: '100%',
             maxHeight: '90vh',
             overflow: 'auto',
@@ -435,9 +431,7 @@ export default function VehicleCritiqueManager({
                     width: '100%',
                     fontSize: '12px',
                     padding: '8px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px'
-                  }}
+                    border: '1px solid var(--border)'}}
                 />
               </div>
 

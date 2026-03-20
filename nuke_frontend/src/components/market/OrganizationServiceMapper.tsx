@@ -160,7 +160,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
       padding: 'var(--space-4)',
       background: 'var(--surface)',
       border: '1px solid var(--border)',
-      borderRadius: '4px',
+      borderRadius: 0,
     }}>
       <h3 style={{ fontSize: '13px', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-3)' }}>
         Organization Service Mapper
@@ -183,7 +183,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
             padding: 'var(--space-2)',
             fontSize: '11px',
             border: '1px solid var(--border)',
-            borderRadius: '4px',
+            borderRadius: 0,
             background: 'var(--surface-hover)',
           }}
         />
@@ -199,7 +199,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
           background: mapping ? 'var(--text-muted)' : 'var(--accent)',
           color: 'var(--white)',
           border: 'none',
-          borderRadius: '4px',
+          borderRadius: 0,
           cursor: mapping ? 'not-allowed' : 'pointer',
           marginBottom: 'var(--space-3)',
           marginRight: 'var(--space-2)',
@@ -217,7 +217,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
           background: 'var(--surface-hover)',
           color: 'var(--text)',
           border: '1px solid var(--border)',
-          borderRadius: '4px',
+          borderRadius: 0,
           cursor: 'pointer',
           marginBottom: 'var(--space-3)',
         }}
@@ -230,7 +230,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
           padding: 'var(--space-2)',
           background: 'var(--danger-light)',
           border: '1px solid var(--danger)',
-          borderRadius: '4px',
+          borderRadius: 0,
           fontSize: '11px',
           color: 'var(--danger)',
           marginBottom: 'var(--space-3)',
@@ -251,7 +251,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
                 padding: 'var(--space-3)',
                 background: 'var(--surface-hover)',
                 border: '1px solid var(--border)',
-                borderRadius: '4px',
+                borderRadius: 0,
                 marginBottom: 'var(--space-2)',
               }}
             >
@@ -265,7 +265,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
                     padding: 'var(--space-1)',
                     fontSize: '11px',
                     border: '1px solid var(--border)',
-                    borderRadius: '4px',
+                    borderRadius: 0,
                     background: 'var(--surface)',
                   }}
                 />
@@ -277,7 +277,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
                     background: 'var(--danger)',
                     color: 'var(--white)',
                     border: 'none',
-                    borderRadius: '4px',
+                    borderRadius: 0,
                     cursor: 'pointer',
                   }}
                 >
@@ -292,7 +292,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
                   padding: 'var(--space-1)',
                   fontSize: '11px',
                   border: '1px solid var(--border)',
-                  borderRadius: '4px',
+                  borderRadius: 0,
                   background: 'var(--surface)',
                   marginBottom: 'var(--space-2)',
                 }}
@@ -324,7 +324,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
                   padding: 'var(--space-1)',
                   fontSize: '11px',
                   border: '1px solid var(--border)',
-                  borderRadius: '4px',
+                  borderRadius: 0,
                   background: 'var(--surface)',
                   marginBottom: 'var(--space-2)',
                   resize: 'vertical',
@@ -343,7 +343,7 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
               background: saving ? 'var(--text-muted)' : 'var(--success)',
               color: 'var(--white)',
               border: 'none',
-              borderRadius: '4px',
+              borderRadius: 0,
               cursor: saving ? 'not-allowed' : 'pointer',
             }}
           >

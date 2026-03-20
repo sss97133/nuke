@@ -17,25 +17,25 @@ export interface DealScoreConfig {
 export const DEAL_SCORE_CONFIG: Record<DealScoreLabel, DealScoreConfig> = {
   plus_3: {
     display: '+++',
-    color: '#059669',
+    color: 'var(--success)',
     colorRgba: 'rgba(5,150,105,0.92)',
     description: 'Significantly below market',
   },
   plus_2: {
     display: '++',
-    color: '#10b981',
+    color: 'var(--success)',
     colorRgba: 'rgba(16,185,129,0.92)',
     description: 'Well below market',
   },
   plus_1: {
     display: '+',
-    color: '#34d399',
+    color: 'var(--success)',
     colorRgba: 'rgba(52,211,153,0.92)',
     description: 'Below market',
   },
   fair: {
     display: 'FAIR',
-    color: '#6b7280',
+    color: 'var(--text-secondary)',
     colorRgba: 'rgba(107,114,128,0.92)',
     description: 'At market',
   },
@@ -47,13 +47,13 @@ export const DEAL_SCORE_CONFIG: Record<DealScoreLabel, DealScoreConfig> = {
   },
   minus_2: {
     display: '\u2212\u2212',
-    color: '#f97316',
+    color: 'var(--orange)',
     colorRgba: 'rgba(249,115,22,0.92)',
     description: 'Well above market',
   },
   minus_3: {
     display: '\u2212\u2212\u2212',
-    color: '#ef4444',
+    color: 'var(--error)',
     colorRgba: 'rgba(239,68,68,0.92)',
     description: 'Significantly above market',
   },

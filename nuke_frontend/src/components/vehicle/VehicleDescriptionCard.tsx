@@ -314,9 +314,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                 width: '100%',
                 fontSize: '12px',
                 padding: '8px',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                resize: 'vertical',
+                border: '1px solid var(--border)', resize: 'vertical',
                 fontFamily: 'inherit'
               }}
             />

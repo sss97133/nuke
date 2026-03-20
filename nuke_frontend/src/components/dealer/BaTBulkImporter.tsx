@@ -193,9 +193,7 @@ const BaTBulkImporter: React.FC<Props> = ({
                 width: '100%',
                 padding: '8px',
                 fontSize: '12px',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                fontFamily: 'monospace'
+                border: '1px solid var(--border)', fontFamily: 'monospace'
               }}
               disabled={importing}
             />
@@ -234,9 +232,7 @@ const BaTBulkImporter: React.FC<Props> = ({
               <div style={{ 
                 width: '100%', 
                 height: '8px', 
-                background: 'var(--background-secondary)', 
-                borderRadius: '4px',
-                overflow: 'hidden'
+                background: 'var(--background-secondary)', overflow: 'hidden'
               }}>
                 <div style={{
                   width: `${(progress.current / progress.total) * 100}%`,
@@ -255,9 +251,7 @@ const BaTBulkImporter: React.FC<Props> = ({
                 gap: '16px', 
                 marginBottom: '12px',
                 padding: '12px',
-                background: 'var(--background-secondary)',
-                borderRadius: '4px'
-              }}>
+                background: 'var(--background-secondary)'}}>
                 <div>
                   <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-success)' }}>
                     ✓ {successCount}
@@ -285,9 +279,7 @@ const BaTBulkImporter: React.FC<Props> = ({
                     style={{
                       padding: '8px',
                       marginBottom: '4px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '4px',
-                      fontSize: '11px',
+                      border: '1px solid var(--border)', fontSize: '11px',
                       background: result.success ? 'rgba(34, 197, 94, 0.05)' : 'rgba(239, 68, 68, 0.05)'
                     }}
                   >
@@ -338,9 +330,7 @@ const BaTBulkImporter: React.FC<Props> = ({
           <div style={{ 
             marginTop: '16px', 
             padding: '12px', 
-            background: 'var(--background-secondary)', 
-            borderRadius: '4px',
-            fontSize: '11px',
+            background: 'var(--background-secondary)', fontSize: '11px',
             color: 'var(--text-muted)'
           }}>
             <div style={{ fontWeight: 600, marginBottom: '4px' }}>What this does:</div>
@@ -354,9 +344,7 @@ const BaTBulkImporter: React.FC<Props> = ({
           <div style={{ 
             marginTop: '12px', 
             padding: '12px', 
-            background: 'rgba(59, 130, 246, 0.1)', 
-            borderRadius: '4px',
-            fontSize: '11px',
+            background: 'rgba(59, 130, 246, 0.1)', fontSize: '11px',
             color: 'var(--text-muted)',
             border: '1px solid rgba(59, 130, 246, 0.3)'
           }}>

@@ -47,19 +47,19 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
 
   const getVerificationColor = (level: string) => {
     switch (level) {
-      case 'expert_verified': return '#f59e0b';
-      case 'business_verified': return '#10b981';
-      case 'phone_verified': return '#3b82f6';
-      case 'email_verified': return '#6b7280';
-      default: return '#9ca3af';
+      case 'expert_verified': return 'var(--warning)';
+      case 'business_verified': return 'var(--success)';
+      case 'phone_verified': return 'var(--info)';
+      case 'email_verified': return 'var(--text-secondary)';
+      default: return 'var(--text-disabled)';
     }
   };
 
   const getTrustLevelColor = (level: number) => {
-    if (level >= 8) return '#f59e0b';
-    if (level >= 5) return '#10b981';
-    if (level >= 3) return '#3b82f6';
-    return '#6b7280';
+    if (level >= 8) return 'var(--warning)';
+    if (level >= 5) return 'var(--success)';
+    if (level >= 3) return 'var(--info)';
+    return 'var(--text-secondary)';
   };
 
   const getSizeStyles = () => {
@@ -77,11 +77,9 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
     return (
       <div style={{
         ...getSizeStyles(),
-        background: 'var(--bg)',
-        borderRadius: '12px',
-        display: 'inline-flex',
+        background: 'var(--bg)', display: 'inline-flex',
         alignItems: 'center',
-        color: '#9ca3af'
+        color: 'var(--text-disabled)'
       }}>
         Loading...
       </div>
@@ -92,11 +90,9 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
     return (
       <div style={{
         ...getSizeStyles(),
-        background: 'var(--bg)',
-        borderRadius: '12px',
-        display: 'inline-flex',
+        background: 'var(--bg)', display: 'inline-flex',
         alignItems: 'center',
-        color: '#9ca3af'
+        color: 'var(--text-disabled)'
       }}>
         👤 New User
       </div>
@@ -109,9 +105,7 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
       <div style={{
         ...getSizeStyles(),
         background: getVerificationColor(userRating.verification_level),
-        color: 'var(--bg)',
-        borderRadius: '12px',
-        display: 'flex',
+        color: 'var(--bg)', display: 'flex',
         alignItems: 'center',
         gap: '4px',
         fontWeight: 'bold'
@@ -124,9 +118,7 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
       <div style={{
         ...getSizeStyles(),
         background: getTrustLevelColor(userRating.trust_level),
-        color: 'var(--bg)',
-        borderRadius: '12px',
-        display: 'flex',
+        color: 'var(--bg)', display: 'flex',
         alignItems: 'center',
         gap: '4px',
         fontWeight: 'bold'
@@ -140,9 +132,7 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
         <div style={{
           ...getSizeStyles(),
           background: '#8b5cf6',
-          color: 'var(--bg)',
-          borderRadius: '12px',
-          display: 'flex',
+          color: 'var(--bg)', display: 'flex',
           alignItems: 'center',
           gap: '4px',
           fontWeight: 'bold'
@@ -156,10 +146,8 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
       {showFullInfo && userRating.contribution_score > 0 && (
         <div style={{
           ...getSizeStyles(),
-          background: '#f59e0b',
-          color: 'var(--bg)',
-          borderRadius: '12px',
-          display: 'flex',
+          background: 'var(--warning)',
+          color: 'var(--bg)', display: 'flex',
           alignItems: 'center',
           gap: '4px',
           fontWeight: 'bold'
@@ -173,10 +161,8 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
       {showFullInfo && userRating.badges && userRating.badges.length > 0 && (
         <div style={{
           ...getSizeStyles(),
-          background: '#ef4444',
-          color: 'var(--bg)',
-          borderRadius: '12px',
-          display: 'flex',
+          background: 'var(--error)',
+          color: 'var(--bg)', display: 'flex',
           alignItems: 'center',
           gap: '4px',
           fontWeight: 'bold'

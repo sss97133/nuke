@@ -29,7 +29,7 @@ export function DemoModeBanner({
   customMessage,
   position = 'top',
   showRegulatoryStatus = false,
-  className = '',
+  className ='',
 }: DemoModeBannerProps) {
   const { status, loading, isDemoMode, logMetric } = usePlatformStatus();
   const [minimized, setMinimized] = useState(false);
@@ -92,7 +92,7 @@ export function DemoModeBanner({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {/* Demo badge */}
-              <span className="bg-black text-amber-500 px-2 py-0.5 rounded text-xs font-mono font-bold">
+              <span className="bg-black text-amber-500 px-2 py-0.5 text-xs font-mono font-bold">
                 DEMO
               </span>
 
@@ -105,7 +105,7 @@ export function DemoModeBanner({
               {showRegulatoryStatus && status?.regulatory_status && (
                 <div className="hidden md:flex items-center gap-2 ml-4 text-xs">
                   <span
-                    className={`px-1.5 py-0.5 rounded ${
+                    className={`px-1.5 py-0.5  ${
                       status.regulatory_status.sec_approved
                         ? 'bg-green-700 text-white'
                         : 'bg-black/20 text-black/70'
@@ -114,7 +114,7 @@ export function DemoModeBanner({
                     SEC {status.regulatory_status.sec_approved ? '✓' : 'Pending'}
                   </span>
                   <span
-                    className={`px-1.5 py-0.5 rounded ${
+                    className={`px-1.5 py-0.5  ${
                       status.regulatory_status.finra_approved
                         ? 'bg-green-700 text-white'
                         : 'bg-black/20 text-black/70'
@@ -135,7 +135,7 @@ export function DemoModeBanner({
               {/* Minimize button */}
               <button
                 onClick={() => setMinimized(true)}
-                className="p-1 hover:bg-black/10 rounded transition-colors"
+                className="p-1 hover:bg-black/10 transition-colors"
                 title="Minimize banner"
               >
                 <svg

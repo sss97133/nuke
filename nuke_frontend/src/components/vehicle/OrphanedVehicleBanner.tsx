@@ -98,12 +98,8 @@ const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
     <div
       style={{
         background: 'var(--warning-dim)',
-        border: '1px solid var(--warning)',
-        borderRadius: '4px',
-        padding: '8px 12px',
-        margin: '8px var(--space-2)',
-        boxShadow: '0 1px 3px rgba(245, 158, 11, 0.15)',
-        position: 'relative'
+        border: '1px solid var(--warning)', padding: '8px 12px',
+        margin: '8px var(--space-2)', position: 'relative'
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
@@ -123,18 +119,16 @@ const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
               <button
                 onClick={handleCompleteProfile}
                 style={{
-                  background: '#f59e0b',
+                  background: 'var(--warning)',
                   color: 'var(--bg)',
                   border: 'none',
-                  padding: '4px 10px',
-                  borderRadius: '4px',
-                  fontSize: '11px',
+                  padding: '4px 10px', fontSize: '11px',
                   fontWeight: 600,
                   cursor: 'pointer',
                   whiteSpace: 'nowrap'
                 }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#d97706'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#f59e0b'}
+                onMouseOver={(e) => e.currentTarget.style.background = 'var(--warning)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'var(--warning)'}
               >
                 Add VIN
               </button>
@@ -147,10 +141,8 @@ const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
                 style={{
                   background: 'transparent',
                   color: '#92400e',
-                  border: '1px solid #f59e0b',
-                  padding: '4px 10px',
-                  borderRadius: '4px',
-                  fontSize: '11px',
+                  border: '1px solid var(--warning)',
+                  padding: '4px 10px', fontSize: '11px',
                   fontWeight: 600,
                   cursor: isClaiming ? 'wait' : 'pointer',
                   whiteSpace: 'nowrap'

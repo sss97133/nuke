@@ -330,7 +330,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
               <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
               <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginBottom: '6px' }}>PROVENANCE</div>
               <div style={{
-                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+                fontFamily: "'Courier New', monospace",
                 fontSize: '10px',
                 lineHeight: '16px',
               }}>
@@ -376,7 +376,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
               <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
               <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginBottom: '6px' }}>PROVENANCE</div>
               <div style={{
-                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+                fontFamily: "'Courier New', monospace",
                 fontSize: '10px',
                 lineHeight: '16px',
               }}>
@@ -503,7 +503,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
         const env = deep.light_and_environment;
 
         const scoreColor = (s: number) =>
-          s >= 7 ? '#4ade80' : s >= 4 ? '#facc15' : '#f87171';
+          s >= 7 ? 'var(--success)' : s >= 4 ? '#facc15' : 'var(--error)';
 
         return (
           <>
@@ -595,7 +595,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                       fontSize: '9px',
                       fontWeight: 700,
                       textTransform: 'uppercase' as const,
-                      color: deg.lifecycle_state === 'archaeological' || deg.lifecycle_state === 'terminal' ? '#f87171' :
+                      color: deg.lifecycle_state === 'archaeological' || deg.lifecycle_state === 'terminal' ? 'var(--error)' :
                              deg.lifecycle_state === 'active_decay' ? '#facc15' : 'rgba(255,255,255,0.7)',
                       border: '1px solid rgba(255,255,255,0.2)',
                     }}>
@@ -1076,9 +1076,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
           style={{
             width: '40px',
             height: '4px',
-            backgroundColor: 'rgba(255,255,255,0.3)',
-            borderRadius: '2px'
-          }}
+            backgroundColor: 'rgba(255,255,255,0.3)'}}
         />
       </div>
 

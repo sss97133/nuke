@@ -294,7 +294,7 @@ export default function Dashboard() {
         style={{
           padding: '16px',
           textAlign: 'center',
-          fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+          fontFamily: "'Courier New', monospace" ,
           fontSize: '11px'
         }}
       >
@@ -305,7 +305,7 @@ export default function Dashboard() {
           onClick={() => navigate(`/login?returnUrl=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`)}
           style={{
             fontSize: '11px',
-            fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+            fontFamily: "'Courier New', monospace" ,
             padding: '8px 16px',
             border: '1px solid var(--border)',
             background: 'var(--surface)',
@@ -381,7 +381,7 @@ export default function Dashboard() {
     <div
       style={{
         padding: '16px',
-        fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+        fontFamily: "'Courier New', monospace" ,
         fontSize: '11px',
         background: 'var(--surface)',
         maxWidth: '800px',
@@ -409,7 +409,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '8px' }}>
           <style>{`@keyframes dash-pulse { 0%,100%{opacity:.7} 50%{opacity:.3} }`}</style>
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} style={{ height: 56, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 2, animation: 'dash-pulse 1.5s ease-in-out infinite' }} />
+            <div key={i} style={{ height: 56, background: 'var(--surface)', border: '1px solid var(--border)', animation: 'dash-pulse 1.5s ease-in-out infinite' }} />
           ))}
         </div>
       ) : allItems.length === 0 ? (
@@ -458,9 +458,7 @@ export default function Dashboard() {
               padding: '20px',
               border: '2px solid var(--border)',
               maxWidth: '500px',
-              width: '90%',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-            }}
+              width: '90%'}}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ marginBottom: '16px' }}>
@@ -481,7 +479,7 @@ export default function Dashboard() {
                   minHeight: '80px',
                   padding: '8px',
                   border: '1px solid var(--border)',
-                  fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                  fontFamily: "'Courier New', monospace" ,
                   fontSize: '11px',
                   resize: 'vertical'
                 }}

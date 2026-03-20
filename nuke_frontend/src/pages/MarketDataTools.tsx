@@ -26,9 +26,7 @@ const OrganizationServiceMapperWithSelector = () => {
             width: '100%',
             padding: 'var(--space-2)',
             fontSize: '11px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            background: 'var(--surface-hover)',
+            border: '1px solid var(--border)', background: 'var(--surface-hover)',
           }}
         />
       </div>
@@ -122,9 +120,7 @@ export default function MarketDataTools() {
           <div style={{
             padding: 'var(--space-4)',
             background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-          }}>
+            border: '1px solid var(--border)', }}>
             <h3 style={{ fontSize: '13px', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-3)' }}>
               Claim External Identity
             </h3>
@@ -140,9 +136,7 @@ export default function MarketDataTools() {
                 fontWeight: 'bold',
                 background: 'var(--accent)',
                 color: 'var(--white)',
-                textDecoration: 'none',
-                borderRadius: '4px',
-              }}
+                textDecoration: 'none', }}
             >
               Go to Claim Identity Page →
             </Link>
@@ -153,9 +147,7 @@ export default function MarketDataTools() {
           <div style={{
             padding: 'var(--space-4)',
             background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-          }}>
+            border: '1px solid var(--border)', }}>
             <h3 style={{ fontSize: '13px', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-3)' }}>
               Backfill Profile Stats
             </h3>
@@ -173,9 +165,7 @@ export default function MarketDataTools() {
                   fontWeight: 'bold',
                   background: backfilling ? 'var(--text-muted)' : 'var(--accent)',
                   color: 'var(--white)',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: backfilling ? 'not-allowed' : 'pointer',
+                  border: 'none', cursor: backfilling ? 'not-allowed' : 'pointer',
                 }}
               >
                 {backfilling ? 'Backfilling...' : 'Backfill All Users'}
@@ -189,9 +179,7 @@ export default function MarketDataTools() {
                   fontWeight: 'bold',
                   background: backfilling ? 'var(--text-muted)' : 'var(--accent)',
                   color: 'var(--white)',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: backfilling ? 'not-allowed' : 'pointer',
+                  border: 'none', cursor: backfilling ? 'not-allowed' : 'pointer',
                 }}
               >
                 {backfilling ? 'Backfilling...' : 'Backfill All Organizations'}
@@ -202,9 +190,7 @@ export default function MarketDataTools() {
               <div style={{
                 padding: 'var(--space-3)',
                 background: backfillResult.error ? 'var(--danger-light)' : 'var(--success-light)',
-                border: `1px solid ${backfillResult.error ? 'var(--danger)' : 'var(--success)'}`,
-                borderRadius: '4px',
-                fontSize: '11px',
+                border: `1px solid ${backfillResult.error ? 'var(--danger)' : 'var(--success)'}`, fontSize: '11px',
               }}>
                 {backfillResult.error ? (
                   <div style={{ color: 'var(--danger)' }}>Error: {backfillResult.error}</div>

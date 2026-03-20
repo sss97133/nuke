@@ -47,9 +47,7 @@ export const MobileBottomNav: React.FC = () => {
             height: 40,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '50%',
-            background: 'var(--accent)',
+            justifyContent: 'center', background: 'var(--accent)',
             color: 'var(--bg)',
             flexShrink: 0,
           } : { position: 'relative' as const }}

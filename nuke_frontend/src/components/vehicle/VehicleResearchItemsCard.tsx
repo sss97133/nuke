@@ -216,7 +216,7 @@ export default function VehicleResearchItemsCard({ vehicleId }: { vehicleId: str
             {items.map((item) => (
               <div
                 key={item.id}
-                style={{ border: '1px solid var(--border-light)', borderRadius: 6, padding: 10, background: 'var(--white)' }}
+                style={{ border: '1px solid var(--border-light)', padding: 10, background: 'var(--white)' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
                   <div style={{ minWidth: 0 }}>

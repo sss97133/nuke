@@ -516,9 +516,7 @@ export default function Portfolio() {
               fontWeight: 600,
               fontFamily: 'Arial, sans-serif',
               cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px'
-            }}
+              transition: '0.12s'}}
           >
             ← Back to Home
           </button>
@@ -534,9 +532,7 @@ export default function Portfolio() {
           {/* Total Value */}
           <div style={{
             background: 'var(--surface)',
-            border: '2px solid var(--border)',
-            borderRadius: '8px',
-            padding: '20px'
+            border: '2px solid var(--border)', padding: '20px'
           }}>
             <div style={{
               fontSize: 'var(--fs-8)',
@@ -563,9 +559,7 @@ export default function Portfolio() {
           {/* Unrealized P&L */}
           <div style={{
             background: 'var(--surface)',
-            border: '2px solid var(--border)',
-            borderRadius: '8px',
-            padding: '20px'
+            border: '2px solid var(--border)', padding: '20px'
           }}>
             <div style={{
               fontSize: 'var(--fs-8)',
@@ -615,9 +609,7 @@ export default function Portfolio() {
                     fontSize: 'var(--fs-9)',
                     fontWeight: 600,
                     cursor: 'pointer',
-                    transition: '0.12s',
-                    borderRadius: '4px',
-                    whiteSpace: 'nowrap',
+                    transition: '0.12s', whiteSpace: 'nowrap',
                     borderColor: activeTab === tab.id ? 'var(--accent)' : 'var(--border)',
                   }}
                 >
@@ -631,9 +623,7 @@ export default function Portfolio() {
         {/* Content */}
         <div style={{
           background: 'var(--surface)',
-          border: '2px solid var(--border)',
-          borderRadius: '8px',
-          overflow: 'hidden'
+          border: '2px solid var(--border)', overflow: 'hidden'
         }}>
           {/* Overview Tab */}
           {activeTab === 'overview' && (
@@ -679,9 +669,7 @@ export default function Portfolio() {
               </div>
 
               <div style={{
-                border: '2px solid var(--border)',
-                borderRadius: '4px',
-                padding: '16px',
+                border: '2px solid var(--border)', padding: '16px',
                 background: 'var(--bg)'
               }}>
                 <div style={{ fontSize: 'var(--fs-9)', fontWeight: 700, marginBottom: '12px' }}>
@@ -805,9 +793,7 @@ export default function Portfolio() {
                       </div>
                       <div>
                         <span style={{
-                          padding: '2px 6px',
-                          borderRadius: '3px',
-                          fontWeight: 700,
+                          padding: '2px 6px', fontWeight: 700,
                           fontSize: '8px',
                           background: order.order_type === 'buy' ? 'rgba(16,185,129,0.15)' : 'rgba(220,38,38,0.15)',
                           color: order.order_type === 'buy' ? 'var(--success, #059669)' : 'var(--danger, #b91c1c)'
@@ -839,9 +825,7 @@ export default function Portfolio() {
                             padding: '4px 8px',
                             fontSize: '8px',
                             fontWeight: 600,
-                            cursor: cancellingOrderId === order.id ? 'not-allowed' : 'pointer',
-                            borderRadius: '3px',
-                            opacity: cancellingOrderId === order.id ? 0.5 : 1,
+                            cursor: cancellingOrderId === order.id ? 'not-allowed' : 'pointer', opacity: cancellingOrderId === order.id ? 0.5 : 1,
                             fontFamily: 'Arial, sans-serif'
                           }}
                         >
@@ -1066,9 +1050,7 @@ export default function Portfolio() {
                         <div style={{
                           fontSize: '8px',
                           fontWeight: 600,
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          background: stake.status === 'active' ? 'var(--accent-dim)' : 'var(--surface)',
+                          padding: '4px 8px', background: stake.status === 'active' ? 'var(--accent-dim)' : 'var(--surface)',
                           color: stake.status === 'active' ? 'var(--accent)' : 'var(--text-secondary)',
                           display: 'inline-block'
                         }}>
@@ -1203,14 +1185,14 @@ export default function Portfolio() {
                         <div style={{
                           fontWeight: 600,
                           fontSize: '10px',
-                          color: holding.unrealized_gain_loss >= 0 ? '#006400' : '#b91c1c'
+                          color: holding.unrealized_gain_loss >= 0 ? '#006400' : 'var(--error-dark, var(--error))'
                         }}>
                           {holding.unrealized_gain_loss >= 0 ? '+' : ''}
                           ${holding.unrealized_gain_loss.toFixed(2)}
                         </div>
                         <div style={{
                           fontSize: '8px',
-                          color: holding.unrealized_gain_loss_pct >= 0 ? '#006400' : '#b91c1c'
+                          color: holding.unrealized_gain_loss_pct >= 0 ? '#006400' : 'var(--error-dark, var(--error))'
                         }}>
                           {holding.unrealized_gain_loss_pct >= 0 ? '+' : ''}
                           {holding.unrealized_gain_loss_pct.toFixed(2)}%
@@ -1242,9 +1224,7 @@ export default function Portfolio() {
                       key={v.id}
                       onClick={() => navigate(`/vehicle/${v.id}`)}
                       style={{
-                        border: '2px solid var(--border)',
-                        borderRadius: '4px',
-                        overflow: 'hidden',
+                        border: '2px solid var(--border)', overflow: 'hidden',
                         cursor: 'pointer',
                         transition: '0.12s',
                         background: 'var(--bg)'

@@ -16,19 +16,19 @@ export interface CardDealScoreProps {
 
 // Colors matching DEAL_SCORE_CONFIG from constants/dealScore.ts
 const DEAL_COLORS: Record<string, { bg: string; text: string; display: string }> = {
-  plus_3:  { bg: '#16825d', text: '#ffffff', display: 'STEAL' },
-  plus_2:  { bg: '#16825d', text: '#ffffff', display: 'GREAT DEAL' },
-  plus_1:  { bg: '#2d9d78', text: '#ffffff', display: 'GOOD DEAL' },
+  plus_3:  { bg: '#16825d', text: 'var(--surface-elevated)', display: 'STEAL' },
+  plus_2:  { bg: '#16825d', text: 'var(--surface-elevated)', display: 'GREAT DEAL' },
+  plus_1:  { bg: '#2d9d78', text: 'var(--surface-elevated)', display: 'GOOD DEAL' },
   fair:    { bg: 'transparent', text: 'var(--text-secondary)', display: 'FAIR' },
-  minus_1: { bg: '#b05a00', text: '#ffffff', display: 'ABOVE MARKET' },
-  minus_2: { bg: '#d13438', text: '#ffffff', display: 'OVERPRICED' },
-  minus_3: { bg: '#d13438', text: '#ffffff', display: 'WAY OVER' },
+  minus_1: { bg: '#b05a00', text: 'var(--surface-elevated)', display: 'ABOVE MARKET' },
+  minus_2: { bg: '#d13438', text: 'var(--surface-elevated)', display: 'OVERPRICED' },
+  minus_3: { bg: '#d13438', text: 'var(--surface-elevated)', display: 'WAY OVER' },
 };
 
 const HEAT_COLORS: Record<string, { color: string; display: string }> = {
   volcanic: { color: '#d13438', display: 'VOLCANIC' },
-  fire:     { color: '#ef4444', display: 'FIRE' },
-  hot:      { color: '#f59e0b', display: 'HOT' },
+  fire:     { color: 'var(--error)', display: 'FIRE' },
+  hot:      { color: 'var(--warning)', display: 'HOT' },
   warm:     { color: '#b05a00', display: 'WARM' },
   cold:     { color: 'var(--text-disabled)', display: 'COLD' },
 };

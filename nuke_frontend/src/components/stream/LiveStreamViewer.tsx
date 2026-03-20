@@ -452,9 +452,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                   alt={stream.streamer_name}
                   style={{
                     width: '16px',
-                    height: '16px',
-                    borderRadius: '50%'
-                  }}
+                    height: '16px'}}
                 />
               )}
               <span>{stream.streamer_name}</span>
@@ -517,9 +515,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                         alt={msg.user_name}
                         style={{
                           width: '12px',
-                          height: '12px',
-                          borderRadius: '50%'
-                        }}
+                          height: '12px'}}
                       />
                     )}
                     <span style={{ fontWeight: 'bold', color: 'var(--text)' }}>
@@ -562,9 +558,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                           fontSize: '11px',
                           border: '1px solid var(--border)',
                           background: 'var(--text)',
-                          color: 'var(--bg)',
-                          borderRadius: '0px',
-                          cursor: 'pointer',
+                          color: 'var(--bg)', cursor: 'pointer',
                           opacity: tipping ? 0.7 : 1,
                         }}
                       >
@@ -583,9 +577,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                       style={{
                         width: 110,
                         padding: '4px',
-                        border: '1px solid var(--border)',
-                        borderRadius: '0px',
-                        fontSize: '11px',
+                        border: '1px solid var(--border)', fontSize: '11px',
                       }}
                     />
                     <input
@@ -596,9 +588,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                       style={{
                         flex: 1,
                         padding: '4px',
-                        border: '1px solid var(--border)',
-                        borderRadius: '0px',
-                        fontSize: '11px',
+                        border: '1px solid var(--border)', fontSize: '11px',
                       }}
                     />
                     <button
@@ -613,9 +603,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                         fontSize: '11px',
                         border: '1px solid var(--border)',
                         background: 'var(--text)',
-                        color: 'var(--bg)',
-                        borderRadius: '0px',
-                        cursor: 'pointer',
+                        color: 'var(--bg)', cursor: 'pointer',
                         opacity: tipping || !parseTipAmountCents() ? 0.6 : 1,
                       }}
                     >
@@ -676,9 +664,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                         style={{
                           width: 110,
                           padding: '4px',
-                          border: '1px solid var(--border)',
-                          borderRadius: '0px',
-                          fontSize: '11px',
+                          border: '1px solid var(--border)', fontSize: '11px',
                         }}
                       />
                       <button
@@ -689,9 +675,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                           fontSize: '11px',
                           border: '1px solid var(--border)',
                           background: 'var(--text)',
-                          color: 'var(--bg)',
-                          borderRadius: '0px',
-                          cursor: 'pointer',
+                          color: 'var(--bg)', cursor: 'pointer',
                           opacity: !user || investing ? 0.7 : 1,
                         }}
                       >
@@ -714,9 +698,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                         fontSize: '11px',
                         border: '1px solid var(--border)',
                         background: 'var(--text)',
-                        color: 'var(--bg)',
-                        borderRadius: '0px',
-                        cursor: 'pointer',
+                        color: 'var(--bg)', cursor: 'pointer',
                         opacity: creatingDeal ? 0.7 : 1,
                       }}
                     >
@@ -730,9 +712,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                         fontSize: '11px',
                         border: '1px solid var(--border)',
                         background: 'var(--text)',
-                        color: 'var(--bg)',
-                        borderRadius: '0px',
-                        cursor: 'pointer',
+                        color: 'var(--bg)', cursor: 'pointer',
                         opacity: creatingDeal ? 0.7 : 1,
                       }}
                     >
@@ -763,9 +743,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                   style={{
                     flex: '1',
                     padding: '4px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '0px',
-                    fontSize: '11px'
+                    border: '1px solid var(--border)', fontSize: '11px'
                   }}
                 />
                 <button
@@ -776,9 +754,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                     fontSize: '11px',
                     border: '1px solid var(--border)',
                     background: newMessage.trim() ? 'var(--text)' : 'var(--border)',
-                    color: newMessage.trim() ? 'var(--bg)' : 'var(--text-disabled)',
-                    borderRadius: '0px',
-                    cursor: newMessage.trim() ? 'pointer' : 'not-allowed'
+                    color: newMessage.trim() ? 'var(--bg)' : 'var(--text-disabled)', cursor: newMessage.trim() ? 'pointer' : 'not-allowed'
                   }}
                 >
                   Send
@@ -823,9 +799,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                 fontSize: '11px',
                 border: '1px solid var(--border)',
                 background: isFollowing ? 'var(--border)' : 'var(--text)',
-                color: isFollowing ? 'var(--text)' : 'var(--bg)',
-                borderRadius: '0px',
-                cursor: 'pointer'
+                color: isFollowing ? 'var(--text)' : 'var(--bg)', cursor: 'pointer'
               }}
             >
               {isFollowing ? '✓ Following' : '+ Follow'}

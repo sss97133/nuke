@@ -44,7 +44,7 @@ const FIELD_SECTIONS = [
     id: 'identity',
     title: 'IDENTITY',
     subtitle: 'Core identification',
-    color: '#3b82f6',
+    color: 'var(--info)',
     fields: ['year', 'make', 'model', 'trim', 'series', 'generation', 'body_style', 'normalized_model', 'normalized_series'],
   },
   {
@@ -58,21 +58,21 @@ const FIELD_SECTIONS = [
     id: 'ownership',
     title: 'OWNERSHIP & ATTRIBUTION',
     subtitle: 'Check for misattribution',
-    color: '#dc2626',
+    color: 'var(--error)',
     fields: ['uploaded_by', 'user_id', 'owner_id', 'owner_name', 'owner_contact', 'discovered_by', 'imported_by', 'created_by_user_id', 'created_by_organization_id', 'ownership_verified', 'ownership_percentage', 'acting_on_behalf_of'],
   },
   {
     id: 'location',
     title: 'LOCATION',
     subtitle: 'Where is this vehicle?',
-    color: '#059669',
+    color: 'var(--success)',
     fields: ['city', 'state', 'country', 'zip_code', 'location', 'listing_location', 'bat_location', 'gps_latitude', 'gps_longitude'],
   },
   {
     id: 'engine',
     title: 'ENGINE & DRIVETRAIN',
     subtitle: 'Powertrain specifications',
-    color: '#ea580c',
+    color: 'var(--orange)',
     fields: ['engine_size', 'engine_type', 'engine_code', 'engine_displacement', 'engine_liters', 'displacement', 'horsepower', 'torque', 'fuel_type', 'transmission', 'transmission_type', 'transmission_model', 'transmission_code', 'drivetrain'],
   },
   {
@@ -107,7 +107,7 @@ const FIELD_SECTIONS = [
     id: 'value',
     title: 'VALUE & PRICING',
     subtitle: 'Financial data',
-    color: '#16a34a',
+    color: 'var(--success)',
     fields: ['msrp', 'purchase_price', 'purchase_date', 'purchase_location', 'current_value', 'asking_price', 'sale_price', 'sold_price', 'price', 'high_bid', 'winning_bid', 'previous_owners'],
   },
   {
@@ -121,7 +121,7 @@ const FIELD_SECTIONS = [
     id: 'bat',
     title: 'BRING A TRAILER',
     subtitle: 'Only if listed on BaT',
-    color: '#f59e0b',
+    color: 'var(--warning)',
     prerequisite: (v: VehicleData) => !!(v.bat_auction_url || v.discovery_url?.includes('bringatrailer')),
     fields: ['bat_auction_url', 'bat_listing_title', 'bat_lot_number', 'bat_sold_price', 'bat_sale_date', 'bat_bid_count', 'bat_bids', 'bat_comments', 'bat_views', 'bat_view_count', 'bat_watchers', 'bat_location', 'bat_seller', 'bat_buyer', 'reserve_status', 'auction_outcome'],
   },
@@ -129,7 +129,7 @@ const FIELD_SECTIONS = [
     id: 'cab',
     title: 'CARS & BIDS / DOUG',
     subtitle: 'Only if listed on C&B',
-    color: '#ef4444',
+    color: 'var(--error)',
     prerequisite: (v: VehicleData) => !!(v.dougs_take || v.discovery_url?.includes('carsandbids')),
     fields: ['dougs_take', 'highlights', 'equipment'],
   },
@@ -159,7 +159,7 @@ const FIELD_SECTIONS = [
     id: 'efficiency',
     title: 'FUEL EFFICIENCY',
     subtitle: 'MPG ratings',
-    color: '#22c55e',
+    color: 'var(--success)',
     fields: ['mpg_city', 'mpg_highway', 'mpg_combined'],
   },
   {
@@ -477,9 +477,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
               padding: '4px 6px',
               fontSize: '11px',
               border: `1px solid ${isModified ? 'var(--warning)' : isEmpty ? 'var(--border)' : 'var(--border)'}`,
-              background: isReadOnly ? 'var(--grey-100)' : isEmpty ? 'var(--bg)' : 'var(--surface)',
-              borderRadius: '2px',
-              minHeight: '50px',
+              background: isReadOnly ? 'var(--grey-100)' : isEmpty ? 'var(--bg)' : 'var(--surface)', minHeight: '50px',
               resize: 'vertical',
               opacity: isReadOnly ? 0.7 : 1
             }}
@@ -511,9 +509,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
               width: '100%',
               padding: '3px 6px',
               border: `1px solid ${isModified ? 'var(--warning)' : isEmpty ? 'var(--border)' : 'var(--border)'}`,
-              background: isReadOnly ? 'var(--grey-100)' : isEmpty ? 'var(--bg)' : 'var(--surface)',
-              borderRadius: '2px',
-              opacity: isReadOnly ? 0.7 : 1,
+              background: isReadOnly ? 'var(--grey-100)' : isEmpty ? 'var(--bg)' : 'var(--surface)', opacity: isReadOnly ? 0.7 : 1,
               fontFamily: (field.includes('_id') || field === 'vin' || field.includes('_url')) ? 'monospace' : 'inherit',
               fontSize: field.includes('_url') ? '7pt' : '8pt'
             }}
@@ -638,9 +634,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                     width: '70px',
                     height: '52px',
                     padding: 0,
-                    border: img.is_primary ? '2px solid var(--primary)' : '1px solid var(--border)',
-                    borderRadius: '3px',
-                    overflow: 'hidden',
+                    border: img.is_primary ? '2px solid var(--primary)' : '1px solid var(--border)', overflow: 'hidden',
                     cursor: 'pointer',
                     background: 'var(--surface)'
                   }}
@@ -687,9 +681,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
               {/* My Relationship / Ownership - Critical for misattribution */}
               <div style={{
                 background: 'var(--error-dim)',
-                border: '1px solid var(--error)',
-                borderRadius: '4px',
-                padding: '10px'
+                border: '1px solid var(--error)', padding: '10px'
               }}>
                 <div style={{
                   fontSize: '11px',
@@ -711,9 +703,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                     <div style={{
                       padding: '6px 8px',
                       background: ownershipVerification.status === 'approved' ? 'var(--success-dim)' : 'var(--warning-dim)',
-                      border: `1px solid ${ownershipVerification.status === 'approved' ? 'var(--success)' : 'var(--warning)'}`,
-                      borderRadius: '3px',
-                      marginBottom: '6px'
+                      border: `1px solid ${ownershipVerification.status === 'approved' ? 'var(--success)' : 'var(--warning)'}`, marginBottom: '6px'
                     }}>
                       <strong>Ownership Verification:</strong> {ownershipVerification.status}
                       <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px' }}>
@@ -726,9 +716,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                     <div style={{
                       padding: '6px 8px',
                       background: 'var(--bg)',
-                      border: '1px solid var(--accent)',
-                      borderRadius: '3px'
-                    }}>
+                      border: '1px solid var(--accent)'}}>
                       <strong>Current Role:</strong>{' '}
                       <span style={{ textTransform: 'capitalize' }}>
                         {myRelationship.role.replace('_', ' ')}
@@ -748,9 +736,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                     <div style={{
                       padding: '6px 8px',
                       background: 'var(--bg)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '3px',
-                      color: 'var(--text-secondary)'
+                      border: '1px solid var(--border)', color: 'var(--text-secondary)'
                     }}>
                       No explicit relationship set. May appear in your list due to import attribution.
                     </div>
@@ -769,9 +755,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                     style={{
                       padding: '4px 8px',
                       fontSize: '11px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '3px',
-                      background: 'var(--surface)',
+                      border: '1px solid var(--border)', background: 'var(--surface)',
                       cursor: updatingRole ? 'wait' : 'pointer',
                       opacity: updatingRole ? 0.6 : 1
                     }}
@@ -795,9 +779,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                         fontWeight: 600,
                         background: 'var(--error-dim)',
                         color: 'var(--error)',
-                        border: '1px solid var(--error)',
-                        borderRadius: '3px',
-                        cursor: updatingRole ? 'wait' : 'pointer',
+                        border: '1px solid var(--error)', cursor: updatingRole ? 'wait' : 'pointer',
                         opacity: updatingRole ? 0.6 : 1
                       }}
                     >
@@ -821,9 +803,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
               {/* Documents On Hand */}
               <div style={{
                 background: 'var(--success-dim)',
-                border: '1px solid var(--success)',
-                borderRadius: '4px',
-                padding: '10px'
+                border: '1px solid var(--success)', padding: '10px'
               }}>
                 <div style={{
                   fontSize: '11px',
@@ -852,9 +832,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                         gap: '5px',
                         padding: '4px 6px',
                         background: documentsOnHand[doc.key] ? 'var(--success-dim)' : 'var(--surface)',
-                        border: `1px solid ${documentsOnHand[doc.key] ? 'var(--success)' : 'var(--border)'}`,
-                        borderRadius: '2px',
-                        cursor: 'pointer',
+                        border: `1px solid ${documentsOnHand[doc.key] ? 'var(--success)' : 'var(--border)'}`, cursor: 'pointer',
                         fontSize: '9px'
                       }}
                     >
@@ -885,9 +863,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                   <div
                     key={section.id}
                     style={{
-                      border: `1px solid ${section.color}30`,
-                      borderRadius: '4px',
-                      overflow: 'hidden'
+                      border: `1px solid ${section.color}30`, overflow: 'hidden'
                     }}
                   >
                     {/* Section Header */}
@@ -911,9 +887,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                         <span style={{
                           width: '4px',
                           height: '16px',
-                          background: section.color,
-                          borderRadius: '2px'
-                        }} />
+                          background: section.color}} />
                         <div>
                           <span style={{
                             fontSize: '11px',
@@ -936,9 +910,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                           fontSize: '9px',
                           color: filledCount === fieldsInSection.length ? 'var(--success)' : 'var(--text-disabled)',
                           background: filledCount === fieldsInSection.length ? 'var(--success-dim)' : 'var(--bg)',
-                          padding: '2px 6px',
-                          borderRadius: '10px'
-                        }}>
+                          padding: '2px 6px'}}>
                           {filledCount}/{fieldsInSection.length}
                         </span>
                         <span style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>
@@ -966,9 +938,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
               {/* Other Fields */}
               {getOtherFields().length > 0 && (
                 <div style={{
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  overflow: 'hidden'
+                  border: '1px solid var(--border)', overflow: 'hidden'
                 }}>
                   <button
                     type="button"
@@ -1035,9 +1005,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                 padding: '6px 16px',
                 fontSize: '12px',
                 background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: '2px',
-                cursor: 'pointer'
+                border: '1px solid var(--border)', cursor: 'pointer'
               }}
             >
               Cancel
@@ -1051,9 +1019,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                 fontWeight: 600,
                 background: Object.keys(editedFields).length > 0 ? 'var(--primary)' : 'var(--grey-300)',
                 color: Object.keys(editedFields).length > 0 ? 'var(--bg)' : 'var(--text-muted)',
-                border: 'none',
-                borderRadius: '2px',
-                cursor: Object.keys(editedFields).length > 0 ? 'pointer' : 'default'
+                border: 'none', cursor: Object.keys(editedFields).length > 0 ? 'pointer' : 'default'
               }}
             >
               {saving ? 'Saving...' : 'Save Changes'}
@@ -1090,9 +1056,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
               color: 'var(--bg)',
               fontSize: '24px',
               width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              cursor: 'pointer',
+              height: '44px', cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -1117,9 +1081,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                 color: 'var(--bg)',
                 fontSize: '24px',
                 width: '44px',
-                height: '44px',
-                borderRadius: '50%',
-                cursor: 'pointer',
+                height: '44px', cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -1136,9 +1098,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
             style={{
               maxWidth: '90vw',
               maxHeight: '85vh',
-              objectFit: 'contain',
-              borderRadius: '4px'
-            }}
+              objectFit: 'contain'}}
           />
 
           {images.length > 1 && (
@@ -1157,9 +1117,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                 color: 'var(--bg)',
                 fontSize: '24px',
                 width: '44px',
-                height: '44px',
-                borderRadius: '50%',
-                cursor: 'pointer',
+                height: '44px', cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -1177,9 +1135,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
               transform: 'translateX(-50%)',
               background: 'rgba(0,0,0,0.6)',
               color: 'var(--bg)',
-              padding: '6px 12px',
-              borderRadius: '4px',
-              fontSize: '12px'
+              padding: '6px 12px', fontSize: '12px'
             }}
           >
             {lightboxIndex + 1} / {images.length}

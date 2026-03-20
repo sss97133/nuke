@@ -70,9 +70,7 @@ export const AsciiAvatar: React.FC<AsciiAvatarProps> = ({
     <div
       style={{
         width: size,
-        height: size,
-        borderRadius: '50%',
-        border: '1px solid var(--border)',
+        height: size, border: '1px solid var(--border)',
         background: 'var(--surface)',
         display: 'flex',
         alignItems: 'center',
@@ -163,9 +161,7 @@ export const FallbackAvatar: React.FC<FallbackAvatarProps> = ({
       alt={alt}
       style={{
         width: size,
-        height: size,
-        borderRadius: '50%',
-        border: '1px solid var(--border)',
+        height: size, border: '1px solid var(--border)',
         objectFit: 'cover',
         display: imageLoaded ? 'block' : 'none',
         ...style

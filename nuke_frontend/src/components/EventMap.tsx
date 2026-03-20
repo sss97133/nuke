@@ -261,14 +261,14 @@ const EventMap: React.FC<EventMapProps> = ({ vehicleId, showLifeOnly = false }) 
             const m = L.marker([lat, lon]).addTo(map);
             const dateStr = ev.event_date ? new Date(ev.event_date).toLocaleDateString() : '';
             const title = ev.title || ev.event_type || 'Event';
-            const img = Array.isArray(ev.image_urls) && ev.image_urls[0] ? `<div style="margin-top:6px;"><img src="${ev.image_urls[0]}" style="width:120px;height:90px;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb;" /></div>` : '';
+            const img = Array.isArray(ev.image_urls) && ev.image_urls[0] ? `<div style="margin-top:6px;"><img src="${ev.image_urls[0]}" style="width:120px;height:90px;object-fit:cover;border-radius:4px;border:1px solid var(--border);" /></div>` : '';
             m.bindPopup(`<div style="font-family:Arial,sans-serif;font-size:12px;max-width:180px;"><div style="font-weight:600;">${title}</div><div>${dateStr}</div>${img}</div>`);
             markers.push(m);
           });
           // Render photo markers (smaller icon)
           photoPoints.forEach((p) => {
-            const m = L.circleMarker([p.lat, p.lon], { radius: 5, color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.85 }).addTo(map);
-            const img = `<div style="margin-top:6px;"><img src="${p.url}" style="width:140px;height:100px;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb;" /></div>`;
+            const m = L.circleMarker([p.lat, p.lon], { radius: 5, color: 'var(--info)', fillColor: 'var(--info)', fillOpacity: 0.85 }).addTo(map);
+            const img = `<div style="margin-top:6px;"><img src="${p.url}" style="width:140px;height:100px;object-fit:cover;border-radius:4px;border:1px solid var(--border);" /></div>`;
             m.bindPopup(`<div style="font-family:Arial,sans-serif;font-size:12px;max-width:200px;"><div style="font-weight:600;">Photo</div>${img}</div>`);
             markers.push(m);
           });
@@ -289,7 +289,7 @@ const EventMap: React.FC<EventMapProps> = ({ vehicleId, showLifeOnly = false }) 
       <div className="card-body">
         {loading && <div className="text-sm text-gray-600">Loading events…</div>}
         {error && <div className="text-sm text-red-600">{error}</div>}
-        <div ref={mapRef} style={{ width: '100%', height: 360, borderRadius: 8, border: '1px solid var(--border)' }} />
+        <div ref={mapRef} style={{ width: '100%', height: 360, border: '1px solid var(--border)' }} />
       </div>
     </div>
   );

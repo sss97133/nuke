@@ -38,7 +38,7 @@ const platformNames: Record<string, string> = {
 
 const platformColors: Record<string, { bg: string; text: string; accent: string }> = {
   bat: { bg: '#1a1a1a', text: 'var(--bg)', accent: 'var(--warning)' },
-  cars_and_bids: { bg: 'var(--error)', text: 'var(--bg)', accent: '#fbbf24' },
+  cars_and_bids: { bg: 'var(--error)', text: 'var(--bg)', accent: 'var(--warning)' },
   ebay_motors: { bg: '#0064d2', text: 'var(--bg)', accent: '#f5af02' },
   hemmings: { bg: '#8b0000', text: 'var(--bg)', accent: '#ffd700' },
 };
@@ -83,7 +83,7 @@ function formatTimeRemaining(endDate: string | null): { text: string; urgency: U
 const urgencyColors: Record<UrgencyLevel, { color: string; glow?: string }> = {
   lastMinute: { color: 'var(--error)', glow: '0 0 12px rgba(220, 38, 38, 0.7)' },
   critical: { color: 'var(--error)', glow: '0 0 8px rgba(220, 38, 38, 0.5)' },
-  urgent: { color: '#ea580c', glow: '0 0 6px rgba(234, 88, 12, 0.4)' },
+  urgent: { color: 'var(--orange)', glow: '0 0 6px rgba(234, 88, 12, 0.4)' },
   gettingClose: { color: '#e07960' },
   normal: { color: 'inherit' },
   ended: { color: 'var(--text-disabled)' },
@@ -214,14 +214,10 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
   return (
     <div
       style={{
-        background: `linear-gradient(135deg, ${colors.bg} 0%, ${colors.bg}ee 100%)`,
-        borderRadius: '6px',
-        padding: '10px 14px',
+        background: colors.bg, padding: '10px 14px',
         marginBottom: '12px',
         fontSize: '11px',
-        color: colors.text,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-      }}
+        color: colors.text, }}
     >
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -232,12 +228,8 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               <div
                 style={{
                   width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: ['lastMinute', 'critical', 'urgent'].includes(timeState.urgency) ? 'var(--error)' : 'var(--success)',
-                  animation: 'pulse 1.5s ease-in-out infinite',
-                  boxShadow: `0 0 8px ${['lastMinute', 'critical', 'urgent'].includes(timeState.urgency) ? 'var(--error)' : 'var(--success)'}`,
-                }}
+                  height: '8px', background: ['lastMinute', 'critical', 'urgent'].includes(timeState.urgency) ? 'var(--error)' : 'var(--success)',
+                  animation: 'pulse 1.5s ease-in-out infinite', }}
               />
               <span style={{ fontWeight: 700, fontSize: '9px', letterSpacing: '0.5px' }}>LIVE</span>
             </div>
@@ -249,9 +241,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
                 fontWeight: 700,
                 fontSize: '9px',
                 background: 'rgba(255,255,255,0.2)',
-                padding: '2px 6px',
-                borderRadius: '3px',
-              }}
+                padding: '2px 6px', }}
             >
               ENDED
             </span>
@@ -286,11 +276,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
             flexDirection: 'column',
             gap: '2px',
             padding: '6px 10px',
-            background: 'rgba(255, 255, 255, 0.08)',
-            borderRadius: '6px',
-            border: `1px solid ${colors.accent}40`,
-            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 3px rgba(0,0,0,0.1)`,
-          }}
+            background: 'rgba(255, 255, 255, 0.08)', border: `1px solid ${colors.accent}40`, }}
         >
           <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase' }}>Current Bid</span>
           <span
@@ -314,9 +300,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
             flexDirection: 'column',
             gap: '2px',
             padding: '6px 10px',
-            background: 'rgba(255, 255, 255, 0.05)',
-            borderRadius: '6px',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
           }}
         >
           <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase' }}>Bids</span>
@@ -331,9 +315,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               flexDirection: 'column',
               gap: '2px',
               padding: '6px 10px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              borderRadius: '6px',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
             }}
           >
             <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase' }}>Watching</span>
@@ -349,9 +331,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               flexDirection: 'column',
               gap: '2px',
               padding: '6px 10px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              borderRadius: '6px',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
             }}
           >
             <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase' }}>Comments</span>
@@ -378,9 +358,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
                 background: colors.accent,
                 border: 'none',
                 color: 'var(--text)',
-                padding: '6px 12px',
-                borderRadius: '4px',
-                fontSize: '9px',
+                padding: '6px 12px', fontSize: '9px',
                 fontWeight: 700,
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
@@ -406,9 +384,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               style={{
                 background: 'rgba(34, 197, 94, 0.2)',
                 color: 'var(--success)',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '8px',
+                padding: '4px 8px', fontSize: '8px',
                 fontWeight: 600,
                 display: 'flex',
                 alignItems: 'center',
@@ -425,9 +401,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               background: 'rgba(255,255,255,0.15)',
               border: 'none',
               color: colors.text,
-              padding: '4px 10px',
-              borderRadius: '4px',
-              fontSize: '9px',
+              padding: '4px 10px', fontSize: '9px',
               fontWeight: 600,
               cursor: 'pointer',
               transition: 'all 0.15s ease',

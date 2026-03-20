@@ -249,17 +249,13 @@ const ExtractionMonitor: React.FC = () => {
               key={notification.id}
               style={{
                 background: colors.bg,
-                border: `2px solid ${colors.border}`,
-                borderRadius: '4px',
-                padding: '12px 16px',
+                border: `2px solid ${colors.border}`, padding: '12px 16px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
                 fontSize: '11px',
                 color: colors.text,
-                fontWeight: 600,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                animation: 'slideInRight 0.2s ease',
+                fontWeight: 600, animation: 'slideInRight 0.2s ease',
                 cursor: 'pointer',
                 maxWidth: '400px'
               }}
@@ -297,9 +293,7 @@ const ExtractionMonitor: React.FC = () => {
         <div style={{
           background: 'rgba(239, 68, 68, 0.15)',
           border: '2px solid var(--error)',
-          padding: '16px',
-          borderRadius: '4px',
-          marginBottom: '24px',
+          padding: '16px', marginBottom: '24px',
           display: 'flex',
           alignItems: 'center',
           gap: '12px'
@@ -355,9 +349,7 @@ const ExtractionMonitor: React.FC = () => {
         <div style={{
           background: 'rgba(255,255,255,0.05)',
           border: '2px solid rgba(255,255,255,0.2)',
-          padding: '20px',
-          borderRadius: '4px'
-        }}>
+          padding: '20px'}}>
           <div style={{ fontSize: '12px', textTransform: 'uppercase', opacity: 0.7, marginBottom: '8px' }}>
             Total Images
           </div>
@@ -369,9 +361,7 @@ const ExtractionMonitor: React.FC = () => {
         <div style={{
           background: 'rgba(34, 197, 94, 0.1)',
           border: '2px solid rgba(34, 197, 94, 0.3)',
-          padding: '20px',
-          borderRadius: '4px'
-        }}>
+          padding: '20px'}}>
           <div style={{ fontSize: '12px', textTransform: 'uppercase', opacity: 0.7, marginBottom: '8px' }}>
             Extracted
           </div>
@@ -386,9 +376,7 @@ const ExtractionMonitor: React.FC = () => {
         <div style={{
           background: 'rgba(255,255,255,0.05)',
           border: '2px solid rgba(255,255,255,0.2)',
-          padding: '20px',
-          borderRadius: '4px'
-        }}>
+          padding: '20px'}}>
           <div style={{ fontSize: '12px', textTransform: 'uppercase', opacity: 0.7, marginBottom: '8px' }}>
             In Progress
           </div>
@@ -401,9 +389,7 @@ const ExtractionMonitor: React.FC = () => {
           <div style={{
             background: 'rgba(239, 68, 68, 0.1)',
             border: '2px solid rgba(239, 68, 68, 0.3)',
-            padding: '20px',
-            borderRadius: '4px'
-          }}>
+            padding: '20px'}}>
             <div style={{ fontSize: '12px', textTransform: 'uppercase', opacity: 0.7, marginBottom: '8px' }}>
               Potential Failures
             </div>
@@ -419,9 +405,7 @@ const ExtractionMonitor: React.FC = () => {
         <div style={{
           background: 'rgba(255,255,255,0.05)',
           border: '2px solid rgba(255,255,255,0.2)',
-          padding: '20px',
-          borderRadius: '4px'
-        }}>
+          padding: '20px'}}>
           <div style={{ fontSize: '12px', textTransform: 'uppercase', opacity: 0.7, marginBottom: '8px' }}>
             Models Used
           </div>
@@ -460,9 +444,7 @@ const ExtractionMonitor: React.FC = () => {
         <div style={{
           width: '100%',
           height: '8px',
-          background: 'rgba(255,255,255,0.1)',
-          borderRadius: '4px',
-          overflow: 'hidden'
+          background: 'rgba(255,255,255,0.1)', overflow: 'hidden'
         }}>
           <div style={{
             width: `${progressPercent}%`,
@@ -497,9 +479,7 @@ const ExtractionMonitor: React.FC = () => {
               <div key={image.id} style={{
                 background: 'rgba(255,255,255,0.05)',
                 border: '2px solid rgba(255,255,255,0.2)',
-                padding: '12px',
-                borderRadius: '4px',
-                fontSize: '11px'
+                padding: '12px', fontSize: '11px'
               }}>
                 <div style={{ 
                   display: 'flex', 
@@ -561,9 +541,7 @@ const ExtractionMonitor: React.FC = () => {
           <div style={{
             background: 'rgba(239, 68, 68, 0.1)',
             border: '2px solid rgba(239, 68, 68, 0.3)',
-            padding: '16px',
-            borderRadius: '4px',
-            marginBottom: '16px'
+            padding: '16px', marginBottom: '16px'
           }}>
             <div style={{ fontSize: '11px', marginBottom: '12px', opacity: 0.8 }}>
               Images older than 1 hour without extractions. These may have failed or are still pending.
@@ -577,9 +555,7 @@ const ExtractionMonitor: React.FC = () => {
                 <div key={failure.id} style={{
                   background: 'rgba(0,0,0,0.2)',
                   border: '1px solid rgba(239, 68, 68, 0.3)',
-                  padding: '12px',
-                  borderRadius: '4px',
-                  fontSize: '11px'
+                  padding: '12px', fontSize: '11px'
                 }}>
                   <div style={{ 
                     display: 'flex', 
@@ -646,9 +622,7 @@ const ExtractionMonitor: React.FC = () => {
         marginTop: '32px', 
         padding: '16px',
         background: 'rgba(255,255,255,0.05)',
-        border: '2px solid rgba(255,255,255,0.2)',
-        borderRadius: '4px',
-        fontSize: '11px',
+        border: '2px solid rgba(255,255,255,0.2)', fontSize: '11px',
         opacity: 0.7
       }}>
         <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>💡 Info</div>
@@ -657,7 +631,7 @@ const ExtractionMonitor: React.FC = () => {
           Use <code>scripts/compare-extractions.js</code> to compare different model results
         </div>
         {stats.failed > 0 && (
-          <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '4px' }}>
+          <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(239, 68, 68, 0.1)'}}>
             <div style={{ fontWeight: 'bold', color: 'var(--error)', marginBottom: '4px' }}>⚠️ Failures Detected</div>
             <div>Some images may have failed extraction. Check the failures section above for details.</div>
             <div style={{ marginTop: '4px', fontSize: '10px' }}>

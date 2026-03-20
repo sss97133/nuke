@@ -291,9 +291,7 @@ export default function ScriptControlCenter() {
                     textTransform: 'uppercase', 
                     color: statusColor,
                     border: `1px solid ${statusColor}`,
-                    padding: '2px 6px',
-                    borderRadius: '4px'
-                  }}>
+                    padding: '2px 6px'}}>
                     {script.status}
                   </div>
                 </div>
@@ -306,7 +304,7 @@ export default function ScriptControlCenter() {
                       {script.progress.current.toLocaleString()} / {script.progress.total.toLocaleString()}
                     </span>
                   </div>
-                  <div style={{ height: '6px', background: 'var(--bg-secondary)', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ height: '6px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
                     <div 
                       style={{ 
                         height: '100%', 

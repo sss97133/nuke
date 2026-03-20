@@ -191,9 +191,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
       <div
         style={{
           background: 'var(--surface)',
-          border: '2px solid var(--border)',
-          borderRadius: '4px',
-          maxWidth: '600px',
+          border: '2px solid var(--border)', maxWidth: '600px',
           width: '100%',
           maxHeight: '80vh',
           overflow: 'auto',
@@ -220,7 +218,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
 
         {/* Sale Info */}
         {salePrice && (
-          <div style={{ marginBottom: '20px', padding: '12px', background: 'var(--grey-100)', borderRadius: '4px' }}>
+          <div style={{ marginBottom: '20px', padding: '12px', background: 'var(--grey-100)'}}>
             <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
               Sale Price
             </div>
@@ -247,14 +245,14 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
                 {(() => {
                   if (recentTransfers.length > 0) {
                     return (
-                      <div style={{ padding: '8px', background: 'var(--warning-dim)', borderRadius: '4px', fontSize: '11px' }}>
+                      <div style={{ padding: '8px', background: 'var(--warning-dim)', fontSize: '11px' }}>
                         <strong>Recent Ownership Change:</strong> {recentTransfers.length} transfer{recentTransfers.length > 1 ? 's' : ''} in last 90 days
                       </div>
                     );
                   }
                   if (ownerships.length >= 3) {
                     return (
-                      <div style={{ padding: '8px', background: 'var(--info-bg)', borderRadius: '4px', fontSize: '11px' }}>
+                      <div style={{ padding: '8px', background: 'var(--info-bg)', fontSize: '11px' }}>
                         <strong>Multiple Owners:</strong> {ownerships.length} total owners
                       </div>
                     );
@@ -263,7 +261,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
                     const daysOwned = (Date.now() - new Date(currentOwners[0].start_date).getTime()) / (1000 * 60 * 60 * 24);
                     if (daysOwned > 365) {
                       return (
-                        <div style={{ padding: '8px', background: 'var(--success-dim)', borderRadius: '4px', fontSize: '11px' }}>
+                        <div style={{ padding: '8px', background: 'var(--success-dim)', fontSize: '11px' }}>
                           <strong>Stable Ownership:</strong> {Math.floor(daysOwned / 365)} year{Math.floor(daysOwned / 365) > 1 ? 's' : ''} owned
                         </div>
                       );
@@ -281,7 +279,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
                   Current Owner{currentOwners.length > 1 ? 's' : ''}
                 </div>
                 {currentOwners.map((owner, idx) => (
-                  <div key={idx} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', marginBottom: '4px' }}>
+                  <div key={idx} style={{ padding: '8px', border: '1px solid var(--border)', marginBottom: '4px' }}>
                     <div style={{ fontWeight: 600 }}>
                       {getOwnerName(owner)}
                     </div>
@@ -307,7 +305,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
                   Ownership Transfers ({transfers.length})
                 </div>
                 {transfers.slice(0, 5).map((transfer, idx) => (
-                  <div key={idx} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', marginBottom: '4px', fontSize: '11px' }}>
+                  <div key={idx} style={{ padding: '8px', border: '1px solid var(--border)', marginBottom: '4px', fontSize: '11px' }}>
                     <div style={{ fontWeight: 600, marginBottom: '4px' }}>
                       {new Date(transfer.transfer_date).toLocaleDateString()}
                     </div>

@@ -339,7 +339,7 @@ export function VehicleDataGapsCard({
       >
         <div>
         {showWhy && (
-          <div style={{ border: '1px solid var(--border-light)', borderRadius: 6, padding: 10, background: 'var(--grey-50)', marginBottom: 12 }}>
+          <div style={{ border: '1px solid var(--border-light)', padding: 10, background: 'var(--grey-50)', marginBottom: 12 }}>
             <div style={{ fontWeight: 800, fontSize: '12px', marginBottom: 4 }}>
               Why does this panel show up sometimes?
             </div>
@@ -365,9 +365,7 @@ export function VehicleDataGapsCard({
               <div
                 key={gap.id}
                 style={{
-                  border: '1px solid var(--border-light)',
-                  borderRadius: 6,
-                  padding: '10px',
+                  border: '1px solid var(--border-light)', padding: '10px',
                   background: 'var(--white)'
                 }}
               >
@@ -535,7 +533,7 @@ export function VehicleDataGapsCard({
                 </label>
 
                 {submitResult && (
-                  <div style={{ border: '1px solid var(--border-light)', padding: 10, borderRadius: 6, background: 'var(--surface)' }}>
+                  <div style={{ border: '1px solid var(--border-light)', padding: 10, background: 'var(--surface)' }}>
                     <div style={{ fontWeight: 800, marginBottom: 4 }}>
                       {submitResult?.gap_filled ? 'Applied to profile' : 'Submitted for consensus'}
                     </div>

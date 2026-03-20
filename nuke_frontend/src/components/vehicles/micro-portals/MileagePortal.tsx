@@ -48,9 +48,7 @@ export default function MileagePortal({ vehicleId, mileage, year, activePortal, 
             </div>
             <div style={{
               padding: '6px 8px',
-              border: '1px dashed var(--border)',
-              borderRadius: '4px',
-              fontSize: '11px',
+              border: '1px dashed var(--border)', fontSize: '11px',
               color: 'var(--primary, #3b82f6)',
               cursor: 'pointer',
               textAlign: 'center',
@@ -69,7 +67,7 @@ export default function MileagePortal({ vehicleId, mileage, year, activePortal, 
               <div style={{
                 fontSize: '21px',
                 fontWeight: 700,
-                fontFamily: 'ui-monospace, "SF Mono", monospace',
+                fontFamily: "'Courier New', monospace",
                 letterSpacing: '1px',
                 marginBottom: '6px',
               }}>
@@ -83,9 +81,7 @@ export default function MileagePortal({ vehicleId, mileage, year, activePortal, 
                 {mileageLevel && (
                   <span style={{
                     marginLeft: '6px',
-                    padding: '1px 5px',
-                    borderRadius: '3px',
-                    fontSize: '9px',
+                    padding: '1px 5px', fontSize: '9px',
                     fontWeight: 600,
                     background: mileageLevel === 'Low' ? 'color-mix(in srgb, var(--success) 12%, transparent)' : mileageLevel === 'Average' ? 'color-mix(in srgb, var(--warning) 12%, transparent)' : 'color-mix(in srgb, var(--error) 12%, transparent)',
                     color: mileageLevel === 'Low' ? 'var(--success)' : mileageLevel === 'Average' ? 'var(--warning)' : 'var(--error)',
@@ -127,9 +123,7 @@ export default function MileagePortal({ vehicleId, mileage, year, activePortal, 
                 {mileageLevel && (
                   <span style={{
                     marginLeft: '6px',
-                    padding: '1px 5px',
-                    borderRadius: '3px',
-                    fontSize: '9px',
+                    padding: '1px 5px', fontSize: '9px',
                     fontWeight: 600,
                     background: mileageLevel === 'Low' ? 'color-mix(in srgb, var(--success) 12%, transparent)' : mileageLevel === 'Average' ? 'color-mix(in srgb, var(--warning) 12%, transparent)' : 'color-mix(in srgb, var(--error) 12%, transparent)',
                     color: mileageLevel === 'Low' ? 'var(--success)' : mileageLevel === 'Average' ? 'var(--warning)' : 'var(--error)',

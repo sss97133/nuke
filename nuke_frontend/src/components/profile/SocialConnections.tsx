@@ -29,7 +29,7 @@ const SOCIAL_PLATFORMS = [
     id: 'x',
     name: 'X (Twitter)',
     domain: 'x.com',
-    color: '#000000',
+    color: 'var(--text)',
     oauthEndpoint: 'twitter', // Uses Supabase built-in provider
     description: 'Auto-post insights and updates',
     shortLabel: 'X'
@@ -47,7 +47,7 @@ const SOCIAL_PLATFORMS = [
     id: 'threads',
     name: 'Threads',
     domain: 'threads.net',
-    color: '#000000',
+    color: 'var(--text)',
     oauthEndpoint: null,
     description: 'Post to Threads (coming soon)',
     shortLabel: 'TH'
@@ -112,9 +112,7 @@ function PlatformFavicon({
     <div
       style={{
         width: containerSize,
-        height: containerSize,
-        borderRadius: '8px',
-        background,
+        height: containerSize, background,
         display: 'grid',
         placeItems: 'center',
         position: 'relative',
@@ -405,9 +403,7 @@ export default function SocialConnections({ userId }: Props) {
             padding: '8px 12px',
             marginBottom: '12px',
             background: 'var(--error-dim)',
-            border: '1px solid var(--error)',
-            borderRadius: '4px',
-            color: 'var(--error)',
+            border: '1px solid var(--error)', color: 'var(--error)',
             fontSize: '11px'
           }}>
             {error}
@@ -434,9 +430,7 @@ export default function SocialConnections({ userId }: Props) {
                     alignItems: 'center',
                     gap: '12px',
                     padding: '10px 12px',
-                    background: 'var(--surface-hover)',
-                    borderRadius: '4px',
-                    border: isExpired ? '2px solid var(--warning)' : '1px solid var(--border)'
+                    background: 'var(--surface-hover)', border: isExpired ? '2px solid var(--warning)' : '1px solid var(--border)'
                   }}
                 >
                   <PlatformFavicon
@@ -453,9 +447,7 @@ export default function SocialConnections({ userId }: Props) {
                       </span>
                       <span style={{
                         display: 'inline-block',
-                        padding: '2px 8px',
-                        borderRadius: '10px',
-                        fontSize: '9px',
+                        padding: '2px 8px', fontSize: '9px',
                         fontWeight: 600,
                         background: isExpired ? 'var(--warning-dim)' : 'var(--success-dim)',
                         color: isExpired ? 'var(--warning)' : 'var(--success)'
@@ -518,9 +510,7 @@ export default function SocialConnections({ userId }: Props) {
                   alignItems: 'center',
                   gap: '12px',
                   padding: '10px 12px',
-                  background: 'var(--surface)',
-                  borderRadius: '4px',
-                  border: '1px dashed var(--border)'
+                  background: 'var(--surface)', border: '1px dashed var(--border)'
                 }}
               >
                 <PlatformFavicon

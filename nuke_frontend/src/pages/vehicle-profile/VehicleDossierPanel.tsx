@@ -101,12 +101,12 @@ function classifySource(sourceType: string | null): SourceClass {
 }
 
 const BADGE_COLORS: Record<string, { border: string; color: string; bg?: string }> = {
-  'badge-vin': { border: '#1a5c1a', color: '#1a5c1a' },
-  'badge-bat': { border: '#1a4a8a', color: '#1a4a8a' },
-  'badge-user': { border: '#666', color: '#666' },
-  'badge-ai': { border: '#8a6b1a', color: '#8a6b1a' },
-  'badge-enrich': { border: '#8a1a1a', color: '#8a1a1a' },
-  'badge-mod': { border: '#8a6b1a', color: '#8a6b1a', bg: '#fff8e6' },
+  'badge-vin': { border: 'var(--success)', color: 'var(--success)' },
+  'badge-bat': { border: 'var(--info)', color: 'var(--info)' },
+  'badge-user': { border: 'var(--text-secondary)', color: 'var(--text-secondary)' },
+  'badge-ai': { border: 'var(--warning)', color: 'var(--warning)' },
+  'badge-enrich': { border: 'var(--error)', color: 'var(--error)' },
+  'badge-mod': { border: 'var(--warning)', color: 'var(--warning)', bg: 'var(--warning-dim)' },
 };
 
 /* ------------------------------------------------------------------ */
@@ -176,7 +176,7 @@ const Badge: React.FC<{
       textTransform: 'uppercase',
       padding: '1px 5px',
       border: `2px solid ${colors.border}`,
-      background: colors.bg || '#fff',
+      background: colors.bg || 'var(--surface-elevated)',
       color: colors.color,
       lineHeight: 1.4,
       ...style,
@@ -212,7 +212,7 @@ const FieldRow: React.FC<{
   }, [group]);
 
   return (
-    <div style={{ borderBottom: '1px solid #e0e0e0' }} data-field={field}>
+    <div style={{ borderBottom: '1px solid var(--border)' }} data-field={field}>
       <div
         onClick={group && group.sources.length > 0 ? onToggle : undefined}
         onMouseEnter={() => setHovered(true)}
@@ -225,7 +225,7 @@ const FieldRow: React.FC<{
           padding: '4px 10px',
           minHeight: '28px',
           cursor: group && group.sources.length > 0 ? 'pointer' : 'default',
-          background: isOpen ? '#f5f5f0' : (hovered && !isOpen ? '#fafafa' : 'transparent'),
+          background: isOpen ? 'var(--surface-hover)' : (hovered && !isOpen ? 'var(--bg)' : 'transparent'),
           transition: 'background 0.1s',
         }}
       >
@@ -236,7 +236,7 @@ const FieldRow: React.FC<{
           fontWeight: 700,
           letterSpacing: '0.5px',
           textTransform: 'uppercase',
-          color: '#666',
+          color: 'var(--text-secondary)',
           whiteSpace: 'nowrap',
         }}>
           {label}
@@ -246,7 +246,7 @@ const FieldRow: React.FC<{
         <span style={{
           fontFamily: field === 'vin' ? "'Courier New', Courier, monospace" : 'Arial, Helvetica, sans-serif',
           fontSize: '10px',
-          color: '#111',
+          color: 'var(--text)',
           padding: '0 8px',
           letterSpacing: field === 'vin' ? '1px' : 'normal',
         }}>
@@ -265,7 +265,7 @@ const FieldRow: React.FC<{
         <span style={{
           fontFamily: 'Arial, Helvetica, sans-serif',
           fontSize: '8px',
-          color: '#999',
+          color: 'var(--text-disabled)',
           textAlign: 'center',
           userSelect: 'none',
           transition: 'transform 0.15s',
@@ -373,8 +373,8 @@ const VehicleDossierPanel: React.FC = () => {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        background: '#fff',
-        border: '2px solid #000',
+        background: 'var(--surface-elevated)',
+        border: '2px solid var(--accent)',
         padding: '8px 12px',
       }}>
         <span style={{
@@ -394,9 +394,9 @@ const VehicleDossierPanel: React.FC = () => {
             letterSpacing: '0.5px',
             textTransform: 'uppercase',
             padding: '2px 6px',
-            border: `2px solid ${verificationClass === 'verified' ? '#1a5c1a' : '#8a6b1a'}`,
-            color: verificationClass === 'verified' ? '#1a5c1a' : '#8a6b1a',
-            background: '#fff',
+            border: `2px solid ${verificationClass === 'verified' ? 'var(--success)' : 'var(--warning)'}`,
+            color: verificationClass === 'verified' ? 'var(--success)' : 'var(--warning)',
+            background: 'var(--surface-elevated)',
           }}>
             {verificationLabel}
           </span>
@@ -404,9 +404,9 @@ const VehicleDossierPanel: React.FC = () => {
             <button
               onClick={() => navigate(`/vehicle/${vehicle!.id}/edit`)}
               style={{
-                border: '2px solid #000',
-                background: '#000',
-                color: '#fff',
+                border: '2px solid var(--accent)',
+                background: 'var(--accent)',
+                color: 'var(--surface-elevated)',
                 fontSize: '9px',
                 fontWeight: 700,
                 textTransform: 'uppercase',
@@ -425,8 +425,8 @@ const VehicleDossierPanel: React.FC = () => {
 
       {/* Identity Block */}
       <div style={{
-        background: '#fff',
-        border: '2px solid #000',
+        background: 'var(--surface-elevated)',
+        border: '2px solid var(--accent)',
         borderTop: 'none',
         padding: '10px 12px 8px',
         marginBottom: '8px',
@@ -445,7 +445,7 @@ const VehicleDossierPanel: React.FC = () => {
           <div style={{
             fontFamily: "'Courier New', Courier, monospace",
             fontSize: '11px',
-            color: '#333',
+            color: 'var(--text)',
             marginTop: '4px',
             letterSpacing: '1px',
           }}>
@@ -470,14 +470,14 @@ const VehicleDossierPanel: React.FC = () => {
                 fontWeight: 700,
                 letterSpacing: '0.5px',
                 textTransform: 'uppercase',
-                color: '#666',
+                color: 'var(--text-secondary)',
               }}>
                 OWNER
               </span>
               <span style={{
                 fontFamily: "'Courier New', Courier, monospace",
                 fontSize: '10px',
-                color: '#1a5c1a',
+                color: 'var(--success)',
               }}>
                 @{ownerName}
               </span>
@@ -488,9 +488,9 @@ const VehicleDossierPanel: React.FC = () => {
                 fontWeight: 700,
                 letterSpacing: '0.5px',
                 padding: '1px 5px',
-                border: '2px solid #1a5c1a',
-                background: '#1a5c1a',
-                color: '#fff',
+                border: '2px solid var(--success)',
+                background: 'var(--success)',
+                color: 'var(--surface-elevated)',
                 lineHeight: 1.4,
               }}>
                 VERIFIED
@@ -512,9 +512,9 @@ const VehicleDossierPanel: React.FC = () => {
                     letterSpacing: '0.5px',
                     textTransform: 'uppercase',
                     padding: '1px 5px',
-                    border: '2px solid #000',
-                    background: '#000',
-                    color: '#fff',
+                    border: '2px solid var(--accent)',
+                    background: 'var(--accent)',
+                    color: 'var(--surface-elevated)',
                     lineHeight: 1.4,
                   }}>
                     SOLD
@@ -529,8 +529,8 @@ const VehicleDossierPanel: React.FC = () => {
 
       {/* Info Panel */}
       <div style={{
-        background: '#fff',
-        border: '2px solid #000',
+        background: 'var(--surface-elevated)',
+        border: '2px solid var(--accent)',
         marginBottom: '8px',
       }}>
         <div style={{
@@ -540,8 +540,8 @@ const VehicleDossierPanel: React.FC = () => {
           letterSpacing: '1px',
           textTransform: 'uppercase',
           padding: '6px 10px',
-          background: '#f0f0f0',
-          borderBottom: '1px solid #ccc',
+          background: 'var(--surface)',
+          borderBottom: '1px solid var(--border)',
         }}>
           VEHICLE INFORMATION
         </div>
@@ -587,9 +587,9 @@ const VehicleDossierPanel: React.FC = () => {
                 letterSpacing: '1px',
                 textTransform: 'uppercase',
                 padding: '6px 10px',
-                background: '#f0f0f0',
-                borderTop: '1px solid #ccc',
-                borderBottom: '1px solid #ccc',
+                background: 'var(--surface)',
+                borderTop: '1px solid var(--border)',
+                borderBottom: '1px solid var(--border)',
               }}>
                 EXTENDED SPECIFICATIONS
               </div>
@@ -619,8 +619,8 @@ const VehicleDossierPanel: React.FC = () => {
 
       {/* Verification Summary */}
       <div style={{
-        background: '#fff',
-        border: '2px solid #000',
+        background: 'var(--surface-elevated)',
+        border: '2px solid var(--accent)',
         padding: '8px 10px',
         marginBottom: '8px',
       }}>
@@ -637,13 +637,13 @@ const VehicleDossierPanel: React.FC = () => {
         <div style={{
           width: '100%',
           height: '6px',
-          background: '#e0e0e0',
+          background: 'var(--border)',
           marginBottom: '4px',
         }}>
           <div style={{
             height: '100%',
             width: `${Math.round(coverage * 100)}%`,
-            background: '#1a5c1a',
+            background: 'var(--success)',
             transition: 'width 0.3s',
           }} />
         </div>
@@ -652,7 +652,7 @@ const VehicleDossierPanel: React.FC = () => {
           fontSize: '8px',
           textTransform: 'uppercase',
           letterSpacing: '0.5px',
-          color: '#666',
+          color: 'var(--text-secondary)',
         }}>
           {withEvidence}/{FIELD_ORDER.length} FIELDS WITH PROVENANCE
         </div>
@@ -661,8 +661,8 @@ const VehicleDossierPanel: React.FC = () => {
       {/* Data Quality Score */}
       {typeof (v as any).data_quality_score === 'number' && (
         <div style={{
-          background: '#fff',
-          border: '2px solid #000',
+          background: 'var(--surface-elevated)',
+          border: '2px solid var(--accent)',
           padding: '8px 10px',
           marginBottom: '8px',
         }}>
@@ -681,19 +681,19 @@ const VehicleDossierPanel: React.FC = () => {
               fontFamily: "'Courier New', Courier, monospace",
               fontSize: '12px',
               fontWeight: 700,
-              color: (v as any).data_quality_score >= 70 ? '#1a5c1a' : (v as any).data_quality_score >= 40 ? '#8a6b1a' : '#8a1a1a',
+              color: (v as any).data_quality_score >= 70 ? 'var(--success)' : (v as any).data_quality_score >= 40 ? 'var(--warning)' : 'var(--error)',
             }}>
               {Math.round((v as any).data_quality_score)}/100
             </span>
             <div style={{
               flex: 1,
               height: '4px',
-              background: '#e0e0e0',
+              background: 'var(--border)',
             }}>
               <div style={{
                 height: '100%',
                 width: `${Math.min(100, Math.max(0, (v as any).data_quality_score))}%`,
-                background: (v as any).data_quality_score >= 70 ? '#1a5c1a' : (v as any).data_quality_score >= 40 ? '#8a6b1a' : '#8a1a1a',
+                background: (v as any).data_quality_score >= 70 ? 'var(--success)' : (v as any).data_quality_score >= 40 ? 'var(--warning)' : 'var(--error)',
                 transition: 'width 0.3s',
               }} />
             </div>
@@ -740,8 +740,8 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
 
   return (
     <div style={{
-      background: '#fff',
-      border: '2px solid #000',
+      background: 'var(--surface-elevated)',
+      border: '2px solid var(--accent)',
       padding: '8px 10px',
       marginBottom: '8px',
     }}>
@@ -766,7 +766,7 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
         <span style={{
           fontFamily: 'Arial, Helvetica, sans-serif',
           fontSize: '9px',
-          color: '#666',
+          color: 'var(--text-secondary)',
           textTransform: 'uppercase',
           letterSpacing: '0.5px',
         }}>
@@ -785,20 +785,20 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
                 fontWeight: 700,
                 letterSpacing: '0.5px',
                 textTransform: 'uppercase',
-                color: '#666',
+                color: 'var(--text-secondary)',
               }}>
                 {d.label}
               </span>
-              <div style={{ height: '4px', background: '#e0e0e0', alignSelf: 'center' }}>
+              <div style={{ height: '4px', background: 'var(--border)', alignSelf: 'center' }}>
                 <div style={{
                   height: '100%',
                   width: `${Math.min(100, Math.max(0, d.value))}%`,
-                  background: d.value >= 70 ? '#1a5c1a' : d.value >= 40 ? '#8a6b1a' : '#8a1a1a',
+                  background: d.value >= 70 ? 'var(--success)' : d.value >= 40 ? 'var(--warning)' : 'var(--error)',
                 }} />
               </div>
               <span style={{
                 fontFamily: "'Courier New', Courier, monospace",
-                color: '#333',
+                color: 'var(--text)',
                 textAlign: 'right',
               }}>
                 {Math.round(d.value)}

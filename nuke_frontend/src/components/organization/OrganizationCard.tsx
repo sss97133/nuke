@@ -88,11 +88,9 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = 'none';
       }}
       onClick={() => navigate(`/org/${organization.organization_id}`)}
     >
@@ -104,18 +102,14 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
               alt={org.business_name || 'Organization'}
               style={{
                 width: '40px',
-                height: '40px',
-                borderRadius: '4px',
-                objectFit: 'cover',
+                height: '40px', objectFit: 'cover',
               }}
             />
           ) : (
             <div
               style={{
                 width: '40px',
-                height: '40px',
-                borderRadius: '4px',
-                backgroundColor: 'var(--border)',
+                height: '40px', backgroundColor: 'var(--border)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -163,9 +157,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
             style={{
               fontSize: '11px',
               fontWeight: 'bold',
-              padding: '3px 8px',
-              borderRadius: '3px',
-              backgroundColor: getRoleColor(organization.role),
+              padding: '3px 8px', backgroundColor: getRoleColor(organization.role),
               color: 'var(--bg)',
             }}
           >
@@ -175,9 +167,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
             style={{
               fontSize: '10px',
               fontWeight: 'bold',
-              padding: '3px 8px',
-              borderRadius: '3px',
-              backgroundColor: statusBadge.color,
+              padding: '3px 8px', backgroundColor: statusBadge.color,
               color: statusBadge.color === 'var(--warning)' ? 'var(--text)' : 'var(--bg)',
             }}
           >
@@ -188,9 +178,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
               style={{
                 fontSize: '10px',
                 fontWeight: 'bold',
-                padding: '3px 8px',
-                borderRadius: '3px',
-                backgroundColor: 'var(--success)',
+                padding: '3px 8px', backgroundColor: 'var(--success)',
                 color: 'var(--text)',
               }}
             >
@@ -208,9 +196,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
             gap: '8px',
             marginBottom: '12px',
             padding: '8px',
-            backgroundColor: 'var(--bg)',
-            borderRadius: '4px',
-          }}
+            backgroundColor: 'var(--bg)', }}
         >
           <div>
             <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Vehicles</div>

@@ -160,9 +160,7 @@ const WorkMemoryCapture: React.FC<WorkMemoryCaptureProps> = ({
                 minHeight: '60px',
                 fontSize: '14px',
                 padding: 'var(--space-2)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius)',
-                resize: 'vertical',
+                border: '1px solid var(--color-border)', resize: 'vertical',
                 width: '100%'
               }}
               rows={3}
@@ -230,9 +228,7 @@ const WorkMemoryCapture: React.FC<WorkMemoryCaptureProps> = ({
                 <div
                   key={memory.id}
                   style={{
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius)',
-                    padding: 'var(--space-2)',
+                    border: '1px solid var(--color-border)', padding: 'var(--space-2)',
                     backgroundColor: 'var(--color-background-muted, #f8f9fa)',
                     fontSize: '12px'
                   }}

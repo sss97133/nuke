@@ -810,7 +810,7 @@ const VehicleMailbox: React.FC = () => {
   if (!mailbox) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+        <div className="animate-spin h-32 w-32 border-b-2 border-gray-900"></div>
       </div>
     )
   }
@@ -847,7 +847,7 @@ const VehicleMailbox: React.FC = () => {
               <Inbox className="w-3 h-3" />
               <span>Inbox</span>
               {unreadCount > 0 && (
-                <span className="ml-auto bg-red-600 text-white px-1.5 py-0.5 rounded-full" style={{ fontSize: '9px' }}>
+                <span className="ml-auto bg-red-600 text-white px-1.5 py-0.5" style={{ fontSize: '9px' }}>
                   {unreadCount}
                 </span>
               )}
@@ -905,7 +905,7 @@ const VehicleMailbox: React.FC = () => {
                 </div>
               )}
               {unreadCount > 0 && (
-                <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-semibold" style={{ fontSize: '11px' }}>
+                <span className="bg-red-100 text-red-800 px-2 py-0.5 font-semibold" style={{ fontSize: '11px' }}>
                   {unreadCount} unread
                 </span>
               )}

@@ -84,9 +84,7 @@ export const VehicleRow: React.FC<VehicleRowProps> = ({
       {/* Thumbnail */}
       <div style={{
         width: '48px',
-        height: '36px',
-        borderRadius: '3px',
-        overflow: 'hidden',
+        height: '36px', overflow: 'hidden',
         flexShrink: 0,
         background: 'var(--grey-200)'
       }}>
@@ -183,9 +181,7 @@ export const VehicleRow: React.FC<VehicleRowProps> = ({
             fontSize: '9px',
             fontWeight: 600,
             background: 'var(--surface-hover)',
-            border: '1px solid var(--border)',
-            borderRadius: '2px',
-            cursor: 'pointer',
+            border: '1px solid var(--border)', cursor: 'pointer',
             color: 'var(--text-muted)'
           }}
         >
@@ -200,9 +196,7 @@ export const VehicleRow: React.FC<VehicleRowProps> = ({
             fontSize: '9px',
             fontWeight: 600,
             background: 'var(--surface-hover)',
-            border: '1px solid var(--border)',
-            borderRadius: '2px',
-            cursor: 'pointer',
+            border: '1px solid var(--border)', cursor: 'pointer',
             color: 'var(--text-muted)'
           }}
         >
@@ -217,9 +211,7 @@ export const VehicleRow: React.FC<VehicleRowProps> = ({
             fontSize: '9px',
             fontWeight: 600,
             background: 'var(--surface-hover)',
-            border: '1px solid var(--border)',
-            borderRadius: '2px',
-            cursor: 'pointer',
+            border: '1px solid var(--border)', cursor: 'pointer',
             color: 'var(--text-muted)'
           }}
         >

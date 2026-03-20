@@ -315,9 +315,7 @@ const RoleManagementInterface: React.FC<RoleManagementInterfaceProps> = ({
                 {/* Avatar */}
                 <div style={{
                   width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--bg)',
+                  height: '48px', backgroundColor: 'var(--bg)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -329,7 +327,7 @@ const RoleManagementInterface: React.FC<RoleManagementInterfaceProps> = ({
                     <img
                       src={contributor.user_profile.avatar_url}
                       alt="Avatar"
-                      style={{ width: '100%', height: '100%', borderRadius: '50%' }}
+                      style={{ width: '100%', height: '100%'}}
                     />
                   ) : (
                     contributor.user_profile?.full_name?.charAt(0) || '?'
@@ -370,7 +368,7 @@ const RoleManagementInterface: React.FC<RoleManagementInterfaceProps> = ({
                   </div>
 
                   {contributor.notes && (
-                    <div className="text text-sm" style={{ marginTop: '8px', padding: '8px', backgroundColor: 'var(--bg)', borderRadius: '4px' }}>
+                    <div className="text text-sm" style={{ marginTop: '8px', padding: '8px', backgroundColor: 'var(--bg)'}}>
                       {contributor.notes}
                     </div>
                   )}
@@ -436,9 +434,7 @@ const RoleManagementInterface: React.FC<RoleManagementInterfaceProps> = ({
                 {/* Avatar */}
                 <div style={{
                   width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--bg)',
+                  height: '48px', backgroundColor: 'var(--bg)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -450,7 +446,7 @@ const RoleManagementInterface: React.FC<RoleManagementInterfaceProps> = ({
                     <img
                       src={request.user_profile.avatar_url}
                       alt="Avatar"
-                      style={{ width: '100%', height: '100%', borderRadius: '50%' }}
+                      style={{ width: '100%', height: '100%'}}
                     />
                   ) : (
                     request.user_profile?.full_name?.charAt(0) || '?'

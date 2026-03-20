@@ -81,12 +81,12 @@ export function FeedStatsStrip({ stats, isLoading, searchText, onSearchChange, r
         <Stat
           label="TODAY"
           value={`+${stats.vehicles_added_today}`}
-          color="#10b981"
+          color="var(--success)"
         />
       )}
       <Stat label="FOR SALE" value={formatCompact(stats.for_sale_count)} />
       {stats.active_auctions > 0 && (
-        <Stat label="LIVE" value={String(stats.active_auctions)} color="#ef4444" />
+        <Stat label="LIVE" value={String(stats.active_auctions)} color="var(--error)" />
       )}
 
       {/* Filter result count + clear */}
@@ -107,9 +107,8 @@ export function FeedStatsStrip({ stats, isLoading, searchText, onSearchChange, r
             style={{
               fontFamily: 'Arial, sans-serif', fontSize: '7px', fontWeight: 700,
               textTransform: 'uppercase', padding: '1px 4px',
-              border: '1px solid #ef4444', background: 'transparent',
-              color: '#ef4444', cursor: 'pointer', borderRadius: 0,
-            }}
+              border: '1px solid var(--error)', background: 'transparent',
+              color: 'var(--error)', cursor: 'pointer', }}
           >
             CLEAR
           </button>
@@ -136,9 +135,7 @@ export function FeedStatsStrip({ stats, isLoading, searchText, onSearchChange, r
               border: '1px solid var(--border)',
               background: 'var(--bg)',
               color: 'var(--text)',
-              outline: 'none',
-              borderRadius: 0,
-            }}
+              outline: 'none', }}
           />
         </div>
       )}

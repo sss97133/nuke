@@ -141,7 +141,7 @@ const ModeratorAssignmentWizard: React.FC<ModeratorAssignmentWizardProps> = ({
       </div>
 
       {searchResults.length > 0 && (
-        <div style={{ marginBottom: '16px', maxHeight: '200px', overflow: 'auto', border: '1px solid var(--border)', borderRadius: '4px', padding: '8px' }}>
+        <div style={{ marginBottom: '16px', maxHeight: '200px', overflow: 'auto', border: '1px solid var(--border)', padding: '8px' }}>
           {searchResults.map((user) => (
             <div
               key={user.id}
@@ -152,9 +152,7 @@ const ModeratorAssignmentWizard: React.FC<ModeratorAssignmentWizardProps> = ({
               style={{
                 padding: '8px',
                 cursor: 'pointer',
-                background: selectedUserId === user.id ? 'var(--primary-light)' : 'transparent',
-                borderRadius: '4px',
-                marginBottom: '4px',
+                background: selectedUserId === user.id ? 'var(--primary-light)' : 'transparent', marginBottom: '4px',
                 border: selectedUserId === user.id ? '2px solid var(--primary)' : '1px solid transparent'
               }}
             >
@@ -172,7 +170,7 @@ const ModeratorAssignmentWizard: React.FC<ModeratorAssignmentWizardProps> = ({
       )}
 
       {selectedUser && (
-        <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--grey-50)', borderRadius: '4px' }}>
+        <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--grey-50)'}}>
           <div style={{ fontWeight: 600, marginBottom: '4px' }}>Selected Moderator:</div>
           <div>{selectedUser.full_name || selectedUser.email}</div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{selectedUser.email}</div>

@@ -1969,10 +1969,8 @@ const VehiclesInner: React.FC = () => {
                 <div style={{
                   padding: '8px 12px',
                   marginBottom: '12px',
-                  background: healthFilter === 'healthy' ? '#dcfce7' : healthFilter === 'needs_work' ? '#fef3c7' : '#fee2e2',
-                  border: `1px solid ${healthFilter === 'healthy' ? '#86efac' : healthFilter === 'needs_work' ? '#fcd34d' : '#fca5a5'}`,
-                  borderRadius: '4px',
-                  display: 'flex',
+                  background: healthFilter === 'healthy' ? 'var(--success-dim)' : healthFilter === 'needs_work' ? 'var(--warning-dim)' : 'var(--error-dim)',
+                  border: `1px solid ${healthFilter === 'healthy' ? '#86efac' : healthFilter === 'needs_work' ? '#fcd34d' : 'var(--error-light, var(--error-dim))'}`, display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
@@ -2254,9 +2252,7 @@ const VehiclesInner: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
             style={{
               background: 'var(--white)',
-              border: '2px solid var(--border)',
-              boxShadow: 'var(--shadow)',
-              maxWidth: '520px',
+              border: '2px solid var(--border)', maxWidth: '520px',
               width: '100%',
               maxHeight: '90vh',
               overflow: 'auto'

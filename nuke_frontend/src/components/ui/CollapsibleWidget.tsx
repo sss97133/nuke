@@ -35,7 +35,7 @@ export function CollapsibleWidget({
   return (
     <div
       className={cn(
-        isProfile ? 'collapsible-widget--profile' : 'rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700',
+        isProfile ? 'collapsible-widget--profile' : ' border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700',
         isProfile && isCollapsed && 'is-collapsed',
         className
       )}

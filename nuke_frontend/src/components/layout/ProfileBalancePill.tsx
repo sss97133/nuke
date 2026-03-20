@@ -74,9 +74,7 @@ export const ProfileBalancePill: React.FC<Props> = ({
           alignItems: 'center',
           width: `${capsuleWidth}px`,
           height: `${circleSize}px`,
-          backgroundColor: 'var(--surface)',
-          borderRadius: '50px',
-          overflow: 'hidden',
+          backgroundColor: 'var(--surface)', overflow: 'hidden',
           transition: 'width 0.3s ease',
           cursor: 'pointer',
           border: '2px solid var(--border)'
@@ -97,7 +95,7 @@ export const ProfileBalancePill: React.FC<Props> = ({
               color: 'var(--text)',
               fontSize: '13px',
               fontWeight: 700,
-              fontFamily: '"MS Sans Serif", sans-serif',
+              fontFamily: 'Arial, sans-serif',
               userSelect: 'none',
               height: '100%',
               paddingLeft: '0px'
@@ -113,9 +111,7 @@ export const ProfileBalancePill: React.FC<Props> = ({
             width: `${circleSize}px`,
             height: `${circleSize}px`,
             minWidth: `${circleSize}px`,
-            minHeight: `${circleSize}px`,
-            borderRadius: '50%',
-            overflow: 'hidden',
+            minHeight: `${circleSize}px`, overflow: 'hidden',
             flexShrink: 0,
             backgroundColor: 'var(--surface-hover)',
             display: 'flex',
@@ -130,11 +126,7 @@ export const ProfileBalancePill: React.FC<Props> = ({
                 right: '-2px',
                 bottom: '-2px',
                 width: '10px',
-                height: '10px',
-                borderRadius: '999px',
-                background: 'var(--error)',
-                boxShadow: '0 0 0 2px var(--bg)'
-              }}
+                height: '10px', background: 'var(--error)'}}
             />
           )}
           {userProfile?.avatar_url ? (
@@ -179,7 +171,7 @@ export const ProfileBalancePill: React.FC<Props> = ({
             >
               <span>Notifications</span>
               {unreadCount > 0 && (
-                <span style={{ background: 'var(--error)', color: 'var(--bg)', borderRadius: '12px', padding: '2px 8px', fontSize: '10px', minWidth: '24px', textAlign: 'center' }}>
+                <span style={{ background: 'var(--error)', color: 'var(--bg)', padding: '2px 8px', fontSize: '10px', minWidth: '24px', textAlign: 'center' }}>
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}

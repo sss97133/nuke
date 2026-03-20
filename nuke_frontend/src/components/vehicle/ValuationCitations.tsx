@@ -151,7 +151,7 @@ const ValuationCitations: React.FC<ValuationCitationsProps> = ({ vehicleId }) =>
             const groupTotal = citationGroup.reduce((sum, c) => sum + (c.value_usd || 0), 0);
             
             return (
-              <div key={componentType} className="border border-gray-200 rounded-lg overflow-hidden">
+              <div key={componentType} className="border border-gray-200 overflow-hidden">
                 {/* Group Header */}
                 <div className="bg-gray-50 px-4 py-2 flex items-center justify-between">
                   <div className="font-semibold text-gray-900">
@@ -195,7 +195,7 @@ const ValuationCitations: React.FC<ValuationCitationsProps> = ({ vehicleId }) =>
                               </span>
                               <span className="capitalize">{citation.evidence_type.replace('_', ' ')}</span>
                               {citation.confidence_score && (
-                                <span className={`px-2 py-0.5 rounded ${
+                                <span className={`px-2 py-0.5  ${
                                   citation.confidence_score >= 80 ? 'bg-green-100 text-green-800' :
                                   citation.confidence_score >= 60 ? 'bg-yellow-100 text-yellow-800' :
                                   'bg-gray-100 text-gray-800'
@@ -220,7 +220,7 @@ const ValuationCitations: React.FC<ValuationCitationsProps> = ({ vehicleId }) =>
         </div>
 
         {/* Info Footer */}
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 text-sm text-blue-900">
           <div className="font-medium flex items-center gap-2">
             <CheckCircle className="w-4 h-4" />
             Transparent Valuation

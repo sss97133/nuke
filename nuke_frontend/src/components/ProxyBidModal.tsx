@@ -263,9 +263,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
     >
       <div
         style={{
-          background: 'var(--surface)',
-          borderRadius: '8px',
-          maxWidth: step === 'agreement' ? '750px' : step === 'credentials' ? '450px' : '500px',
+          background: 'var(--surface)', maxWidth: step === 'agreement' ? '750px' : step === 'credentials' ? '450px' : '500px',
           width: '100%',
           maxHeight: '90vh',
           overflow: 'auto'
@@ -302,12 +300,10 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
         <div style={{ padding: '20px' }}>
           {error && (
             <div style={{
-              background: '#fef2f2',
+              background: 'var(--error-dim)',
               border: '1px solid #fecaca',
               color: '#991b1b',
-              padding: '10px 12px',
-              borderRadius: '4px',
-              marginBottom: '16px',
+              padding: '10px 12px', marginBottom: '16px',
               fontSize: '12px'
             }}>
               {error}
@@ -333,11 +329,9 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
           {step === 'credentials' && (
             <div>
               <div style={{
-                background: '#fef3c7',
+                background: 'var(--warning-dim)',
                 border: '1px solid #fcd34d',
-                padding: '12px',
-                borderRadius: '4px',
-                marginBottom: '16px'
+                padding: '12px', marginBottom: '16px'
               }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>
                   Platform Login Required
@@ -353,9 +347,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                 gap: '12px',
                 marginBottom: '16px',
                 padding: '12px',
-                background: 'var(--surface-hover)',
-                borderRadius: '4px'
-              }}>
+                background: 'var(--surface-hover)'}}>
                 {listing.vehicle.primary_image_url && (
                   <img
                     src={listing.vehicle.primary_image_url}
@@ -363,9 +355,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                     style={{
                       width: '80px',
                       height: '60px',
-                      objectFit: 'cover',
-                      borderRadius: '4px'
-                    }}
+                      objectFit: 'cover'}}
                   />
                 )}
                 <div>
@@ -438,9 +428,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                 gap: '12px',
                 marginBottom: '20px',
                 padding: '12px',
-                background: 'var(--surface-hover)',
-                borderRadius: '4px'
-              }}>
+                background: 'var(--surface-hover)'}}>
                 {listing.vehicle.primary_image_url && (
                   <img
                     src={listing.vehicle.primary_image_url}
@@ -448,9 +436,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                     style={{
                       width: '80px',
                       height: '60px',
-                      objectFit: 'cover',
-                      borderRadius: '4px'
-                    }}
+                      objectFit: 'cover'}}
                   />
                 )}
                 <div>
@@ -513,9 +499,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                     gap: '10px',
                     padding: '10px 12px',
                     background: bidStrategy === 'proxy_auto' ? 'var(--accent-dim)' : 'var(--surface-hover)',
-                    border: `2px solid ${bidStrategy === 'proxy_auto' ? 'var(--accent)' : 'var(--border)'}`,
-                    borderRadius: '4px',
-                    cursor: 'pointer'
+                    border: `2px solid ${bidStrategy === 'proxy_auto' ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer'
                   }}>
                     <input
                       type="radio"
@@ -537,9 +521,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                     gap: '10px',
                     padding: '10px 12px',
                     background: bidStrategy === 'snipe_last_minute' ? 'var(--accent-dim)' : 'var(--surface-hover)',
-                    border: `2px solid ${bidStrategy === 'snipe_last_minute' ? 'var(--accent)' : 'var(--border)'}`,
-                    borderRadius: '4px',
-                    cursor: 'pointer'
+                    border: `2px solid ${bidStrategy === 'snipe_last_minute' ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer'
                   }}>
                     <input
                       type="radio"
@@ -562,9 +544,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
               {maxBidCents > 0 && (
                 <div style={{
                   background: 'var(--surface-hover)',
-                  padding: '12px',
-                  borderRadius: '4px',
-                  marginBottom: '16px',
+                  padding: '12px', marginBottom: '16px',
                   fontSize: '11px'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
@@ -631,11 +611,9 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
           {step === 'confirm' && (
             <div>
               <div style={{
-                background: '#fef3c7',
+                background: 'var(--warning-dim)',
                 border: '1px solid #fcd34d',
-                padding: '12px',
-                borderRadius: '4px',
-                marginBottom: '16px',
+                padding: '12px', marginBottom: '16px',
                 fontSize: '12px'
               }}>
                 <strong>Please confirm your proxy bid:</strong>
@@ -643,9 +621,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
 
               <div style={{
                 background: 'var(--surface-hover)',
-                padding: '16px',
-                borderRadius: '4px',
-                marginBottom: '16px'
+                padding: '16px', marginBottom: '16px'
               }}>
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Vehicle</div>
@@ -718,9 +694,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
               <div style={{
                 width: '64px',
                 height: '64px',
-                background: '#dcfce7',
-                borderRadius: '50%',
-                display: 'flex',
+                background: 'var(--success-dim)', display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px',

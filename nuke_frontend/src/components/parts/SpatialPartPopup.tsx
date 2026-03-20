@@ -70,7 +70,7 @@ const SpatialPartPopup: React.FC<SpatialPartPopupProps> = ({ part, onClose, onOr
 							</button>
 						))}
 						{(part.suppliers || []).length === 0 && (
-							<div style={{ fontSize: '11px', color: '#6b7280' }}>No suppliers available</div>
+							<div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>No suppliers available</div>
 						)}
 					</div>
 				</div>

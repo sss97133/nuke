@@ -45,9 +45,7 @@ export const ComprehensiveProfileStats: React.FC<ProfileStatsProps> = ({
       gap: 'var(--space-3)',
       padding: 'var(--space-4)',
       background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: '4px',
-    }}>
+      border: '1px solid var(--border)', }}>
       {/* Header */}
       <div style={{
         display: 'flex',
@@ -122,9 +120,7 @@ const StatCard: React.FC<{ label: string; value: string; link?: string }> = ({ l
       alignItems: 'center',
       padding: 'var(--space-3)',
       background: 'var(--surface-hover)',
-      border: '1px solid var(--border)',
-      borderRadius: '4px',
-      cursor: link ? 'pointer' : 'default',
+      border: '1px solid var(--border)', cursor: link ? 'pointer' : 'default',
       transition: 'all 0.12s ease',
     }}
     onMouseEnter={(e) => {

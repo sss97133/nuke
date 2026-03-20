@@ -37,7 +37,7 @@
 .stat-card {
   background: var(--surface);
   border: 2px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: var(--space-4);
   text-align: center;
   transition: var(--transition);
@@ -69,7 +69,7 @@
 .merge-proposal-card {
   background: var(--surface);
   border: 2px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: var(--space-4);
   transition: var(--transition);
 }
@@ -94,7 +94,7 @@
 
 .merge-badge {
   padding: 2px var(--space-2);
-  border-radius: 2px;
+  border-radius: 0;
   font-size: var(--fs-8);
   font-weight: 700;
   color: var(--bg);
@@ -103,7 +103,7 @@
 
 .confidence-badge {
   padding: 2px var(--space-2);
-  border-radius: 2px;
+  border-radius: 0;
   font-size: var(--fs-8);
   font-weight: 700;
   color: var(--bg);
@@ -125,7 +125,7 @@
 .vehicle-card {
   padding: var(--space-3);
   border: 2px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   background: var(--bg);
 }
 
@@ -189,7 +189,7 @@
   padding: var(--space-2);
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   font-size: var(--fs-8);
   color: var(--text-secondary);
   margin-bottom: var(--space-3);
@@ -200,7 +200,7 @@
   padding: var(--space-2) var(--space-3);
   background: var(--surface);
   border: 2px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   font-size: var(--fs-9);
   font-weight: 600;
   color: var(--text);
@@ -225,7 +225,7 @@
   padding: var(--space-4);
   background: var(--bg);
   border: 2px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   margin-bottom: var(--space-3);
 }
 
@@ -325,7 +325,7 @@
 .source-badge {
   display: inline-block;
   padding: 2px var(--space-2);
-  border-radius: 2px;
+  border-radius: 0;
   font-weight: 600;
   text-transform: capitalize;
 }
@@ -354,7 +354,7 @@
   padding: var(--space-2);
   background: var(--accent-dim);
   border: 1px solid var(--accent);
-  border-radius: var(--radius);
+  border-radius: 0;
   font-size: var(--fs-8);
   color: var(--text);
 }

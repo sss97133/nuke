@@ -63,7 +63,7 @@ function PaymentSetupForm({ onSuccess, onCancel }: PaymentMethodSetupProps) {
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Card Information
         </label>
-        <div className="p-3 border border-gray-300 rounded">
+        <div className="p-3 border border-gray-300">
           <CardElement
             options={{
               style: {
@@ -84,7 +84,7 @@ function PaymentSetupForm({ onSuccess, onCancel }: PaymentMethodSetupProps) {
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm">
           {error}
         </div>
       )}
@@ -93,14 +93,14 @@ function PaymentSetupForm({ onSuccess, onCancel }: PaymentMethodSetupProps) {
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+          className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={!stripe || loading}
-          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? 'Processing...' : 'Add Payment Method'}
         </button>
@@ -143,16 +143,16 @@ export default function PaymentMethodSetup({ onSuccess, onCancel }: PaymentMetho
   if (!stripeKey) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg max-w-md w-full p-6">
+        <div className="bg-white max-w-md w-full p-6">
           <h2 className="text-2xl font-bold mb-4">Add Payment Method</h2>
-          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-sm">
+          <div className="p-3 bg-yellow-50 border border-yellow-200 text-sm">
             Payments are currently unavailable because the Stripe publishable key is not configured.
           </div>
           <div className="mt-4 flex gap-3">
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
             >
               Close
             </button>
@@ -165,7 +165,7 @@ export default function PaymentMethodSetup({ onSuccess, onCancel }: PaymentMetho
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg max-w-md w-full p-6">
+        <div className="bg-white max-w-md w-full p-6">
           <h2 className="text-2xl font-bold mb-4">Add Payment Method</h2>
           <p className="text-sm text-gray-600">Loading secure payment form…</p>
         </div>
@@ -176,9 +176,9 @@ export default function PaymentMethodSetup({ onSuccess, onCancel }: PaymentMetho
   if (loadError || !stripeInstance) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg max-w-md w-full p-6">
+        <div className="bg-white max-w-md w-full p-6">
           <h2 className="text-2xl font-bold mb-4">Add Payment Method</h2>
-          <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
+          <div className="p-3 bg-red-50 border border-red-200 text-sm text-red-800">
             {loadError || 'Payment form failed to load.'}
             <p className="mt-2 text-xs">If you see a content security or script error, your network or organization may be blocking Stripe. Try again later or use a different network.</p>
           </div>
@@ -186,7 +186,7 @@ export default function PaymentMethodSetup({ onSuccess, onCancel }: PaymentMetho
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
             >
               Close
             </button>
@@ -198,7 +198,7 @@ export default function PaymentMethodSetup({ onSuccess, onCancel }: PaymentMetho
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-md w-full p-6">
+      <div className="bg-white max-w-md w-full p-6">
         <h2 className="text-2xl font-bold mb-4">Add Payment Method</h2>
         <p className="text-sm text-gray-600 mb-6">
           We'll place a temporary hold on your card when you bid. The hold is released if you're
@@ -209,7 +209,7 @@ export default function PaymentMethodSetup({ onSuccess, onCancel }: PaymentMetho
           <PaymentSetupForm onSuccess={onSuccess} onCancel={onCancel} />
         </Elements>
 
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 text-xs text-blue-800">
           <p className="font-medium mb-1">Secure Payment Processing</p>
           <p>
             Your payment information is processed securely by Stripe. We never store your full card

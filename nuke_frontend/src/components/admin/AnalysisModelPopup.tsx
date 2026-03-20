@@ -249,10 +249,7 @@ export const AnalysisModelPopup: React.FC<AnalysisModelPopupProps> = ({
             maxHeight: '80vh',
             overflowY: 'auto',
             backgroundColor: 'var(--white)',
-            border: '2px solid var(--border-medium)',
-            borderRadius: '0px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-            padding: 'var(--space-4)'
+            border: '2px solid var(--border-medium)', padding: 'var(--space-4)'
           }}
           onClick={(e) => e.stopPropagation()}
         >

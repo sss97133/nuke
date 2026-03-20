@@ -53,10 +53,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const getColors = (type: Toast['type']) => {
     switch (type) {
-      case 'success': return { bg: '#dcfce7', border: '#22c55e', text: '#166534' };
-      case 'error': return { bg: '#fee2e2', border: '#ef4444', text: '#991b1b' };
-      case 'warning': return { bg: '#fef3c7', border: '#f59e0b', text: '#92400e' };
-      case 'info': return { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af' };
+      case 'success': return { bg: 'var(--success-dim)', border: 'var(--success)', text: '#166534' };
+      case 'error': return { bg: 'var(--error-dim)', border: 'var(--error)', text: '#991b1b' };
+      case 'warning': return { bg: 'var(--warning-dim)', border: 'var(--warning)', text: '#92400e' };
+      case 'info': return { bg: 'var(--info-dim)', border: 'var(--info)', text: '#1e40af' };
       default: return { bg: 'var(--surface)', border: 'var(--border)', text: 'var(--text)' };
     }
   };
@@ -83,17 +83,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               key={toast.id}
               style={{
                 background: colors.bg,
-                border: `2px solid ${colors.border}`,
-                borderRadius: '4px',
-                padding: '12px 16px',
+                border: `2px solid ${colors.border}`, padding: '12px 16px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
                 fontSize: '10px',
                 color: colors.text,
-                fontWeight: 500,
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                animation: 'slideIn 0.12s ease',
+                fontWeight: 500, animation: 'slideIn 0.12s ease',
                 cursor: 'pointer'
               }}
               onClick={() => removeToast(toast.id)}

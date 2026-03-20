@@ -135,9 +135,7 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
                     padding: '8px 16px',
                     border: `2px solid ${assetType === type ? 'var(--primary)' : 'var(--border)'}`,
                     background: assetType === type ? 'var(--primary)' : 'transparent',
-                    color: assetType === type ? 'var(--white)' : 'var(--text)',
-                    borderRadius: '4px',
-                    fontSize: '12px',
+                    color: assetType === type ? 'var(--white)' : 'var(--text)', fontSize: '12px',
                     fontWeight: 700,
                     cursor: 'pointer',
                     textTransform: 'uppercase'
@@ -156,12 +154,12 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={`Search ${assetType}s...`}
-              style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+              style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
             />
           </div>
 
           {/* Available Assets */}
-          <div style={{ maxHeight: '400px', overflowY: 'auto', border: '2px solid var(--border)', borderRadius: '4px', padding: '12px' }}>
+          <div style={{ maxHeight: '400px', overflowY: 'auto', border: '2px solid var(--border)', padding: '12px' }}>
             {loading ? (
               <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '12px' }}>
                 Loading {assetType}s...
@@ -187,9 +185,7 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         padding: '12px',
-                        border: '2px solid var(--border)',
-                        borderRadius: '4px',
-                        background: isSelected ? 'var(--surface)' : 'transparent'
+                        border: '2px solid var(--border)', background: isSelected ? 'var(--surface)' : 'transparent'
                       }}
                     >
                       <div style={{ flex: 1 }}>
@@ -209,9 +205,7 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
                           padding: '6px 12px',
                           border: `2px solid ${isSelected ? 'var(--danger, #ef4444)' : 'var(--primary)'}`,
                           background: isSelected ? 'var(--danger, #ef4444)' : 'var(--primary)',
-                          color: 'var(--white)',
-                          borderRadius: '4px',
-                          fontSize: '11px',
+                          color: 'var(--white)', fontSize: '11px',
                           fontWeight: 700,
                           cursor: 'pointer'
                         }}
@@ -242,9 +236,7 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
                   padding: '4px 12px',
                   border: `2px solid ${allocationMode === 'percentage' ? 'var(--primary)' : 'var(--border)'}`,
                   background: allocationMode === 'percentage' ? 'var(--primary)' : 'transparent',
-                  color: allocationMode === 'percentage' ? 'var(--white)' : 'var(--text)',
-                  borderRadius: '4px',
-                  fontSize: '11px',
+                  color: allocationMode === 'percentage' ? 'var(--white)' : 'var(--text)', fontSize: '11px',
                   fontWeight: 700
                 }}
               >
@@ -256,9 +248,7 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
                   padding: '4px 12px',
                   border: `2px solid ${allocationMode === 'fixed' ? 'var(--primary)' : 'var(--border)'}`,
                   background: allocationMode === 'fixed' ? 'var(--primary)' : 'transparent',
-                  color: allocationMode === 'fixed' ? 'var(--white)' : 'var(--text)',
-                  borderRadius: '4px',
-                  fontSize: '11px',
+                  color: allocationMode === 'fixed' ? 'var(--white)' : 'var(--text)', fontSize: '11px',
                   fontWeight: 700
                 }}
               >
@@ -272,9 +262,7 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
                   key={`${asset.type}-${asset.id}`}
                   style={{
                     padding: '12px',
-                    border: '2px solid var(--border)',
-                    borderRadius: '4px',
-                    display: 'grid',
+                    border: '2px solid var(--border)', display: 'grid',
                     gridTemplateColumns: '2fr 1fr 1fr 1fr',
                     gap: '12px',
                     alignItems: 'center'
@@ -297,7 +285,7 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
                         min="0"
                         max="100"
                         step="0.1"
-                        style={{ width: '100%', padding: '6px', border: '2px solid var(--border)', borderRadius: '4px', fontSize: '12px' }}
+                        style={{ width: '100%', padding: '6px', border: '2px solid var(--border)', fontSize: '12px' }}
                       />
                     </div>
                   ) : (
@@ -309,7 +297,7 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
                         placeholder="$"
                         min="0"
                         step="100"
-                        style={{ width: '100%', padding: '6px', border: '2px solid var(--border)', borderRadius: '4px', fontSize: '12px' }}
+                        style={{ width: '100%', padding: '6px', border: '2px solid var(--border)', fontSize: '12px' }}
                       />
                     </div>
                   )}
@@ -320,7 +308,7 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
                       value={asset.notes || ''}
                       onChange={(e) => updateAssetAllocation(asset.id, 'notes', e.target.value)}
                       placeholder="Curator notes..."
-                      style={{ width: '100%', padding: '6px', border: '2px solid var(--border)', borderRadius: '4px', fontSize: '11px' }}
+                      style={{ width: '100%', padding: '6px', border: '2px solid var(--border)', fontSize: '11px' }}
                     />
                   </div>
 
@@ -331,9 +319,7 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
                         padding: '6px 12px',
                         border: '2px solid var(--danger, #ef4444)',
                         background: 'transparent',
-                        color: 'var(--danger, #ef4444)',
-                        borderRadius: '4px',
-                        fontSize: '11px',
+                        color: 'var(--danger, #ef4444)', fontSize: '11px',
                         fontWeight: 700,
                         cursor: 'pointer',
                         width: '100%'
@@ -346,7 +332,7 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
               ))}
             </div>
 
-            <div style={{ marginTop: '16px', padding: '12px', background: 'var(--surface)', borderRadius: '4px', fontSize: '12px' }}>
+            <div style={{ marginTop: '16px', padding: '12px', background: 'var(--surface)', fontSize: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                 <span style={{ fontWeight: 700 }}>Total Portfolio Value:</span>
                 <span style={{ fontWeight: 700 }}>{formatUSD(totalValue)}</span>

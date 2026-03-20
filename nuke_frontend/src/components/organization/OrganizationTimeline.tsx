@@ -136,9 +136,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
               fontWeight: 700,
               color: '#fff',
               position: 'relative',
-              zIndex: 1,
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}>
+              zIndex: 1}}>
               {new Date(date).getDate()}
             </div>
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
@@ -149,9 +147,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
                 fontSize: '9px',
                 padding: '2px 6px',
                 background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: '2px',
-                color: 'var(--text-muted)'
+                border: '1px solid var(--border)', color: 'var(--text-muted)'
               }}>
                 {groupedEvents[date].length} events
               </div>
@@ -167,9 +163,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
                 marginBottom: '16px',
                 padding: '12px',
                 background: 'var(--white)',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                transition: '0.12s'
+                border: '1px solid var(--border)', transition: '0.12s'
               }}
               className="hover-lift"
             >
@@ -189,9 +183,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: event.image_urls?.length ? '10px' : '0' }}>
                 <div style={{
                   fontSize: '9px',
-                  padding: '2px 6px',
-                  borderRadius: '2px',
-                  background: 'var(--accent-dim)',
+                  padding: '2px 6px', background: 'var(--accent-dim)',
                   color: 'var(--accent)',
                   fontWeight: 600,
                   textTransform: 'uppercase'
@@ -202,9 +194,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
                 {event.profiles && (
                   <div style={{
                     fontSize: '9px',
-                    padding: '2px 6px',
-                    borderRadius: '2px',
-                    background: 'var(--surface)',
+                    padding: '2px 6px', background: 'var(--surface)',
                     color: 'var(--text-muted)',
                     border: '1px solid var(--border)'
                   }}>
@@ -215,9 +205,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
                 {event.cost_amount && (
                   <div style={{
                     fontSize: '9px',
-                    padding: '2px 6px',
-                    borderRadius: '2px',
-                    background: '#d4edda',
+                    padding: '2px 6px', background: '#d4edda',
                     color: '#155724',
                     fontWeight: 600
                   }}>
@@ -228,9 +216,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
                 {event.labor_hours && (
                   <div style={{
                     fontSize: '9px',
-                    padding: '2px 6px',
-                    borderRadius: '2px',
-                    background: '#d1ecf1',
+                    padding: '2px 6px', background: '#d1ecf1',
                     color: '#0c5460'
                   }}>
                     {event.labor_hours}h
@@ -249,9 +235,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
                         height: '80px',
                         backgroundImage: `url(${url})`,
                         backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        borderRadius: '2px',
-                        border: '1px solid var(--border)',
+                        backgroundPosition: 'center', border: '1px solid var(--border)',
                         cursor: 'pointer'
                       }}
                       onClick={() => window.open(url, '_blank')}
@@ -265,9 +249,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
                       alignItems: 'center',
                       justifyContent: 'center',
                       background: 'var(--surface)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '2px',
-                      fontSize: '12px',
+                      border: '1px solid var(--border)', fontSize: '12px',
                       color: 'var(--text-muted)',
                       fontWeight: 600
                     }}>

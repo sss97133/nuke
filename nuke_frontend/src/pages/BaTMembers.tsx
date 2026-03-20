@@ -149,9 +149,7 @@ export default function BaTMembers() {
       {/* Search & Filters */}
       <div style={{
         background: 'var(--white)',
-        border: '1px solid var(--border)',
-        borderRadius: '4px',
-        padding: '16px',
+        border: '1px solid var(--border)', padding: '16px',
         marginBottom: '20px'
       }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '12px', alignItems: 'center' }}>
@@ -203,9 +201,7 @@ export default function BaTMembers() {
           padding: '40px',
           textAlign: 'center',
           background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: '4px'
-        }}>
+          border: '1px solid var(--border)'}}>
           <div style={{ fontSize: '12px', marginBottom: '8px' }}>No members found</div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             {searchQuery ? 'Try a different search term' : 'No members with activity yet'}
@@ -223,27 +219,21 @@ export default function BaTMembers() {
               onClick={() => handleMemberClick(member)}
               style={{
                 background: 'var(--white)',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '16px',
+                border: '1px solid var(--border)', padding: '16px',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = 'var(--primary)';
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = 'var(--border)';
-                e.currentTarget.style.boxShadow = 'none';
               }}
             >
               {/* Avatar placeholder */}
               <div style={{
                 width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                background: 'var(--grey-100)',
+                height: '48px', background: 'var(--grey-100)',
                 border: '1px solid var(--border)',
                 marginBottom: '12px',
                 display: 'flex',

@@ -208,12 +208,8 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
       top: 0,
       zIndex: 100,
       background: 'var(--surface)',
-      border: '2px solid var(--accent)',
-      borderRadius: '4px',
-      padding: '12px',
-      marginBottom: '16px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-    }}>
+      border: '2px solid var(--accent)', padding: '12px',
+      marginBottom: '16px'}}>
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -237,9 +233,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
               border: '1px solid var(--border)',
               background: 'var(--surface)',
               color: 'var(--text-muted)',
-              cursor: action === 'favorite' ? 'wait' : 'pointer',
-              borderRadius: '4px',
-              opacity: action === 'favorite' ? 0.5 : 1
+              cursor: action === 'favorite' ? 'wait' : 'pointer', opacity: action === 'favorite' ? 0.5 : 1
             }}
           >
             {action === 'favorite' ? 'Adding...' : 'FAVORITE'}
@@ -255,9 +249,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
               border: '1px solid var(--border)',
               background: 'var(--surface)',
               color: 'var(--text-muted)',
-              cursor: action === 'unfavorite' ? 'wait' : 'pointer',
-              borderRadius: '4px',
-              opacity: action === 'unfavorite' ? 0.5 : 1
+              cursor: action === 'unfavorite' ? 'wait' : 'pointer', opacity: action === 'unfavorite' ? 0.5 : 1
             }}
           >
             {action === 'unfavorite' ? 'Removing...' : 'UNFAVORITE'}
@@ -274,9 +266,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
               border: '1px solid var(--border)',
               background: 'var(--surface)',
               color: 'var(--text-muted)',
-              cursor: action === 'hide' ? 'wait' : 'pointer',
-              borderRadius: '4px',
-              opacity: action === 'hide' ? 0.5 : 1
+              cursor: action === 'hide' ? 'wait' : 'pointer', opacity: action === 'hide' ? 0.5 : 1
             }}
           >
             {action === 'hide' ? 'Hiding...' : 'HIDE'}
@@ -292,9 +282,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
               border: '1px solid var(--border)',
               background: 'var(--surface)',
               color: 'var(--text-muted)',
-              cursor: action === 'unhide' ? 'wait' : 'pointer',
-              borderRadius: '4px',
-              opacity: action === 'unhide' ? 0.5 : 1
+              cursor: action === 'unhide' ? 'wait' : 'pointer', opacity: action === 'unhide' ? 0.5 : 1
             }}
           >
             {action === 'unhide' ? 'Unhiding...' : 'UNHIDE'}
@@ -319,9 +307,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                 style={{
                   padding: '6px 12px',
                   fontSize: '11px',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  width: '150px'
+                  border: '1px solid var(--border)', width: '150px'
                 }}
                 autoFocus
               />
@@ -338,9 +324,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                   border: '1px solid var(--accent)',
                   background: 'var(--accent)',
                   color: 'var(--bg)',
-                  cursor: action === 'collection' ? 'wait' : 'pointer',
-                  borderRadius: '4px',
-                  opacity: action === 'collection' ? 0.5 : 1
+                  cursor: action === 'collection' ? 'wait' : 'pointer', opacity: action === 'collection' ? 0.5 : 1
                 }}
               >
                 {action === 'collection' ? 'Adding...' : 'ADD'}
@@ -356,9 +340,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                   border: '1px solid var(--border)',
                   background: 'var(--surface)',
                   color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  borderRadius: '4px'
-                }}
+                  cursor: 'pointer'}}
               >
                 CANCEL
               </button>
@@ -374,9 +356,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                   border: '1px solid var(--border)',
                   background: 'var(--surface)',
                   color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  borderRadius: '4px'
-                }}
+                  cursor: 'pointer'}}
               >
                 ADD TO COLLECTION
               </button>
@@ -390,9 +370,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                   border: '1px solid var(--border)',
                   background: 'var(--surface)',
                   color: 'var(--text-muted)',
-                  cursor: action === 'remove_collection' ? 'wait' : 'pointer',
-                  borderRadius: '4px',
-                  opacity: action === 'remove_collection' ? 0.5 : 1
+                  cursor: action === 'remove_collection' ? 'wait' : 'pointer', opacity: action === 'remove_collection' ? 0.5 : 1
                 }}
               >
                 {action === 'remove_collection' ? 'Removing...' : 'REMOVE FROM COLLECTION'}
@@ -415,11 +393,9 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                     fontSize: '9px',
                     fontWeight: 600,
                     border: '1px solid #15803d',
-                    background: '#dcfce7',
+                    background: 'var(--success-dim)',
                     color: '#15803d',
-                    cursor: 'pointer',
-                    borderRadius: '4px'
-                  }}
+                    cursor: 'pointer'}}
                 >
                   $ PRICE
                 </button>
@@ -433,11 +409,9 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                     fontSize: '9px',
                     fontWeight: 600,
                     border: '1px solid #15803d',
-                    background: '#dcfce7',
+                    background: 'var(--success-dim)',
                     color: '#15803d',
-                    cursor: 'pointer',
-                    borderRadius: '4px'
-                  }}
+                    cursor: 'pointer'}}
                 >
                   # VIN
                 </button>
@@ -451,11 +425,9 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                     fontSize: '9px',
                     fontWeight: 600,
                     border: '1px solid #15803d',
-                    background: '#dcfce7',
+                    background: 'var(--success-dim)',
                     color: '#15803d',
-                    cursor: 'pointer',
-                    borderRadius: '4px'
-                  }}
+                    cursor: 'pointer'}}
                 >
                   MI MILEAGE
                 </button>
@@ -469,11 +441,9 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                     fontSize: '9px',
                     fontWeight: 600,
                     border: '1px solid #15803d',
-                    background: '#dcfce7',
+                    background: 'var(--success-dim)',
                     color: '#15803d',
-                    cursor: 'pointer',
-                    borderRadius: '4px'
-                  }}
+                    cursor: 'pointer'}}
                 >
                   COLOR
                 </button>
@@ -485,9 +455,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                     border: '1px solid var(--border)',
                     background: 'var(--surface)',
                     color: 'var(--text-muted)',
-                    cursor: 'pointer',
-                    borderRadius: '4px'
-                  }}
+                    cursor: 'pointer'}}
                 >
                   CANCEL
                 </button>
@@ -502,9 +470,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                   border: '1px solid #15803d',
                   background: '#15803d',
                   color: 'var(--bg)',
-                  cursor: 'pointer',
-                  borderRadius: '4px'
-                }}
+                  cursor: 'pointer'}}
               >
                 FIX DATA
               </button>
@@ -526,9 +492,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                     style={{
                       padding: '6px 12px',
                       fontSize: '11px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '4px',
-                      minWidth: '200px'
+                      border: '1px solid var(--border)', minWidth: '200px'
                     }}
                   >
                     <option value="">Select organization...</option>
@@ -544,9 +508,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                     style={{
                       padding: '6px 12px',
                       fontSize: '11px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '4px'
-                    }}
+                      border: '1px solid var(--border)'}}
                   >
                     <option value="work_location">Work Location</option>
                     <option value="service_provider">Service Provider</option>
@@ -568,9 +530,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                       border: '1px solid var(--accent)',
                       background: 'var(--accent)',
                       color: 'var(--bg)',
-                      cursor: action === 'assign_org' || !selectedOrgId ? 'wait' : 'pointer',
-                      borderRadius: '4px',
-                      opacity: action === 'assign_org' || !selectedOrgId ? 0.5 : 1
+                      cursor: action === 'assign_org' || !selectedOrgId ? 'wait' : 'pointer', opacity: action === 'assign_org' || !selectedOrgId ? 0.5 : 1
                     }}
                   >
                     {action === 'assign_org' ? 'Assigning...' : 'ASSIGN'}
@@ -586,9 +546,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                       border: '1px solid var(--border)',
                       background: 'var(--surface)',
                       color: 'var(--text-muted)',
-                      cursor: 'pointer',
-                      borderRadius: '4px'
-                    }}
+                      cursor: 'pointer'}}
                   >
                     CANCEL
                   </button>
@@ -605,9 +563,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                 border: '1px solid #1e40af',
                 background: '#1e40af',
                 color: 'var(--bg)',
-                cursor: 'pointer',
-                borderRadius: '4px'
-              }}
+                cursor: 'pointer'}}
             >
               ASSIGN TO ORGANIZATION
             </button>
@@ -623,9 +579,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
               border: '1px solid var(--border)',
               background: 'var(--surface)',
               color: 'var(--text-muted)',
-              cursor: 'pointer',
-              borderRadius: '4px'
-            }}
+              cursor: 'pointer'}}
           >
             DESELECT ALL
           </button>

@@ -127,7 +127,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
           left: 0,
           right: 0,
           padding: 'var(--space-3)',
-          background: 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
+          background: 'rgba(0,0,0,0.6)',
           zIndex: 10,
           display: 'flex',
           justifyContent: 'space-between',
@@ -190,9 +190,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
                 color: '#fff',
                 fontSize: '24px',
                 width: '44px',
-                height: '44px',
-                borderRadius: '50%',
-                cursor: 'pointer',
+                height: '44px', cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -212,9 +210,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
                 color: '#fff',
                 fontSize: '24px',
                 width: '44px',
-                height: '44px',
-                borderRadius: '50%',
-                cursor: 'pointer',
+                height: '44px', cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -235,7 +231,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
             left: 0,
             right: 0,
             padding: 'var(--space-4)',
-            background: 'linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
+            background: 'rgba(0,0,0,0.6)',
             color: '#fff'
           }}
         >

@@ -760,9 +760,7 @@ const AdminVerifications: React.FC = () => {
                                     style={{
                                       width: 48,
                                       height: 48,
-                                      objectFit: 'contain',
-                                      borderRadius: 4,
-                                      border: '1px solid var(--border)',
+                                      objectFit: 'contain', border: '1px solid var(--border)',
                                       background: 'var(--surface)',
                                       padding: 4
                                     }}
@@ -774,9 +772,7 @@ const AdminVerifications: React.FC = () => {
                                   <FaviconIcon
                                     url={r.shop_website_url}
                                     size={48}
-                                    style={{
-                                      borderRadius: 4,
-                                      border: '1px solid var(--border)',
+                                    style={{ border: '1px solid var(--border)',
                                       padding: 8,
                                       background: 'var(--surface)'
                                     }}
@@ -785,9 +781,7 @@ const AdminVerifications: React.FC = () => {
                                   <div
                                     style={{
                                       width: 48,
-                                      height: 48,
-                                      borderRadius: 4,
-                                      border: '1px solid var(--border)',
+                                      height: 48, border: '1px solid var(--border)',
                                       background: 'var(--surface-hover)',
                                       display: 'flex',
                                       alignItems: 'center',
@@ -824,9 +818,7 @@ const AdminVerifications: React.FC = () => {
                                       alt={r.requester_name}
                                       style={{
                                         width: 20,
-                                        height: 20,
-                                        borderRadius: '50%',
-                                        objectFit: 'cover',
+                                        height: 20, objectFit: 'cover',
                                         border: '1px solid var(--border)',
                                         verticalAlign: 'middle'
                                       }}
@@ -835,9 +827,7 @@ const AdminVerifications: React.FC = () => {
                                     <div
                                       style={{
                                         width: 20,
-                                        height: 20,
-                                        borderRadius: '50%',
-                                        background: 'var(--surface-hover)',
+                                        height: 20, background: 'var(--surface-hover)',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -975,9 +965,7 @@ const AdminVerifications: React.FC = () => {
                                 top: 8,
                                 right: 8,
                                 background: 'var(--surface)',
-                                padding: '4px 8px',
-                                borderRadius: 4,
-                                fontSize: '11px',
+                                padding: '4px 8px', fontSize: '11px',
                                 zIndex: 10
                               }}>
                                 Processing...
@@ -1008,17 +996,17 @@ const AdminVerifications: React.FC = () => {
                                     <img
                                       src={thumb}
                                       alt={d.document_type}
-                                      style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 0, marginBottom: 8, cursor: 'zoom-in' }}
+                                      style={{ width: '100%', height: 180, objectFit: 'cover', marginBottom: 8, cursor: 'zoom-in' }}
                                       onClick={() => viewDocument(d)}
                                     />
                                   </ImageHoverPreview>
                                 ) : (
-                                  <div className="text-small text-muted" style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', borderRadius: 0, marginBottom: 8 }}>
+                                  <div className="text-small text-muted" style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', marginBottom: 8 }}>
                                     Loading preview…
                                   </div>
                                 )
                               ) : (
-                                <div className="text-small text-muted" style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', borderRadius: 0, marginBottom: 8 }}>
+                                <div className="text-small text-muted" style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', marginBottom: 8 }}>
                                   {d.mime_type || 'Document'}
                                 </div>
                               )}
@@ -1033,9 +1021,7 @@ const AdminVerifications: React.FC = () => {
                                         alt={(d as any).user_name}
                                         style={{
                                           width: 24,
-                                          height: 24,
-                                          borderRadius: '50%',
-                                          objectFit: 'cover',
+                                          height: 24, objectFit: 'cover',
                                           border: '1px solid var(--border)',
                                           flexShrink: 0
                                         }}
@@ -1044,9 +1030,7 @@ const AdminVerifications: React.FC = () => {
                                       <div
                                         style={{
                                           width: 24,
-                                          height: 24,
-                                          borderRadius: '50%',
-                                          background: 'var(--surface-hover)',
+                                          height: 24, background: 'var(--surface-hover)',
                                           display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'center',
@@ -1178,7 +1162,7 @@ const AdminVerifications: React.FC = () => {
               <img 
                 src={previewUrl} 
                 alt="Preview" 
-                style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: 4 }} 
+                style={{ maxWidth: '100%', maxHeight: '80vh'}} 
               />
             </div>
           </div>

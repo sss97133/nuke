@@ -22,7 +22,7 @@ declare global {
   }
 }
 
-const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' }) => {
+const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className ='' }) => {
   const [allUploads, setAllUploads] = useState<Map<string, UploadFile[]>>(new Map());
   const [isExpanded, setIsExpanded] = useState(false);
   const navigate = useNavigate();
@@ -80,7 +80,7 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
   const isUploading = uploadingFiles > 0;
 
   return (
-    <div className={`fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm global-upload-status ${className}`}>
+    <div className={`fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700  global-upload-status ${className}`}>
       {/* Compact Progress Bar */}
       <div 
         className={`px-4 py-2 cursor-pointer transition-all ${
@@ -91,7 +91,7 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {isUploading && (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <div className="animate-spin h-4 w-4 border-b-2 border-blue-600"></div>
             )}
             <span className={`text-sm font-medium ${
               isUploading ? 'text-blue-700 dark:text-blue-300' : completedFiles > 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
@@ -165,9 +165,9 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
                 </div>
                 
                 {/* Vehicle progress bar */}
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1 mb-2">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 h-1 mb-2">
                   <div 
-                    className={`h-1 rounded-full transition-all duration-300 ${
+                    className={`h-1  transition-all duration-300 ${
                       vehicleUploading > 0 ? 'bg-blue-600' : vehicleCompleted > 0 ? 'bg-green-600' : 'bg-red-600'
                     }`}
                     style={{ width: `${vehicleProgress}%` }}
@@ -215,7 +215,7 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
                   // Trigger retry for all failed uploads
                   window.dispatchEvent(new CustomEvent('retry_all_failed_uploads'));
                 }}
-                className="px-3 py-1 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700"
+                className="px-3 py-1 bg-yellow-600 text-white text-sm hover:bg-yellow-700"
               >
                 Retry All Failed ({failedFiles})
               </button>
@@ -226,14 +226,14 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
                   // Clear all completed uploads
                   window.dispatchEvent(new CustomEvent('clear_all_completed_uploads'));
                 }}
-                className="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700"
+                className="px-3 py-1 bg-gray-600 text-white text-sm hover:bg-gray-700"
               >
                 Clear Completed
               </button>
             )}
             <button
               onClick={() => setIsExpanded(false)}
-              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+              className="px-3 py-1 bg-blue-600 text-white text-sm hover:bg-blue-700"
             >
               Minimize
             </button>

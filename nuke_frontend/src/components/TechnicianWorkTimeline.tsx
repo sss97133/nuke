@@ -173,19 +173,19 @@ export const TechnicianWorkTimeline: React.FC<TechnicianWorkTimelineProps> = ({
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white p-4">
           <div className="text-2xl font-bold text-blue-600">{workSummary.totalHours}h</div>
           <div className="text-sm text-gray-600">Total Hours</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white p-4">
           <div className="text-2xl font-bold text-green-600">{workSummary.sessionCount}</div>
           <div className="text-sm text-gray-600">Work Sessions</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white p-4">
           <div className="text-2xl font-bold text-purple-600">{workSummary.vehicleCount}</div>
           <div className="text-sm text-gray-600">Vehicles Worked On</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white p-4">
           <div className="text-2xl font-bold text-orange-600">
             {workSummary.sessionCount > 0 ? Math.round(workSummary.totalHours / workSummary.sessionCount * 10) / 10 : 0}h
           </div>
@@ -195,13 +195,13 @@ export const TechnicianWorkTimeline: React.FC<TechnicianWorkTimelineProps> = ({
 
       {/* Period Selection */}
       {!dateRange && (
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white p-4">
           <div className="flex flex-wrap gap-2 mb-4">
             {(['week', 'month', 'year', 'custom'] as const).map(period => (
               <button
                 key={period}
                 onClick={() => setSelectedPeriod(period)}
-                className={`px-3 py-1 rounded text-sm ${
+                className={`px-3 py-1  text-sm ${
                   selectedPeriod === period 
                     ? 'bg-blue-600 text-white' 
                     : 'bg-gray-100 hover:bg-gray-200'
@@ -218,13 +218,13 @@ export const TechnicianWorkTimeline: React.FC<TechnicianWorkTimelineProps> = ({
                 type="date"
                 value={customRange.start}
                 onChange={(e) => setCustomRange(prev => ({ ...prev, start: e.target.value }))}
-                className="border rounded px-3 py-1"
+                className="border px-3 py-1"
               />
               <input
                 type="date"
                 value={customRange.end}
                 onChange={(e) => setCustomRange(prev => ({ ...prev, end: e.target.value }))}
-                className="border rounded px-3 py-1"
+                className="border px-3 py-1"
               />
             </div>
           )}
@@ -232,7 +232,7 @@ export const TechnicianWorkTimeline: React.FC<TechnicianWorkTimelineProps> = ({
       )}
 
       {/* Work Sessions Timeline */}
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-white">
         <div className="p-4 border-b">
           <h3 className="text-lg font-semibold">Work Sessions Timeline</h3>
         </div>
@@ -253,7 +253,7 @@ export const TechnicianWorkTimeline: React.FC<TechnicianWorkTimelineProps> = ({
                   
                   <div className="space-y-2">
                     {sessions.map(session => (
-                      <div key={session.id} className="bg-gray-50 rounded p-3">
+                      <div key={session.id} className="bg-gray-50 p-3">
                         <div className="flex justify-between items-start">
                           <div>
                             <div className="font-medium text-sm">
@@ -287,7 +287,7 @@ export const TechnicianWorkTimeline: React.FC<TechnicianWorkTimelineProps> = ({
                 const totalMinutes = sessions.reduce((sum, s) => sum + s.duration_minutes, 0);
                 
                 return (
-                  <div key={vehicleId} className="border rounded-lg p-4">
+                  <div key={vehicleId} className="border p-4">
                     <div className="flex justify-between items-center mb-4">
                       <h4 className="font-medium">
                         {vehicle ? `${vehicle.year} ${vehicle.make} ${vehicle.model}` : 'Unknown Vehicle'}

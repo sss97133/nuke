@@ -80,7 +80,7 @@ const ImageTrackingBackfill: React.FC = () => {
             </div>
             
             {stats && (
-              <div className="bg-gray-50 p-3 rounded">
+              <div className="bg-gray-50 p-3">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <div className="font-medium">Total Images</div>
@@ -102,9 +102,9 @@ const ImageTrackingBackfill: React.FC = () => {
                 
                 {/* Progress bar */}
                 <div className="mt-3">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-gray-200 h-2">
                     <div 
-                      className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-green-600 h-2 transition-all duration-300"
                       style={{ width: `${stats.coveragePercentage}%` }}
                     />
                   </div>
@@ -139,7 +139,7 @@ const ImageTrackingBackfill: React.FC = () => {
             )}
             
             {backfillResult && (
-              <div className="mt-3 p-3 bg-blue-50 rounded">
+              <div className="mt-3 p-3 bg-blue-50">
                 <div className="text-sm">
                   <div className="font-medium text-blue-800">Backfill Complete</div>
                   <div className="text-blue-700">
@@ -170,7 +170,7 @@ const ImageTrackingBackfill: React.FC = () => {
           </div>
 
           {/* Warning */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+          <div className="bg-yellow-50 border border-yellow-200 p-3">
             <div className="text-sm text-yellow-800">
               <div className="font-medium">⚠️ Important Notes</div>
               <ul className="mt-1 space-y-1 text-xs">

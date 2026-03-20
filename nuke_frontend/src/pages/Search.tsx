@@ -744,9 +744,7 @@ export default function Search() {
             border: '1px solid var(--border)',
             background: showVinSearch ? 'var(--text)' : 'transparent',
             color: showVinSearch ? 'var(--surface)' : 'var(--text-secondary)',
-            cursor: 'pointer',
-            borderRadius: '0px',
-          }}
+            cursor: 'pointer', }}
         >
           {showVinSearch ? 'Close VIN Lookup' : 'VIN Lookup'}
         </button>
@@ -1036,9 +1034,7 @@ export default function Search() {
           <div style={{
             padding: '16px',
             background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: '0px'
-          }}>
+            border: '1px solid var(--border)'}}>
             <div className="text font-bold" style={{ fontSize: '12px', marginBottom: '8px' }}>Answer</div>
             {answerLoading && (
               <div className="text-small text-muted" style={{ fontSize: '11px' }}>Thinking…</div>
@@ -1164,9 +1160,7 @@ export default function Search() {
               border: '1px solid var(--border)',
               background: 'transparent',
               color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              borderRadius: '0px',
-            }}
+              cursor: 'pointer', }}
           >
             {showWorkstation ? 'Hide quick links' : 'Quick links & workspace'}
           </button>

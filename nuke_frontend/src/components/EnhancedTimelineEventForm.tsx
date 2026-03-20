@@ -292,7 +292,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
           <select
             value={formData.event_type}
             onChange={(e) => handleInputChange('event_type', e.target.value)}
-            className="w-full p-2 border rounded text-sm"
+            className="w-full p-2 border text-sm"
           >
             <option value="maintenance">Maintenance</option>
             <option value="repair">Repair</option>
@@ -315,7 +315,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
             type="date"
             value={formData.event_date}
             onChange={(e) => handleInputChange('event_date', e.target.value)}
-            className="w-full p-2 border rounded text-sm"
+            className="w-full p-2 border text-sm"
           />
         </div>
       </div>
@@ -327,7 +327,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
           value={formData.title}
           onChange={(e) => handleInputChange('title', e.target.value)}
           placeholder="e.g., Oil change and filter replacement"
-          className="w-full p-2 border rounded text-sm"
+          className="w-full p-2 border text-sm"
         />
       </div>
 
@@ -337,7 +337,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
           value={formData.description}
           onChange={(e) => handleInputChange('description', e.target.value)}
           placeholder="Detailed description of work performed..."
-          className="w-full p-2 border rounded text-sm h-20 resize-none"
+          className="w-full p-2 border text-sm h-20 resize-none"
         />
       </div>
 
@@ -349,7 +349,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
             value={formData.mileage_at_event || ''}
             onChange={(e) => handleInputChange('mileage_at_event', parseInt(e.target.value))}
             placeholder="Current mileage"
-            className="w-full p-2 border rounded text-sm"
+            className="w-full p-2 border text-sm"
           />
         </div>
         
@@ -361,7 +361,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
             value={formData.receipt_amount || ''}
             onChange={(e) => handleInputChange('receipt_amount', parseFloat(e.target.value))}
             placeholder="Total cost"
-            className="w-full p-2 border rounded text-sm"
+            className="w-full p-2 border text-sm"
           />
         </div>
       </div>
@@ -373,7 +373,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
           value={formData.location || ''}
           onChange={(e) => handleInputChange('location', e.target.value)}
           placeholder="e.g., Boulder City, NV to St. George, UT"
-          className="w-full p-2 border rounded text-sm"
+          className="w-full p-2 border text-sm"
         />
       </div>
 
@@ -383,14 +383,14 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
           value={formData.route_notes || ''}
           onChange={(e) => handleInputChange('route_notes', e.target.value)}
           placeholder="Document your journey: U-Haul rental, gas stops, route taken, etc."
-          className="w-full p-2 border rounded text-sm h-20 resize-none"
+          className="w-full p-2 border text-sm h-20 resize-none"
         />
       </div>
 
       {/* Image Upload Section */}
       <div>
         <label className="block text-xs font-medium mb-2">Photos</label>
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+        <div className="border-2 border-dashed border-gray-300 p-4">
           <div className="text-center">
             <ImageIcon className="mx-auto h-8 w-8 text-gray-400" />
             <div className="mt-2">
@@ -418,11 +418,11 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
                   <img
                     src={URL.createObjectURL(file)}
                     alt={`Preview ${index + 1}`}
-                    className="w-full h-16 object-cover rounded border"
+                    className="w-full h-16 object-cover border"
                   />
                   <button
                     onClick={() => removeImage(index)}
-                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
+                    className="absolute -top-1 -right-1 bg-red-500 text-white w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
                   >
                     ×
                   </button>
@@ -448,7 +448,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
             step="0.25"
             value={formData.labor_hours || ''}
             onChange={(e) => handleInputChange('labor_hours', parseFloat(e.target.value))}
-            className="w-full p-2 border rounded text-sm"
+            className="w-full p-2 border text-sm"
           />
         </div>
         
@@ -459,7 +459,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
             step="0.01"
             value={formData.labor_rate || ''}
             onChange={(e) => handleInputChange('labor_rate', parseFloat(e.target.value))}
-            className="w-full p-2 border rounded text-sm"
+            className="w-full p-2 border text-sm"
           />
         </div>
         
@@ -471,7 +471,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
             max="10"
             value={formData.work_complexity || ''}
             onChange={(e) => handleInputChange('work_complexity', parseInt(e.target.value))}
-            className="w-full p-2 border rounded text-sm"
+            className="w-full p-2 border text-sm"
           />
         </div>
       </div>
@@ -481,7 +481,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
         <select
           value={formData.technician_level || ''}
           onChange={(e) => handleInputChange('technician_level', e.target.value)}
-          className="w-full p-2 border rounded text-sm"
+          className="w-full p-2 border text-sm"
         >
           <option value="">Select level</option>
           <option value="apprentice">Apprentice</option>
@@ -497,7 +497,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
           value={formData.diagnostic_findings || ''}
           onChange={(e) => handleInputChange('diagnostic_findings', e.target.value)}
           placeholder="What did you discover during diagnosis?"
-          className="w-full p-2 border rounded text-sm h-16 resize-none"
+          className="w-full p-2 border text-sm h-16 resize-none"
         />
       </div>
 
@@ -507,7 +507,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
           value={formData.professional_recommendations || ''}
           onChange={(e) => handleInputChange('professional_recommendations', e.target.value)}
           placeholder="What should be done next? Future maintenance needs?"
-          className="w-full p-2 border rounded text-sm h-16 resize-none"
+          className="w-full p-2 border text-sm h-16 resize-none"
         />
       </div>
     </div>
@@ -520,7 +520,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
         <button
           type="button"
           onClick={addPart}
-          className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="text-xs px-2 py-1 bg-blue-600 text-white hover:bg-blue-700"
         >
           Add Part
         </button>
@@ -529,7 +529,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
       {parts && parts.length > 0 ? (
         <div className="space-y-3">
           {parts.map((part, index) => (
-            <div key={index} className="bg-gray-50 p-3 rounded border">
+            <div key={index} className="bg-gray-50 p-3 border">
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="block text-xs font-medium mb-1">Part Number</label>
@@ -538,7 +538,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
                     value={part.part_number}
                     onChange={(e) => updatePart(index, 'part_number', e.target.value)}
                     placeholder="e.g., 15400-PLM-A02"
-                    className="w-full p-2 border rounded text-sm"
+                    className="w-full p-2 border text-sm"
                   />
                 </div>
                 <div>
@@ -548,7 +548,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
                     value={part.part_name}
                     onChange={(e) => updatePart(index, 'part_name', e.target.value)}
                     placeholder="e.g., Oil Filter"
-                    className="w-full p-2 border rounded text-sm"
+                    className="w-full p-2 border text-sm"
                   />
                 </div>
               </div>
@@ -561,7 +561,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
                     min="1"
                     value={part.quantity}
                     onChange={(e) => updatePart(index, 'quantity', parseInt(e.target.value))}
-                    className="w-full p-2 border rounded text-sm"
+                    className="w-full p-2 border text-sm"
                   />
                 </div>
                 <div>
@@ -571,7 +571,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
                     step="0.01"
                     value={part.cost}
                     onChange={(e) => updatePart(index, 'cost', parseFloat(e.target.value))}
-                    className="w-full p-2 border rounded text-sm"
+                    className="w-full p-2 border text-sm"
                   />
                 </div>
                 <div>
@@ -579,7 +579,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
                   <select
                     value={part.oem_vs_aftermarket}
                     onChange={(e) => updatePart(index, 'oem_vs_aftermarket', e.target.value)}
-                    className="w-full p-2 border rounded text-sm"
+                    className="w-full p-2 border text-sm"
                   >
                     <option value="oem">OEM</option>
                     <option value="aftermarket">Aftermarket</option>
@@ -591,7 +591,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
                   <button
                     type="button"
                     onClick={() => removePart(index)}
-                    className="w-full p-2 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                    className="w-full p-2 text-xs bg-red-600 text-white hover:bg-red-700"
                   >
                     Remove
                   </button>
@@ -605,7 +605,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
                   value={part.supplier}
                   onChange={(e) => updatePart(index, 'supplier', e.target.value)}
                   placeholder="e.g., AutoZone, Honda Dealer, etc."
-                  className="w-full p-2 border rounded text-sm"
+                  className="w-full p-2 border text-sm"
                 />
               </div>
             </div>
@@ -631,7 +631,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
           <select
             value={formData.client_satisfaction_rating || ''}
             onChange={(e) => handleInputChange('client_satisfaction_rating', parseInt(e.target.value))}
-            className="w-full p-2 border rounded text-sm"
+            className="w-full p-2 border text-sm"
           >
             <option value="">Not rated</option>
             <option value="5">5 - Excellent</option>
@@ -651,7 +651,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
             value={formData.efficiency_score || ''}
             onChange={(e) => handleInputChange('efficiency_score', parseInt(e.target.value))}
             placeholder="How efficient was this work?"
-            className="w-full p-2 border rounded text-sm"
+            className="w-full p-2 border text-sm"
           />
         </div>
       </div>
@@ -662,7 +662,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
           value={formData.safety_concerns || ''}
           onChange={(e) => handleInputChange('safety_concerns', e.target.value)}
           placeholder="Any safety issues discovered or addressed?"
-          className="w-full p-2 border rounded text-sm h-16 resize-none"
+          className="w-full p-2 border text-sm h-16 resize-none"
         />
       </div>
 
@@ -672,7 +672,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
           value={formData.learning_outcomes || ''}
           onChange={(e) => handleInputChange('learning_outcomes', e.target.value)}
           placeholder="What did you learn? Any process improvements?"
-          className="w-full p-2 border rounded text-sm h-16 resize-none"
+          className="w-full p-2 border text-sm h-16 resize-none"
         />
       </div>
 
@@ -719,7 +719,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
             type="date"
             value={formData.follow_up_date || ''}
             onChange={(e) => handleInputChange('follow_up_date', e.target.value)}
-            className="p-1 border rounded text-xs"
+            className="p-1 border text-xs"
           />
         )}
       </div>
@@ -728,7 +728,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-white max-w-2xl w-full max-h-[90vh] overflow-hidden">
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-lg font-semibold">
             {isProfessional ? 'Professional Work Documentation' : 'Add Timeline Event'}
@@ -742,7 +742,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
             {Array.from({ length: totalSteps }, (_, i) => (
               <div
                 key={i}
-                className={`flex-1 h-1 rounded ${
+                className={`flex-1 h-1  ${
                   i + 1 <= currentStep ? 'bg-blue-500' : 'bg-gray-300'
                 }`}
               />
@@ -765,7 +765,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
           <button
             onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
             disabled={currentStep === 1}
-            className="px-4 py-2 text-sm border rounded hover:bg-gray-50 disabled:opacity-50"
+            className="px-4 py-2 text-sm border hover:bg-gray-50 disabled:opacity-50"
           >
             Previous
           </button>
@@ -773,7 +773,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm border rounded hover:bg-gray-50"
+              className="px-4 py-2 text-sm border hover:bg-gray-50"
             >
               Cancel
             </button>
@@ -782,7 +782,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
               <button
                 onClick={() => setCurrentStep(currentStep + 1)}
                 disabled={!formData.title.trim()}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 Next
               </button>
@@ -790,7 +790,7 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
               <button
                 onClick={saveEvent}
                 disabled={saving || uploading || !formData.title.trim()}
-                className="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
               >
                 {uploading ? 'Uploading Images...' : saving ? 'Saving...' : 'Save Event'}
               </button>

@@ -8,11 +8,11 @@ interface ClientWorkZoneProps {
 }
 
 const getProximityColor = (daysSinceService: number | null): string => {
-  if (daysSinceService === null) return '#f3f4f6'; // grey - no service date
-  if (daysSinceService <= 7) return '#dcfce7'; // green - fresh
-  if (daysSinceService <= 30) return '#fef3c7'; // amber - recent
-  if (daysSinceService <= 90) return '#f9fafb'; // light grey - stale
-  return '#f3f4f6'; // grey - old
+  if (daysSinceService === null) return 'var(--bg-secondary)'; // grey - no service date
+  if (daysSinceService <= 7) return 'var(--success-dim)'; // green - fresh
+  if (daysSinceService <= 30) return 'var(--warning-dim)'; // amber - recent
+  if (daysSinceService <= 90) return 'var(--bg-secondary)'; // light grey - stale
+  return 'var(--bg-secondary)'; // grey - old
 };
 
 const formatRelativeServiceDate = (dateString: string | null, daysSince: number | null): string => {
@@ -66,9 +66,7 @@ export const ClientWorkZone: React.FC<ClientWorkZoneProps> = ({
             fontSize: '11px',
             color: 'var(--text-muted)',
             background: 'var(--surface-hover)',
-            padding: '2px 6px',
-            borderRadius: '2px'
-          }}>
+            padding: '2px 6px'}}>
             {vehicles.length}
           </span>
         </div>

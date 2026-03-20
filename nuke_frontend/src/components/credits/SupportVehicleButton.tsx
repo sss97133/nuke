@@ -165,9 +165,7 @@ const styles = {
   },
   modal: {
     background: 'var(--surface)',
-    border: '1px solid var(--border)',
-    borderRadius: '4px',
-    width: '90%',
+    border: '1px solid var(--border)', width: '90%',
     maxWidth: '400px'
   },
   header: {
@@ -218,9 +216,7 @@ const styles = {
   quickButton: {
     padding: '4px 6px',
     background: 'var(--bg)',
-    border: '1px solid var(--border)',
-    borderRadius: '3px',
-    fontSize: '10px',
+    border: '1px solid var(--border)', fontSize: '10px',
     cursor: 'pointer',
     transition: 'border-color 0.1s',
     color: 'var(--text)'
@@ -235,9 +231,7 @@ const styles = {
     height: '32px',
     padding: '0 10px',
     background: 'var(--bg)',
-    border: '1px solid var(--border)',
-    borderRadius: '3px',
-    fontSize: '10px',
+    border: '1px solid var(--border)', fontSize: '10px',
     color: 'var(--text)',
     boxSizing: 'border-box' as const
   },
@@ -255,10 +249,8 @@ const styles = {
     width: '100%',
     height: '32px',
     background: 'var(--accent)',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '3px',
-    fontSize: '10px',
+    color: 'var(--surface-elevated)',
+    border: 'none', fontSize: '10px',
     fontWeight: 500 as const,
     cursor: 'pointer',
     transition: 'opacity 0.1s'

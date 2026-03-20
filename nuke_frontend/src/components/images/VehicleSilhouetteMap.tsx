@@ -310,7 +310,7 @@ function zoneFill(count: number, isHovered: boolean, isActive: boolean): string 
 }
 
 function zoneStroke(isActive: boolean, isDashed: boolean): string {
-  if (isActive) return '#ffffff';
+  if (isActive) return 'var(--surface-elevated)';
   return isDashed ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.2)';
 }
 
@@ -419,7 +419,7 @@ const VehicleSilhouetteMap: React.FC<VehicleSilhouetteMapProps> = ({
                   dominantBaseline="middle"
                   fill={count > 0 ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)'}
                   fontSize="11"
-                  fontFamily="'SF Mono', 'Fira Code', 'Cascadia Code', monospace"
+                  fontFamily="'Courier New', monospace"
                   fontWeight="600"
                   style={{ pointerEvents: 'none' }}
                 >
@@ -458,7 +458,7 @@ const VehicleSilhouetteMap: React.FC<VehicleSilhouetteMapProps> = ({
           textAnchor="middle"
           fill="rgba(255,255,255,0.3)"
           fontSize="9"
-          fontFamily="'SF Mono', 'Fira Code', monospace"
+          fontFamily="'Courier New', monospace"
           letterSpacing="2"
         >
           FRONT
@@ -468,7 +468,7 @@ const VehicleSilhouetteMap: React.FC<VehicleSilhouetteMapProps> = ({
           textAnchor="middle"
           fill="rgba(255,255,255,0.3)"
           fontSize="9"
-          fontFamily="'SF Mono', 'Fira Code', monospace"
+          fontFamily="'Courier New', monospace"
           letterSpacing="2"
         >
           REAR
@@ -480,7 +480,7 @@ const VehicleSilhouetteMap: React.FC<VehicleSilhouetteMapProps> = ({
           textAnchor="middle"
           fill="rgba(255,255,255,0.2)"
           fontSize="8"
-          fontFamily="'SF Mono', 'Fira Code', monospace"
+          fontFamily="'Courier New', monospace"
           letterSpacing="1"
           transform="rotate(-90, 10, 355)"
         >
@@ -491,7 +491,7 @@ const VehicleSilhouetteMap: React.FC<VehicleSilhouetteMapProps> = ({
           textAnchor="middle"
           fill="rgba(255,255,255,0.2)"
           fontSize="8"
-          fontFamily="'SF Mono', 'Fira Code', monospace"
+          fontFamily="'Courier New', monospace"
           letterSpacing="1"
           transform="rotate(90, 390, 355)"
         >
@@ -510,7 +510,7 @@ const VehicleSilhouetteMap: React.FC<VehicleSilhouetteMapProps> = ({
             border: '1px solid rgba(255,255,255,0.2)',
             padding: '4px 8px',
             fontSize: '10px',
-            fontFamily: "'SF Mono', 'Fira Code', monospace",
+            fontFamily: "'Courier New', monospace",
             color: '#fff',
             pointerEvents: 'none',
             whiteSpace: 'nowrap',

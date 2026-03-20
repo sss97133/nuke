@@ -25,7 +25,7 @@ interface Draft {
 
 const to8 = { fontSize: '12px' } as const;
 const cardHeaderStyle: React.CSSProperties = { ...to8, padding: '10px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' };
-const inputStyle: React.CSSProperties = { ...to8, width: 120, padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 4 };
+const inputStyle: React.CSSProperties = { ...to8, width: 120, padding: '6px 8px', border: '1px solid var(--border)'};
 const cellStyle: React.CSSProperties = { ...to8, padding: '8px 10px', borderBottom: '1px solid var(--border)', minHeight: 36 };
 const headCellStyle: React.CSSProperties = { ...to8, padding: '8px 10px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', fontWeight: 700 };
 

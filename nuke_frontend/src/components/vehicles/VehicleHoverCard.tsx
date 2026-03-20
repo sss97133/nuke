@@ -145,14 +145,11 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
         top: adjustedPosition.y,
         zIndex: 9999,
         background: 'var(--bg)',
-        border: '1px solid var(--border)',
-        borderRadius: '6px',
-        boxShadow: '0 10px 40px var(--overlay)',
-        padding: '12px',
+        border: '1px solid var(--border)', padding: '12px',
         minWidth: '280px',
         maxWidth: '320px',
         fontSize: '12px',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontFamily: 'Arial, sans-serif',
         pointerEvents: 'auto',
         opacity: 1,
         transform: 'translateY(0)',
@@ -187,9 +184,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
           <span style={{
             background: status.color,
             color: 'var(--bg)',
-            padding: '2px 6px',
-            borderRadius: '3px',
-            fontSize: '9px',
+            padding: '2px 6px', fontSize: '9px',
             fontWeight: 600,
             whiteSpace: 'nowrap',
           }}>
@@ -226,9 +221,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
         gap: '8px',
         marginBottom: '10px',
         padding: '8px',
-        background: 'var(--bg-secondary)',
-        borderRadius: '4px',
-      }}>
+        background: 'var(--bg-secondary)', }}>
         <div>
           <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Miles</div>
           <div style={{ fontWeight: 600 }}>
@@ -324,9 +317,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
           padding: '8px',
           marginBottom: '10px',
           background: 'var(--grey-50)',
-          border: '1px solid var(--border)',
-          borderRadius: '4px',
-          fontSize: '11px',
+          border: '1px solid var(--border)', fontSize: '11px',
         }}>
           <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>
             AI Take
@@ -337,9 +328,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
             <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{
                 width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: vehicle.deal_score > 20 ? 'var(--success)' : vehicle.deal_score > 0 ? 'var(--success)' : vehicle.deal_score > -20 ? 'var(--warning)' : 'var(--error)',
+                height: '6px', background: vehicle.deal_score > 20 ? 'var(--success)' : vehicle.deal_score > 0 ? 'var(--success)' : vehicle.deal_score > -20 ? 'var(--warning)' : 'var(--error)',
                 flexShrink: 0,
               }} />
               <span style={{ color: 'var(--text)' }}>
@@ -361,9 +350,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
               <div style={{
                 width: '40px',
                 height: '4px',
-                background: 'var(--border)',
-                borderRadius: '2px',
-                overflow: 'hidden',
+                background: 'var(--border)', overflow: 'hidden',
                 flexShrink: 0,
               }}>
                 <div style={{
@@ -385,9 +372,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
               <span style={{
                 background: 'var(--warning)',
                 color: 'var(--text)',
-                padding: '1px 6px',
-                borderRadius: '3px',
-                fontSize: '9px',
+                padding: '1px 6px', fontSize: '9px',
                 fontWeight: 600,
               }}>
                 RECORD
@@ -422,9 +407,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
             padding: '6px 10px',
             background: 'var(--primary)',
             color: 'var(--bg)',
-            border: 'none',
-            borderRadius: '4px',
-            fontSize: '11px',
+            border: 'none', fontSize: '11px',
             fontWeight: 500,
             cursor: 'pointer',
           }}
@@ -446,9 +429,7 @@ const VehicleHoverCard: React.FC<VehicleHoverCardProps> = ({
             padding: '6px 10px',
             background: isFollowing ? 'var(--primary)' : 'var(--bg-secondary)',
             color: isFollowing ? 'var(--bg)' : 'var(--text)',
-            border: isFollowing ? 'none' : '1px solid var(--border)',
-            borderRadius: '4px',
-            fontSize: '11px',
+            border: isFollowing ? 'none' : '1px solid var(--border)', fontSize: '11px',
             cursor: followLoading ? 'wait' : 'pointer',
             opacity: followLoading ? 0.6 : 1,
             transition: 'all 0.15s ease',

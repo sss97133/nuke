@@ -271,9 +271,7 @@ What do you want to do first?`,
           >
             <div
               style={{
-                padding: '12px',
-                borderRadius: '8px',
-                background: message.role === 'user'
+                padding: '12px', background: message.role === 'user'
                   ? 'var(--accent)'
                   : 'var(--surface)',
                 color: message.role === 'user' ? 'var(--bg)' : 'var(--text)',
@@ -293,9 +291,7 @@ What do you want to do first?`,
                       key={idx}
                       style={{
                         padding: '4px 8px',
-                        background: message.role === 'user' ? 'rgba(255,255,255,0.2)' : 'var(--grey-50)',
-                        borderRadius: '4px',
-                        fontSize: '9px'
+                        background: message.role === 'user' ? 'rgba(255,255,255,0.2)' : 'var(--grey-50)', fontSize: '9px'
                       }}
                     >
                       {att.name}
@@ -315,9 +311,7 @@ What do you want to do first?`,
                       key={idx}
                       style={{
                         padding: '6px 8px',
-                        background: 'var(--grey-50)',
-                        borderRadius: '4px',
-                        fontSize: '11px',
+                        background: 'var(--grey-50)', fontSize: '11px',
                         marginBottom: '4px',
                         display: 'flex',
                         justifyContent: 'space-between',
@@ -332,9 +326,7 @@ What do you want to do first?`,
                       </span>
                       <span style={{
                         fontSize: '9px',
-                        padding: '2px 6px',
-                        borderRadius: '3px',
-                        background: action.status === 'completed' ? 'var(--success)' : 
+                        padding: '2px 6px', background: action.status === 'completed' ? 'var(--success)' : 
                                    action.status === 'failed' ? 'var(--danger)' : 'var(--warning)',
                         color: 'var(--bg)'
                       }}>
@@ -359,9 +351,7 @@ What do you want to do first?`,
         {processing && (
           <div style={{
             alignSelf: 'flex-start',
-            padding: '12px',
-            borderRadius: '8px',
-            background: 'var(--surface)',
+            padding: '12px', background: 'var(--surface)',
             border: '1px solid var(--border)',
             fontSize: '12px',
             color: 'var(--text-muted)'
@@ -394,9 +384,7 @@ What do you want to do first?`,
                 style={{
                   padding: '6px 12px',
                   background: 'var(--grey-50)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  fontSize: '11px',
+                  border: '1px solid var(--border)', fontSize: '11px',
                   display: 'flex',
                   gap: '8px',
                   alignItems: 'center'
@@ -441,9 +429,7 @@ What do you want to do first?`,
             style={{
               padding: '10px',
               border: '1px solid var(--border)',
-              background: 'var(--surface)',
-              borderRadius: '4px',
-              cursor: 'pointer',
+              background: 'var(--surface)', cursor: 'pointer',
               fontSize: '19px'
             }}
             title="Attach files"
@@ -465,9 +451,7 @@ What do you want to do first?`,
             style={{
               flex: 1,
               padding: '10px',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              fontSize: '12px',
+              border: '1px solid var(--border)', fontSize: '12px',
               resize: 'none',
               minHeight: '60px',
               fontFamily: 'inherit'
@@ -482,9 +466,7 @@ What do you want to do first?`,
               padding: '10px 20px',
               background: 'var(--accent)',
               color: 'var(--bg)',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: processing ? 'wait' : 'pointer',
+              border: 'none', cursor: processing ? 'wait' : 'pointer',
               fontSize: '12px',
               fontWeight: 600,
               opacity: processing || (!input.trim() && selectedFiles.length === 0) ? 0.5 : 1

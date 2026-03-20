@@ -398,9 +398,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
               style={{
                 flex: '1 1 250px',
                 padding: '6px 10px',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                fontSize: '12px'
+                border: '1px solid var(--border)', fontSize: '12px'
               }}
             />
 
@@ -410,9 +408,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
               onChange={(e) => setSortBy(e.target.value as SortBy)}
               style={{
                 padding: '6px 8px',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                fontSize: '11px',
+                border: '1px solid var(--border)', fontSize: '11px',
                 cursor: 'pointer'
               }}
             >
@@ -428,9 +424,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
               onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
               style={{
                 padding: '6px 8px',
-                border: '1px solid var(--border)',
-                borderRadius: '3px',
-                fontSize: '11px',
+                border: '1px solid var(--border)', fontSize: '11px',
                 cursor: 'pointer',
                 background: 'var(--white)',
                 minWidth: '40px'
@@ -441,7 +435,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
             </button>
 
             {/* View mode buttons */}
-            <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', border: '1px solid var(--border)', overflow: 'hidden' }}>
               {(['gallery', 'grid', 'technical'] as ViewMode[]).map(mode => (
                 <button
                   key={mode}
@@ -481,9 +475,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
               key={vehicle.id}
               onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
               style={{
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                overflow: 'hidden',
+                border: '1px solid var(--border)', overflow: 'hidden',
                 background: 'var(--white)',
                 cursor: 'pointer',
                 transition: 'transform 0.12s, box-shadow 0.12s'
@@ -510,9 +502,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                     left: '8px',
                     background: 'rgba(220, 38, 38, 0.95)',
                     color: 'var(--bg)',
-                    padding: '4px 10px',
-                    borderRadius: '2px',
-                    fontSize: '9px',
+                    padding: '4px 10px', fontSize: '9px',
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'background 0.12s',
@@ -533,9 +523,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                     right: '8px',
                     background: 'rgba(0,0,0,0.7)',
                     color: 'var(--bg)',
-                    padding: '4px 8px',
-                    borderRadius: '2px',
-                    fontSize: '9px',
+                    padding: '4px 8px', fontSize: '9px',
                     fontWeight: 600
                   }}>
                     {vehicle.image_count} photos
@@ -592,9 +580,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
               key={vehicle.id}
               onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
               style={{
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                overflow: 'hidden',
+                border: '1px solid var(--border)', overflow: 'hidden',
                 background: 'var(--white)',
                 cursor: 'pointer'
               }}
@@ -618,9 +604,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                     left: '6px',
                     background: 'rgba(220, 38, 38, 0.95)',
                     color: 'var(--bg)',
-                    padding: '3px 8px',
-                    borderRadius: '2px',
-                    fontSize: '8px',
+                    padding: '3px 8px', fontSize: '8px',
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'background 0.12s',
@@ -661,11 +645,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
                     background: 'var(--surface)',
-                    border: '2px solid var(--border)',
-                    borderRadius: '8px',
-                    padding: '16px',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                    zIndex: 1000,
+                    border: '2px solid var(--border)', padding: '16px', zIndex: 1000,
                     maxWidth: '400px',
                     pointerEvents: 'none'
                   }}
@@ -677,9 +657,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                       style={{
                         width: '100%',
                         aspectRatio: '4/3',
-                        objectFit: 'cover',
-                        borderRadius: '4px',
-                        marginBottom: '12px'
+                        objectFit: 'cover', marginBottom: '12px'
                       }}
                     />
                   )}
@@ -830,15 +808,11 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: 'var(--surface)',
-              borderRadius: '8px',
-              padding: '20px',
+              background: 'var(--surface)', padding: '20px',
               maxWidth: '500px',
               width: '100%',
               maxHeight: '90vh',
-              overflow: 'auto',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
-            }}
+              overflow: 'auto'}}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ margin: 0, fontSize: '19px', fontWeight: 700 }}>
@@ -870,9 +844,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                 <div style={{ fontWeight: 600, marginBottom: '4px', color: 'var(--text-muted)' }}>Proof Type:</div>
                 <div style={{ 
                   padding: '6px 10px', 
-                  background: selectedProof.proof_confidence && selectedProof.proof_confidence >= 80 ? 'var(--success-dim)' : 'var(--warning-dim)',
-                  borderRadius: '4px',
-                  display: 'inline-block',
+                  background: selectedProof.proof_confidence && selectedProof.proof_confidence >= 80 ? 'var(--success-dim)' : 'var(--warning-dim)', display: 'inline-block',
                   fontWeight: 600
                 }}>
                   {formatProofType(selectedProof.proof_type)}
@@ -904,9 +876,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                       wordBreak: 'break-all',
                       display: 'block',
                       padding: '6px',
-                      background: 'var(--surface)',
-                      borderRadius: '4px',
-                      border: '1px solid var(--border)'
+                      background: 'var(--surface)', border: '1px solid var(--border)'
                     }}
                     className="hover:underline"
                   >
@@ -937,9 +907,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
               {selectedProof.vehicle_event_id && (
                 <div style={{
                   padding: '8px',
-                  background: 'var(--success-dim)',
-                  borderRadius: '4px',
-                  fontSize: '11px'
+                  background: 'var(--success-dim)', fontSize: '11px'
                 }}>
                   <strong>Vehicle Event Record:</strong> Verified sale through vehicle_events table (ID: {selectedProof.vehicle_event_id})
                 </div>
@@ -948,9 +916,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
               {selectedProof.timeline_event_id && (
                 <div style={{ 
                   padding: '8px', 
-                  background: 'var(--info-dim)', 
-                  borderRadius: '4px',
-                  fontSize: '11px'
+                  background: 'var(--info-dim)', fontSize: '11px'
                 }}>
                   <strong>Timeline Event:</strong> Sale recorded in timeline_events (ID: {selectedProof.timeline_event_id})
                 </div>
@@ -959,9 +925,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
               {!selectedProof.proof_url && !selectedProof.bat_auction_url && !selectedProof.timeline_bat_url && (
                 <div style={{ 
                   padding: '8px', 
-                  background: 'var(--warning-dim)', 
-                  borderRadius: '4px',
-                  fontSize: '11px',
+                  background: 'var(--warning-dim)', fontSize: '11px',
                   color: 'var(--warning)'
                 }}>
                   <strong>No external proof available.</strong> This vehicle was marked as sold manually or imported from a source without listing URLs.

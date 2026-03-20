@@ -56,14 +56,14 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
     return (
       <div className="space-y-6">
         {/* Main Valuation */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl p-6 border border-blue-200 dark:border-blue-700">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 p-6 border border-blue-200 dark:border-blue-700">
           <div className="text-center">
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
               {pricingService.formatCurrency(priceIntelligence.total_estimated_value)}
             </h2>
             <p className="text-lg text-gray-600 dark:text-gray-400 mb-4">Estimated Market Value</p>
             <div className="flex items-center justify-center gap-2">
-              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+              <div className={`px-3 py-1  text-sm font-medium ${
                 priceIntelligence.confidence_score >= 80 ? 'bg-green-100 text-green-800' :
                 priceIntelligence.confidence_score >= 60 ? 'bg-yellow-100 text-yellow-800' :
                 'bg-red-100 text-red-800'
@@ -78,7 +78,7 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
         </div>
 
         {/* Value Breakdown */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Value Breakdown</h3>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
@@ -127,7 +127,7 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
         </div>
 
         {/* Visual Evidence */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Visual Evidence Quality</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center">
@@ -145,9 +145,9 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
           </div>
           <div className="mt-4">
             <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">Verification Quality</div>
-            <div className="bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div className="bg-gray-200 dark:bg-gray-700 h-2">
               <div
-                className="bg-blue-600 h-2 rounded-full"
+                className="bg-blue-600 h-2"
                 style={{ width: `${priceIntelligence.visual_evidence.verification_quality}%` }}
               />
             </div>
@@ -158,7 +158,7 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
         </div>
 
         {/* Risk Factors */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Risk Assessment</h3>
           <div className="space-y-2">
             {Object.entries(priceIntelligence.risk_factors).map(([key, value]) => (
@@ -166,7 +166,7 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
                 <span className="text-gray-600 dark:text-gray-400 capitalize">
                   {key.replace(/_/g, ' ')}
                 </span>
-                <div className={`px-2 py-1 rounded text-xs font-medium ${
+                <div className={`px-2 py-1  text-xs font-medium ${
                   value ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
                 }`}>
                   {value ? 'Risk Detected' : 'No Issues'}
@@ -185,7 +185,7 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
     return (
       <div className="space-y-6">
         {/* Summary */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Modification Summary</h3>
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div className="text-center">
@@ -210,19 +210,19 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
 
           {/* Category Breakdown */}
           <div className="grid grid-cols-3 gap-4">
-            <div className="text-center p-3 bg-red-50 rounded-lg">
+            <div className="text-center p-3 bg-red-50">
               <div className="text-lg font-semibold text-red-700">
                 {modificationAnalysis.summary.modification_categories.performance}
               </div>
               <div className="text-xs text-red-600">Performance</div>
             </div>
-            <div className="text-center p-3 bg-blue-50 rounded-lg">
+            <div className="text-center p-3 bg-blue-50">
               <div className="text-lg font-semibold text-blue-700">
                 {modificationAnalysis.summary.modification_categories.aesthetic}
               </div>
               <div className="text-xs text-blue-600">Aesthetic</div>
             </div>
-            <div className="text-center p-3 bg-green-50 rounded-lg">
+            <div className="text-center p-3 bg-green-50">
               <div className="text-lg font-semibold text-green-700">
                 {modificationAnalysis.summary.modification_categories.functional}
               </div>
@@ -234,7 +234,7 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
         {/* Detailed Analysis */}
         <div className="space-y-4">
           {modificationAnalysis.detailed_analysis.map((mod, index) => (
-            <div key={index} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <div key={index} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h4 className="font-semibold text-gray-900 dark:text-white">{mod.modification_name}</h4>
@@ -242,11 +242,11 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
                     <p className="text-sm text-gray-600 dark:text-gray-400">{mod.brand}</p>
                   )}
                   <div className="flex gap-2 mt-2">
-                    <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-xs">
+                    <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs">
                       {mod.modification_type}
                     </span>
                     <span
-                      className="px-2 py-1 rounded text-xs text-white"
+                      className="px-2 py-1 text-xs text-white"
                       style={{ backgroundColor: pricingService.getDemandColor(mod.market_factors.market_demand) }}
                     >
                       {mod.market_factors.market_demand} demand
@@ -265,7 +265,7 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
                 <div>
                   <div className="text-gray-600 dark:text-gray-400">Installation Quality</div>
                   <div
-                    className="px-2 py-1 rounded text-xs text-white mt-1 inline-block"
+                    className="px-2 py-1 text-xs text-white mt-1 inline-block"
                     style={{ backgroundColor: pricingService.getQualityColor(mod.quality_assessment.installation_quality) }}
                   >
                     {mod.quality_assessment.installation_quality.replace('_', ' ')}
@@ -293,7 +293,7 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
     return (
       <div className="space-y-6">
         {/* Market Intelligence */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Market Intelligence</h3>
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
@@ -320,7 +320,7 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
         {/* Data Sources */}
         <div className="space-y-4">
           {marketComparison.sources.map((source, index) => (
-            <div key={index} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div key={index} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4">
               <div className="flex justify-between items-start">
                 <div>
                   <h4 className="font-semibold text-gray-900 dark:text-white capitalize">{source.source}</h4>
@@ -350,7 +350,7 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin h-12 w-12 border-b-2 border-blue-600"></div>
         <span className="ml-4 text-gray-600 dark:text-gray-400">Generating pricing intelligence...</span>
       </div>
     );
@@ -358,12 +358,12 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+      <div className="bg-red-50 border border-red-200 p-6 text-center">
         <div className="text-red-800 font-medium mb-2">Failed to Generate Pricing Intelligence</div>
         <div className="text-red-600 text-sm mb-4">{error}</div>
         <button
           onClick={generateFullAnalysis}
-          className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+          className="bg-red-600 text-white px-4 py-2 hover:bg-red-700"
         >
           Try Again
         </button>
@@ -374,7 +374,7 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
   return (
     <div className="max-w-6xl mx-auto">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6 mb-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🎯 The Ultimate Appraisal Tool</h1>
@@ -392,7 +392,7 @@ export const PricingIntelligence: React.FC<PricingIntelligenceProps> = ({ vehicl
       </div>
 
       {/* Tab Navigation */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-6">
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mb-6">
         <div className="flex border-b">
           {[
             { key: 'overview', label: 'Overview', icon: '📊' },

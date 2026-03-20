@@ -766,9 +766,7 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
                 </label>
                 <div 
                   style={{
-                    border: dragActive ? '2px dashed var(--primary)' : '2px dashed var(--border-medium)',
-                    borderRadius: '0px',
-                    padding: '20px',
+                    border: dragActive ? '2px dashed var(--primary)' : '2px dashed var(--border-medium)', padding: '20px',
                     textAlign: 'center',
                     backgroundColor: dragActive ? 'var(--grey-100)' : 'var(--white)',
                     cursor: 'pointer',
@@ -899,9 +897,7 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
               maxWidth: '90%',
               maxHeight: '90%',
               objectFit: 'contain',
-              border: '2px solid var(--white)',
-              boxShadow: '0 0 20px rgba(0,0,0,0.8)'
-            }}
+              border: '2px solid var(--white)'}}
           />
         </div>
       )}

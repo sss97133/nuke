@@ -386,9 +386,7 @@ const DealerBulkEditor: React.FC = () => {
       {/* AI Spreadsheet Import */}
       <div style={{
         background: 'var(--surface)',
-        border: '2px solid var(--accent)',
-        borderRadius: '4px',
-        padding: '16px',
+        border: '2px solid var(--accent)', padding: '16px',
         marginBottom: '20px'
       }}>
         <h3 style={{ fontSize: '13px', fontWeight: 700, margin: '0 0 12px 0' }}>
@@ -429,9 +427,7 @@ const DealerBulkEditor: React.FC = () => {
       <div style={{ 
         overflowX: 'auto',
         background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: '4px'
-      }}>
+        border: '1px solid var(--border)'}}>
         <table style={{
           width: '100%',
           borderCollapse: 'collapse',
@@ -681,9 +677,7 @@ const DealerBulkEditor: React.FC = () => {
           marginTop: '20px',
           padding: '12px',
           background: 'rgba(255, 0, 0, 0.1)',
-          border: '1px solid var(--danger)',
-          borderRadius: '4px'
-        }}>
+          border: '1px solid var(--danger)'}}>
           <h4 style={{ fontSize: '12px', fontWeight: 700, margin: '0 0 8px 0', color: 'var(--danger)' }}>
             Validation Errors
           </h4>

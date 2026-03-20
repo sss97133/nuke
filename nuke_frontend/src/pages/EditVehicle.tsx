@@ -1118,9 +1118,7 @@ const EditVehicle: React.FC = () => {
                             marginTop: '12px', 
                             padding: '12px', 
                             background: 'var(--bg)', 
-                            border: '2px solid var(--border)',
-                            borderRadius: '4px'
-                          }}>
+                            border: '2px solid var(--border)'}}>
                             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                               Trade details will be managed in the vehicle profile after saving.
                               You'll be able to link the vehicle(s) you traded and specify values.

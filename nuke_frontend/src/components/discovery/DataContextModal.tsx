@@ -180,9 +180,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
     >
       <div
         style={{
-          background: 'var(--surface)',
-          borderRadius: '2px',
-          border: '1px solid #c0c0c0',
+          background: 'var(--surface)', border: '1px solid #c0c0c0',
           maxWidth: '900px',
           width: '100%',
           maxHeight: '80vh',
@@ -223,7 +221,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
         {contextType && ['year', 'make', 'model'].includes(contextType) && (
           <div style={{ 
             padding: '8px 16px', 
-            borderBottom: '1px solid #e5e7eb',
+            borderBottom: '1px solid var(--border)',
             display: 'flex',
             gap: '4px',
             flexWrap: 'wrap'
@@ -235,12 +233,10 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
                 onClick={() => setSortBy(sort as any)}
                 className="badge"
                 style={{
-                  background: sortBy === sort ? '#2563eb' : '#f3f4f6',
-                  color: sortBy === sort ? 'white' : '#374151',
+                  background: sortBy === sort ? 'var(--info)' : 'var(--bg-secondary)',
+                  color: sortBy === sort ? 'white' : 'var(--text)',
                   border: '1px solid #c0c0c0',
-                  padding: '2px 6px',
-                  borderRadius: '2px',
-                  fontSize: '11px',
+                  padding: '2px 6px', fontSize: '11px',
                   cursor: 'pointer'
                 }}
               >
@@ -286,9 +282,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
                     onClick={onClose}
                     style={{
                       textDecoration: 'none',
-                      border: '1px solid #c0c0c0',
-                      borderRadius: '2px',
-                      overflow: 'hidden',
+                      border: '1px solid #c0c0c0', overflow: 'hidden',
                       background: 'var(--surface)',
                       cursor: 'pointer',
                       display: 'block'
@@ -306,10 +300,8 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
                           <span className="badge" style={{
                             background: 'var(--bg)',
                             border: '1px solid #c0c0c0',
-                            padding: '1px 4px',
-                            borderRadius: '2px',
-                            fontSize: '9px',
-                            color: '#374151'
+                            padding: '1px 4px', fontSize: '9px',
+                            color: 'var(--text)'
                           }}>
                             ${estimate.toLocaleString()}
                           </span>
@@ -318,9 +310,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
                           <span className="badge" style={{
                             background: 'var(--bg)',
                             border: '1px solid #c0c0c0',
-                            padding: '1px 4px',
-                            borderRadius: '2px',
-                            fontSize: '9px',
+                            padding: '1px 4px', fontSize: '9px',
                             color: change >= 0 ? '#166534' : '#991b1b'
                           }}>
                             {change >= 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}%

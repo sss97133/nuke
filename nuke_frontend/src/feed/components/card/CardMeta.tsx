@@ -88,9 +88,9 @@ export function CardMeta({ mileage, transmission, drivetrain, bodyStyle, timeLab
               ...chipStyle,
               fontFamily: "'Courier New', monospace",
               fontSize: '7px',
-              color: timeLabel.startsWith('sold') ? '#10b981'
-                : timeLabel.startsWith('ends') ? '#ef4444'
-                : timeLabel.startsWith('listed') ? '#3b82f6'
+              color: timeLabel.startsWith('sold') ? 'var(--success)'
+                : timeLabel.startsWith('ends') ? 'var(--error)'
+                : timeLabel.startsWith('listed') ? 'var(--info)'
                 : 'var(--text-disabled)',
               borderColor: 'transparent',
               padding: '1px 2px',

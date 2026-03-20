@@ -73,48 +73,48 @@ export default function BidExecutionStatus({ proxyBidId, onStatusChange }: BidEx
     switch (status) {
       case 'queued':
         return {
-          color: '#3b82f6',
-          bg: '#eff6ff',
+          color: 'var(--info)',
+          bg: 'var(--info-dim)',
           icon: '⏳',
           label: 'Scheduled',
           description: 'Waiting for execution window'
         };
       case 'locked':
         return {
-          color: '#f59e0b',
-          bg: '#fef3c7',
+          color: 'var(--warning)',
+          bg: 'var(--warning-dim)',
           icon: '🔒',
           label: 'Preparing',
           description: 'Bid execution starting'
         };
       case 'executing':
         return {
-          color: '#f59e0b',
-          bg: '#fef3c7',
+          color: 'var(--warning)',
+          bg: 'var(--warning-dim)',
           icon: '⚡',
           label: 'Executing',
           description: 'Placing bid now...'
         };
       case 'completed':
         return {
-          color: '#22c55e',
-          bg: '#dcfce7',
+          color: 'var(--success)',
+          bg: 'var(--success-dim)',
           icon: '✓',
           label: 'Completed',
           description: 'Bid successfully placed'
         };
       case 'failed':
         return {
-          color: '#ef4444',
-          bg: '#fef2f2',
+          color: 'var(--error)',
+          bg: 'var(--error-dim)',
           icon: '✗',
           label: 'Failed',
           description: 'Bid execution failed'
         };
       case 'cancelled':
         return {
-          color: '#6b7280',
-          bg: '#f3f4f6',
+          color: 'var(--text-secondary)',
+          bg: 'var(--bg-secondary)',
           icon: '○',
           label: 'Cancelled',
           description: 'Bid was cancelled'
@@ -150,9 +150,7 @@ export default function BidExecutionStatus({ proxyBidId, onStatusChange }: BidEx
     return (
       <div style={{
         padding: '12px',
-        background: 'var(--surface-hover)',
-        borderRadius: '4px',
-        fontSize: '11px',
+        background: 'var(--surface-hover)', fontSize: '11px',
         color: 'var(--text-muted)'
       }}>
         Loading execution status...
@@ -168,9 +166,7 @@ export default function BidExecutionStatus({ proxyBidId, onStatusChange }: BidEx
 
   return (
     <div style={{
-      border: `2px solid ${statusInfo.color}`,
-      borderRadius: '6px',
-      overflow: 'hidden'
+      border: `2px solid ${statusInfo.color}`, overflow: 'hidden'
     }}>
       {/* Status header */}
       <div style={{
@@ -212,9 +208,7 @@ export default function BidExecutionStatus({ proxyBidId, onStatusChange }: BidEx
           <div style={{ marginBottom: '10px' }}>
             <div style={{
               height: '4px',
-              background: 'var(--border)',
-              borderRadius: '2px',
-              overflow: 'hidden'
+              background: 'var(--border)', overflow: 'hidden'
             }}>
               <div style={{
                 height: '100%',
@@ -236,7 +230,7 @@ export default function BidExecutionStatus({ proxyBidId, onStatusChange }: BidEx
             )}
             {execution.result_data.is_high_bidder !== undefined && (
               <div style={{
-                color: execution.result_data.is_high_bidder ? '#22c55e' : '#f59e0b'
+                color: execution.result_data.is_high_bidder ? 'var(--success)' : 'var(--warning)'
               }}>
                 {execution.result_data.is_high_bidder ? '✓ You are the high bidder' : '⚠ Outbid'}
               </div>
@@ -248,7 +242,7 @@ export default function BidExecutionStatus({ proxyBidId, onStatusChange }: BidEx
         {execution.status === 'failed' && execution.error_message && (
           <div style={{
             fontSize: '11px',
-            color: '#ef4444'
+            color: 'var(--error)'
           }}>
             {execution.error_message}
           </div>

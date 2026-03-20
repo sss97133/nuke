@@ -122,7 +122,7 @@ const S = {
     color: 'var(--text-secondary)',
   },
   value: {
-    fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+    fontFamily: "'Courier New', monospace" ,
     fontSize: '11px',
     fontWeight: 700,
     color: 'var(--text)',
@@ -142,7 +142,7 @@ const S = {
     gap: '4px',
   },
   statValue: {
-    fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+    fontFamily: "'Courier New', monospace" ,
     fontSize: '11px',
     fontWeight: 700,
     color: 'var(--text)',
@@ -282,7 +282,7 @@ const IntelligenceSection: React.FC<{
                   }}
                 >
                   <span style={{
-                    fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                    fontFamily: "'Courier New', monospace" ,
                     fontSize: '9px',
                     color: isCurrentValue ? 'var(--text)' : 'var(--text-secondary)',
                     fontWeight: isCurrentValue ? 700 : 400,
@@ -294,7 +294,7 @@ const IntelligenceSection: React.FC<{
                     {tv.value}
                   </span>
                   <span style={{
-                    fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                    fontFamily: "'Courier New', monospace" ,
                     fontSize: '9px',
                     fontWeight: 700,
                     color: isCurrentValue ? 'var(--text)' : 'var(--text-disabled)',
@@ -329,7 +329,7 @@ const IntelligenceSection: React.FC<{
                     {comp.label}:
                   </span>
                   <span style={{
-                    fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                    fontFamily: "'Courier New', monospace" ,
                     fontSize: '9px',
                     color: 'var(--text)',
                   }}>
@@ -605,7 +605,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                 onChange={(e) => setEditedValue(e.target.value)}
                 autoFocus
                 style={{
-                  fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                  fontFamily: "'Courier New', monospace" ,
                   fontSize: '11px',
                   fontWeight: 700,
                   padding: '4px 8px',

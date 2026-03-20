@@ -173,12 +173,12 @@ const DuplicateDetectionModal: React.FC<DuplicateDetectionModalProps> = ({
   if (loading) {
     return (
       <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg p-6 max-w-2xl w-full">
+        <div className="bg-white p-6 max-w-2xl w-full">
           <div className="animate-pulse space-y-4">
-            <div className="h-6 bg-gray-300 rounded w-3/4"></div>
+            <div className="h-6 bg-gray-300 w-3/4"></div>
             <div className="space-y-2">
-              <div className="h-4 bg-gray-300 rounded"></div>
-              <div className="h-4 bg-gray-300 rounded w-5/6"></div>
+              <div className="h-4 bg-gray-300"></div>
+              <div className="h-4 bg-gray-300 w-5/6"></div>
             </div>
           </div>
         </div>
@@ -189,7 +189,7 @@ const DuplicateDetectionModal: React.FC<DuplicateDetectionModalProps> = ({
   if (!detection) {
     return (
       <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <div className="bg-white p-6 max-w-md w-full">
           <div className="text-center">
             <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -200,7 +200,7 @@ const DuplicateDetectionModal: React.FC<DuplicateDetectionModalProps> = ({
             </p>
             <button
               onClick={onClose}
-              className="mt-4 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+              className="mt-4 bg-gray-600 text-white px-4 py-2 hover:bg-gray-700"
             >
               Close
             </button>
@@ -212,7 +212,7 @@ const DuplicateDetectionModal: React.FC<DuplicateDetectionModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-screen overflow-auto">
+      <div className="bg-white max-w-4xl w-full max-h-screen overflow-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div className="flex items-center space-x-3">
@@ -229,7 +229,7 @@ const DuplicateDetectionModal: React.FC<DuplicateDetectionModalProps> = ({
         {/* Content */}
         <div className="p-6 space-y-6">
           {/* Detection Summary */}
-          <div className="bg-gray-50 rounded-lg p-4">
+          <div className="bg-gray-50 p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
                 {getDetectionMethodIcon(detection.detection_method)}
@@ -256,9 +256,9 @@ const DuplicateDetectionModal: React.FC<DuplicateDetectionModalProps> = ({
           {/* Vehicle Comparison */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Original Vehicle */}
-            <div className="border rounded-lg p-4">
+            <div className="border p-4">
               <div className="flex items-center space-x-2 mb-3">
-                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-blue-500"></div>
                 <h4 className="font-medium text-gray-900">Original Vehicle</h4>
               </div>
               <div className="space-y-2 text-sm">
@@ -278,9 +278,9 @@ const DuplicateDetectionModal: React.FC<DuplicateDetectionModalProps> = ({
             </div>
 
             {/* Duplicate Vehicle */}
-            <div className="border rounded-lg p-4">
+            <div className="border p-4">
               <div className="flex items-center space-x-2 mb-3">
-                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-red-500"></div>
                 <h4 className="font-medium text-gray-900">Potential Duplicate</h4>
                 <a
                   href={`/vehicle/${detection.duplicate_vehicle.id}`}
@@ -309,7 +309,7 @@ const DuplicateDetectionModal: React.FC<DuplicateDetectionModalProps> = ({
           </div>
 
           {/* Evidence Details */}
-          <div className="border rounded-lg p-4">
+          <div className="border p-4">
             <h4 className="font-medium text-gray-900 mb-3">Evidence Details</h4>
             <div className="text-sm text-gray-600">
               {formatEvidence(detection.evidence, detection.detection_method)}
@@ -326,20 +326,20 @@ const DuplicateDetectionModal: React.FC<DuplicateDetectionModalProps> = ({
         <div className="flex justify-end space-x-3 p-6 border-t bg-gray-50">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300"
+            className="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300"
           >
             Cancel
           </button>
           <button
             onClick={() => onConfirm('reject')}
-            className="px-4 py-2 text-white bg-gray-600 rounded hover:bg-gray-700 flex items-center space-x-2"
+            className="px-4 py-2 text-white bg-gray-600 hover:bg-gray-700 flex items-center space-x-2"
           >
             <XCircle className="w-4 h-4" />
             <span>Not a Duplicate</span>
           </button>
           <button
             onClick={() => onConfirm('confirm')}
-            className="px-4 py-2 text-white bg-red-600 rounded hover:bg-red-700 flex items-center space-x-2"
+            className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 flex items-center space-x-2"
           >
             <CheckCircle className="w-4 h-4" />
             <span>Confirm Duplicate</span>

@@ -93,9 +93,7 @@ const DatabaseDiagnostic: React.FC = () => {
           <div style={{ marginTop: 'var(--space-3)' }}>
             <pre className="text-small" style={{ 
               background: 'var(--grey-100)', 
-              padding: 'var(--space-2)', 
-              borderRadius: '4px',
-              overflow: 'auto',
+              padding: 'var(--space-2)', overflow: 'auto',
               maxHeight: '400px'
             }}>
               {JSON.stringify(results, null, 2)}

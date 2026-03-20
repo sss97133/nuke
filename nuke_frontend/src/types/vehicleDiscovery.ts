@@ -94,11 +94,11 @@ export const getStatusLabel = (status: VehicleStatus): string => {
 
 export const getStatusColor = (status: VehicleStatus): string => {
   const colors: Record<VehicleStatus, string> = {
-    needs_data: '#ef4444', // red
-    active_work: '#3b82f6', // blue
-    for_sale: '#10b981', // green
+    needs_data: 'var(--error)', // red
+    active_work: 'var(--info)', // blue
+    for_sale: 'var(--success)', // green
     verified_profile: '#8b5cf6', // purple
-    open_contributions: '#f59e0b', // amber
+    open_contributions: 'var(--warning)', // amber
     professional_serviced: '#06b6d4' // cyan
   };
   return colors[status];
@@ -106,26 +106,26 @@ export const getStatusColor = (status: VehicleStatus): string => {
 
 export const getVerificationBadge = (level: VerificationLevel): { label: string; color: string; icon?: string } => {
   const badges: Record<VerificationLevel, { label: string; color: string; icon?: string }> = {
-    none: { label: 'Unverified', color: '#6b7280' },
-    ai_only: { label: 'AI Verified', color: '#3b82f6' },
-    human_verified: { label: 'Human Verified', color: '#10b981', icon: '✓' },
+    none: { label: 'Unverified', color: 'var(--text-secondary)' },
+    ai_only: { label: 'AI Verified', color: 'var(--info)' },
+    human_verified: { label: 'Human Verified', color: 'var(--success)', icon: '✓' },
     professional_verified: { label: 'Pro Verified', color: '#8b5cf6', icon: '✓✓' }
   };
   return badges[level];
 };
 
 export const getActivityHeatLabel = (score: number): { label: string; color: string } => {
-  if (score >= 80) return { label: 'Very Active', color: '#ef4444' };
-  if (score >= 60) return { label: 'Active', color: '#f59e0b' };
-  if (score >= 40) return { label: 'Moderate', color: '#3b82f6' };
-  if (score >= 20) return { label: 'Low Activity', color: '#6b7280' };
-  return { label: 'Inactive', color: '#e5e7eb' };
+  if (score >= 80) return { label: 'Very Active', color: 'var(--error)' };
+  if (score >= 60) return { label: 'Active', color: 'var(--warning)' };
+  if (score >= 40) return { label: 'Moderate', color: 'var(--info)' };
+  if (score >= 20) return { label: 'Low Activity', color: 'var(--text-secondary)' };
+  return { label: 'Inactive', color: 'var(--border)' };
 };
 
 export const getCompletenessLabel = (score: number): { label: string; color: string } => {
-  if (score >= 90) return { label: 'Complete', color: '#10b981' };
-  if (score >= 70) return { label: 'Good', color: '#3b82f6' };
-  if (score >= 50) return { label: 'Partial', color: '#f59e0b' };
-  if (score >= 30) return { label: 'Basic', color: '#6b7280' };
-  return { label: 'Minimal', color: '#ef4444' };
+  if (score >= 90) return { label: 'Complete', color: 'var(--success)' };
+  if (score >= 70) return { label: 'Good', color: 'var(--info)' };
+  if (score >= 50) return { label: 'Partial', color: 'var(--warning)' };
+  if (score >= 30) return { label: 'Basic', color: 'var(--text-secondary)' };
+  return { label: 'Minimal', color: 'var(--error)' };
 };

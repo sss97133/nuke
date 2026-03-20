@@ -73,9 +73,7 @@ export const MyVehiclesZone: React.FC<MyVehiclesZoneProps> = ({
             fontSize: '11px',
             color: 'var(--text-muted)',
             background: 'var(--surface-hover)',
-            padding: '2px 6px',
-            borderRadius: '2px'
-          }}>
+            padding: '2px 6px'}}>
             {vehicles.length}
           </span>
         </div>
@@ -92,9 +90,7 @@ export const MyVehiclesZone: React.FC<MyVehiclesZoneProps> = ({
               fontWeight: 600,
               background: 'var(--primary)',
               color: 'var(--bg)',
-              border: 'none',
-              borderRadius: '2px',
-              cursor: 'pointer'
+              border: 'none', cursor: 'pointer'
             }}
           >
             + ADD

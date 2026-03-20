@@ -27,9 +27,7 @@ const badgeStyle: React.CSSProperties = {
   fontSize: '10px',
   padding: '2px 6px',
   background: 'var(--bg)',
-  border: '1px solid var(--border)',
-  borderRadius: '4px',
-  textTransform: 'uppercase'
+  border: '1px solid var(--border)', textTransform: 'uppercase'
 };
 
 export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ scope, id, limit = 200 }) => {

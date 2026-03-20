@@ -89,9 +89,7 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
             onChange={(e) => onSearchChange(e.target.value)}
             style={{
               paddingRight: '80px',
-              fontSize: '11px',
-              borderRadius: '2px'
-            }}
+              fontSize: '11px'}}
           />
           <button
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
@@ -102,9 +100,7 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
               top: '50%',
               transform: 'translateY(-50%)',
               padding: '2px 4px',
-              fontSize: '11px',
-              borderRadius: '2px'
-            }}
+              fontSize: '11px'}}
           >
             {showAdvancedFilters ? 'Less' : 'Filters'}
           </button>
@@ -132,9 +128,7 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
               style={{
                 padding: '4px 6px',
                 fontSize: '11px',
-                border: filters.contentTypes.includes(option.value) ? '2px solid var(--accent)' : '1px solid var(--border)',
-                borderRadius: '2px'
-              }}
+                border: filters.contentTypes.includes(option.value) ? '2px solid var(--accent)' : '1px solid var(--border)'}}
             >
               {option.label}
             </button>
@@ -146,9 +140,7 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
       {showAdvancedFilters && (
         <div className="advanced-filters" style={{
           background: 'var(--bg-secondary)',
-          border: '1px solid var(--border)',
-          borderRadius: '2px',
-          padding: '8px',
+          border: '1px solid var(--border)', padding: '8px',
           marginBottom: '8px'
         }}>
           <div style={{
@@ -168,12 +160,12 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
                   placeholder="Enter city, state, or ZIP"
                   value={locationQuery}
                   onChange={(e) => setLocationQuery(e.target.value)}
-                  style={{ marginBottom: '6px', fontSize: '11px', borderRadius: '2px' }}
+                  style={{ marginBottom: '6px', fontSize: '11px'}}
                 />
                 <button
                   onClick={getCurrentLocation}
                   className="button button-secondary w-full"
-                  style={{ fontSize: '11px', padding: '4px', borderRadius: '2px' }}
+                  style={{ fontSize: '11px', padding: '4px'}}
                 >
                   Use Current Location
                 </button>
@@ -194,7 +186,7 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
                   })}
                   style={{ width: '100%' }}
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)' }}>
                   <span>1mi</span>
                   <span>500mi</span>
                 </div>
@@ -258,10 +250,8 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
               {filters.contentTypes.length > 0 && !filters.contentTypes.includes('all') && (
                 <span className="badge" style={{
                   background: 'var(--bg)',
-                  color: '#374151',
-                  padding: '1px 4px',
-                  borderRadius: '2px',
-                  fontSize: '11px',
+                  color: 'var(--text)',
+                  padding: '1px 4px', fontSize: '11px',
                   border: '1px solid #c0c0c0'
                 }}>
                   {filters.contentTypes.length} content types
@@ -271,10 +261,8 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
               {filters.location && (
                 <span className="badge" style={{
                   background: 'var(--bg)',
-                  color: '#374151',
-                  padding: '1px 4px',
-                  borderRadius: '2px',
-                  fontSize: '11px',
+                  color: 'var(--text)',
+                  padding: '1px 4px', fontSize: '11px',
                   border: '1px solid #c0c0c0'
                 }}>
                   {filters.radius}mi radius
@@ -284,10 +272,8 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
               {filters.dateRange !== 'all' && (
                 <span className="badge" style={{
                   background: 'var(--bg)',
-                  color: '#374151',
-                  padding: '1px 4px',
-                  borderRadius: '2px',
-                  fontSize: '11px',
+                  color: 'var(--text)',
+                  padding: '1px 4px', fontSize: '11px',
                   border: '1px solid #c0c0c0'
                 }}>
                   {dateRangeOptions.find(o => o.value === filters.dateRange)?.label}
@@ -305,7 +291,7 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#ef4444',
+                  color: 'var(--error)',
                   cursor: 'pointer',
                   fontSize: '11px',
                   textDecoration: 'underline'

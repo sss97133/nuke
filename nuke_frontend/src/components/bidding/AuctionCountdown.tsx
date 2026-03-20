@@ -157,13 +157,13 @@ export default function AuctionCountdown({
   const getUrgencyStyle = (level: string) => {
     switch (level) {
       case 'critical':
-        return { color: '#ef4444', bg: '#fef2f2', border: '#fecaca' };
+        return { color: 'var(--error)', bg: 'var(--error-dim)', border: '#fecaca' };
       case 'urgent':
-        return { color: '#f59e0b', bg: '#fef3c7', border: '#fcd34d' };
+        return { color: 'var(--warning)', bg: 'var(--warning-dim)', border: '#fcd34d' };
       case 'soon':
-        return { color: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe' };
+        return { color: 'var(--info)', bg: 'var(--info-dim)', border: 'var(--info-dim)' };
       case 'ended':
-        return { color: '#6b7280', bg: '#f3f4f6', border: '#d1d5db' };
+        return { color: 'var(--text-secondary)', bg: 'var(--bg-secondary)', border: 'var(--border)' };
       default:
         return { color: 'var(--text)', bg: 'var(--surface-hover)', border: 'var(--border)' };
     }
@@ -189,16 +189,14 @@ export default function AuctionCountdown({
       {/* Main countdown */}
       <div style={{
         background: urgencyStyle.bg,
-        border: `2px solid ${urgencyStyle.border}`,
-        borderRadius: '6px',
-        padding: sizeStyle.padding,
+        border: `2px solid ${urgencyStyle.border}`, padding: sizeStyle.padding,
         textAlign: 'center'
       }}>
         {/* Soft-close indicator */}
         {state?.is_soft_close_active && timeRemaining !== null && timeRemaining > 0 && (
           <div style={{
             fontSize: '9px',
-            color: '#ef4444',
+            color: 'var(--error)',
             fontWeight: 600,
             marginBottom: '4px',
             textTransform: 'uppercase',
@@ -251,7 +249,7 @@ export default function AuctionCountdown({
           </span>
           {serverOffset !== 0 && (
             <span style={{
-              color: Math.abs(serverOffset) > 5000 ? '#f59e0b' : 'var(--text-muted)'
+              color: Math.abs(serverOffset) > 5000 ? 'var(--warning)' : 'var(--text-muted)'
             }}>
               Δ{serverOffset > 0 ? '+' : ''}{Math.round(serverOffset / 1000)}s
             </span>
@@ -264,9 +262,7 @@ export default function AuctionCountdown({
         <div style={{
           marginTop: '8px',
           padding: '8px 10px',
-          background: 'var(--surface-hover)',
-          borderRadius: '4px',
-          display: 'flex',
+          background: 'var(--surface-hover)', display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>

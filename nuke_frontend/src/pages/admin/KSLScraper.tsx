@@ -145,9 +145,7 @@ export default function KSLScraper() {
             style={{
               width: '100%',
               padding: '12px',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              fontSize: '14px'
+              border: '1px solid var(--border)', fontSize: '14px'
             }}
           />
         </div>
@@ -165,9 +163,7 @@ export default function KSLScraper() {
             style={{
               width: '100px',
               padding: '12px',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              fontSize: '14px'
+              border: '1px solid var(--border)', fontSize: '14px'
             }}
           />
         </div>
@@ -191,9 +187,7 @@ export default function KSLScraper() {
               padding: '12px 24px',
               backgroundColor: 'var(--primary)',
               color: 'var(--bg)',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '14px',
+              border: 'none', fontSize: '14px',
               fontWeight: '500',
               cursor: scraping ? 'not-allowed' : 'pointer',
               opacity: scraping ? 0.6 : 1
@@ -209,9 +203,7 @@ export default function KSLScraper() {
               padding: '12px 24px',
               backgroundColor: 'var(--background-secondary)',
               color: 'var(--text)',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              fontSize: '14px',
+              border: '1px solid var(--border)', fontSize: '14px',
               fontWeight: '500',
               cursor: scraping ? 'not-allowed' : 'pointer'
             }}
@@ -221,7 +213,7 @@ export default function KSLScraper() {
         </div>
 
         {progress && (
-          <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'var(--background-secondary)', borderRadius: '4px', fontSize: '14px' }}>
+          <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'var(--background-secondary)', fontSize: '14px' }}>
             {progress}
           </div>
         )}
@@ -263,9 +255,7 @@ export default function KSLScraper() {
                 style={{
                   padding: '12px',
                   marginBottom: '8px',
-                  backgroundColor: result.success ? 'var(--background-secondary)' : 'var(--error-background)',
-                  borderRadius: '4px',
-                  fontSize: '14px'
+                  backgroundColor: result.success ? 'var(--background-secondary)' : 'var(--error-background)', fontSize: '14px'
                 }}
               >
                 <div style={{ fontWeight: '500', marginBottom: '4px' }}>
@@ -299,9 +289,7 @@ export default function KSLScraper() {
               <pre style={{ 
                 marginTop: '8px', 
                 padding: '12px', 
-                backgroundColor: 'var(--background)', 
-                borderRadius: '4px',
-                fontSize: '12px',
+                backgroundColor: 'var(--background)', fontSize: '12px',
                 overflow: 'auto'
               }}>
                 node scripts/scrape-ksl-parallel.js "{searchUrl}" {maxListings} {importToDb ? 'true' : 'false'}

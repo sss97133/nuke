@@ -368,7 +368,7 @@ export default function CreateOrganization() {
           </div>
         </div>
 
-        <div style={{ marginTop: '16px', padding: '12px', background: 'var(--surface)', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
+        <div style={{ marginTop: '16px', padding: '12px', background: 'var(--surface)', border: '1px solid var(--border-light)', fontSize: '11px', color: 'var(--text-muted)' }}>
           <strong>Collaborative profiles</strong>: Like vehicles, any user can contribute to this organization profile. You'll be credited as the creator. To claim ownership, you'll need to submit business documents for verification.
         </div>
       </div>

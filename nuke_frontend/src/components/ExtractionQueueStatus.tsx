@@ -71,11 +71,11 @@ const ExtractionQueueStatus: React.FC<ExtractionQueueStatusProps> = ({ vehicleId
 
   const statusColor = (status: string) => {
     switch (status) {
-      case 'pending': return '#f59e0b';
-      case 'processing': return '#3b82f6';
-      case 'completed': return '#10b981';
-      case 'failed': return '#ef4444';
-      default: return '#9ca3af';
+      case 'pending': return 'var(--warning)';
+      case 'processing': return 'var(--info)';
+      case 'completed': return 'var(--success)';
+      case 'failed': return 'var(--error)';
+      default: return 'var(--text-disabled)';
     }
   };
 

@@ -49,9 +49,9 @@ export function CardPrice({ price, compact = false }: CardPriceProps) {
 
   const labelColor =
     label === 'SOLD'
-      ? '#10b981'
+      ? 'var(--success)'
       : label === 'RESULT'
-        ? '#f59e0b'
+        ? 'var(--warning)'
         : 'rgba(255,255,255,0.92)';
 
   const baseStyle: CSSProperties = {

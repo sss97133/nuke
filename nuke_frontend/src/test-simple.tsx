@@ -15,9 +15,7 @@ export const TestSimple: React.FC = () => {
       <div style={{
         marginTop: '20px',
         padding: '20px',
-        border: '1px solid #ccc',
-        borderRadius: '8px'
-      }}>
+        border: '1px solid #ccc'}}>
         <h2>Test 1: Basic Images</h2>
         <div>
           <img
@@ -32,9 +30,7 @@ export const TestSimple: React.FC = () => {
       <div style={{
         marginTop: '20px',
         padding: '20px',
-        border: '1px solid #ccc',
-        borderRadius: '8px'
-      }}>
+        border: '1px solid #ccc'}}>
         <h2>Test 2: Database Info</h2>
         <p>If this renders, React is working</p>
         <p>If the image loads, Supabase storage is working</p>

@@ -207,7 +207,7 @@ export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
                 id: 'activity',
                 label: 'Listings',
                 data: monthlyData,
-                color: '#4ade80',
+                color: 'var(--success)',
                 showArea: true,
               }]}
               width={280}

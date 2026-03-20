@@ -159,8 +159,8 @@ export function SubscriptionFlow() {
       <div className="min-h-screen bg-gray-900 text-white p-8">
         <div className="max-w-2xl mx-auto">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-700 rounded w-1/3"></div>
-            <div className="h-64 bg-gray-700 rounded"></div>
+            <div className="h-8 bg-gray-700 w-1/3"></div>
+            <div className="h-64 bg-gray-700"></div>
           </div>
         </div>
       </div>
@@ -174,7 +174,7 @@ export function SubscriptionFlow() {
           <h1 className="text-2xl font-bold mb-4">Offering Not Found</h1>
           <button
             onClick={() => navigate('/invest')}
-            className="px-4 py-2 bg-blue-600 rounded"
+            className="px-4 py-2 bg-blue-600"
           >
             Back to Offerings
           </button>
@@ -208,7 +208,7 @@ export function SubscriptionFlow() {
           {steps.map((step, index) => (
             <div key={step.id} className="flex-1 flex items-center">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                className={`w-8 h-8  flex items-center justify-center text-sm font-bold ${
                   index < currentStep
                     ? 'bg-green-600 text-white'
                     : index === currentStep
@@ -229,7 +229,7 @@ export function SubscriptionFlow() {
         </div>
 
         {/* Step content */}
-        <div className="bg-gray-800 rounded-lg p-6">
+        <div className="bg-gray-800 p-6">
           {currentStep === 0 && (
             <ReviewStep
               offering={offering}
@@ -321,7 +321,7 @@ function ReviewStep({ offering, state, setState, onContinue, formatCurrency }: S
               }));
             }}
             min={1}
-            className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-3 text-white text-lg font-mono"
+            className="w-full bg-gray-700 border border-gray-600 px-4 py-3 text-white text-lg font-mono"
           />
         </div>
 
@@ -332,7 +332,7 @@ function ReviewStep({ offering, state, setState, onContinue, formatCurrency }: S
       </div>
 
       {state.totalAmount < offering.min_investment && (
-        <div className="mb-4 p-3 bg-amber-900/20 border border-amber-500/30 rounded">
+        <div className="mb-4 p-3 bg-amber-900/20 border border-amber-500/30">
           <span className="text-amber-400 text-sm">
             Minimum investment is {formatCurrency(offering.min_investment)}
           </span>
@@ -342,7 +342,7 @@ function ReviewStep({ offering, state, setState, onContinue, formatCurrency }: S
       <button
         onClick={onContinue}
         disabled={state.shares < 1 || state.totalAmount < offering.min_investment}
-        className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold disabled:opacity-50"
+        className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold disabled:opacity-50"
       >
         Continue
       </button>
@@ -374,7 +374,7 @@ function SuitabilityStep({ state, setState, onContinue, onBack }: StepProps) {
           { key: 'longTermHorizon', text: 'I understand this is a long-term investment and I may not be able to sell for an extended period.' },
           { key: 'noLiquidityNeeds', text: 'I do not have an immediate need for the funds I am investing.' }
         ].map(({ key, text }) => (
-          <label key={key} className="flex items-start gap-3 p-4 bg-gray-700 rounded cursor-pointer">
+          <label key={key} className="flex items-start gap-3 p-4 bg-gray-700 cursor-pointer">
             <input
               type="checkbox"
               checked={answers[key as keyof typeof answers]}
@@ -389,7 +389,7 @@ function SuitabilityStep({ state, setState, onContinue, onBack }: StepProps) {
       <div className="flex gap-4">
         <button
           onClick={onBack}
-          className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded text-white"
+          className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white"
         >
           Back
         </button>
@@ -399,7 +399,7 @@ function SuitabilityStep({ state, setState, onContinue, onBack }: StepProps) {
             onContinue?.();
           }}
           disabled={!allConfirmed}
-          className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold disabled:opacity-50"
+          className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold disabled:opacity-50"
         >
           Continue
         </button>
@@ -418,7 +418,7 @@ function AgreementStep({ offering, state, setState, onContinue, onBack, formatCu
     <div>
       <h2 className="text-xl font-bold mb-4">Subscription Agreement</h2>
 
-      <div className="bg-gray-900 rounded p-4 mb-6 max-h-64 overflow-y-auto text-sm text-gray-300">
+      <div className="bg-gray-900 p-4 mb-6 max-h-64 overflow-y-auto text-sm text-gray-300">
         <h3 className="text-white font-bold mb-2">SUBSCRIPTION AGREEMENT</h3>
         <p className="mb-4">
           This Subscription Agreement is entered into by and between {offering.entity?.entity_name},
@@ -445,7 +445,7 @@ function AgreementStep({ offering, state, setState, onContinue, onBack, formatCu
         </p>
       </div>
 
-      <label className="flex items-start gap-3 p-4 bg-gray-700 rounded cursor-pointer mb-4">
+      <label className="flex items-start gap-3 p-4 bg-gray-700 cursor-pointer mb-4">
         <input
           type="checkbox"
           checked={agreed}
@@ -464,14 +464,14 @@ function AgreementStep({ offering, state, setState, onContinue, onBack, formatCu
           value={signature}
           onChange={(e) => setSignature(e.target.value)}
           placeholder="Full Legal Name"
-          className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-3 text-white"
+          className="w-full bg-gray-700 border border-gray-600 px-4 py-3 text-white"
         />
       </div>
 
       <div className="flex gap-4">
         <button
           onClick={onBack}
-          className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded text-white"
+          className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white"
         >
           Back
         </button>
@@ -481,7 +481,7 @@ function AgreementStep({ offering, state, setState, onContinue, onBack, formatCu
             onContinue?.();
           }}
           disabled={!agreed || !signature.trim()}
-          className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold disabled:opacity-50"
+          className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold disabled:opacity-50"
         >
           Sign & Continue
         </button>
@@ -502,7 +502,7 @@ function FundingStep({ state, setState, onSubmit, onBack, submitting, isDemoMode
       <h2 className="text-xl font-bold mb-4">Fund Your Investment</h2>
 
       {isDemoMode && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded p-3 mb-6">
+        <div className="bg-amber-500/10 border border-amber-500/30 p-3 mb-6">
           <span className="text-amber-400 text-sm">
             Demo Mode: No real funds will be transferred.
           </span>
@@ -518,7 +518,7 @@ function FundingStep({ state, setState, onSubmit, onBack, submitting, isDemoMode
         {fundingMethods.map((method) => (
           <label
             key={method.id}
-            className={`flex items-center gap-4 p-4 rounded cursor-pointer border ${
+            className={`flex items-center gap-4 p-4  cursor-pointer border ${
               state.fundingMethod === method.id
                 ? 'border-blue-500 bg-blue-900/20'
                 : 'border-gray-700 bg-gray-700'
@@ -542,14 +542,14 @@ function FundingStep({ state, setState, onSubmit, onBack, submitting, isDemoMode
       <div className="flex gap-4">
         <button
           onClick={onBack}
-          className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded text-white"
+          className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white"
         >
           Back
         </button>
         <button
           onClick={onSubmit}
           disabled={!state.fundingMethod || submitting}
-          className="flex-1 py-3 bg-green-600 hover:bg-green-500 rounded text-white font-bold disabled:opacity-50"
+          className="flex-1 py-3 bg-green-600 hover:bg-green-500 text-white font-bold disabled:opacity-50"
         >
           {submitting ? 'Processing...' : 'Complete Investment'}
         </button>

@@ -191,9 +191,7 @@ const VehicleRelationshipManager: React.FC<VehicleRelationshipManagerProps> = ({
           fontSize: '9px', 
           color: 'var(--error)',
           background: 'var(--error-dim)',
-          border: '1px solid var(--error)',
-          borderRadius: '3px'
-        }}>
+          border: '1px solid var(--error)'}}>
           {error}
         </div>
       )}
@@ -205,9 +203,7 @@ const VehicleRelationshipManager: React.FC<VehicleRelationshipManagerProps> = ({
           fontSize: '9px', 
           color: 'var(--success)',
           background: 'var(--success-dim)',
-          border: '1px solid var(--success)',
-          borderRadius: '3px'
-        }}>
+          border: '1px solid var(--success)'}}>
           ✓ Relationship updated successfully
         </div>
       )}

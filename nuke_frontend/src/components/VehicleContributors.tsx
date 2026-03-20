@@ -119,10 +119,10 @@ const VehicleContributors: React.FC<VehicleContributorsProps> = ({ vehicleId }) 
                 <img
                   src={contributor.avatar_url}
                   alt=""
-                  style={{ width: '24px', height: '24px', borderRadius: '50%' }}
+                  style={{ width: '24px', height: '24px'}}
                 />
               ) : (
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: 'var(--grey-300)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '24px', height: '24px', backgroundColor: 'var(--grey-300)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span className="text" style={{ fontSize: '8px', color: 'var(--grey-600)' }}>
                     {(contributor.full_name || contributor.username || '?')[0].toUpperCase()}
                   </span>

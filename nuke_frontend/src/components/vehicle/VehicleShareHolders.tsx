@@ -160,9 +160,7 @@ export default function VehicleShareHolders({ vehicleId, vehicleValue = 0, compa
   return (
     <div style={{
       background: 'var(--surface)',
-      border: '2px solid var(--border)',
-      borderRadius: '8px',
-      overflow: 'hidden'
+      border: '2px solid var(--border)', overflow: 'hidden'
     }}>
       {/* Header */}
       <div style={{
@@ -196,9 +194,7 @@ export default function VehicleShareHolders({ vehicleId, vehicleValue = 0, compa
               fontWeight: 600,
               fontFamily: 'Arial, sans-serif',
               cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px'
-            }}
+              transition: '0.12s'}}
           >
             💰 Supporters ({totalSupporters})
           </button>
@@ -214,9 +210,7 @@ export default function VehicleShareHolders({ vehicleId, vehicleValue = 0, compa
               fontWeight: 600,
               fontFamily: 'Arial, sans-serif',
               cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px'
-            }}
+              transition: '0.12s'}}
           >
             📊 Share Holders ({totalShareHolders})
           </button>

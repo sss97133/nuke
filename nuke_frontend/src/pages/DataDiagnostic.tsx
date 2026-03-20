@@ -63,7 +63,7 @@ const DataDiagnostic: React.FC = () => {
         <h1 className="text-3xl font-bold mb-8">Data Pipeline Diagnostic</h1>
         
         {/* Authentication Status */}
-        <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <div className="bg-white p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">Authentication Status</h2>
           {session ? (
             <div className="text-green-600">
@@ -76,7 +76,7 @@ const DataDiagnostic: React.FC = () => {
               <p><strong>NOT LOGGED IN</strong></p>
               <button 
                 onClick={forceLogin}
-                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded"
+                className="mt-2 px-4 py-2 bg-blue-600 text-white"
               >
                 Login with Google
               </button>
@@ -85,12 +85,12 @@ const DataDiagnostic: React.FC = () => {
         </div>
 
         {/* localStorage Data */}
-        <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <div className="bg-white p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">📱 localStorage Data (Port {window.location.port})</h2>
             <button 
               onClick={clearLocalStorage}
-              className="px-4 py-2 bg-red-600 text-white rounded text-sm"
+              className="px-4 py-2 bg-red-600 text-white text-sm"
             >
               Clear localStorage
             </button>
@@ -101,7 +101,7 @@ const DataDiagnostic: React.FC = () => {
               <p className="font-bold text-green-600">{localVehicles.length} vehicles found</p>
               <ul className="mt-2 space-y-1">
                 {localVehicles.map((vehicle, index) => (
-                  <li key={index} className="text-sm bg-gray-100 p-2 rounded">
+                  <li key={index} className="text-sm bg-gray-100 p-2">
                     {vehicle.year} {vehicle.make} {vehicle.model} (ID: {vehicle.id?.slice(0, 8)}...)
                   </li>
                 ))}
@@ -113,7 +113,7 @@ const DataDiagnostic: React.FC = () => {
         </div>
 
         {/* Supabase Data */}
-        <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <div className="bg-white p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">☁️ Supabase Database</h2>
           <p className="text-gray-600 mb-4">Vehicles stored in the cloud (shared across all ports)</p>
           {session ? (
@@ -122,7 +122,7 @@ const DataDiagnostic: React.FC = () => {
                 <p className="font-bold text-green-600">{supabaseVehicles.length} vehicles found</p>
                 <ul className="mt-2 space-y-1">
                   {supabaseVehicles.map((vehicle, index) => (
-                    <li key={index} className="text-sm bg-blue-100 p-2 rounded">
+                    <li key={index} className="text-sm bg-blue-100 p-2">
                       {vehicle.year} {vehicle.make} {vehicle.model} (ID: {vehicle.id?.slice(0, 8)}...)
                     </li>
                   ))}
@@ -144,7 +144,7 @@ const DataDiagnostic: React.FC = () => {
         )}
 
         {/* Summary */}
-        <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-lg">
+        <div className="bg-yellow-50 border border-yellow-200 p-6">
           <h2 className="text-xl font-bold mb-4">Summary</h2>
           <ul className="space-y-2">
             <li>Authentication: {session ? 'LOGGED IN' : 'NOT LOGGED IN'}</li>
@@ -154,7 +154,7 @@ const DataDiagnostic: React.FC = () => {
           </ul>
           
           {localVehicles.length > 0 && session && (
-            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded">
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200">
               <p className="font-bold text-blue-800">Recommendation:</p>
               <p className="text-blue-700">You have vehicles in localStorage. Go to /local-vehicles and click "Sync Local to Cloud" to consolidate everything.</p>
             </div>
@@ -164,13 +164,13 @@ const DataDiagnostic: React.FC = () => {
         <div className="mt-6 flex gap-4">
           <button 
             onClick={checkEverything}
-            className="px-6 py-2 bg-green-600 text-white rounded"
+            className="px-6 py-2 bg-green-600 text-white"
           >
             Refresh Diagnostic
           </button>
           <a 
             href="/local-vehicles"
-            className="px-6 py-2 bg-blue-600 text-white rounded"
+            className="px-6 py-2 bg-blue-600 text-white"
           >
             Go to Vehicle List
           </a>

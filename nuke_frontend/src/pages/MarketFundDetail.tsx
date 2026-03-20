@@ -74,7 +74,6 @@ function SkeletonBlock({ width = '100%', height = '16px' }: { width?: string; he
       width,
       height,
       background: 'var(--border)',
-      borderRadius: '3px',
       animation: 'pulse 1.5s ease-in-out infinite',
     }} />
   );
@@ -332,7 +331,6 @@ export default function MarketFundDetail() {
                 background: 'var(--bg)',
                 border: '1px solid var(--border)',
                 padding: '2px 6px',
-                borderRadius: '3px',
               }}>
                 {seg?.manager_type ? seg.manager_type.toUpperCase() : 'AI'} ETF
               </span>
@@ -359,7 +357,6 @@ export default function MarketFundDetail() {
         <div style={{
           padding: '20px',
           border: '2px solid var(--border)',
-          borderRadius: '6px',
           background: 'var(--surface)',
           display: 'flex',
           gap: '32px',
@@ -431,15 +428,14 @@ export default function MarketFundDetail() {
               {[1, 2, 3, 4, 5, 6].map(i => (
                 <div key={i} style={{
                   border: '1px solid var(--border)',
-                  borderRadius: '6px',
                   overflow: 'hidden',
                   background: 'var(--surface)',
                   animation: 'pulse 1.5s ease-in-out infinite',
                 }}>
                   <div style={{ height: '120px', background: 'var(--border)' }} />
                   <div style={{ padding: '10px', display: 'grid', gap: '6px' }}>
-                    <div style={{ height: '12px', background: 'var(--border)', borderRadius: '2px', width: '80%' }} />
-                    <div style={{ height: '10px', background: 'var(--border)', borderRadius: '2px', width: '50%' }} />
+                    <div style={{ height: '12px', background: 'var(--border)', width: '80%' }} />
+                    <div style={{ height: '10px', background: 'var(--border)', width: '50%' }} />
                   </div>
                 </div>
               ))}
@@ -458,20 +454,17 @@ export default function MarketFundDetail() {
                     textAlign: 'left',
                     cursor: 'pointer',
                     border: '1px solid var(--border)',
-                    borderRadius: '6px',
                     overflow: 'hidden',
                     background: 'var(--surface)',
                     padding: 0,
                     display: 'block',
                     width: '100%',
-                    transition: 'box-shadow 0.12s ease, border-color 0.12s ease',
+                    transition: 'border-color 0.12s ease',
                   }}
                   onMouseEnter={e => {
-                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.1)';
                     e.currentTarget.style.borderColor = 'var(--primary)';
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.boxShadow = 'none';
                     e.currentTarget.style.borderColor = 'var(--border)';
                   }}
                 >
@@ -525,7 +518,6 @@ export default function MarketFundDetail() {
               padding: '32px',
               textAlign: 'center',
               border: '1px solid var(--border)',
-              borderRadius: '6px',
               background: 'var(--surface)',
               fontSize: 'var(--fs-9)',
               color: 'var(--text-secondary)',
@@ -569,7 +561,6 @@ export default function MarketFundDetail() {
                         padding: '2px 6px',
                         background: 'var(--bg)',
                         border: '1px solid var(--border)',
-                        borderRadius: '3px',
                         fontSize: 'var(--fs-8)',
                       }}>
                         {kw}
@@ -603,7 +594,7 @@ export default function MarketFundDetail() {
             <div className="card-body" style={{ display: 'grid', gap: '12px' }}>
               {user ? (
                 <>
-                  <div style={{ fontSize: 'var(--fs-9)', display: 'flex', justifyContent: 'space-between', padding: '10px', background: 'var(--bg)', borderRadius: '4px' }}>
+                  <div style={{ fontSize: 'var(--fs-9)', display: 'flex', justifyContent: 'space-between', padding: '10px', background: 'var(--bg)' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Your cash balance</span>
                     <strong>{formatUSD2(cashCents / 100)}</strong>
                   </div>
@@ -617,7 +608,6 @@ export default function MarketFundDetail() {
                       style={{
                         border: '2px solid var(--border)',
                         padding: '10px',
-                        borderRadius: '4px',
                         background: 'var(--white)',
                         color: 'var(--text)',
                         fontSize: 'var(--fs-9)',
@@ -640,12 +630,12 @@ export default function MarketFundDetail() {
                     {buying ? 'Processing...' : `Invest ${parsedAmountUSD ? formatUSD2(parsedAmountUSD) : ''}`}
                   </button>
                   {error && (
-                    <div style={{ fontSize: 'var(--fs-9)', color: 'var(--error)', padding: '10px', background: 'var(--error-dim)', borderRadius: '4px' }}>
+                    <div style={{ fontSize: 'var(--fs-9)', color: 'var(--error)', padding: '10px', background: 'var(--error-dim)' }}>
                       {error}
                     </div>
                   )}
                   {success && (
-                    <div style={{ fontSize: 'var(--fs-9)', color: 'var(--success)', padding: '10px', background: 'var(--success-dim)', borderRadius: '4px' }}>
+                    <div style={{ fontSize: 'var(--fs-9)', color: 'var(--success)', padding: '10px', background: 'var(--success-dim)' }}>
                       {success}
                     </div>
                   )}

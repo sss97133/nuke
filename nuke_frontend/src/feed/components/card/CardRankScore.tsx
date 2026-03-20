@@ -47,7 +47,7 @@ function decomposeScore(v: FeedVehicle): ScoreComponent[] {
     components.push({
       label: 'HEAT',
       value: Math.round(heatContrib * 10) / 10,
-      color: heatContrib > 5 ? '#ef4444' : 'var(--text-secondary)',
+      color: heatContrib > 5 ? 'var(--error)' : 'var(--text-secondary)',
     });
   }
 
@@ -62,7 +62,7 @@ function decomposeScore(v: FeedVehicle): ScoreComponent[] {
     components.push({
       label: 'FOR SALE',
       value: forSaleTotal,
-      color: forSaleTotal > 20 ? '#3b82f6' : forSaleTotal > 0 ? '#6b9dfc' : '#d13438',
+      color: forSaleTotal > 20 ? 'var(--info)' : forSaleTotal > 0 ? '#6b9dfc' : '#d13438',
     });
   }
 

@@ -253,9 +253,7 @@ const APIAccessSubscription: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <div style={{
                 padding: 'var(--space-3)',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                background: 'var(--grey-50)'
+                border: '1px solid var(--border)', background: 'var(--grey-50)'
               }}>
                 <h4 className="text font-bold" style={{ marginBottom: 'var(--space-2)' }}>
                   Purchase Credits (From Balance)
@@ -279,9 +277,7 @@ const APIAccessSubscription: React.FC = () => {
                       style={{
                         width: '100%',
                         padding: '6px 8px',
-                        border: '1px solid var(--border)',
-                        borderRadius: '2px',
-                        fontSize: '12px'
+                        border: '1px solid var(--border)', fontSize: '12px'
                       }}
                     />
                   </div>
@@ -316,9 +312,7 @@ const APIAccessSubscription: React.FC = () => {
           <div>
             <div style={{
               padding: 'var(--space-3)',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              background: isActive ? 'var(--success-light)' : 'var(--warning-light)',
+              border: '1px solid var(--border)', background: isActive ? 'var(--success-light)' : 'var(--warning-light)',
               marginBottom: 'var(--space-3)'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>

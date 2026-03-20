@@ -61,7 +61,7 @@
 .shadow-xl,
 .shadow-2xl,
 .shadow-inner {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+  box-shadow: none !important;
 }
 
 /* --------------------------------------------------------------------------
@@ -310,7 +310,7 @@
 }
 
 code, pre, kbd, samp, .font-mono, [class*="font-mono"] {
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace !important;
+  font-family: 'Courier New', monospace !important;
 }
 
 /* --------------------------------------------------------------------------

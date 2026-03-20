@@ -199,7 +199,7 @@ mark {
   background-color: #fef08a;
   color: #000;
   padding: 2px 4px;
-  border-radius: 2px;
+  border-radius: 0;
   font-weight: 600;
 }
 
@@ -609,7 +609,7 @@ body {
   font-size: var(--font-size);
   padding: var(--space-2) var(--space-4);
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: 0;
 }
 
 .nav-item:hover {
@@ -633,7 +633,7 @@ body {
   font-weight: normal;
   line-height: var(--leading-tight);
   border: 2px outset var(--border-light);
-  border-radius: var(--radius);
+  border-radius: 0;
   cursor: pointer;
   text-decoration: none;
   background: var(--surface-hover);
@@ -679,7 +679,7 @@ body {
 .card {
   background: var(--white);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius);
+  border-radius: 0;
   box-shadow: var(--shadow);
   overflow: hidden;
 }
@@ -724,7 +724,7 @@ body {
   color: var(--text);
   background: var(--white);
   border: 1px inset var(--border-light);
-  border-radius: var(--radius);
+  border-radius: 0;
 }
 
 .form-input:focus {
@@ -810,7 +810,7 @@ body {
 /* Alerts - Classic Style */
 .alert {
   padding: var(--space-3);
-  border-radius: var(--radius);
+  border-radius: 0;
   border: 1px solid var(--border-light);
   margin-bottom: var(--space-4);
   font-size: var(--font-size);
@@ -1565,7 +1565,7 @@ body {
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: 0;
   font-weight: 900;
   letter-spacing: 0.2px;
   background: #0b0f14;
@@ -1672,7 +1672,7 @@ body {
 .modal {
   background: var(--white);
   border: 2px outset var(--border-light);
-  border-radius: var(--radius);
+  border-radius: 0;
   box-shadow: var(--shadow);
   max-width: 500px;
   width: 90%;
@@ -1713,7 +1713,7 @@ body {
 /* Upload Zone - Classic Style */
 .upload-zone {
   border: 2px dashed var(--border-medium);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: var(--space-8);
   text-align: center;
   cursor: pointer;
@@ -1754,7 +1754,7 @@ body {
 .image-details-panel {
   background: var(--white);
   border: 2px inset var(--border-light);
-  border-radius: var(--radius);
+  border-radius: 0;
   box-shadow: var(--shadow);
   max-width: 600px;
   width: 100%;
@@ -1877,7 +1877,7 @@ body {
   padding: var(--space-2);
   background: var(--grey-50);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius);
+  border-radius: 0;
 }
 
 .social-stat-item {
@@ -1963,7 +1963,7 @@ body {
   font-family: var(--font-family);
   font-size: var(--font-size-small);
   border: 1px inset var(--border-light);
-  border-radius: var(--radius);
+  border-radius: 0;
   background: var(--white);
   color: var(--text);
   resize: vertical;
@@ -1992,7 +1992,7 @@ body {
   max-height: 400px;
   background: var(--grey-100);
   border: 2px outset var(--border-light);
-  border-radius: var(--radius);
+  border-radius: 0;
   box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
   pointer-events: all;
   display: flex;
@@ -2319,7 +2319,7 @@ body {
   padding: var(--space-3);
   background: var(--grey-50);
   border: 1px inset var(--border-light);
-  border-radius: var(--radius);
+  border-radius: 0;
 }
 
 .result-item {
@@ -2417,7 +2417,7 @@ body {
   padding: var(--space-3);
   background: var(--grey-50);
   border: 1px inset var(--border-light);
-  border-radius: var(--radius);
+  border-radius: 0;
 }
 
 .comment-meta {
@@ -2781,7 +2781,7 @@ body {
   padding: var(--space-6);
   background: var(--white);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius);
+  border-radius: 0;
 }
 
 .achievement-icon {
@@ -2820,7 +2820,7 @@ body {
   padding: var(--space-6);
   background: var(--white);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius);
+  border-radius: 0;
 }
 
 .activity-content {
@@ -2858,7 +2858,7 @@ body {
   gap: 4px;
   background: #f5f5f5;
   padding: 4px;
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 .tab-button {
@@ -2867,7 +2867,7 @@ body {
   font-family: Arial, sans-serif;
   background: transparent;
   border: none;
-  border-radius: 2px;
+  border-radius: 0;
   cursor: pointer;
   color: #424242;
   display: flex;
@@ -2890,7 +2890,7 @@ body {
   color: #000000;
   font-size: 8px;
   padding: 2px 4px;
-  border-radius: 4px;
+  border-radius: 0;
   font-weight: normal;
 }
 
@@ -2905,7 +2905,7 @@ body {
   padding: 12px;
   background: #ffffff;
   border: 1px solid #e0e0e0;
-  border-radius: 2px;
+  border-radius: 0;
   cursor: pointer;
   text-align: center;
   display: flex;
@@ -2963,7 +2963,7 @@ body {
 .session-card {
   background: #ffffff;
   border: 1px solid #e0e0e0;
-  border-radius: 2px;
+  border-radius: 0;
   padding: 12px;
 }
 
@@ -3030,7 +3030,7 @@ body {
   gap: 2px;
   padding: 2px 6px;
   background: #f5f5f5;
-  border-radius: 4px;
+  border-radius: 0;
   font-size: 9px;
   font-family: Arial, sans-serif;
   color: #424242;
@@ -3049,7 +3049,7 @@ body {
   margin-bottom: 8px;
   background: #fafafa;
   padding: 6px;
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 .request-details,
@@ -3217,7 +3217,7 @@ body {
   cursor: pointer;
   font-size: 1.2rem;
   padding: 0.25rem 0.5rem;
-  border-radius: 3px;
+  border-radius: 0;
   transition: background-color 0.2s, color 0.2s;
   z-index: 10;
 }
@@ -3237,7 +3237,7 @@ body {
   flex-direction: column;
   background: var(--white);
   border: 1px solid var(--border-light);
-  border-radius: 4px;
+  border-radius: 0;
   overflow: hidden;
   transition: all 0.2s ease;
   cursor: pointer;
@@ -3262,7 +3262,7 @@ body {
   background: rgba(255, 0, 0, 0.9);
   color: white;
   padding: 2px 6px;
-  border-radius: 2px;
+  border-radius: 0;
   font-size: 8px;
   font-weight: bold;
   display: flex;
@@ -3336,7 +3336,7 @@ body {
   flex: 1;
   height: 8px;
   background: var(--grey-200);
-  border-radius: 4px;
+  border-radius: 0;
   overflow: hidden;
   margin-right: var(--space-1);
 }
@@ -3344,7 +3344,7 @@ body {
 .hype-bar {
   height: 100%;
   background: linear-gradient(90deg, #ffd700, #ff6b35, #ff0000);
-  border-radius: 4px;
+  border-radius: 0;
   transition: width 0.3s ease;
 }
 
@@ -3564,7 +3564,7 @@ body {
 
 .auction-price-pulse {
   animation: auctionUrgencyPulse var(--auction-pulse-ms, 3800ms) ease-in-out infinite;
-  border-radius: 3px;
+  border-radius: 0;
   padding: 1px 3px;
 }
 

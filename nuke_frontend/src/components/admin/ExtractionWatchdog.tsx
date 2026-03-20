@@ -62,7 +62,7 @@ export const ExtractionWatchdog: React.FC = () => {
 
   if (loading && !status) {
     return (
-      <div className="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
+      <div className="bg-neutral-900 p-4 border border-neutral-800">
         <div className="animate-pulse">Loading extraction status...</div>
       </div>
     );
@@ -73,7 +73,7 @@ export const ExtractionWatchdog: React.FC = () => {
   const etaHours = h && h.processing_rate > 0 ? (h.pending / h.processing_rate).toFixed(1) : '?';
 
   return (
-    <div className={`bg-neutral-900 rounded-lg p-4 border ${isHealthy ? 'border-neutral-800' : 'border-amber-600'}`}>
+    <div className={`bg-neutral-900  p-4 border ${isHealthy ? 'border-neutral-800' : 'border-amber-600'}`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-medium flex items-center gap-2">
           {isHealthy ? '✅' : '⚠️'} Extraction Status
@@ -130,7 +130,7 @@ export const ExtractionWatchdog: React.FC = () => {
       )}
 
       {status?.issues && status.issues.length > 0 && (
-        <div className="mt-4 p-2 bg-amber-900/30 rounded border border-amber-700">
+        <div className="mt-4 p-2 bg-amber-900/30 border border-amber-700">
           <div className="text-amber-400 text-sm font-medium mb-1">Issues Detected:</div>
           <ul className="text-sm text-amber-200">
             {status.issues.map((issue, i) => (

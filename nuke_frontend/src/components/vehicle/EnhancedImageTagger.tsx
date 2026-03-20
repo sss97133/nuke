@@ -480,10 +480,8 @@ export default function EnhancedImageTagger({
                 transform: 'translate(-50%, -100%)',
                 backgroundColor: getTagColor(tag),
                 color: 'white',
-                padding: '1px 3px',
-                borderRadius: '0',
-                fontSize: '11px',
-                fontFamily: '"MS Sans Serif", sans-serif',
+                padding: '1px 3px', fontSize: '11px',
+                fontFamily: 'Arial, sans-serif',
                 whiteSpace: 'nowrap',
                 zIndex: 10,
                 cursor: 'pointer'
@@ -540,9 +538,7 @@ export default function EnhancedImageTagger({
               transform: 'translate(-50%, -50%)',
               width: '12px',
               height: '12px',
-              background: '#ff4444',
-              borderRadius: '50%',
-              border: '2px solid white',
+              background: '#ff4444', border: '2px solid white',
               zIndex: 10
             }}
           />
@@ -595,7 +591,7 @@ export default function EnhancedImageTagger({
       <style jsx>{`
         .enhanced-image-tagger {
           position: relative;
-          font-family: "MS Sans Serif", sans-serif;
+          font-family: Arial, sans-serif;
           font-size: 8pt;
         }
 
@@ -618,7 +614,7 @@ export default function EnhancedImageTagger({
           border: 1px outset var(--border);
           padding: 1px 6px;
           font-size: 8pt;
-          font-family: "MS Sans Serif", sans-serif;
+          font-family: Arial, sans-serif;
           cursor: pointer;
         }
 
@@ -634,7 +630,7 @@ export default function EnhancedImageTagger({
           border: 1px inset var(--border);
           padding: 1px 3px;
           font-size: 8pt;
-          font-family: "MS Sans Serif", sans-serif;
+          font-family: Arial, sans-serif;
           background: var(--bg);
         }
 

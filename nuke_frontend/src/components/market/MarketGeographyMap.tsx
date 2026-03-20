@@ -30,10 +30,10 @@ const US_REGIONS = [
 
 // Market heat colors
 const HEAT_COLORS = {
-  hot: '#EF4444',
-  warm: '#F59E0B',
-  neutral: '#10B981',
-  cool: '#3B82F6',
+  hot: 'var(--error)',
+  warm: 'var(--warning)',
+  neutral: 'var(--success)',
+  cool: 'var(--info)',
   cold: '#6366F1',
 };
 
@@ -129,7 +129,7 @@ export default function MarketGeographyMap() {
   };
 
   return (
-    <div className="bg-gray-900 rounded-xl p-6 space-y-6">
+    <div className="bg-gray-900 p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -141,25 +141,25 @@ export default function MarketGeographyMap() {
       {/* Market Overview Cards */}
       {marketOverview && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gray-800 rounded-lg p-4">
+          <div className="bg-gray-800 p-4">
             <div className="text-gray-400 text-sm">Total Volume</div>
             <div className="text-2xl font-bold text-green-400">
               {formatCurrency(marketOverview.total_volume)}
             </div>
           </div>
-          <div className="bg-gray-800 rounded-lg p-4">
+          <div className="bg-gray-800 p-4">
             <div className="text-gray-400 text-sm">Vehicles Tracked</div>
             <div className="text-2xl font-bold text-white">
               {marketOverview.total_vehicles.toLocaleString()}
             </div>
           </div>
-          <div className="bg-gray-800 rounded-lg p-4">
+          <div className="bg-gray-800 p-4">
             <div className="text-gray-400 text-sm">Average Price</div>
             <div className="text-2xl font-bold text-blue-400">
               {formatCurrency(marketOverview.avg_price)}
             </div>
           </div>
-          <div className="bg-gray-800 rounded-lg p-4">
+          <div className="bg-gray-800 p-4">
             <div className="text-gray-400 text-sm">Top Venue</div>
             <div className="text-2xl font-bold text-purple-400">
               {marketOverview.top_venue}
@@ -174,7 +174,7 @@ export default function MarketGeographyMap() {
           <button
             key={segment}
             onClick={() => setPriceFilter(segment as any)}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+            className={`px-4 py-2  font-medium transition-all ${
               priceFilter === segment
                 ? 'bg-green-500 text-white'
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
@@ -190,14 +190,14 @@ export default function MarketGeographyMap() {
         {venueDistribution?.map(venue => (
           <div
             key={venue.slug}
-            className="bg-gray-800 rounded-lg p-4 hover:bg-gray-750 transition-all cursor-pointer border border-gray-700 hover:border-green-500/50"
+            className="bg-gray-800 p-4 hover:bg-gray-750 transition-all cursor-pointer border border-gray-700 hover:border-green-500/50"
           >
             <div className="flex items-center justify-between mb-3">
               <div>
                 <div className="font-medium text-white">{venue.name}</div>
                 <div className="text-sm text-gray-400">{venue.venue_type}</div>
               </div>
-              <span className={`px-2 py-1 rounded text-xs ${
+              <span className={`px-2 py-1  text-xs ${
                 venue.venue_type === 'online'
                   ? 'bg-blue-900/50 text-blue-300'
                   : venue.venue_type === 'live'
@@ -253,7 +253,7 @@ export default function MarketGeographyMap() {
       </div>
 
       {/* Arbitrage Opportunity Matrix */}
-      <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg p-4 border border-gray-700">
+      <div className="bg-gradient-to-r from-gray-800 to-gray-900 p-4 border border-gray-700">
         <h3 className="text-white font-medium mb-4">Arbitrage Opportunities</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">

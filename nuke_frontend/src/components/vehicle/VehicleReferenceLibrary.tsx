@@ -570,9 +570,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
               {userId && (
                 <div style={{
                   background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  padding: '8px'
+                  border: '1px solid var(--border)', padding: '8px'
                 }}>
                   <h4 style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700 }}>
                     Upload Reference Documents
@@ -593,9 +591,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                           fontSize: '9px', 
                           width: '100%',
                           padding: '6px',
-                          border: '2px dashed var(--border)',
-                          borderRadius: '3px',
-                          background: 'var(--surface)',
+                          border: '2px dashed var(--border)', background: 'var(--surface)',
                           cursor: uploading ? 'wait' : 'pointer'
                         }}
                       />
@@ -614,7 +610,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                                   <span>{fileName}</span>
                                   <span>{progress}%</span>
                                 </div>
-                                <div style={{ background: 'var(--border)', borderRadius: '4px', height: '4px', overflow: 'hidden' }}>
+                                <div style={{ background: 'var(--border)', height: '4px', overflow: 'hidden' }}>
                                   <div style={{ background: 'var(--primary)', height: '100%', width: `${progress}%`, transition: 'width 0.3s' }} />
                                 </div>
                               </div>
@@ -638,9 +634,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                     <div style={{
                       marginTop: '8px',
                       background: 'var(--success-dim)',
-                      border: '2px solid var(--success)',
-                      borderRadius: '4px',
-                      padding: '8px'
+                      border: '2px solid var(--success)', padding: '8px'
                     }}>
                       <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--success)', marginBottom: '4px' }}>
                         ✓ {uploadedFiles.length} Document{uploadedFiles.length > 1 ? 's' : ''} Uploaded!
@@ -659,9 +653,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                           background: 'transparent',
                           border: '1px solid var(--success)',
                           color: 'var(--success)',
-                          padding: '3px 6px',
-                          borderRadius: '3px',
-                          cursor: 'pointer'
+                          padding: '3px 6px', cursor: 'pointer'
                         }}
                       >
                         Close
@@ -705,12 +697,10 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                         onClick={() => openBook(bookIndex)}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = 'translateY(-4px)';
-                          e.currentTarget.style.boxShadow = '0 8px 16px color-mix(in srgb, var(--text) 15%, transparent)';
                           e.currentTarget.style.borderColor = 'var(--primary)';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = 'none';
                           e.currentTarget.style.borderColor = 'var(--border)';
                         }}
                       >
@@ -744,9 +734,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                               right: '8px',
                               background: 'var(--overlay)',
                               color: 'var(--bg)',
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              fontSize: '11px',
+                              padding: '4px 8px', fontSize: '11px',
                               fontWeight: 600
                             }}>
                               {book.page_count} pages
@@ -767,9 +755,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                             <div style={{ 
                               fontSize: '9px',
                               padding: '4px 6px',
-                              background: book.extraction.status === 'pending_review' ? 'var(--warning-dim)' : 'var(--success-dim)',
-                              borderRadius: '4px',
-                              marginBottom: '8px'
+                              background: book.extraction.status === 'pending_review' ? 'var(--warning-dim)' : 'var(--success-dim)', marginBottom: '8px'
                             }}>
                               {book.extraction.status === 'pending_review' ? 'Processing' : 'Extracted'}
                               {book.extraction.colors && book.extraction.colors > 0 && ` • ${book.extraction.colors} colors`}

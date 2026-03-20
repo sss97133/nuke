@@ -109,9 +109,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
   return (
     <div style={{
       marginBottom: '16px',
-      border: '2px solid var(--accent)',
-      borderRadius: '4px',
-      background: 'var(--surface)'
+      border: '2px solid var(--accent)', background: 'var(--surface)'
     }}>
       <div style={{
         padding: '12px',
@@ -130,9 +128,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
             style={{
               padding: '12px',
               marginBottom: '12px',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              background: '#fef3c7'
+              border: '1px solid var(--border)', background: 'var(--warning-dim)'
             }}
           >
             <div style={{
@@ -158,9 +154,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
                 color: 'var(--text-muted)',
                 marginBottom: '12px',
                 padding: '6px',
-                background: 'var(--surface)',
-                borderRadius: '3px'
-              }}>
+                background: 'var(--surface)'}}>
                 {question.question_type === 'org_link_move' && (
                   <>Linked to: {question.evidence_details.organization_name}</>
                 )}
@@ -181,12 +175,10 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
                   padding: '6px 16px',
                   fontSize: '11px',
                   fontWeight: 600,
-                  border: '1px solid #059669',
-                  background: '#059669',
+                  border: '1px solid var(--success)',
+                  background: 'var(--success)',
                   color: 'var(--bg)',
-                  cursor: responding.has(question.question_id) ? 'wait' : 'pointer',
-                  borderRadius: '4px',
-                  opacity: responding.has(question.question_id) ? 0.5 : 1
+                  cursor: responding.has(question.question_id) ? 'wait' : 'pointer', opacity: responding.has(question.question_id) ? 0.5 : 1
                 }}
               >
                 {responding.has(question.question_id) ? 'Saving...' : 'YES'}
@@ -202,9 +194,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
                   border: '1px solid var(--border)',
                   background: 'var(--surface)',
                   color: 'var(--text-muted)',
-                  cursor: responding.has(question.question_id) ? 'wait' : 'pointer',
-                  borderRadius: '4px',
-                  opacity: responding.has(question.question_id) ? 0.5 : 1
+                  cursor: responding.has(question.question_id) ? 'wait' : 'pointer', opacity: responding.has(question.question_id) ? 0.5 : 1
                 }}
               >
                 {responding.has(question.question_id) ? 'Saving...' : 'NO'}

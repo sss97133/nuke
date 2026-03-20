@@ -151,7 +151,7 @@ export function BrandHeartbeat({ make, model }: BrandHeartbeatProps) {
           <HeartbeatStatCell
             label="DEMAND"
             value={d.demand_high_pct > 60 ? 'HIGH' : d.demand_high_pct > 30 ? 'MED' : 'LOW'}
-            color={d.demand_high_pct > 60 ? '#10b981' : undefined}
+            color={d.demand_high_pct > 60 ? 'var(--success)' : undefined}
           />
         )}
       </div>

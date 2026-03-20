@@ -131,10 +131,7 @@ const FlagProblemButton: React.FC<Props> = ({ orgVehicleId, vehicleId, userId, c
               right: 0,
               marginTop: '4px',
               background: 'var(--surface)',
-              border: '2px solid var(--border)',
-              borderRadius: '4px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              zIndex: 1000,
+              border: '2px solid var(--border)', zIndex: 1000,
               minWidth: '200px'
             }}
           >

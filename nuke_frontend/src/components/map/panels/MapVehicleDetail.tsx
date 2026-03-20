@@ -283,8 +283,7 @@ function ActionButton({ label, onClick }: { label: string; onClick: () => void }
         display: 'block', width: '100%', textAlign: 'center' as const, padding: '8px',
         background: 'transparent', color: 'var(--text)', cursor: 'pointer',
         fontWeight: 600, fontSize: 9, fontFamily: MAP_FONT,
-        border: '1px solid var(--border)', borderRadius: 0,
-        textTransform: 'uppercase' as const, letterSpacing: '0.5px',
+        border: '1px solid var(--border)', textTransform: 'uppercase' as const, letterSpacing: '0.5px',
       }}
     >
       {label}

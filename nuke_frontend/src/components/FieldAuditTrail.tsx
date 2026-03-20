@@ -46,16 +46,16 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
   };
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.9) return '#22c55e'; // Green
-    if (confidence >= 0.7) return '#eab308'; // Yellow
-    return '#ef4444'; // Red
+    if (confidence >= 0.9) return 'var(--success)'; // Green
+    if (confidence >= 0.7) return 'var(--warning)'; // Yellow
+    return 'var(--error)'; // Red
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             Data Source Audit: {fieldName}
@@ -70,7 +70,7 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
 
         {loading ? (
           <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <div className="animate-spin h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-2 text-gray-600 dark:text-gray-400">Loading audit trail...</p>
           </div>
         ) : auditTrail.length === 0 ? (
@@ -82,7 +82,7 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
             {auditTrail.map((entry, index) => (
               <div
                 key={index}
-                className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700"
+                className="border border-gray-200 dark:border-gray-600 p-4 bg-gray-50 dark:bg-gray-700"
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-2">
@@ -91,14 +91,14 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
                       {entry.source_type.replace('_', ' ')}
                     </span>
                     {entry.verification_status && (
-                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                      <span className="bg-green-100 text-green-800 px-2 py-1 text-xs">
                         ✓ Verified
                       </span>
                     )}
                   </div>
                   <div className="flex items-center space-x-2">
                     <span
-                      className="px-2 py-1 rounded text-xs text-white font-medium"
+                      className="px-2 py-1 text-xs text-white font-medium"
                       style={{ backgroundColor: getConfidenceColor(entry.confidence) }}
                     >
                       {Math.round(entry.confidence * 100)}% confidence
@@ -132,7 +132,7 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
                       <img
                         src={entry.source_image_url}
                         alt="Source document"
-                        className="max-w-xs max-h-32 object-contain border rounded"
+                        className="max-w-xs max-h-32 object-contain border"
                       />
                     </div>
                   </div>
@@ -152,7 +152,7 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
                 {entry.raw_text && (
                   <div className="mb-2">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Raw Extracted Text:</span>
-                    <div className="mt-1 p-2 bg-gray-100 dark:bg-gray-600 rounded text-sm font-mono text-gray-900 dark:text-gray-200">
+                    <div className="mt-1 p-2 bg-gray-100 dark:bg-gray-600 text-sm font-mono text-gray-900 dark:text-gray-200">
                       {entry.raw_text}
                     </div>
                   </div>
@@ -162,7 +162,7 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
                 {entry.ai_reasoning && (
                   <div className="mb-2">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Analysis:</span>
-                    <div className="mt-1 p-2 bg-blue-50 dark:bg-blue-900/30 rounded text-sm text-gray-900 dark:text-gray-200">
+                    <div className="mt-1 p-2 bg-blue-50 dark:bg-blue-900/30 text-sm text-gray-900 dark:text-gray-200">
                       {entry.ai_reasoning}
                     </div>
                   </div>

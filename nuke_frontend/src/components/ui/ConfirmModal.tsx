@@ -28,9 +28,9 @@ export default function ConfirmModal({
   const getColors = () => {
     switch (type) {
       case 'danger':
-        return { accent: '#ef4444', accentDim: '#fee2e2' };
+        return { accent: 'var(--error)', accentDim: 'var(--error-dim)' };
       case 'warning':
-        return { accent: '#f59e0b', accentDim: '#fef3c7' };
+        return { accent: 'var(--warning)', accentDim: 'var(--warning-dim)' };
       default:
         return { accent: 'var(--accent)', accentDim: 'var(--accent-dim)' };
     }
@@ -58,13 +58,9 @@ export default function ConfirmModal({
       <div
         style={{
           background: 'var(--surface)',
-          border: '2px solid var(--border)',
-          borderRadius: '4px',
-          padding: '20px',
+          border: '2px solid var(--border)', padding: '20px',
           maxWidth: '400px',
-          width: '100%',
-          boxShadow: '0 8px 16px rgba(0,0,0,0.2)'
-        }}
+          width: '100%'}}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -104,9 +100,7 @@ export default function ConfirmModal({
         {amount !== undefined && (
           <div style={{
             background: colors.accentDim,
-            border: `2px solid ${colors.accent}`,
-            borderRadius: '4px',
-            padding: '12px',
+            border: `2px solid ${colors.accent}`, padding: '12px',
             marginBottom: '16px',
             textAlign: 'center'
           }}>
@@ -142,9 +136,7 @@ export default function ConfirmModal({
               padding: '6px 12px',
               fontSize: '9px',
               fontWeight: 600,
-              cursor: 'pointer',
-              borderRadius: '4px',
-              transition: '0.12s'
+              cursor: 'pointer', transition: '0.12s'
             }}
           >
             {cancelLabel}
@@ -158,9 +150,7 @@ export default function ConfirmModal({
               padding: '6px 12px',
               fontSize: '9px',
               fontWeight: 600,
-              cursor: 'pointer',
-              borderRadius: '4px',
-              transition: '0.12s'
+              cursor: 'pointer', transition: '0.12s'
             }}
           >
             {confirmLabel}

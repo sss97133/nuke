@@ -298,7 +298,7 @@ export default function PurchaseAgreementCreator({
 
         {/* Add Buyer Modal/Form */}
         {activeTab === 'buyer' && !agreement.buyer_name && (
-          <div className="mt-6 p-4 border rounded-lg">
+          <div className="mt-6 p-4 border">
             <h3 className="text-lg font-semibold mb-4">Add Buyer Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -450,7 +450,7 @@ export default function PurchaseAgreementCreator({
         </div>
       </div>
 
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+      <div className="mb-6 p-4 bg-gray-50">
         <h4 className="font-semibold mb-2">Estimated Total</h4>
         <div className="text-sm space-y-1">
           <div className="flex justify-between">

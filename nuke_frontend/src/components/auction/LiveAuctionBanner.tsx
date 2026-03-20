@@ -24,9 +24,9 @@ interface AuctionListing {
 type UrgencyLevel = 'ended' | 'lastMinute' | 'critical' | 'urgent' | 'gettingClose' | 'normal';
 
 const urgencyColors: Record<UrgencyLevel, { color: string; glow?: string }> = {
-  lastMinute: { color: '#dc2626', glow: '0 0 8px rgba(220, 38, 38, 0.6)' },
-  critical: { color: '#dc2626', glow: '0 0 6px rgba(220, 38, 38, 0.4)' },
-  urgent: { color: '#ea580c' },
+  lastMinute: { color: 'var(--error)', glow: '0 0 8px rgba(220, 38, 38, 0.6)' },
+  critical: { color: 'var(--error)', glow: '0 0 6px rgba(220, 38, 38, 0.4)' },
+  urgent: { color: 'var(--orange)' },
   gettingClose: { color: '#e07960' },
   normal: { color: 'var(--text-muted)' },
   ended: { color: '#94a3b8' },
@@ -255,18 +255,14 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
       {timerExtension?.visible && (
         <div
           style={{
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            background: 'var(--success)',
             color: 'var(--bg)',
             padding: '8px 12px',
-            marginBottom: '8px',
-            borderRadius: '4px',
-            fontSize: '12px',
+            marginBottom: '8px', fontSize: '12px',
             fontWeight: 600,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
-            animation: 'slideDown 0.3s ease-out',
+            gap: '8px', animation: 'slideDown 0.3s ease-out',
           }}
         >
           <span style={{ fontSize: '14px' }}>⏱️</span>
@@ -281,9 +277,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           padding: '8px 12px',
-          marginBottom: '12px',
-          borderRadius: '4px',
-          fontSize: '11px',
+          marginBottom: '12px', fontSize: '11px',
           lineHeight: '1.4'
         }}
       >
@@ -292,9 +286,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
             <div
               style={{
                 width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: isEnded ? '#94a3b8' : '#dc2626',
+                height: '6px', background: isEnded ? '#94a3b8' : 'var(--error)',
                 flexShrink: 0
               }}
             />
@@ -320,9 +312,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
                 padding: '4px 12px',
                 background: 'var(--primary)',
                 color: 'var(--bg)',
-                border: 'none',
-                borderRadius: '3px',
-                fontSize: '11px',
+                border: 'none', fontSize: '11px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 transition: 'all 0.12s ease',
@@ -399,15 +389,11 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
         >
           <div
             style={{
-              background: 'var(--surface)',
-              borderRadius: '8px',
-              padding: '20px',
+              background: 'var(--surface)', padding: '20px',
               maxWidth: '600px',
               width: '100%',
               maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
-            }}
+              overflowY: 'auto'}}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -419,7 +405,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
                   border: 'none',
                   fontSize: '20px',
                   cursor: 'pointer',
-                  color: '#6b7280',
+                  color: 'var(--text-secondary)',
                   padding: '4px 8px'
                 }}
               >

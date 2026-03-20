@@ -84,7 +84,7 @@ const FBMarketplacePanel: React.FC<FBMarketplacePanelProps> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="bg-[#1a1a1a] rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-zinc-700">
+      <div className="bg-[#1a1a1a] w-full max-w-6xl max-h-[90vh] overflow-hidden border border-zinc-700">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-700 bg-gradient-to-r from-blue-900/30 to-purple-900/30">
           <div className="flex items-center gap-3">
@@ -100,13 +100,13 @@ const FBMarketplacePanel: React.FC<FBMarketplacePanelProps> = ({ onClose }) => {
             <button
               onClick={fetchListings}
               disabled={loading}
-              className="px-3 py-1.5 text-sm bg-zinc-700 hover:bg-zinc-600 rounded-lg transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 text-sm bg-zinc-700 hover:bg-zinc-600 transition-colors disabled:opacity-50"
             >
               {loading ? '⏳' : '🔄'} Refresh
             </button>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-zinc-700 rounded-lg transition-colors"
+              className="p-2 hover:bg-zinc-700 transition-colors"
             >
               ✕
             </button>
@@ -141,7 +141,7 @@ const FBMarketplacePanel: React.FC<FBMarketplacePanelProps> = ({ onClose }) => {
                 return (
                   <div
                     key={listing.id}
-                    className={`bg-zinc-800 rounded-lg overflow-hidden border transition-all cursor-pointer ${
+                    className={`bg-zinc-800  overflow-hidden border transition-all cursor-pointer ${
                       isExpanded ? 'border-blue-500 col-span-full' : 'border-zinc-700 hover:border-zinc-500'
                     }`}
                     onClick={() => setExpandedId(isExpanded ? null : listing.id)}
@@ -161,17 +161,17 @@ const FBMarketplacePanel: React.FC<FBMarketplacePanelProps> = ({ onClose }) => {
                         </div>
                       )}
                       {/* Price badge */}
-                      <div className="absolute top-2 left-2 px-2 py-1 bg-black/80 rounded text-sm font-bold text-green-400">
+                      <div className="absolute top-2 left-2 px-2 py-1 bg-black/80 text-sm font-bold text-green-400">
                         {formatPrice(listing.price)}
                       </div>
                       {/* Image count badge */}
                       {imageCount > 0 && (
-                        <div className="absolute top-2 right-2 px-2 py-1 bg-black/80 rounded text-xs text-zinc-300">
+                        <div className="absolute top-2 right-2 px-2 py-1 bg-black/80 text-xs text-zinc-300">
                           📷 {imageCount}
                         </div>
                       )}
                       {/* Time badge */}
-                      <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/80 rounded text-xs text-zinc-400">
+                      <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/80 text-xs text-zinc-400">
                         {formatTime(listing.scraped_at)}
                       </div>
                     </div>
@@ -202,7 +202,7 @@ const FBMarketplacePanel: React.FC<FBMarketplacePanelProps> = ({ onClose }) => {
 
                           {/* Description */}
                           {listing.description && (
-                            <div className="bg-zinc-900 p-3 rounded text-xs text-zinc-400 max-h-32 overflow-y-auto">
+                            <div className="bg-zinc-900 p-3 text-xs text-zinc-400 max-h-32 overflow-y-auto">
                               {listing.description}
                             </div>
                           )}
@@ -222,12 +222,12 @@ const FBMarketplacePanel: React.FC<FBMarketplacePanelProps> = ({ onClose }) => {
                                   key={i}
                                   src={img}
                                   alt={`${i + 1}`}
-                                  className="w-full aspect-square object-cover rounded"
+                                  className="w-full aspect-square object-cover"
                                   loading="lazy"
                                 />
                               ))}
                               {listing.all_images.length > 12 && (
-                                <div className="w-full aspect-square bg-zinc-700 rounded flex items-center justify-center text-xs text-zinc-400">
+                                <div className="w-full aspect-square bg-zinc-700 flex items-center justify-center text-xs text-zinc-400">
                                   +{listing.all_images.length - 12}
                                 </div>
                               )}
@@ -241,7 +241,7 @@ const FBMarketplacePanel: React.FC<FBMarketplacePanelProps> = ({ onClose }) => {
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded text-xs text-center font-medium transition-colors"
+                              className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-xs text-center font-medium transition-colors"
                             >
                               View on Facebook →
                             </a>

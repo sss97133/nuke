@@ -154,10 +154,10 @@ function computeSignalScore(org: Organization): number {
 
 /** Get a tier label based on signal score */
 function getSignalTier(score: number): { label: string; color: string; bg: string } {
-  if (score >= 70) return { label: 'RICH DATA', color: '#16a34a', bg: 'rgba(22,163,74,0.1)' };
+  if (score >= 70) return { label: 'RICH DATA', color: 'var(--success)', bg: 'rgba(22,163,74,0.1)' };
   if (score >= 40) return { label: 'MODERATE', color: '#ca8a04', bg: 'rgba(202,138,4,0.1)' };
-  if (score >= 15) return { label: 'SPARSE', color: '#9ca3af', bg: 'rgba(156,163,175,0.1)' };
-  return { label: 'STUB', color: '#6b7280', bg: 'rgba(107,114,128,0.08)' };
+  if (score >= 15) return { label: 'SPARSE', color: 'var(--text-disabled)', bg: 'rgba(156,163,175,0.1)' };
+  return { label: 'STUB', color: 'var(--text-secondary)', bg: 'rgba(107,114,128,0.08)' };
 }
 
 export default function Organizations() {
@@ -365,9 +365,7 @@ export default function Organizations() {
         gridTemplateColumns: 'repeat(5, 1fr)',
         gap: '1px',
         background: 'var(--border)',
-        border: '1px solid var(--border)',
-        borderRadius: '4px',
-        overflow: 'hidden',
+        border: '1px solid var(--border)', overflow: 'hidden',
         marginBottom: '16px',
       }}>
         {[
@@ -456,9 +454,7 @@ export default function Organizations() {
       {displayOrgs.length === 0 ? (
         <div style={{
           background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: '4px',
-          padding: '60px 20px',
+          border: '1px solid var(--border)', padding: '60px 20px',
           textAlign: 'center',
         }}>
           <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '8px' }}>
@@ -551,9 +547,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
       className="hover-lift"
       style={{
         background: 'var(--white)',
-        border: '1px solid var(--border)',
-        borderRadius: '4px',
-        overflow: 'hidden',
+        border: '1px solid var(--border)', overflow: 'hidden',
         cursor: 'pointer',
         transition: '0.12s',
         display: 'flex',
@@ -578,9 +572,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
           left: '8px',
           background: 'rgba(0,0,0,0.75)',
           color: '#fff',
-          padding: '2px 7px',
-          borderRadius: '2px',
-          fontSize: '9px',
+          padding: '2px 7px', fontSize: '9px',
           fontWeight: 600,
           backdropFilter: 'blur(4px)',
         }}>
@@ -595,9 +587,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
             right: '8px',
             background: 'rgba(0,0,0,0.85)',
             color: '#00ff00',
-            padding: '2px 7px',
-            borderRadius: '2px',
-            fontSize: '9px',
+            padding: '2px 7px', fontSize: '9px',
             fontWeight: 700,
             fontFamily: 'monospace',
           }}>
@@ -612,9 +602,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
           right: '8px',
           background: 'rgba(0,0,0,0.75)',
           color: signalTier.color,
-          padding: '2px 7px',
-          borderRadius: '2px',
-          fontSize: '8px',
+          padding: '2px 7px', fontSize: '8px',
           fontWeight: 700,
           letterSpacing: '0.05em',
           backdropFilter: 'blur(4px)',
@@ -679,9 +667,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
             lineHeight: 1.35,
             marginBottom: '6px',
             padding: '4px 6px',
-            background: 'var(--gray-50)',
-            borderRadius: '3px',
-            borderLeft: '2px solid var(--blue-500)',
+            background: 'var(--gray-50)', borderLeft: '2px solid var(--blue-500)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
               <Info size={9} style={{ flexShrink: 0 }} />
@@ -752,16 +738,12 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
         <div style={{ marginTop: '8px' }}>
           <div style={{
             height: '2px',
-            background: 'var(--border-light, #eee)',
-            borderRadius: '1px',
-            overflow: 'hidden',
+            background: 'var(--border-light, #eee)', overflow: 'hidden',
           }}>
             <div style={{
               height: '100%',
               width: `${signalScore}%`,
-              background: signalTier.color,
-              borderRadius: '1px',
-              transition: 'width 0.3s ease',
+              background: signalTier.color, transition: 'width 0.3s ease',
             }} />
           </div>
         </div>

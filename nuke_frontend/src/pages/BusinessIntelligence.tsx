@@ -173,9 +173,7 @@ export default function BusinessIntelligence() {
               padding: '6px 12px',
               fontSize: '12px',
               borderBottom: activeTab === tab ? '2px solid var(--accent)' : 'none',
-              background: activeTab === tab ? 'var(--bg)' : 'var(--surface)',
-              borderRadius: '0'
-            }}
+              background: activeTab === tab ? 'var(--bg)' : 'var(--surface)'}}
           >
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>

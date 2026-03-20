@@ -193,7 +193,7 @@ export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
           width: '100%',
           maxWidth: '420px',
           background: 'var(--surface)',
-          borderRadius: '8px',
+          borderRadius: 0,
           maxHeight: '80vh',
           overflow: 'auto'
         }}
@@ -257,7 +257,7 @@ export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
                   marginTop: '8px',
                   padding: '8px',
                   background: 'var(--surface)',
-                  borderRadius: '4px',
+                  borderRadius: 0,
                   fontSize: '10px',
                   color: 'var(--text-muted)',
                   lineHeight: 1.4
@@ -300,7 +300,7 @@ export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
                       padding: '8px',
                       margin: '4px 0',
                       background: 'var(--surface-raised)',
-                      borderRadius: '4px',
+                      borderRadius: 0,
                       textDecoration: 'none',
                       color: 'inherit'
                     }}
@@ -482,7 +482,7 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
           width: '100%',
           maxWidth: '480px',
           background: 'var(--surface)',
-          borderRadius: '8px',
+          borderRadius: 0,
           maxHeight: '80vh',
           overflow: 'auto'
         }}
@@ -547,7 +547,7 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
               <div style={{
                 padding: '12px',
                 background: 'var(--surface-raised)',
-                borderRadius: '6px',
+                borderRadius: 0,
                 marginBottom: '12px'
               }}>
                 <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' }}>
@@ -558,7 +558,7 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                     background: 'var(--accent)',
                     color: 'var(--bg)',
                     padding: '4px 8px',
-                    borderRadius: '4px',
+                    borderRadius: 0,
                     fontSize: '14px',
                     fontWeight: 700
                   }}>
@@ -583,7 +583,7 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
               <div style={{
                 padding: '12px',
                 background: 'var(--surface-raised)',
-                borderRadius: '6px',
+                borderRadius: 0,
                 marginBottom: '12px'
               }}>
                 <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' }}>
@@ -610,7 +610,7 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                 <div style={{
                   padding: '12px',
                   background: 'var(--surface-raised)',
-                  borderRadius: '6px'
+                  borderRadius: 0
                 }}>
                   <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                     HOUR {hourOfDay} PERFORMANCE
@@ -667,7 +667,7 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                         padding: '10px',
                         margin: '4px 0',
                         background: 'var(--surface-raised)',
-                        borderRadius: '4px',
+                        borderRadius: 0,
                         textDecoration: 'none',
                         color: 'inherit'
                       }}
@@ -727,7 +727,7 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                     marginBottom: '12px',
                     padding: '8px',
                     background: 'var(--surface-raised)',
-                    borderRadius: '6px'
+                    borderRadius: 0
                   }}>
                     {timeSlots.map((slot) => {
                       const maxRate = Math.max(...timeSlots.map(s => s.sellRate));
@@ -743,7 +743,7 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                                         slot.sellRate > 70 ? 'var(--success)' :
                                         slot.sellRate > 50 ? 'var(--warning)' : 'var(--text-muted)',
                             height: `${Math.max(height, 5)}%`,
-                            borderRadius: '2px 2px 0 0',
+                            borderRadius: 0,
                             opacity: isCurrentHour ? 1 : 0.6
                           }}
                           title={`Hour ${slot.hour}: ${slot.sellRate.toFixed(0)}% sell rate`}
@@ -767,7 +767,7 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                           justifyContent: 'space-between',
                           padding: '8px',
                           background: slot.hour === hourOfDay ? 'var(--accent-dim)' : 'var(--surface-raised)',
-                          borderRadius: '4px',
+                          borderRadius: 0,
                           marginBottom: '4px',
                           border: slot.hour === hourOfDay ? '1px solid var(--accent)' : 'none'
                         }}

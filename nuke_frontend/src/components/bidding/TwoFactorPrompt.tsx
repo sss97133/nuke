@@ -246,12 +246,8 @@ export default function TwoFactorPrompt({
     >
       <div
         style={{
-          background: 'var(--surface)',
-          borderRadius: '8px',
-          maxWidth: '380px',
-          width: '100%',
-          boxShadow: '0 8px 24px var(--overlay)'
-        }}
+          background: 'var(--surface)', maxWidth: '380px',
+          width: '100%'}}
       >
         {/* Header */}
         <div style={{
@@ -265,9 +261,7 @@ export default function TwoFactorPrompt({
             <div style={{
               width: '32px',
               height: '32px',
-              background: 'var(--warning-dim)',
-              borderRadius: '50%',
-              display: 'flex',
+              background: 'var(--warning-dim)', display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '19px'
@@ -304,9 +298,7 @@ export default function TwoFactorPrompt({
           <div style={{
             background: isExpired ? 'var(--error-dim)' : 'var(--warning-dim)',
             border: `1px solid ${isExpired ? 'var(--error)' : 'var(--warning)'}`,
-            padding: '10px 12px',
-            borderRadius: '4px',
-            marginBottom: '16px',
+            padding: '10px 12px', marginBottom: '16px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between'
@@ -329,9 +321,7 @@ export default function TwoFactorPrompt({
               background: 'var(--error-dim)',
               border: '1px solid var(--error)',
               color: 'var(--error)',
-              padding: '10px 12px',
-              borderRadius: '4px',
-              marginBottom: '16px',
+              padding: '10px 12px', marginBottom: '16px',
               fontSize: '12px'
             }}>
               {error}
@@ -359,9 +349,7 @@ export default function TwoFactorPrompt({
                 style={{
                   width: '100%',
                   padding: '14px 16px',
-                  border: '2px solid var(--border)',
-                  borderRadius: '4px',
-                  fontSize: '21px',
+                  border: '2px solid var(--border)', fontSize: '21px',
                   fontFamily: 'monospace',
                   textAlign: 'center',
                   letterSpacing: '8px',

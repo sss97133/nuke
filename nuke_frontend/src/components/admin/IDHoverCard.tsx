@@ -305,10 +305,7 @@ export const IDHoverCard: React.FC<IDHoverCardProps> = ({
             maxHeight: '500px',
             overflowY: 'auto',
             backgroundColor: 'var(--white)',
-            border: '2px solid var(--border-medium)',
-            borderRadius: '0px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            padding: 'var(--space-3)',
+            border: '2px solid var(--border-medium)', padding: 'var(--space-3)',
             pointerEvents: 'none'
           }}
           onMouseEnter={() => setShowCard(true)}

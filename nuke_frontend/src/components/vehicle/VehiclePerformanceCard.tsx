@@ -237,9 +237,7 @@ function ScoreBadge({ score, label, size = 'md', onClick }: { score: number | nu
       <div
         style={{
           width: dim,
-          height: dim,
-          borderRadius: '50%',
-          background: bg,
+          height: dim, background: bg,
           color,
           display: 'flex',
           alignItems: 'center',

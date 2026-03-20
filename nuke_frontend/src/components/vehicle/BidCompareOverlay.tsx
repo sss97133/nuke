@@ -79,9 +79,7 @@ function CompareTooltip({ active, payload }: any) {
   const diff = d.vehicle - d.market;
   return (
     <div style={{
-      background: 'var(--grey-800, #1f2937)', color: 'var(--bg)', padding: '6px 10px',
-      borderRadius: 6, fontSize: '11px', fontFamily: 'monospace', boxShadow: '0 2px 8px color-mix(in srgb, var(--text) 30%, transparent)',
-    }}>
+      background: 'var(--grey-800, #1f2937)', color: 'var(--bg)', padding: '6px 10px', fontSize: '11px', fontFamily: 'monospace', }}>
       <div>Time: {d.pctTime}%</div>
       <div style={{ color: 'var(--accent)' }}>Vehicle: {d.vehicle}%</div>
       <div style={{ color: 'var(--warning)' }}>Market: {d.market}%</div>
@@ -200,7 +198,7 @@ export default function BidCompareOverlay({ vehicleId, vehicleBids, make, model 
             <Line
               type="monotone"
               dataKey="vehicle"
-              stroke="#3b82f6"
+              stroke="var(--info)"
               strokeWidth={2.5}
               dot={false}
               name="This vehicle"
@@ -210,7 +208,7 @@ export default function BidCompareOverlay({ vehicleId, vehicleBids, make, model 
             <Line
               type="monotone"
               dataKey="market"
-              stroke="#f59e0b"
+              stroke="var(--warning)"
               strokeWidth={2}
               strokeDasharray="6 3"
               dot={false}

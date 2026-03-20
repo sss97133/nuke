@@ -128,9 +128,9 @@ const SpendingDashboard = () => {
     if (!analytics) return [];
 
     return [
-      { label: 'Parts', amount: analytics.parts_spent, color: '#3b82f6' },
-      { label: 'Tools', amount: analytics.tools_spent, color: '#10b981' },
-      { label: 'Labor', amount: analytics.labor_spent, color: '#f59e0b' },
+      { label: 'Parts', amount: analytics.parts_spent, color: 'var(--info)' },
+      { label: 'Tools', amount: analytics.tools_spent, color: 'var(--success)' },
+      { label: 'Labor', amount: analytics.labor_spent, color: 'var(--warning)' },
       { label: 'Consumables', amount: analytics.consumables_spent, color: '#8b5cf6' }
     ].filter(item => item.amount > 0);
   };
@@ -183,9 +183,7 @@ const SpendingDashboard = () => {
             onChange={(e) => setSelectedVehicle(e.target.value)}
             style={{
               padding: '2px',
-              border: '1px solid #bdbdbd',
-              borderRadius: '0px',
-              fontSize: '11px'
+              border: '1px solid #bdbdbd', fontSize: '11px'
             }}
           >
             <option value="all">All Vehicles</option>
@@ -204,9 +202,7 @@ const SpendingDashboard = () => {
             onChange={(e) => setTimeRange(e.target.value)}
             style={{
               padding: '2px',
-              border: '1px solid #bdbdbd',
-              borderRadius: '0px',
-              fontSize: '11px'
+              border: '1px solid #bdbdbd', fontSize: '11px'
             }}
           >
             <option value="week">Last 7 Days</option>
@@ -224,9 +220,7 @@ const SpendingDashboard = () => {
             fontSize: '11px',
             border: '1px solid #bdbdbd',
             background: loading ? 'var(--border)' : 'var(--text)',
-            color: loading ? 'var(--text-secondary)' : 'var(--bg)',
-            borderRadius: '0px',
-            cursor: loading ? 'not-allowed' : 'pointer'
+            color: loading ? 'var(--text-secondary)' : 'var(--bg)', cursor: loading ? 'not-allowed' : 'pointer'
           }}
         >
           {loading ? 'Loading...' : 'Refresh'}

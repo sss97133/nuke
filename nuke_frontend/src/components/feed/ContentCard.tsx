@@ -36,9 +36,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
   const smallChipStyle: React.CSSProperties = {
     background: 'var(--bg)',
     border: '1px solid var(--border)',
-    padding: '1px 4px',
-    borderRadius: '2px',
-    fontSize: '11px',
+    padding: '1px 4px', fontSize: '11px',
     color: 'var(--text)'
   };
 
@@ -208,9 +206,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
       className="content-card"
       style={{
         background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: '2px',
-        overflow: 'hidden',
+        border: '1px solid var(--border)', overflow: 'hidden',
         cursor: 'pointer'
       }}
       onClick={handleCardClick}
@@ -363,12 +359,12 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
                           <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>conf {sig.confidence}</span>
                         )}
                         {(item as any).type === 'auction' || (item.metadata?.auction_status === 'active') ? (
-                          <a href={`/vehicle/${item.id}?action=bid`} onClick={(e) => e.stopPropagation()} style={{ marginLeft: 'auto', background: 'var(--error-dim)', border: '1px solid var(--border)', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: 'var(--error)', textDecoration: 'none' }}>
+                          <a href={`/vehicle/${item.id}?action=bid`} onClick={(e) => e.stopPropagation()} style={{ marginLeft: 'auto', background: 'var(--error-dim)', border: '1px solid var(--border)', padding: '1px 4px', fontSize: '11px', color: 'var(--error)', textDecoration: 'none' }}>
                             Bid
                           </a>
                         ) : null}
                         {item.metadata?.is_for_sale ? (
-                          <a href={`/vehicle/${item.id}?action=buy`} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--success-dim)', border: '1px solid var(--border)', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: 'var(--success)', textDecoration: 'none' }}>
+                          <a href={`/vehicle/${item.id}?action=buy`} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--success-dim)', border: '1px solid var(--border)', padding: '1px 4px', fontSize: '11px', color: 'var(--success)', textDecoration: 'none' }}>
                             Buy
                           </a>
                         ) : null}
@@ -405,12 +401,12 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
                       {pc != null && (<span className="badge" style={smallChipStyle}>Parts: {formatCurrency(pc)}</span>)}
                       {partsCount != null && (<span className="badge" style={smallChipStyle}>Parts: {partsCount}</span>)}
                       {(m.book_url || m.shop_id) && (
-                        <a href={m.book_url || `/book?vehicle_id=${(item as any).metadata?.vehicle_id || ''}&event=${item.id}`} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--accent-dim, #e0f2fe)', border: '1px solid var(--border)', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: 'var(--accent)', textDecoration: 'none' }}>
+                        <a href={m.book_url || `/book?vehicle_id=${(item as any).metadata?.vehicle_id || ''}&event=${item.id}`} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--accent-dim, #e0f2fe)', border: '1px solid var(--border)', padding: '1px 4px', fontSize: '11px', color: 'var(--accent)', textDecoration: 'none' }}>
                           Book
                         </a>
                       )}
                       {(m.order_url || m.parts_list) && (
-                        <a href={m.order_url || `/order-parts?vehicle_id=${(item as any).metadata?.vehicle_id || ''}&event=${item.id}`} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--warning-dim)', border: '1px solid var(--border)', padding: '1px 4px', borderRadius: '2px', fontSize: '11px', color: 'var(--warning)', textDecoration: 'none' }}>
+                        <a href={m.order_url || `/order-parts?vehicle_id=${(item as any).metadata?.vehicle_id || ''}&event=${item.id}`} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--warning-dim)', border: '1px solid var(--border)', padding: '1px 4px', fontSize: '11px', color: 'var(--warning)', textDecoration: 'none' }}>
                           Order
                         </a>
                       )}

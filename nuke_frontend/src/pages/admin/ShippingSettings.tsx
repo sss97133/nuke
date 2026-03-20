@@ -62,9 +62,7 @@ const ShippingSettings: React.FC = () => {
 
       {/* Central Dispatch Connection Card */}
       <div style={{ 
-        border: '2px solid var(--text)',
-        borderRadius: '0px',
-        background: 'var(--surface)',
+        border: '2px solid var(--text)', background: 'var(--surface)',
         marginBottom: '20px'
       }}>
         <div style={{
@@ -84,9 +82,7 @@ const ShippingSettings: React.FC = () => {
             </div>
           </div>
           <div style={{
-            padding: '6px 12px',
-            borderRadius: '0px',
-            background: connection?.connected ? 'var(--success)' : 'var(--error)',
+            padding: '6px 12px', background: connection?.connected ? 'var(--success)' : 'var(--error)',
             color: 'var(--bg)',
             fontSize: '11px',
             fontWeight: 700
@@ -101,9 +97,7 @@ const ShippingSettings: React.FC = () => {
               <div style={{ 
                 padding: '16px',
                 background: 'var(--success-dim)',
-                border: '2px solid var(--success)',
-                borderRadius: '0px',
-                marginBottom: '20px'
+                border: '2px solid var(--success)', marginBottom: '20px'
               }}>
                 <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: 'var(--success)' }}>
                   ✅ Connected Successfully
@@ -133,9 +127,7 @@ const ShippingSettings: React.FC = () => {
                   marginTop: '20px',
                   padding: '12px',
                   background: 'var(--warning-dim)',
-                  border: '1px solid var(--warning)',
-                  borderRadius: '0px',
-                  fontSize: '11px'
+                  border: '1px solid var(--warning)', fontSize: '11px'
                 }}>
                   <strong>⚠️ Test Mode Active:</strong> Listings will be created in Central Dispatch's test marketplace. 
                   Switch to production mode when ready to go live.
@@ -158,9 +150,7 @@ const ShippingSettings: React.FC = () => {
                   color: 'var(--error)',
                   fontSize: '12px',
                   fontWeight: 700,
-                  cursor: 'pointer',
-                  borderRadius: '0px'
-                }}
+                  cursor: 'pointer'}}
               >
                 Disconnect
               </button>
@@ -170,9 +160,7 @@ const ShippingSettings: React.FC = () => {
               <div style={{ 
                 padding: '16px',
                 background: 'var(--error-dim)',
-                border: '2px solid var(--error)',
-                borderRadius: '0px',
-                marginBottom: '20px'
+                border: '2px solid var(--error)', marginBottom: '20px'
               }}>
                 <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: 'var(--error)' }}>
                   ○ Not Connected
@@ -197,9 +185,7 @@ const ShippingSettings: React.FC = () => {
               <div style={{ 
                 padding: '16px', 
                 background: 'var(--accent-dim, #f0f9ff)',
-                border: '1px solid var(--accent)',
-                borderRadius: '0px',
-                marginBottom: '20px',
+                border: '1px solid var(--accent)', marginBottom: '20px',
                 fontSize: '11px',
                 lineHeight: 1.6
               }}>
@@ -220,9 +206,7 @@ const ShippingSettings: React.FC = () => {
                   color: 'var(--bg)',
                   fontSize: '13px',
                   fontWeight: 700,
-                  cursor: connecting ? 'wait' : 'pointer',
-                  borderRadius: '0px'
-                }}
+                  cursor: connecting ? 'wait' : 'pointer'}}
               >
                 {connecting ? 'Connecting...' : '🔗 Connect Central Dispatch'}
               </button>
@@ -241,9 +225,7 @@ const ShippingSettings: React.FC = () => {
 
       {/* Documentation Card */}
       <div style={{ 
-        border: '2px solid var(--text)',
-        borderRadius: '0px',
-        background: 'var(--surface)'
+        border: '2px solid var(--text)', background: 'var(--surface)'
       }}>
         <div style={{
           padding: '16px',
@@ -265,9 +247,7 @@ const ShippingSettings: React.FC = () => {
           <pre style={{ 
             background: 'var(--text)',
             color: 'var(--success)',
-            padding: '12px',
-            borderRadius: '0px',
-            fontSize: '11px',
+            padding: '12px', fontSize: '11px',
             overflow: 'auto',
             fontFamily: 'monospace'
           }}>
@@ -298,9 +278,7 @@ supabase secrets set CENTRAL_DISPATCH_TEST_MODE="true"`}
           background: 'var(--surface)',
           fontSize: '12px',
           fontWeight: 700,
-          cursor: 'pointer',
-          borderRadius: '0px'
-        }}
+          cursor: 'pointer'}}
       >
         ← Back to Admin
       </button>

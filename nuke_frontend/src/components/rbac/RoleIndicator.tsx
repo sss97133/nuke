@@ -193,9 +193,7 @@ const RoleIndicator: React.FC<RoleIndicatorProps> = ({
           padding: sizeConfig.padding,
           backgroundColor: config.bgColor,
           color: config.color,
-          border: `1px solid ${config.borderColor}`,
-          borderRadius: '6px',
-          fontSize: sizeConfig.fontSize,
+          border: `1px solid ${config.borderColor}`, fontSize: sizeConfig.fontSize,
           fontWeight: '500'
         }}
       >
@@ -208,9 +206,7 @@ const RoleIndicator: React.FC<RoleIndicatorProps> = ({
               fontSize: '11px',
               padding: '2px 6px',
               backgroundColor: trustConfig.bgColor,
-              color: trustConfig.color,
-              borderRadius: '4px',
-              marginLeft: '4px'
+              color: trustConfig.color, marginLeft: '4px'
             }}
           >
             {trustScore}
@@ -227,9 +223,7 @@ const RoleIndicator: React.FC<RoleIndicatorProps> = ({
             fontSize: '12px',
             backgroundColor: 'var(--color-primary)',
             color: 'var(--bg)',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
+            border: 'none', cursor: 'pointer'
           }}
         >
           Upgrade

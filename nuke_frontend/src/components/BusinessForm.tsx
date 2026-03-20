@@ -161,7 +161,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="text"
                 value={formData.legal_name}
                 onChange={(e) => handleInputChange('legal_name', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter legal business name"
               />
             </div>
@@ -173,7 +173,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
               <select
                 value={formData.business_type}
                 onChange={(e) => handleInputChange('business_type', e.target.value as BusinessType)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {BUSINESS_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>
@@ -194,7 +194,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="number"
                 value={formData.years_in_business || ''}
                 onChange={(e) => handleInputChange('years_in_business', e.target.value ? parseInt(e.target.value) : undefined)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="0"
                 min="0"
               />
@@ -209,14 +209,14 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
               value={formData.description}
               onChange={(e) => handleInputChange('description', e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Describe your business, services, and specialties..."
             />
           </div>
         </div>
 
         {/* Contact Information */}
-        <div className="bg-gray-50 p-6 rounded-lg">
+        <div className="bg-gray-50 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -228,7 +228,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="email"
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="business@example.com"
               />
               {errors.email && (
@@ -244,7 +244,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="(555) 123-4567"
               />
             </div>
@@ -257,7 +257,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="url"
                 value={formData.website}
                 onChange={(e) => handleInputChange('website', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="https://www.example.com"
               />
               {errors.website && (
@@ -268,7 +268,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
         </div>
 
         {/* Location */}
-        <div className="bg-gray-50 p-6 rounded-lg">
+        <div className="bg-gray-50 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Location</h3>
           
           <div className="space-y-4">
@@ -280,7 +280,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="text"
                 value={formData.address}
                 onChange={(e) => handleInputChange('address', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="123 Main Street"
               />
             </div>
@@ -294,7 +294,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                   type="text"
                   value={formData.city}
                   onChange={(e) => handleInputChange('city', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="City"
                 />
               </div>
@@ -307,7 +307,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                   type="text"
                   value={formData.state}
                   onChange={(e) => handleInputChange('state', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="State"
                 />
               </div>
@@ -320,7 +320,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                   type="text"
                   value={formData.zip_code}
                   onChange={(e) => handleInputChange('zip_code', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="12345"
                 />
               </div>
@@ -329,7 +329,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
         </div>
 
         {/* Services & Capabilities */}
-        <div className="bg-gray-50 p-6 rounded-lg">
+        <div className="bg-gray-50 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Services & Capabilities</h3>
           
           <div className="space-y-4">
@@ -341,7 +341,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="text"
                 value={formData.specializations.join(', ')}
                 onChange={(e) => handleArrayInputChange('specializations', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="engine_rebuild, paint_and_bodywork, electrical_systems"
               />
               <p className="text-sm text-gray-500 mt-1">
@@ -357,7 +357,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="text"
                 value={formData.services_offered.join(', ')}
                 onChange={(e) => handleArrayInputChange('services_offered', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="maintenance, repair, restoration, custom_build"
               />
               <p className="text-sm text-gray-500 mt-1">
@@ -430,7 +430,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
         </div>
 
         {/* Business Details */}
-        <div className="bg-gray-50 p-6 rounded-lg">
+        <div className="bg-gray-50 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Business Details</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -442,7 +442,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="number"
                 value={formData.employee_count || ''}
                 onChange={(e) => handleInputChange('employee_count', e.target.value ? parseInt(e.target.value) : undefined)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="0"
                 min="0"
               />
@@ -456,7 +456,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="number"
                 value={formData.facility_size_sqft || ''}
                 onChange={(e) => handleInputChange('facility_size_sqft', e.target.value ? parseInt(e.target.value) : undefined)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="0"
                 min="0"
               />
@@ -470,7 +470,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="number"
                 value={formData.service_radius_miles || ''}
                 onChange={(e) => handleInputChange('service_radius_miles', e.target.value ? parseInt(e.target.value) : undefined)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="0"
                 min="0"
               />
@@ -486,7 +486,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="number"
                 value={formData.hourly_rate_min || ''}
                 onChange={(e) => handleInputChange('hourly_rate_min', e.target.value ? parseFloat(e.target.value) : undefined)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"
                 step="0.01"
                 min="0"
@@ -501,7 +501,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="number"
                 value={formData.hourly_rate_max || ''}
                 onChange={(e) => handleInputChange('hourly_rate_max', e.target.value ? parseFloat(e.target.value) : undefined)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"
                 step="0.01"
                 min="0"
@@ -514,7 +514,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
         </div>
 
         {/* Legal Information */}
-        <div className="bg-gray-50 p-6 rounded-lg">
+        <div className="bg-gray-50 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Legal Information</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -526,7 +526,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="text"
                 value={formData.business_license}
                 onChange={(e) => handleInputChange('business_license', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="License number"
               />
             </div>
@@ -539,7 +539,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="text"
                 value={formData.tax_id}
                 onChange={(e) => handleInputChange('tax_id', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="XX-XXXXXXX"
               />
             </div>
@@ -552,7 +552,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="text"
                 value={formData.registration_state}
                 onChange={(e) => handleInputChange('registration_state', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="State"
               />
             </div>
@@ -565,7 +565,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
                 type="date"
                 value={formData.registration_date}
                 onChange={(e) => handleInputChange('registration_date', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -577,7 +577,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
             <button
               type="button"
               onClick={onCancel}
-              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              className="px-6 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
             >
               Cancel
             </button>
@@ -586,7 +586,7 @@ export const BusinessForm: React.FC<BusinessFormProps> = ({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            className="px-6 py-2 bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
           >
             {isSubmitting ? 'Creating...' : mode === 'create' ? 'Create Business' : 'Update Business'}
           </button>

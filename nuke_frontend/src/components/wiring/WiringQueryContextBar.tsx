@@ -102,9 +102,7 @@ export default function WiringQueryContextBar({
           border: '2px solid var(--border)',
           padding: '4px 6px',
           height: '28px',
-          transition: '0.12s',
-          borderRadius: '2px'
-        }}
+          transition: '0.12s'}}
       >
         <input
           ref={inputRef}
@@ -119,7 +117,7 @@ export default function WiringQueryContextBar({
             border: 'none',
             outline: 'none',
             fontSize: '11px',
-            fontFamily: '"MS Sans Serif", sans-serif',
+            fontFamily: 'Arial, sans-serif',
             background: 'transparent',
             minWidth: 0,
             height: '100%',
@@ -154,9 +152,7 @@ export default function WiringQueryContextBar({
             marginTop: '4px',
             padding: '4px 8px',
             background: '#ffebee',
-            border: '1px solid #f44336',
-            borderRadius: '2px',
-            fontSize: '11px',
+            border: '1px solid #f44336', fontSize: '11px',
             color: '#c62828'
           }}
         >

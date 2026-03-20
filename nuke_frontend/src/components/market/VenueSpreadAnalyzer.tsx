@@ -41,14 +41,14 @@ const PRICE_PRESETS = [
 ];
 
 const VENUE_COLORS: Record<string, string> = {
-  'bat': '#10B981',
-  'carsandbids': '#3B82F6',
+  'bat': 'var(--success)',
+  'carsandbids': 'var(--info)',
   'pcarmarket': '#8B5CF6',
-  'rmsothebys': '#EF4444',
-  'mecum': '#F59E0B',
+  'rmsothebys': 'var(--error)',
+  'mecum': 'var(--warning)',
   'gooding': '#EC4899',
   'bonhams': '#6366F1',
-  'barrett-jackson': '#F97316',
+  'barrett-jackson': 'var(--orange)',
   'hagerty': '#14B8A6',
 };
 
@@ -143,7 +143,7 @@ export default function VenueSpreadAnalyzer() {
     : 0;
 
   return (
-    <div className="bg-gray-900 rounded-xl p-6 space-y-6">
+    <div className="bg-gray-900 p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -162,7 +162,7 @@ export default function VenueSpreadAnalyzer() {
           <button
             key={preset.value}
             onClick={() => handlePriceChange(preset.value)}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+            className={`px-4 py-2  font-medium transition-all ${
               selectedPrice === preset.value
                 ? 'bg-green-500 text-white'
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
@@ -177,14 +177,14 @@ export default function VenueSpreadAnalyzer() {
             value={customPrice}
             onChange={(e) => setCustomPrice(e.target.value)}
             placeholder="Custom..."
-            className="px-3 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 w-28"
+            className="px-3 py-2 bg-gray-800 text-white border border-gray-700 w-28"
           />
         </form>
       </div>
 
       {/* Key Insight */}
       {optimalVenue && (
-        <div className="bg-gradient-to-r from-green-900/50 to-gray-900 rounded-lg p-4 border border-green-500/30">
+        <div className="bg-gradient-to-r from-green-900/50 to-gray-900 p-4 border border-green-500/30">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-green-400 font-medium">Optimal Venue</div>
@@ -229,14 +229,14 @@ export default function VenueSpreadAnalyzer() {
                 <td className="py-3 px-4">
                   <div className="flex items-center gap-2">
                     <div
-                      className="w-3 h-3 rounded-full"
+                      className="w-3 h-3"
                       style={{ backgroundColor: VENUE_COLORS[spread.venue_slug] || 'var(--text-secondary)' }}
                     />
                     <span className="text-white font-medium">{spread.venue_name}</span>
                   </div>
                 </td>
                 <td className="py-3 px-4 text-right">
-                  <span className={`px-2 py-1 rounded text-xs ${
+                  <span className={`px-2 py-1  text-xs ${
                     spread.venue_type === 'online'
                       ? 'bg-blue-900/50 text-blue-300'
                       : spread.venue_type === 'live'
@@ -288,9 +288,9 @@ export default function VenueSpreadAnalyzer() {
                 <div className="w-32 text-sm text-gray-400 truncate">
                   {spread.venue_name}
                 </div>
-                <div className="flex-1 h-6 bg-gray-800 rounded overflow-hidden">
+                <div className="flex-1 h-6 bg-gray-800 overflow-hidden">
                   <div
-                    className="h-full rounded transition-all duration-500"
+                    className="h-full transition-all duration-500"
                     style={{
                       width: `${widthPct}%`,
                       backgroundColor: VENUE_COLORS[spread.venue_slug] || 'var(--text-secondary)',

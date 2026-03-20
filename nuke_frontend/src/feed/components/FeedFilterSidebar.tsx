@@ -236,8 +236,8 @@ export function FeedFilterSidebar({
               style={{
                 ...chipStyle,
                 fontSize: '7px',
-                color: '#ef4444',
-                borderColor: '#ef4444',
+                color: 'var(--error)',
+                borderColor: 'var(--error)',
                 padding: '1px 4px',
               }}
             >

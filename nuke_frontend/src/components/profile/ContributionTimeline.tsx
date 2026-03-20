@@ -286,7 +286,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                 <div
                   key={targetYear}
                   id={`year-${targetYear}`}
-                  className="rounded-lg p-2"
+                  className="p-2"
                   style={{
                     background: 'var(--surface)',
                     border: '1px solid var(--border)',
@@ -467,9 +467,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                                       gridColumn: weekIdx + 1,
                                       width: '12px',
                                       height: '12px',
-                                      backgroundColor: inYear ? colorForHours(hours) : 'var(--bg-secondary)',
-                                      borderRadius: '2px',
-                                      border: clickable ? '1px solid rgba(0,0,0,0.1)' : 'none',
+                                      backgroundColor: inYear ? colorForHours(hours) : 'var(--bg-secondary)', border: clickable ? '1px solid rgba(0,0,0,0.1)' : 'none',
                                       opacity: inYear ? 1 : 0.3
                                     }}
                                   />
@@ -506,9 +504,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                 width: 11,
                 height: 11,
                 backgroundColor: colorForHours(level),
-                border: '1px solid var(--border-light)',
-                borderRadius: 2
-              }}
+                border: '1px solid var(--border-light)'}}
             />
           ))}
           <span className="text-small">More</span>
@@ -679,9 +675,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                                 fontSize: '11px',
                                 padding: '6px',
                                 backgroundColor: 'var(--accent-dim, #e8f4f8)',
-                                border: '1px solid var(--accent, #4a90e2)',
-                                borderRadius: '3px',
-                                marginTop: '4px'
+                                border: '1px solid var(--accent, #4a90e2)', marginTop: '4px'
                               }}>
                                 <div style={{ fontWeight: 'bold', color: 'var(--text)', marginBottom: '2px', fontSize: '11px' }}>
                                   AI Analysis

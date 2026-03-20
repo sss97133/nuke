@@ -40,12 +40,12 @@ interface Props {
 }
 
 const categoryColors: Record<string, string> = {
-  infrastructure: '#3b82f6',
+  infrastructure: 'var(--info)',
   storage: '#8b5cf6',
-  diagnostic: '#f59e0b',
-  hand_tool: '#10b981',
+  diagnostic: 'var(--warning)',
+  hand_tool: 'var(--success)',
   specialty: '#ec4899',
-  consumable: '#ef4444',
+  consumable: 'var(--error)',
 };
 
 const formatCurrency = (amount: number) =>
@@ -244,9 +244,7 @@ export default function WorkSessionEventCard({ event, expanded: initialExpanded 
                         className="text-small"
                         style={{
                           background: 'var(--surface)',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          border: '1px solid var(--border)'
+                          padding: '2px 8px', border: '1px solid var(--border)'
                         }}
                       >
                         {tool.name}

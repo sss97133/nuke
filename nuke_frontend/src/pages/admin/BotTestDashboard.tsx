@@ -288,23 +288,23 @@ export default function BotTestDashboard() {
       {/* Stats Overview */}
       {stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-          <div className="stat-card" style={{ padding: '16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+          <div className="stat-card" style={{ padding: '16px', background: 'var(--surface)', border: '1px solid var(--border)'}}>
             <div style={{ fontSize: '32px', fontWeight: 'bold', color: stats.criticalCount > 0 ? 'var(--error)' : 'inherit' }}>
               {stats.criticalCount}
             </div>
             <div style={{ color: 'var(--text-muted)' }}>Critical Issues</div>
           </div>
-          <div className="stat-card" style={{ padding: '16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+          <div className="stat-card" style={{ padding: '16px', background: 'var(--surface)', border: '1px solid var(--border)'}}>
             <div style={{ fontSize: '32px', fontWeight: 'bold', color: stats.highCount > 0 ? 'var(--error)' : 'inherit' }}>
               {stats.highCount}
             </div>
             <div style={{ color: 'var(--text-muted)' }}>High Priority</div>
           </div>
-          <div className="stat-card" style={{ padding: '16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+          <div className="stat-card" style={{ padding: '16px', background: 'var(--surface)', border: '1px solid var(--border)'}}>
             <div style={{ fontSize: '32px', fontWeight: 'bold' }}>{stats.newCount}</div>
             <div style={{ color: 'var(--text-muted)' }}>New Findings</div>
           </div>
-          <div className="stat-card" style={{ padding: '16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+          <div className="stat-card" style={{ padding: '16px', background: 'var(--surface)', border: '1px solid var(--border)'}}>
             <div style={{ fontSize: '32px', fontWeight: 'bold' }}>{stats.recentRuns}</div>
             <div style={{ color: 'var(--text-muted)' }}>Runs (24h)</div>
           </div>
@@ -319,7 +319,7 @@ export default function BotTestDashboard() {
               className="form-select"
               value={filter.severity || ''}
               onChange={(e) => setFilter({ ...filter, severity: e.target.value || undefined })}
-              style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}
+              style={{ padding: '8px', border: '1px solid var(--border)' }}
             >
               <option value="">All Severities</option>
               <option value="critical">Critical</option>
@@ -333,7 +333,7 @@ export default function BotTestDashboard() {
               className="form-select"
               value={filter.status || ''}
               onChange={(e) => setFilter({ ...filter, status: e.target.value || undefined })}
-              style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}
+              style={{ padding: '8px', border: '1px solid var(--border)' }}
             >
               <option value="">All Statuses</option>
               {STATUS_OPTIONS.map(s => (
@@ -345,7 +345,7 @@ export default function BotTestDashboard() {
               className="form-select"
               value={filter.type || ''}
               onChange={(e) => setFilter({ ...filter, type: e.target.value || undefined })}
-              style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }}
+              style={{ padding: '8px', border: '1px solid var(--border)' }}
             >
               <option value="">All Types</option>
               <option value="bug">Bug</option>
@@ -372,9 +372,7 @@ export default function BotTestDashboard() {
                   key={finding.id}
                   style={{
                     border: '1px solid var(--border)',
-                    borderLeft: `4px solid ${SEVERITY_COLORS[finding.severity]}`,
-                    borderRadius: '4px',
-                    padding: '16px',
+                    borderLeft: `4px solid ${SEVERITY_COLORS[finding.severity]}`, padding: '16px',
                     background: 'var(--surface)',
                     cursor: 'pointer',
                   }}
@@ -387,9 +385,7 @@ export default function BotTestDashboard() {
                           style={{
                             backgroundColor: SEVERITY_COLORS[finding.severity],
                             color: 'var(--bg)',
-                            padding: '2px 8px',
-                            borderRadius: '12px',
-                            fontSize: '12px',
+                            padding: '2px 8px', fontSize: '12px',
                             fontWeight: 'bold',
                             textTransform: 'uppercase',
                           }}
@@ -416,7 +412,7 @@ export default function BotTestDashboard() {
                           updateFindingStatus(finding.id, e.target.value);
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        style={{ padding: '4px 8px', border: '1px solid var(--border)' }}
                       >
                         {STATUS_OPTIONS.map(s => (
                           <option key={s} value={s}>{s.replace('_', ' ')}</option>
@@ -436,9 +432,7 @@ export default function BotTestDashboard() {
             <div
               key={run.id}
               style={{
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '16px',
+                border: '1px solid var(--border)', padding: '16px',
                 background: 'var(--surface)',
               }}
             >
@@ -459,9 +453,7 @@ export default function BotTestDashboard() {
                     style={{
                       backgroundColor: run.status === 'completed' ? 'var(--success)' : run.status === 'failed' ? 'var(--error)' : 'var(--warning)',
                       color: 'var(--bg)',
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      fontSize: '12px',
+                      padding: '2px 8px', fontSize: '12px',
                     }}
                   >
                     {run.status}
@@ -472,7 +464,7 @@ export default function BotTestDashboard() {
                 </div>
               </div>
               {run.final_summary && (
-                <p style={{ margin: '12px 0 0 0', padding: '8px', background: 'var(--surface-hover)', borderRadius: '4px', fontSize: '14px' }}>
+                <p style={{ margin: '12px 0 0 0', padding: '8px', background: 'var(--surface-hover)', fontSize: '14px' }}>
                   {run.final_summary}
                 </p>
               )}
@@ -491,9 +483,7 @@ export default function BotTestDashboard() {
               <div
                 key={agent.id}
                 style={{
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  padding: '16px',
+                  border: '1px solid var(--border)', padding: '16px',
                   background: 'var(--surface)',
                 }}
               >
@@ -527,9 +517,7 @@ export default function BotTestDashboard() {
                 <div
                   key={session.id}
                   style={{
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    padding: '12px',
+                    border: '1px solid var(--border)', padding: '12px',
                     background: 'var(--surface)',
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -547,9 +535,7 @@ export default function BotTestDashboard() {
                       style={{
                         backgroundColor: session.status === 'completed' ? 'var(--success)' : session.status === 'failed' ? 'var(--error)' : 'var(--warning)',
                         color: 'var(--bg)',
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        fontSize: '11px',
+                        padding: '2px 8px', fontSize: '11px',
                       }}
                     >
                       {session.status}
@@ -575,9 +561,7 @@ export default function BotTestDashboard() {
                 <div
                   key={inv.id}
                   style={{
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    padding: '12px',
+                    border: '1px solid var(--border)', padding: '12px',
                     background: 'var(--surface)',
                   }}
                 >
@@ -586,9 +570,7 @@ export default function BotTestDashboard() {
                     <span style={{
                       backgroundColor: inv.fix_complexity === 'trivial' ? 'var(--success)' : inv.fix_complexity === 'simple' ? 'var(--success)' : inv.fix_complexity === 'moderate' ? 'var(--warning)' : 'var(--error)',
                       color: 'var(--bg)',
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      fontSize: '11px',
+                      padding: '2px 8px', fontSize: '11px',
                     }}>
                       {inv.fix_complexity}
                     </span>
@@ -623,9 +605,7 @@ export default function BotTestDashboard() {
                 <div
                   key={fix.id}
                   style={{
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    padding: '12px',
+                    border: '1px solid var(--border)', padding: '12px',
                     background: 'var(--surface)',
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -648,9 +628,7 @@ export default function BotTestDashboard() {
                       style={{
                         backgroundColor: fix.status === 'merged' ? 'var(--success)' : fix.status === 'applied' ? 'var(--success)' : fix.status === 'rejected' ? 'var(--error)' : 'var(--text-muted)',
                         color: 'var(--bg)',
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        fontSize: '11px',
+                        padding: '2px 8px', fontSize: '11px',
                       }}
                     >
                       {fix.status}
@@ -684,9 +662,7 @@ export default function BotTestDashboard() {
             style={{
               backgroundColor: 'var(--surface)',
               border: '2px solid var(--border)',
-              padding: '24px',
-              borderRadius: '8px',
-              maxWidth: '800px',
+              padding: '24px', maxWidth: '800px',
               width: '90%',
               maxHeight: '80vh',
               overflow: 'auto',
@@ -700,9 +676,7 @@ export default function BotTestDashboard() {
                   style={{
                     backgroundColor: SEVERITY_COLORS[selectedFinding.severity],
                     color: 'var(--bg)',
-                    padding: '4px 12px',
-                    borderRadius: '12px',
-                    fontSize: '14px',
+                    padding: '4px 12px', fontSize: '14px',
                     fontWeight: 'bold',
                     textTransform: 'uppercase',
                   }}
@@ -745,7 +719,7 @@ export default function BotTestDashboard() {
             {selectedFinding.console_logs && selectedFinding.console_logs.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
                 <strong>Console Errors:</strong>
-                <pre style={{ background: 'var(--surface-hover)', padding: '12px', borderRadius: '4px', overflow: 'auto', fontSize: '12px' }}>
+                <pre style={{ background: 'var(--surface-hover)', padding: '12px', overflow: 'auto', fontSize: '12px' }}>
                   {JSON.stringify(selectedFinding.console_logs, null, 2)}
                 </pre>
               </div>
@@ -755,7 +729,7 @@ export default function BotTestDashboard() {
               <select
                 value={selectedFinding.status}
                 onChange={(e) => updateFindingStatus(selectedFinding.id, e.target.value)}
-                style={{ padding: '8px 16px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                style={{ padding: '8px 16px', border: '1px solid var(--border)' }}
               >
                 {STATUS_OPTIONS.map(s => (
                   <option key={s} value={s}>{s.replace('_', ' ')}</option>

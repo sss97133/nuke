@@ -11,19 +11,19 @@ export interface CardTierProps {
 const TIER_COLORS: Record<string, string> = {
   SSS: '#7c3aed',
   SS: '#8b5cf6',
-  S: '#ef4444',
-  A: '#f59e0b',
-  B: '#3b82f6',
-  C: '#10b981',
-  D: '#6b7280',
-  E: '#9ca3af',
+  S: 'var(--error)',
+  A: 'var(--warning)',
+  B: 'var(--info)',
+  C: 'var(--success)',
+  D: 'var(--text-secondary)',
+  E: 'var(--text-disabled)',
   F: '#a855f7',
 };
 
 export function CardTier({ tier }: CardTierProps) {
   if (!tier) return null;
 
-  const color = TIER_COLORS[tier] || '#6b7280';
+  const color = TIER_COLORS[tier] || 'var(--text-secondary)';
 
   return (
     <span

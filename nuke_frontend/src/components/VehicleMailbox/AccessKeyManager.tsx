@@ -176,7 +176,7 @@ const AccessKeyManager: React.FC<AccessKeyManagerProps> = ({ vehicleId }) => {
     }
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[keyType] || colors.system}`}>
+      <span className={`px-2 py-1  text-xs font-medium ${colors[keyType] || colors.system}`}>
         {keyType}
       </span>
     )
@@ -191,7 +191,7 @@ const AccessKeyManager: React.FC<AccessKeyManagerProps> = ({ vehicleId }) => {
     }
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[permission] || colors.filtered}`}>
+      <span className={`px-2 py-1  text-xs font-medium ${colors[permission] || colors.filtered}`}>
         {permission.replace('_', ' ')}
       </span>
     )
@@ -201,10 +201,10 @@ const AccessKeyManager: React.FC<AccessKeyManagerProps> = ({ vehicleId }) => {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-gray-300 rounded w-1/3"></div>
+          <div className="h-6 bg-gray-300 w-1/3"></div>
           <div className="space-y-3">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-16 bg-gray-300 rounded"></div>
+              <div key={i} className="h-16 bg-gray-300"></div>
             ))}
           </div>
         </div>
@@ -218,7 +218,7 @@ const AccessKeyManager: React.FC<AccessKeyManagerProps> = ({ vehicleId }) => {
         <h3 className="text-lg font-medium text-gray-900">Access Keys</h3>
         <button
           onClick={() => setShowGrantForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center space-x-2"
+          className="bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 flex items-center space-x-2"
         >
           <Plus className="w-4 h-4" />
           <span>Grant Access</span>
@@ -227,7 +227,7 @@ const AccessKeyManager: React.FC<AccessKeyManagerProps> = ({ vehicleId }) => {
 
       {/* Grant Access Form */}
       {showGrantForm && (
-        <div className="bg-gray-50 border rounded-lg p-4 mb-6">
+        <div className="bg-gray-50 border p-4 mb-6">
           <h4 className="font-medium text-gray-900 mb-4">Grant New Access</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -238,7 +238,7 @@ const AccessKeyManager: React.FC<AccessKeyManagerProps> = ({ vehicleId }) => {
                 type="email"
                 value={grantForm.user_email}
                 onChange={(e) => setGrantForm(prev => ({ ...prev, user_email: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                className="w-full border border-gray-300 px-3 py-2"
                 placeholder="user@example.com"
               />
             </div>
@@ -249,7 +249,7 @@ const AccessKeyManager: React.FC<AccessKeyManagerProps> = ({ vehicleId }) => {
               <select
                 value={grantForm.relationship_type}
                 onChange={(e) => setGrantForm(prev => ({ ...prev, relationship_type: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                className="w-full border border-gray-300 px-3 py-2"
               >
                 <option value="trusted_party">Trusted Party</option>
                 <option value="family">Family</option>
@@ -265,7 +265,7 @@ const AccessKeyManager: React.FC<AccessKeyManagerProps> = ({ vehicleId }) => {
               <select
                 value={grantForm.permission_level}
                 onChange={(e) => setGrantForm(prev => ({ ...prev, permission_level: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                className="w-full border border-gray-300 px-3 py-2"
               >
                 <option value="read_only">Read Only</option>
                 <option value="read_write">Read/Write</option>
@@ -280,7 +280,7 @@ const AccessKeyManager: React.FC<AccessKeyManagerProps> = ({ vehicleId }) => {
                 type="number"
                 value={grantForm.expires_in_days}
                 onChange={(e) => setGrantForm(prev => ({ ...prev, expires_in_days: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                className="w-full border border-gray-300 px-3 py-2"
                 placeholder="30"
               />
             </div>
@@ -288,13 +288,13 @@ const AccessKeyManager: React.FC<AccessKeyManagerProps> = ({ vehicleId }) => {
           <div className="flex justify-end space-x-3 mt-4">
             <button
               onClick={() => setShowGrantForm(false)}
-              className="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300"
+              className="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300"
             >
               Cancel
             </button>
             <button
               onClick={grantAccess}
-              className="px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700"
+              className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700"
             >
               Grant Access
             </button>
@@ -311,7 +311,7 @@ const AccessKeyManager: React.FC<AccessKeyManagerProps> = ({ vehicleId }) => {
           </div>
         ) : (
           accessKeys.map((accessKey) => (
-            <div key={accessKey.id} className="border rounded-lg p-4 hover:bg-gray-50">
+            <div key={accessKey.id} className="border p-4 hover:bg-gray-50">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   {getKeyTypeIcon(accessKey.key_type)}

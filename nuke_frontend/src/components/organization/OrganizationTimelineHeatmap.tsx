@@ -253,7 +253,7 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
             <div
               key={rangeStart}
               id="timeline-rolling"
-              className="rounded-lg p-2"
+              className="p-2"
               style={{
                 background: 'var(--surface)',
                 border: '1px solid var(--border)',
@@ -347,9 +347,7 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
                                   gridColumn: weekIdx + 1,
                                   width: '12px',
                                   height: '12px',
-                                  backgroundColor: inRange ? colorForActivity(hours, count) : 'var(--heat-0)',
-                                  borderRadius: '2px',
-                                  border: clickable ? '1px solid var(--heat-border)' : 'none',
+                                  backgroundColor: inRange ? colorForActivity(hours, count) : 'var(--heat-0)', border: clickable ? '1px solid var(--heat-border)' : 'none',
                                   opacity: inRange ? 1 : 0.3
                                 }}
                               />
@@ -373,9 +371,7 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
                       padding: 'var(--space-1) var(--space-2)',
                       fontSize: '11px',
                       background: 'var(--grey-200)',
-                      border: '1px solid var(--border-medium)',
-                      borderRadius: '2px',
-                      minWidth: '45px',
+                      border: '1px solid var(--border-medium)', minWidth: '45px',
                       textAlign: 'center'
                     }}
                   >
@@ -405,9 +401,7 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
                 width: 11,
                 height: 11,
                 backgroundColor: colorForActivity(level, level > 0 ? 1 : 0),
-                border: '1px solid var(--heat-border)',
-                borderRadius: 2
-              }}
+                border: '1px solid var(--heat-border)'}}
             />
           ))}
           <span className="text-small">More activity</span>
@@ -426,9 +420,7 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
             maxHeight: '100vh',
             overflow: 'auto',
             background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            boxShadow: 'var(--shadow-lg)'
-          }}
+            border: '1px solid var(--border)'}}
         >
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <h3 className="text font-bold">

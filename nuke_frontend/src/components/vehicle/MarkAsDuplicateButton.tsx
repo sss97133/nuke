@@ -114,9 +114,7 @@ const MarkAsDuplicateButton: React.FC<Props> = ({ vehicleId, userId, onMarked })
                 width: '100%',
                 padding: '8px',
                 fontSize: '12px',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                fontFamily: 'monospace'
+                border: '1px solid var(--border)', fontFamily: 'monospace'
               }}
             />
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>

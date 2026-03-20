@@ -613,9 +613,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
             style={{
               background: 'var(--primary)',
               color: 'var(--white)',
-              border: '1px solid var(--border)',
-              borderRadius: '0px',
-              padding: '2px 6px',
+              border: '1px solid var(--border)', padding: '2px 6px',
               fontSize: '9px',
               cursor: 'pointer'
             }}
@@ -965,7 +963,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                 <span style={{
                   fontWeight: 700,
                   color: (vehicle as any).data_quality_score >= 70 ? 'var(--success)' :
-                         (vehicle as any).data_quality_score >= 40 ? '#eab308' : '#ef4444',
+                         (vehicle as any).data_quality_score >= 40 ? 'var(--warning)' : 'var(--error)',
                   fontSize: '12px',
                   fontFamily: 'monospace'
                 }}>
@@ -975,18 +973,14 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                   display: 'inline-block',
                   width: '48px',
                   height: '4px',
-                  background: 'var(--border)',
-                  borderRadius: '2px',
-                  overflow: 'hidden'
+                  background: 'var(--border)', overflow: 'hidden'
                 }}>
                   <span style={{
                     display: 'block',
                     height: '100%',
                     width: `${Math.min(100, Math.max(0, (vehicle as any).data_quality_score))}%`,
                     background: (vehicle as any).data_quality_score >= 70 ? 'var(--success)' :
-                                (vehicle as any).data_quality_score >= 40 ? '#eab308' : '#ef4444',
-                    borderRadius: '2px'
-                  }} />
+                                (vehicle as any).data_quality_score >= 40 ? 'var(--warning)' : 'var(--error)'}} />
                 </span>
               </span>
             </div>

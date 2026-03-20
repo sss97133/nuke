@@ -1103,7 +1103,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                     background: 'rgba(0, 0, 0, 0.8)',
                     color: 'white',
                     padding: '8px 12px',
-                    borderRadius: '4px',
+                    borderRadius: 0,
                     fontSize: '12px',
                     zIndex: 1002
                   }}
@@ -1163,13 +1163,13 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                     onMouseEnter={(e) => {
                       if (!tag.isEditing && selectedTagId !== tag.id && !draggingTagId) {
                         e.currentTarget.style.transform = 'scale(1.2)';
-                        e.currentTarget.style.boxShadow = '0 0 6px var(--success)';
+                        e.currentTarget.style.outline = '2px solid var(--success)';
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!tag.isEditing && selectedTagId !== tag.id && !draggingTagId) {
                         e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.boxShadow = 'none';
+                        e.currentTarget.style.outline = 'none';
                       }
                     }}
                     title={selectedTagId === tag.id ? "Drag to move, Click to edit" : "Click to select"}
@@ -1194,7 +1194,6 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                         maxWidth: '300px',
                         zIndex: 11,
                         pointerEvents: 'none',
-                        boxShadow: '1px 1px 0 rgba(0, 0, 0, 0.25)',
                         cursor: 'pointer'
                       }}
                       onClick={(e) => {
@@ -1236,7 +1235,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                             backgroundColor: tag.trust_score >= 75 ? 'var(--success)' :
                                            tag.trust_score >= 50 ? 'var(--warning)' : 'var(--danger)',
                             padding: '2px 4px',
-                            borderRadius: '2px',
+                            borderRadius: 0,
                             fontWeight: 'bold'
                           }}>
                             {tag.trust_score}%
@@ -1303,12 +1302,11 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                         left: '50%',
                         transform: 'translateX(-50%)',
                         background: 'var(--grey-200)',
-                        border: '2px outset var(--border-medium)',
+                        border: '2px solid var(--border)',
                         padding: 'var(--space-2)',
                         minWidth: '250px',
                         maxWidth: '350px',
-                        zIndex: 1000,
-                        boxShadow: '2px 2px 0 rgba(0, 0, 0, 0.25)'
+                        zIndex: 1000
                       }}
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -1460,7 +1458,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                 transform: 'translateX(-50%)',
                 background: 'var(--grey-800)',
                 border: '2px outset var(--border-medium)',
-                borderRadius: 'var(--radius)'
+                borderRadius: 0
               }}
             >
               {/* Back to Grid */}
@@ -1525,9 +1523,9 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                   style={{
                     background: 'transparent',
                     border: '1px solid rgba(220, 53, 69, 0.5)',
-                    color: '#dc3545',
+                    color: 'var(--error)',
                     padding: '8px 16px',
-                    borderRadius: '16px',
+                    borderRadius: 0,
                     cursor: 'pointer',
                     fontSize: '14px'
                   }}
@@ -1735,7 +1733,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                             style={{
                               padding: 'var(--space-2)',
                               border: '1px solid var(--border-light)',
-                              borderRadius: 'var(--radius)',
+                              borderRadius: 0,
                               backgroundColor: selectedTagId === tag.id ? 'var(--bg-hover)' : 'transparent',
                               cursor: 'pointer'
                             }}
@@ -1798,7 +1796,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                       marginBottom: 'var(--space-3)',
                       padding: 'var(--space-2)',
                       backgroundColor: 'var(--grey-50)',
-                      borderRadius: 'var(--radius)',
+                      borderRadius: 0,
                       fontSize: '11px',
                       color: 'var(--text-muted)',
                       lineHeight: '1.6'

@@ -8,7 +8,7 @@ type UrgencyLevel = 'ended' | 'lastMinute' | 'critical' | 'urgent' | 'gettingClo
 const urgencyTimerColors: Record<UrgencyLevel, string> = {
   lastMinute: 'var(--error)',    // Bright red - pulsing
   critical: 'var(--error)',      // Red
-  urgent: '#ea580c',             // Orange (not yellow!) - intentional unique color
+  urgent: 'var(--orange)',             // Orange (not yellow!) - intentional unique color
   gettingClose: '#e07960',       // Coral/salmon - intentional unique color
   normal: 'var(--text-secondary)',  // Gray
   ended: 'var(--text-disabled)',    // Light gray
@@ -165,9 +165,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
           <div style={{
             width: '100%',
             height: '4px',
-            background: 'var(--border)',
-            borderRadius: '2px',
-            overflow: 'hidden',
+            background: 'var(--border)', overflow: 'hidden',
             marginBottom: '6px'
           }}>
             <div
@@ -251,9 +249,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
             color: 'var(--bg)',
             padding: '4px 8px',
             fontSize: '11px',
-            fontWeight: 'bold',
-            borderRadius: '2px'
-          }}
+            fontWeight: 'bold'}}
         >
           {getStateLabel()}
         </div>
@@ -268,11 +264,8 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
             color: urgencyTimerColors[urgencyLevel],
             padding: '4px 8px',
             fontSize: '12px',
-            fontWeight: 'bold',
-            borderRadius: '2px',
-            opacity: ['lastMinute', 'critical'].includes(urgencyLevel) ? (pulsePhase === 0 ? 1 : 0.7) : 1,
-            boxShadow: urgencyLevel === 'lastMinute' ? `0 0 8px ${urgencyTimerColors[urgencyLevel]}` : 'none',
-            transition: 'opacity 0.15s, box-shadow 0.15s',
+            fontWeight: 'bold', opacity: ['lastMinute', 'critical'].includes(urgencyLevel) ? (pulsePhase === 0 ? 1 : 0.7) : 1,
+            transition: 'opacity 0.15s',
           }}
         >
           {timeRemaining}
@@ -289,9 +282,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
               color: 'var(--warning)',
               padding: '2px 6px',
               fontSize: '11px',
-              fontWeight: 'bold',
-              borderRadius: '2px'
-            }}
+              fontWeight: 'bold'}}
           >
             ⚡ Extended {auction.extension_count}x
           </div>
@@ -329,13 +320,9 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
 
         {/* Current Bid Section - with visual accent */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.03) 100%)',
+          background: 'var(--success-dim)',
           padding: '10px',
-          marginBottom: '8px',
-          borderRadius: '4px',
-          border: '1px solid rgba(16, 185, 129, 0.2)',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5)',
-        }}>
+          marginBottom: '8px', border: '1px solid rgba(16, 185, 129, 0.2)', }}>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
             Current Bid:
           </div>
@@ -368,9 +355,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
         <div style={{
           width: '100%',
           height: '6px',
-          background: 'var(--border)',
-          borderRadius: '2px',
-          overflow: 'hidden',
+          background: 'var(--border)', overflow: 'hidden',
           marginBottom: '6px'
         }}>
           <div
@@ -411,9 +396,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
             padding: '8px',
             background: getStateColor(),
             color: 'var(--bg)',
-            border: 'none',
-            borderRadius: '2px',
-            fontSize: '12px',
+            border: 'none', fontSize: '12px',
             fontWeight: 'bold',
             cursor: ['active', 'ending_soon'].includes(auction.state) ? 'pointer' : 'not-allowed',
             opacity: ['active', 'ending_soon'].includes(auction.state) ? 1 : 0.5,

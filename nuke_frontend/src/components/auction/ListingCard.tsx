@@ -157,11 +157,9 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 4px 12px color-mix(in srgb, var(--text) 15%, transparent)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = 'none';
       }}
       onClick={() => {
         if (listing.external_url) {
@@ -204,18 +202,14 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
               style={{
                 width: '120px',
                 height: '80px',
-                objectFit: 'contain',
-                borderRadius: '4px',
-              }}
+                objectFit: 'contain', }}
             />
           ) : (
             <div
               style={{
                 width: '120px',
                 height: '80px',
-                backgroundColor: 'var(--bg-secondary)',
-                borderRadius: '4px',
-                display: 'flex',
+                backgroundColor: 'var(--bg-secondary)', display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '12px',
@@ -250,9 +244,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
         <div
           style={{
             padding: '8px',
-            backgroundColor: 'var(--bg)',
-            borderRadius: '4px',
-            marginBottom: '12px',
+            backgroundColor: 'var(--bg)', marginBottom: '12px',
           }}
         >
           {listing.current_bid ? (

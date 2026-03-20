@@ -23,10 +23,10 @@ interface PlatformMeta {
 }
 
 const PLATFORMS = [
-  { id: 'bat', name: 'Bring a Trailer', domain: 'bringatrailer.com', color: '#d97706', shortLabel: 'BaT' },
-  { id: 'cars_and_bids', name: 'Cars & Bids', domain: 'carsandbids.com', color: '#dc2626', shortLabel: 'CB' },
-  { id: 'pcarmarket', name: 'PCarMarket', domain: 'pcarmarket.com', color: '#16a34a', shortLabel: 'PCM' },
-  { id: 'collecting_cars', name: 'Collecting Cars', domain: 'collectingcars.com', color: '#2563eb', shortLabel: 'CC' },
+  { id: 'bat', name: 'Bring a Trailer', domain: 'bringatrailer.com', color: 'var(--warning)', shortLabel: 'BaT' },
+  { id: 'cars_and_bids', name: 'Cars & Bids', domain: 'carsandbids.com', color: 'var(--error)', shortLabel: 'CB' },
+  { id: 'pcarmarket', name: 'PCarMarket', domain: 'pcarmarket.com', color: 'var(--success)', shortLabel: 'PCM' },
+  { id: 'collecting_cars', name: 'Collecting Cars', domain: 'collectingcars.com', color: 'var(--info)', shortLabel: 'CC' },
   { id: 'broad_arrow', name: 'Broad Arrow', domain: 'broadarrowauctions.com', color: '#7c3aed', shortLabel: 'BA' },
   { id: 'rmsothebys', name: "RM Sotheby's", domain: 'rmsothebys.com', color: '#0891b2', shortLabel: 'RM' },
   { id: 'gooding', name: 'Gooding & Company', domain: 'goodingco.com', color: '#ca8a04', shortLabel: 'GC' },
@@ -74,9 +74,7 @@ function PlatformFavicon({
     <div
       style={{
         width: containerSize,
-        height: containerSize,
-        borderRadius: '8px',
-        background,
+        height: containerSize, background,
         display: 'grid',
         placeItems: 'center',
         position: 'relative',
@@ -205,9 +203,7 @@ export default function ConnectedPlatforms() {
     return (
       <span style={{
         display: 'inline-block',
-        padding: '2px 8px',
-        borderRadius: '10px',
-        fontSize: '9px',
+        padding: '2px 8px', fontSize: '9px',
         fontWeight: 600,
         background: style.bg,
         color: style.color
@@ -259,14 +255,10 @@ export default function ConnectedPlatforms() {
           <div style={{
             textAlign: 'center',
             padding: '30px 20px',
-            background: 'var(--surface-hover)',
-            borderRadius: '4px'
-          }}>
+            background: 'var(--surface-hover)'}}>
             <div style={{
               width: '48px',
-              height: '48px',
-              borderRadius: '50%',
-              border: '1px solid var(--border)',
+              height: '48px', border: '1px solid var(--border)',
               background: 'var(--surface)',
               display: 'flex',
               alignItems: 'center',
@@ -305,9 +297,7 @@ export default function ConnectedPlatforms() {
                     gap: '12px',
                     flexWrap: 'wrap',
                     padding: '10px 12px',
-                    background: 'var(--surface-hover)',
-                    borderRadius: '4px',
-                    border: cred.status === '2fa_required' ? '2px solid var(--warning)' : '1px solid var(--border)'
+                    background: 'var(--surface-hover)', border: cred.status === '2fa_required' ? '2px solid var(--warning)' : '1px solid var(--border)'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 200px', minWidth: 0 }}>
@@ -391,9 +381,7 @@ export default function ConnectedPlatforms() {
           <div style={{
             marginTop: '12px',
             padding: '10px',
-            background: 'var(--surface)',
-            borderRadius: '4px',
-            border: '1px dashed var(--border)'
+            background: 'var(--surface)', border: '1px dashed var(--border)'
           }}>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>
               Also available:
@@ -412,9 +400,7 @@ export default function ConnectedPlatforms() {
                     padding: '4px 8px',
                     fontSize: '9px',
                     background: 'var(--surface-hover)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
+                    border: '1px solid var(--border)', cursor: 'pointer'
                   }}
                 >
                   <PlatformFavicon

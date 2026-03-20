@@ -190,13 +190,11 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
   return (
     <div style={{
       marginBottom: '16px',
-      border: '2px solid #dc2626',
-      borderRadius: '4px',
-      background: 'var(--surface)'
+      border: '2px solid var(--error)', background: 'var(--surface)'
     }}>
       <div style={{
         padding: '12px',
-        background: '#dc2626',
+        background: 'var(--error)',
         color: 'var(--bg)',
         fontSize: '12px',
         fontWeight: 700
@@ -211,9 +209,7 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
             style={{
               padding: '12px',
               marginBottom: '12px',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              background: '#fef2f2'
+              border: '1px solid var(--border)', background: 'var(--error-dim)'
             }}
           >
             <div style={{
@@ -248,9 +244,7 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
                     minHeight: '80px',
                     padding: '8px',
                     fontSize: '11px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    marginBottom: '8px',
+                    border: '1px solid var(--border)', marginBottom: '8px',
                     fontFamily: 'inherit'
                   }}
                 />
@@ -262,12 +256,10 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
                       padding: '6px 16px',
                       fontSize: '11px',
                       fontWeight: 600,
-                      border: '1px solid #dc2626',
-                      background: '#dc2626',
+                      border: '1px solid var(--error)',
+                      background: 'var(--error)',
                       color: 'var(--bg)',
-                      cursor: processing.has(transfer.id) ? 'wait' : 'pointer',
-                      borderRadius: '4px',
-                      opacity: processing.has(transfer.id) || !disputeReason.trim() ? 0.5 : 1
+                      cursor: processing.has(transfer.id) ? 'wait' : 'pointer', opacity: processing.has(transfer.id) || !disputeReason.trim() ? 0.5 : 1
                     }}
                   >
                     {processing.has(transfer.id) ? 'Processing...' : 'DISPUTE TRANSFER'}
@@ -285,9 +277,7 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
                       border: '1px solid var(--border)',
                       background: 'var(--surface)',
                       color: 'var(--text-muted)',
-                      cursor: 'pointer',
-                      borderRadius: '4px'
-                    }}
+                      cursor: 'pointer'}}
                   >
                     CANCEL
                   </button>
@@ -302,12 +292,10 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
                     padding: '6px 16px',
                     fontSize: '11px',
                     fontWeight: 600,
-                    border: '1px solid #059669',
-                    background: '#059669',
+                    border: '1px solid var(--success)',
+                    background: 'var(--success)',
                     color: 'var(--bg)',
-                    cursor: processing.has(transfer.id) ? 'wait' : 'pointer',
-                    borderRadius: '4px',
-                    opacity: processing.has(transfer.id) ? 0.5 : 1
+                    cursor: processing.has(transfer.id) ? 'wait' : 'pointer', opacity: processing.has(transfer.id) ? 0.5 : 1
                   }}
                 >
                   {processing.has(transfer.id) ? 'Processing...' : 'APPROVE TRANSFER'}
@@ -320,12 +308,10 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
                     padding: '6px 16px',
                     fontSize: '11px',
                     fontWeight: 600,
-                    border: '1px solid #dc2626',
+                    border: '1px solid var(--error)',
                     background: 'var(--surface)',
-                    color: '#dc2626',
-                    cursor: processing.has(transfer.id) ? 'wait' : 'pointer',
-                    borderRadius: '4px',
-                    opacity: processing.has(transfer.id) ? 0.5 : 1
+                    color: 'var(--error)',
+                    cursor: processing.has(transfer.id) ? 'wait' : 'pointer', opacity: processing.has(transfer.id) ? 0.5 : 1
                   }}
                 >
                   DISPUTE / DENY
@@ -335,7 +321,7 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
 
             <div style={{
               fontSize: '9px',
-              color: '#dc2626',
+              color: 'var(--error)',
               marginTop: '8px',
               fontStyle: 'italic'
             }}>

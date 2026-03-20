@@ -103,7 +103,7 @@ const VehicleSaleSettings: React.FC<VehicleSaleSettingsProps> = ({
             <span className="text-small text-muted">Reserve</span>
             <input
               type="number"
-              className="text-xs border rounded px-2 py-1"
+              className="text-xs border px-2 py-1"
               placeholder="e.g. 25000"
               value={saleSettings.reserve}
               onChange={(e) => onSaleSettingsChange({

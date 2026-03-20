@@ -342,9 +342,7 @@ export default function ApiKeysPage() {
                         fontSize: '10px',
                         padding: '2px 8px',
                         background: 'rgba(76, 175, 80, 0.2)',
-                        color: 'var(--success, #4caf50)',
-                        borderRadius: '9999px',
-                      }}>
+                        color: 'var(--success, #4caf50)', }}>
                         Active
                       </span>
                     ) : (
@@ -352,9 +350,7 @@ export default function ApiKeysPage() {
                         fontSize: '10px',
                         padding: '2px 8px',
                         background: 'rgba(244, 67, 54, 0.2)',
-                        color: 'var(--error, #f44336)',
-                        borderRadius: '9999px',
-                      }}>
+                        color: 'var(--error, #f44336)', }}>
                         Revoked
                       </span>
                     )}

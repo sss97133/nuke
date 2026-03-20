@@ -61,9 +61,7 @@ export const ProfileSuccessStoriesTab: React.FC<ProfileSuccessStoriesTabProps> =
             style={{
               padding: 'var(--space-4)',
               background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-            }}
+              border: '1px solid var(--border)', }}
           >
             {/* Header */}
             <div style={{ marginBottom: 'var(--space-3)' }}>

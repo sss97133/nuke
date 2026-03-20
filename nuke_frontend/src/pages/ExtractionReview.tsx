@@ -113,7 +113,7 @@ const ExtractionReview: React.FC = () => {
         <div style={{
           background: 'var(--surface)',
           border: '1px solid var(--border)',
-          borderRadius: '4px',
+          borderRadius: 0,
           padding: '40px',
           textAlign: 'center'
         }}>
@@ -151,7 +151,7 @@ const ExtractionReview: React.FC = () => {
           <div style={{
             background: 'var(--surface)',
             border: '1px solid var(--border)',
-            borderRadius: '4px',
+            borderRadius: 0,
             padding: '16px'
           }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '12px' }}>
@@ -172,7 +172,7 @@ const ExtractionReview: React.FC = () => {
           <div style={{
             background: 'var(--surface)',
             border: '1px solid var(--border)',
-            borderRadius: '4px',
+            borderRadius: 0,
             padding: '16px',
             display: 'flex',
             flexDirection: 'column',
@@ -201,7 +201,7 @@ const ExtractionReview: React.FC = () => {
         <div style={{
           background: 'var(--surface)',
           border: '1px solid var(--border)',
-          borderRadius: '4px',
+          borderRadius: 0,
           padding: '16px'
         }}>
           <h3 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px' }}>
@@ -221,7 +221,7 @@ const ExtractionReview: React.FC = () => {
                     fontSize: '9px',
                     background: 'var(--bg)',
                     padding: '8px',
-                    borderRadius: '4px',
+                    borderRadius: 0,
                     overflow: 'auto'
                   }}>
                     {JSON.stringify(selectedExtraction.extracted_data.specifications.dimensions, null, 2)}
@@ -239,7 +239,7 @@ const ExtractionReview: React.FC = () => {
                     fontSize: '9px',
                     background: 'var(--bg)',
                     padding: '8px',
-                    borderRadius: '4px',
+                    borderRadius: 0,
                     overflow: 'auto',
                     maxHeight: '200px'
                   }}>
@@ -261,7 +261,7 @@ const ExtractionReview: React.FC = () => {
                   <div key={index} style={{
                     background: 'var(--bg)',
                     padding: '8px',
-                    borderRadius: '4px',
+                    borderRadius: 0,
                     fontSize: '9px'
                   }}>
                     <div style={{ fontWeight: 600 }}>{color.name}</div>
@@ -285,7 +285,7 @@ const ExtractionReview: React.FC = () => {
                 fontSize: '9px',
                 background: 'var(--bg)',
                 padding: '8px',
-                borderRadius: '4px',
+                borderRadius: 0,
                 overflow: 'auto',
                 maxHeight: '200px'
               }}>
@@ -304,7 +304,7 @@ const ExtractionReview: React.FC = () => {
                 fontSize: '9px',
                 background: 'var(--bg)',
                 padding: '8px',
-                borderRadius: '4px',
+                borderRadius: 0,
                 overflow: 'auto'
               }}>
                 {JSON.stringify(selectedExtraction.extracted_data.trim_levels, null, 2)}
@@ -321,7 +321,7 @@ const ExtractionReview: React.FC = () => {
               fontSize: '9px',
               background: 'var(--bg)',
               padding: '8px',
-              borderRadius: '4px',
+              borderRadius: 0,
               overflow: 'auto',
               maxHeight: '400px',
               marginTop: '8px'
@@ -350,7 +350,7 @@ const ExtractionReview: React.FC = () => {
             style={{
               background: 'var(--surface)',
               border: '1px solid var(--border)',
-              borderRadius: '4px',
+              borderRadius: 0,
               padding: '16px',
               cursor: 'pointer',
               transition: 'border-color 0.2s'
@@ -373,10 +373,10 @@ const ExtractionReview: React.FC = () => {
                 </div>
               </div>
               <div style={{
-                background: '#fef3c7',
+                background: 'var(--warning-dim)',
                 color: '#92400e',
                 padding: '4px 8px',
-                borderRadius: '12px',
+                borderRadius: 0,
                 fontSize: '9px',
                 fontWeight: 600
               }}>

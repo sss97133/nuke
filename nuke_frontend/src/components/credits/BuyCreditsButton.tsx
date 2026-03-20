@@ -126,9 +126,7 @@ const styles = {
   },
   modal: {
     background: 'var(--surface)',
-    border: '1px solid var(--border)',
-    borderRadius: '4px',
-    width: '90%',
+    border: '1px solid var(--border)', width: '90%',
     maxWidth: '400px',
     maxHeight: '80vh',
     overflow: 'auto'
@@ -173,9 +171,7 @@ const styles = {
   presetButton: {
     padding: '8px 6px',
     background: 'var(--bg)',
-    border: '1px solid var(--border)',
-    borderRadius: '3px',
-    cursor: 'pointer',
+    border: '1px solid var(--border)', cursor: 'pointer',
     fontSize: '10px',
     fontWeight: 500 as const,
     transition: 'border-color 0.1s',
@@ -205,19 +201,15 @@ const styles = {
     height: '32px',
     padding: '0 10px',
     background: 'var(--bg)',
-    border: '1px solid var(--border)',
-    borderRadius: '3px',
-    fontSize: '10px',
+    border: '1px solid var(--border)', fontSize: '10px',
     color: 'var(--text)'
   },
   buyButton: {
     height: '32px',
     padding: '0 12px',
     background: 'var(--accent)',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '3px',
-    fontSize: '10px',
+    color: 'var(--surface-elevated)',
+    border: 'none', fontSize: '10px',
     fontWeight: 500 as const,
     cursor: 'pointer'
   }

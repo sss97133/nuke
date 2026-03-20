@@ -187,7 +187,7 @@ export default function UnifiedScraperDashboard() {
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded text-red-700">
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700">
           Error: {error}
         </div>
       )}
@@ -197,14 +197,14 @@ export default function UnifiedScraperDashboard() {
         <button
           onClick={runCycle}
           disabled={running}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+          className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
         >
           {running ? 'Running...' : 'Run Cycle'}
         </button>
         <button
           onClick={loadCoordinationBrief}
           disabled={coordLoading}
-          className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+          className="px-4 py-2 bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
         >
           {coordLoading ? 'Generating brief…' : 'AI Brief'}
         </button>
@@ -218,20 +218,20 @@ export default function UnifiedScraperDashboard() {
         </label>
         <button
           onClick={loadStatus}
-          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+          className="px-4 py-2 bg-gray-200 hover:bg-gray-300"
         >
           Refresh Now
         </button>
       </div>
 
       {coordError && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded text-red-700">
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700">
           AI Brief Error: {coordError}
         </div>
       )}
 
       {coordBrief?.output && (
-        <div className="mb-8 p-4 bg-white border border-gray-200 rounded">
+        <div className="mb-8 p-4 bg-white border border-gray-200">
           <div className="flex items-baseline justify-between gap-4 mb-3">
             <h2 className="text-xl font-semibold">Extraction coordination brief</h2>
             <div className="text-xs text-gray-500">
@@ -255,7 +255,7 @@ export default function UnifiedScraperDashboard() {
               <div className="text-sm font-semibold mb-2">Do now</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {coordBrief.output.priorities_now.slice(0, 6).map((p: any, idx: number) => (
-                  <div key={idx} className="p-3 border border-gray-200 rounded bg-gray-50">
+                  <div key={idx} className="p-3 border border-gray-200 bg-gray-50">
                     <div className="font-semibold text-sm">{p?.title || 'Untitled'}</div>
                     {p?.why && <div className="text-xs text-gray-600 mt-1">{p.why}</div>}
                     {Array.isArray(p?.steps) && p.steps.length > 0 && (
@@ -276,7 +276,7 @@ export default function UnifiedScraperDashboard() {
               <div className="text-sm font-semibold mb-2">Next</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {coordBrief.output.priorities_next.slice(0, 4).map((p: any, idx: number) => (
-                  <div key={idx} className="p-3 border border-gray-200 rounded">
+                  <div key={idx} className="p-3 border border-gray-200">
                     <div className="font-semibold text-sm">{p?.title || 'Untitled'}</div>
                     {p?.why && <div className="text-xs text-gray-600 mt-1">{p.why}</div>}
                   </div>
@@ -302,28 +302,28 @@ export default function UnifiedScraperDashboard() {
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="p-4 bg-white rounded-lg shadow">
+            <div className="p-4 bg-white">
               <div className="text-sm text-gray-600">Total Sources</div>
               <div className="text-2xl font-bold">{status.sources.total}</div>
               <div className="text-xs text-gray-500 mt-1">
                 {status.sources.healthy} healthy, {status.sources.degraded} degraded, {status.sources.failing} failing
               </div>
             </div>
-            <div className="p-4 bg-white rounded-lg shadow">
+            <div className="p-4 bg-white">
               <div className="text-sm text-gray-600">Queue Pending</div>
               <div className="text-2xl font-bold">{status.queue.pending}</div>
               <div className="text-xs text-gray-500 mt-1">
                 {status.queue.processing} processing
               </div>
             </div>
-            <div className="p-4 bg-white rounded-lg shadow">
+            <div className="p-4 bg-white">
               <div className="text-sm text-gray-600">Vehicles Today</div>
               <div className="text-2xl font-bold">{status.database.vehicles_today}</div>
               <div className="text-xs text-gray-500 mt-1">
                 {status.database.total_vehicles.toLocaleString()} total
               </div>
             </div>
-            <div className="p-4 bg-white rounded-lg shadow">
+            <div className="p-4 bg-white">
               <div className="text-sm text-gray-600">Unmapped Sources</div>
               <div className="text-2xl font-bold text-red-600">{status.sources.unmapped}</div>
               <div className="text-xs text-gray-500 mt-1">
@@ -335,7 +335,7 @@ export default function UnifiedScraperDashboard() {
           {/* Sources Table */}
           <div className="mb-8">
             <h2 className="text-xl font-bold mb-4">Source Status</h2>
-            <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="bg-white overflow-hidden">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
@@ -355,7 +355,7 @@ export default function UnifiedScraperDashboard() {
                         <div className="text-xs text-gray-500">{source.scraper_function}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(source.status)}`}>
+                        <span className={`px-2 py-1  text-xs font-medium ${getStatusColor(source.status)}`}>
                           {source.status}
                         </span>
                       </td>
@@ -392,7 +392,7 @@ export default function UnifiedScraperDashboard() {
           {/* Recent Cycles */}
           <div>
             <h2 className="text-xl font-bold mb-4">Recent Cycles</h2>
-            <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="bg-white overflow-hidden">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
@@ -420,7 +420,7 @@ export default function UnifiedScraperDashboard() {
                         {cycle.vehicles_added}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        <span className={`px-2 py-1  text-xs font-medium ${
                           cycle.status === 'success' ? 'bg-green-100 text-green-700' :
                           cycle.status === 'partial' ? 'bg-yellow-100 text-yellow-700' :
                           'bg-red-100 text-red-700'

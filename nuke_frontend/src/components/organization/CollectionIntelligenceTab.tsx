@@ -78,13 +78,13 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
     );
   }
 
-  const demandColor = (intel.demand_score || 0) >= 70 ? '#22C55E'
-    : (intel.demand_score || 0) >= 40 ? '#F59E0B'
-    : '#EF4444';
+  const demandColor = (intel.demand_score || 0) >= 70 ? 'var(--success)'
+    : (intel.demand_score || 0) >= 40 ? 'var(--warning)'
+    : 'var(--error)';
 
-  const utilizationColor = (intel.capacity_utilization || 0) >= 80 ? '#EF4444'
-    : (intel.capacity_utilization || 0) >= 50 ? '#F59E0B'
-    : '#22C55E';
+  const utilizationColor = (intel.capacity_utilization || 0) >= 80 ? 'var(--error)'
+    : (intel.capacity_utilization || 0) >= 50 ? 'var(--warning)'
+    : 'var(--success)';
 
   const topMakes = Object.entries(intel.make_distribution || {})
     .sort((a, b) => b[1] - a[1])
@@ -153,8 +153,8 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
                   <div style={{ width: '100px', color: 'var(--text-muted)' }}>
                     {key.replace(/_/g, ' ')}
                   </div>
-                  <div style={{ flex: 1, height: '4px', background: 'var(--gray-100)', borderRadius: '2px', overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min(100, (value / 30) * 100)}%`, height: '100%', background: demandColor, borderRadius: '2px' }} />
+                  <div style={{ flex: 1, height: '4px', background: 'var(--gray-100)', overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.min(100, (value / 30) * 100)}%`, height: '100%', background: demandColor}} />
                   </div>
                   <div style={{ width: '24px', textAlign: 'right', fontWeight: 600 }}>{Math.round(value)}</div>
                 </div>
@@ -231,13 +231,11 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
             {topMakes.map(([make, count]) => (
               <div key={make} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ width: '80px', fontSize: '12px', fontWeight: 600, textAlign: 'right' }}>{make}</div>
-                <div style={{ flex: 1, height: '16px', background: 'var(--gray-100)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ flex: 1, height: '16px', background: 'var(--gray-100)', overflow: 'hidden' }}>
                   <div style={{
                     width: `${(count / maxMakeCount) * 100}%`,
                     height: '100%',
-                    background: 'var(--accent, #3B82F6)',
-                    borderRadius: '4px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '6px',
+                    background: 'var(--accent, #3B82F6)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '6px',
                     fontSize: '11px', color: '#fff', fontWeight: 600,
                   }}>
                     {count}
@@ -260,9 +258,7 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
               <div key={era} style={{
                 padding: '6px 12px',
                 background: 'var(--gray-50)',
-                border: '1px solid var(--border)',
-                borderRadius: '6px',
-                fontSize: '12px',
+                border: '1px solid var(--border)', fontSize: '12px',
               }}>
                 <span style={{ fontWeight: 600 }}>{era}</span>
                 <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>{count}</span>

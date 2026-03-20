@@ -1974,9 +1974,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   color: transferStatus.status === 'completed' ? 'var(--success)' :
                          transferStatus.status === 'stalled' ? 'var(--warning)' : 'var(--text-secondary)',
                   border: `1px solid ${transferStatus.status === 'completed' ? 'var(--success)' :
-                                        transferStatus.status === 'stalled' ? 'var(--warning)' : 'var(--border)'}`,
-                  borderRadius: 0,
-                  padding: '2px 5px',
+                                        transferStatus.status === 'stalled' ? 'var(--warning)' : 'var(--border)'}`, padding: '2px 5px',
                 }}
                 title={[
                   `Transfer: ${transferStatus.status}`,
@@ -2063,9 +2061,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       background: 'var(--bg)',
                       border: '2px solid var(--border)',
                       padding: '10px 12px',
-                      width: '280px',
-                      boxShadow: '0 4px 12px var(--shadow)',
-                      marginTop: '4px',
+                      width: '280px', marginTop: '4px',
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -2113,9 +2109,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       title={headerSeller.title}
                       style={showCompact ? {
                         width: 18,
-                        height: 18,
-                        borderRadius: 0,
-                        border: '1px solid var(--border)',
+                        height: 18, border: '1px solid var(--border)',
                         background: 'var(--surface)',
                         padding: 0,
                         margin: 0,
@@ -2133,9 +2127,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 4,
-                        padding: '2px 6px',
-                        borderRadius: 0,
-                        background: 'var(--surface)',
+                        padding: '2px 6px', background: 'var(--surface)',
                         border: '1px solid var(--border)',
                         color: baseTextColor,
                         lineHeight: 1,
@@ -2224,9 +2216,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 4,
-                      padding: '2px 6px',
-                      borderRadius: 0,
-                      background: 'var(--surface)',
+                      padding: '2px 6px', background: 'var(--surface)',
                       border: '1px solid var(--border)',
                       color: baseTextColor,
                       lineHeight: 1,
@@ -2279,9 +2269,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: 4,
-                              padding: '2px 6px',
-                              borderRadius: 0,
-                              background: 'var(--surface)',
+                              padding: '2px 6px', background: 'var(--surface)',
                               border: '1px solid var(--border)',
                               color: baseTextColor,
                               lineHeight: 1,
@@ -2306,9 +2294,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: 4,
-                              padding: '2px 6px',
-                              borderRadius: 0,
-                              background: 'var(--surface)',
+                              padding: '2px 6px', background: 'var(--surface)',
                               border: '1px solid var(--border)',
                               color: baseTextColor,
                               lineHeight: 1,
@@ -2343,9 +2329,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       title={`${headerAuctionHouse.label} — Click for details`}
                       style={{
                         width: 18,
-                        height: 18,
-                        borderRadius: 0,
-                        border: '1px solid var(--border)',
+                        height: 18, border: '1px solid var(--border)',
                         background: 'var(--surface)',
                         padding: 0,
                         margin: 0,
@@ -2482,9 +2466,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: 4,
-                          padding: '2px 6px',
-                          borderRadius: 0,
-                          background:
+                          padding: '2px 6px', background:
                             headerBuyer.tone === 'success'
                               ? 'var(--success-bg)'
                               : headerBuyer.tone === 'muted'
@@ -2519,9 +2501,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 4,
-                        padding: '2px 6px',
-                        borderRadius: 0,
-                        background:
+                        padding: '2px 6px', background:
                           headerBuyer.tone === 'success'
                             ? 'var(--success-bg)'
                             : headerBuyer.tone === 'muted'
@@ -2560,9 +2540,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 4,
-                      padding: '2px 6px',
-                      borderRadius: 0,
-                      background: 'var(--surface)',
+                      padding: '2px 6px', background: 'var(--surface)',
                       border: '1px solid var(--border)',
                       color: baseTextColor,
                       lineHeight: 1,
@@ -2572,9 +2550,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       className={headerCountdown.isLive ? 'auction-live-dot' : undefined}
                       style={{
                         width: 6,
-                        height: 6,
-                        borderRadius: 0,
-                        background: headerCountdown.isLive ? 'var(--error)' : 'var(--text-disabled)',
+                        height: 6, background: headerCountdown.isLive ? 'var(--error)' : 'var(--text-disabled)',
                         display: 'inline-block',
                         flexShrink: 0,
                       }}
@@ -2609,9 +2585,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   padding: '2px 6px',
-                  color: baseTextColor,
-                  borderRadius: 0,
-                  lineHeight: 1,
+                  color: baseTextColor, lineHeight: 1,
                 }}
                 title={`Location: ${locationDisplay.full || locationDisplay.short}`}
               >
@@ -2629,9 +2603,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     background: 'var(--bg)',
                     border: '2px solid var(--primary)',
                     padding: '12px',
-                    width: '260px',
-                    boxShadow: '0 4px 12px var(--shadow)',
-                    marginTop: '4px',
+                    width: '260px', marginTop: '4px',
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -2778,9 +2750,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     background: 'var(--bg)',
                     border: '2px solid var(--primary)',
                     padding: '12px',
-                    width: '320px',
-                    boxShadow: '0 4px 12px var(--shadow)',
-                    marginTop: '4px',
+                    width: '320px', marginTop: '4px',
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -2983,9 +2953,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     background: 'var(--bg)',
                     border: '2px solid var(--primary)',
                     padding: '12px',
-                    width: '280px',
-                    boxShadow: '0 4px 12px var(--shadow)',
-                    marginTop: '4px',
+                    width: '280px', marginTop: '4px',
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -3141,9 +3109,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   title={`Seller: @${(sellerBadge as any)?.handle || sellerBadge.label} - Click to claim identity`}
                   style={{
                     width: 18,
-                    height: 18,
-                    borderRadius: 0,
-                    border: '1px solid var(--border)',
+                    height: 18, border: '1px solid var(--border)',
                     background: 'var(--surface)',
                     padding: 0,
                     margin: 0,
@@ -3229,9 +3195,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         title="Bring a Trailer - Click to view listing"
                         style={{
                           width: 18,
-                          height: 18,
-                          borderRadius: 0,
-                          border: '1px solid var(--border)',
+                          height: 18, border: '1px solid var(--border)',
                           background: 'var(--surface)',
                           padding: 0,
                           margin: 0,
@@ -3263,9 +3227,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         title={`${auctionPulse.platform} - Click to view listing`}
                         style={{
                           width: 18,
-                          height: 18,
-                          borderRadius: 0,
-                          border: '1px solid var(--border)',
+                          height: 18, border: '1px solid var(--border)',
                           background: 'var(--surface)',
                           padding: 0,
                           margin: 0,
@@ -3311,9 +3273,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         title={sellerOrg ? `${sellerOrg.business_name} (${formatRelationship(sellerOrg.relationship_type)}) - Click to view details` : `Seller: @${batIdentityHref.seller.handle} - Click to claim identity`}
                         style={{
                           width: 18,
-                          height: 18,
-                          borderRadius: 0,
-                          border: '1px solid var(--border)',
+                          height: 18, border: '1px solid var(--border)',
                           background: 'var(--surface)',
                           color: 'var(--text)',
                           fontSize: '9px',
@@ -3369,9 +3329,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     className={isAuctionLive ? 'auction-live-dot' : undefined}
                     style={{
                       width: 6,
-                      height: 6,
-                      borderRadius: 0,
-                      background: isAuctionLive ? 'var(--error)' : 'var(--text-disabled)',
+                      height: 6, background: isAuctionLive ? 'var(--error)' : 'var(--text-disabled)',
                       display: 'inline-block',
                       flexShrink: 0
                     }}
@@ -3468,9 +3426,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   background: 'var(--success-bg)',
                   color: 'var(--success)',
                   fontWeight: 600,
-                  padding: '1px 8px',
-                  borderRadius: 0,
-                  cursor: 'pointer',
+                  padding: '1px 8px', cursor: 'pointer',
                   fontSize: '11px'
                 }}
               >
@@ -3490,9 +3446,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     background: 'var(--warning-bg)',
                     color: 'var(--warning)',
                     fontWeight: 600,
-                    padding: '1px 8px',
-                    borderRadius: 0,
-                    cursor: 'pointer',
+                    padding: '1px 8px', cursor: 'pointer',
                     fontSize: '11px'
                   }}
                 >
@@ -3505,10 +3459,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       top: '130%',
                       left: 0,
                       background: 'var(--surface)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 0,
-                      boxShadow: '0 8px 20px var(--shadow)',
-                      padding: 12,
+                      border: '1px solid var(--border)', padding: 12,
                       width: 320,
                       zIndex: 950,
                       maxHeight: '400px',
@@ -3566,9 +3517,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                               key={similar.id}
                               style={{
                                 background: 'var(--warning-bg)',
-                                border: '1px solid var(--warning)',
-                                borderRadius: 0,
-                                padding: '8px',
+                                border: '1px solid var(--warning)', padding: '8px',
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
@@ -3589,9 +3538,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                                     background: 'transparent',
                                     border: '1px solid var(--border)',
                                     color: 'var(--text)',
-                                    padding: '4px 8px',
-                                    borderRadius: 0,
-                                    fontSize: '9px',
+                                    padding: '4px 8px', fontSize: '9px',
                                     cursor: 'pointer',
                                   }}
                                 >
@@ -3619,9 +3566,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                                       background: 'var(--warning)',
                                       border: '1px solid var(--warning)',
                                       color: 'var(--bg)',
-                                      padding: '4px 8px',
-                                      borderRadius: 0,
-                                      fontSize: '9px',
+                                      padding: '4px 8px', fontSize: '9px',
                                       cursor: 'pointer',
                                       fontWeight: 600,
                                     }}
@@ -3689,9 +3634,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                             fontWeight: 700,
                             padding: '4px 8px',
                             cursor: 'pointer',
-                            fontSize: '11px',
-                            borderRadius: 0,
-                            transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+                            fontSize: '11px', transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                             textDecoration: 'none',
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -3767,9 +3710,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           fontWeight: 700,
                           padding: '4px 8px',
                           cursor: 'pointer',
-                          fontSize: '11px',
-                          borderRadius: 0,
-                          transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+                          fontSize: '11px', transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                           textDecoration: 'none',
                           display: 'inline-flex',
                           alignItems: 'center'
@@ -3837,9 +3778,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         fontWeight: 700,
                         padding: '4px 8px',
                         cursor: 'pointer',
-                        fontSize: '11px',
-                        borderRadius: 0,
-                        transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+                        fontSize: '11px', transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                         textDecoration: 'none',
                         display: 'inline-flex',
                         alignItems: 'center'
@@ -3940,9 +3879,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     background: 'var(--surface)',
                     color: 'var(--primary)',
                     fontWeight: 600,
-                    padding: '2px 8px',
-                    borderRadius: 0,
-                    cursor: 'pointer',
+                    padding: '2px 8px', cursor: 'pointer',
                     fontSize: '11px',
                     textDecoration: 'none',
                     display: 'inline-flex',
@@ -3961,10 +3898,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   top: '130%',
                   left: 0,
                   background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 0,
-                  boxShadow: '0 8px 20px var(--shadow)',
-                  padding: 12,
+                  border: '1px solid var(--border)', padding: 12,
                   width: 260,
                   zIndex: 950
                 }}
@@ -3972,7 +3906,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               >
                 <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
                   {ownerProfile.avatar_url && (
-                    <img src={ownerProfile.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: 0, border: '1px solid var(--border)' }} />
+                    <img src={ownerProfile.avatar_url} alt="" style={{ width: 36, height: 36, border: '1px solid var(--border)' }} />
                   )}
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: '9px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
@@ -4174,9 +4108,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 fontWeight: 700,
                 padding: '4px 8px',
                 cursor: 'pointer',
-                fontSize: '11px',
-                borderRadius: 0,
-                textDecoration: 'none',
+                fontSize: '11px', textDecoration: 'none',
                 display: 'inline-flex',
                 alignItems: 'center',
                 ...(auctionPulseMs ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : {}),
@@ -4343,9 +4275,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   fontFamily: 'Arial, Helvetica, sans-serif',
                   color: auctionContext.badge.color,
                   background: auctionContext.badge.bg,
-                  padding: '2px 6px',
-                  borderRadius: 0,
-                  letterSpacing: '0.1em',
+                  padding: '2px 6px', letterSpacing: '0.1em',
                   textTransform: 'uppercase' as const,
                   lineHeight: 1,
                   whiteSpace: 'nowrap',
@@ -4365,9 +4295,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     fontFamily: 'Arial, Helvetica, sans-serif',
                     color: 'var(--success)',
                     background: 'var(--success-bg)',
-                    padding: '2px 6px',
-                    borderRadius: 0,
-                    letterSpacing: '0.1em',
+                    padding: '2px 6px', letterSpacing: '0.1em',
                     textTransform: 'uppercase' as const,
                     lineHeight: 1,
                     cursor: 'pointer',
@@ -4395,9 +4323,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     fontFamily: 'Arial, Helvetica, sans-serif',
                     color: 'var(--text-secondary)',
                     background: 'var(--info-bg)',
-                    padding: '2px 6px',
-                    borderRadius: 0,
-                    letterSpacing: '0.1em',
+                    padding: '2px 6px', letterSpacing: '0.1em',
                     textTransform: 'uppercase' as const,
                     lineHeight: 1,
                     whiteSpace: 'nowrap'
@@ -4418,10 +4344,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 right: 0,
                 marginTop: 8,
                 background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 0,
-                boxShadow: '0 12px 24px var(--shadow)',
-                padding: 12,
+                border: '1px solid var(--border)', padding: 12,
                 fontSize: '11px',
                 color: baseTextColor,
                 width: '280px',
@@ -4526,9 +4449,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       fontWeight: 700,
                       background: 'var(--accent)',
                       color: 'var(--white)',
-                      border: 'none',
-                      borderRadius: 0,
-                      cursor: 'pointer',
+                      border: 'none', cursor: 'pointer',
                       textAlign: 'center'
                     }}
                   >
@@ -4672,9 +4593,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   aria-label="Jump to vehicle photos"
                   style={{
                     width: 34,
-                    height: 34,
-                    borderRadius: 0,
-                    border: '1px solid var(--border)',
+                    height: 34, border: '1px solid var(--border)',
                     background: 'var(--bg)',
                     padding: 0,
                     overflow: 'hidden',
@@ -4697,9 +4616,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       className={isAuctionLive ? 'auction-live-dot' : undefined}
                       style={{
                         width: 6,
-                        height: 6,
-                        borderRadius: 0,
-                        background: isAuctionLive ? 'var(--error)' : 'var(--text-disabled)',
+                        height: 6, background: isAuctionLive ? 'var(--error)' : 'var(--text-disabled)',
                         display: 'inline-block',
                         flexShrink: 0,
                       }}
@@ -4723,9 +4640,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     <span
                       style={{
                         width: 6,
-                        height: 6,
-                        borderRadius: 0,
-                        background: 'var(--error)',
+                        height: 6, background: 'var(--error)',
                         display: 'inline-block',
                         flexShrink: 0,
                       }}
@@ -4794,9 +4709,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   <span
                     style={{
                       width: 6,
-                      height: 6,
-                      borderRadius: 0,
-                      background: 'var(--error)',
+                      height: 6, background: 'var(--error)',
                       display: 'inline-block',
                       flexShrink: 0,
                     }}

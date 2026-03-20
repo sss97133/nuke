@@ -133,9 +133,7 @@ const LazyImage: React.FC<LazyImageProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'var(--bg)',
-            borderRadius: 'inherit'
-          }}
+            backgroundColor: 'var(--bg)'}}
         >
           {/* Shimmer effect */}
           <div
@@ -146,10 +144,8 @@ const LazyImage: React.FC<LazyImageProps> = ({
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-              animation: 'shimmer 1.5s infinite',
-              borderRadius: 'inherit'
-            }}
+              background: 'var(--surface-hover)',
+              animation: 'shimmer 1.5s infinite'}}
           />
           {/* Loading icon */}
           <svg
@@ -179,9 +175,7 @@ const LazyImage: React.FC<LazyImageProps> = ({
             height: '100%',
             objectFit: 'contain',
             opacity: loaded ? 1 : 0,
-            transition: 'opacity 0.3s ease-in-out',
-            borderRadius: 'inherit',
-            cursor: onClick ? 'pointer' : 'default'
+            transition: 'opacity 0.3s ease-in-out', cursor: onClick ? 'pointer' : 'default'
           }}
         />
       )}

@@ -171,9 +171,7 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
                 fontWeight: 600,
                 border: '1px solid var(--accent)',
                 background: 'var(--accent)',
-                color: 'var(--bg)',
-                borderRadius: '4px',
-                cursor: 'pointer',
+                color: 'var(--bg)', cursor: 'pointer',
                 transition: 'all 0.12s ease',
                 whiteSpace: 'nowrap'
               }}
@@ -194,7 +192,7 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
               <Link
                 key={org.id}
                 to={`/org/${org.organization_id}`}
-                className="block p-3 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all"
+                className="block p-3 border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all"
               >
                 <div className="flex items-start gap-3">
                   {/* Logo or Icon */}
@@ -203,10 +201,10 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
                       <img
                         src={org.logo_url}
                         alt={org.business_name}
-                        className="w-12 h-12 rounded-lg object-cover"
+                        className="w-12 h-12 object-cover"
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center">
+                      <div className="w-12 h-12 bg-gray-100 flex items-center justify-center">
                         <Icon className="w-6 h-6 text-gray-400" />
                       </div>
                     )}
@@ -219,7 +217,7 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
                         {org.business_name}
                       </h4>
                       {org.auto_tagged && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                        <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800">
                           Auto-linked
                         </span>
                       )}
@@ -258,7 +256,7 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
         </div>
 
         {organizations.some(o => o.auto_tagged) && (
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 text-sm text-blue-900">
             <div className="font-medium">Auto-linked from GPS data</div>
             <div className="mt-1 text-blue-700">
               Organizations were automatically detected from image location data and receipt information.

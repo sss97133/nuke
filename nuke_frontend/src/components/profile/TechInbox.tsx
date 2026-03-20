@@ -616,9 +616,7 @@ export default function TechInbox({ technicianId }: TechInboxProps) {
                       cursor: 'pointer',
                       border: selectedItems.has(`img-${img.id}`)
                         ? '3px solid var(--primary)'
-                        : '1px solid var(--border)',
-                      borderRadius: '4px',
-                      overflow: 'hidden',
+                        : '1px solid var(--border)', overflow: 'hidden',
                       background: selectedItems.has(`img-${img.id}`) ? 'var(--primary-bg)' : 'var(--surface)'
                     }}
                   >
@@ -651,9 +649,7 @@ export default function TechInbox({ technicianId }: TechInboxProps) {
                             right: '4px',
                             background: 'var(--black)',
                             color: 'var(--white)',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            fontSize: '8px'
+                            padding: '2px 6px', fontSize: '8px'
                           }}>
                             {img.category}
                           </div>
@@ -667,9 +663,7 @@ export default function TechInbox({ technicianId }: TechInboxProps) {
                             right: '4px',
                             background: 'rgba(0,0,0,0.8)',
                             color: 'var(--white)',
-                            padding: '4px',
-                            borderRadius: '4px',
-                            fontSize: '8px'
+                            padding: '4px', fontSize: '8px'
                           }}>
                             🤖 AI: {Math.round(img.ai_confidence * 100)}%
                           </div>
@@ -680,7 +674,7 @@ export default function TechInbox({ technicianId }: TechInboxProps) {
                         <img
                           src={img.image_url}
                           alt={img.caption || 'Vehicle photo'}
-                          style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '4px' }}
+                          style={{ width: '60px', height: '60px', objectFit: 'cover'}}
                         />
                         <div style={{ flex: 1 }}>
                           <div className="text-small">{img.caption || '(no caption)'}</div>
@@ -690,9 +684,7 @@ export default function TechInbox({ technicianId }: TechInboxProps) {
                           {img.category && (
                             <span className="text-small" style={{
                               background: 'var(--surface-hover)',
-                              padding: '2px 6px',
-                              borderRadius: '4px'
-                            }}>
+                              padding: '2px 6px'}}>
                               {img.category}
                             </span>
                           )}
@@ -708,9 +700,7 @@ export default function TechInbox({ technicianId }: TechInboxProps) {
                         left: '4px',
                         width: '20px',
                         height: '20px',
-                        background: 'var(--primary)',
-                        borderRadius: '50%',
-                        display: 'flex',
+                        background: 'var(--primary)', display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: 'var(--bg)',
@@ -735,9 +725,7 @@ export default function TechInbox({ technicianId }: TechInboxProps) {
                       padding: 'var(--space-2)',
                       border: selectedItems.has(`note-${note.id}`)
                         ? '2px solid var(--primary)'
-                        : '1px solid var(--border)',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
+                        : '1px solid var(--border)', cursor: 'pointer',
                       background: selectedItems.has(`note-${note.id}`) ? 'var(--primary-bg)' : 'var(--surface)',
                       display: 'flex',
                       alignItems: 'flex-start',

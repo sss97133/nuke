@@ -75,9 +75,7 @@ function TriageToast({ message, variant }: { message: string; variant: 'success'
         letterSpacing: '0.5px',
         color: variant === 'success' ? 'var(--success, #16825d)' : 'var(--warning, #b05a00)',
         backgroundColor: 'var(--surface, #ebebeb)',
-        border: `2px solid ${variant === 'success' ? 'var(--success, #16825d)' : 'var(--warning, #b05a00)'}`,
-        borderRadius: 0,
-        opacity,
+        border: `2px solid ${variant === 'success' ? 'var(--success, #16825d)' : 'var(--warning, #b05a00)'}`, opacity,
         transition: 'opacity 180ms ease',
         pointerEvents: 'none',
       }}
@@ -131,9 +129,7 @@ function DropTarget({
       style={{
         width: 100,
         height: 72,
-        border: `2px solid ${borderColor}`,
-        borderRadius: 0,
-        backgroundColor: bgColor,
+        border: `2px solid ${borderColor}`, backgroundColor: bgColor,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',

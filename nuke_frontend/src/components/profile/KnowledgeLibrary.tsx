@@ -162,9 +162,7 @@ const KnowledgeLibrary: React.FC<KnowledgeLibraryProps> = ({ userId, isOwnProfil
             <div
               style={{
                 background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '16px',
+                border: '1px solid var(--border)', padding: '16px',
                 marginBottom: 'var(--space-3)'
               }}
             >
@@ -274,9 +272,7 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ document, isOwnProfile, onD
     <div
       style={{
         padding: 'var(--space-3)',
-        border: '1px solid var(--border)',
-        borderRadius: '4px',
-        background: 'var(--white)'
+        border: '1px solid var(--border)', background: 'var(--white)'
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-2)' }}>
@@ -289,9 +285,7 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ document, isOwnProfile, onD
                 padding: '2px 6px',
                 background: 'var(--success-dim)',
                 color: 'var(--success)',
-                fontSize: '9px',
-                borderRadius: '2px'
-              }}>
+                fontSize: '9px'}}>
                 PUBLIC
               </span>
             )}
@@ -301,9 +295,7 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ document, isOwnProfile, onD
                 padding: '2px 6px',
                 background: 'var(--primary-dim)',
                 color: 'var(--primary)',
-                fontSize: '9px',
-                borderRadius: '2px'
-              }}>
+                fontSize: '9px'}}>
                 FACTORY
               </span>
             )}
@@ -329,9 +321,7 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ document, isOwnProfile, onD
                   style={{
                     padding: '2px 6px',
                     background: 'var(--grey-200)',
-                    fontSize: '9px',
-                    borderRadius: '2px'
-                  }}
+                    fontSize: '9px'}}
                 >
                   {tag}
                 </span>
@@ -407,9 +397,7 @@ const DocumentUploadForm: React.FC<DocumentUploadFormProps> = ({ onUpload, onCan
   return (
     <div style={{
       padding: 'var(--space-3)',
-      border: '1px solid var(--border)',
-      borderRadius: '4px',
-      marginBottom: 'var(--space-3)',
+      border: '1px solid var(--border)', marginBottom: 'var(--space-3)',
       background: 'var(--grey-50)'
     }}>
       <div className="text font-bold" style={{ marginBottom: 'var(--space-2)' }}>

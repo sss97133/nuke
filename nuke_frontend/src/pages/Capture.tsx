@@ -185,7 +185,7 @@ const Capture: React.FC = () => {
 
           {cameraOpen ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+              <div style={{ border: '1px solid var(--border)', overflow: 'hidden' }}>
                 <video ref={videoRef} playsInline muted style={{ width: '100%', height: 'auto', display: 'block' }} />
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -209,7 +209,7 @@ const Capture: React.FC = () => {
                   <img
                     src={c.preview}
                     alt=""
-                    style={{ width: 78, height: 78, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }}
+                    style={{ width: 78, height: 78, objectFit: 'cover', border: '1px solid var(--border)' }}
                   />
                   <button
                     type="button"
@@ -219,9 +219,7 @@ const Capture: React.FC = () => {
                       top: 4,
                       right: 4,
                       fontSize: '11px',
-                      padding: '2px 6px',
-                      borderRadius: 999,
-                    }}
+                      padding: '2px 6px', }}
                     onClick={() => {
                       setCaptured((prev) => {
                         const next = [...prev];

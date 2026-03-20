@@ -38,7 +38,7 @@ interface ImageLocationMapProps {
 // Small dot marker — minimal footprint, data-point aesthetic
 const IMAGE_DOT = L.divIcon({
   className: '',
-  html: `<div style="background:#3B82F6;width:5px;height:5px;border-radius:50%;border:1px solid rgba(255,255,255,.7);box-shadow:0 0 3px rgba(59,130,246,.6)"></div>`,
+  html: `<div style="background:var(--info);width:5px;height:5px;border-radius:50%;border:1px solid rgba(255,255,255,.7);box-shadow:0 0 3px rgba(59,130,246,.6)"></div>`,
   iconSize: [5, 5],
   iconAnchor: [2.5, 2.5],
   popupAnchor: [0, -3],
@@ -216,9 +216,7 @@ const ImageLocationMap: React.FC<ImageLocationMapProps> = ({
                       fontSize: '10px',
                       background: '#1a1a2e',
                       color: '#ccc',
-                      padding: 0,
-                      borderRadius: 0,
-                    }}
+                      padding: 0, }}
                   >
                     {thumb && (
                       <img

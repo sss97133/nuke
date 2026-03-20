@@ -525,7 +525,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
         {/* Access Request Onboarding Questionnaire */}
         {showAccessRequest && session?.user && ReactDOM.createPortal(
           <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'var(--overlay)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div className="modal" style={{ background: 'var(--surface)', width: '640px', maxWidth: '95vw', maxHeight: '90vh', overflow: 'auto', border: '1px solid var(--border)', borderRadius: '4px' }}>
+            <div className="modal" style={{ background: 'var(--surface)', width: '640px', maxWidth: '95vw', maxHeight: '90vh', overflow: 'auto', border: '1px solid var(--border)'}}>
               <div className="modal-header">
                 <div className="modal-title">Request Vehicle Access</div>
               </div>
@@ -646,7 +646,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
         {/* Simple Ownership Claim Form */}
         {showOwnershipForm && session?.user && ReactDOM.createPortal(
           <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'var(--overlay)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div className="modal" style={{ background: 'var(--surface)', width: '640px', maxWidth: '95vw', maxHeight: '90vh', overflow: 'auto', border: '1px solid var(--border)', borderRadius: '4px' }}>
+            <div className="modal" style={{ background: 'var(--surface)', width: '640px', maxWidth: '95vw', maxHeight: '90vh', overflow: 'auto', border: '1px solid var(--border)'}}>
               <div className="modal-header">
                 <div className="modal-title">Claim Ownership</div>
               </div>
@@ -656,9 +656,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                   marginBottom: '16px',
                   padding: '12px',
                   backgroundColor: 'var(--grey-100)',
-                  border: '2px solid var(--accent)',
-                  borderRadius: '4px',
-                  fontSize: '12px'
+                  border: '2px solid var(--accent)', fontSize: '12px'
                 }}>
                   <div style={{ fontWeight: 700, marginBottom: '6px', color: 'var(--text)' }}>
                     Also claim your Bring a Trailer profile?
@@ -676,9 +674,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                         padding: '6px 12px',
                         backgroundColor: 'var(--accent)',
                         color: 'var(--bg)',
-                        textDecoration: 'none',
-                        borderRadius: '3px',
-                        fontSize: '11px',
+                        textDecoration: 'none', fontSize: '11px',
                         fontWeight: 700,
                         border: 'none',
                         cursor: 'pointer',
@@ -700,9 +696,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                         color: 'var(--text-secondary)',
                         textDecoration: 'underline',
                         fontSize: '11px',
-                        border: '1px solid var(--border)',
-                        borderRadius: '3px',
-                        cursor: 'pointer',
+                        border: '1px solid var(--border)', cursor: 'pointer',
                         display: 'inline-block'
                       }}
                       onClick={(e) => {
@@ -976,7 +970,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
               }}>
 
                 {(claimUploading || claimSuccessMessage) && (
-                  <div style={{ marginBottom: '12px', padding: '10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg-secondary)' }}>
+                  <div style={{ marginBottom: '12px', padding: '10px', border: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
                     <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '6px' }}>
                       {claimSuccessMessage ? 'Submitted' : 'Uploading'}
                     </div>
@@ -984,7 +978,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                       {claimSuccessMessage || claimStep || 'Working…'}
                     </div>
                     {!claimSuccessMessage && (
-                      <div style={{ height: '10px', border: '1px solid var(--border)', borderRadius: '3px', background: 'var(--white)', overflow: 'hidden' }}>
+                      <div style={{ height: '10px', border: '1px solid var(--border)', background: 'var(--white)', overflow: 'hidden' }}>
                         <div style={{ height: '100%', width: `${Math.max(0, Math.min(100, claimProgress))}%`, background: 'var(--accent)', transition: 'width 0.18s ease' }} />
                       </div>
                     )}
@@ -1068,7 +1062,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
         {/* Role Management Interface Modal */}
         {showManagement && ReactDOM.createPortal(
           <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'var(--overlay)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div className="modal modal-large" style={{ background: 'var(--surface)', width: '860px', maxWidth: '98vw', maxHeight: '92vh', overflow: 'auto', border: '1px solid var(--border)', borderRadius: '4px' }}>
+            <div className="modal modal-large" style={{ background: 'var(--surface)', width: '860px', maxWidth: '98vw', maxHeight: '92vh', overflow: 'auto', border: '1px solid var(--border)'}}>
               <div className="modal-header">
                 <div className="modal-title">Manage Contributors</div>
                 <button
@@ -1096,7 +1090,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
         {/* Moderator Assignment Wizard */}
         {showModeratorWizard && ReactDOM.createPortal(
           <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'var(--overlay)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div className="modal" style={{ background: 'var(--surface)', width: '520px', maxWidth: '95vw', maxHeight: '90vh', overflow: 'auto', border: '1px solid var(--border)', borderRadius: '4px' }}>
+            <div className="modal" style={{ background: 'var(--surface)', width: '520px', maxWidth: '95vw', maxHeight: '90vh', overflow: 'auto', border: '1px solid var(--border)'}}>
               <div className="modal-header">
                 <div className="modal-title">Assign Moderator</div>
                 <button

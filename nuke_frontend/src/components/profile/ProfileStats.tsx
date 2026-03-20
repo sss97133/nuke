@@ -60,9 +60,7 @@ const ProfileStats: React.FC<ProfileStatsProps> = ({ stats, isOwnProfile }) => {
             <div 
               key={index}
               style={{
-                padding: 'var(--space-3)',
-                borderRadius: '4px',
-                background: 'var(--surface)',
+                padding: 'var(--space-3)', background: 'var(--surface)',
                 border: '1px solid var(--border)',
                 textAlign: 'center'
               }}

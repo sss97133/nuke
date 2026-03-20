@@ -59,12 +59,12 @@ export const CommittedBidStack: React.FC<CommittedBidStackProps> = ({
 
   if (loading) {
     return (
-      <div className="bg-gray-900 rounded-lg p-4">
+      <div className="bg-gray-900 p-4">
         <div className="animate-pulse space-y-3">
-          <div className="h-4 bg-gray-700 rounded w-1/2"></div>
-          <div className="h-8 bg-gray-700 rounded"></div>
-          <div className="h-8 bg-gray-700 rounded"></div>
-          <div className="h-8 bg-gray-700 rounded"></div>
+          <div className="h-4 bg-gray-700 w-1/2"></div>
+          <div className="h-8 bg-gray-700"></div>
+          <div className="h-8 bg-gray-700"></div>
+          <div className="h-8 bg-gray-700"></div>
         </div>
       </div>
     );
@@ -73,7 +73,7 @@ export const CommittedBidStack: React.FC<CommittedBidStackProps> = ({
   const { bid_count, total_committed, high_bid, reserve_met, bids } = bidStack;
 
   return (
-    <div className="bg-gray-900 rounded-lg overflow-hidden">
+    <div className="bg-gray-900 overflow-hidden">
       {/* Header Summary */}
       <div className="bg-gray-800 px-4 py-3 border-b border-gray-700">
         <div className="flex items-center justify-between">
@@ -86,7 +86,7 @@ export const CommittedBidStack: React.FC<CommittedBidStackProps> = ({
         {bid_count > 0 && (
           <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
             <div
-              className="p-2 rounded-md"
+              className="p-2"
               style={{
                 background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -96,7 +96,7 @@ export const CommittedBidStack: React.FC<CommittedBidStackProps> = ({
               <p className="text-white font-medium">{formatCurrency(total_committed)}</p>
             </div>
             <div
-              className="p-2 rounded-md"
+              className="p-2"
               style={{
                 background: 'rgba(16, 185, 129, 0.08)',
                 border: '1px solid rgba(16, 185, 129, 0.2)',
@@ -114,7 +114,7 @@ export const CommittedBidStack: React.FC<CommittedBidStackProps> = ({
         {reservePrice && (
           <div className="mt-2 flex items-center gap-2">
             <span
-              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+              className={`inline-flex items-center px-2 py-0.5  text-xs font-medium ${
                 reserve_met
                   ? 'bg-green-900/50 text-green-400 border border-green-700'
                   : 'bg-yellow-900/50 text-yellow-400 border border-yellow-700'
@@ -137,7 +137,7 @@ export const CommittedBidStack: React.FC<CommittedBidStackProps> = ({
             {onPlaceBid && (
               <button
                 onClick={onPlaceBid}
-                className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
               >
                 Place First Bid
               </button>
@@ -158,7 +158,7 @@ export const CommittedBidStack: React.FC<CommittedBidStackProps> = ({
                 <div className="flex items-center gap-3">
                   {/* Rank Badge */}
                   <div
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                    className={`w-6 h-6  flex items-center justify-center text-xs font-bold ${
                       isHighBid
                         ? 'bg-green-600 text-white'
                         : 'bg-gray-700 text-gray-300'
@@ -202,7 +202,7 @@ export const CommittedBidStack: React.FC<CommittedBidStackProps> = ({
         <div className="px-4 py-3 bg-gray-800 border-t border-gray-700">
           <button
             onClick={onPlaceBid}
-            className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+            className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
           >
             {userBidId ? 'Update Your Bid' : 'Place a Bid'}
           </button>

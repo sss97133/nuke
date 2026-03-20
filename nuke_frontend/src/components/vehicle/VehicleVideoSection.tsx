@@ -106,9 +106,7 @@ const VideoModal: React.FC<{
         style={{
           width: '100%',
           maxWidth: '900px',
-          background: 'var(--surface)',
-          borderRadius: '8px',
-          overflow: 'hidden'
+          background: 'var(--surface)', overflow: 'hidden'
         }}
       >
         {/* Video */}
@@ -141,9 +139,7 @@ const VideoModal: React.FC<{
                   onClick={() => setShowLotPopup(true)}
                   style={{
                     background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    padding: '4px 8px',
+                    border: '1px solid var(--border)', padding: '4px 8px',
                     cursor: 'pointer',
                     fontSize: '11px',
                     fontWeight: 600,
@@ -169,9 +165,7 @@ const VideoModal: React.FC<{
                   onClick={() => setShowPricePopup(true)}
                   style={{
                     background: 'var(--success-dim)',
-                    border: '1px solid var(--success)',
-                    borderRadius: '4px',
-                    padding: '4px 10px',
+                    border: '1px solid var(--success)', padding: '4px 10px',
                     cursor: 'pointer',
                     fontWeight: 700,
                     color: 'var(--success)',
@@ -186,9 +180,7 @@ const VideoModal: React.FC<{
                 onClick={onClose}
                 style={{
                   background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  padding: '4px 12px',
+                  border: '1px solid var(--border)', padding: '4px 12px',
                   cursor: 'pointer',
                   fontSize: '11px'
                 }}
@@ -318,20 +310,16 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
                     key={video.id}
                     onClick={() => setActiveModal(video)}
                     style={{
-                      cursor: 'pointer',
-                      borderRadius: '6px',
-                      overflow: 'hidden',
+                      cursor: 'pointer', overflow: 'hidden',
                       background: 'var(--surface-raised)',
                       border: '1px solid var(--border)',
                       transition: 'transform 0.15s, box-shadow 0.15s'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'scale(1.02)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'scale(1)';
-                      e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
                     {/* Thumbnail with play overlay */}
@@ -356,9 +344,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
                         transform: 'translate(-50%, -50%)',
                         width: '36px',
                         height: '36px',
-                        background: 'rgba(0,0,0,0.7)',
-                        borderRadius: '50%',
-                        display: 'flex',
+                        background: 'rgba(0,0,0,0.7)', display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
                       }}>
@@ -378,9 +364,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
                         right: '4px',
                         background: 'rgba(0,0,0,0.8)',
                         color: 'var(--bg)',
-                        padding: '2px 5px',
-                        borderRadius: '3px',
-                        fontSize: '9px',
+                        padding: '2px 5px', fontSize: '9px',
                         fontFamily: 'monospace'
                       }}>
                         {formatTimestamp(video.broadcast_timestamp_start)}

@@ -52,7 +52,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
   vehicleId,
   vehicleInfo,
   isOwner = false,
-  className = '',
+  className ='',
   initialValuation
 }) => {
   const [pricingStatus, setPricingStatus] = useState<PricingStatus | null>(null);
@@ -598,7 +598,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
 
   if (error) {
     return (
-      <div className={`bg-red-50 border border-red-200 rounded-lg p-4 ${className}`}>
+      <div className={`bg-red-50 border border-red-200  p-4 ${className}`}>
         <div className="flex items-center text-red-700">
           <span className="mr-2">❌</span>
           <span className="font-medium">Pricing Unavailable</span>
@@ -768,9 +768,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                       justifyContent: 'space-between',
                       marginBottom: '2px',
                       cursor: 'pointer',
-                      padding: '2px 4px',
-                      borderRadius: '2px'
-                    }}
+                      padding: '2px 4px'}}
                     className="hover:bg-gray-50"
                     onClick={() => openPartViewer(part)}
                     title="Click to view validation images"
@@ -794,9 +792,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                           style={{
                             position: 'relative',
                             width: '40px',
-                            height: '40px',
-                            borderRadius: '4px',
-                            overflow: 'hidden',
+                            height: '40px', overflow: 'hidden',
                             border: '1px solid var(--border)',
                             cursor: 'pointer'
                           }}
@@ -830,9 +826,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                       {part.images.length > 3 && (
                         <div style={{
                           width: '40px',
-                          height: '40px',
-                          borderRadius: '4px',
-                          backgroundColor: 'var(--bg)',
+                          height: '40px', backgroundColor: 'var(--bg)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1093,7 +1087,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
       {/* Full Analysis Modal */}
       {showFullAnalysis && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-hidden">
+          <div className="bg-white max-w-4xl max-h-[90vh] overflow-hidden">
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <h2 className="text-xl font-semibold">
                 Complete Pricing Analysis - {vehicleInfo.year} {vehicleInfo.make} {vehicleInfo.model}

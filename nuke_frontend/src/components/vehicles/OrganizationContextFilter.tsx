@@ -88,9 +88,7 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
             border: selectedOrganizationId === null ? '2px solid var(--accent)' : '1px solid var(--border)',
             background: selectedOrganizationId === null ? 'rgba(var(--accent-rgb), 0.1)' : 'white',
             color: selectedOrganizationId === null ? 'var(--accent)' : 'var(--text-muted)',
-            cursor: 'pointer',
-            borderRadius: '4px',
-            transition: 'all 0.12s ease'
+            cursor: 'pointer', transition: 'all 0.12s ease'
           }}
         >
           Personal ({organizations.length > 0 ? 'All Vehicles' : 'My Vehicles'})
@@ -108,9 +106,7 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
             border: selectedOrganizationId === org.organization_id ? '2px solid var(--accent)' : '1px solid var(--border)',
             background: selectedOrganizationId === org.organization_id ? 'rgba(var(--accent-rgb), 0.1)' : 'white',
             color: selectedOrganizationId === org.organization_id ? 'var(--accent)' : 'var(--text-muted)',
-            cursor: 'pointer',
-            borderRadius: '4px',
-            transition: 'all 0.12s ease',
+            cursor: 'pointer', transition: 'all 0.12s ease',
             display: 'flex',
             alignItems: 'center',
             gap: '6px'
@@ -152,9 +148,7 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
               alt=""
               style={{
                 width: '16px',
-                height: '16px',
-                borderRadius: '2px',
-                objectFit: 'cover'
+                height: '16px', objectFit: 'cover'
               }}
             />
           )}

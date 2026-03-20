@@ -432,7 +432,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
             </div>
             {/* Drag and drop area */}
             <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              className={`border-2 border-dashed  p-8 text-center transition-colors ${
                 extracting ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
               }`}
               onDrop={handleDrop}
@@ -442,7 +442,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
             >
               {extracting ? (
                 <div className="flex flex-col items-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
+                  <div className="animate-spin h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
                   <p className="text-lg font-bold text-blue-700">Processing Images...</p>
                   <p className="text-sm text-gray-600">Extracting EXIF data and location information</p>
                 </div>
@@ -464,7 +464,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                   <button
                     type="button"
                     onClick={() => document.getElementById('event-image-upload')?.click()}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    className="px-6 py-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
                   >
                     Choose Images
                   </button>
@@ -473,7 +473,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
             </div>
 
             {selectionLog.length > 0 && (
-              <div className="mt-3 p-2 bg-gray-50 rounded border">
+              <div className="mt-3 p-2 bg-gray-50 border">
                 <div className="text-sm font-medium mb-1">Image Selection Log</div>
                 <div className="text-xs text-gray-600 max-h-40 overflow-y-auto">
                   {selectionLog.slice(-200).map((entry, idx) => (
@@ -501,7 +501,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-semibold mb-4">Review Event Details</h3>
         
         {/* Image previews with metadata */}
@@ -515,7 +515,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                   <img
                     src={URL.createObjectURL(file)}
                     alt={`Preview ${index + 1}`}
-                    className="w-full h-20 object-cover rounded"
+                    className="w-full h-20 object-cover"
                     style={sensitivityHints[index]?.isSensitive ? { filter: 'blur(6px)' } : undefined}
                   />
                   {metadata?.dateTaken && (
@@ -524,7 +524,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                     </div>
                   )}
                   {sensitivityHints[index]?.isSensitive && (
-                    <div className="absolute top-0 left-0 m-1 px-1.5 py-0.5 text-[10px] rounded bg-red-600 text-white">
+                    <div className="absolute top-0 left-0 m-1 px-1.5 py-0.5 text-[10px] bg-red-600 text-white">
                       Sensitive{sensitivityHints[index]?.type ? ` • ${sensitivityHints[index]?.type}` : ''}
                     </div>
                   )}
@@ -537,7 +537,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
         {/* Event form */}
         <div className="space-y-4">
           {bulkMode && groups.length > 0 && (
-            <div className="p-3 bg-gray-50 rounded border">
+            <div className="p-3 bg-gray-50 border">
               <div className="text-sm font-medium mb-2">Bulk Mode: {groups.length} date groups detected</div>
               <div className="space-y-2">
                 {groups.map((g, i) => (
@@ -549,7 +549,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                        className="px-2 py-1 text-xs border hover:bg-gray-100"
                         onClick={() => autoSplitGroup(i)}
                         title={`Auto-split by ${splitGapMinutes} minute gaps`}
                       >
@@ -561,7 +561,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                         step={5}
                         value={splitGapMinutes}
                         onChange={(e) => setSplitGapMinutes(Math.max(5, Number(e.target.value) || GAP_MINUTES_DEFAULT))}
-                        className="w-16 text-right text-xs border rounded px-1 py-0.5"
+                        className="w-16 text-right text-xs border px-1 py-0.5"
                         title="Gap (minutes)"
                       />
                       {typeof splitResultInfo[i] !== 'undefined' && (
@@ -571,7 +571,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                       <select
                         value={g.stage}
                         onChange={(e) => setGroups(prev => prev.map((x, idx) => idx === i ? { ...x, stage: e.target.value } : x))}
-                        className="border rounded px-2 py-1 text-sm"
+                        className="border px-2 py-1 text-sm"
                       >
                         <option value="discovery">Discovery</option>
                         <option value="disassembly">Disassembly</option>
@@ -591,7 +591,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                       <select
                         value={g.event_type || 'maintenance'}
                         onChange={(e) => setGroups(prev => prev.map((x, idx) => idx === i ? { ...x, event_type: e.target.value } : x))}
-                        className="border rounded px-2 py-1 text-sm"
+                        className="border px-2 py-1 text-sm"
                         title="Choose 'Life' for family/life moments"
                       >
                         <option value="maintenance">Work</option>
@@ -613,7 +613,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                   type="text"
                   value={eventData.title}
                   onChange={(e) => setEventData(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
@@ -623,7 +623,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                 <select
                   value={eventData.event_type}
                   onChange={(e) => setEventData(prev => ({ ...prev, event_type: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="maintenance">Maintenance</option>
                   <option value="repair">Repair</option>
@@ -646,7 +646,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                   type="date"
                   value={eventData.event_date}
                   onChange={(e) => setEventData(prev => ({ ...prev, event_date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </>
@@ -664,7 +664,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
               value={eventData.location}
               onChange={(e) => setEventData(prev => ({ ...prev, location: e.target.value }))}
               placeholder="Location (optional)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -677,18 +677,18 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
               onChange={(e) => setEventData(prev => ({ ...prev, description: e.target.value }))}
               rows={3}
               placeholder="Additional details about this event..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
 
         {/* Metadata summary */}
         {imageMetadata.length > 0 && (
-          <div className="mt-4 p-3 bg-gray-50 rounded-md">
+          <div className="mt-4 p-3 bg-gray-50">
             <h5 className="text-sm font-medium text-gray-700 mb-2">Extracted Metadata:</h5>
             <div className="text-xs text-gray-600 space-y-1">
               {selectionLog.length > 0 && (
-                <div className="mb-2 p-2 bg-white border rounded">
+                <div className="mb-2 p-2 bg-white border">
                   <div className="font-medium">Selection Summary</div>
                   <div>Added {selectionLog.filter(l => l.status==='added').length} • Duplicates {selectionLog.filter(l => l.status==='duplicate').length} • Dropped {selectionLog.filter(l => l.status==='dropped').length}</div>
                 </div>
@@ -732,7 +732,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
 
         {/* Upload Progress */}
         {submitting && (
-          <div className="mt-6 p-4 bg-blue-50 rounded-md">
+          <div className="mt-6 p-4 bg-blue-50">
             <h4 className="font-medium text-blue-900 mb-3">Uploading Photos...</h4>
             <div className="space-y-2">
               {selectedFiles.map((file, index) => {
@@ -742,18 +742,18 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                 return (
                   <div key={index} className="flex items-center space-x-3">
                     <div className="flex-shrink-0 w-4 h-4">
-                      {status === 'pending' && <div className="w-4 h-4 bg-gray-300 rounded-full"></div>}
-                      {status === 'uploading' && <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse"></div>}
-                      {status === 'completed' && <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-white text-xs">✓</div>}
-                      {status === 'error' && <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">✗</div>}
+                      {status === 'pending' && <div className="w-4 h-4 bg-gray-300"></div>}
+                      {status === 'uploading' && <div className="w-4 h-4 bg-blue-500 animate-pulse"></div>}
+                      {status === 'completed' && <div className="w-4 h-4 bg-green-500 flex items-center justify-center text-white text-xs">✓</div>}
+                      {status === 'error' && <div className="w-4 h-4 bg-red-500 flex items-center justify-center text-white text-xs">✗</div>}
                     </div>
                     
                     <div className="flex-1 min-w-0">
                       <div className="text-sm text-gray-700 truncate">{file.name}</div>
                       {status === 'uploading' && (
-                        <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                        <div className="w-full bg-gray-200 h-1.5 mt-1">
                           <div 
-                            className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
+                            className="bg-blue-600 h-1.5 transition-all duration-300" 
                             style={{ width: `${progress}%` }}
                           ></div>
                         </div>
@@ -791,11 +791,11 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
           >
             {submitting ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <div className="animate-spin h-4 w-4 border-b-2 border-white"></div>
                 <span>Creating Event...</span>
               </>
             ) : (

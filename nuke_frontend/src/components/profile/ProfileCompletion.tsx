@@ -77,9 +77,7 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ completion, onAct
           <div style={{ 
             width: '100%', 
             height: '8px', 
-            backgroundColor: 'var(--surface)', 
-            borderRadius: '4px',
-            overflow: 'hidden'
+            backgroundColor: 'var(--surface)', overflow: 'hidden'
           }}>
             <div style={{
               width: `${percentage}%`,
@@ -103,17 +101,13 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ completion, onAct
                 alignItems: 'center', 
                 justifyContent: 'space-between',
                 padding: '8px',
-                backgroundColor: item.completed ? 'var(--success-dim)' : 'var(--bg-secondary)',
-                borderRadius: '4px',
-                border: item.completed ? '1px solid var(--success)' : '1px solid var(--border)'
+                backgroundColor: item.completed ? 'var(--success-dim)' : 'var(--bg-secondary)', border: item.completed ? '1px solid var(--success)' : '1px solid var(--border)'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{
                   width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  backgroundColor: item.completed ? 'var(--success)' : 'var(--border)',
+                  height: '16px', backgroundColor: item.completed ? 'var(--success)' : 'var(--border)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
@@ -145,9 +139,7 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ completion, onAct
           <div style={{ 
             marginTop: '16px', 
             padding: '12px', 
-            backgroundColor: 'var(--success-dim, #f0fdf4)',
-            borderRadius: '4px',
-            border: '1px solid var(--success)'
+            backgroundColor: 'var(--success-dim, #f0fdf4)', border: '1px solid var(--success)'
           }}>
             <div className="text-small font-bold" style={{ color: 'var(--success)', fontSize: '11px' }}>
               Profile Complete

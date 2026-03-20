@@ -139,10 +139,7 @@ export const FollowAuctionCard: React.FC<FollowAuctionCardProps> = ({
     <div
       style={{
         background: 'var(--surface)',
-        border: '2px solid var(--border)',
-        borderRadius: '0px',
-        boxShadow: '0 12px 24px rgba(15, 23, 42, 0.15)',
-        padding: '16px',
+        border: '2px solid var(--border)', padding: '16px',
         fontSize: '12px',
         color: 'var(--text)',
         width: '320px'
@@ -224,9 +221,7 @@ export const FollowAuctionCard: React.FC<FollowAuctionCardProps> = ({
           color: isFollowing ? 'var(--text)' : 'var(--button-text, #fff)',
           fontSize: '12px',
           fontWeight: 700,
-          cursor: loading || checkingFollow ? 'not-allowed' : 'pointer',
-          borderRadius: '0px',
-          opacity: loading || checkingFollow ? 0.6 : 1,
+          cursor: loading || checkingFollow ? 'not-allowed' : 'pointer', opacity: loading || checkingFollow ? 0.6 : 1,
           transition: 'all 0.12s ease'
         }}
         onMouseEnter={(e) => {

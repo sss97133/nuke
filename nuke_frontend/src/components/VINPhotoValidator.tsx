@@ -458,9 +458,7 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
       </p>
 
       <div className="upload-area" style={{ 
-        border: '2px dashed #d1d5db', 
-        borderRadius: '8px', 
-        padding: '32px', 
+        border: '2px dashed var(--border)', padding: '32px', 
         textAlign: 'center',
         marginBottom: '16px',
         cursor: 'pointer'
@@ -529,7 +527,7 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
           <img 
             src={vinPhotoPreview} 
             alt="VIN tag reference" 
-            style={{ maxWidth: '400px', maxHeight: '250px', borderRadius: '8px' }}
+            style={{ maxWidth: '400px', maxHeight: '250px'}}
           />
         </div>
       )}
@@ -667,9 +665,7 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
         zIndex: 1000
       }}>
         <div className="modal-content" style={{
-          backgroundColor: 'var(--surface)',
-          borderRadius: '12px',
-          padding: '32px',
+          backgroundColor: 'var(--surface)', padding: '32px',
           maxWidth: '600px',
           width: '90%',
           maxHeight: '90vh',

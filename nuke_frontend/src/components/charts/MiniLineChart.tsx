@@ -218,9 +218,7 @@ export const MiniLineChart: React.FC<MiniLineChartProps> = ({
             top: Math.max(0, hoveredPoint.y - 30),
             background: 'var(--grey-800)',
             color: 'var(--white)',
-            padding: '2px 6px',
-            borderRadius: 4,
-            fontSize: '9px',
+            padding: '2px 6px', fontSize: '9px',
             fontFamily: 'monospace',
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
@@ -240,7 +238,7 @@ export const MiniLineChart: React.FC<MiniLineChartProps> = ({
               <span style={{ color: 'var(--text-muted)' }}>{s.label}</span>
               {showTrendArrow && trends[s.id] && (
                 <span style={{
-                  color: trends[s.id].direction === 'up' ? '#22c55e' : trends[s.id].direction === 'down' ? '#ef4444' : 'var(--text-muted)'
+                  color: trends[s.id].direction === 'up' ? 'var(--success)' : trends[s.id].direction === 'down' ? 'var(--error)' : 'var(--text-muted)'
                 }}>
                   {trends[s.id].direction === 'up' ? '\u2191' : trends[s.id].direction === 'down' ? '\u2193' : '\u2192'}
                   {Math.abs(trends[s.id].pct).toFixed(1)}%

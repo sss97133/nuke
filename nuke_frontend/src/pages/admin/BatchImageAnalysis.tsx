@@ -96,9 +96,7 @@ export default function BatchImageAnalysis() {
           className="cursor-button"
           style={{
             padding: '8px 16px',
-            border: '2px solid var(--border)',
-            borderRadius: '2px',
-            background: 'var(--surface)',
+            border: '2px solid var(--border)', background: 'var(--surface)',
             cursor: 'pointer',
             fontSize: '11px',
             fontWeight: 600,
@@ -129,9 +127,7 @@ export default function BatchImageAnalysis() {
               className="cursor-button"
               style={{
                 padding: '8px 16px',
-                border: '2px solid var(--border)',
-                borderRadius: '2px',
-                background: 'var(--surface)',
+                border: '2px solid var(--border)', background: 'var(--surface)',
                 color: 'var(--text)',
                 cursor: analyzing ? 'not-allowed' : 'pointer',
                 opacity: analyzing ? 0.5 : 1,
@@ -148,9 +144,7 @@ export default function BatchImageAnalysis() {
               className="cursor-button"
               style={{
                 padding: '8px 16px',
-                border: '2px solid var(--accent)',
-                borderRadius: '2px',
-                background: 'var(--accent)',
+                border: '2px solid var(--accent)', background: 'var(--accent)',
                 color: 'var(--bg)',
                 cursor: analyzing ? 'not-allowed' : 'pointer',
                 opacity: analyzing ? 0.5 : 1,
@@ -237,9 +231,7 @@ export default function BatchImageAnalysis() {
             className="cursor-button"
             style={{
               padding: '12px 24px',
-              border: '2px solid var(--accent)',
-              borderRadius: '2px',
-              background: analyzing || !vehicleId.trim() ? 'var(--border)' : 'var(--accent)',
+              border: '2px solid var(--accent)', background: analyzing || !vehicleId.trim() ? 'var(--border)' : 'var(--accent)',
               color: 'var(--bg)',
               fontWeight: 600,
               cursor: analyzing || !vehicleId.trim() ? 'not-allowed' : 'pointer',

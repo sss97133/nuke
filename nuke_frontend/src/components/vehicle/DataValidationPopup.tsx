@@ -228,10 +228,10 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
   };
 
   const getConfidenceColor = (score: number) => {
-    if (score >= 95) return '#10b981'; // green
-    if (score >= 80) return '#3b82f6'; // blue
-    if (score >= 60) return '#f59e0b'; // orange
-    return '#ef4444'; // red
+    if (score >= 95) return 'var(--success)'; // green
+    if (score >= 80) return 'var(--info)'; // blue
+    if (score >= 60) return 'var(--warning)'; // orange
+    return 'var(--error)'; // red
   };
 
   return (
@@ -287,9 +287,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
               <div style={{
                 padding: '12px',
                 background: 'var(--bg-secondary)',
-                border: '2px solid var(--accent)',
-                borderRadius: '4px',
-                marginBottom: '16px'
+                border: '2px solid var(--accent)', marginBottom: '16px'
               }}>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Current Value</div>
                 <div style={{ fontSize: '19px', fontWeight: 700 }}>{fieldValue}</div>
@@ -299,9 +297,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
               {consensus && (
                 <div style={{
                   padding: '12px',
-                  background: 'var(--bg-tertiary)',
-                  borderRadius: '4px',
-                  marginBottom: '16px'
+                  background: 'var(--bg-tertiary)', marginBottom: '16px'
                 }}>
                   <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                     <div>
@@ -342,9 +338,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
                       key={idx}
                       style={{
                         padding: '12px',
-                        border: '1px solid var(--border)',
-                        borderRadius: '4px',
-                        background: 'var(--white)'
+                        border: '1px solid var(--border)', background: 'var(--white)'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
@@ -354,9 +348,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
                           </span>
                         </div>
                         <div style={{
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          background: getConfidenceColor(validation.confidence_score),
+                          padding: '2px 8px', background: getConfidenceColor(validation.confidence_score),
                           color: '#fff',
                           fontSize: '11px',
                           fontWeight: 700
@@ -388,9 +380,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
                                   width: 160,
                                   maxWidth: '100%',
                                   height: 'auto',
-                                  border: '1px solid var(--border)',
-                                  borderRadius: 4,
-                                  display: 'block'
+                                  border: '1px solid var(--border)', display: 'block'
                                 }}
                               />
                             </a>
@@ -423,9 +413,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
               <div style={{
                 marginTop: '16px',
                 padding: '12px',
-                background: 'var(--bg-secondary)',
-                borderRadius: '4px',
-                border: '1px dashed var(--border)'
+                background: 'var(--bg-secondary)', border: '1px dashed var(--border)'
               }}>
                 <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px' }}>
                   Have additional proof?

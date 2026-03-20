@@ -324,9 +324,7 @@ const VehicleProfileInner: React.FC = () => {
         >
           <div
             style={{
-              backgroundColor: 'var(--surface)',
-              borderRadius: '8px',
-              maxWidth: '600px',
+              backgroundColor: 'var(--surface)', maxWidth: '600px',
               width: '100%',
               maxHeight: '90vh',
               overflow: 'auto',

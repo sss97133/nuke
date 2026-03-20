@@ -53,11 +53,11 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
 
   if (events.length === 0) {
     return (
-      <div className="text-center p-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
+      <div className="text-center p-8 bg-gray-50 dark:bg-gray-800">
         <p className="mb-4 text-gray-700 dark:text-gray-300">No timeline events found for this vehicle.</p>
         <button
           onClick={() => setShowAddEventForm(true)}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4"
         >
           Add First Event
         </button>
@@ -102,13 +102,13 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
   const sortedYears = Object.keys(groupedEvents).sort((a, b) => parseInt(b) - parseInt(a));
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
+    <div className="bg-gray-50 dark:bg-gray-800 p-6">
       {/* Add Event Button - Always visible */}
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">Timeline Events</h3>
         <button
           onClick={() => setShowAddEventForm(true)}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-sm transition-colors"
+          className="bg-blue-500 hover:bg-blue-700 text-white font-medium py-2 px-4 text-sm transition-colors"
         >
           Add Event
         </button>
@@ -126,7 +126,7 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
               <div key={event.id} className="relative mb-6 ml-10">
                 {/* Timeline dot */}
                 <div className="absolute -left-10 mt-1.5">
-                  <div className={`w-4 h-4 rounded-full border-2 ${
+                  <div className={`w-4 h-4  border-2 ${
                     event.verified 
                       ? 'bg-blue-500 border-blue-600' 
                       : getEventTypeColor(event.event_type)
@@ -134,19 +134,19 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
                 </div>
                 
                 {/* Event card */}
-                <div className="bg-white dark:bg-gray-700 rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow">
+                <div className="bg-white dark:bg-gray-700 p-4 hover: transition-">
                   <div className="flex justify-between items-start mb-2">
                     <h4 className="text-lg font-bold text-gray-900 dark:text-white">{event.title}</h4>
                     
                     <div className="flex items-center">
                       {/* Event type badge */}
-                      <span className={`mr-2 px-2 py-1 text-xs font-semibold rounded-full ${getEventTypeBgColor(event.event_type)}`}>
+                      <span className={`mr-2 px-2 py-1 text-xs font-semibold  ${getEventTypeBgColor(event.event_type)}`}>
                         {formatEventType(event.event_type)}
                       </span>
                       
                       {/* Verification badge if verified */}
                       {event.verified && (
-                        <span className="bg-blue-100 text-blue-800 px-2 py-1 text-xs font-semibold rounded-full">
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 text-xs font-semibold">
                           VERIFIED
                         </span>
                       )}
@@ -165,9 +165,9 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
                   
                   {/* Confidence score indicator */}
                   <div className="flex items-center mt-2">
-                    <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5 mr-2">
+                    <div className="w-full bg-gray-200 dark:bg-gray-600 h-2.5 mr-2">
                       <div 
-                        className={`h-2.5 rounded-full ${getConfidenceColor(event.confidence_score)}`}
+                        className={`h-2.5  ${getConfidenceColor(event.confidence_score)}`}
                         style={{ width: `${event.confidence_score * 100}%` }}
                       ></div>
                     </div>

@@ -128,17 +128,17 @@ const TimelineEventComments: React.FC<TimelineEventCommentsProps> = ({
                 const isEditing = editingCommentId === comment.id;
 
                 return (
-                  <div key={comment.id} className="bg-gray-50 rounded p-2 text-xs">
+                  <div key={comment.id} className="bg-gray-50 p-2 text-xs">
                     <div className="flex items-start justify-between mb-1">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-gray-700">
                           @{comment.user_profile?.username || 'user'}
                         </span>
                         {comment.user_id === vehicleOwnerId && (
-                          <span className="bg-blue-100 text-blue-700 px-1 rounded text-xs">Owner</span>
+                          <span className="bg-blue-100 text-blue-700 px-1 text-xs">Owner</span>
                         )}
                         {comment.user_id === eventCreatorId && comment.user_id !== vehicleOwnerId && (
-                          <span className="bg-green-100 text-green-700 px-1 rounded text-xs">Creator</span>
+                          <span className="bg-green-100 text-green-700 px-1 text-xs">Creator</span>
                         )}
                       </div>
                       <div className="flex items-center gap-1">
@@ -171,7 +171,7 @@ const TimelineEventComments: React.FC<TimelineEventCommentsProps> = ({
                         <textarea
                           value={editingText}
                           onChange={(e) => setEditingText(e.target.value)}
-                          className="w-full text-xs border rounded p-1 resize-none"
+                          className="w-full text-xs border p-1 resize-none"
                           rows={2}
                           placeholder="Edit your comment..."
                         />
@@ -179,13 +179,13 @@ const TimelineEventComments: React.FC<TimelineEventCommentsProps> = ({
                           <button
                             onClick={() => handleEditComment(comment.id)}
                             disabled={submitting || !editingText.trim()}
-                            className="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 disabled:opacity-50"
+                            className="bg-blue-500 text-white px-2 py-1 text-xs hover:bg-blue-600 disabled:opacity-50"
                           >
                             Save
                           </button>
                           <button
                             onClick={cancelEdit}
-                            className="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs hover:bg-gray-400"
+                            className="bg-gray-300 text-gray-700 px-2 py-1 text-xs hover:bg-gray-400"
                           >
                             Cancel
                           </button>
@@ -219,7 +219,7 @@ const TimelineEventComments: React.FC<TimelineEventCommentsProps> = ({
               <textarea
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                className="w-full text-xs border rounded p-2 resize-none"
+                className="w-full text-xs border p-2 resize-none"
                 rows={2}
                 placeholder="Add a comment..."
                 disabled={submitting}
@@ -227,7 +227,7 @@ const TimelineEventComments: React.FC<TimelineEventCommentsProps> = ({
               <button
                 onClick={handleAddComment}
                 disabled={submitting || !newComment.trim()}
-                className="bg-primary text-white px-3 py-1 rounded text-xs hover:bg-primary-dark disabled:opacity-50"
+                className="bg-primary text-white px-3 py-1 text-xs hover:bg-primary-dark disabled:opacity-50"
               >
                 {submitting ? 'Adding...' : 'Comment'}
               </button>

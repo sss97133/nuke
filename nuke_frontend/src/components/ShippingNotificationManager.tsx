@@ -82,7 +82,7 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="bg-white p-6 max-w-md w-full mx-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Add Notification Recipient</h3>
             <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
@@ -99,7 +99,7 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
                 type="text"
                 value={formData.recipient_name}
                 onChange={(e) => setFormData(prev => ({ ...prev, recipient_name: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-3 py-2 border border-gray-300"
                 required
               />
             </div>
@@ -113,7 +113,7 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
                 value={formData.recipient_phone}
                 onChange={(e) => setFormData(prev => ({ ...prev, recipient_phone: e.target.value }))}
                 placeholder="+1234567890"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-3 py-2 border border-gray-300"
                 required
               />
             </div>
@@ -126,7 +126,7 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
                 type="email"
                 value={formData.recipient_email}
                 onChange={(e) => setFormData(prev => ({ ...prev, recipient_email: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-3 py-2 border border-gray-300"
               />
             </div>
 
@@ -137,7 +137,7 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
               <select
                 value={formData.notification_method}
                 onChange={(e) => setFormData(prev => ({ ...prev, notification_method: e.target.value as any }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-3 py-2 border border-gray-300"
               >
                 <option value="sms">SMS Only</option>
                 <option value="email">Email Only</option>
@@ -168,7 +168,7 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700"
               >
                 Add Recipient
               </button>
@@ -235,13 +235,13 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
   if (loading) {
     return (
       <div className="p-4 text-center">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+        <div className="animate-spin h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-50 rounded-lg p-4 mt-4">
+    <div className="bg-gray-50 p-4 mt-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-2">
           <Bell className="w-5 h-5 text-blue-600" />
@@ -266,12 +266,12 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
           {recipients.map((recipient) => (
             <div 
               key={recipient.id} 
-              className={`flex items-center justify-between p-2 bg-white rounded border ${
+              className={`flex items-center justify-between p-2 bg-white  border ${
                 recipient.is_active ? 'border-gray-200' : 'border-gray-100 opacity-50'
               }`}
             >
               <div className="flex items-center space-x-3">
-                <div className={`p-1 rounded ${recipient.is_buyer ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                <div className={`p-1  ${recipient.is_buyer ? 'bg-blue-100' : 'bg-gray-100'}`}>
                   {recipient.notification_method === 'sms' || recipient.notification_method === 'both' ? (
                     <Phone className="w-4 h-4 text-gray-600" />
                   ) : (
@@ -282,7 +282,7 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
                   <div className="flex items-center space-x-2">
                     <span className="text-sm font-medium">{recipient.recipient_name}</span>
                     {recipient.is_buyer && (
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Buyer</span>
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5">Buyer</span>
                     )}
                   </div>
                   <div className="text-xs text-gray-500">
@@ -307,7 +307,7 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
 
       {/* Send Custom Notification */}
       {isOwner && recipients.filter(r => r.is_active).length > 0 && (
-        <div className="mt-4 p-3 bg-white rounded border border-gray-200">
+        <div className="mt-4 p-3 bg-white border border-gray-200">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Send Update to All Active Recipients
           </label>
@@ -317,12 +317,12 @@ const ShippingNotificationManager: React.FC<ShippingNotificationManagerProps> = 
               value={notificationMessage}
               onChange={(e) => setNotificationMessage(e.target.value)}
               placeholder={`Update about ${taskTitle}`}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="flex-1 px-3 py-2 border border-gray-300 text-sm"
             />
             <button
               onClick={sendCustomNotification}
               disabled={sendingNotification || !notificationMessage.trim()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm"
+              className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 text-sm"
             >
               {sendingNotification ? 'Sending...' : 'Send'}
             </button>

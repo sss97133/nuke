@@ -132,12 +132,8 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
         onClick={(e) => e.stopPropagation()}
         style={{
           background: 'var(--white)',
-          border: '2px solid var(--border)',
-          boxShadow: 'var(--shadow)',
-          maxWidth: '480px',
-          width: '100%',
-          borderRadius: '4px',
-          overflow: 'hidden'
+          border: '2px solid var(--border)', maxWidth: '480px',
+          width: '100%', overflow: 'hidden'
         }}
       >
         {/* Header */}
@@ -223,9 +219,7 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
               style={{
                 padding: '12px',
                 background: roi >= 0 ? 'var(--success-dim)' : 'var(--error-dim)',
-                border: `2px solid ${roi >= 0 ? 'var(--success)' : 'var(--error)'}`,
-                borderRadius: '4px',
-                marginBottom: '16px'
+                border: `2px solid ${roi >= 0 ? 'var(--success)' : 'var(--error)'}`, marginBottom: '16px'
               }}
             >
               <div style={{ fontSize: '9px', fontWeight: 600, marginBottom: '4px', color: roi >= 0 ? 'var(--success)' : 'var(--error)' }}>
@@ -243,9 +237,7 @@ const VehicleValueEditModal: React.FC<VehicleValueEditModalProps> = ({
               style={{
                 padding: '10px',
                 background: 'var(--error-dim)',
-                border: '1px solid var(--error)',
-                borderRadius: '4px',
-                color: 'var(--error)',
+                border: '1px solid var(--error)', color: 'var(--error)',
                 fontSize: '11px',
                 marginBottom: '16px'
               }}

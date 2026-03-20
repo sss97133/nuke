@@ -77,9 +77,7 @@ export default function KeyFiguresWithCharts() {
                         letterSpacing: '0.05em',
                         color: 'var(--success, #16a34a)',
                         background: 'rgba(22, 163, 74, 0.12)',
-                        padding: '2px 5px',
-                        borderRadius: 4,
-                      }}
+                        padding: '2px 5px', }}
                     >
                       LIVE
                     </span>
@@ -93,11 +91,7 @@ export default function KeyFiguresWithCharts() {
                         marginLeft: 8,
                         zIndex: 10,
                         background: 'var(--surface, #fff)',
-                        border: '1px solid var(--border-medium)',
-                        borderRadius: 8,
-                        padding: 12,
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                        minWidth: 220,
+                        border: '1px solid var(--border-medium)', padding: 12, minWidth: 220,
                       }}
                     >
                       <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: 6 }}>Live — current trend</div>
