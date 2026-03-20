@@ -52,9 +52,11 @@ serve(async (req) => {
     }
     const userId = auth.userId;
 
-    // Detect agent staging: stage_write scope without write scope → sandbox mode
-    const isStageOnly = auth.scopes?.includes('stage_write') && !auth.scopes?.includes('write');
+    // Detect agent staging: any agent with stage_write scope goes through staging.
+    // This is identity-based (agentId present) + scope-based (stage_write), so even if
+    // an agent somehow gets write scope added, they still stage if stage_write is present.
     const agentId = auth.agentId;
+    const isStageOnly = agentId ? auth.scopes?.includes('stage_write') : false;
 
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
