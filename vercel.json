@@ -13,6 +13,10 @@
       "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/mcp-connector"
     },
     {
+      "source": "/api/functions/v1/:path*",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/:path*"
+    },
+    {
       "source": "/api/:path+",
       "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path+"
     },
