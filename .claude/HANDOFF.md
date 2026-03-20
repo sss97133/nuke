@@ -1,151 +1,43 @@
-# Session Handoffs
+# Overnight Session Handoff — 2026-03-20 ~02:30 AM
 
-*Fresh start — previous 4,153 lines archived to HANDOFF_archive_20260320.md*
+## What Was Done
 
----
+### Block 1: Data Quality (COMPLETE)
+- **139,051 vehicle_events rows backfilled** for orphaned vehicles (138,950 → 0 orphans)
+- 19 NULL models fixed from URL slugs; remaining 1,122 are unparseable
+- 33K NULL primary_image_url confirmed as genuinely imageless (no images exist)
 
-# Overnight Autonomous Work Plan — Completed 2026-03-20 ~01:30 AM
+### Block 2: Design System (COMPLETE — 52% → ~87%)
+- Global CSS reset enforces zero border-radius + zero box-shadow
+- Tailwind config overrides all rounded/shadow
+- 2,700+ individual violations fixed across 250+ files
+- 488 hex colors migrated to CSS variables
+- Build passes clean
 
-**Branch:** `overnight-data-quality` (5 commits ahead of main)
+### Block 3: Edge Functions + Discovery (PARTIAL)
+- `idx_vehicles_api_list` index created (fixes api-v1-vehicles timeout)
+- Edge function errors diagnosed: all intermittent, no code fixes needed
+- bat_extraction_queue: 141K pending, blocked on Anthropic API credits
+- Ollama discovery running in background (PID 19546), slow (~2/min)
 
-## Completed
+## What's Running
+- Ollama local discovery: PID 19546, `scripts/local-description-discovery.mjs --batch 50 --parallel 2 --max 5000`
+- Will add ~300-600 discoveries over next few hours
 
-### BLOCK 1: Flush & Ship ✅
-- 4 edge functions deployed, branch pushed, nuke.ag 200 OK
+## What's Next
+1. **Deploy frontend** — design system changes are committed but not deployed to Vercel
+2. **Ollama throughput** — script works but is slow (~2/min). Consider running with `--parallel 4` or using groq/gemini free tiers
+3. **bat_extraction_queue** — 141K pending, needs API credits or local extraction approach
+4. **Design system remaining ~13%** — mostly hardcoded colors in charts/visualizations
 
-### BLOCK 2: Design System Border-Radius Purge ✅
-- **1,800+ violations → 0 remaining** across 400+ files
-- 3 parallel agents, TypeScript clean
+## Branch
+`overnight-data-quality` — 14 commits ahead of main
 
-### BLOCK 3: Deno Import Modernization ✅
-- **260 edge functions** cleaned of all `deno.land/std@*` imports
-- 35+ deployed in 3 batches
-
-### BLOCK 4: Data Quality Enrichment ✅
-- 73 vehicles enriched, profile_origin backfilled
-
-### BLOCK 5: Comment Mining 🔄
-- 80-group job launched (check with `--stats`)
-
-### BLOCK 6: Hardcoded Colors ✅
-- 200 replacements across 71 files (1,675 → 499 remaining)
-
-## Next Actions
-1. Merge `overnight-data-quality` → `main`
-2. Check comment mining results
-3. Continue color migration (499 remaining)
-4. Deploy remaining 220+ modernized functions
-5. Run `npx vite build` to verify
-
----
-# Auto-Checkpoint — 2026-03-20 01:08:53
-*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
-
-## Recent Commits (last 30 min)
-04919d4e4 Update DONE.md, HANDOFF.md, clear active agents after overnight run
-f5122bbc7 style(components): remove box-shadow values and dead transition refs
-7e1184a84 style: remove box-shadow from map cluster icons, clean up borderRadius: 0 leftovers
-c80f73be7 style: replace image overlay gradients with solid backgrounds, remove remaining borderRadius
-1771048a3 style: fix last non-compliant font (system-ui -> Arial) in VehiclePerformanceCard canvas
-dcf1a887d style(components): remove border-radius and box-shadow violations
-2338b2376 style: final design system compliance pass — remove remaining border-radius, fix fonts
-8016ba89d Design system: migrate 200 hardcoded colors to CSS variables (71 files)
-fceb8cb5f style: additional design system cleanup — borderRadius removals, formatting fixes
-8bff945a3 style: remaining design system fixes — VehicleCardDense, ClaimExternalIdentity
-545d434c1 Fix remaining borderRadius numeric violations + iphoto overnight script
-f079ef413 style: enforce design system across 400+ components — zero border-radius
-999aee831 Modernize all edge functions: remove deno.land/std@ imports, use Deno.serve
-32756bef4 style: global CSS enforcement — zero border-radius and box-shadow
-876a2a661 chore: commit pending work from Mar 20 session (pre-overnight-batch)
-
-## Uncommitted Changes
-nuke_frontend/src/components/ErrorBoundary.tsx
-nuke_frontend/src/components/GlobalUploadIndicator.tsx
-nuke_frontend/src/components/VINPhotoValidator.tsx
-nuke_frontend/src/components/ValueProvenancePopup.tsx
-nuke_frontend/src/components/admin/AdminShell.tsx
-nuke_frontend/src/components/admin/IDHoverCard.tsx
-nuke_frontend/src/components/admin/LiveImageAnalysisMonitor.tsx
-nuke_frontend/src/components/auction/ExternalAuctionLiveBanner.tsx
-nuke_frontend/src/components/auction/LiveAuctionBanner.tsx
-nuke_frontend/src/components/bidder/BidderProfileCard.tsx
-nuke_frontend/src/components/bidding/AuctionCountdown.tsx
-nuke_frontend/src/components/bidding/PlatformCredentialForm.tsx
-nuke_frontend/src/components/bidding/TwoFactorPrompt.tsx
-nuke_frontend/src/components/charts/MiniLineChart.tsx
-nuke_frontend/src/components/charts/ValueTrendsPanel.tsx
-nuke_frontend/src/components/common/AsciiAvatar.tsx
-nuke_frontend/src/components/contract/ContractTransparency.tsx
-nuke_frontend/src/components/dashboard/ActiveAuctionsPanel.tsx
-nuke_frontend/src/components/dealer/BaTBulkImporter.tsx
-nuke_frontend/src/components/dealer/DropboxImporter.tsx
-
-## Staged
-none
-
-## On Next Session
-1. `cat PROJECT_STATE.md` — sprint focus
-2. `tail -40 DONE.md` — what exists
-3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
-4. Register in `.claude/ACTIVE_AGENTS.md`
-
----
-# Auto-Checkpoint — 2026-03-20 01:09:15
-*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
-
-## Recent Commits (last 30 min)
-04919d4e4 Update DONE.md, HANDOFF.md, clear active agents after overnight run
-f5122bbc7 style(components): remove box-shadow values and dead transition refs
-7e1184a84 style: remove box-shadow from map cluster icons, clean up borderRadius: 0 leftovers
-c80f73be7 style: replace image overlay gradients with solid backgrounds, remove remaining borderRadius
-1771048a3 style: fix last non-compliant font (system-ui -> Arial) in VehiclePerformanceCard canvas
-dcf1a887d style(components): remove border-radius and box-shadow violations
-2338b2376 style: final design system compliance pass — remove remaining border-radius, fix fonts
-8016ba89d Design system: migrate 200 hardcoded colors to CSS variables (71 files)
-fceb8cb5f style: additional design system cleanup — borderRadius removals, formatting fixes
-8bff945a3 style: remaining design system fixes — VehicleCardDense, ClaimExternalIdentity
-545d434c1 Fix remaining borderRadius numeric violations + iphoto overnight script
-f079ef413 style: enforce design system across 400+ components — zero border-radius
-999aee831 Modernize all edge functions: remove deno.land/std@ imports, use Deno.serve
-32756bef4 style: global CSS enforcement — zero border-radius and box-shadow
-876a2a661 chore: commit pending work from Mar 20 session (pre-overnight-batch)
-
-## Uncommitted Changes
-.claude/HANDOFF.md
-nuke_frontend/src/components/ErrorBoundary.tsx
-nuke_frontend/src/components/GlobalUploadIndicator.tsx
-nuke_frontend/src/components/VINPhotoValidator.tsx
-nuke_frontend/src/components/ValueProvenancePopup.tsx
-nuke_frontend/src/components/admin/AdminShell.tsx
-nuke_frontend/src/components/admin/IDHoverCard.tsx
-nuke_frontend/src/components/admin/LiveImageAnalysisMonitor.tsx
-nuke_frontend/src/components/auction/ExternalAuctionLiveBanner.tsx
-nuke_frontend/src/components/auction/LiveAuctionBanner.tsx
-nuke_frontend/src/components/bidder/BidderProfileCard.tsx
-nuke_frontend/src/components/bidding/AuctionCountdown.tsx
-nuke_frontend/src/components/bidding/PlatformCredentialForm.tsx
-nuke_frontend/src/components/bidding/TwoFactorPrompt.tsx
-nuke_frontend/src/components/charts/MiniLineChart.tsx
-nuke_frontend/src/components/charts/ValueTrendsPanel.tsx
-nuke_frontend/src/components/common/AsciiAvatar.tsx
-nuke_frontend/src/components/contract/ContractTransparency.tsx
-nuke_frontend/src/components/dashboard/ActiveAuctionsPanel.tsx
-nuke_frontend/src/components/dealer/BaTBulkImporter.tsx
-
-## Staged
-.claude/HANDOFF.md
-nuke_frontend/src/components/ErrorBoundary.tsx
-nuke_frontend/src/components/GlobalUploadIndicator.tsx
-nuke_frontend/src/components/VINPhotoValidator.tsx
-nuke_frontend/src/components/ValueProvenancePopup.tsx
-nuke_frontend/src/components/admin/AdminShell.tsx
-nuke_frontend/src/components/admin/IDHoverCard.tsx
-nuke_frontend/src/components/admin/LiveImageAnalysisMonitor.tsx
-nuke_frontend/src/components/auction/ExternalAuctionLiveBanner.tsx
-nuke_frontend/src/components/auction/LiveAuctionBanner.tsx
-
-## On Next Session
-1. `cat PROJECT_STATE.md` — sprint focus
-2. `tail -40 DONE.md` — what exists
-3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
-4. Register in `.claude/ACTIVE_AGENTS.md`
+## Key Numbers
+| Metric | Before | After |
+|--------|--------|-------|
+| Orphaned vehicles | 138,950 | 0 |
+| Design compliance | ~52% | ~87% |
+| NULL models | 1,141 | 1,122 |
+| Description discoveries | 11,170 | 11,227+ |
+| vehicle_events rows | ~152K | ~291K |

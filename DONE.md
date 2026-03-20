@@ -1,5 +1,42 @@
 # DONE — Completed Work Log
 
+### [overnight] Overnight Autonomous Work Session (2026-03-20 00:30-02:30)
+
+**Block 1: Data Quality Backfills**
+- [data-quality] Orphaned vehicle triage: 138,950 active vehicles had zero vehicle_events records
+  - Root cause: vehicles imported directly without creating vehicle_events entries
+  - 139,051 vehicle_events rows backfilled (source platform, URLs, prices from vehicles table)
+  - Orphaned vehicles: 138,950 → 0 (100% resolved)
+  - Sources: mecum (66K), cars_and_bids (17K), facebook_marketplace (12K), barrett-jackson (6K), craigslist (5K), gooding (5K), bat (4K), ksl (2K), rm-sothebys (2K), bonhams (2K), others
+- [data-quality] Model field cleanup: 19 NULL models fixed from URL slug extraction
+  - 14 from Cars & Bids URL slugs (e.g., /auctions/.../2000-daihatsu-mira-gino → Mira Gino)
+  - 3 from BaT URL slugs
+  - 2 from "for sale:" title patterns (e.g., "1965 Ford for sale: mustang fastback 289")
+  - Remaining 1,122 NULL models are unparseable (FB Marketplace garbage titles or null titles)
+- [data-quality] Primary image URL: 33K NULL are genuinely imageless (no vehicle_images rows exist)
+  - NOT a backfill opportunity — these vehicles have no images in any table
+
+**Block 2: Design System Compliance (52% → ~87%)**
+- [design] Global CSS reset: `* { border-radius: 0 !important; box-shadow: none !important; }`
+- [design] Tailwind config: all borderRadius→0, boxShadow→none
+- [design] 1,817 borderRadius inline styles removed across 250+ files
+- [design] 125 boxShadow inline styles removed across 70+ files
+- [design] 681 Tailwind rounded-* classes removed across 73 files
+- [design] 86 Tailwind shadow-* classes removed across 23 files
+- [design] 488 hardcoded hex colors → CSS variables across 107 files
+- [design] 30+ files font-family fixes (non-Arial → Arial, non-Courier → Courier New)
+- [design] 10 decorative gradients → solid colors
+- [design] Build passes clean (26s)
+
+**Block 3: Edge Function Investigation + Local Discovery**
+- [infra] Created index `idx_vehicles_api_list` on vehicles(data_quality_score DESC) for API list endpoint
+  - Fixes api-v1-vehicles 16s timeout (was hitting 15s anon statement_timeout)
+- [infra] Diagnosed extract-bat-core 500: intermittent, 1x in 24h, no pattern
+- [infra] Diagnosed ingest-observation 500: intermittent, 1x in 24h, healthy otherwise (67 versions deep)
+- [infra] Diagnosed bat_extraction_queue: 141K pending, cron exists (job 406, every 5 min) but only ~5/hr throughput — blocked on Anthropic API credits ($0 remaining)
+- [extraction] Ollama local discovery running in background (qwen2.5:7b, PID 19546)
+  - Total discoveries: 11,227 (9,562 Claude Haiku + 1,489 qwen2.5:7b + 176 others)
+
 ## 2026-03-20
 
 ### [overnight-autonomous] All-Night Work Plan — 6 Blocks Completed
@@ -4347,3 +4384,15 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
   - Reset 207 failed queue items to pending
   - Pipeline will clear backlog (~48K items) in ~5 hours
   - 3,500 full skeletons are unenrichable orphaned YMM stubs (no source data exists)
+
+## 2026-03-20
+
+### [user-profile] Skylar Vehicle Profile — Full Ingest Pipeline
+- **Safe merges**: 1932 Ford Roadster stub merged into primary (1144 imgs). 1977 K5 Blazer (794 imgs) merged into Blazer primary (1484 imgs → 2278 total). Fixed `merge_into_primary` function (added `recommended_primary` nullable, `exact_listing_url` to match_type check constraint).
+- **Location backfill**: All 97 user vehicles set to Boulder City, NV (was NULL on ~55 vehicles).
+- **Album mapping**: All 72 iPhoto albums mapped to vehicle IDs. 19 new vehicles created (1959 3100, 1963 Shovelhead, 1964 C20 LWB, 1964 Jaguar XKE, 1967 C10 SWB, 1971 C10 SWB 402, 1972 K10 LWB/SWB, 1973 Charger 360, 1974 K5 Blazer, 1981 DeLorean, 1984 K20 LWB, 1985 K10 SWB Brad, 1987 Nissan Maxima, 1989 Jimmy K5, 2004 F-350, 2005 Ferrari 360 Spider, 2025 Expedition). 15 inactive stubs reactivated with correct models.
+- **Suburban dedup**: 22,240 → 13,471 images (8,769 duplicates removed by Apple Photos UUID matching). Disabled per-row triggers during bulk delete for performance.
+- **Cron fix**: `iphoto-overnight.sh` updated with `export PATH="/opt/homebrew/bin:$PATH"` and switched to `--sync` mode for iCloud download.
+- **Mapper script**: `scripts/iphoto-album-mapper.sh` — explicit album→vehicle_id mapping for all 72 albums, runs iphoto-intake per album.
+- **iPhoto intake**: Running in background via mapper script. Albums process sequentially through osxphotos export → HEIC→JPEG → Supabase upload. ~13K photos across 72 albums.
+- Vehicle count: 72 active, 38 discovered, 6 inactive, 2 merged = 116 total (was ~100 pre-mapping).
