@@ -611,7 +611,7 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
           height: 40px;
           border: 3px solid var(--surface);
           border-top: 3px solid var(--accent);
-          border-radius: 50%;
+          border-radius: 0;
           animation: spin 1s linear infinite;
         }
         
