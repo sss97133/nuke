@@ -354,7 +354,6 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
                         width: '48px',
                         height: '48px',
                         background: 'rgba(0, 0, 0, 0.6)',
-                        borderRadius: '50%',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',

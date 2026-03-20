@@ -1220,11 +1220,11 @@ function CuratorPanel({
                 <img
                   src={curatorProfile.avatar_url}
                   alt=""
-                  style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--border)' }}
+                  style={{ width: '48px', height: '48px', objectFit: 'cover', border: '2px solid var(--border)' }}
                 />
               ) : (
                 <div style={{
-                  width: '48px', height: '48px', borderRadius: '50%',
+                  width: '48px', height: '48px',
                   background: isAgent ? 'var(--agent, #8b5cf6)' : 'var(--primary)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: 'var(--bg)', fontSize: '21px', fontWeight: 900,

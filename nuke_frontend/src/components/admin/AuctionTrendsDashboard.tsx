@@ -183,7 +183,6 @@ export default function AuctionTrendsDashboard() {
             width: '20px',
             height: '20px',
             background: sentimentConfig.bg,
-            borderRadius: '50%',
             transform: 'translateX(-50%)',
           }} />
         </div>
