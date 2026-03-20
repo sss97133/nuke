@@ -271,7 +271,7 @@ export default function CatalogBrowser() {
                 transition: 'transform 0.12s',
                 cursor: 'pointer'
               }}
-              className="hover:"
+              className=""
               onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
               onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
             >

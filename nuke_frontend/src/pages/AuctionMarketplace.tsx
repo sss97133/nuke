@@ -704,7 +704,7 @@ function AuctionCard({ auction, now }: { auction: LiveAuction; now: number }) {
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: '6px 8px',
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 100%)',
+          background: 'rgba(0,0,0,0.35)',
         }}>
           <span style={{
             fontFamily: 'Arial, sans-serif',

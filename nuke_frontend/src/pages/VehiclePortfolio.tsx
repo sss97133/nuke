@@ -524,7 +524,7 @@ const styles: Record<string, React.CSSProperties> = {
   heroOverlay: {
     position: 'absolute',
     inset: 0,
-    background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, transparent 35%, transparent 50%, rgba(0,0,0,0.72) 100%)',
+    background: 'rgba(0,0,0,0.35)',
     pointerEvents: 'none',
   },
   heroCaption: {
@@ -772,7 +772,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--bg)',
     width: '48px',
     height: '48px',
-    borderRadius: '50%',
     fontSize: '24px',
     cursor: 'pointer',
     display: 'flex',
@@ -789,7 +788,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--bg)',
     width: '38px',
     height: '38px',
-    borderRadius: '50%',
     fontSize: '20px',
     cursor: 'pointer',
     display: 'flex',
