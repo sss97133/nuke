@@ -792,6 +792,53 @@ const TOOLS: ToolDef[] = [
       required: ["vehicle_id"],
     },
   },
+
+  // ── Photo Ingest ────────────────────────────────────────────────────
+  {
+    name: "ingest_photos",
+    description:
+      "Ingest vehicle photos into Nuke. Accepts base64-encoded images or URLs. " +
+      "Use this when a user wants to upload, catalog, or document their vehicle with photos. " +
+      "Each image is uploaded to storage, AI-classified (make/model/zone), and linked to a vehicle record. " +
+      "If vehicle_id is not provided, AI will attempt to match based on image content and any hints (year/make/model). " +
+      "Returns upload results with vehicle match and classification details.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        images: {
+          type: "array",
+          description: "Array of images to ingest. Each must have either 'url' (public URL) or 'base64' (base64-encoded image data).",
+          items: {
+            type: "object",
+            properties: {
+              url: { type: "string", description: "Public URL of the image" },
+              base64: { type: "string", description: "Base64-encoded image data (JPEG or PNG)" },
+              filename: { type: "string", description: "Original filename (e.g. 'IMG_2453.jpg')" },
+              taken_at: { type: "string", description: "ISO timestamp when photo was taken" },
+              latitude: { type: "number", description: "GPS latitude" },
+              longitude: { type: "number", description: "GPS longitude" },
+              caption: { type: "string", description: "User description or caption for the photo" },
+            },
+          },
+        },
+        vehicle_id: { type: "string", description: "Vehicle UUID if known. If omitted, AI will match from image content." },
+        vehicle_hint: {
+          type: "object",
+          description: "Hints to help match the vehicle if vehicle_id is not known.",
+          properties: {
+            year: { type: "number" },
+            make: { type: "string" },
+            model: { type: "string" },
+            vin: { type: "string" },
+            color: { type: "string" },
+          },
+        },
+        user_id: { type: "string", description: "User UUID (for attribution). Optional." },
+        source: { type: "string", description: "Where photos came from (e.g. 'claude_upload', 'user_folder', 'phone'). Default: 'ai_ingest'." },
+      },
+      required: ["images"],
+    },
+  },
 ];
 
 // =============================================================================
@@ -1955,6 +2002,137 @@ async function handlePrepareListing(
   });
 }
 
+// ── Photo Ingest Handler ────────────────────────────────────────────────────
+
+async function handleIngestPhotos(args: Record<string, unknown>): Promise<ToolResult> {
+  const supabase = sb();
+  const images = args.images as Array<{
+    url?: string; base64?: string; filename?: string;
+    taken_at?: string; latitude?: number; longitude?: number; caption?: string;
+  }>;
+  const vehicleId = args.vehicle_id as string | undefined;
+  const vehicleHint = args.vehicle_hint as { year?: number; make?: string; model?: string; vin?: string; color?: string } | undefined;
+  const userId = args.user_id as string | undefined;
+  const source = (args.source as string) || "ai_ingest";
+
+  if (!images || !Array.isArray(images) || images.length === 0) {
+    return toolErr("images array required with at least one image (url or base64)");
+  }
+
+  if (images.length > 100) {
+    return toolErr(`Too many images in one call (${images.length}). Maximum 100. Split into multiple calls.`);
+  }
+
+  // If we have a vehicle hint but no ID, try to find/create the vehicle
+  let resolvedVehicleId = vehicleId || null;
+  if (!resolvedVehicleId && vehicleHint) {
+    const { year, make, model, vin } = vehicleHint;
+    // Try VIN match first
+    if (vin) {
+      const { data } = await supabase.from("vehicles").select("id").eq("vin", vin).limit(1).single();
+      if (data) resolvedVehicleId = data.id;
+    }
+    // Then YMM match
+    if (!resolvedVehicleId && year && make) {
+      let q = supabase.from("vehicles").select("id").eq("year", year).ilike("make", make);
+      if (model) q = q.ilike("model", `%${model}%`);
+      const { data } = await q.limit(1).single();
+      if (data) resolvedVehicleId = data.id;
+    }
+  }
+
+  // Upload each image: base64 → storage, or pass URL directly
+  const results: Array<{ filename: string; status: string; error?: string }> = [];
+  let uploaded = 0, errors = 0;
+
+  for (let i = 0; i < images.length; i += 10) {
+    const batch = images.slice(i, i + 10);
+    await Promise.all(batch.map(async (img, idx) => {
+      const filename = img.filename || `photo_${i + idx + 1}.jpg`;
+      try {
+        let imageUrl: string;
+
+        if (img.base64) {
+          // Upload base64 to storage
+          const raw = img.base64.replace(/^data:image\/\w+;base64,/, "");
+          const bytes = Uint8Array.from(atob(raw), c => c.charCodeAt(0));
+          const ext = filename.split(".").pop()?.toLowerCase() || "jpg";
+          const mime = ext === "png" ? "image/png" : "image/jpeg";
+          const vehicleDir = resolvedVehicleId || "unassigned";
+          const storagePath = `${vehicleDir}/${source}/${filename}`;
+
+          const { error: uploadErr } = await supabase.storage
+            .from("vehicle-photos")
+            .upload(storagePath, bytes, { contentType: mime, upsert: true });
+
+          if (uploadErr) {
+            results.push({ filename, status: "error", error: uploadErr.message });
+            errors++;
+            return;
+          }
+          const { data: { publicUrl } } = supabase.storage.from("vehicle-photos").getPublicUrl(storagePath);
+          imageUrl = publicUrl;
+        } else if (img.url) {
+          imageUrl = img.url;
+        } else {
+          results.push({ filename, status: "error", error: "No url or base64 provided" });
+          errors++;
+          return;
+        }
+
+        // Insert into vehicle_images
+        const row: Record<string, unknown> = {
+          image_url: imageUrl,
+          source,
+          file_name: filename,
+          is_external: !img.base64,
+          ai_processing_status: "pending",
+          ...(resolvedVehicleId && { vehicle_id: resolvedVehicleId }),
+          ...(userId && { documented_by_user_id: userId }),
+          ...(img.taken_at && { taken_at: img.taken_at }),
+          ...(img.latitude != null && { latitude: img.latitude }),
+          ...(img.longitude != null && { longitude: img.longitude }),
+          ...(img.caption && { caption: img.caption }),
+        };
+
+        const { error: insertErr } = await supabase.from("vehicle_images").insert(row);
+        if (insertErr && !insertErr.message.includes("duplicate")) {
+          results.push({ filename, status: "error", error: insertErr.message });
+          errors++;
+        } else {
+          results.push({ filename, status: "ok" });
+          uploaded++;
+        }
+      } catch (e) {
+        results.push({ filename, status: "error", error: e instanceof Error ? e.message : String(e) });
+        errors++;
+      }
+    }));
+  }
+
+  // Get vehicle info for response
+  let vehicleInfo = null;
+  if (resolvedVehicleId) {
+    const { data: v } = await supabase.from("vehicles")
+      .select("year, make, model, vin")
+      .eq("id", resolvedVehicleId).single();
+    if (v) vehicleInfo = { id: resolvedVehicleId, ...v };
+  }
+
+  return toolOk({
+    uploaded,
+    errors,
+    total: images.length,
+    vehicle: vehicleInfo || (resolvedVehicleId ? { id: resolvedVehicleId } : null),
+    vehicle_matched: !!resolvedVehicleId,
+    vehicle_hint_used: !vehicleId && !!vehicleHint,
+    results: results.length <= 20 ? results : results.filter(r => r.status === "error").slice(0, 10),
+    _note: resolvedVehicleId
+      ? `${uploaded} photos linked to vehicle. AI classification will run automatically.`
+      : `${uploaded} photos uploaded as unassigned. Use search_vehicles to find the vehicle, then call ingest_photos again with vehicle_id.`,
+  });
+}
+
 // =============================================================================
 // TOOL DISPATCH
 // =============================================================================
@@ -1986,6 +2164,7 @@ const TOOL_HANDLERS: Record<string, (args: Record<string, unknown>) => Promise<T
   get_auction_readiness: handleGetAuctionReadiness,
   get_coaching_plan: handleGetCoachingPlan,
   prepare_listing: handlePrepareListing,
+  ingest_photos: handleIngestPhotos,
 };
 
 // =============================================================================

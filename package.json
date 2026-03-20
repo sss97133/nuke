@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "build": "cd nuke_frontend && npm install && npm run build && rm -rf ../dist && mv dist ../dist",
+    "photo:drop": "dotenvx run -- node scripts/nuke-photo-drop.mjs",
     "env:doctor": "node scripts/tools/env-doctor.cjs",
     "audit": "tsx scripts/run-autonomous-audit.ts",
     "audit:dry-run": "tsx scripts/run-autonomous-audit.ts --dry-run",
@@ -120,7 +121,9 @@
     "promote:library": "dotenvx run -- node scripts/promote-library-extractions.mjs",
     "promote:library:dry": "dotenvx run -- node scripts/promote-library-extractions.mjs --dry-run",
     "promote:library:stats": "dotenvx run -- node scripts/promote-library-extractions.mjs --stats",
-    "overnight": "dotenvx run -- bash scripts/overnight-run.sh"
+    "overnight": "dotenvx run -- bash scripts/overnight-run.sh",
+    "mine:modal": "dotenvx run -- node scripts/mine-comments-for-library.mjs --run 500 --provider modal --concurrency 3",
+    "discover:modal": "dotenvx run -- node scripts/local-description-discovery.mjs --provider modal --max 10000 --continue --parallel 4 --batch 50"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",
