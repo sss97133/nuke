@@ -28,14 +28,17 @@ const getArg = (name, def) => { const i = cliArgs.indexOf(`--${name}`); return i
 const PROVIDER = getArg('provider', 'anthropic');
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 
+const MODAL_URL = process.env.MODAL_LLM_URL || 'https://sss97133--nuke-vllm-serve.modal.run';
+
 const PROVIDER_MODELS = {
   anthropic: 'claude-haiku-4-5-20251001',
   ollama: 'qwen2.5:7b',
   gemini: 'gemini-2.0-flash-lite',
+  modal: 'qwen2.5-7b',
 };
 const MODEL = getArg('model', PROVIDER_MODELS[PROVIDER] || 'qwen2.5:7b');
 
-const PROVIDER_CONCURRENCY = { anthropic: 5, ollama: 2, gemini: 5 };
+const PROVIDER_CONCURRENCY = { anthropic: 5, ollama: 2, gemini: 5, modal: 6 };
 const CONCURRENCY = parseInt(getArg('concurrency', String(PROVIDER_CONCURRENCY[PROVIDER] || 2)));
 
 const DB_HOST = '54.177.55.191';
@@ -219,7 +222,29 @@ async function callGemini(systemPrompt, userPrompt) {
   return { text: r.candidates?.[0]?.content?.parts?.[0]?.text || '', input_tokens: 0, output_tokens: 0, cost: 0 };
 }
 
-const PROVIDERS = { anthropic: callAnthropic, ollama: callOllama, gemini: callGemini };
+async function callModal(systemPrompt, userPrompt) {
+  const resp = await fetch(`${MODAL_URL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'qwen2.5-7b',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.1,
+      max_tokens: 4096,
+    }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    throw new Error(`Modal ${resp.status}: ${text.slice(0, 200)}`);
+  }
+  const r = await resp.json();
+  return { text: r.choices?.[0]?.message?.content || '', input_tokens: 0, output_tokens: 0, cost: 0 };
+}
+
+const PROVIDERS = { anthropic: callAnthropic, ollama: callOllama, gemini: callGemini, modal: callModal };
 
 // ─── Parse JSON from LLM output ─────────────────────────────────────────────
 function parseJsonResponse(text) {

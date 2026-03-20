@@ -533,7 +533,7 @@ Deno.serve(async (req) => {
           total_value: cacheRow.total_value ?? 0,
           for_sale_count: cacheRow.for_sale_count ?? 0,
           active_auctions: cacheRow.active_auctions ?? 0,
-          avg_price: cacheRow.avg_value ?? 0,
+          avg_price: cacheRow.avg_value || (cacheRow.total_vehicles > 0 ? Math.round(cacheRow.total_value / cacheRow.total_vehicles) : 0),
           vehicles_added_today: cacheRow.vehicles_added_today ?? 0,
           sales_count_today: cacheRow.sales_count_today ?? 0,
           sales_volume_today: cacheRow.sales_volume_today ?? 0,
