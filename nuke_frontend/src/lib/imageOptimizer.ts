@@ -7,9 +7,10 @@
  * - Other sources: Returns original URL
  */
 
-export type ImageSize = 'thumbnail' | 'small' | 'medium' | 'large' | 'full';
+export type ImageSize = 'micro' | 'thumbnail' | 'small' | 'medium' | 'large' | 'full';
 
 const SIZE_CONFIG: Record<ImageSize, { width: number; quality: number }> = {
+  micro: { width: 80, quality: 60 },
   thumbnail: { width: 150, quality: 75 },
   small: { width: 300, quality: 80 },
   medium: { width: 600, quality: 85 },
