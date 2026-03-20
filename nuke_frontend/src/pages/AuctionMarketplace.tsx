@@ -1,51 +1,50 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../hooks/useAuth';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { getVehicleIdentityParts } from '../utils/vehicleIdentity';
 import { formatCurrencyFromCents, resolveCurrencyCode } from '../utils/currency';
-import ProxyBidModal from '../components/ProxyBidModal';
-import AuctionNetworkDirectory from '../components/auction/AuctionNetworkDirectory';
 import '../styles/unified-design-system.css';
 
-// Add pulse animation for LIVE badge + skeleton loading
-const liveBadgeStyle = `
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-  }
-  @keyframes auction-skeleton-pulse {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 0.3; }
-  }
-`;
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style');
-  style.textContent = liveBadgeStyle;
-  document.head.appendChild(style);
-}
+const AUCTION_PLATFORMS = [
+  'bat', 'cars_and_bids', 'collecting_cars', 'broad_arrow',
+  'rmsothebys', 'gooding', 'sbx', 'barrettjackson', 'mecum',
+] as const;
 
-interface AuctionListing {
+const PLATFORM_LABELS: Record<string, string> = {
+  bat: 'BAT',
+  cars_and_bids: 'C&B',
+  collecting_cars: 'CC',
+  broad_arrow: 'BA',
+  rmsothebys: 'RM',
+  gooding: 'GOODING',
+  sbx: 'SBX',
+  barrettjackson: 'B-J',
+  mecum: 'MECUM',
+};
+
+const PLATFORM_NAMES: Record<string, string> = {
+  bat: 'Bring a Trailer',
+  cars_and_bids: 'Cars & Bids',
+  collecting_cars: 'Collecting Cars',
+  broad_arrow: 'Broad Arrow',
+  rmsothebys: 'RM Sotheby\'s',
+  gooding: 'Gooding & Co',
+  sbx: 'SBX Cars',
+  barrettjackson: 'Barrett-Jackson',
+  mecum: 'Mecum',
+};
+
+interface LiveAuction {
   id: string;
   vehicle_id: string;
-  seller_id?: string;
-  sale_type?: string;
-  source: 'native' | 'external';
-  platform?: string;
-  listing_url?: string;
-  lead_image_url?: string | null;
-  current_high_bid_cents: number | null;
-  reserve_price_cents: number | null;
-  currency_code?: string | null;
+  platform: string;
+  source_url: string | null;
+  end_time: string | null;
+  current_price_cents: number | null;
+  currency_code: string | null;
   bid_count: number;
-  auction_start_time?: string | null;
-  auction_end_time: string | null;
-  status: string;
-  description?: string;
-  created_at: string;
-  updated_at?: string | null;
-  telemetry_stale?: boolean;
-  is_flash?: boolean;
+  comment_count: number | null;
+  no_reserve: boolean;
   vehicle: {
     id: string;
     year: number;
@@ -54,1072 +53,623 @@ interface AuctionListing {
     trim: string | null;
     mileage: number | null;
     primary_image_url: string | null;
-    body_style?: string | null;
-    canonical_vehicle_type?: string | null;
-    canonical_body_style?: string | null;
-    listing_kind?: string | null;
-    bat_comments?: number | null;
-    bat_views?: number | null;
   };
 }
 
-type FilterType = 'all' | 'ending_now' | 'ending_soon' | 'flash' | 'no_reserve' | 'new_listings';
-type SortType = 'ending_soon' | 'bid_count' | 'price_low' | 'price_high' | 'newest';
+type SortType = 'ending_soon' | 'most_bids' | 'price_low' | 'price_high' | 'newest';
+
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+const SIXTY_DAYS_MS = 60 * 24 * 60 * 60 * 1000;
 
 export default function AuctionMarketplace() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [listings, setListings] = useState<AuctionListing[]>([]);
+  const [auctions, setAuctions] = useState<LiveAuction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<FilterType>('all');
-  const [sort, setSort] = useState<SortType>('ending_soon');
   const [searchQuery, setSearchQuery] = useState('');
-  const [nowTick, setNowTick] = useState<number>(() => Date.now());
-  // Default to including 0-bid auctions so marketplace doesn't look empty while bid_count backfills.
-  const [includeNoBidAuctions, setIncludeNoBidAuctions] = useState(true);
-  const [hiddenNoBidCount, setHiddenNoBidCount] = useState(0);
-  const [hiddenBadDataCount, setHiddenBadDataCount] = useState(0);
-  const [hiddenExcludedTypeCount, setHiddenExcludedTypeCount] = useState(0);
-  const [includeBadDataListings, setIncludeBadDataListings] = useState(false);
-  const [includeStaleAuctions, setIncludeStaleAuctions] = useState(false);
-  const [hiddenStaleCount, setHiddenStaleCount] = useState(0);
-  const [debugCounts, setDebugCounts] = useState<{ native: number; external: number; bat: number; total: number } | null>(null);
-  const endingNowWindowMs = 15 * 60 * 1000;
-  const endingSoonWindowMs = 2 * 60 * 60 * 1000;
-  const maxReasonableEndMs = 60 * 24 * 60 * 60 * 1000;
-  const nowMs = nowTick;
+  const [platformFilter, setPlatformFilter] = useState<string | null>(null);
+  const [sort, setSort] = useState<SortType>('ending_soon');
+  const [nowTick, setNowTick] = useState(Date.now());
 
   useEffect(() => {
-    loadListings();
-    
-    // Subscribe to real-time updates
+    loadAuctions();
+
     let scheduled = false;
     const scheduleReload = () => {
       if (scheduled) return;
       scheduled = true;
       window.setTimeout(() => {
         scheduled = false;
-        loadListings();
-      }, 750);
+        loadAuctions();
+      }, 2000);
     };
 
     const channel = supabase
-      .channel('auction-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'vehicle_listings',
-          filter: 'status=eq.active',
-        },
-        scheduleReload,
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'vehicle_events',
-        },
-        scheduleReload,
-      )
+      .channel('live-auctions')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_events' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_listings', filter: 'status=eq.active' }, scheduleReload)
       .subscribe();
 
-    return () => {
-      channel.unsubscribe();
-    };
-  }, [filter, sort, includeNoBidAuctions, includeBadDataListings, includeStaleAuctions]);
+    return () => { channel.unsubscribe(); };
+  }, []);
 
-  // Refresh time-left labels + "ending soon" buckets.
+  // Tick timer for countdowns
   useEffect(() => {
-    const id = window.setInterval(() => setNowTick(Date.now()), 30000);
+    const id = window.setInterval(() => setNowTick(Date.now()), 30_000);
     return () => window.clearInterval(id);
   }, []);
 
-  const loadListings = async () => {
+  const loadAuctions = async () => {
     setLoading(true);
     const nowIso = new Date().toISOString();
-    const nowMsLocal = Date.now();
-    const maxReasonableEndMs = 60 * 24 * 60 * 60 * 1000; // 60 days
-    const externalStaleMs = 6 * 60 * 60 * 1000; // 6 hours
-    const externalEndPastGraceMs = 10 * 60 * 1000; // 10 minutes
-    const allListings: AuctionListing[] = [];
-    let hiddenNoBids = 0;
-    let hiddenBadData = 0;
-    let hiddenExcludedType = 0;
-    let hiddenStale = 0;
+    const results: LiveAuction[] = [];
 
     try {
-      const normalizeEndTime = (params: {
-        raw: any;
-        source: 'native' | 'external';
-        status?: any;
-        updatedAt?: any;
-      }): { endTime: string | null; isStale: boolean } => {
-        const raw = params.raw;
-        if (!raw) return { endTime: null, isStale: false };
-        const end = new Date(raw);
-        if (!Number.isFinite(end.getTime())) return { endTime: null, isStale: false };
-        const diff = end.getTime() - nowMsLocal;
-        if (diff > maxReasonableEndMs) return { endTime: null, isStale: false };
+      // 1. External auctions from vehicle_events — real auction platforms only
+      const { data: events } = await supabase
+        .from('vehicle_events')
+        .select(`
+          id, vehicle_id, source_platform, source_url, ended_at, end_date,
+          current_price, current_bid, bid_count, event_status, listing_status,
+          reserve_status, no_reserve, metadata, created_at, updated_at,
+          currency, currency_code, price_currency,
+          vehicle:vehicles (
+            id, year, make, model, trim, mileage, primary_image_url,
+            bat_comments
+          )
+        `)
+        .in('source_platform', [...AUCTION_PLATFORMS])
+        .or(`event_status.eq.active,ended_at.gt.${nowIso}`);
 
-        let stale = false;
-        if (params.source === 'external') {
-          const updatedAt = params.updatedAt ? new Date(params.updatedAt) : null;
-          if (updatedAt && Number.isFinite(updatedAt.getTime())) {
-            stale = nowMsLocal - updatedAt.getTime() > externalStaleMs;
-          }
-          const status = String(params.status || '').toLowerCase();
-          const isLiveStatus = ['active', 'live'].includes(status);
-          if (isLiveStatus && diff < -externalEndPastGraceMs) {
-            return { endTime: null, isStale: true };
-          }
-          if (status && !isLiveStatus && diff < 0) {
-            return { endTime: null, isStale: true };
-          }
-          // If telemetry is stale and the end time is already in the past, hide it.
-          if (stale && diff < -5 * 60 * 1000) {
-            return { endTime: null, isStale: stale };
-          }
-        }
+      if (events) {
+        const nowMs = Date.now();
+        for (const ev of events as any[]) {
+          const platform = ev.source_platform;
+          const v = ev.vehicle;
+          if (!v?.id || !v?.year || !v?.make) continue;
 
-        return { endTime: end.toISOString(), isStale: stale };
-      };
+          // Parse end time
+          const rawEnd = ev.ended_at ?? ev.end_date;
+          const endDate = rawEnd ? new Date(rawEnd) : null;
+          const endMs = endDate && Number.isFinite(endDate.getTime()) ? endDate.getTime() : null;
 
-      const isFlashAuction = (start?: string | null, end?: string | null, saleType?: string | null) => {
-        if (!start || !end) return false;
-        if (saleType !== 'live_auction') return false;
-        const s = new Date(start).getTime();
-        const e = new Date(end).getTime();
-        if (!Number.isFinite(s) || !Number.isFinite(e)) return false;
-        const durationMs = e - s;
-        return durationMs > 0 && durationMs <= 10 * 60 * 1000;
-      };
+          // Skip garbage dates (> 60 days out or already ended with non-active status)
+          if (endMs !== null && (endMs - nowMs) > SIXTY_DAYS_MS) continue;
 
-      const parseTitle = (title: any): { year?: number; make?: string; model?: string; trim?: string | null } => {
-        const t = typeof title === 'string' ? title.trim() : '';
-        // Best-effort: "<year> <make> <model> <trim...>"
-        const m = t.match(/\b(19\d{2}|20\d{2})\s+([A-Za-z0-9]+)\s+(.+)$/);
-        if (!m) return {};
-        const year = Number(m[1]);
-        const make = m[2];
-        const rest = (m[3] || '').trim();
-        // Split rest into model + optional trim (keep it simple)
-        const parts = rest.split(/\s+/);
-        const model = parts.slice(0, Math.min(2, parts.length)).join(' ');
-        const trim = parts.length > 2 ? parts.slice(2).join(' ') : null;
-        return {
-          year: Number.isFinite(year) ? year : undefined,
-          make: make || undefined,
-          model: model || undefined,
-          trim,
-        };
-      };
+          const status = String(ev.event_status ?? ev.listing_status ?? '').toLowerCase();
+          const isActive = status === 'active' || status === 'live';
 
-      const titleFromListingUrl = (listingUrl?: string | null): string | null => {
-        if (!listingUrl) return null;
-        try {
-          const u = new URL(listingUrl);
-          const parts = u.pathname.split('/').filter(Boolean);
-          if (parts.length === 0) return null;
-          let slug = parts[parts.length - 1] || '';
-          if (!slug || slug.endsWith('.xml') || slug === 'listing' || slug === 'lots' || slug === 'auctions') {
-            return null;
-          }
-          if (/^\d+$/.test(slug)) return null;
-          slug = slug.replace(/[-_]+/g, ' ').trim();
-          if (!/^(19|20)\d{2}\b/.test(slug)) return null;
-          return slug;
-        } catch {
-          return null;
-        }
-      };
+          // Skip ended auctions (end time in past and not marked active)
+          if (endMs !== null && endMs < nowMs && !isActive) continue;
+          // Skip if no end time and not active
+          if (endMs === null && !isActive) continue;
 
-      const getListingFallbackTitle = (listing: any): string | null => {
-        const metadata = listing?.metadata || {};
-        return (
-          metadata?.bat_title ||
-          metadata?.title ||
-          metadata?.listing_title ||
-          metadata?.vehicle_title ||
-          metadata?.auction_title ||
-          metadata?.name ||
-          listing?.title ||
-          listing?.listing_title ||
-          titleFromListingUrl(listing?.listing_url) ||
-          null
-        );
-      };
+          // Skip sold/ended
+          const inactiveStatuses = new Set(['sold', 'ended', 'cancelled', 'no_sale', 'reserve_not_met', 'withdrawn', 'expired', 'closed', 'archived']);
+          if (inactiveStatuses.has(status)) continue;
 
-      const normalizeVehicle = (params: {
-        vehicleId: string;
-        maybeVehicle: any;
-        fallbackTitle?: any;
-        fallbackImageUrl?: any;
-      }) => {
-        const v = params.maybeVehicle || null;
-        const titleParts = parseTitle(params.fallbackTitle);
-        const rawYear = typeof v?.year === 'number' ? v.year : Number(v?.year);
-        const year = Number.isFinite(rawYear) && rawYear > 0 ? rawYear : (titleParts.year || 0);
-        return {
-          id: (v?.id as string) || params.vehicleId,
-          year,
-          make: (typeof v?.make === 'string' && v.make ? v.make : titleParts.make || 'Unknown'),
-          model: (typeof v?.model === 'string' && v.model ? v.model : titleParts.model || 'Vehicle'),
-          trim: (v?.trim ?? titleParts.trim ?? null) as string | null,
-          mileage: (typeof v?.mileage === 'number' ? v.mileage : null) as number | null,
-          primary_image_url: (v?.primary_image_url ?? params.fallbackImageUrl ?? null) as string | null,
-          body_style: (typeof v?.body_style === 'string' ? v.body_style : null) as string | null,
-          canonical_vehicle_type: (typeof v?.canonical_vehicle_type === 'string' ? v.canonical_vehicle_type : null) as string | null,
-          canonical_body_style: (typeof v?.canonical_body_style === 'string' ? v.canonical_body_style : null) as string | null,
-          listing_kind: (typeof v?.listing_kind === 'string' ? v.listing_kind : null) as string | null,
-          bat_comments: (typeof v?.bat_comments === 'number' ? v.bat_comments : null) as number | null,
-          bat_views: (typeof v?.bat_views === 'number' ? v.bat_views : null) as number | null,
-        };
-      };
+          // Price
+          const rawPrice = ev.current_price ?? ev.current_bid;
+          const priceCents = rawPrice ? Math.round(Number(rawPrice) * 100) : null;
 
-      const resolveListingCurrency = (listing: any): string | null =>
-        resolveCurrencyCode(
-          listing?.currency,
-          listing?.currency_code,
-          listing?.price_currency,
-          listing?.metadata?.currency,
-          listing?.metadata?.currency_code,
-          listing?.metadata?.currencyCode,
-          listing?.metadata?.price_currency,
-          listing?.metadata?.priceCurrency,
-          listing?.metadata?.priceCurrencyCode,
-        );
+          // Currency
+          const currCode = resolveCurrencyCode(
+            ev.currency, ev.currency_code, ev.price_currency,
+            ev.metadata?.currency, ev.metadata?.currency_code,
+            ev.metadata?.priceCurrency,
+          );
 
-      const hasBidSignal = (params: { bidCount: any; currentHighBidCents: any }) => {
-        const n = typeof params.bidCount === 'number' ? params.bidCount : Number(params.bidCount || 0);
-        if (Number.isFinite(n) && n > 0) return true;
-        const bidCents =
-          typeof params.currentHighBidCents === 'number'
-            ? params.currentHighBidCents
-            : Number(params.currentHighBidCents || 0);
-        return Number.isFinite(bidCents) && bidCents > 0;
-      };
+          // Reserve
+          const noReserve = ev.no_reserve === true ||
+            ev.reserve_status === 'no_reserve' ||
+            ev.metadata?.no_reserve === true ||
+            String(ev.metadata?.reserve_status ?? '').toLowerCase() === 'no reserve';
 
-      const parseNumeric = (value: any): number => {
-        if (typeof value === 'number') return value;
-        const s = String(value ?? '').trim();
-        if (!s) return NaN;
-        return Number(s.replace(/[$,]/g, ''));
-      };
-
-      const isExternalSoldListing = (listing: any): boolean => {
-        const status = String(listing?.listing_status || '').toLowerCase();
-        const inactiveStatuses = new Set([
-          'sold',
-          'ended',
-          'cancelled',
-          'no_sale',
-          'reserve_not_met',
-          'withdrawn',
-          'expired',
-          'closed',
-          'archived',
-        ]);
-        if (inactiveStatuses.has(status)) return true;
-
-        const finalPrice = parseNumeric(listing?.final_price);
-        if (Number.isFinite(finalPrice) && finalPrice > 0) return true;
-
-        const soldAt = listing?.sold_at ? new Date(listing.sold_at) : null;
-        if (soldAt && Number.isFinite(soldAt.getTime())) return true;
-
-        return false;
-      };
-
-      const nowYear = new Date().getFullYear();
-      const isNonVehicleListing = (vehicle: AuctionListing['vehicle']) => {
-        const kind = String(vehicle?.listing_kind || '').trim().toLowerCase();
-        return Boolean(kind && kind !== 'vehicle');
-      };
-      const isMotorcycleListing = (vehicle: AuctionListing['vehicle']) => {
-        const canonicalType = String(vehicle?.canonical_vehicle_type || '').trim().toUpperCase();
-        if (canonicalType === 'MOTORCYCLE') return true;
-        const canonicalBody = String(vehicle?.canonical_body_style || '').trim().toUpperCase();
-        if (canonicalBody === 'MOTORCYCLE') return true;
-        const bodyStyle = String(vehicle?.body_style || '').trim().toLowerCase();
-        if (!bodyStyle) return false;
-        return bodyStyle.includes('motorcycle') || bodyStyle.includes('motor bike') || bodyStyle === 'bike';
-      };
-      const isIdentityUsable = (vehicle: AuctionListing['vehicle']) => {
-        const make = String(vehicle?.make || '').trim();
-        const model = String(vehicle?.model || '').trim();
-        const makeLower = make.toLowerCase();
-        const modelLower = model.toLowerCase();
-        const yearNum = Number(vehicle?.year);
-        const yearOk = Number.isFinite(yearNum) && yearNum >= 1885 && yearNum <= nowYear + 1;
-        const badTokens = ['navigation', 'menu', 'login', 'register', 'sign in', 'search', 'home', 'about', 'contact', 'inventory'];
-        const badTokenHit = badTokens.some((token) => makeLower.includes(token) || modelLower.includes(token));
-        const stopModelTokens = new Set(['in', 'for', 'with', 'and']);
-        const makeOk = make.length > 0 && !['unknown', 'n/a', 'na', 'none'].includes(makeLower) && !badTokenHit;
-        const modelOk =
-          model.length > 1 &&
-          !['vehicle', 'unknown', 'n/a', 'na', 'none'].includes(modelLower) &&
-          !stopModelTokens.has(modelLower) &&
-          !badTokenHit;
-        return makeOk && modelOk && yearOk;
-      };
-      const getExclusionReason = (
-        listing: AuctionListing
-      ): 'missing_vehicle' | 'non_vehicle' | 'motorcycle' | 'identity' | null => {
-        if (!listing?.vehicle?.id) return 'missing_vehicle';
-        if (isNonVehicleListing(listing.vehicle)) return 'non_vehicle';
-        if (isMotorcycleListing(listing.vehicle)) return 'motorcycle';
-        if (!includeBadDataListings && !isIdentityUsable(listing.vehicle)) return 'identity';
-        return null;
-      };
-
-      const baseVehicleSelect = `
-            id,
-            year,
-            make,
-            model,
-            trim,
-            mileage,
-            primary_image_url,
-            body_style
-          `;
-      const extendedVehicleSelect = `
-            ${baseVehicleSelect},
-            canonical_vehicle_type,
-            canonical_body_style,
-            listing_kind,
-            bat_comments,
-            bat_views
-          `;
-      const getMissingColumn = (err: any): string | null => {
-        const message = String(err?.message || '');
-        const match =
-          message.match(/column\s+[\w.]+\.(\w+)\s+does\s+not\s+exist/i) ||
-          message.match(/column\s+(\w+)\s+does\s+not\s+exist/i);
-        return match?.[1] || null;
-      };
-      const runWithVehicleFallback = async (runner: (selectFields: string) => Promise<any>) => {
-        let result = await runner(extendedVehicleSelect);
-        if (result.error) {
-          const missing = getMissingColumn(result.error);
-          if (
-            missing &&
-            ['canonical_vehicle_type', 'canonical_body_style', 'listing_kind', 'bat_comments', 'bat_views'].includes(
-              missing
-            )
-          ) {
-            result = await runner(baseVehicleSelect);
-          }
-        }
-        return result;
-      };
-      const runNativeQuery = (selectFields: string) =>
-        supabase
-          .from('vehicle_listings')
-          .select(`
-            *,
-            vehicle:vehicles (
-              ${selectFields}
-            )
-          `)
-          .eq('status', 'active')
-          .in('sale_type', ['auction', 'live_auction']);
-
-      const runExternalQuery = (selectFields: string) =>
-        supabase
-          .from('vehicle_events')
-          .select(`
-            *,
-            vehicle:vehicles (
-              ${selectFields}
-            )
-          `)
-          // Do not exclude rows with missing/stale ended_at; treat 'active' status as primary signal.
-          // Show rows that are explicitly active OR have a future ended_at.
-          .or(`event_status.eq.active,ended_at.gt.${nowIso}`);
-
-      // 1. Load native vehicle_listings (Nuke auctions)
-      const { data: nativeListings, error: nativeError } = await runWithVehicleFallback(runNativeQuery);
-
-      if (!nativeError && nativeListings) {
-        for (const listing of nativeListings) {
-          const nativeEndRaw = (listing as any).auction_end_time ?? (listing as any).auction_end_date ?? null;
-          const { endTime: nativeEndTime } = normalizeEndTime({
-            raw: nativeEndRaw,
-            source: 'native',
+          results.push({
+            id: ev.id,
+            vehicle_id: ev.vehicle_id,
+            platform,
+            source_url: ev.source_url ?? null,
+            end_time: endMs !== null ? endDate!.toISOString() : null,
+            current_price_cents: Number.isFinite(priceCents) && priceCents! > 0 ? priceCents : null,
+            currency_code: currCode,
+            bid_count: typeof ev.bid_count === 'number' ? ev.bid_count : 0,
+            comment_count: typeof v.bat_comments === 'number' ? v.bat_comments : null,
+            no_reserve: noReserve,
+            vehicle: {
+              id: v.id,
+              year: v.year,
+              make: v.make,
+              model: v.model,
+              trim: v.trim ?? null,
+              mileage: typeof v.mileage === 'number' ? v.mileage : null,
+              primary_image_url: v.primary_image_url ?? null,
+            },
           });
-          const endMs = nativeEndTime ? new Date(nativeEndTime).getTime() : null;
-          const isPastLong = endMs !== null && nowMsLocal - endMs > 2 * 60 * 60 * 1000;
-          const vehicle = normalizeVehicle({
-            vehicleId: listing.vehicle_id,
-            maybeVehicle: (listing as any).vehicle,
-            fallbackTitle: (listing as any).title,
-            fallbackImageUrl: (listing as any).vehicle?.primary_image_url ?? null,
-          });
-
-          // Marketplace rule: don't show auctions with no bids.
-          if (
-            !includeNoBidAuctions &&
-            !hasBidSignal({
-              bidCount: (listing as any).bid_count,
-              currentHighBidCents: (listing as any).current_high_bid_cents,
-            })
-          ) {
-            hiddenNoBids += 1;
-            continue;
-          }
-
-          // Keep auctions even if end time is missing (some sources backfill it later).
-          // Drop only if end time is far in the past (likely stuck).
-          if (!isPastLong) {
-            const normalizedListing: AuctionListing = {
-              id: listing.id,
-              vehicle_id: listing.vehicle_id,
-              seller_id: listing.seller_id,
-              sale_type: listing.sale_type,
-              source: 'native',
-              lead_image_url: vehicle.primary_image_url || null,
-              current_high_bid_cents: (listing as any).current_high_bid_cents ?? null,
-              reserve_price_cents: listing.reserve_price_cents,
-              bid_count: (listing as any).bid_count || 0,
-              auction_start_time: (listing as any).auction_start_time ?? null,
-              auction_end_time: nativeEndTime,
-              status: listing.status,
-              description: listing.description,
-              created_at: listing.created_at,
-              updated_at: (listing as any).updated_at ?? null,
-              telemetry_stale: false,
-              is_flash: isFlashAuction((listing as any).auction_start_time ?? null, nativeEndTime, listing.sale_type),
-              vehicle
-            };
-            const exclusionReason = getExclusionReason(normalizedListing);
-            if (exclusionReason) {
-              if (exclusionReason === 'non_vehicle' || exclusionReason === 'motorcycle') {
-                hiddenExcludedType += 1;
-              } else {
-                hiddenBadData += 1;
-              }
-              continue;
-            }
-            allListings.push(normalizedListing);
-          }
         }
       }
 
-      // 2. Load vehicle_events (BaT, Cars & Bids, eBay Motors, etc.)
-      const { data: externalListings, error: externalError } = await runWithVehicleFallback(runExternalQuery);
+      // 2. Native vehicle_listings (the few real ones)
+      const { data: native } = await supabase
+        .from('vehicle_listings')
+        .select(`
+          id, vehicle_id, sale_type, auction_end_time, current_high_bid_cents,
+          reserve_price_cents, bid_count, status, listing_url, created_at,
+          vehicle:vehicles (
+            id, year, make, model, trim, mileage, primary_image_url
+          )
+        `)
+        .eq('status', 'active')
+        .in('sale_type', ['auction', 'live_auction']);
 
-      if (!externalError && externalListings) {
-        for (const listing of externalListings) {
-          const currentHighBidCents = (listing.current_price ?? listing.current_bid) ? Math.round(Number(listing.current_price ?? listing.current_bid) * 100) : null;
+      if (native) {
+        for (const nl of native as any[]) {
+          const v = nl.vehicle;
+          if (!v?.id) continue;
+          const rawEnd = nl.auction_end_time;
+          const endDate = rawEnd ? new Date(rawEnd) : null;
+          const endMs = endDate && Number.isFinite(endDate.getTime()) ? endDate.getTime() : null;
 
-          // Always hide sold/ended external listings regardless of status.
-          if (isExternalSoldListing(listing)) {
-            continue;
-          }
-
-          // Marketplace rule: don't show auctions with no bids.
-          if (
-            !includeNoBidAuctions &&
-            !hasBidSignal({ bidCount: listing.bid_count, currentHighBidCents })
-          ) {
-            hiddenNoBids += 1;
-            continue;
-          }
-
-          // IMPORTANT:
-          // We do NOT hard-filter external auctions by end_date here.
-          // Many sources (especially live auctions) can have stale/missing end_date while still being active.
-          const { endTime: effectiveEndDate, isStale: telemetryStale } = normalizeEndTime({
-            raw: listing.ended_at ?? listing.end_date,
-            source: 'external',
-            status: listing.event_status ?? listing.listing_status,
-            updatedAt: listing.updated_at,
+          results.push({
+            id: nl.id,
+            vehicle_id: nl.vehicle_id,
+            platform: 'nuke',
+            source_url: nl.listing_url ?? null,
+            end_time: endMs !== null ? endDate!.toISOString() : null,
+            current_price_cents: nl.current_high_bid_cents ?? null,
+            currency_code: null,
+            bid_count: nl.bid_count ?? 0,
+            comment_count: null,
+            no_reserve: nl.reserve_price_cents === null,
+            vehicle: {
+              id: v.id,
+              year: v.year,
+              make: v.make,
+              model: v.model,
+              trim: v.trim ?? null,
+              mileage: typeof v.mileage === 'number' ? v.mileage : null,
+              primary_image_url: v.primary_image_url ?? null,
+            },
           });
-
-          const metaImage =
-            listing?.metadata?.image_url ||
-            listing?.metadata?.primary_image_url ||
-            (Array.isArray(listing?.metadata?.images) ? listing.metadata.images[0] : null);
-          const vehicle = normalizeVehicle({
-            vehicleId: listing.vehicle_id,
-            maybeVehicle: (listing as any).vehicle,
-            fallbackTitle: getListingFallbackTitle(listing),
-            fallbackImageUrl: metaImage,
-          });
-
-          const normalizedListing: AuctionListing = {
-            id: listing.id,
-            vehicle_id: listing.vehicle_id,
-            source: 'external',
-            platform: listing.source_platform ?? listing.platform,
-            listing_url: listing.source_url ?? listing.listing_url,
-            lead_image_url: vehicle.primary_image_url || null,
-            current_high_bid_cents: currentHighBidCents,
-            reserve_price_cents: listing.reserve_price ? Math.round(Number(listing.reserve_price) * 100) : null,
-            currency_code: resolveListingCurrency(listing),
-            bid_count: listing.bid_count || 0,
-            auction_end_time: effectiveEndDate,
-            status: listing.event_status ?? listing.listing_status,
-            created_at: listing.created_at,
-            updated_at: listing.updated_at,
-            telemetry_stale: telemetryStale,
-            is_flash: false,
-            vehicle
-          };
-          const exclusionReason = getExclusionReason(normalizedListing);
-          if (exclusionReason) {
-            if (exclusionReason === 'non_vehicle' || exclusionReason === 'motorcycle') {
-              hiddenExcludedType += 1;
-            } else {
-              hiddenBadData += 1;
-            }
-            continue;
-          }
-          allListings.push(normalizedListing);
         }
       }
 
-      // Improve "No Image" cases using vehicle_images for vehicles without a primary image.
-      const missingImageVehicleIds = Array.from(
-        new Set(
-          allListings
-            .filter((l) => !l.lead_image_url && !l.vehicle?.primary_image_url)
-            .map((l) => l.vehicle_id)
-            .filter(Boolean)
-        )
-      );
-
-      if (missingImageVehicleIds.length > 0) {
-        const { data: imageRows, error: imageErr } = await supabase
+      // Backfill missing images from vehicle_images
+      const noImage = results.filter(a => !a.vehicle.primary_image_url).map(a => a.vehicle_id);
+      if (noImage.length > 0) {
+        const { data: imgs } = await supabase
           .from('vehicle_images')
-          .select('vehicle_id, image_url, is_primary, created_at')
-          .in('vehicle_id', missingImageVehicleIds)
+          .select('vehicle_id, image_url')
+          .in('vehicle_id', [...new Set(noImage)])
           .not('is_document', 'is', true)
           .not('is_duplicate', 'is', true)
           .order('is_primary', { ascending: false })
           .order('created_at', { ascending: false })
-          .limit(5000);
+          .limit(500);
 
-        if (!imageErr && imageRows && imageRows.length > 0) {
-          const bestByVehicle = new Map<string, string>();
-          for (const row of imageRows as any[]) {
-            const vid = String(row?.vehicle_id || '');
-            const url = String(row?.image_url || '');
-            if (!vid || !url) continue;
-            if (bestByVehicle.has(vid)) continue;
-            bestByVehicle.set(vid, url);
+        if (imgs) {
+          const best = new Map<string, string>();
+          for (const row of imgs as any[]) {
+            if (!best.has(row.vehicle_id) && row.image_url) {
+              best.set(row.vehicle_id, row.image_url);
+            }
           }
-
-          for (const l of allListings) {
-            if (!l.lead_image_url && bestByVehicle.has(l.vehicle_id)) {
-              l.lead_image_url = bestByVehicle.get(l.vehicle_id) || null;
+          for (const a of results) {
+            if (!a.vehicle.primary_image_url && best.has(a.vehicle_id)) {
+              a.vehicle.primary_image_url = best.get(a.vehicle_id)!;
             }
           }
         }
       }
-
-      // Apply filters
-      let filtered = allListings;
-      if (!includeStaleAuctions) {
-        filtered = filtered.filter((l) => {
-          if (l.telemetry_stale) {
-            hiddenStale += 1;
-            return false;
-          }
-          if (l.source === 'external') {
-            const statusLower = String(l.status || '').toLowerCase();
-            if (statusLower && !['active', 'live'].includes(statusLower)) {
-              hiddenStale += 1;
-              return false;
-            }
-          }
-          return true;
-        });
-      }
-      if (filter === 'ending_now') {
-        filtered = filtered.filter((l) => {
-          if (!l.auction_end_time) return false;
-          if (l.telemetry_stale) return false;
-          const diff = new Date(l.auction_end_time).getTime() - nowMsLocal;
-          return diff >= -2 * 60 * 1000 && diff <= endingNowWindowMs;
-        });
-      } else if (filter === 'ending_soon') {
-        filtered = filtered.filter((l) => {
-          if (!l.auction_end_time) return false;
-          if (l.telemetry_stale) return false;
-          const diff = new Date(l.auction_end_time).getTime() - nowMsLocal;
-          return diff >= 0 && diff <= endingSoonWindowMs;
-        });
-      } else if (filter === 'flash') {
-        filtered = filtered.filter((l) => l.source === 'native' && l.is_flash);
-      } else if (filter === 'no_reserve') {
-        filtered = filtered.filter(l => !l.reserve_price_cents);
-      } else if (filter === 'new_listings') {
-        const last7Days = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        filtered = filtered.filter(l => l.created_at >= last7Days);
-      }
-
-      // Apply sorting
-      filtered.sort((a, b) => {
-        switch (sort) {
-          case 'ending_soon':
-            if (a.telemetry_stale && !b.telemetry_stale) return 1;
-            if (!a.telemetry_stale && b.telemetry_stale) return -1;
-            if (!a.auction_end_time) return 1;
-            if (!b.auction_end_time) return -1;
-            return new Date(a.auction_end_time).getTime() - new Date(b.auction_end_time).getTime();
-          case 'bid_count':
-            return (b.bid_count || 0) - (a.bid_count || 0);
-          case 'price_low':
-            const aPrice = a.current_high_bid_cents || 0;
-            const bPrice = b.current_high_bid_cents || 0;
-            return aPrice - bPrice;
-          case 'price_high':
-            const aPriceHigh = a.current_high_bid_cents || 0;
-            const bPriceHigh = b.current_high_bid_cents || 0;
-            return bPriceHigh - aPriceHigh;
-          case 'newest':
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-          default:
-            return 0;
-        }
-      });
-
-      // Show all live auctions on the page (do not truncate to 50).
-      setListings(filtered);
-      setHiddenNoBidCount(hiddenNoBids);
-      setHiddenBadDataCount(hiddenBadData);
-      setHiddenExcludedTypeCount(hiddenExcludedType);
-      setHiddenStaleCount(hiddenStale);
-      const batCount = (externalListings || []).filter((l: any) => String(l?.platform || '').toLowerCase() === 'bat').length;
-      setDebugCounts({
-        native: nativeListings?.length || 0,
-        external: externalListings?.length || 0,
-        bat: batCount,
-        total: filtered.length,
-      });
-    } catch (error) {
-      // Error loading listings - fail silently
-      setListings([]);
-      setHiddenNoBidCount(0);
-      setHiddenBadDataCount(0);
-      setHiddenExcludedTypeCount(0);
-      setHiddenStaleCount(0);
-      setDebugCounts(null);
+    } catch {
+      // fail silently
     }
 
+    setAuctions(results);
     setLoading(false);
   };
 
-  const formatCurrency = (cents: number | null, currencyCode?: string | null) =>
-    formatCurrencyFromCents(cents, {
-      currency: currencyCode ?? undefined,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-      fallback: '—',
+  // Derived data
+  const activePlatforms = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const a of auctions) {
+      counts.set(a.platform, (counts.get(a.platform) ?? 0) + 1);
+    }
+    return counts;
+  }, [auctions]);
+
+  const filtered = useMemo(() => {
+    let list = auctions;
+
+    // Platform filter
+    if (platformFilter) {
+      list = list.filter(a => a.platform === platformFilter);
+    }
+
+    // Search
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(a => {
+        const v = a.vehicle;
+        return (
+          String(v.year).includes(q) ||
+          v.make.toLowerCase().includes(q) ||
+          v.model.toLowerCase().includes(q) ||
+          (v.trim && v.trim.toLowerCase().includes(q))
+        );
+      });
+    }
+
+    // Sort
+    list = [...list].sort((a, b) => {
+      switch (sort) {
+        case 'ending_soon': {
+          if (!a.end_time) return 1;
+          if (!b.end_time) return -1;
+          return new Date(a.end_time).getTime() - new Date(b.end_time).getTime();
+        }
+        case 'most_bids':
+          return (b.bid_count || 0) - (a.bid_count || 0);
+        case 'price_low':
+          return (a.current_price_cents || 0) - (b.current_price_cents || 0);
+        case 'price_high':
+          return (b.current_price_cents || 0) - (a.current_price_cents || 0);
+        case 'newest':
+          return (b.end_time ? new Date(b.end_time).getTime() : 0) - (a.end_time ? new Date(a.end_time).getTime() : 0);
+        default:
+          return 0;
+      }
     });
 
-  const formatTimeRemaining = (endTime: string | null) => {
-    if (!endTime) return '—';
-    const now = new Date();
-    const end = new Date(endTime);
-    const diff = end.getTime() - now.getTime();
+    return list;
+  }, [auctions, platformFilter, searchQuery, sort]);
 
-    if (!Number.isFinite(diff)) return '—';
-    if (diff > maxReasonableEndMs) return '—';
-    if (diff <= -6 * 60 * 60 * 1000) return '—';
-    if (diff <= 0) return 'Ended';
+  const endingNow = useMemo(() => {
+    const now = nowTick;
+    return filtered.filter(a => {
+      if (!a.end_time) return false;
+      const diff = new Date(a.end_time).getTime() - now;
+      return diff > 0 && diff <= TWO_HOURS_MS;
+    }).sort((a, b) => new Date(a.end_time!).getTime() - new Date(b.end_time!).getTime());
+  }, [filtered, nowTick]);
 
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days}d ${hours % 24}h`;
-    if (hours > 0) return `${hours}h ${minutes % 60}m`;
-    return `${minutes}m`;
-  };
-
-  const getTimeRemainingStyle = (endTime: string | null): React.CSSProperties => {
-    if (!endTime) return { color: 'var(--text-secondary)' };
-    const now = new Date();
-    const end = new Date(endTime);
-    const diff = end.getTime() - now.getTime();
-    const hours = diff / (60 * 60 * 1000);
-
-    if (!Number.isFinite(diff) || diff <= 0 || diff > maxReasonableEndMs) return { color: 'var(--text-secondary)' };
-    if (hours < 1) return { color: 'var(--error)', fontWeight: 700 };
-    if (hours < 24) return { color: 'var(--warning)', fontWeight: 600 };
-    return { color: 'var(--text)' };
-  };
-
-  const filteredListings = listings.filter(listing => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    const vehicle = listing.vehicle;
-    return (
-      vehicle.year.toString().includes(query) ||
-      vehicle.make.toLowerCase().includes(query) ||
-      vehicle.model.toLowerCase().includes(query) ||
-      (vehicle.trim && vehicle.trim.toLowerCase().includes(query))
-    );
-  });
-
-  const liveNowListings = listings.filter((listing) => {
-    if (!listing.auction_end_time) return false;
-    if (listing.telemetry_stale) return false;
-    const diff = new Date(listing.auction_end_time).getTime() - nowMs;
-    return diff >= -2 * 60 * 1000 && diff <= endingNowWindowMs;
-  });
-
-  const flashListings = liveNowListings.filter((listing) => listing.is_flash);
-
-  // Proxy bid modal state
-  const [proxyBidListing, setProxyBidListing] = useState<AuctionListing | null>(null);
-
-  const handleBidClick = (listing: AuctionListing) => {
-    if (!user) {
-      navigate('/login?redirect=/auctions');
-      return;
-    }
-    setProxyBidListing(listing);
-  };
+  const platformCount = activePlatforms.size;
+  const totalCount = auctions.length;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: 'var(--space-4)' }}>
-        {/* Header + filters */}
-        <section className="section">
-          <div className="card">
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h1 style={{ margin: 0, fontSize: '19px', fontWeight: 700 }}>Auction Marketplace</h1>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Collector vehicle auction platforms.
-                </div>
-                {!loading && debugCounts && debugCounts.total > 0 && (
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    {debugCounts.total} live auctions
-                  </div>
-                )}
-{/* Hidden counts removed from UI for cleaner look */}
-{/* Stale count hidden from UI - internal metric only */}
-              </div>
-              {user && (
-                <button
-                  onClick={() => navigate('/auctions/create')}
-                  className="button button-primary"
-                  style={{ fontSize: '12px' }}
-                >
-                  List Your Vehicle
-                </button>
-              )}
-            </div>
-            {filteredListings.length > 0 && (
-            <div className="card-body">
-              {/* Search */}
-              <div style={{ marginBottom: '12px' }}>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by make, model, year..."
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    border: '1px solid var(--border)',
-                    fontSize: '12px'
-                  }}
-                />
-              </div>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: 'var(--space-4)' }}>
 
-              {/* Filters + Sort */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '12px',
-                  alignItems: 'center'
-                }}
-              >
-                {/* Filter buttons */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {[
-                    { id: 'all', label: 'All Auctions' },
-                    { id: 'ending_now', label: 'Ending Now (≤15m)' },
-                    { id: 'ending_soon', label: 'Ending Soon (≤2h)' },
-                    { id: 'no_reserve', label: 'No Reserve' },
-                    { id: 'new_listings', label: 'New Listings' }
-                  ].map(option => (
-                    <button
-                      key={option.id}
-                      onClick={() => setFilter(option.id as FilterType)}
-                      style={{
-                        padding: '4px 10px',
-                        fontSize: '11px',
-                        border: filter === option.id ? '2px solid var(--accent)' : '1px solid var(--border)',
-                        background: filter === option.id ? 'var(--accent-dim)' : 'var(--surface)',
-                        color: filter === option.id ? 'var(--accent)' : 'var(--text)',
-                        cursor: 'pointer',
-                        borderRadius: '2px',
-                        fontWeight: filter === option.id ? 700 : 400
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Sort dropdown */}
-                <div style={{ marginLeft: 'auto', minWidth: '180px' }}>
-                  <select
-                    value={sort}
-                    onChange={(e) => setSort(e.target.value as SortType)}
-                    style={{
-                      width: '100%',
-                      padding: '6px 10px',
-                      fontSize: '11px',
-                      border: '1px solid var(--border)'
-                    }}
-                  >
-                    <option value="ending_soon">Ending Soon</option>
-                    <option value="bid_count">Most Bids</option>
-                    <option value="price_low">Price: Low to High</option>
-                    <option value="price_high">Price: High to Low</option>
-                    <option value="newest">Newest First</option>
-                  </select>
-                </div>
-              </div>
-            </div>
+        {/* Header */}
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--space-3)' }}>
+            <h1 style={{
+              margin: 0,
+              fontFamily: 'Arial, sans-serif',
+              fontSize: 'var(--fs-11)',
+              fontWeight: 700,
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase' as const,
+              color: 'var(--text)',
+            }}>
+              LIVE AUCTIONS
+            </h1>
+            {!loading && (
+              <span style={{
+                fontFamily: '"Courier New", monospace',
+                fontSize: 'var(--fs-9)',
+                color: 'var(--text-secondary)',
+                textTransform: 'uppercase' as const,
+                letterSpacing: '0.3px',
+              }}>
+                {totalCount} ACROSS {platformCount} PLATFORM{platformCount !== 1 ? 'S' : ''}
+              </span>
             )}
           </div>
-        </section>
 
-        {/* Live Now strip */}
-        {liveNowListings.length > 0 && (
-          <section className="section">
-            <div className="card">
-              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--text)' }}>LIVE NOW</span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Ending in the next 15 minutes ({liveNowListings.length})
-                  </span>
-                  {flashListings.length > 0 && (
-                    <span style={{ fontSize: '9px', fontWeight: 800, color: 'var(--error)' }}>
-                      FLASH {flashListings.length}
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="button button-small"
-                  style={{ fontSize: '11px' }}
-                  onClick={() => {
-                    setFilter('ending_now');
-                    setSort('ending_soon');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                >
-                  View all ending now
-                </button>
-              </div>
-              <div className="card-body">
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-                    gap: '12px',
-                  }}
-                >
-                  {liveNowListings.slice(0, 6).map((listing) => (
-                    <AuctionCard
-                      key={`live-${listing.id}`}
-                      listing={listing}
-                      formatCurrency={formatCurrency}
-                      formatTimeRemaining={formatTimeRemaining}
-                      getTimeRemainingStyle={getTimeRemainingStyle}
-                      onBidClick={handleBidClick}
-                    />
-                  ))}
-                </div>
-              </div>
+          {/* Search */}
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search by make, model, year..."
+            style={{
+              width: '100%',
+              padding: '6px 8px',
+              border: '2px solid var(--border)',
+              background: 'var(--surface)',
+              fontFamily: 'Arial, sans-serif',
+              fontSize: 'var(--fs-10)',
+              color: 'var(--text)',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+            onFocus={e => { e.currentTarget.style.borderColor = 'var(--text)'; }}
+            onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+          />
+
+          {/* Platform chips + sort */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: 'var(--space-2)',
+            flexWrap: 'wrap',
+            gap: 'var(--space-2)',
+          }}>
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+              <ChipButton
+                active={platformFilter === null}
+                onClick={() => setPlatformFilter(null)}
+              >
+                ALL
+              </ChipButton>
+              {AUCTION_PLATFORMS.map(p => {
+                const count = activePlatforms.get(p);
+                if (!count) return null;
+                return (
+                  <ChipButton
+                    key={p}
+                    active={platformFilter === p}
+                    onClick={() => setPlatformFilter(platformFilter === p ? null : p)}
+                  >
+                    {PLATFORM_LABELS[p] || p.toUpperCase()}
+                  </ChipButton>
+                );
+              })}
             </div>
-          </section>
-        )}
 
-        {/* Auction Network Directory — always shown */}
-        <section className="section">
-          <div className="card">
-            <div className="card-body">
-              <AuctionNetworkDirectory expanded={filteredListings.length === 0} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{
+                fontFamily: 'Arial, sans-serif',
+                fontSize: 'var(--fs-8)',
+                textTransform: 'uppercase' as const,
+                letterSpacing: '0.3px',
+                color: 'var(--text-secondary)',
+              }}>
+                SORT
+              </span>
+              <select
+                value={sort}
+                onChange={e => setSort(e.target.value as SortType)}
+                style={{
+                  padding: '4px 6px',
+                  border: '2px solid var(--border)',
+                  background: 'var(--surface)',
+                  fontFamily: 'Arial, sans-serif',
+                  fontSize: 'var(--fs-9)',
+                  color: 'var(--text)',
+                  textTransform: 'uppercase' as const,
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="ending_soon">ENDING SOON</option>
+                <option value="most_bids">MOST BIDS</option>
+                <option value="price_low">PRICE: LOW</option>
+                <option value="price_high">PRICE: HIGH</option>
+                <option value="newest">NEWEST</option>
+              </select>
             </div>
           </div>
-        </section>
+        </div>
 
-        {/* Aggregated listings (when available) */}
-        {!loading && filteredListings.length > 0 && (
-          <section className="section">
-            <div className="card">
-              <div className="card-body">
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                    gap: '16px'
-                  }}
-                >
-                  {filteredListings.map((listing) => (
-                    <AuctionCard
-                      key={listing.id}
-                      listing={listing}
-                      formatCurrency={formatCurrency}
-                      formatTimeRemaining={formatTimeRemaining}
-                      getTimeRemainingStyle={getTimeRemainingStyle}
-                      onBidClick={handleBidClick}
-                    />
-                  ))}
+        {/* Loading skeleton */}
+        {loading && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: 'var(--space-3)',
+          }}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} style={{
+                border: '2px solid var(--border)',
+                background: 'var(--surface)',
+              }}>
+                <div style={{ paddingBottom: '66.66%', background: 'var(--surface-hover)' }} />
+                <div style={{ padding: 'var(--space-3)' }}>
+                  <div style={{ height: 10, width: '70%', background: 'var(--surface-hover)', marginBottom: 8 }} />
+                  <div style={{ height: 8, width: '40%', background: 'var(--surface-hover)' }} />
                 </div>
               </div>
+            ))}
+          </div>
+        )}
+
+        {/* Ending Now tier */}
+        {!loading && endingNow.length > 0 && (
+          <div style={{ marginBottom: 'var(--space-4)' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 'var(--space-2)',
+              marginBottom: 'var(--space-2)',
+              borderBottom: '2px solid var(--text)',
+              paddingBottom: 'var(--space-1)',
+            }}>
+              <span style={{
+                fontFamily: 'Arial, sans-serif',
+                fontSize: 'var(--fs-10)',
+                fontWeight: 700,
+                textTransform: 'uppercase' as const,
+                letterSpacing: '0.5px',
+                color: 'var(--error)',
+              }}>
+                ENDING NOW
+              </span>
+              <span style={{
+                fontFamily: '"Courier New", monospace',
+                fontSize: 'var(--fs-9)',
+                color: 'var(--text-secondary)',
+              }}>
+                {endingNow.length} WITHIN 2H
+              </span>
             </div>
-          </section>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: 'var(--space-3)',
+            }}>
+              {endingNow.map(a => (
+                <AuctionCard key={`now-${a.id}`} auction={a} now={nowTick} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* All Live */}
+        {!loading && filtered.length > 0 && (
+          <div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 'var(--space-2)',
+              marginBottom: 'var(--space-2)',
+              borderBottom: '2px solid var(--border)',
+              paddingBottom: 'var(--space-1)',
+            }}>
+              <span style={{
+                fontFamily: 'Arial, sans-serif',
+                fontSize: 'var(--fs-10)',
+                fontWeight: 700,
+                textTransform: 'uppercase' as const,
+                letterSpacing: '0.5px',
+                color: 'var(--text)',
+              }}>
+                ALL LIVE
+              </span>
+              <span style={{
+                fontFamily: '"Courier New", monospace',
+                fontSize: 'var(--fs-9)',
+                color: 'var(--text-secondary)',
+              }}>
+                {filtered.length}
+              </span>
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: 'var(--space-3)',
+            }}>
+              {filtered.map(a => (
+                <AuctionCard key={a.id} auction={a} now={nowTick} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!loading && filtered.length === 0 && (
+          <div style={{
+            border: '2px solid var(--border)',
+            padding: 'var(--space-6)',
+            textAlign: 'center',
+          }}>
+            <div style={{
+              fontFamily: 'Arial, sans-serif',
+              fontSize: 'var(--fs-11)',
+              fontWeight: 700,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.5px',
+              color: 'var(--text)',
+              marginBottom: 'var(--space-2)',
+            }}>
+              NO LIVE AUCTIONS
+            </div>
+            <div style={{
+              fontFamily: 'Arial, sans-serif',
+              fontSize: 'var(--fs-9)',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.5,
+            }}>
+              Check back during market hours. Auctions typically run 7 days on BaT,
+              with endings clustered between 12–5pm ET.
+            </div>
+          </div>
         )}
       </div>
-
-      {/* Proxy Bid Modal */}
-      {proxyBidListing && (
-        <ProxyBidModal
-          isOpen={true}
-          onClose={() => setProxyBidListing(null)}
-          listing={{
-            id: proxyBidListing.id,
-            vehicle_id: proxyBidListing.vehicle_id,
-            platform: proxyBidListing.platform || '',
-            listing_url: proxyBidListing.listing_url || '',
-            current_bid_cents: proxyBidListing.current_high_bid_cents,
-            vehicle: {
-              year: proxyBidListing.vehicle.year,
-              make: proxyBidListing.vehicle.make,
-              model: proxyBidListing.vehicle.model,
-              primary_image_url: proxyBidListing.lead_image_url || proxyBidListing.vehicle.primary_image_url,
-            }
-          }}
-          onBidPlaced={(bidId) => {
-            setProxyBidListing(null);
-          }}
-        />
-      )}
     </div>
   );
 }
 
-interface AuctionCardProps {
-  listing: AuctionListing;
-  formatCurrency: (cents: number | null, currency?: string | null) => string;
-  formatTimeRemaining: (endTime: string | null) => string;
-  getTimeRemainingStyle: (endTime: string | null) => React.CSSProperties;
-  onBidClick?: (listing: AuctionListing) => void;
+/* ─── Chip Button ─── */
+
+function ChipButton({ active, onClick, children }: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: '2px 8px',
+        border: `2px solid ${active ? 'var(--text)' : 'var(--border)'}`,
+        background: active ? 'var(--accent-dim)' : 'transparent',
+        fontFamily: 'Arial, sans-serif',
+        fontSize: 'var(--fs-8)',
+        fontWeight: active ? 700 : 400,
+        textTransform: 'uppercase' as const,
+        letterSpacing: '0.3px',
+        color: active ? 'var(--text)' : 'var(--text-secondary)',
+        cursor: 'pointer',
+        transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+      }}
+    >
+      {children}
+    </button>
+  );
 }
 
-// Platform configuration for badges and colors
-const PLATFORM_CONFIG: Record<string, { name: string; short: string; color: string; textColor: string }> = {
-  bat: { name: 'Bring a Trailer', short: 'BaT', color: '#1e40af', textColor: 'var(--bg)' },
-  cars_and_bids: { name: 'Cars & Bids', short: 'C&B', color: '#dc2626', textColor: 'var(--bg)' },
-  pcarmarket: { name: 'PCarMarket', short: 'PCM', color: '#0d9488', textColor: 'var(--bg)' },
-  collecting_cars: { name: 'Collecting Cars', short: 'CC', color: '#7c3aed', textColor: 'var(--bg)' },
-  broad_arrow: { name: 'Broad Arrow', short: 'BA', color: '#0369a1', textColor: 'var(--bg)' },
-  rmsothebys: { name: 'RM Sothebys', short: 'RM', color: '#b91c1c', textColor: 'var(--bg)' },
-  gooding: { name: 'Gooding & Co', short: 'G&C', color: '#166534', textColor: 'var(--bg)' },
-  sbx: { name: 'SBX Cars', short: 'SBX', color: '#ea580c', textColor: 'var(--bg)' },
-  ebay_motors: { name: 'eBay Motors', short: 'eBay', color: '#0064d2', textColor: 'var(--bg)' },
-  facebook_marketplace: { name: 'Facebook', short: 'FB', color: '#1877f2', textColor: 'var(--bg)' },
-  autotrader: { name: 'Autotrader', short: 'AT', color: '#ff6600', textColor: 'var(--bg)' },
-  hemmings: { name: 'Hemmings', short: 'HEM', color: '#8b4513', textColor: 'var(--bg)' },
-  classic_com: { name: 'Classic.com', short: 'CLC', color: '#4b5563', textColor: 'var(--bg)' },
-  craigslist: { name: 'Craigslist', short: 'CL', color: '#5c2d91', textColor: 'var(--bg)' },
-  copart: { name: 'Copart', short: 'COP', color: '#00529b', textColor: 'var(--bg)' },
-  iaai: { name: 'IAA', short: 'IAA', color: '#003366', textColor: 'var(--bg)' },
-};
+/* ─── Auction Card ─── */
 
-function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRemainingStyle, onBidClick }: AuctionCardProps) {
-  const vehicle = listing.vehicle;
-  const hasReserve = listing.reserve_price_cents !== null;
-  const platformConfig = listing.platform ? PLATFORM_CONFIG[listing.platform] : null;
-  const platformName = platformConfig?.name || (listing.platform ? listing.platform.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : null);
-  const platformShort = platformConfig?.short || platformName;
-  const platformColor = platformConfig?.color || 'var(--text-secondary)';
-  const isStale = Boolean(listing.telemetry_stale);
-  const endMs = listing.auction_end_time ? new Date(listing.auction_end_time).getTime() : null;
-  const statusLower = String(listing.status || '').toLowerCase();
-  const isLive = !isStale && (
-    (endMs !== null ? endMs > Date.now() : (statusLower === 'active' || statusLower === 'live'))
-  );
-  const bidCountSuspicious =
-    listing.source === 'external' &&
-    typeof listing.bid_count === 'number' &&
-    listing.bid_count > 250 &&
-    !(listing.current_high_bid_cents && listing.current_high_bid_cents > 0);
-  const bidCountDisplay = isStale || bidCountSuspicious ? '—' : listing.bid_count;
-  const bidCountLabel = isStale ? 'bids' : listing.bid_count === 1 ? 'bid' : 'bids';
-  const commentCount = vehicle.bat_comments;
+function AuctionCard({ auction, now }: { auction: LiveAuction; now: number }) {
+  const v = auction.vehicle;
+  const imageUrl = v.primary_image_url;
+  const platformLabel = PLATFORM_LABELS[auction.platform] || auction.platform.toUpperCase();
+  const platformName = PLATFORM_NAMES[auction.platform] || auction.platform;
 
-  const imageUrl = listing.lead_image_url || vehicle.primary_image_url || null;
-  const isBat = listing.platform === 'bat';
-  const [batIconOk, setBatIconOk] = useState(true);
-  const platformBadgeContent = isBat && batIconOk ? (
-    <img
-      src="/vendor/bat/favicon.ico"
-      alt="BaT"
-      style={{
-        width: 12,
-        height: 12,
-        display: 'block',
-        imageRendering: 'auto',
-      }}
-      onError={() => setBatIconOk(false)}
-    />
-  ) : (
-    platformShort
-  );
+  // Time remaining
+  const endMs = auction.end_time ? new Date(auction.end_time).getTime() : null;
+  const diffMs = endMs !== null ? endMs - now : null;
+  const timeStr = formatTimeRemaining(diffMs);
+  const timeColor = getTimeColor(diffMs);
+
+  // Price
+  const priceStr = formatCurrencyFromCents(auction.current_price_cents, {
+    currency: auction.currency_code ?? undefined,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+    fallback: '—',
+  });
+
+  // Vehicle title
+  const identity = getVehicleIdentityParts(v as any);
+  const title = identity.primary.join(' ') || 'Vehicle';
+
+  // Mileage
+  const mileageStr = v.mileage ? `${v.mileage.toLocaleString()} MILES` : null;
 
   return (
     <Link
-      to={`/vehicle/${vehicle.id}`}
+      to={`/vehicle/${v.id}`}
       style={{
         display: 'block',
-        background: 'var(--surface)',
         border: '2px solid var(--border)',
-        borderRadius: '4px',
-        overflow: 'hidden',
+        background: 'var(--surface)',
         textDecoration: 'none',
         color: 'inherit',
-        transition: 'all 0.12s ease',
+        overflow: 'hidden',
+        transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--text)';
-        e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.12)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'var(--border)';
-        e.currentTarget.style.boxShadow = 'none';
-      }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text)'; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
     >
       {/* Image */}
-      <div
-        style={{
-          position: 'relative',
-          width: '100%',
-          paddingBottom: '75%',
-          backgroundColor: 'var(--surface-hover)',
-          overflow: 'hidden',
-        }}
-      >
+      <div style={{ position: 'relative', paddingBottom: '66.66%', background: 'var(--surface-hover)', overflow: 'hidden' }}>
         {imageUrl ? (
           <img
             src={imageUrl}
-            alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+            alt={title}
+            loading="lazy"
             style={{
               position: 'absolute',
               inset: 0,
@@ -1129,264 +679,191 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             }}
           />
         ) : (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '13px',
-              color: 'var(--text-secondary)',
-            }}
-          >
-            No Image
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: 'Arial, sans-serif',
+            fontSize: 'var(--fs-9)',
+            color: 'var(--text-secondary)',
+            textTransform: 'uppercase' as const,
+          }}>
+            NO IMAGE
           </div>
         )}
 
-        {/* Top-left badges */}
-        {(!hasReserve || listing.is_flash || isStale) && (
-          <div style={{ position: 'absolute', top: '6px', left: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {!hasReserve && (
-              <div
-                style={{
-                  background: 'var(--warning)',
-                  color: 'var(--bg)',
-                  padding: '3px 8px',
-                  borderRadius: '3px',
-                  fontSize: '9px',
-                  fontWeight: 700,
-                }}
-              >
-                NO RESERVE
-              </div>
-            )}
-            {listing.is_flash && (
-              <div
-                style={{
-                  background: 'var(--error)',
-                  color: 'var(--bg)',
-                  padding: '3px 8px',
-                  borderRadius: '3px',
-                  fontSize: '9px',
-                  fontWeight: 800,
-                  letterSpacing: '0.5px',
-                }}
-              >
-                FLASH
-              </div>
-            )}
-            {isStale && (
-              <div
-                style={{
-                  background: 'var(--text-secondary)',
-                  color: 'var(--bg)',
-                  padding: '3px 8px',
-                  borderRadius: '3px',
-                  fontSize: '9px',
-                  fontWeight: 700,
-                }}
-              >
-                STALE
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* LIVE badge - show for active auctions */}
-        {isLive && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '6px',
-              right: '6px',
-              background: 'var(--error)',
-              color: 'var(--bg)',
-              padding: '3px 8px',
-              borderRadius: '3px',
-              fontSize: '9px',
-              fontWeight: 700,
-              animation: 'pulse 2s infinite',
-            }}
-          >
-            LIVE
-          </div>
-        )}
-
-        {/* Platform badge */}
-        {platformName && (
-          <div
-            style={{
-              position: 'absolute',
-              top: isLive ? '28px' : '6px',
-              right: '6px',
-              background: platformColor,
-              color: 'var(--bg)',
-              padding: isBat && batIconOk ? '2px 8px' : '3px 8px',
-              borderRadius: '3px',
-              fontSize: '9px',
-              fontWeight: 700,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minWidth: '28px',
-            }}
-            title={platformName || undefined}
-          >
-            {platformBadgeContent}
-          </div>
-        )}
+        {/* Top bar: platform left, timer right */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '6px 8px',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 100%)',
+        }}>
+          <span style={{
+            fontFamily: 'Arial, sans-serif',
+            fontSize: 'var(--fs-8)',
+            fontWeight: 700,
+            textTransform: 'uppercase' as const,
+            letterSpacing: '0.5px',
+            color: '#fff',
+          }}>
+            {platformLabel}
+          </span>
+          <span style={{
+            fontFamily: '"Courier New", monospace',
+            fontSize: 'var(--fs-9)',
+            fontWeight: 700,
+            color: timeColor === 'default' ? '#fff' : timeColor === 'red' ? '#ff6b6b' : '#ffb347',
+            letterSpacing: '0.5px',
+          }}>
+            {timeStr}
+          </span>
+        </div>
       </div>
 
       {/* Content */}
-      <div style={{ padding: '10px 12px' }}>
-        <h3
-          style={{
-            fontSize: '13px',
-            fontWeight: 700,
-            margin: '0 0 4px 0',
-          }}
-        >
-          {(() => {
-            const identity = getVehicleIdentityParts(vehicle as any);
-            const primary = identity.primary.join(' ');
-            const diffs = identity.differentiators;
-            return `${primary || 'Vehicle'}${diffs.length > 0 ? ` • ${diffs.join(' • ')}` : ''}`;
-          })()}
-        </h3>
+      <div style={{ padding: '8px 10px' }}>
+        {/* Title */}
+        <div style={{
+          fontFamily: 'Arial, sans-serif',
+          fontSize: 'var(--fs-11)',
+          fontWeight: 700,
+          color: 'var(--text)',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          marginBottom: 2,
+        }}>
+          {title}
+        </div>
 
-        {vehicle.mileage && (
-          <div
-            style={{
-              fontSize: '11px',
-              color: 'var(--text-secondary)',
-              marginBottom: '6px',
-            }}
-          >
-            {vehicle.mileage.toLocaleString()} miles
+        {/* Mileage */}
+        {mileageStr && (
+          <div style={{
+            fontFamily: '"Courier New", monospace',
+            fontSize: 'var(--fs-8)',
+            textTransform: 'uppercase' as const,
+            color: 'var(--text-secondary)',
+            letterSpacing: '0.3px',
+            marginBottom: 6,
+          }}>
+            {mileageStr}
           </div>
         )}
 
-        {/* Bid + time row */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            paddingTop: '6px',
-            borderTop: '1px solid var(--border)',
-            marginTop: '4px',
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--accent)', whiteSpace: 'nowrap' }}>
-              {formatCurrency(listing.current_high_bid_cents, listing.currency_code)}
-            </div>
-            {isStale && (
-              <div style={{ fontSize: '9px', color: 'var(--warning)', fontWeight: 700, marginTop: '2px' }}>
-                Telemetry stale
-              </div>
-            )}
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div
-              style={{
-                fontSize: '9px',
-                color: 'var(--text-secondary)',
-                marginBottom: '2px',
-              }}
-            >
-              Time Left
-            </div>
-            <div
-              style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                ...(isStale ? { color: 'var(--text-secondary)' } : getTimeRemainingStyle(listing.auction_end_time)),
-              }}
-            >
-              {isStale ? '—' : formatTimeRemaining(listing.auction_end_time)}
-            </div>
-          </div>
-        </div>
+        {/* Price row */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          borderTop: '2px solid var(--border)',
+          paddingTop: 6,
+        }}>
+          <span style={{
+            fontFamily: '"Courier New", monospace',
+            fontSize: 'var(--fs-11)',
+            fontWeight: 700,
+            color: 'var(--text)',
+          }}>
+            {priceStr}
+          </span>
 
-        {/* Footer row with bids / comments / reserve */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginTop: '6px',
-            fontSize: '11px',
-            color: 'var(--text-secondary)',
-          }}
-        >
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <span
-              title={bidCountSuspicious ? 'Bid count looks suspect (external telemetry). Refresh pending.' : undefined}
-              style={bidCountSuspicious ? { color: 'var(--warning)', fontWeight: 700 } : undefined}
-            >
-              {bidCountDisplay} {bidCountLabel}
-            </span>
-            {typeof commentCount === 'number' && commentCount > 0 && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-                {commentCount}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+            {auction.bid_count > 0 && (
+              <span style={{
+                fontFamily: '"Courier New", monospace',
+                fontSize: 'var(--fs-8)',
+                color: 'var(--text-secondary)',
+                textTransform: 'uppercase' as const,
+              }}>
+                {auction.bid_count} BID{auction.bid_count !== 1 ? 'S' : ''}
+              </span>
+            )}
+            {auction.comment_count !== null && auction.comment_count > 0 && (
+              <span style={{
+                fontFamily: '"Courier New", monospace',
+                fontSize: 'var(--fs-8)',
+                color: 'var(--text-secondary)',
+                textTransform: 'uppercase' as const,
+              }}>
+                {auction.comment_count} CMT{auction.comment_count !== 1 ? 'S' : ''}
               </span>
             )}
           </div>
-          {hasReserve && <span>Reserve</span>}
         </div>
 
-        {/* Bid button for external listings */}
-        {listing.source === 'external' && listing.listing_url && onBidClick && (
-          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            <button
-              type="button"
-              className="button button-primary button-small"
-              style={{ flex: 1, fontSize: '11px' }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onBidClick(listing);
+        {/* Bottom row: no reserve + external link */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginTop: 4,
+          minHeight: 16,
+        }}>
+          {auction.no_reserve ? (
+            <span style={{
+              fontFamily: 'Arial, sans-serif',
+              fontSize: 'var(--fs-8)',
+              fontWeight: 700,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.3px',
+              color: 'var(--warning)',
+            }}>
+              NO RESERVE
+            </span>
+          ) : <span />}
+
+          {auction.source_url && (
+            <a
+              href={auction.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              title={`View on ${platformName}`}
+              style={{
+                fontFamily: 'Arial, sans-serif',
+                fontSize: 'var(--fs-9)',
+                color: 'var(--text-secondary)',
+                textDecoration: 'none',
+                transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
               }}
-            >
-              Bid
-            </button>
-            <button
-              type="button"
-              className="button button-small"
-              style={{ fontSize: '11px', padding: '4px 8px' }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                window.open(listing.listing_url!, '_blank');
-              }}
-              title={`View on ${platformName || 'source'}`}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
             >
               ↗
-            </button>
-          </div>
-        )}
-        {/* View button only for non-external listings */}
-        {listing.source !== 'external' && listing.listing_url && (
-          <button
-            type="button"
-            className="button button-small"
-            style={{ marginTop: '8px', width: '100%', fontSize: '11px' }}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              window.open(listing.listing_url!, '_blank');
-            }}
-          >
-            View on {platformName || 'source'}
-          </button>
-        )}
+            </a>
+          )}
+        </div>
       </div>
     </Link>
   );
 }
 
+/* ─── Helpers ─── */
+
+function formatTimeRemaining(diffMs: number | null): string {
+  if (diffMs === null) return '—';
+  if (diffMs <= 0) return 'ENDED';
+
+  const minutes = Math.floor(diffMs / 60_000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days}D ${hours % 24}H`;
+  if (hours > 0) return `${hours}H ${minutes % 60}M`;
+  return `${minutes}M`;
+}
+
+function getTimeColor(diffMs: number | null): 'red' | 'orange' | 'default' {
+  if (diffMs === null || diffMs <= 0) return 'default';
+  if (diffMs < 60 * 60 * 1000) return 'red';
+  if (diffMs < 24 * 60 * 60 * 1000) return 'orange';
+  return 'default';
+}
