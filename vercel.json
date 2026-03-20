@@ -5,6 +5,14 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/mcp/:path*",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/mcp-connector/:path*"
+    },
+    {
+      "source": "/mcp",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/mcp-connector"
+    },
+    {
       "source": "/api/:path+",
       "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path+"
     },
