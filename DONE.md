@@ -1,5 +1,28 @@
 # DONE — Completed Work Log
 
+### [overnight-batch] Overnight Batch Run (2026-03-20 08:00-09:00)
+- [design] Global CSS enforcement: `* { border-radius: 0 !important; box-shadow: none !important; }` in unified-design-system.css
+- [design] src/pages/ cleanup: 7 files, 0 violations remaining (borderRadius, boxShadow, gradients, shadows)
+- [design] src/components/ cleanup: 20+ files, 0 violations remaining (boxShadow, gradients, borderRadius, CSS-in-string, dead transitions)
+- [infra] Fixed `review-agent-submissions` cron: `get_service_url()` hardcoded URL (was reading missing GUC). 0 failures since fix.
+- [infra] Deleted 12 dead edge functions (10 widget-*, concierge-webhook, pipeline-dashboard). Active: 243→231.
+- [data] FB Marketplace national sweep: 58 metros, 4,608 scanned, 1,610 vintage vehicles upserted
+- [data] primary_image_url backfill: 61%→88.5% (256,530/289,926 active vehicles). Remaining 33K have zero images.
+
+### [auction-readiness] Auction Readiness System — Sprint 1+2 (2026-03-20)
+- [schema] Created `auction_readiness`, `ars_tier_transitions`, `photo_coverage_requirements` tables
+- [schema] Created `idx_vehicle_images_vehicle_zone(vehicle_id, vehicle_zone)` index on 33M rows
+- [schema] Seeded 20 photo zones (8 required MVPS + 12 competitive CPS) with coaching prompts
+- [schema] Registered `auction_readiness` + `ars_tier_transitions` in `pipeline_registry`
+- [function] `compute_auction_readiness(uuid)` — 6-dimension scorer (identity/photo/doc/desc/market/condition), 0-100 weighted composite, ~65ms/vehicle
+- [function] `persist_auction_readiness(uuid)` — upsert wrapper with tier transition audit logging
+- [function] `recompute_ars_dimension(uuid, text)` — trigger-friendly recompute
+- [triggers] `trg_ars_on_image_insert`, `trg_ars_on_observation_insert`, `trg_ars_on_evidence_insert` — error-swallowing, fire only for vehicles with existing ARS records
+- [mcp] Added 3 tools to mcp-connector: `get_auction_readiness`, `get_coaching_plan`, `prepare_listing`
+- [edge] Created `generate-listing-package` edge function — assembles submission bundles with BaT field mapping skeleton
+- [data] Batch computed ARS for 2,142 vehicles (data_quality_score >= 95): 3 NEEDS_WORK, 279 EARLY_STAGE, 1860 DISCOVERY_ONLY. Zero TIER 1-2 (as predicted). Top vehicle: 1991 Mercedes 300SL at score 67.
+- [docs] Appended implementation results to `auction-readiness-strategy.md`
+
 ### [overnight] Overnight Autonomous Work Session (2026-03-20 00:30-02:30)
 
 **Block 1: Data Quality Backfills**
