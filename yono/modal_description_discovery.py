@@ -148,7 +148,7 @@ def _parse_json(text: str) -> dict:
 @app.cls(
     image=image,
     gpu="T4",
-    max_containers=4,
+    max_containers=10,
     timeout=1800,          # 30 min per batch
     retries=2,             # Retry on preemption
     scaledown_window=300,  # Keep warm 5min between calls
@@ -204,7 +204,7 @@ class DescriptionExtractor:
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
-                max_new_tokens=2048,
+                max_new_tokens=1024,
                 temperature=0.1,
                 do_sample=True,
                 top_p=0.9,
@@ -280,7 +280,7 @@ class DescriptionExtractor:
 def main(
     limit: int = 5000,
     min_price: int = 0,
-    batch_size: int = 50,
+    batch_size: int = 20,
     dry_run: bool = False,
 ):
     """Batch extract descriptions from Supabase via Modal GPU workers.
@@ -307,45 +307,48 @@ def main(
         "Content-Type": "application/json",
     }
 
-    # ── Fetch candidates via PostgREST RPC ──
-    # Use execute_sql RPC to get vehicles without existing qwen2.5:7b-modal discoveries
+    # ── Fetch candidates ──
+    # For small limits, use RPC with NOT EXISTS for exact dedup.
+    # For large limits (>5000), use paginated REST — faster and avoids statement timeout.
     print(f"[DESC-EXTRACT] Fetching up to {limit} candidates (min_price={min_price})...")
 
-    query = f"""
-        SELECT v.id, v.year, v.make, v.model, v.description,
-               COALESCE(v.sale_price, v.winning_bid, v.high_bid, v.bat_sold_price) AS sale_price
-        FROM vehicles v
-        WHERE v.description IS NOT NULL
-          AND length(v.description) >= 100
-          AND v.deleted_at IS NULL
-          AND COALESCE(v.sale_price, v.winning_bid, v.high_bid, v.bat_sold_price, 0) >= {min_price}
-          AND NOT EXISTS (
-            SELECT 1 FROM description_discoveries dd
-            WHERE dd.vehicle_id = v.id AND dd.model_used = 'qwen2.5:7b-modal'
-          )
-        LIMIT {limit}
-    """
+    vehicles = []
+    if limit <= 5000:
+        # Small batch — use RPC for exact dedup
+        query = f"""
+            SELECT v.id, v.year, v.make, v.model, v.description,
+                   COALESCE(v.sale_price, v.winning_bid, v.high_bid, v.bat_sold_price) AS sale_price
+            FROM vehicles v
+            WHERE v.description IS NOT NULL
+              AND length(v.description) >= 100
+              AND v.deleted_at IS NULL
+              AND COALESCE(v.sale_price, v.winning_bid, v.high_bid, v.bat_sold_price, 0) >= {min_price}
+              AND NOT EXISTS (
+                SELECT 1 FROM description_discoveries dd
+                WHERE dd.vehicle_id = v.id AND dd.model_used = 'qwen2.5:7b-modal'
+              )
+            LIMIT {limit}
+        """
+        rpc_body = json.dumps({"query": query}).encode()
+        req = urllib.request.Request(
+            f"{supabase_url}/rest/v1/rpc/execute_sql",
+            data=rpc_body,
+            headers=headers,
+            method="POST",
+        )
+        try:
+            resp = urllib.request.urlopen(req, timeout=120)
+            result = json.loads(resp.read().decode())
+            if isinstance(result, list):
+                vehicles = result
+            else:
+                print(f"[DESC-EXTRACT] RPC returned {type(result).__name__}, falling back to REST...")
+        except Exception as e:
+            print(f"[DESC-EXTRACT] RPC error: {e}, falling back to REST...")
 
-    rpc_body = json.dumps({"query": query}).encode()
-    req = urllib.request.Request(
-        f"{supabase_url}/rest/v1/rpc/execute_sql",
-        data=rpc_body,
-        headers=headers,
-        method="POST",
-    )
-
-    try:
-        resp = urllib.request.urlopen(req, timeout=120)
-        vehicles = json.loads(resp.read().decode())
-    except Exception as e:
-        print(f"[DESC-EXTRACT] Error fetching candidates: {e}")
-        # Fallback: paginated REST API fetch
-        print("[DESC-EXTRACT] Falling back to paginated REST fetch...")
-        vehicles = _fetch_paginated(supabase_url, headers, limit, min_price)
-
-    if not isinstance(vehicles, list):
-        print(f"[DESC-EXTRACT] Unexpected response type: {type(vehicles)}")
-        return
+    if not vehicles:
+        # Large batch or RPC failed — paginated REST fetch + client-side dedup
+        vehicles = _fetch_paginated_with_dedup(supabase_url, headers, limit, min_price)
 
     print(f"[DESC-EXTRACT] Got {len(vehicles)} candidates")
 
@@ -356,7 +359,7 @@ def main(
     # ── Split into batches and fan out to GPU workers ──
     batches = [vehicles[i:i + batch_size] for i in range(0, len(vehicles), batch_size)]
     print(f"[DESC-EXTRACT] Processing {len(vehicles)} vehicles in {len(batches)} batches of {batch_size}")
-    print(f"[DESC-EXTRACT] Using 4 T4 containers @ $0.59/hr each")
+    print(f"[DESC-EXTRACT] Using up to 10 T4 containers @ $0.59/hr each")
 
     extractor = DescriptionExtractor()
     t0 = time.time()
@@ -409,7 +412,7 @@ def main(
     print(f"  Throughput:     {len(good_results)/elapsed:.1f} desc/s" if elapsed > 0 else "")
 
     # Cost estimate
-    container_hours = (elapsed / 3600) * 4  # 4 containers
+    container_hours = (elapsed / 3600) * 10  # up to 10 containers
     cost = container_hours * 0.59
     print(f"  Est. cost:      ${cost:.2f} ({container_hours:.2f} container-hours)")
 
@@ -428,17 +431,49 @@ def main(
             print(f"    Keys: {', '.join(top_keys)}")
 
 
-def _fetch_paginated(supabase_url: str, headers: dict, limit: int, min_price: int) -> list:
-    """Fallback: fetch candidates via paginated REST API."""
+def _fetch_paginated_with_dedup(supabase_url: str, headers: dict, limit: int, min_price: int) -> list:
+    """Fetch candidates via paginated REST, dedup against existing discoveries."""
     import urllib.request
 
+    # Step 1: Get existing vehicle_ids that already have qwen2.5:7b-modal discoveries
+    print("[DESC-EXTRACT] Fetching existing discovery IDs for dedup...")
+    existing_ids = set()
+    dedup_offset = 0
+    while True:
+        dedup_url = (
+            f"{supabase_url}/rest/v1/description_discoveries"
+            f"?select=vehicle_id"
+            f"&model_used=eq.qwen2.5:7b-modal"
+            f"&limit=1000&offset={dedup_offset}"
+        )
+        req = urllib.request.Request(dedup_url, headers=headers)
+        try:
+            resp = urllib.request.urlopen(req, timeout=60)
+            page = json.loads(resp.read().decode())
+        except Exception as e:
+            print(f"[DESC-EXTRACT] Dedup fetch error: {e}")
+            break
+        if not page:
+            break
+        for row in page:
+            existing_ids.add(row["vehicle_id"])
+        dedup_offset += len(page)
+        if len(page) < 1000:
+            break
+
+    print(f"[DESC-EXTRACT] {len(existing_ids)} vehicles already extracted, will skip these")
+
+    # Step 2: Paginated fetch of vehicles with descriptions
     vehicles = []
     page_size = 1000
     offset = 0
-    remaining = limit
+    # Fetch more than limit to account for dedup filtering
+    fetch_limit = limit + len(existing_ids) + 1000
 
-    while remaining > 0:
-        fetch_count = min(page_size, remaining)
+    while len(vehicles) < limit:
+        fetch_count = min(page_size, fetch_limit - offset)
+        if fetch_count <= 0:
+            break
         price_filter = f"&sale_price=gte.{min_price}" if min_price > 0 else ""
         url = (
             f"{supabase_url}/rest/v1/vehicles"
@@ -461,15 +496,19 @@ def _fetch_paginated(supabase_url: str, headers: dict, limit: int, min_price: in
         if not page:
             break
 
-        good = [v for v in page if v.get("description") and len(v["description"]) >= 100]
-        vehicles.extend(good)
+        for v in page:
+            if (v.get("description") and len(v["description"]) >= 100
+                    and v["id"] not in existing_ids):
+                vehicles.append(v)
+
         offset += len(page)
-        remaining -= len(page)
+        if offset % 10000 == 0:
+            print(f"[DESC-EXTRACT] Fetched {offset} rows, {len(vehicles)} candidates so far...")
 
         if len(page) < fetch_count:
-            break
+            break  # No more data
 
-    return vehicles
+    return vehicles[:limit]
 
 
 def _write_results(results: list[dict], supabase_url: str, headers: dict) -> int:
