@@ -100,7 +100,7 @@
   
   /* Typography */
   --font-family: Arial, sans-serif;
-  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  --font-mono: 'Courier New', monospace;
   
   /* Border Radius */
   --radius: 0px;
@@ -699,6 +699,30 @@
   --accent-alt: #00a3e0;
   --accent-dim: rgba(0, 133, 202, 0.12);
   --border-focus: var(--accent);
+}
+
+/* ================================================
+   GLOBAL DESIGN SYSTEM RESETS
+   Zero border-radius and zero box-shadow everywhere.
+   These !important overrides catch any leaks from
+   third-party libraries, Tailwind utilities, or
+   inline styles that slip through.
+   ================================================ */
+
+/* GLOBAL ENFORCEMENT — Zero border-radius, zero shadows (design system mandate) */
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Exception: range input thumbs need border-radius for usability */
+input[type="range"]::-webkit-slider-thumb {
+  border-radius: 50% !important;
+}
+input[type="range"]::-moz-range-thumb {
+  border-radius: 50% !important;
 }
 
 /* ================================================
