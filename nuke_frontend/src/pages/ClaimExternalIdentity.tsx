@@ -563,7 +563,7 @@ const ClaimExternalIdentity: React.FC = () => {
                             style={{ width: 56, height: 40, objectFit: 'cover', flexShrink: 0 }}
                           />
                         ) : (
-                          <div style={{ width: 56, height: 40, backgroundColor: 'var(--grey-100)', borderRadius: 0, flexShrink: 0 }} />
+                          <div style={{ width: 56, height: 40, backgroundColor: 'var(--grey-100)', flexShrink: 0 }} />
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -582,7 +582,6 @@ const ClaimExternalIdentity: React.FC = () => {
                   <div style={{
                     padding: 'var(--space-3) var(--space-4)',
                     border: '1px solid #4ade8040',
-                    borderRadius: 0,
                     backgroundColor: '#4ade8008',
                     fontSize: '13px',
                   }}>
@@ -671,7 +670,6 @@ const ClaimExternalIdentity: React.FC = () => {
               <div style={{
                 padding: 'var(--space-4)',
                 backgroundColor: 'var(--grey-50)',
-                borderRadius: 0,
                 marginBottom: 'var(--space-3)'
               }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
@@ -681,7 +679,6 @@ const ClaimExternalIdentity: React.FC = () => {
                   padding: 'var(--space-3)',
                   backgroundColor: 'var(--white)',
                   border: '2px dashed var(--border-light)',
-                  borderRadius: 0,
                   fontFamily: 'monospace',
                   fontSize: '19px',
                   textAlign: 'center',

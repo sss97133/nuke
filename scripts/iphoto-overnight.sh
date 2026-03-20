@@ -23,7 +23,8 @@ echo "========================================" >> "$LOG"
 echo "$(date): Starting iPhoto overnight intake" >> "$LOG"
 echo "========================================" >> "$LOG"
 
-cd "$SCRIPT_DIR" && dotenvx run -- node scripts/iphoto-intake.mjs --all >> "$LOG" 2>&1
+export PATH="/opt/homebrew/bin:$PATH"
+cd "$SCRIPT_DIR" && dotenvx run -- node scripts/iphoto-intake.mjs --sync >> "$LOG" 2>&1
 STATUS=$?
 
 echo "$(date): Finished (exit $STATUS)" >> "$LOG"
