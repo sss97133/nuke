@@ -25,10 +25,10 @@ interface PlatformMeta {
 }
 
 const PLATFORMS = [
-  { id: 'bat', name: 'Bring a Trailer', domain: 'bringatrailer.com', color: '#d97706', shortLabel: 'BaT' },
-  { id: 'cars_and_bids', name: 'Cars & Bids', domain: 'carsandbids.com', color: '#dc2626', shortLabel: 'CB' },
-  { id: 'pcarmarket', name: 'PCarMarket', domain: 'pcarmarket.com', color: '#16a34a', shortLabel: 'PCM' },
-  { id: 'collecting_cars', name: 'Collecting Cars', domain: 'collectingcars.com', color: '#2563eb', shortLabel: 'CC' },
+  { id: 'bat', name: 'Bring a Trailer', domain: 'bringatrailer.com', color: 'var(--warning)', shortLabel: 'BaT' },
+  { id: 'cars_and_bids', name: 'Cars & Bids', domain: 'carsandbids.com', color: 'var(--error)', shortLabel: 'CB' },
+  { id: 'pcarmarket', name: 'PCarMarket', domain: 'pcarmarket.com', color: 'var(--success)', shortLabel: 'PCM' },
+  { id: 'collecting_cars', name: 'Collecting Cars', domain: 'collectingcars.com', color: 'var(--info)', shortLabel: 'CC' },
   { id: 'broad_arrow', name: 'Broad Arrow', domain: 'broadarrowauctions.com', color: '#7c3aed', shortLabel: 'BA' },
   { id: 'rmsothebys', name: "RM Sotheby's", domain: 'rmsothebys.com', color: '#0891b2', shortLabel: 'RM' },
   { id: 'gooding', name: 'Gooding & Company', domain: 'goodingco.com', color: '#ca8a04', shortLabel: 'GC' },
@@ -76,9 +76,7 @@ function PlatformFavicon({
     <div
       style={{
         width: containerSize,
-        height: containerSize,
-        borderRadius: '6px',
-        background,
+        height: containerSize, background,
         display: 'grid',
         placeItems: 'center',
         position: 'relative',
@@ -250,9 +248,7 @@ export default function PlatformCredentialForm({
     >
       <div
         style={{
-          background: 'var(--surface)',
-          borderRadius: '8px',
-          maxWidth: '450px',
+          background: 'var(--surface)', maxWidth: '450px',
           width: '100%',
           maxHeight: '90vh',
           overflow: 'auto',
@@ -294,9 +290,7 @@ export default function PlatformCredentialForm({
               background: 'var(--error-dim)',
               border: '1px solid var(--error)',
               color: 'var(--error)',
-              padding: '10px 12px',
-              borderRadius: '4px',
-              marginBottom: '16px',
+              padding: '10px 12px', marginBottom: '16px',
               fontSize: '12px'
             }}>
               {error}
@@ -320,9 +314,7 @@ export default function PlatformCredentialForm({
                         style={{
                           padding: '10px 8px',
                           border: `2px solid ${platform === p.id ? 'var(--accent)' : 'var(--border)'}`,
-                          background: platform === p.id ? 'var(--accent-dim)' : 'var(--surface)',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
+                          background: platform === p.id ? 'var(--accent-dim)' : 'var(--surface)', cursor: 'pointer',
                           textAlign: 'center'
                         }}
                       >
@@ -345,9 +337,7 @@ export default function PlatformCredentialForm({
               {!existingCredential && initialPlatform && (
                 <div style={{
                   background: 'var(--surface-hover)',
-                  padding: '12px',
-                  borderRadius: '4px',
-                  marginBottom: '16px',
+                  padding: '12px', marginBottom: '16px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '10px'
@@ -375,9 +365,7 @@ export default function PlatformCredentialForm({
               {existingCredential && (
                 <div style={{
                   background: 'var(--surface-hover)',
-                  padding: '12px',
-                  borderRadius: '4px',
-                  marginBottom: '16px'
+                  padding: '12px', marginBottom: '16px'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {existingPlatformInfo && (
@@ -420,9 +408,7 @@ export default function PlatformCredentialForm({
                   style={{
                     width: '100%',
                     padding: '10px 12px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    fontSize: '12px'
+                    border: '1px solid var(--border)', fontSize: '12px'
                   }}
                 />
               </div>
@@ -444,9 +430,7 @@ export default function PlatformCredentialForm({
                   style={{
                     width: '100%',
                     padding: '10px 12px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    fontSize: '12px'
+                    border: '1px solid var(--border)', fontSize: '12px'
                   }}
                 />
                 <p style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -484,9 +468,7 @@ export default function PlatformCredentialForm({
                       style={{
                         width: '100%',
                         padding: '10px 12px',
-                        border: '1px solid var(--border)',
-                        borderRadius: '4px',
-                        fontSize: '12px',
+                        border: '1px solid var(--border)', fontSize: '12px',
                         fontFamily: 'monospace'
                       }}
                     />
@@ -509,9 +491,7 @@ export default function PlatformCredentialForm({
                       padding: '10px 16px',
                       border: '1px solid var(--error)',
                       background: 'transparent',
-                      color: 'var(--error)',
-                      borderRadius: '4px',
-                      fontSize: '12px',
+                      color: 'var(--error)', fontSize: '12px',
                       cursor: 'pointer'
                     }}
                   >
@@ -547,9 +527,7 @@ export default function PlatformCredentialForm({
                 width: '48px',
                 height: '48px',
                 border: '3px solid var(--border)',
-                borderTopColor: 'var(--accent)',
-                borderRadius: '50%',
-                margin: '0 auto 16px',
+                borderTopColor: 'var(--accent)', margin: '0 auto 16px',
                 animation: 'spin 1s linear infinite'
               }} />
               <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>
@@ -567,9 +545,7 @@ export default function PlatformCredentialForm({
               <div style={{
                 width: '64px',
                 height: '64px',
-                background: 'var(--warning-dim)',
-                borderRadius: '50%',
-                display: 'flex',
+                background: 'var(--warning-dim)', display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px',
@@ -606,9 +582,7 @@ export default function PlatformCredentialForm({
               <div style={{
                 width: '64px',
                 height: '64px',
-                background: 'var(--success-dim)',
-                borderRadius: '50%',
-                display: 'flex',
+                background: 'var(--success-dim)', display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px',

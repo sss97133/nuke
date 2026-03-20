@@ -728,9 +728,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                             fontWeight: 700,
                             color: 'var(--success)',
                             backgroundColor: 'var(--success-dim)',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            marginLeft: '4px'
+                            padding: '2px 6px', marginLeft: '4px'
                           }}>
                             {amount && amount > 0 ? `$${amount.toLocaleString()} SOLD` : 'SOLD'}
                           </span>
@@ -741,9 +739,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                             fontWeight: 700,
                             color: 'var(--success)',
                             backgroundColor: 'var(--success-dim)',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            marginLeft: '4px'
+                            padding: '2px 6px', marginLeft: '4px'
                           }}>
                             ${amount.toLocaleString()} BID
                           </span>
@@ -754,9 +750,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                             fontWeight: 600,
                             color: 'var(--error)',
                             backgroundColor: 'var(--error-dim)',
-                            padding: '2px 6px',
-                            borderRadius: '4px'
-                          }}>
+                            padding: '2px 6px'}}>
                             SELLER
                           </span>
                         )}
@@ -836,9 +830,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                                     style={{
                                       maxWidth: '100px',
                                       maxHeight: '100px',
-                                      objectFit: 'cover',
-                                      borderRadius: '4px',
-                                      border: '1px solid var(--border)',
+                                      objectFit: 'cover', border: '1px solid var(--border)',
                                       cursor: 'pointer'
                                     }}
                                     onClick={() => window.open(url, '_blank')}
@@ -934,9 +926,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
               right: 0,
               marginBottom: '4px',
               background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              boxShadow: '0 2px 8px color-mix(in srgb, var(--text) 15%, transparent)',
-              zIndex: 1000,
+              border: '1px solid var(--border)', zIndex: 1000,
               maxHeight: '240px',
               overflow: 'hidden',
               display: 'flex',

@@ -129,9 +129,7 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
   const containerStyle = {
     ...sizeStyles[size],
     backgroundColor: 'var(--bg-secondary)',
-    border: '1px solid var(--border)',
-    borderRadius: '4px',
-    overflow: 'hidden',
+    border: '1px solid var(--border)', overflow: 'hidden',
     cursor: onClick ? 'pointer' : 'default',
     position: 'relative' as const,
     display: 'flex',

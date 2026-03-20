@@ -64,9 +64,7 @@ export default function ModelPortal({ make, model, vehiclePrice, activePortal, o
                 <span style={{
                   padding: '1px 5px',
                   background: data.rarity_level === 'rare' ? '#fbbf2420' : 'var(--bg-secondary)',
-                  color: data.rarity_level === 'rare' ? '#d97706' : 'var(--text-muted)',
-                  borderRadius: '3px',
-                  fontSize: '9px',
+                  color: data.rarity_level === 'rare' ? 'var(--warning)' : 'var(--text-muted)', fontSize: '9px',
                   fontWeight: 600,
                 }}>
                   {data.rarity_level.toUpperCase()}
@@ -103,9 +101,7 @@ function PriceBand({ p25, median, p75, vehiclePrice }: {
       <div style={{
         position: 'relative',
         height: '8px',
-        background: 'linear-gradient(to right, #22c55e, #f59e0b, #ef4444)',
-        borderRadius: '4px',
-        overflow: 'visible',
+        background: 'var(--surface)', overflow: 'visible',
       }}>
         {/* Median marker */}
         <div style={{
@@ -114,9 +110,7 @@ function PriceBand({ p25, median, p75, vehiclePrice }: {
           top: '-2px',
           width: '2px',
           height: '12px',
-          background: 'var(--text)',
-          borderRadius: '1px',
-        }} title={`Median: ${formatCurrencyAmount(median)}`} />
+          background: 'var(--text)', }} title={`Median: ${formatCurrencyAmount(median)}`} />
 
         {/* This vehicle marker */}
         {vehiclePct != null && (
@@ -127,11 +121,7 @@ function PriceBand({ p25, median, p75, vehiclePrice }: {
             width: '6px',
             height: '6px',
             background: 'var(--primary, #3b82f6)',
-            border: '1.5px solid white',
-            borderRadius: '50%',
-            transform: 'translateX(-3px)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-          }} title={vehiclePrice ? `This vehicle: ${formatCurrencyAmount(vehiclePrice)}` : undefined} />
+            border: '1.5px solid white', transform: 'translateX(-3px)', }} title={vehiclePrice ? `This vehicle: ${formatCurrencyAmount(vehiclePrice)}` : undefined} />
         )}
       </div>
     </div>
@@ -140,16 +130,15 @@ function PriceBand({ p25, median, p75, vehiclePrice }: {
 
 function TrendBadge({ direction }: { direction: 'up' | 'down' | 'stable' }) {
   const config = {
-    up: { arrow: '\u2191', color: '#22c55e', label: 'Rising' },
-    down: { arrow: '\u2193', color: '#ef4444', label: 'Declining' },
-    stable: { arrow: '\u2192', color: '#6b7280', label: 'Stable' },
+    up: { arrow: '\u2191', color: 'var(--success)', label: 'Rising' },
+    down: { arrow: '\u2193', color: 'var(--error)', label: 'Declining' },
+    stable: { arrow: '\u2192', color: 'var(--text-secondary)', label: 'Stable' },
   }[direction];
 
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: '3px',
-      padding: '1px 5px', borderRadius: '3px',
-      background: config.color + '15', color: config.color,
+      padding: '1px 5px', background: config.color + '15', color: config.color,
       fontSize: '9px', fontWeight: 600,
     }}>
       {config.arrow} {config.label}
@@ -161,12 +150,12 @@ function HeatGauge({ score }: { score: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
       <div style={{
-        width: '30px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden',
+        width: '30px', height: '4px', background: 'var(--border)', overflow: 'hidden',
       }}>
         <div style={{
           width: `${Math.min(100, Math.max(5, score))}%`,
           height: '100%',
-          background: score > 70 ? '#ef4444' : score > 40 ? '#f59e0b' : '#6b7280',
+          background: score > 70 ? 'var(--error)' : score > 40 ? 'var(--warning)' : 'var(--text-secondary)',
         }} />
       </div>
       <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>

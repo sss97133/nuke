@@ -140,7 +140,7 @@ function StatCard({
         style={{
           fontSize: '20px',
           fontWeight: 700,
-          fontFamily: "'SF Mono', Monaco, 'Courier New', monospace",
+          fontFamily: "'Courier New', monospace",
           color: 'var(--text, #2a2a2a)',
         }}
       >
@@ -211,7 +211,7 @@ function ProgressRow({
         <span
           style={{
             fontSize: '10px',
-            fontFamily: "'SF Mono', Monaco, monospace",
+            fontFamily: "'Courier New', monospace",
             color: 'var(--text-secondary, #666)',
           }}
         >
@@ -295,7 +295,7 @@ function DataTable({
                     textAlign: ci === 0 ? 'left' : 'right',
                     padding: '5px 8px',
                     fontFamily: monoSet.has(ci)
-                      ? "'SF Mono', Monaco, monospace"
+                      ? "'Courier New', monospace"
                       : 'inherit',
                     color: 'var(--text, #2a2a2a)',
                     whiteSpace: 'nowrap',
@@ -326,7 +326,7 @@ function ChartTooltip({ active, payload, label }: any) {
       }}
     >
       <div style={{ fontWeight: 700, marginBottom: '2px' }}>{label}</div>
-      <div style={{ fontFamily: "'SF Mono', Monaco, monospace" }}>
+      <div style={{ fontFamily: "'Courier New', monospace" }}>
         {fmt(payload[0].value)} users
       </div>
     </div>
@@ -436,7 +436,7 @@ export default function UserMetrics() {
               fontSize: '10px',
               color: 'var(--text-secondary, #666)',
               marginTop: '4px',
-              fontFamily: "'SF Mono', Monaco, monospace",
+              fontFamily: "'Courier New', monospace",
             }}
           >
             {fmt(totals.total_identity_seeds)} identity seeds across{' '}
@@ -561,7 +561,7 @@ export default function UserMetrics() {
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 9, fill: '#666', fontFamily: "'SF Mono', Monaco, monospace" }}
+                  tick={{ fontSize: 9, fill: '#666', fontFamily: "'Courier New', monospace" }}
                   axisLine={{ stroke: '#bdbdbd' }}
                   tickLine={false}
                   tickFormatter={(v: number) =>
@@ -582,7 +582,7 @@ export default function UserMetrics() {
               marginTop: '8px',
               fontSize: '9px',
               color: 'var(--text-secondary, #666)',
-              fontFamily: "'SF Mono', Monaco, monospace",
+              fontFamily: "'Courier New', monospace",
             }}
           >
             {fmt(bat_activity.with_bids)} with bids &middot;{' '}
@@ -647,7 +647,7 @@ export default function UserMetrics() {
               marginTop: '12px',
               fontSize: '9px',
               color: 'var(--text-secondary, #666)',
-              fontFamily: "'SF Mono', Monaco, monospace",
+              fontFamily: "'Courier New', monospace",
             }}
           >
             {ghost_breakdown.profile_buildable} buildable &middot;{' '}
@@ -674,7 +674,7 @@ export default function UserMetrics() {
               marginTop: '12px',
               fontSize: '9px',
               color: 'var(--text-secondary, #666)',
-              fontFamily: "'SF Mono', Monaco, monospace",
+              fontFamily: "'Courier New', monospace",
             }}
           >
             {fb_stats.with_active_listings} active listings &middot;{' '}
@@ -710,7 +710,7 @@ export default function UserMetrics() {
         style={{
           fontSize: '9px',
           color: 'var(--text-secondary, #666)',
-          fontFamily: "'SF Mono', Monaco, monospace",
+          fontFamily: "'Courier New', monospace",
           textAlign: 'right',
         }}
       >

@@ -387,7 +387,7 @@ const InvoiceManager: React.FC = () => {
                   fontSize: '9px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  borderRadius: 'var(--radius)',
+                  borderRadius: 0,
                   transition: 'var(--transition)',
                   textTransform: 'uppercase'
                 }}
@@ -402,7 +402,7 @@ const InvoiceManager: React.FC = () => {
         <div style={{
           background: 'var(--surface)',
           border: '2px solid var(--border)',
-          borderRadius: 'var(--radius)',
+          borderRadius: 0,
           padding: 'var(--space-3)',
           marginBottom: 'var(--space-3)'
         }}>
@@ -457,7 +457,7 @@ const InvoiceManager: React.FC = () => {
                 fontSize: '9px',
                 fontWeight: 700,
                 cursor: draftBusy ? 'not-allowed' : 'pointer',
-                borderRadius: 'var(--radius)',
+                borderRadius: 0,
               }}
             >
               DRY RUN
@@ -473,7 +473,7 @@ const InvoiceManager: React.FC = () => {
                 fontSize: '9px',
                 fontWeight: 800,
                 cursor: draftBusy ? 'not-allowed' : 'pointer',
-                borderRadius: 'var(--radius)',
+                borderRadius: 0,
               }}
             >
               {draftBusy ? 'WORKING…' : 'GENERATE DRAFTS'}
@@ -504,7 +504,7 @@ const InvoiceManager: React.FC = () => {
                 style={{
                   background: 'var(--surface)',
                   border: '2px solid var(--border)',
-                  borderRadius: 'var(--radius)',
+                  borderRadius: 0,
                   padding: 'var(--space-3)',
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -534,7 +534,7 @@ const InvoiceManager: React.FC = () => {
                       color: 'var(--text)',
                       background: 'var(--bg)',
                       padding: '4px 8px',
-                      borderRadius: 'var(--radius)',
+                      borderRadius: 0,
                       border: '1px solid var(--border)',
                       display: 'inline-block',
                       marginBottom: '4px'
@@ -605,7 +605,7 @@ const InvoiceManager: React.FC = () => {
                       fontSize: '9px',
                       fontWeight: 600,
                       cursor: 'pointer',
-                      borderRadius: 'var(--radius)',
+                      borderRadius: 0,
                       transition: 'var(--transition)'
                     }}
                   >
@@ -623,7 +623,7 @@ const InvoiceManager: React.FC = () => {
                         fontSize: '9px',
                         fontWeight: 700,
                         cursor: 'pointer',
-                        borderRadius: 'var(--radius)',
+                        borderRadius: 0,
                         transition: 'var(--transition)'
                       }}
                     >
@@ -643,11 +643,11 @@ const InvoiceManager: React.FC = () => {
                         padding: '4px var(--space-2)',
                         border: '2px solid var(--success)',
                         background: 'var(--success)',
-                        color: '#ffffff',
+                        color: 'var(--surface-elevated)',
                         fontSize: '9px',
                         fontWeight: 700,
                         cursor: 'pointer',
-                        borderRadius: 'var(--radius)',
+                        borderRadius: 0,
                         transition: 'var(--transition)'
                       }}
                     >
@@ -680,7 +680,7 @@ const InvoiceManager: React.FC = () => {
             style={{
               background: 'var(--surface)',
               border: '2px solid var(--border)',
-              borderRadius: 'var(--radius)',
+              borderRadius: 0,
               maxWidth: '900px',
               width: '100%',
               maxHeight: '90vh',
@@ -710,7 +710,7 @@ const InvoiceManager: React.FC = () => {
                   fontSize: '9px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  borderRadius: 'var(--radius)'
+                  borderRadius: 0
                 }}
               >
                 CLOSE
@@ -724,7 +724,7 @@ const InvoiceManager: React.FC = () => {
                   background: 'var(--surface)',
                   padding: 'var(--space-4)',
                   border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius)'
+                  borderRadius: 0
                 }}
                 dangerouslySetInnerHTML={{ __html: previewInvoice.html_content }}
               />
@@ -761,7 +761,7 @@ const InvoiceManager: React.FC = () => {
                   fontSize: '9px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  borderRadius: 'var(--radius)',
+                  borderRadius: 0,
                   transition: 'var(--transition)'
                 }}
               >
@@ -781,7 +781,7 @@ const InvoiceManager: React.FC = () => {
                   fontSize: '9px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  borderRadius: 'var(--radius)',
+                  borderRadius: 0,
                   transition: 'var(--transition)'
                 }}
               >
@@ -801,7 +801,7 @@ const InvoiceManager: React.FC = () => {
                   fontSize: '9px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  borderRadius: 'var(--radius)',
+                  borderRadius: 0,
                   transition: 'var(--transition)'
                 }}
               >

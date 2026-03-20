@@ -244,9 +244,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
             maxWidth: '500px',
             width: '100%',
             maxHeight: '80vh',
-            overflow: 'auto',
-            boxShadow: '0 8px 32px var(--overlay)'
-          }}
+            overflow: 'auto'}}
           onClick={e => e.stopPropagation()}
         >
           <div style={{
@@ -304,9 +302,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
           maxHeight: '80vh',
           overflow: 'hidden',
           display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 8px 32px var(--overlay)'
-        }}
+          flexDirection: 'column'}}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -374,9 +370,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
                   style={{
                     padding: '12px',
                     background: vehicle.fixed ? 'var(--success-dim)' : 'var(--bg)',
-                    border: `1px solid ${vehicle.fixed ? 'var(--success)' : 'var(--border)'}`,
-                    borderRadius: '4px',
-                    opacity: vehicle.fixed ? 0.7 : 1
+                    border: `1px solid ${vehicle.fixed ? 'var(--success)' : 'var(--border)'}`, opacity: vehicle.fixed ? 0.7 : 1
                   }}
                 >
                   <div style={{
@@ -404,9 +398,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
                             width: '100%',
                             padding: '8px 10px',
                             fontSize: '12px',
-                            border: '1px solid var(--border)',
-                            borderRadius: '3px',
-                            background: 'var(--surface)'
+                            border: '1px solid var(--border)', background: 'var(--surface)'
                           }}
                           onKeyDown={e => {
                             if (e.key === 'Enter') {
@@ -427,9 +419,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
                           fontWeight: 600,
                           background: values[vehicle.id]?.trim() ? 'var(--accent)' : 'var(--text-disabled)',
                           color: 'var(--bg)',
-                          border: 'none',
-                          borderRadius: '3px',
-                          cursor: values[vehicle.id]?.trim() ? 'pointer' : 'not-allowed'
+                          border: 'none', cursor: values[vehicle.id]?.trim() ? 'pointer' : 'not-allowed'
                         }}
                       >
                         {saving ? '...' : 'SAVE'}
@@ -459,9 +449,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
               fontSize: '11px',
               fontWeight: 600,
               background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: '3px',
-              cursor: 'pointer'
+              border: '1px solid var(--border)', cursor: 'pointer'
             }}
           >
             {fixedCount > 0 ? 'DONE' : 'CANCEL'}
@@ -476,9 +464,7 @@ const QuickFixModal: React.FC<QuickFixModalProps> = ({
               fontWeight: 600,
               background: hasValues && remainingCount > 0 ? 'var(--success)' : 'var(--text-disabled)',
               color: 'var(--bg)',
-              border: 'none',
-              borderRadius: '3px',
-              cursor: hasValues && remainingCount > 0 ? 'pointer' : 'not-allowed'
+              border: 'none', cursor: hasValues && remainingCount > 0 ? 'pointer' : 'not-allowed'
             }}
           >
             {saving ? 'SAVING...' : `SAVE ALL (${Object.values(values).filter(v => v.trim()).length})`}

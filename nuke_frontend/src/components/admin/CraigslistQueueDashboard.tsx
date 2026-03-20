@@ -279,9 +279,7 @@ const CraigslistQueueDashboard: React.FC = () => {
           <div style={{
             width: '100%',
             height: '24px',
-            backgroundColor: 'var(--bg-secondary)',
-            borderRadius: '4px',
-            overflow: 'hidden',
+            backgroundColor: 'var(--bg-secondary)', overflow: 'hidden',
             border: '2px solid var(--border)'
           }}>
             <div style={{
@@ -310,9 +308,7 @@ const CraigslistQueueDashboard: React.FC = () => {
                 key={item.id}
                 style={{
                   padding: '12px',
-                  backgroundColor: 'var(--bg-secondary)',
-                  borderRadius: '4px',
-                  border: '1px solid var(--border-light)',
+                  backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-light)',
                   fontSize: '11px'
                 }}
               >
@@ -329,9 +325,7 @@ const CraigslistQueueDashboard: React.FC = () => {
                   </div>
                   <div style={{ marginLeft: '12px', textAlign: 'right' }}>
                     <div style={{
-                      padding: '2px 6px',
-                      borderRadius: '2px',
-                      fontSize: '9px',
+                      padding: '2px 6px', fontSize: '9px',
                       fontWeight: '700',
                       backgroundColor:
                         item.status === 'complete' ? 'var(--success)' :

@@ -23,9 +23,9 @@ const IMPORTANCE_LABELS: Record<FieldImportance, string> = {
 };
 
 const IMPORTANCE_COLORS: Record<FieldImportance, string> = {
-  critical: '#ef4444',
-  important: '#f59e0b',
-  nice_to_have: '#6b7280',
+  critical: 'var(--error)',
+  important: 'var(--warning)',
+  nice_to_have: 'var(--text-secondary)',
 };
 
 export default function CompletenessPortal({ vehicle, activePortal, onOpen }: CompletenessPortalProps) {
@@ -36,16 +36,14 @@ export default function CompletenessPortal({ vehicle, activePortal, onOpen }: Co
       <span style={{
         width: '40px',
         height: '4px',
-        background: 'var(--border)',
-        borderRadius: '2px',
-        overflow: 'hidden',
+        background: 'var(--border)', overflow: 'hidden',
         display: 'inline-block',
       }}>
         <span style={{
           display: 'block',
           width: `${completeness.percent}%`,
           height: '100%',
-          background: completeness.percent > 70 ? '#22c55e' : completeness.percent > 40 ? '#f59e0b' : '#ef4444',
+          background: completeness.percent > 70 ? 'var(--success)' : completeness.percent > 40 ? 'var(--warning)' : 'var(--error)',
         }} />
       </span>
       <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{completeness.percent}%</span>
@@ -76,9 +74,7 @@ export default function CompletenessPortal({ vehicle, activePortal, onOpen }: Co
         <div style={{
           display: 'flex',
           gap: '2px',
-          height: '6px',
-          borderRadius: '3px',
-          overflow: 'hidden',
+          height: '6px', overflow: 'hidden',
           marginBottom: '10px',
         }}>
           {completeness.fields.map((f) => (
@@ -87,10 +83,10 @@ export default function CompletenessPortal({ vehicle, activePortal, onOpen }: Co
               style={{
                 flex: 1,
                 background: f.filled
-                  ? '#22c55e'
-                  : f.importance === 'critical' ? '#ef4444'
-                  : f.importance === 'important' ? '#f59e0b'
-                  : '#d1d5db',
+                  ? 'var(--success)'
+                  : f.importance === 'critical' ? 'var(--error)'
+                  : f.importance === 'important' ? 'var(--warning)'
+                  : 'var(--border)',
                 transition: 'background 0.2s',
               }}
               title={`${f.label}: ${f.filled ? 'filled' : 'missing'}`}

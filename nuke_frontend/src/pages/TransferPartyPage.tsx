@@ -310,7 +310,7 @@ export default function TransferPartyPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Arial, sans-serif' }}>
       {/* Top nav */}
       <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>
@@ -325,7 +325,7 @@ export default function TransferPartyPage() {
 
       <div style={{ maxWidth: '680px', margin: '0 auto', padding: '32px 24px' }}>
         {/* Vehicle card */}
-        <div style={{ background: 'var(--surface)', borderRadius: '12px', overflow: 'hidden', marginBottom: '24px' }}>
+        <div style={{ background: 'var(--surface)', overflow: 'hidden', marginBottom: '24px' }}>
           {vehicleImage && (
             <div style={{ height: '200px', overflow: 'hidden', background: 'var(--bg)' }}>
               <img
@@ -348,7 +348,7 @@ export default function TransferPartyPage() {
                 </div>
               )}
               <div style={{
-                padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 600,
+                padding: '3px 10px', fontSize: '12px', fontWeight: 600,
                 background: isComplete ? 'var(--success-dim)' : 'var(--accent-dim)',
                 color: isComplete ? 'var(--success)' : 'var(--accent)',
               }}>
@@ -364,21 +364,19 @@ export default function TransferPartyPage() {
         </div>
 
         {/* Progress bar */}
-        <div style={{ background: 'var(--surface)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
+        <div style={{ background: 'var(--surface)', padding: '20px', marginBottom: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>Transfer Progress</div>
             <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
               {completedMilestones.length} of {requiredMilestones.length} steps done
             </div>
           </div>
-          <div style={{ background: 'var(--bg)', borderRadius: '6px', height: '10px', overflow: 'hidden', marginBottom: '16px' }}>
+          <div style={{ background: 'var(--bg)', height: '10px', overflow: 'hidden', marginBottom: '16px' }}>
             <div
               style={{
                 height: '100%',
                 width: `${progressPct}%`,
-                background: isComplete ? 'var(--success)' : 'linear-gradient(90deg, var(--accent), var(--accent))',
-                borderRadius: '6px',
-                transition: 'width 0.5s ease',
+                background: isComplete ? 'var(--success)' : 'var(--accent)', transition: 'width 0.5s ease',
               }}
             />
           </div>
@@ -401,15 +399,14 @@ export default function TransferPartyPage() {
                     key={m.milestone_type}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '12px',
-                      padding: '10px 12px', borderRadius: '8px',
-                      background: isCurrent ? 'var(--accent-dim)' : 'transparent',
+                      padding: '10px 12px', background: isCurrent ? 'var(--accent-dim)' : 'transparent',
                       border: isCurrent ? '1px solid var(--border)' : '1px solid transparent',
                       opacity: isSkipped ? 0.4 : 1,
                     }}
                   >
                     {/* Status icon */}
                     <div style={{
-                      width: '24px', height: '24px', borderRadius: '50%', flexShrink: 0,
+                      width: '24px', height: '24px', flexShrink: 0,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       background: isDone ? 'var(--success-dim)' : isOverdue ? 'var(--error-dim)' : isCurrent ? 'var(--accent-dim)' : 'var(--surface)',
                       border: `2px solid ${isDone ? 'var(--success)' : isOverdue ? 'var(--error)' : isCurrent ? 'var(--accent)' : 'var(--border)'}`,
@@ -444,8 +441,7 @@ export default function TransferPartyPage() {
                         onClick={() => confirmMilestone(m.milestone_type)}
                         disabled={confirming === m.milestone_type}
                         style={{
-                          background: 'var(--success-dim)', color: 'var(--success)', border: '1px solid var(--success)',
-                          borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: 600,
+                          background: 'var(--success-dim)', color: 'var(--success)', border: '1px solid var(--success)', padding: '5px 12px', fontSize: '12px', fontWeight: 600,
                           cursor: confirming === m.milestone_type ? 'wait' : 'pointer',
                           flexShrink: 0,
                         }}
@@ -465,7 +461,7 @@ export default function TransferPartyPage() {
 
         {/* Current action prompt */}
         {!isComplete && transfer.current_milestone && (
-          <div style={{ background: 'var(--accent-dim)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
+          <div style={{ background: 'var(--accent-dim)', border: '1px solid var(--border)', padding: '20px', marginBottom: '24px' }}>
             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
               Waiting on
             </div>
@@ -482,7 +478,7 @@ export default function TransferPartyPage() {
 
         {/* Free-form signal */}
         {!isComplete && (
-          <div style={{ background: 'var(--surface)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
+          <div style={{ background: 'var(--surface)', padding: '20px', marginBottom: '24px' }}>
             <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' }}>
               Send an update
             </div>
@@ -496,8 +492,7 @@ export default function TransferPartyPage() {
               placeholder="What happened? (e.g. 'I wired the deposit this morning')"
               rows={3}
               style={{
-                width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px',
-                color: 'var(--text)', padding: '10px 12px', fontSize: '13px', resize: 'vertical',
+                width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 12px', fontSize: '13px', resize: 'vertical',
                 boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit',
               }}
             />
@@ -512,8 +507,7 @@ export default function TransferPartyPage() {
               disabled={!signalText.trim() || signaling}
               style={{
                 marginTop: '10px',
-                background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: '6px',
-                padding: '9px 20px', fontSize: '13px', fontWeight: 600,
+                background: 'var(--accent)', color: 'var(--bg)', border: 'none', padding: '9px 20px', fontSize: '13px', fontWeight: 600,
                 cursor: !signalText.trim() || signaling ? 'not-allowed' : 'pointer',
                 opacity: !signalText.trim() ? 0.5 : 1,
               }}
@@ -524,7 +518,7 @@ export default function TransferPartyPage() {
         )}
 
         {isComplete && (
-          <div style={{ background: 'var(--success-dim)', border: '1px solid var(--success)', borderRadius: '10px', padding: '20px', textAlign: 'center' }}>
+          <div style={{ background: 'var(--success-dim)', border: '1px solid var(--success)', padding: '20px', textAlign: 'center' }}>
             <div style={{ fontSize: '28px', marginBottom: '8px' }}>✓</div>
             <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--success)' }}>Transfer Complete</div>
             <div style={{ fontSize: '13px', color: 'var(--success)', marginTop: '6px' }}>

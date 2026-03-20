@@ -192,9 +192,7 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
               <div style={{
                 background: 'var(--color-danger-light)',
                 border: '1px solid var(--color-danger)',
-                padding: '8px 12px',
-                borderRadius: '2px',
-                marginBottom: '16px',
+                padding: '8px 12px', marginBottom: '16px',
                 fontSize: '12px'
               }}>
                 {error}

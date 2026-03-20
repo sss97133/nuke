@@ -127,9 +127,7 @@ export function ServiceReportModal({
     >
       <div 
         style={{
-          background: 'var(--card-bg, #fff)',
-          borderRadius: '4px',
-          width: '100%',
+          background: 'var(--card-bg, #fff)', width: '100%',
           maxWidth: '800px',
           maxHeight: '90vh',
           overflow: 'auto',
@@ -223,7 +221,7 @@ export function ServiceReportModal({
                       <img 
                         src={url} 
                         alt=""
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '2px' }}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover'}}
                       />
                     </div>
                   ))}
@@ -294,9 +292,7 @@ export function ServiceReportModal({
                   padding: '8px 16px',
                   fontSize: '11px',
                   fontWeight: 600,
-                  cursor: 'pointer',
-                  borderRadius: '2px'
-                }}
+                  cursor: 'pointer'}}
               >
                 VIEW FULL PROFILE
               </button>

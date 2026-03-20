@@ -223,9 +223,7 @@ const AddOrganizationRelationship: React.FC<AddOrganizationRelationshipProps> = 
             <div style={{
               padding: '12px',
               background: 'var(--error-dim)',
-              border: '1px solid var(--error)',
-              borderRadius: '4px',
-              fontSize: '12px',
+              border: '1px solid var(--error)', fontSize: '12px',
               color: 'var(--error)'
             }}>
               {error}
@@ -235,10 +233,8 @@ const AddOrganizationRelationship: React.FC<AddOrganizationRelationshipProps> = 
           {alreadyExists && (
             <div style={{
               padding: '12px',
-              background: '#fef3c7',
-              border: '1px solid #f59e0b',
-              borderRadius: '4px',
-              fontSize: '12px',
+              background: 'var(--warning-dim)',
+              border: '1px solid var(--warning)', fontSize: '12px',
               color: '#92400e'
             }}>
               This relationship already exists. Please select a different organization or relationship type.
@@ -267,9 +263,7 @@ const AddOrganizationRelationship: React.FC<AddOrganizationRelationshipProps> = 
                   width: '100%',
                   padding: '10px',
                   fontSize: '12px',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  background: 'var(--surface)'
+                  border: '1px solid var(--border)', background: 'var(--surface)'
                 }}
               >
                 <option value="">Select an organization...</option>
@@ -303,9 +297,7 @@ const AddOrganizationRelationship: React.FC<AddOrganizationRelationshipProps> = 
                     padding: '12px',
                     border: '2px solid',
                     borderColor: relationshipType === type.value ? 'var(--accent)' : 'var(--border-light)',
-                    background: relationshipType === type.value ? 'var(--accent-dim)' : 'transparent',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
+                    background: relationshipType === type.value ? 'var(--accent-dim)' : 'transparent', cursor: 'pointer',
                     transition: 'all 0.12s ease',
                     textAlign: 'left'
                   }}
@@ -340,9 +332,7 @@ const AddOrganizationRelationship: React.FC<AddOrganizationRelationshipProps> = 
                 minHeight: '80px',
                 padding: '8px',
                 fontSize: '12px',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                fontFamily: 'inherit',
+                border: '1px solid var(--border)', fontFamily: 'inherit',
                 resize: 'vertical'
               }}
             />

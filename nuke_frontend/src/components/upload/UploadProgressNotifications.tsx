@@ -204,7 +204,7 @@ export function UploadProgressNotifications({
         <div
           key={notification.id}
           className={`
-            bg-white dark:bg-gray-800 border-2 rounded-lg shadow-lg p-4
+            bg-white dark:bg-gray-800 border-2   p-4
             transform transition-all duration-300 ease-out
             ${notification.type === 'success' ? 'border-green-500' : ''}
             ${notification.type === 'warning' ? 'border-yellow-500' : ''}
@@ -235,7 +235,7 @@ export function UploadProgressNotifications({
               </p>
 
               {notification.extractedData && (
-                <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 text-xs font-mono text-gray-800 dark:text-gray-200">
+                <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs font-mono text-gray-800 dark:text-gray-200">
                   <div className="font-bold mb-1">Extracted Fields:</div>
                   {notification.extractedData.vin && (
                     <div>VIN: {notification.extractedData.vin}</div>
@@ -258,7 +258,7 @@ export function UploadProgressNotifications({
               {notification.actionRequired && (
                 <button
                   onClick={notification.onAction}
-                  className="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
+                  className="mt-3 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium"
                 >
                   Review Now
                 </button>

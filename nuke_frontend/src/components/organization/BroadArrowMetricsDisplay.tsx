@@ -47,34 +47,34 @@ export const BroadArrowMetricsDisplay: React.FC<BroadArrowMetricsDisplayProps> =
       <div className="card-body">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
           {/* Volume Metrics */}
-          <div style={{ padding: '12px', background: 'var(--grey-50)', borderRadius: '4px' }}>
+          <div style={{ padding: '12px', background: 'var(--grey-50)'}}>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Vehicles</div>
             <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--text)' }}>{formatted.volume.total}</div>
           </div>
 
-          <div style={{ padding: '12px', background: 'var(--success-dim)', borderRadius: '4px' }}>
+          <div style={{ padding: '12px', background: 'var(--success-dim)'}}>
             <div style={{ fontSize: '11px', color: 'var(--success)', marginBottom: '4px' }}>Vehicles Sold</div>
             <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--success)' }}>{formatted.volume.sold}</div>
           </div>
 
-          <div style={{ padding: '12px', background: 'var(--error-dim)', borderRadius: '4px' }}>
+          <div style={{ padding: '12px', background: 'var(--error-dim)'}}>
             <div style={{ fontSize: '11px', color: 'var(--error)', marginBottom: '4px' }}>Vehicles Unsold</div>
             <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--error)' }}>{formatted.volume.unsold}</div>
           </div>
 
-          <div style={{ padding: '12px', background: 'var(--grey-50)', borderRadius: '4px' }}>
+          <div style={{ padding: '12px', background: 'var(--grey-50)'}}>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Sell-Through Rate</div>
             <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--text)' }}>{formatted.volume.sellThroughRate}</div>
           </div>
 
           {/* Revenue Metrics */}
-          <div style={{ padding: '12px', background: 'var(--accent-dim)', borderRadius: '4px' }}>
+          <div style={{ padding: '12px', background: 'var(--accent-dim)'}}>
             <div style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '4px' }}>Total Revenue</div>
             <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--accent)' }}>{formatted.revenue.total}</div>
             <div style={{ fontSize: '9px', color: 'var(--accent)', marginTop: '2px' }}>(Buyer's Premium)</div>
           </div>
 
-          <div style={{ padding: '12px', background: 'var(--accent-dim)', borderRadius: '4px' }}>
+          <div style={{ padding: '12px', background: 'var(--accent-dim)'}}>
             <div style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '4px' }}>Avg Premium/Sale</div>
             <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--accent)' }}>{formatted.revenue.averagePerSale}</div>
           </div>
@@ -82,12 +82,12 @@ export const BroadArrowMetricsDisplay: React.FC<BroadArrowMetricsDisplayProps> =
           {/* Sales Metrics */}
           {showDetailed && (
             <>
-              <div style={{ padding: '12px', background: 'var(--grey-50)', borderRadius: '4px' }}>
+              <div style={{ padding: '12px', background: 'var(--grey-50)'}}>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Hammer Price</div>
                 <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--text)' }}>{formatted.sales.totalHammerPrice}</div>
               </div>
 
-              <div style={{ padding: '12px', background: 'var(--grey-50)', borderRadius: '4px' }}>
+              <div style={{ padding: '12px', background: 'var(--grey-50)'}}>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Avg Sale Price</div>
                 <div style={{ fontSize: '21px', fontWeight: 700, color: 'var(--text)' }}>{formatted.sales.averageSalePrice}</div>
               </div>

@@ -41,9 +41,9 @@ const DataSourcePopover: React.FC<DataSourcePopoverProps> = ({
   };
 
   const getConfidenceColor = (score: number): string => {
-    if (score >= 0.8) return '#22c55e'; // green
-    if (score >= 0.6) return '#eab308'; // yellow
-    return '#ef4444'; // red
+    if (score >= 0.8) return 'var(--success)'; // green
+    if (score >= 0.6) return 'var(--warning)'; // yellow
+    return 'var(--error)'; // red
   };
 
   const formatTimestamp = (timestamp: string): string => {

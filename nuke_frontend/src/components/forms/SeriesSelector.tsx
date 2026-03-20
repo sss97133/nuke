@@ -17,7 +17,7 @@ const SeriesSelector: React.FC<SeriesSelectorProps> = ({
   series,
   onSeriesChange,
   disabled = false,
-  className = '',
+  className ='',
   placeholder = 'e.g., K5, C10, K10, K1500'
 }) => {
   const [seriesQuery, setSeriesQuery] = useState(series);
@@ -119,7 +119,7 @@ const SeriesSelector: React.FC<SeriesSelectorProps> = ({
         {showSuggestions && filteredSuggestions.length > 0 && (
           <div
             ref={suggestionsRef}
-            className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
+            className="absolute z-50 mt-1 w-full bg-white border border-gray-300 max-h-60 overflow-auto"
           >
             {filteredSuggestions.map((opt) => (
               <button
@@ -131,7 +131,7 @@ const SeriesSelector: React.FC<SeriesSelectorProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-gray-900">{opt.code}</span>
                   {opt.is2WD && (
-                    <span className="text-xs text-gray-500 bg-blue-50 px-2 py-0.5 rounded">
+                    <span className="text-xs text-gray-500 bg-blue-50 px-2 py-0.5">
                       2WD
                     </span>
                   )}

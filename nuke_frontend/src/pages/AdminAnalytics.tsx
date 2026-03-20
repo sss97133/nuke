@@ -119,7 +119,7 @@ export default function AdminAnalytics() {
     return (
       <div className="flex items-center justify-center min-h-[400px] bg-white">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent mx-auto mb-2"></div>
+          <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent mx-auto mb-2"></div>
           <p className="text-8pt text-gray-600 uppercase tracking-wide">Loading analytics...</p>
         </div>
       </div>
@@ -139,14 +139,14 @@ export default function AdminAnalytics() {
 
       {/* Current Operations */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-        <div className="bg-white border-2 border-gray-200 rounded p-3">
+        <div className="bg-white border-2 border-gray-200 p-3">
           <div className="text-8pt text-gray-500 uppercase tracking-wide mb-1">Processing Status</div>
           <div className={`text-8pt font-bold ${data.processing.processing ? 'text-green-600' : 'text-gray-400'}`}>
             {data.processing.processing ? 'ACTIVE' : 'IDLE'}
           </div>
         </div>
 
-        <div className="bg-white border-2 border-blue-200 rounded p-3">
+        <div className="bg-white border-2 border-blue-200 p-3">
           <div className="text-8pt text-gray-500 uppercase tracking-wide mb-1">Angles Set</div>
           <div className="text-8pt font-bold text-gray-900">
             {data.processing.anglesSet.toLocaleString()} / {data.processing.totalImages.toLocaleString()}
@@ -156,7 +156,7 @@ export default function AdminAnalytics() {
           </div>
         </div>
 
-        <div className="bg-white border-2 border-yellow-200 rounded p-3">
+        <div className="bg-white border-2 border-yellow-200 p-3">
           <div className="text-8pt text-gray-500 uppercase tracking-wide mb-1">API Cost</div>
           <div className="text-8pt font-bold text-yellow-700">
             ${data.processing.estimatedCost.toFixed(4)}
@@ -166,7 +166,7 @@ export default function AdminAnalytics() {
           </div>
         </div>
 
-        <div className="bg-white border-2 border-purple-200 rounded p-3">
+        <div className="bg-white border-2 border-purple-200 p-3">
           <div className="text-8pt text-gray-500 uppercase tracking-wide mb-1">Tables Ready</div>
           <div className="text-8pt font-bold text-purple-700">
             {data.tables.filter(t => t.rows === 0).length} / {data.tables.length}
@@ -178,14 +178,14 @@ export default function AdminAnalytics() {
       </div>
 
       {/* Progress Bar */}
-      <div className="bg-white border-2 border-gray-200 rounded p-4 mb-4">
+      <div className="bg-white border-2 border-gray-200 p-4 mb-4">
         <div className="flex justify-between text-8pt mb-2">
           <span className="text-gray-700 uppercase tracking-wide">Angle Detection Progress</span>
           <span className="font-mono text-gray-900">{data.processing.anglesSet} / {data.processing.totalImages}</span>
         </div>
-        <div className="bg-gray-100 rounded-full h-2">
+        <div className="bg-gray-100 h-2">
           <div 
-            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            className="bg-blue-600 h-2 transition-all duration-300"
             style={{ width: `${data.processing.percentComplete}%` }}
           />
         </div>
@@ -196,7 +196,7 @@ export default function AdminAnalytics() {
       </div>
 
       {/* Professional Tables Population */}
-      <div className="bg-white border-2 border-gray-200 rounded p-4 mb-4">
+      <div className="bg-white border-2 border-gray-200 p-4 mb-4">
         <h3 className="text-8pt font-bold uppercase tracking-wide mb-3 text-gray-900">Professional Appraisal Tables</h3>
         <div className="space-y-2">
           {data.tables.map((table) => {
@@ -211,7 +211,7 @@ export default function AdminAnalytics() {
                   <div className={`text-8pt font-bold ${isEmpty ? 'text-gray-400' : 'text-green-600'}`}>
                     {table.rows.toLocaleString()} rows
                   </div>
-                  <div className={`text-8pt uppercase tracking-wide px-2 py-0.5 rounded ${
+                  <div className={`text-8pt uppercase tracking-wide px-2 py-0.5  ${
                     isEmpty ? 'bg-gray-100 text-gray-500' : 'bg-green-50 text-green-700 border border-green-200'
                   }`}>
                     {isEmpty ? 'READY' : 'ACTIVE'}
@@ -224,7 +224,7 @@ export default function AdminAnalytics() {
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-white border-2 border-gray-200 rounded p-4">
+      <div className="bg-white border-2 border-gray-200 p-4">
         <h3 className="text-8pt font-bold uppercase tracking-wide mb-3 text-gray-900">Recent Activity</h3>
         <div className="space-y-1">
           {data.recentImages.slice(0, 8).map((img, idx) => {

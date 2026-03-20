@@ -231,10 +231,7 @@ export const ImageHoverPreview: React.FC<ImageHoverPreviewProps> = ({
             zIndex: 10000,
             width: '320px',
             backgroundColor: 'var(--white)',
-            border: '2px solid var(--border-medium)',
-            borderRadius: '0px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            padding: 'var(--space-3)',
+            border: '2px solid var(--border-medium)', padding: 'var(--space-3)',
             pointerEvents: 'none'
           }}
           onMouseEnter={() => setShowPreview(true)}

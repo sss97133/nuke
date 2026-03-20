@@ -162,7 +162,7 @@ export default function AuctionBiddingInterface({
 
   if (!user) {
     return (
-      <div className="p-6 border border-gray-200 rounded">
+      <div className="p-6 border border-gray-200">
         <p className="text-gray-600">Please log in to place a bid</p>
       </div>
     );
@@ -177,7 +177,7 @@ export default function AuctionBiddingInterface({
         />
       )}
       
-    <div className="p-6 border border-gray-200 rounded space-y-4">
+    <div className="p-6 border border-gray-200 space-y-4">
       {/* Current Status */}
       <div className="space-y-2">
         <div className="flex justify-between items-center">
@@ -222,7 +222,7 @@ export default function AuctionBiddingInterface({
               placeholder={minimumBid ? (minimumBid / 100).toFixed(2) : '0.00'}
               min={minimumBid ? minimumBid / 100 : 0}
               step="0.01"
-              className="flex-1 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           {minimumBid && (
@@ -239,13 +239,13 @@ export default function AuctionBiddingInterface({
         </div>
 
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+          <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">
+          <div className="p-3 bg-green-50 border border-green-200 text-green-700 text-sm">
             Bid placed successfully!
           </div>
         )}
@@ -253,7 +253,7 @@ export default function AuctionBiddingInterface({
         <button
           onClick={handlePlaceBid}
           disabled={loading || !maxBid}
-          className="w-full px-6 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          className="w-full px-6 py-3 bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
           {loading
             ? 'Placing Bid...'
@@ -264,7 +264,7 @@ export default function AuctionBiddingInterface({
       </div>
 
       {/* Info Box */}
-      <div className="p-4 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+      <div className="p-4 bg-blue-50 border border-blue-200 text-sm text-blue-800">
         <p className="font-medium mb-1">How Proxy Bidding Works:</p>
         <ul className="list-disc list-inside space-y-1 text-xs">
           <li>Enter the maximum amount you're willing to pay</li>
@@ -276,7 +276,7 @@ export default function AuctionBiddingInterface({
 
       {/* Deposit Info */}
       {paymentsEnabled && depositAmount > 0 && (
-        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+        <div className="p-4 bg-yellow-50 border border-yellow-200 text-sm text-yellow-800">
           <p className="font-medium mb-1">About Bid Deposits:</p>
           <ul className="list-disc list-inside space-y-1 text-xs">
             <li>We'll hold {formatCurrency(depositAmount)} on your card when you place this bid</li>

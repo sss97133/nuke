@@ -249,14 +249,10 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
       <div
         role="dialog"
         style={{
-          background: 'var(--surface, #fff)',
-          borderRadius: 12,
-          maxWidth: 440,
+          background: 'var(--surface, #fff)', maxWidth: 440,
           width: '100%',
           maxHeight: '90vh',
-          overflow: 'auto',
-          boxShadow: '0 20px 60px color-mix(in srgb, var(--text) 25%, transparent)',
-        }}
+          overflow: 'auto', }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ padding: 24 }}>
@@ -392,7 +388,7 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
                 </p>
               )}
               <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-muted)' }}>Please read and agree to access the data room.</p>
-              <div style={{ maxHeight: 200, overflowY: 'auto', padding: 12, background: 'var(--grey-100)', borderRadius: 8, marginBottom: 16, fontSize: 11, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+              <div style={{ maxHeight: 200, overflowY: 'auto', padding: 12, background: 'var(--grey-100)', marginBottom: 16, fontSize: 11, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                 {NDA_AND_TERMS}
               </div>
               <p style={{ marginBottom: 12, fontSize: 11 }}>

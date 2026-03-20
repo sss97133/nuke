@@ -79,9 +79,7 @@ function NavBadge({ count }: { count: number }) {
       fontWeight: 700,
       fontFamily: 'monospace',
       color: '#fff',
-      backgroundColor: '#b91c1c',
-      borderRadius: '3px',
-      lineHeight: '14px',
+      backgroundColor: 'var(--error-dark, var(--error))', lineHeight: '14px',
       verticalAlign: 'middle',
     }}>
       {count > 999 ? '999+' : count}
@@ -101,9 +99,7 @@ function NavList({ items, counts }: { items: AdminNavItem[]; counts: NavCounts }
             style={({ isActive }) => ({
               display: 'block',
               padding: 'var(--space-2) var(--space-3)',
-              fontSize: '11px',
-              borderRadius: '0px',
-              backgroundColor: isActive ? 'var(--grey-100)' : 'transparent',
+              fontSize: '11px', backgroundColor: isActive ? 'var(--grey-100)' : 'transparent',
               color: isActive ? 'var(--text)' : 'var(--text-muted)',
               transition: 'all 0.12s ease',
               textDecoration: 'none'
@@ -320,9 +316,7 @@ export default function AdminShell() {
       <div style={{ padding: 'var(--space-6)' }}>
         <div style={{
           maxWidth: '36rem',
-          border: '2px solid var(--border-light)',
-          borderRadius: '0px',
-          padding: 'var(--space-4)',
+          border: '2px solid var(--border-light)', padding: 'var(--space-4)',
           backgroundColor: 'var(--white)'
         }}>
           <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-1)' }}>Access denied</div>
@@ -363,9 +357,7 @@ export default function AdminShell() {
               style={{
                 width: '100%',
                 fontSize: '11px',
-                padding: '8px 10px',
-                borderRadius: '0px',
-                border: '2px solid var(--border-light)',
+                padding: '8px 10px', border: '2px solid var(--border-light)',
                 outline: 'none',
               }}
             />
@@ -406,9 +398,7 @@ export default function AdminShell() {
                   style={({ isActive }) => ({
                     display: 'block',
                     padding: 'var(--space-2) var(--space-3)',
-                    fontSize: '11px',
-                    borderRadius: '0px',
-                    backgroundColor: isActive ? 'var(--grey-100)' : 'transparent',
+                    fontSize: '11px', backgroundColor: isActive ? 'var(--grey-100)' : 'transparent',
                     color: isActive ? 'var(--text)' : 'var(--text-muted)',
                     transition: 'all 0.12s ease',
                     textDecoration: 'none'

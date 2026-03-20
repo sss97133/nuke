@@ -263,10 +263,10 @@ export default function MarketMap() {
         if (gw < 2 || gh < 2) continue;
 
         const gDiv = document.createElement('div');
-        gDiv.style.cssText = `position:absolute;left:${group.x0}px;top:${group.y0}px;width:${gw}px;height:${gh}px;overflow:hidden;border:1px solid rgba(42,42,42,0.6);border-radius:2px;background:rgba(30,30,30,0.3);cursor:pointer;`;
+        gDiv.style.cssText = `position:absolute;left:${group.x0}px;top:${group.y0}px;width:${gw}px;height:${gh}px;overflow:hidden;border:1px solid rgba(42,42,42,0.6);border-radius:0;background:rgba(30,30,30,0.3);cursor:pointer;`;
 
         const label = document.createElement('div');
-        label.style.cssText = 'position:absolute;top:0;left:0;right:0;padding:3px 5px 2px;font-size:9px;font-weight:700;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2;pointer-events:none;background:linear-gradient(180deg,rgba(30,30,30,0.85) 0%,rgba(30,30,30,0.4) 80%,transparent 100%);';
+        label.style.cssText = 'position:absolute;top:0;left:0;right:0;padding:3px 5px 2px;font-size:9px;font-weight:700;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2;pointer-events:none;background:rgba(30,30,30,0.7);';
         label.innerHTML = `${gw > 60 ? group.data.name : group.data.name.slice(0, Math.floor(gw / 6))}<span style="font-weight:400;font-family:monospace;font-size:8px;color:#858585;margin-left:6px;">${displayVal(group.data)}</span>`;
         gDiv.appendChild(label);
 
@@ -481,7 +481,7 @@ export default function MarketMap() {
               <button key={v} onClick={() => switchView(v)} style={{
                 border: `1px solid ${view === v ? 'var(--text)' : 'var(--border)'}`, background: view === v ? 'var(--text)' : 'transparent',
                 color: view === v ? 'var(--surface)' : 'var(--text-secondary)', padding: '4px 10px', fontSize: '9px', fontWeight: 600,
-                cursor: 'pointer', borderRadius: '3px', fontFamily: 'inherit',
+                cursor: 'pointer', fontFamily: 'inherit',
               }}>
                 {v.charAt(0).toUpperCase() + v.slice(1)}
               </button>
@@ -492,7 +492,7 @@ export default function MarketMap() {
               <button key={m} onClick={() => setMetric(m)} style={{
                 border: `1px solid ${metric === m ? 'var(--text)' : 'var(--border)'}`, background: metric === m ? 'var(--text)' : 'transparent',
                 color: metric === m ? 'var(--surface)' : 'var(--text-secondary)', padding: '4px 10px', fontSize: '9px', fontWeight: 600,
-                cursor: 'pointer', borderRadius: '3px', fontFamily: 'inherit',
+                cursor: 'pointer', fontFamily: 'inherit',
               }}>
                 {m === 'count' ? 'Volume' : 'Value'}
               </button>
@@ -523,7 +523,7 @@ export default function MarketMap() {
       </div>
 
       {/* Treemap container */}
-      <div style={{ position: 'relative', border: '1px solid var(--border)', borderRadius: '3px', overflow: 'hidden', background: 'var(--surface)', flex: 1, minHeight: 0 }}>
+      <div style={{ position: 'relative', border: '1px solid var(--border)', overflow: 'hidden', background: 'var(--surface)', flex: 1, minHeight: 0 }}>
         <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%' }} />
         {loading && (
           <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: 'var(--text-disabled)', fontSize: '11px' }}>Loading...</div>
@@ -534,11 +534,8 @@ export default function MarketMap() {
       {tooltip.visible && (
         <div style={{
           position: 'fixed', left: tooltip.x, top: tooltip.y,
-          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px',
-          padding: '10px 14px', pointerEvents: 'none', zIndex: 1000,
-          minWidth: '180px', maxWidth: '280px', fontSize: '10px',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-        }}>
+          background: 'var(--surface)', border: '1px solid var(--border)', padding: '10px 14px', pointerEvents: 'none', zIndex: 1000,
+          minWidth: '180px', maxWidth: '280px', fontSize: '10px', }}>
           <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: '4px', fontSize: '11px' }}>{tooltip.name}</div>
           <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'monospace', color: 'var(--success)', marginBottom: '8px' }}>{tooltip.value}</div>
           <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '6px 0' }} />

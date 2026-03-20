@@ -143,9 +143,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
     <div style={{
       padding: '16px',
       background: 'var(--background-secondary)',
-      border: '1px solid var(--border)',
-      borderRadius: '4px',
-      marginBottom: '16px'
+      border: '1px solid var(--border)', marginBottom: '16px'
     }}>
       <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>
         Bring a Trailer Listing Manager
@@ -164,9 +162,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
             fontSize: '12px',
             background: mode === 'import' ? 'var(--color-primary)' : 'var(--background-secondary)',
             color: mode === 'import' ? '#fff' : 'var(--text)',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            cursor: 'pointer'
+            border: '1px solid var(--border)', cursor: 'pointer'
           }}
         >
           Import Data
@@ -178,9 +174,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
             fontSize: '12px',
             background: mode === 'extract' ? 'var(--color-primary)' : 'var(--background-secondary)',
             color: mode === 'extract' ? '#fff' : 'var(--text)',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            cursor: 'pointer'
+            border: '1px solid var(--border)', cursor: 'pointer'
           }}
         >
           Extract Parts/Brands
@@ -193,9 +187,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
           marginBottom: '12px',
           padding: '8px',
           background: 'rgba(16, 185, 129, 0.1)',
-          border: '1px solid rgba(16, 185, 129, 0.3)',
-          borderRadius: '4px',
-          fontSize: '11px'
+          border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '11px'
         }}>
           <strong>Already extracted:</strong> {existingParts.length} parts/brands from this listing
           <div style={{ marginTop: '4px', fontSize: '9px', opacity: 0.8 }}>
@@ -221,9 +213,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
             flex: 1,
             padding: '6px 12px',
             fontSize: '12px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            fontFamily: 'inherit'
+            border: '1px solid var(--border)', fontFamily: 'inherit'
           }}
         />
         <button
@@ -234,9 +224,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
             fontSize: '12px',
             background: (mode === 'import' ? importing : extracting) ? 'var(--background-secondary)' : 'var(--color-primary)',
             color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: (mode === 'import' ? importing : extracting) ? 'not-allowed' : 'pointer',
+            border: 'none', cursor: (mode === 'import' ? importing : extracting) ? 'not-allowed' : 'pointer',
             opacity: (mode === 'import' ? importing : extracting) ? 0.6 : 1
           }}
         >
@@ -252,10 +240,8 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
         <div style={{
           padding: '8px',
           background: 'rgba(16, 185, 129, 0.1)',
-          border: '1px solid rgba(16, 185, 129, 0.3)',
-          borderRadius: '4px',
-          fontSize: '11px',
-          color: '#10b981',
+          border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '11px',
+          color: 'var(--success)',
           marginTop: '8px'
         }}>
           {progress}
@@ -266,10 +252,8 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
         <div style={{
           padding: '8px',
           background: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid rgba(239, 68, 68, 0.3)',
-          borderRadius: '4px',
-          fontSize: '11px',
-          color: '#ef4444',
+          border: '1px solid rgba(239, 68, 68, 0.3)', fontSize: '11px',
+          color: 'var(--error)',
           marginTop: '8px'
         }}>
           {error}
@@ -282,9 +266,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
           marginTop: '12px',
           padding: '12px',
           background: 'rgba(59, 130, 246, 0.1)',
-          border: '1px solid rgba(59, 130, 246, 0.3)',
-          borderRadius: '4px',
-          fontSize: '11px'
+          border: '1px solid rgba(59, 130, 246, 0.3)', fontSize: '11px'
         }}>
           <strong>Import Summary:</strong>
           <div style={{ marginTop: '6px', fontSize: '9px', opacity: 0.9 }}>

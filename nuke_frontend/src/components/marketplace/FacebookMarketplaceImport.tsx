@@ -114,7 +114,7 @@ export default function FacebookMarketplaceImport() {
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-6 max-w-xl">
+    <div className="bg-gray-800 p-6 max-w-xl">
       <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
         <svg className="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
           <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
@@ -137,7 +137,7 @@ export default function FacebookMarketplaceImport() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://facebook.com/marketplace/item/..."
-            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            className="w-full bg-gray-700 border border-gray-600 px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
           />
         </div>
 
@@ -147,7 +147,7 @@ export default function FacebookMarketplaceImport() {
             type="checkbox"
             checked={isOwner}
             onChange={(e) => setIsOwner(e.target.checked)}
-            className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-green-500 focus:ring-green-500"
+            className="w-5 h-5 bg-gray-700 border-gray-600 text-green-500 focus:ring-green-500"
           />
           <div>
             <span className="text-white">This is my listing</span>
@@ -161,7 +161,7 @@ export default function FacebookMarketplaceImport() {
         <button
           onClick={handleImport}
           disabled={loading || !url}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition"
+          className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed font-medium transition"
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
@@ -179,7 +179,7 @@ export default function FacebookMarketplaceImport() {
 
       {/* Results */}
       {result && (
-        <div className={`mt-6 p-4 rounded-lg ${result.success ? "bg-green-900/30 border border-green-700" : "bg-red-900/30 border border-red-700"}`}>
+        <div className={`mt-6 p-4  ${result.success ? "bg-green-900/30 border border-green-700" : "bg-red-900/30 border border-red-700"}`}>
           {result.success ? (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-green-400">
@@ -234,14 +234,14 @@ export default function FacebookMarketplaceImport() {
               {isOwner && result.listing_id && !showSaleForm && (
                 <button
                   onClick={() => setShowSaleForm(true)}
-                  className="mt-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm"
+                  className="mt-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-sm"
                 >
                   Did this sell? Report the outcome →
                 </button>
               )}
 
               {showSaleForm && (
-                <div className="mt-4 p-4 bg-gray-800 rounded-lg space-y-3">
+                <div className="mt-4 p-4 bg-gray-800 space-y-3">
                   <h3 className="font-medium text-white">Report Sale</h3>
 
                   <div>
@@ -253,7 +253,7 @@ export default function FacebookMarketplaceImport() {
                       value={soldPrice}
                       onChange={(e) => setSoldPrice(e.target.value)}
                       placeholder="15000"
-                      className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2"
+                      className="w-full bg-gray-700 border border-gray-600 px-3 py-2"
                     />
                   </div>
 
@@ -265,7 +265,7 @@ export default function FacebookMarketplaceImport() {
                       type="date"
                       value={soldDate}
                       onChange={(e) => setSoldDate(e.target.value)}
-                      className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2"
+                      className="w-full bg-gray-700 border border-gray-600 px-3 py-2"
                     />
                   </div>
 
@@ -276,7 +276,7 @@ export default function FacebookMarketplaceImport() {
                     <select
                       value={soldToType}
                       onChange={(e) => setSoldToType(e.target.value as any)}
-                      className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2"
+                      className="w-full bg-gray-700 border border-gray-600 px-3 py-2"
                     >
                       <option value="private_party">Private Party</option>
                       <option value="dealer">Dealer</option>
@@ -288,13 +288,13 @@ export default function FacebookMarketplaceImport() {
                     <button
                       onClick={handleReportSale}
                       disabled={saleLoading}
-                      className="flex-1 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 rounded font-medium"
+                      className="flex-1 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 font-medium"
                     >
                       {saleLoading ? "Saving..." : "Report Sale"}
                     </button>
                     <button
                       onClick={() => setShowSaleForm(false)}
-                      className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded"
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-500"
                     >
                       Cancel
                     </button>
@@ -318,7 +318,7 @@ export default function FacebookMarketplaceImport() {
       )}
 
       {/* Info box */}
-      <div className="mt-6 p-4 bg-gray-700/50 rounded-lg">
+      <div className="mt-6 p-4 bg-gray-700/50">
         <h3 className="text-sm font-medium text-gray-300 mb-2">
           Why import from Facebook Marketplace?
         </h3>

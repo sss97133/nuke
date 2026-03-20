@@ -279,9 +279,7 @@ const OwnershipVerificationDashboard = () => {
                 fontSize: '11px',
                 border: '1px solid var(--border)',
                 background: filter === status ? 'var(--text)' : 'var(--bg)',
-                color: filter === status ? 'var(--bg)' : 'var(--text)',
-                borderRadius: '0px',
-                cursor: 'pointer'
+                color: filter === status ? 'var(--bg)' : 'var(--text)', cursor: 'pointer'
               }}
             >
               {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
@@ -378,9 +376,7 @@ const OwnershipVerificationDashboard = () => {
         }}>
           <div style={{
             background: 'var(--surface)',
-            border: '2px solid var(--border)',
-            borderRadius: '0px',
-            padding: '0px',
+            border: '2px solid var(--border)', padding: '0px',
             maxWidth: '600px',
             width: '90%',
             maxHeight: '80vh',
@@ -463,9 +459,7 @@ const OwnershipVerificationDashboard = () => {
                     style={{
                       background: 'var(--warning)',
                       color: 'var(--bg)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '0px',
-                      padding: '6px 12px',
+                      border: '1px solid var(--border)', padding: '6px 12px',
                       fontSize: '11px',
                       cursor: processing === selectedVerification.id ? 'not-allowed' : 'pointer'
                     }}
@@ -478,9 +472,7 @@ const OwnershipVerificationDashboard = () => {
                     style={{
                       background: 'var(--success)',
                       color: 'var(--bg)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '0px',
-                      padding: '6px 12px',
+                      border: '1px solid var(--border)', padding: '6px 12px',
                       fontSize: '11px',
                       cursor: processing === selectedVerification.id ? 'not-allowed' : 'pointer'
                     }}
@@ -493,9 +485,7 @@ const OwnershipVerificationDashboard = () => {
                     style={{
                       background: 'var(--error)',
                       color: 'var(--bg)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '0px',
-                      padding: '6px 12px',
+                      border: '1px solid var(--border)', padding: '6px 12px',
                       fontSize: '11px',
                       cursor: processing === selectedVerification.id ? 'not-allowed' : 'pointer'
                     }}
@@ -513,9 +503,7 @@ const OwnershipVerificationDashboard = () => {
                     style={{
                       background: 'var(--success)',
                       color: 'var(--bg)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '0px',
-                      padding: '6px 12px',
+                      border: '1px solid var(--border)', padding: '6px 12px',
                       fontSize: '11px',
                       cursor: processing === selectedVerification.id ? 'not-allowed' : 'pointer'
                     }}
@@ -528,9 +516,7 @@ const OwnershipVerificationDashboard = () => {
                     style={{
                       background: 'var(--error)',
                       color: 'var(--bg)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '0px',
-                      padding: '6px 12px',
+                      border: '1px solid var(--border)', padding: '6px 12px',
                       fontSize: '11px',
                       cursor: processing === selectedVerification.id ? 'not-allowed' : 'pointer'
                     }}

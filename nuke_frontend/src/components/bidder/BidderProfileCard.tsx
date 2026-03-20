@@ -21,11 +21,11 @@ interface BidderProfileCardProps {
 type BiddingStyle = 'Early Bird' | 'Late Sniper' | 'Steady Climber' | 'One-Shot' | 'Unknown';
 
 const STYLE_META: Record<BiddingStyle, { color: string; description: string }> = {
-  'Early Bird':     { color: '#f59e0b', description: 'Most bids placed in first 25% of auction' },
-  'Late Sniper':    { color: '#ef4444', description: 'Most bids in last 10% of auction' },
-  'Steady Climber': { color: '#3b82f6', description: 'Bids evenly distributed through auction' },
+  'Early Bird':     { color: 'var(--warning)', description: 'Most bids placed in first 25% of auction' },
+  'Late Sniper':    { color: 'var(--error)', description: 'Most bids in last 10% of auction' },
+  'Steady Climber': { color: 'var(--info)', description: 'Bids evenly distributed through auction' },
   'One-Shot':       { color: '#8b5cf6', description: 'Typically places one bid per auction' },
-  'Unknown':        { color: '#6b7280', description: '' },
+  'Unknown':        { color: 'var(--text-secondary)', description: '' },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
       id: 'bids',
       label: 'Bid amounts',
       data: points,
-      color: '#3b82f6',
+      color: 'var(--info)',
       showArea: true,
     }];
   }, [profileData]);
@@ -149,10 +149,7 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
       <div
         style={{
           position: 'relative', zIndex: 1,
-          background: 'var(--bg, #fff)', border: '1px solid var(--border-light, #e5e7eb)',
-          borderRadius: 0, padding: 20, width: 400, maxWidth: '90vw',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-        }}
+          background: 'var(--bg, #fff)', border: '1px solid var(--border-light, #e5e7eb)', padding: 20, width: 400, maxWidth: '90vw', }}
         onClick={e => e.stopPropagation()}
       >
         {/* Close button */}
@@ -178,8 +175,7 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
                 <span style={{ fontSize: '19px', fontWeight: 700 }}>{username}</span>
                 {mvProfile && (
                   <span style={{
-                    fontSize: '9px', background: 'var(--primary, #3b82f6)', color: 'var(--bg)',
-                    borderRadius: 10, padding: '1px 8px', fontWeight: 600,
+                    fontSize: '9px', background: 'var(--primary, #3b82f6)', color: 'var(--bg)', padding: '1px 8px', fontWeight: 600,
                   }}>
                     {mvProfile.total_bids} bids
                   </span>
@@ -193,8 +189,7 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
             {/* ─── Style Badge ─────────────────────────── */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '6px 10px', borderRadius: 0,
-              background: `${styleMeta.color}10`, border: `1px solid ${styleMeta.color}30`,
+              padding: '6px 10px', background: `${styleMeta.color}10`, border: `1px solid ${styleMeta.color}30`,
             }}>
               <span style={{ fontWeight: 700, color: styleMeta.color, fontSize: '13px' }}>
                 {biddingStyle}
@@ -225,8 +220,7 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
                     <span
                       key={m.make}
                       style={{
-                        fontSize: '11px', padding: '2px 8px', borderRadius: 12,
-                        background: 'var(--grey-100, #f3f4f6)', color: 'var(--text)',
+                        fontSize: '11px', padding: '2px 8px', background: 'var(--grey-100, #f3f4f6)', color: 'var(--text)',
                         border: '1px solid var(--border-light, #e5e7eb)',
                       }}
                     >

@@ -275,10 +275,10 @@ export default function WebhooksPage() {
     return (
       <div className="p-8 max-w-4xl mx-auto">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+          <div className="h-8 bg-gray-200 w-1/4 mb-6"></div>
           <div className="space-y-4">
             {[1, 2].map(i => (
-              <div key={i} className="h-24 bg-gray-100 rounded"></div>
+              <div key={i} className="h-24 bg-gray-100"></div>
             ))}
           </div>
         </div>
@@ -297,14 +297,14 @@ export default function WebhooksPage() {
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 transition-colors"
         >
           Add Endpoint
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg">
+        <div className="mb-4 p-4 bg-red-50 text-red-700">
           {error}
           <button onClick={() => setError(null)} className="ml-2 underline">Dismiss</button>
         </div>
@@ -312,13 +312,13 @@ export default function WebhooksPage() {
 
       {/* Webhooks List */}
       {webhooks.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
+        <div className="text-center py-12 bg-gray-50">
           <div className="text-4xl mb-4">🔔</div>
           <h3 className="text-lg font-medium text-gray-900">No webhook endpoints</h3>
           <p className="text-gray-500 mt-1">Create an endpoint to start receiving events.</p>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="mt-4 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700"
           >
             Add First Endpoint
           </button>
@@ -328,15 +328,15 @@ export default function WebhooksPage() {
           {webhooks.map(webhook => (
             <div
               key={webhook.id}
-              className="border rounded-lg p-4 hover:border-gray-300 transition-colors"
+              className="border p-4 hover:border-gray-300 transition-colors"
             >
               <div className="flex justify-between items-start">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <code className="text-sm bg-gray-100 px-2 py-1 rounded truncate max-w-md">
+                    <code className="text-sm bg-gray-100 px-2 py-1 truncate max-w-md">
                       {webhook.url}
                     </code>
-                    <span className={`text-xs px-2 py-0.5 rounded ${
+                    <span className={`text-xs px-2 py-0.5  ${
                       webhook.is_active
                         ? 'bg-green-100 text-green-700'
                         : 'bg-gray-100 text-gray-500'
@@ -349,7 +349,7 @@ export default function WebhooksPage() {
                   )}
                   <div className="flex flex-wrap gap-1 mt-2">
                     {webhook.events.map(event => (
-                      <span key={event} className="text-xs bg-gray-100 px-2 py-0.5 rounded">
+                      <span key={event} className="text-xs bg-gray-100 px-2 py-0.5">
                         {event}
                       </span>
                     ))}
@@ -368,13 +368,13 @@ export default function WebhooksPage() {
                 <div className="flex gap-2 ml-4">
                   <button
                     onClick={() => loadWebhookDetail(webhook.id)}
-                    className="px-3 py-1 text-sm border rounded hover:bg-gray-50"
+                    className="px-3 py-1 text-sm border hover:bg-gray-50"
                   >
                     Details
                   </button>
                   <button
                     onClick={() => toggleWebhook(webhook.id, webhook.is_active)}
-                    className="px-3 py-1 text-sm border rounded hover:bg-gray-50"
+                    className="px-3 py-1 text-sm border hover:bg-gray-50"
                   >
                     {webhook.is_active ? 'Disable' : 'Enable'}
                   </button>
@@ -388,7 +388,7 @@ export default function WebhooksPage() {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">Add Webhook Endpoint</h2>
 
             <div className="space-y-4">
@@ -401,7 +401,7 @@ export default function WebhooksPage() {
                   value={newUrl}
                   onChange={(e) => setNewUrl(e.target.value)}
                   placeholder="https://your-server.com/webhooks"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Must be HTTPS (HTTP allowed for localhost only)
@@ -417,7 +417,7 @@ export default function WebhooksPage() {
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
                   placeholder="Production webhook handler"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
@@ -425,7 +425,7 @@ export default function WebhooksPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Events to Listen For
                 </label>
-                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3">
+                <div className="space-y-2 max-h-48 overflow-y-auto border p-3">
                   {AVAILABLE_EVENTS.map(event => (
                     <label key={event.value} className="flex items-start gap-2 cursor-pointer">
                       <input
@@ -453,14 +453,14 @@ export default function WebhooksPage() {
                   setNewDescription('');
                   setNewEvents(['*']);
                 }}
-                className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 border hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={createWebhook}
                 disabled={creating || !newUrl.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {creating ? 'Creating...' : 'Create Endpoint'}
               </button>
@@ -472,27 +472,27 @@ export default function WebhooksPage() {
       {/* Secret Display Modal */}
       {newWebhookSecret && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
+          <div className="bg-white p-6 max-w-lg w-full mx-4">
             <h2 className="text-xl font-bold mb-4">Webhook Secret Created</h2>
             <p className="text-gray-600 mb-4">
               Save this secret now. You won't be able to see it again.
             </p>
             <div className="relative">
-              <code className="block p-4 bg-gray-100 rounded-lg font-mono text-sm break-all">
+              <code className="block p-4 bg-gray-100 font-mono text-sm break-all">
                 {newWebhookSecret}
               </code>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(newWebhookSecret);
                 }}
-                className="absolute top-2 right-2 px-2 py-1 text-xs bg-white border rounded hover:bg-gray-50"
+                className="absolute top-2 right-2 px-2 py-1 text-xs bg-white border hover:bg-gray-50"
               >
                 Copy
               </button>
             </div>
             <p className="text-sm text-gray-500 mt-4">
               Use this secret to verify webhook signatures. Each payload includes a{' '}
-              <code className="bg-gray-100 px-1 rounded">Nuke-Signature</code> header.
+              <code className="bg-gray-100 px-1">Nuke-Signature</code> header.
             </p>
             <div className="flex justify-end mt-6">
               <button
@@ -500,7 +500,7 @@ export default function WebhooksPage() {
                   setNewWebhookSecret(null);
                   setShowCreateModal(false);
                 }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700"
               >
                 Done
               </button>
@@ -512,7 +512,7 @@ export default function WebhooksPage() {
       {/* Detail Modal */}
       {showDetailModal && selectedWebhook && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
               <h2 className="text-xl font-bold">Endpoint Details</h2>
               <button
@@ -526,7 +526,7 @@ export default function WebhooksPage() {
             <div className="space-y-4">
               <div>
                 <label className="text-sm text-gray-500">URL</label>
-                <code className="block mt-1 p-2 bg-gray-100 rounded text-sm break-all">
+                <code className="block mt-1 p-2 bg-gray-100 text-sm break-all">
                   {selectedWebhook.url}
                 </code>
               </div>
@@ -542,7 +542,7 @@ export default function WebhooksPage() {
                 <label className="text-sm text-gray-500">Events</label>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {selectedWebhook.events.map(event => (
-                    <span key={event} className="text-sm bg-gray-100 px-2 py-1 rounded">
+                    <span key={event} className="text-sm bg-gray-100 px-2 py-1">
                       {event}
                     </span>
                   ))}
@@ -552,7 +552,7 @@ export default function WebhooksPage() {
               <div>
                 <label className="text-sm text-gray-500">Status</label>
                 <p className="mt-1">
-                  <span className={`px-2 py-1 rounded text-sm ${
+                  <span className={`px-2 py-1  text-sm ${
                     selectedWebhook.is_active
                       ? 'bg-green-100 text-green-700'
                       : 'bg-gray-100 text-gray-500'
@@ -569,11 +569,11 @@ export default function WebhooksPage() {
                 ) : (
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {recentDeliveries.map(delivery => (
-                      <div key={delivery.id} className="border rounded p-3 text-sm">
+                      <div key={delivery.id} className="border p-3 text-sm">
                         <div className="flex justify-between items-start">
                           <div>
                             <span className="font-mono">{delivery.event_type}</span>
-                            <span className={`ml-2 px-2 py-0.5 rounded text-xs ${getStatusColor(delivery.status)}`}>
+                            <span className={`ml-2 px-2 py-0.5  text-xs ${getStatusColor(delivery.status)}`}>
                               {delivery.status}
                             </span>
                           </div>
@@ -600,20 +600,20 @@ export default function WebhooksPage() {
                 <div className="space-x-2">
                   <button
                     onClick={() => rotateSecret(selectedWebhook.id)}
-                    className="px-3 py-1 text-sm border rounded hover:bg-gray-50"
+                    className="px-3 py-1 text-sm border hover:bg-gray-50"
                   >
                     Rotate Secret
                   </button>
                   <button
                     onClick={() => deleteWebhook(selectedWebhook.id)}
-                    className="px-3 py-1 text-sm border border-red-200 text-red-600 rounded hover:bg-red-50"
+                    className="px-3 py-1 text-sm border border-red-200 text-red-600 hover:bg-red-50"
                   >
                     Delete
                   </button>
                 </div>
                 <button
                   onClick={() => setShowDetailModal(null)}
-                  className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                  className="px-4 py-2 border hover:bg-gray-50"
                 >
                   Close
                 </button>

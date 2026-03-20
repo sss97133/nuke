@@ -45,7 +45,7 @@ interface InstitutionalDashboardProps {
   className?: string;
 }
 
-export function InstitutionalDashboard({ userId, className = '' }: InstitutionalDashboardProps) {
+export function InstitutionalDashboard({ userId, className ='' }: InstitutionalDashboardProps) {
   const { isDemoMode, logMetric } = usePlatformStatus();
   const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null);
   const [holdings, setHoldings] = useState<Holding[]>([]);
@@ -125,12 +125,12 @@ export function InstitutionalDashboard({ userId, className = '' }: Institutional
 
   if (loading) {
     return (
-      <div className={`bg-gray-800 rounded-lg p-6 ${className}`}>
+      <div className={`bg-gray-800  p-6 ${className}`}>
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-700 rounded w-1/3"></div>
+          <div className="h-8 bg-gray-700 w-1/3"></div>
           <div className="grid grid-cols-4 gap-4">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-24 bg-gray-700 rounded"></div>
+              <div key={i} className="h-24 bg-gray-700"></div>
             ))}
           </div>
         </div>
@@ -155,7 +155,7 @@ export function InstitutionalDashboard({ userId, className = '' }: Institutional
             <button
               key={view}
               onClick={() => setActiveView(view)}
-              className={`px-4 py-2 rounded text-sm ${
+              className={`px-4 py-2  text-sm ${
                 activeView === view
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-700 text-gray-400 hover:text-white'
@@ -209,7 +209,7 @@ export function InstitutionalDashboard({ userId, className = '' }: Institutional
           <button
             key={period}
             onClick={() => setSelectedPeriod(period)}
-            className={`px-3 py-1 rounded text-sm ${
+            className={`px-3 py-1  text-sm ${
               selectedPeriod === period
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-700 text-gray-400 hover:text-white'
@@ -224,7 +224,7 @@ export function InstitutionalDashboard({ userId, className = '' }: Institutional
       {activeView === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Risk Metrics */}
-          <div className="bg-gray-800 rounded-lg p-4">
+          <div className="bg-gray-800 p-4">
             <h3 className="text-lg font-semibold text-white mb-4">Risk Metrics</h3>
             <div className="grid grid-cols-2 gap-4">
               <MetricCard
@@ -251,7 +251,7 @@ export function InstitutionalDashboard({ userId, className = '' }: Institutional
           </div>
 
           {/* Allocation Chart */}
-          <div className="bg-gray-800 rounded-lg p-4">
+          <div className="bg-gray-800 p-4">
             <h3 className="text-lg font-semibold text-white mb-4">Allocation</h3>
             <div className="space-y-2">
               {holdings.slice(0, 5).map(holding => (
@@ -261,7 +261,7 @@ export function InstitutionalDashboard({ userId, className = '' }: Institutional
                       <span className="text-white">{holding.code || holding.name}</span>
                       <span className="text-gray-400">{holding.weight.toFixed(1)}%</span>
                     </div>
-                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div className="h-2 bg-gray-700 overflow-hidden">
                       <div
                         className="h-full bg-blue-500"
                         style={{ width: `${holding.weight}%` }}
@@ -281,7 +281,7 @@ export function InstitutionalDashboard({ userId, className = '' }: Institutional
       )}
 
       {activeView === 'holdings' && (
-        <div className="bg-gray-800 rounded-lg overflow-hidden">
+        <div className="bg-gray-800 overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-900">
               <tr className="text-left text-gray-400 text-sm">
@@ -348,7 +348,7 @@ export function InstitutionalDashboard({ userId, className = '' }: Institutional
             </div>
           ))}
           {holdings.filter(h => h.type === 'index').length === 0 && (
-            <div className="bg-gray-800 rounded-lg p-8 text-center">
+            <div className="bg-gray-800 p-8 text-center">
               <p className="text-gray-400">
                 No index holdings to display metrics for.
               </p>
@@ -377,9 +377,9 @@ interface MetricCardProps {
   small?: boolean;
 }
 
-function MetricCard({ label, value, valueColor = 'text-white', className = '', small = false }: MetricCardProps) {
+function MetricCard({ label, value, valueColor = 'text-white', className ='', small = false }: MetricCardProps) {
   return (
-    <div className={`rounded-lg p-4 ${className || 'bg-gray-900'}`}>
+    <div className={` p-4 ${className || 'bg-gray-900'}`}>
       <div className={`text-gray-400 ${small ? 'text-xs' : 'text-sm'}`}>{label}</div>
       <div className={`font-mono ${valueColor} ${small ? 'text-lg' : 'text-2xl'}`}>{value}</div>
     </div>

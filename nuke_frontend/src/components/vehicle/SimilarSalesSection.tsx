@@ -38,9 +38,9 @@ interface SimilarSalesSectionProps {
 
 const PLATFORM_COLORS: Record<string, string> = {
   'Bring a Trailer': '#e85d04',
-  'Cars & Bids': '#2563eb',
+  'Cars & Bids': 'var(--info)',
   'Mecum': '#7c3aed',
-  'Barrett-Jackson': '#b91c1c',
+  'Barrett-Jackson': 'var(--error-dark, var(--error))',
   "RM Sotheby's": '#1e40af',
   'Bonhams': '#065f46',
   'Gooding & Company': '#92400e',
@@ -162,9 +162,7 @@ export function SimilarSalesSection({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
           {[1, 2, 3].map((i) => (
             <div key={i} style={{
-              height: '100px',
-              borderRadius: '6px',
-              backgroundColor: 'var(--surface)',
+              height: '100px', backgroundColor: 'var(--surface)',
               border: '1px solid var(--border-light)',
               opacity: 0.6,
             }} />
@@ -246,9 +244,7 @@ export function SimilarSalesSection({
             onClick={() => setShowAll(!showAll)}
             style={{
               background: 'none',
-              border: '1px solid var(--border-light)',
-              borderRadius: '4px',
-              padding: '5px 16px',
+              border: '1px solid var(--border-light)', padding: '5px 16px',
               fontSize: '12px',
               color: 'var(--text-muted)',
               cursor: 'pointer',
@@ -283,15 +279,13 @@ function StatPill({ label, value, accent }: { label: string; value: string; acce
 
 function SaleCard({ sale }: { sale: SimilarSale }) {
   const [imgError, setImgError] = useState(false);
-  const platformColor = sale.platform ? (PLATFORM_COLORS[sale.platform] ?? '#6b7280') : '#6b7280';
+  const platformColor = sale.platform ? (PLATFORM_COLORS[sale.platform] ?? 'var(--text-secondary)') : 'var(--text-secondary)';
 
   const cardContent = (
     <div style={{
       display: 'flex',
       gap: '12px',
-      padding: '12px',
-      borderRadius: '8px',
-      border: '1px solid var(--border-light)',
+      padding: '12px', border: '1px solid var(--border-light)',
       backgroundColor: 'var(--surface)',
       transition: 'border-color 0.12s ease, box-shadow 0.12s ease',
       cursor: sale.listing_url ? 'pointer' : 'default',
@@ -301,21 +295,17 @@ function SaleCard({ sale }: { sale: SimilarSale }) {
     onMouseEnter={(e) => {
       if (sale.listing_url) {
         (e.currentTarget as HTMLElement).style.borderColor = 'var(--primary)';
-        (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
       }
     }}
     onMouseLeave={(e) => {
       (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-light)';
-      (e.currentTarget as HTMLElement).style.boxShadow = 'none';
     }}
     >
       {/* Thumbnail */}
       <div style={{
         flexShrink: 0,
         width: '100px',
-        height: '70px',
-        borderRadius: '6px',
-        overflow: 'hidden',
+        height: '70px', overflow: 'hidden',
         backgroundColor: 'var(--bg)',
       }}>
         <img
@@ -368,9 +358,7 @@ function SaleCard({ sale }: { sale: SimilarSale }) {
               fontWeight: 600,
               color: platformColor,
               backgroundColor: `${platformColor}15`,
-              padding: '2px 6px',
-              borderRadius: '4px',
-              whiteSpace: 'nowrap',
+              padding: '2px 6px', whiteSpace: 'nowrap',
             }}>
               {sale.platform}
             </span>

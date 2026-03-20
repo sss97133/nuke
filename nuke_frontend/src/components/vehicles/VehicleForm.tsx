@@ -137,7 +137,7 @@ const VehicleForm = () => {
     return (
       <div className="container mx-auto p-6 flex justify-center items-center min-h-[50vh]">
         <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+          <div className="animate-spin h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
           <p className="text-gray-600 font-medium">Loading vehicle data...</p>
         </div>
       </div>
@@ -165,7 +165,7 @@ const VehicleForm = () => {
       
       {/* Error message */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded shadow-sm">
+        <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6">
           <div className="flex items-center">
             <svg className="h-5 w-5 text-red-500 mr-2" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -176,7 +176,7 @@ const VehicleForm = () => {
       )}
       
       {/* Form */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white border border-gray-100 overflow-hidden">
         <form onSubmit={handleSubmit} className="p-6">
           <div className="space-y-6">
             {/* Basic Information Section */}
@@ -210,7 +210,7 @@ const VehicleForm = () => {
                       max={new Date().getFullYear() + 1}
                       value={formData.year}
                       onChange={handleChange}
-                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      className="focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300"
                     />
                   </div>
                 </div>
@@ -227,7 +227,7 @@ const VehicleForm = () => {
                       id="vin"
                       value={formData.vin}
                       onChange={handleChange}
-                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      className="focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300"
                       placeholder="Vehicle Identification Number"
                     />
                   </div>
@@ -245,7 +245,7 @@ const VehicleForm = () => {
                       id="license_plate"
                       value={formData.license_plate}
                       onChange={handleChange}
-                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      className="focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300"
                     />
                   </div>
                 </div>
@@ -262,7 +262,7 @@ const VehicleForm = () => {
                       id="color"
                       value={formData.color}
                       onChange={handleChange}
-                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      className="focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300"
                       placeholder="e.g., Silver, Black, White"
                     />
                   </div>
@@ -285,7 +285,7 @@ const VehicleForm = () => {
                       required
                       value={formData.relationship_type}
                       onChange={handleChange}
-                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      className="focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300"
                     >
                       <option value="owned">I Own This Vehicle</option>
                       <option value="discovered">I Discovered This Vehicle</option>
@@ -319,7 +319,7 @@ const VehicleForm = () => {
                       min="0"
                       value={formData.mileage}
                       onChange={handleChange}
-                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      className="focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300"
                     />
                   </div>
                 </div>
@@ -336,7 +336,7 @@ const VehicleForm = () => {
                       id="engine_type"
                       value={formData.engine_type}
                       onChange={handleChange}
-                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      className="focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300"
                       placeholder="e.g., 2.0L 4-Cylinder, V6, Electric"
                     />
                   </div>
@@ -353,7 +353,7 @@ const VehicleForm = () => {
                       name="transmission"
                       value={formData.transmission}
                       onChange={handleChange}
-                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      className="focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300"
                     >
                       <option value="">Select transmission</option>
                       <option value="Automatic">Automatic</option>
@@ -376,7 +376,7 @@ const VehicleForm = () => {
                       name="drivetrain"
                       value={formData.drivetrain}
                       onChange={handleChange}
-                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      className="focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300"
                     >
                       <option value="">Select drivetrain</option>
                       <option value="FWD">FWD (Front Wheel Drive)</option>
@@ -398,7 +398,7 @@ const VehicleForm = () => {
                       name="status"
                       value={formData.status}
                       onChange={handleChange}
-                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      className="focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300"
                     >
                       <option value="active">Active</option>
                       <option value="pending">Pending</option>
@@ -414,14 +414,14 @@ const VehicleForm = () => {
             <div className="flex justify-end space-x-3 pt-5">
               <Link
                 to="/vehicles"
-                className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Cancel
               </Link>
               <button
                 type="submit"
                 disabled={submitting}
-                className={`px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+                className={`px-4 py-2 border border-transparent text-sm font-medium   text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
                   submitting ? 'opacity-75 cursor-not-allowed' : ''
                 }`}
               >

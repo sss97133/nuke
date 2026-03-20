@@ -190,9 +190,7 @@ export const BaTProfileExtractor: React.FC = () => {
     <div style={{
       padding: 'var(--space-4)',
       background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: '4px',
-    }}>
+      border: '1px solid var(--border)', }}>
       <h3 style={{ fontSize: '13px', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-3)' }}>
         BaT Profile Extractor
       </h3>
@@ -213,9 +211,7 @@ export const BaTProfileExtractor: React.FC = () => {
             width: '100%',
             padding: 'var(--space-2)',
             fontSize: '11px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            background: 'var(--surface-hover)',
+            border: '1px solid var(--border)', background: 'var(--surface-hover)',
           }}
         />
       </div>
@@ -229,9 +225,7 @@ export const BaTProfileExtractor: React.FC = () => {
           fontWeight: 'bold',
           background: extracting ? 'var(--text-muted)' : 'var(--accent)',
           color: 'var(--white)',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: extracting ? 'not-allowed' : 'pointer',
+          border: 'none', cursor: extracting ? 'not-allowed' : 'pointer',
           marginBottom: 'var(--space-3)',
         }}
       >
@@ -242,9 +236,7 @@ export const BaTProfileExtractor: React.FC = () => {
         <div style={{
           padding: 'var(--space-2)',
           background: 'var(--danger-light)',
-          border: '1px solid var(--danger)',
-          borderRadius: '4px',
-          fontSize: '11px',
+          border: '1px solid var(--danger)', fontSize: '11px',
           color: 'var(--danger)',
           marginBottom: 'var(--space-3)',
         }}>
@@ -256,9 +248,7 @@ export const BaTProfileExtractor: React.FC = () => {
         <div style={{
           padding: 'var(--space-3)',
           background: 'var(--surface-hover)',
-          border: '1px solid var(--border)',
-          borderRadius: '4px',
-          marginBottom: 'var(--space-3)',
+          border: '1px solid var(--border)', marginBottom: 'var(--space-3)',
         }}>
           <h4 style={{ fontSize: '12px', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-2)' }}>
             Profile Data

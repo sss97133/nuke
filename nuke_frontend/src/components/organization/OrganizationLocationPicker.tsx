@@ -338,9 +338,7 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
               style={{ 
                 width: '100%', 
                 height: '400px', 
-                border: '2px solid var(--border)', 
-                borderRadius: '4px',
-                position: 'relative',
+                border: '2px solid var(--border)', position: 'relative',
                 zIndex: 1
               }}
             />
@@ -363,7 +361,7 @@ export const OrganizationLocationPicker: React.FC<LocationPickerProps> = ({
           </div>
 
           {/* Help Text */}
-          <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--info-dim)', border: '1px solid var(--info)', borderRadius: '4px' }}>
+          <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--info-dim)', border: '1px solid var(--info)'}}>
             <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '4px', color: 'var(--info)' }}>
               How to get coordinates:
             </div>

@@ -80,8 +80,8 @@ const STATUS_COLORS: Record<string, string> = {
   discovered: 'var(--text-muted)',
   saved: 'var(--info, #3b82f6)',
   watching: '#8b5cf6',
-  contacted: '#f59e0b',
-  negotiating: '#f97316',
+  contacted: 'var(--warning)',
+  negotiating: 'var(--orange)',
   purchased: 'var(--success, #22c55e)',
   passed: 'var(--text-muted)',
 };

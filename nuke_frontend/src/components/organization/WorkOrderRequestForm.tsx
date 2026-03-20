@@ -270,9 +270,7 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
               </div>
               <div style={{ 
                 padding: '12px', 
-                border: '2px dashed var(--border)', 
-                borderRadius: '4px',
-                background: '#f8f9fa',
+                border: '2px dashed var(--border)', background: '#f8f9fa',
                 textAlign: 'center'
               }}>
                 <input
@@ -309,9 +307,7 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
                           height: '80px',
                           backgroundImage: `url(${url})`,
                           backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                          borderRadius: '4px',
-                          border: '2px solid var(--border)'
+                          backgroundPosition: 'center', border: '2px solid var(--border)'
                         }}
                       >
                         <button
@@ -322,9 +318,7 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
                             top: '-8px',
                             right: '-8px',
                             width: '20px',
-                            height: '20px',
-                            borderRadius: '50%',
-                            background: 'var(--danger)',
+                            height: '20px', background: 'var(--danger)',
                             color: 'var(--bg)',
                             border: 'none',
                             cursor: 'pointer',

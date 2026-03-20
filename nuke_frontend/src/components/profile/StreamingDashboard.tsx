@@ -164,9 +164,7 @@ const StreamingDashboard: React.FC<StreamingDashboardProps> = ({ userId, isOwnPr
               {showScheduleForm && (
                 <div style={{
                   padding: 'var(--space-3)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  marginBottom: 'var(--space-3)',
+                  border: '1px solid var(--border)', marginBottom: 'var(--space-3)',
                   background: 'var(--grey-50)'
                 }}>
                   <StreamForm
@@ -192,9 +190,7 @@ const StreamingDashboard: React.FC<StreamingDashboardProps> = ({ userId, isOwnPr
                       key={stream.id}
                       style={{
                         padding: 'var(--space-3)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '4px',
-                        background: stream.is_live ? 'var(--success-dim)' : 'var(--white)'
+                        border: '1px solid var(--border)', background: stream.is_live ? 'var(--success-dim)' : 'var(--white)'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-2)' }}>
@@ -207,9 +203,7 @@ const StreamingDashboard: React.FC<StreamingDashboardProps> = ({ userId, isOwnPr
                                 padding: '2px 6px',
                                 background: 'var(--error)',
                                 color: 'var(--bg)',
-                                fontSize: '9px',
-                                borderRadius: '2px'
-                              }}>
+                                fontSize: '9px'}}>
                                 LIVE
                               </span>
                             )}
@@ -271,17 +265,17 @@ const StreamingDashboard: React.FC<StreamingDashboardProps> = ({ userId, isOwnPr
             </div>
             <div className="card-body">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--space-3)' }}>
-                <div style={{ padding: 'var(--space-2)', border: '1px solid var(--border)', borderRadius: '4px', textAlign: 'center' }}>
+                <div style={{ padding: 'var(--space-2)', border: '1px solid var(--border)', textAlign: 'center' }}>
                   <div className="text text-small text-muted">Total Streams</div>
                   <div className="text font-bold" style={{ fontSize: '21px' }}>{streams.length}</div>
                 </div>
-                <div style={{ padding: 'var(--space-2)', border: '1px solid var(--border)', borderRadius: '4px', textAlign: 'center' }}>
+                <div style={{ padding: 'var(--space-2)', border: '1px solid var(--border)', textAlign: 'center' }}>
                   <div className="text text-small text-muted">Total Viewers</div>
                   <div className="text font-bold" style={{ fontSize: '21px' }}>
                     {streams.reduce((sum, s) => sum + s.viewer_count, 0)}
                   </div>
                 </div>
-                <div style={{ padding: 'var(--space-2)', border: '1px solid var(--border)', borderRadius: '4px', textAlign: 'center' }}>
+                <div style={{ padding: 'var(--space-2)', border: '1px solid var(--border)', textAlign: 'center' }}>
                   <div className="text text-small text-muted">Live Now</div>
                   <div className="text font-bold" style={{ fontSize: '21px' }}>
                     {streams.filter(s => s.is_live).length}

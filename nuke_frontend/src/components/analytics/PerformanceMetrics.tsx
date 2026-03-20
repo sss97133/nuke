@@ -61,7 +61,7 @@ export function PerformanceMetrics({
   userId,
   compact = false,
   showBenchmarkComparison = true,
-  className = ''
+  className =''
 }: PerformanceMetricsProps) {
   const [metrics, setMetrics] = useState<AssetPerformanceMetrics | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<string>('1y');
@@ -91,12 +91,12 @@ export function PerformanceMetrics({
 
   if (loading) {
     return (
-      <div className={`bg-gray-800 rounded-lg p-4 ${className}`}>
+      <div className={`bg-gray-800  p-4 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-700 rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-gray-700 w-1/3 mb-4"></div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="h-16 bg-gray-700 rounded"></div>
-            <div className="h-16 bg-gray-700 rounded"></div>
+            <div className="h-16 bg-gray-700"></div>
+            <div className="h-16 bg-gray-700"></div>
           </div>
         </div>
       </div>
@@ -105,7 +105,7 @@ export function PerformanceMetrics({
 
   if (error) {
     return (
-      <div className={`bg-gray-800 rounded-lg p-4 ${className}`}>
+      <div className={`bg-gray-800  p-4 ${className}`}>
         <div className="text-red-400 text-sm">{error}</div>
       </div>
     );
@@ -113,7 +113,7 @@ export function PerformanceMetrics({
 
   if (!metrics || Object.keys(metrics.periods).length === 0) {
     return (
-      <div className={`bg-gray-800 rounded-lg p-4 ${className}`}>
+      <div className={`bg-gray-800  p-4 ${className}`}>
         <div className="text-gray-400 text-sm">No performance data available</div>
       </div>
     );
@@ -132,7 +132,7 @@ export function PerformanceMetrics({
   }
 
   return (
-    <div className={`bg-gray-800 rounded-lg p-4 ${className}`}>
+    <div className={`bg-gray-800  p-4 ${className}`}>
       {/* Header with period selector */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold text-white">Performance Metrics</h3>
@@ -141,7 +141,7 @@ export function PerformanceMetrics({
             <button
               key={period}
               onClick={() => setSelectedPeriod(period)}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
+              className={`px-2 py-1 text-xs  transition-colors ${
                 selectedPeriod === period
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-700 text-gray-400 hover:text-white'
@@ -291,7 +291,7 @@ function MetricCard({ label, value, isPositive, neutral, tooltip }: MetricCardPr
 
   return (
     <div
-      className="bg-gray-900 rounded p-3"
+      className="bg-gray-900 p-3"
       title={tooltip}
     >
       <div className="text-gray-400 text-xs mb-1 flex items-center gap-1">
@@ -312,7 +312,7 @@ interface CompactMetricsProps {
   className?: string;
 }
 
-function CompactMetrics({ metrics, className = '' }: CompactMetricsProps) {
+function CompactMetrics({ metrics, className ='' }: CompactMetricsProps) {
   return (
     <div className={`flex flex-wrap gap-4 text-sm ${className}`}>
       <div>

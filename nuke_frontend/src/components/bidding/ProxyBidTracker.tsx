@@ -261,15 +261,11 @@ export function BidToast({ notification, onClose }: BidToastProps) {
     <div
       style={{
         background: styles.bg,
-        border: `2px solid ${styles.border}`,
-        borderRadius: '8px',
-        padding: '12px 16px',
+        border: `2px solid ${styles.border}`, padding: '12px 16px',
         display: 'flex',
         alignItems: 'flex-start',
         gap: '12px',
-        maxWidth: '360px',
-        boxShadow: '0 4px 12px var(--overlay)',
-        animation: 'slideIn 0.3s ease',
+        maxWidth: '360px', animation: 'slideIn 0.3s ease',
       }}
     >
       <span style={{ fontSize: '27px' }}>{styles.icon}</span>
@@ -363,9 +359,7 @@ export function ActiveBidsIndicator({ onClick }: ActiveBidsIndicatorProps) {
         gap: '6px',
         padding: '6px 12px',
         background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
-        border: '1px solid var(--accent)',
-        borderRadius: '20px',
-        cursor: 'pointer',
+        border: '1px solid var(--accent)', cursor: 'pointer',
         fontSize: '11px',
         fontWeight: 600,
         color: 'var(--accent)',

@@ -46,13 +46,13 @@ export default function DigitalSignature({
     canvas.height = 150;
 
     // Set drawing properties
-    ctx.strokeStyle = '#000000';
+    ctx.strokeStyle = 'var(--text)';
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
     // Fill with white background
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = 'var(--surface-elevated)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Add signature line
@@ -64,7 +64,7 @@ export default function DigitalSignature({
     ctx.stroke();
 
     // Reset drawing properties
-    ctx.strokeStyle = '#000000';
+    ctx.strokeStyle = 'var(--text)';
     ctx.lineWidth = 2;
   }, []);
 
@@ -119,7 +119,7 @@ export default function DigitalSignature({
     if (!canvas || !ctx) return;
 
     // Clear canvas
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = 'var(--surface-elevated)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Redraw signature line
@@ -131,7 +131,7 @@ export default function DigitalSignature({
     ctx.stroke();
 
     // Reset drawing properties
-    ctx.strokeStyle = '#000000';
+    ctx.strokeStyle = 'var(--text)';
     ctx.lineWidth = 2;
 
     setSignatureExists(false);
@@ -211,7 +211,7 @@ export default function DigitalSignature({
         <Label className="block mb-2">
           Please sign in the area below:
         </Label>
-        <div className="border-2 border-gray-300 rounded-lg overflow-hidden">
+        <div className="border-2 border-gray-300 overflow-hidden">
           <canvas
             ref={canvasRef}
             className={`block cursor-crosshair ${disabled ? 'opacity-50' : ''}`}

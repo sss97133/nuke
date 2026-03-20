@@ -207,9 +207,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
                       <span style={{ 
                         padding: '2px 6px', 
                         background: getPriorityColor(rec.priority),
-                        color: 'var(--bg)',
-                        borderRadius: '2px',
-                        marginRight: '8px'
+                        color: 'var(--bg)', marginRight: '8px'
                       }}>
                         {rec.priority.toUpperCase()}
                       </span>

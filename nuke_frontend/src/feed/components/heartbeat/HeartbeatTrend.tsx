@@ -28,7 +28,7 @@ export function HeartbeatTrend({ stats }: { stats: ModelMarketStats }) {
       <HeartbeatStatCell
         label="TREND"
         value={`${TREND_ICONS[trend] ?? ''} ${trend.toUpperCase()}`}
-        color={trend === 'up' ? '#10b981' : trend === 'down' ? '#ef4444' : undefined}
+        color={trend === 'up' ? 'var(--success)' : trend === 'down' ? 'var(--error)' : undefined}
       />
       <HeartbeatStatCell label="P25" value={formatPrice(stats.p25_price)} />
       <HeartbeatStatCell label="P75" value={formatPrice(stats.p75_price)} />

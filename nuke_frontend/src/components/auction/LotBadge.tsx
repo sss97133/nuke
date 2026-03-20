@@ -102,9 +102,7 @@ export const LotBadge: React.FC<LotBadgeProps> = ({
         }}
         style={{
           background: isPast ? 'var(--success-dim)' : isUpcoming ? 'var(--info-bg, var(--accent-dim, #dbeafe))' : 'var(--warning-dim)',
-          border: `1px solid ${isPast ? 'var(--success)' : isUpcoming ? 'var(--accent)' : 'var(--warning)'}`,
-          borderRadius: '3px',
-          padding: '2px 6px',
+          border: `1px solid ${isPast ? 'var(--success)' : isUpcoming ? 'var(--accent)' : 'var(--warning)'}`, padding: '2px 6px',
           cursor: hasDetails ? 'pointer' : 'default',
           fontFamily: 'inherit',
           fontSize: '9px',
@@ -149,14 +147,10 @@ export const LotBadge: React.FC<LotBadgeProps> = ({
             right: 0,
             marginTop: '4px',
             background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            padding: '8px 10px',
+            border: '1px solid var(--border)', padding: '8px 10px',
             minWidth: '180px',
             maxWidth: '250px',
-            zIndex: 1000,
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            fontSize: '11px',
+            zIndex: 1000, fontSize: '11px',
           }}
           onClick={(e) => e.stopPropagation()}
         >

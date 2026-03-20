@@ -351,7 +351,7 @@ const TitleScan: React.FC<TitleScanProps> = ({ vehicleId, onApply, onComplete, o
 
 
       {result && (
-        <div className="mt-3 p-3 bg-gray-50 rounded border">
+        <div className="mt-3 p-3 bg-gray-50 border">
           <div className="text-sm font-semibold mb-2">Detected Fields</div>
           <div className="grid grid-cols-2 gap-3">
             <label className="flex items-center gap-2">
@@ -414,12 +414,12 @@ const TitleScan: React.FC<TitleScanProps> = ({ vehicleId, onApply, onComplete, o
             <img 
               src={preview} 
               alt="Enlarged title" 
-              className="max-w-full max-h-full object-contain rounded cursor-pointer"
+              className="max-w-full max-h-full object-contain cursor-pointer"
               onClick={() => setShowEnlarged(false)}
             />
             <button
               onClick={() => setShowEnlarged(false)}
-              className="absolute top-2 right-2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-1 text-gray-700 hover:text-gray-900 text-xs"
+              className="absolute top-2 right-2 bg-white bg-opacity-80 hover:bg-opacity-100 p-1 text-gray-700 hover:text-gray-900 text-xs"
               title="Close"
             >
               ✕

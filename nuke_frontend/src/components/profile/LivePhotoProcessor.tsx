@@ -287,9 +287,7 @@ export default function LivePhotoProcessor() {
               <div style={{
                 width: '80px',
                 height: '80px',
-                flexShrink: 0,
-                borderRadius: '4px',
-                overflow: 'hidden',
+                flexShrink: 0, overflow: 'hidden',
                 background: 'var(--surface-hover)'
               }}>
                 <img
@@ -338,9 +336,7 @@ export default function LivePhotoProcessor() {
                 {img.status === 'processing' && (
                   <div style={{
                     height: '4px',
-                    background: 'var(--surface-hover)',
-                    borderRadius: '2px',
-                    marginBottom: 'var(--space-1)',
+                    background: 'var(--surface-hover)', marginBottom: 'var(--space-1)',
                     overflow: 'hidden'
                   }}>
                     <div style={{
@@ -374,27 +370,21 @@ export default function LivePhotoProcessor() {
                     {img.detected_features.color && (
                       <span className="text-small" style={{
                         background: 'var(--surface-hover)',
-                        padding: '2px 6px',
-                        borderRadius: '4px'
-                      }}>
+                        padding: '2px 6px'}}>
                         {img.detected_features.color}
                       </span>
                     )}
                     {img.detected_features.model_badge && (
                       <span className="text-small" style={{
                         background: 'var(--surface-hover)',
-                        padding: '2px 6px',
-                        borderRadius: '4px'
-                      }}>
+                        padding: '2px 6px'}}>
                         {img.detected_features.model_badge}
                       </span>
                     )}
                     {img.detected_features.is_receipt && (
                       <span className="text-small" style={{
                         background: 'var(--warning-bg)',
-                        padding: '2px 6px',
-                        borderRadius: '4px'
-                      }}>
+                        padding: '2px 6px'}}>
                         Receipt
                       </span>
                     )}

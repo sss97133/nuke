@@ -961,7 +961,7 @@ const VehicleTimeline: React.FC<{
                     <div
                       key={targetYear}
                       id={`year-${targetYear}`}
-                      className="rounded-lg"
+                      className=""
                       style={{
                         background: 'var(--surface)',
                         border: '1px solid var(--border)',
@@ -1292,9 +1292,7 @@ const VehicleTimeline: React.FC<{
                                         gridColumn: weekIdx + 1,
                                         width: '12px',
                                         height: '12px',
-                                        backgroundColor: inYear ? colorForHours(hours) : 'var(--heat-0)',
-                                        borderRadius: '2px',
-                                        border: clickable ? '1px solid var(--heat-border)' : 'none',
+                                        backgroundColor: inYear ? colorForHours(hours) : 'var(--heat-0)', border: clickable ? '1px solid var(--heat-border)' : 'none',
                                         opacity: inYear ? 1 : 0.3
                                       }}
                                     />
@@ -1335,7 +1333,7 @@ const VehicleTimeline: React.FC<{
               <img
                 src={popupImageUrl}
                 alt="Event image"
-                style={{ width: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: 'var(--radius)' }}
+                style={{ width: '100%', maxHeight: '80vh', objectFit: 'contain'}}
               />
               <button
                 onClick={() => setPopupImageUrl(null)}
@@ -1346,9 +1344,7 @@ const VehicleTimeline: React.FC<{
                   padding: '6px 12px',
                   border: '2px solid rgba(255, 255, 255, 0.3)',
                   background: 'rgba(42, 42, 42, 0.85)',
-                  color: '#ffffff',
-                  borderRadius: 'var(--radius)',
-                  fontSize: '10px',
+                  color: 'var(--surface-elevated)', fontSize: '10px',
                   fontWeight: 700,
                   cursor: 'pointer',
                   transition: 'var(--transition)'
@@ -1375,9 +1371,7 @@ const VehicleTimeline: React.FC<{
           }}>
             <div style={{
               background: 'var(--surface)',
-              padding: 'var(--space-4)',
-              borderRadius: 'var(--radius)',
-              maxWidth: '400px',
+              padding: 'var(--space-4)', maxWidth: '400px',
               width: '90%',
               border: '2px solid var(--border)'
             }}>
@@ -1402,9 +1396,7 @@ const VehicleTimeline: React.FC<{
                   onClick={() => setShowDeleteConfirm(null)}
                   style={{
                     padding: '6px 12px',
-                    border: '2px solid var(--border)',
-                    borderRadius: 'var(--radius)',
-                    background: 'var(--surface)',
+                    border: '2px solid var(--border)', background: 'var(--surface)',
                     color: 'var(--text)',
                     fontSize: '9px',
                     fontWeight: 700,
@@ -1419,10 +1411,8 @@ const VehicleTimeline: React.FC<{
                   style={{
                     padding: '6px 12px',
                     background: 'var(--error)',
-                    color: '#ffffff',
-                    border: '2px solid var(--error)',
-                    borderRadius: 'var(--radius)',
-                    fontSize: '9px',
+                    color: 'var(--surface-elevated)',
+                    border: '2px solid var(--error)', fontSize: '9px',
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'var(--transition)'
@@ -1540,14 +1530,12 @@ const VehicleTimeline: React.FC<{
                       <span
                         className="badge"
                         style={{
-                          background: isOpen ? '#dcfce7' : '#f3f4f6',
-                          color: isOpen ? '#15803d' : '#6b7280',
-                          border: `1px solid ${isOpen ? '#22c55e' : '#d1d5db'}`,
+                          background: isOpen ? 'var(--success-dim)' : 'var(--bg-secondary)',
+                          color: isOpen ? '#15803d' : 'var(--text-secondary)',
+                          border: `1px solid ${isOpen ? 'var(--success)' : 'var(--border)'}`,
                           fontWeight: 700,
                           fontSize: '10px',
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                        }}
+                          padding: '3px 8px', }}
                         title={isOpen ? 'Receipt is open (live auction day)' : 'Auction day receipt'}
                       >
                         {isOpen ? (
@@ -1756,7 +1744,7 @@ const VehicleTimeline: React.FC<{
                       cursor: canCreateWorkSession ? 'default' : 'pointer',
                       ...(isFutureAuction ? {
                         borderStyle: 'dashed',
-                        borderColor: '#3b82f6',
+                        borderColor: 'var(--info)',
                         background: 'var(--blue-50, #eff6ff)',
                       } : {})
                     }} onClick={() => {
@@ -1816,10 +1804,8 @@ const VehicleTimeline: React.FC<{
                                         fontSize: '9px',
                                         fontWeight: 700,
                                         color: '#1d4ed8',
-                                        background: '#dbeafe',
-                                        padding: '2px 6px',
-                                        borderRadius: '3px',
-                                        letterSpacing: '0.5px',
+                                        background: 'var(--info-dim)',
+                                        padding: '2px 6px', letterSpacing: '0.5px',
                                       }}>
                                         SCHEDULED
                                       </span>
@@ -2031,7 +2017,7 @@ const VehicleTimeline: React.FC<{
         {/* Bulk Image Upload Modal - USING PORTAL TO ESCAPE TIMELINE DIV */}
         {showBulkUpload && ReactDOM.createPortal(
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style={{ zIndex: 10001 }}>
-            <div className="bg-white p-6 rounded max-w-4xl w-full mx-4 max-h-screen overflow-auto">
+            <div className="bg-white p-6 max-w-4xl w-full mx-4 max-h-screen overflow-auto">
               <UniversalImageUpload
                 vehicleId={vehicleId}
                 variant="bulk"

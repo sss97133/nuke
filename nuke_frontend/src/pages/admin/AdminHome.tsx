@@ -196,9 +196,7 @@ export default function AdminHome() {
       </div>
 
       <div style={{
-        marginTop: 'var(--space-6)',
-        borderRadius: '0px',
-        border: '2px solid var(--border-light)',
+        marginTop: 'var(--space-6)', border: '2px solid var(--border-light)',
         backgroundColor: 'var(--white)',
         padding: 'var(--space-4)'
       }}>
@@ -314,9 +312,7 @@ export default function AdminHome() {
 
       {/* Operational pulse */}
       <div style={{
-        marginTop: 'var(--space-6)',
-        borderRadius: '0px',
-        border: '2px solid var(--border-light)',
+        marginTop: 'var(--space-6)', border: '2px solid var(--border-light)',
         backgroundColor: 'var(--white)',
         padding: 'var(--space-4)'
       }}>
@@ -384,9 +380,7 @@ export default function AdminHome() {
               key={c.to}
               to={c.to}
               style={{
-                display: 'block',
-                borderRadius: '0px',
-                border: hasAlert ? '2px solid var(--error)' : '2px solid var(--border-light)',
+                display: 'block', border: hasAlert ? '2px solid var(--error)' : '2px solid var(--border-light)',
                 backgroundColor: 'var(--white)',
                 padding: 'var(--space-4)',
                 transition: 'all 0.12s ease'
@@ -419,9 +413,7 @@ export default function AdminHome() {
       </div>
 
       <div style={{
-        marginTop: 'var(--space-6)',
-        borderRadius: '0px',
-        border: '2px solid var(--border-light)',
+        marginTop: 'var(--space-6)', border: '2px solid var(--border-light)',
         backgroundColor: 'var(--white)',
         padding: 'var(--space-4)'
       }}>

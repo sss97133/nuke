@@ -146,14 +146,10 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
     >
       <div
         style={{
-          background: 'var(--white)',
-          borderRadius: '4px',
-          maxWidth: '500px',
+          background: 'var(--white)', maxWidth: '500px',
           width: '100%',
           maxHeight: '90vh',
-          overflow: 'auto',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
-        }}
+          overflow: 'auto'}}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{
@@ -196,9 +192,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
                 width: '100%',
                 padding: '6px',
                 fontSize: '12px',
-                border: '1px solid var(--border)',
-                borderRadius: '2px'
-              }}
+                border: '1px solid var(--border)'}}
             >
               <option value="purchase">Purchase Inquiry</option>
               <option value="viewing">Schedule Viewing</option>
@@ -220,9 +214,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
                 width: '100%',
                 padding: '6px',
                 fontSize: '12px',
-                border: '1px solid var(--border)',
-                borderRadius: '2px'
-              }}
+                border: '1px solid var(--border)'}}
             />
           </div>
 
@@ -239,9 +231,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
                 width: '100%',
                 padding: '6px',
                 fontSize: '12px',
-                border: '1px solid var(--border)',
-                borderRadius: '2px'
-              }}
+                border: '1px solid var(--border)'}}
             />
           </div>
 
@@ -257,9 +247,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
                 width: '100%',
                 padding: '6px',
                 fontSize: '12px',
-                border: '1px solid var(--border)',
-                borderRadius: '2px'
-              }}
+                border: '1px solid var(--border)'}}
             />
           </div>
 
@@ -277,9 +265,7 @@ export const VehicleInquiryModal: React.FC<VehicleInquiryModalProps> = ({
                 width: '100%',
                 padding: '6px',
                 fontSize: '12px',
-                border: '1px solid var(--border)',
-                borderRadius: '2px',
-                fontFamily: 'inherit',
+                border: '1px solid var(--border)', fontFamily: 'inherit',
                 resize: 'vertical'
               }}
             />

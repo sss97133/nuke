@@ -909,7 +909,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 bg-gray-900 text-white rounded-full p-3 shadow-lg hover:bg-gray-800 transition-colors flex items-center justify-center"
+        className="fixed bottom-4 right-4 bg-gray-900 text-white p-3 hover:bg-gray-800 transition-colors flex items-center justify-center"
         style={{ fontSize: '11px' }}
         title={`Chat with ${vehicleDisplayName}`}
       >
@@ -922,8 +922,8 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
     variant === 'embedded'
       ? 'w-full h-full bg-white flex flex-col'
       : variant === 'panel'
-      ? 'fixed top-4 bottom-4 right-4 left-4 md:left-auto md:w-[45vw] md:min-w-[420px] md:max-w-[760px] bg-white border-2 border-gray-300 shadow-lg flex flex-col'
-      : 'fixed bottom-4 right-4 w-80 h-96 bg-white border-2 border-gray-300 shadow-lg flex flex-col'
+      ? 'fixed top-4 bottom-4 right-4 left-4 md:left-auto md:w-[45vw] md:min-w-[420px] md:max-w-[760px] bg-white border-2 border-gray-300 flex flex-col'
+      : 'fixed bottom-4 right-4 w-80 h-96 bg-white border-2 border-gray-300 flex flex-col'
 
   const containerStyle: React.CSSProperties = { fontSize: '11px' }
 
@@ -932,7 +932,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
       {/* Header */}
       <div className={`${variant === 'embedded' ? 'bg-white border-b border-gray-200' : 'bg-gray-100 border-b-2 border-gray-300'} px-3 py-2 flex items-center justify-between`}>
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-gray-900 flex items-center justify-center">
+          <div className="w-6 h-6 bg-gray-900 flex items-center justify-center">
             <MessageCircle className="w-3 h-3 text-white" />
           </div>
           <span className="font-semibold" style={{ fontSize: '11px' }}>{vehicleDisplayName} - Expert</span>
@@ -990,7 +990,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
           </div>
           <ErrorBoundary
             fallback={
-              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '4px' }}>
+              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-secondary)', border: '1px solid var(--border)'}}>
                 3D model viewer unavailable
               </div>
             }
@@ -1010,7 +1010,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] px-2 py-1 rounded ${
+              className={`max-w-[80%] px-2 py-1  ${
                 message.role === 'user'
                   ? 'bg-gray-900 text-white'
                   : message.role === 'system'
@@ -1026,7 +1026,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
         ))}
         {isProcessing && (
           <div className="flex justify-start">
-            <div className="bg-gray-50 border border-gray-300 px-2 py-1 rounded flex items-center gap-1"
+            <div className="bg-gray-50 border border-gray-300 px-2 py-1 flex items-center gap-1"
               style={{ fontSize: '11px' }}>
               <Loader className="w-3 h-3 animate-spin" />
               <span>Thinking...</span>

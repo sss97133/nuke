@@ -50,9 +50,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
   const smallChipStyle: React.CSSProperties = {
     background: 'var(--bg)',
     border: '1px solid var(--border)',
-    padding: '1px 4px',
-    borderRadius: '2px',
-    fontSize: '11px',
+    padding: '1px 4px', fontSize: '11px',
     color: 'var(--text)'
   };
 
@@ -63,9 +61,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
         className="content-card"
         style={{
           background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: '2px',
-          overflow: 'hidden',
+          border: '1px solid var(--border)', overflow: 'hidden',
           textDecoration: 'none',
           display: 'block',
           cursor: 'pointer'
@@ -88,9 +84,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
               <span
                 style={{
                   fontSize: '9px',
-                  padding: '2px 6px',
-                  borderRadius: '2px',
-                  fontWeight: 600,
+                  padding: '2px 6px', fontWeight: 600,
                   background: vehicle.listing_status === 'sold' ? 'var(--success-dim)' : vehicle.listing_status === 'unsold' ? 'var(--error-dim)' : 'var(--accent-dim)',
                   color: vehicle.listing_status === 'sold' ? 'var(--success)' : vehicle.listing_status === 'unsold' ? 'var(--error)' : 'var(--accent)',
                 }}
@@ -109,7 +103,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
       <Link
         to={`/vehicle/${vehicle.id}`}
         className="content-card"
-        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '2px', overflow: 'hidden', textDecoration: 'none', display: 'block', cursor: 'pointer' }}
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)', overflow: 'hidden', textDecoration: 'none', display: 'block', cursor: 'pointer' }}
       >
         <div style={{ position: 'relative', width: '100%', height: denseMode ? '100px' : '120px', overflow: 'hidden' }}>
           <VehicleThumbnail vehicleId={vehicle.id} />
@@ -141,7 +135,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
     <Link
       to={`/vehicle/${vehicle.id}`}
       className="content-card"
-      style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '2px', overflow: 'hidden', textDecoration: 'none', display: 'block', cursor: 'pointer' }}
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)', overflow: 'hidden', textDecoration: 'none', display: 'block', cursor: 'pointer' }}
     >
       <div style={{ display: 'flex', gap: '12px', padding: '8px' }}>
         <div style={{ width: denseMode ? '80px' : '120px', height: denseMode ? '60px' : '90px', flexShrink: 0, overflow: 'hidden' }}>

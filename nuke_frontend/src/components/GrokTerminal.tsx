@@ -236,9 +236,7 @@ export default function GrokTerminal({ userId }: Props) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                 <div style={{
                   width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: 'var(--text)',
+                  height: '32px', background: 'var(--text)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -289,7 +287,7 @@ export default function GrokTerminal({ userId }: Props) {
               <div key={msg.id} style={{ marginBottom: '16px' }}>
                 {msg.role === 'user' ? (
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--border)', flexShrink: 0 }} />
+                    <div style={{ width: '24px', height: '24px', background: 'var(--border)', flexShrink: 0 }} />
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 'var(--fs-9)', marginBottom: '4px' }}>You</div>
                       <div>{msg.content}</div>
@@ -299,9 +297,7 @@ export default function GrokTerminal({ userId }: Props) {
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <div style={{
                       width: '24px',
-                      height: '24px',
-                      borderRadius: '50%',
-                      background: 'var(--text)',
+                      height: '24px', background: 'var(--text)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -319,9 +315,7 @@ export default function GrokTerminal({ userId }: Props) {
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <div style={{
                       width: '24px',
-                      height: '24px',
-                      borderRadius: '50%',
-                      background: 'var(--text)',
+                      height: '24px', background: 'var(--text)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',

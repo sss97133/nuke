@@ -121,9 +121,7 @@ export const InlineVINEditor: React.FC<InlineVINEditorProps> = ({
         alignItems: 'center',
         gap: 'var(--space-2)',
         padding: '8px 12px',
-        border: `2px solid ${isFakeVIN ? 'var(--warning)' : 'var(--border)'}`,
-        borderRadius: '0px',
-        background: 'var(--white)',
+        border: `2px solid ${isFakeVIN ? 'var(--warning)' : 'var(--border)'}`, background: 'var(--white)',
         transition: 'all 0.12s ease'
       }}>
         <div style={{ flex: 1 }}>
@@ -187,9 +185,7 @@ export const InlineVINEditor: React.FC<InlineVINEditorProps> = ({
           style={{
             width: '100%',
             fontFamily: 'monospace',
-            border: `2px solid ${error ? 'var(--error)' : 'var(--border)'}`,
-            borderRadius: '0px',
-            marginBottom: 'var(--space-2)'
+            border: `2px solid ${error ? 'var(--error)' : 'var(--border)'}`, marginBottom: 'var(--space-2)'
           }}
         />
         

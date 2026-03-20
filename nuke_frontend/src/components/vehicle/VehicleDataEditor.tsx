@@ -119,9 +119,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
       zIndex: 1000
     }}>
       <div style={{
-        backgroundColor: 'var(--surface)',
-        borderRadius: '8px',
-        width: '90%',
+        backgroundColor: 'var(--surface)', width: '90%',
         maxWidth: '800px',
         maxHeight: '90vh',
         display: 'flex',
@@ -547,9 +545,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
 
               {/* Documents Section */}
               <div style={{ 
-                border: '1px solid var(--border)', 
-                borderRadius: '8px',
-                padding: '16px'
+                border: '1px solid var(--border)', padding: '16px'
               }}>
                 <div style={{ 
                   display: 'flex', 
@@ -592,9 +588,7 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
                         display: 'flex',
                         alignItems: 'center',
                         padding: '8px 12px',
-                        border: '1px solid var(--border)',
-                        borderRadius: '6px'
-                      }}>
+                        border: '1px solid var(--border)'}}>
                         <FileText size={20} style={{ marginRight: '8px', color: 'var(--text-secondary)' }} />
                         <span style={{ flex: 1 }}>{doc.name}</span>
                         <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{doc.type}</span>

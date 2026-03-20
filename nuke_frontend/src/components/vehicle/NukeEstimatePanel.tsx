@@ -49,11 +49,11 @@ const DEAL_COLORS: Record<string, string> = Object.fromEntries(
 );
 
 const HEAT_COLORS: Record<string, string> = {
-  volcanic: '#ef4444',
-  fire: '#f97316',
-  hot: '#eab308',
-  warm: '#6b7280',
-  cold: '#9ca3af',
+  volcanic: 'var(--error)',
+  fire: 'var(--orange)',
+  hot: 'var(--warning)',
+  warm: 'var(--text-secondary)',
+  cold: 'var(--text-disabled)',
 };
 
 const SIGNAL_LABELS: Record<string, string> = {
@@ -156,8 +156,8 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
       <div className="card">
         <div className="card-header">NUKE ESTIMATE</div>
         <div className="card-body" style={{ padding: '12px' }}>
-          <div style={{ height: 28, background: 'var(--border)', borderRadius: 2, marginBottom: 8, width: '50%', opacity: 0.5 }} />
-          <div style={{ height: 14, background: 'var(--border)', borderRadius: 2, width: '70%', opacity: 0.4 }} />
+          <div style={{ height: 28, background: 'var(--border)', marginBottom: 8, width: '50%', opacity: 0.5 }} />
+          <div style={{ height: 14, background: 'var(--border)', width: '70%', opacity: 0.4 }} />
         </div>
       </div>
     );
@@ -174,9 +174,7 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
           style={{
             background: 'var(--grey-100)',
             border: '1px solid var(--border)',
-            padding: '2px 8px',
-            borderRadius: '3px',
-            fontSize: '9px',
+            padding: '2px 8px', fontSize: '9px',
             fontWeight: 600,
             cursor: computing ? 'wait' : 'pointer',
             color: 'var(--text)',
@@ -192,8 +190,7 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{
-                    width: '8px', height: '8px', borderRadius: '50%',
-                    background: '#10b981',
+                    width: '8px', height: '8px', background: 'var(--success)',
                     animation: 'pulse 1.5s ease-in-out infinite',
                   }} />
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -205,13 +202,11 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
                     <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ width: '100px', fontSize: '8px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{s}</span>
                       <div style={{
-                        flex: 1, height: '3px', background: 'var(--grey-100)', borderRadius: '2px', overflow: 'hidden',
+                        flex: 1, height: '3px', background: 'var(--grey-100)', overflow: 'hidden',
                       }}>
                         <div style={{
                           width: `${30 + i * 15}%`, height: '100%',
-                          background: 'var(--border)',
-                          borderRadius: '2px',
-                          animation: `shimmer 1.5s ease-in-out infinite`,
+                          background: 'var(--border)', animation: `shimmer 1.5s ease-in-out infinite`,
                           animationDelay: `${i * 0.2}s`,
                         }} />
                       </div>
@@ -247,9 +242,7 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
               </span>
               <span style={{
                 fontSize: '9px',
-                padding: '1px 5px',
-                borderRadius: '3px',
-                background: 'var(--grey-100)',
+                padding: '1px 5px', background: 'var(--grey-100)',
                 color: 'var(--text-muted)',
                 fontWeight: 600,
                 textTransform: 'uppercase',
@@ -271,9 +264,7 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
             <div style={{ display: 'flex', gap: '12px' }}>
               {estimate.deal_score != null && estimate.deal_score_label && (
                 <div style={{
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  background: DEAL_COLORS[estimate.deal_score_label] || '#6b7280',
+                  padding: '4px 8px', background: DEAL_COLORS[estimate.deal_score_label] || 'var(--text-secondary)',
                   color: 'var(--bg)',
                   fontSize: '11px',
                   fontWeight: 700,
@@ -285,9 +276,7 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
               )}
               {estimate.heat_score != null && estimate.heat_score_label && (
                 <div style={{
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  background: HEAT_COLORS[estimate.heat_score_label] || '#6b7280',
+                  padding: '4px 8px', background: HEAT_COLORS[estimate.heat_score_label] || 'var(--text-secondary)',
                   color: 'var(--bg)',
                   fontSize: '11px',
                   fontWeight: 700,
@@ -315,18 +304,14 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
                     <div style={{
                       flex: 1,
                       height: '4px',
-                      background: 'var(--grey-100)',
-                      borderRadius: '2px',
-                      overflow: 'hidden',
+                      background: 'var(--grey-100)', overflow: 'hidden',
                     }}>
                       <div style={{
                         width: `${Math.min(sig.weight * 500, 100)}%`,
                         height: '100%',
                         background: sig.sourceCount > 0
-                          ? sig.multiplier > 1.02 ? '#10b981' : sig.multiplier < 0.98 ? '#ef4444' : '#3b82f6'
-                          : 'var(--grey-300)',
-                        borderRadius: '2px',
-                      }} />
+                          ? sig.multiplier > 1.02 ? 'var(--success)' : sig.multiplier < 0.98 ? 'var(--error)' : 'var(--info)'
+                          : 'var(--grey-300)', }} />
                     </div>
                     <span style={{ width: '40px', textAlign: 'right', fontWeight: 600, color: sig.sourceCount > 0 ? 'var(--text)' : 'var(--text-muted)' }}>
                       {sig.multiplier.toFixed(2)}x

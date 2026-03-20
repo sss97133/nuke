@@ -881,17 +881,14 @@ export const PersonalPhotoLibrary: React.FC = () => {
                   <span
                     style={{
                       width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: isProcessing
+                      height: '8px', background: isProcessing
                         ? 'var(--success)'
                         : hasIssues
                           ? 'var(--error)'
                           : item.status === 'complete'
                             ? 'var(--success)'
                             : 'var(--text-disabled)',
-                      display: 'inline-block',
-                      boxShadow: isProcessing || hasIssues ? '0 0 4px currentColor' : 'none'
+                      display: 'inline-block'
                     }}
                   />
                   <span className="text text-small">{item.label}</span>

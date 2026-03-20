@@ -269,15 +269,11 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
                     alignItems: 'center',
                     gap: '12px',
                     padding: '12px',
-                    background: 'var(--surface-elevated)',
-                    borderRadius: '8px',
-                  }}
+                    background: 'var(--surface-elevated)', }}
                 >
                   <div style={{
                     width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    background: 'var(--accent)',
+                    height: '40px', background: 'var(--accent)',
                     color: 'var(--bg)',
                     display: 'flex',
                     alignItems: 'center',
@@ -323,9 +319,7 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
                 key={offering.id}
                 style={{
                   padding: '16px',
-                  background: offering.status === 'active' ? 'var(--success-bg)' : 'var(--surface-elevated)',
-                  borderRadius: '8px',
-                  marginBottom: '12px',
+                  background: offering.status === 'active' ? 'var(--success-bg)' : 'var(--surface-elevated)', marginBottom: '12px',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
@@ -339,9 +333,7 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
                     </div>
                   </div>
                   <div style={{
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    fontSize: '11px',
+                    padding: '4px 8px', fontSize: '11px',
                     fontWeight: 600,
                     background: offering.status === 'active' ? 'var(--success)' : 'var(--text-muted)',
                     color: 'var(--bg)',
@@ -358,16 +350,12 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
                   </div>
                   <div style={{
                     height: '8px',
-                    background: 'var(--border)',
-                    borderRadius: '4px',
-                    overflow: 'hidden'
+                    background: 'var(--border)', overflow: 'hidden'
                   }}>
                     <div style={{
                       height: '100%',
                       width: `${Math.min(100, ((offering.amount_sold || 0) / offering.total_offering_amount) * 100)}%`,
-                      background: 'var(--accent)',
-                      borderRadius: '4px',
-                    }} />
+                      background: 'var(--accent)', }} />
                   </div>
                 </div>
 
@@ -475,9 +463,7 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
           textAlign: 'center',
           padding: '40px 20px',
           color: 'var(--text-muted)',
-          background: 'var(--surface-elevated)',
-          borderRadius: '8px',
-        }}>
+          background: 'var(--surface-elevated)', }}>
           <div style={{ fontSize: '43px', marginBottom: '12px' }}>📋</div>
           <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '8px' }}>
             No Legal Information Available

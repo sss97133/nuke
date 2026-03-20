@@ -198,7 +198,7 @@ const StatsModal: React.FC<StatsModalProps> = ({ isOpen, onClose, type, listings
         <div style={{ flex: 1, minWidth: '200px' }}>
           {paths.map((path, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-              <div style={{ width: '12px', height: '12px', backgroundColor: path.color, borderRadius: '2px' }} />
+              <div style={{ width: '12px', height: '12px', backgroundColor: path.color}} />
               <span style={{ fontSize: 'var(--font-size-small)', flex: 1 }}>{path.label}</span>
               <span style={{ fontSize: 'var(--font-size-small)', fontWeight: 'bold' }}>
                 {path.value.toLocaleString()} ({path.percentage.toFixed(1)}%)
@@ -268,7 +268,7 @@ const StatsModal: React.FC<StatsModalProps> = ({ isOpen, onClose, type, listings
     bat: '#8b0000',
     ebay_motors: '#0064d2',
     cars_and_bids: '#ff6b35',
-    hemmings: '#000000',
+    hemmings: 'var(--text)',
     autotrader: '#00a0df',
     facebook_marketplace: '#1877f2',
     craigslist: '#800080',
@@ -884,9 +884,7 @@ const MyAuctions: React.FC = () => {
           }
           style={{
             padding: '6px 12px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            fontSize: '12px',
+            border: '1px solid var(--border)', fontSize: '12px',
           }}
         >
           <option value="all">All (Accessible)</option>
@@ -901,9 +899,7 @@ const MyAuctions: React.FC = () => {
           }
           style={{
             padding: '6px 12px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            fontSize: '12px',
+            border: '1px solid var(--border)', fontSize: '12px',
           }}
         >
           <option value="all">All</option>
@@ -919,9 +915,7 @@ const MyAuctions: React.FC = () => {
           }
           style={{
             padding: '6px 12px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            fontSize: '12px',
+            border: '1px solid var(--border)', fontSize: '12px',
           }}
         >
           <option value="all">All Platforms</option>
@@ -944,9 +938,7 @@ const MyAuctions: React.FC = () => {
           }
           style={{
             padding: '6px 12px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            fontSize: '12px',
+            border: '1px solid var(--border)', fontSize: '12px',
           }}
         >
           <option value="ending_soon">Ending Soon</option>

@@ -131,9 +131,7 @@ export default function ContractorWorkInput({
           maxWidth: '600px',
           width: '100%',
           maxHeight: '90vh',
-          overflow: 'auto',
-          borderRadius: '4px',
-          border: '2px solid var(--border)'
+          overflow: 'auto', border: '2px solid var(--border)'
         }}
       >
         {/* Header */}
@@ -163,18 +161,14 @@ export default function ContractorWorkInput({
                 width: '100%',
                 maxHeight: '200px',
                 objectFit: 'contain',
-                border: '1px solid var(--border)',
-                borderRadius: '2px'
-              }}
+                border: '1px solid var(--border)'}}
             />
             <div style={{
               fontSize: '9px',
               color: 'var(--warning)',
               marginTop: '8px',
               padding: '8px',
-              background: '#fff3cd',
-              borderRadius: '2px',
-              border: '1px solid #ffeaa7'
+              background: '#fff3cd', border: '1px solid #ffeaa7'
             }}>
               This image is marked as PRIVATE. It will only be visible to you and the shop owner. Your contribution credit will be tracked.
             </div>
@@ -289,9 +283,7 @@ export default function ContractorWorkInput({
           {(laborHours || hourlyRate || materialsCost) && (
             <div style={{
               padding: '12px',
-              background: 'var(--accent-dim)',
-              borderRadius: '4px',
-              marginBottom: '12px',
+              background: 'var(--accent-dim)', marginBottom: '12px',
               border: '2px solid var(--accent)'
             }}>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
@@ -326,9 +318,7 @@ export default function ContractorWorkInput({
           {/* Privacy Controls */}
           <div style={{
             padding: '12px',
-            background: '#f8f9fa',
-            borderRadius: '4px',
-            marginBottom: '16px',
+            background: '#f8f9fa', marginBottom: '16px',
             border: '1px solid var(--border)'
           }}>
             <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '12px' }}>

@@ -94,11 +94,7 @@ const SpatialTagMarker: React.FC<SpatialTagMarkerProps> = ({ tag, isShoppable, o
         width: `${tag.width || 20}%`,
         height: `${tag.height || 20}%`,
         background: isHovered ? bgColor : bgColorWithAlpha,
-        border: `3px ${borderStyle} ${borderColor}`,
-        borderRadius: '4px',
-        cursor: 'pointer',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-        transition: 'all 0.12s ease',
+        border: `3px ${borderStyle} ${borderColor}`, cursor: 'pointer', transition: 'all 0.12s ease',
         zIndex: isHovered ? 10001 : 10000,
         pointerEvents: 'auto',
         opacity: isHovered ? 0.9 : 0.6
@@ -113,9 +109,7 @@ const SpatialTagMarker: React.FC<SpatialTagMarkerProps> = ({ tag, isShoppable, o
           marginBottom: '8px',
           background: 'rgba(0, 0, 0, 0.95)',
           color: 'white',
-          padding: '6px 10px',
-          borderRadius: '4px',
-          fontSize: '11px',
+          padding: '6px 10px', fontSize: '11px',
           fontWeight: 'bold',
           whiteSpace: 'nowrap',
           pointerEvents: 'none',
@@ -1960,17 +1954,17 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         const isPreviousOwner = commenterId && previousOwners.has(commenterId);
                         
                         return (
-                          <div key={c.id} className="bg-white/5 p-3 rounded">
+                          <div key={c.id} className="bg-white/5 p-3">
                             <div className="flex justify-between items-center mb-1">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold text-blue-400">{c.user?.full_name || 'Unknown'}</span>
                                 {isOwner && (
-                                  <span className="text-[9px] px-1.5 py-0.5 bg-green-900/50 text-green-300 rounded border border-green-700">
+                                  <span className="text-[9px] px-1.5 py-0.5 bg-green-900/50 text-green-300 border border-green-700">
                                     OWNER
                                   </span>
                                 )}
                                 {isPreviousOwner && !isOwner && (
-                                  <span className="text-[9px] px-1.5 py-0.5 bg-yellow-900/50 text-yellow-300 rounded border border-yellow-700">
+                                  <span className="text-[9px] px-1.5 py-0.5 bg-yellow-900/50 text-yellow-300 border border-yellow-700">
                                     PREVIOUS OWNER
                                   </span>
                                 )}
@@ -1985,7 +1979,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                   </div>
                   <div className="mt-auto pt-4 border-t-2 border-white/20">
                     <input
-                      className="w-full bg-[#1a1a1a] border-2 border-white/30 text-white text-[10px] p-3 mb-3 transition-all duration-150 focus:border-white focus:outline-none focus:shadow-[0_0_0_3px_rgba(255,255,255,0.1)] placeholder:text-white/40"
+                      className="w-full bg-[#1a1a1a] border-2 border-white/30 text-white text-[10px] p-3 mb-3 transition-all duration-150 focus:border-white focus:outline-none focus: -[0_0_0_3px_rgba(255,255,255,0.1)] placeholder:text-white/40"
                       style={{ fontFamily: 'Arial, sans-serif' }}
                       placeholder="Add a comment..."
                       value={newComment}
@@ -1995,7 +1989,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     <button 
                       onClick={addComment}
                       disabled={!newComment.trim()}
-                      className="w-full py-2.5 bg-white text-black border-2 border-white text-[10px] font-bold uppercase tracking-wide hover:bg-white/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 hover:translate-y-[-2px] hover:shadow-[0_0_0_3px_rgba(255,255,255,0.2)]"
+                      className="w-full py-2.5 bg-white text-black border-2 border-white text-[10px] font-bold uppercase tracking-wide hover:bg-white/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 hover:translate-y-[-2px] hover: -[0_0_0_3px_rgba(255,255,255,0.2)]"
                       style={{ fontFamily: 'Arial, sans-serif' }}
                     >
                       POST COMMENT
@@ -2011,9 +2005,9 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     <div className="text-center text-gray-500 mt-10">No tags yet. Click "+ TAG" to add one.</div>
                   ) : (
                     tags.map(tag => (
-                      <div key={tag.id} className="flex justify-between items-center bg-white/5 p-2 rounded hover:bg-white/10 cursor-pointer">
+                      <div key={tag.id} className="flex justify-between items-center bg-white/5 p-2 hover:bg-white/10 cursor-pointer">
                         <span className="text-sm">{tag.tag_name}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded ${tag.verified ? 'bg-green-900 text-green-300' : 'bg-yellow-900 text-yellow-300'}`}>
+                        <span className={`text-[10px] px-2 py-0.5  ${tag.verified ? 'bg-green-900 text-green-300' : 'bg-yellow-900 text-yellow-300'}`}>
                           {tag.verified ? 'Verified' : 'AI'}
                         </span>
                       </div>
@@ -2232,7 +2226,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     padding: '8px 10px',
                     fontSize: '10px',
                     fontWeight: 'bold',
-                    backgroundColor: claimSubmitting ? 'var(--text-disabled)' : '#ffffff',
+                    backgroundColor: claimSubmitting ? 'var(--text-disabled)' : 'var(--surface-elevated)',
                     color: claimSubmitting ? 'rgba(255,255,255,0.6)' : '#000',
                     border: '1px solid rgba(255,255,255,0.25)',
                     cursor: claimSubmitting ? 'not-allowed' : 'pointer',

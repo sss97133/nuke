@@ -162,9 +162,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
                 fontSize: '9px',
                 border: filter === f ? '2px solid var(--accent)' : '1px solid var(--border)',
                 background: filter === f ? 'rgba(var(--accent-rgb), 0.1)' : 'white',
-                cursor: 'pointer',
-                borderRadius: '3px'
-              }}
+                cursor: 'pointer'}}
             >
               {f.toUpperCase()}
             </button>
@@ -193,9 +191,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
                 key={notif.id}
                 style={{
                   padding: '12px',
-                  border: '2px solid var(--border)',
-                  borderRadius: '4px',
-                  background: isUnread ? 'rgba(var(--accent-rgb), 0.05)' : 'var(--surface)',
+                  border: '2px solid var(--border)', background: isUnread ? 'rgba(var(--accent-rgb), 0.05)' : 'var(--surface)',
                   cursor: 'pointer'
                 }}
                 onClick={() => {
@@ -227,9 +223,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
                         marginTop: '8px',
                         padding: '8px',
                         background: 'var(--bg)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '3px',
-                        fontSize: '9px'
+                        border: '1px solid var(--border)', fontSize: '9px'
                       }}>
                         {verification.proof_url && (
                           <div style={{ marginBottom: '4px' }}>
@@ -250,9 +244,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
                   {isUnread && (
                     <div style={{
                       width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: 'var(--accent)',
+                      height: '8px', background: 'var(--accent)',
                       flexShrink: 0,
                       marginLeft: '8px'
                     }} />
@@ -273,9 +265,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
                         fontSize: '9px',
                         border: '1px solid var(--border)',
                         background: 'var(--surface)',
-                        cursor: 'pointer',
-                        borderRadius: '3px'
-                      }}
+                        cursor: 'pointer'}}
                     >
                       Reject
                     </button>
@@ -287,9 +277,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
                         border: 'none',
                         background: 'var(--accent)',
                         color: 'var(--bg)',
-                        cursor: 'pointer',
-                        borderRadius: '3px',
-                        fontWeight: 600
+                        cursor: 'pointer', fontWeight: 600
                       }}
                     >
                       Approve

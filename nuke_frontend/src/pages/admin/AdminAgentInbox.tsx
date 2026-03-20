@@ -55,9 +55,7 @@ function RolePill({ role }: { role: string }) {
       fontFamily: 'monospace',
       fontWeight: 600,
       color: 'var(--bg)',
-      backgroundColor: roleColor(role),
-      borderRadius: '3px',
-    }}>
+      backgroundColor: roleColor(role), }}>
       {role}
     </span>
   );
@@ -175,9 +173,7 @@ export default function AdminAgentInbox() {
             style={{
               fontSize: '11px',
               padding: '2px 6px',
-              border: '1px solid var(--border-light)',
-              borderRadius: '0px',
-              backgroundColor: 'var(--white)',
+              border: '1px solid var(--border-light)', backgroundColor: 'var(--white)',
             }}
           >
             <option value="all">all</option>
@@ -194,9 +190,7 @@ export default function AdminAgentInbox() {
             style={{
               fontSize: '11px',
               padding: '2px 6px',
-              border: '1px solid var(--border-light)',
-              borderRadius: '0px',
-              backgroundColor: 'var(--white)',
+              border: '1px solid var(--border-light)', backgroundColor: 'var(--white)',
             }}
           >
             <option value="all">all</option>
@@ -249,7 +243,7 @@ export default function AdminAgentInbox() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     {msg.read_at == null && (
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--accent)', flexShrink: 0 }} />
+                      <div style={{ width: 6, height: 6, backgroundColor: 'var(--accent)', flexShrink: 0 }} />
                     )}
                     <RolePill role={msg.from_role} />
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>→</span>

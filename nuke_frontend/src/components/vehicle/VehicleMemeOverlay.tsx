@@ -65,12 +65,8 @@ export default function VehicleMemeOverlay({
               left: '12px',
               top: `${top}px`,
               background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: '8px',
-              padding: '8px',
-              maxWidth: '200px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-              animation: 'memeIn 0.3s ease-out',
+              border: '1px solid var(--border)', padding: '8px',
+              maxWidth: '200px', animation: 'memeIn 0.3s ease-out',
             }}
           >
             {item.imageUrl && (
@@ -80,9 +76,7 @@ export default function VehicleMemeOverlay({
                 style={{
                   maxHeight: '100px',
                   maxWidth: '100%',
-                  display: 'block',
-                  borderRadius: '4px',
-                }}
+                  display: 'block', }}
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}

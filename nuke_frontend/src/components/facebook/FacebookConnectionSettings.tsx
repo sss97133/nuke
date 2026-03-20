@@ -78,9 +78,7 @@ const FacebookConnectionSettings: React.FC<FacebookConnectionSettingsProps> = ({
     return (
       <div style={{
         padding: '16px',
-        border: '1px solid var(--border-light)',
-        borderRadius: '8px',
-        background: 'var(--surface)'
+        border: '1px solid var(--border-light)', background: 'var(--surface)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -119,9 +117,7 @@ const FacebookConnectionSettings: React.FC<FacebookConnectionSettingsProps> = ({
               padding: '8px 16px',
               background: '#1877F2',
               color: 'var(--bg)',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '12px',
+              border: 'none', fontSize: '12px',
               fontWeight: 600,
               cursor: 'pointer'
             }}
@@ -136,9 +132,7 @@ const FacebookConnectionSettings: React.FC<FacebookConnectionSettingsProps> = ({
   return (
     <div style={{
       padding: '16px',
-      border: '1px solid var(--border-light)',
-      borderRadius: '8px',
-      background: 'var(--surface)'
+      border: '1px solid var(--border-light)', background: 'var(--surface)'
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
@@ -162,9 +156,7 @@ const FacebookConnectionSettings: React.FC<FacebookConnectionSettingsProps> = ({
             <span style={{
               padding: '2px 8px',
               background: '#1877F2',
-              color: 'var(--bg)',
-              borderRadius: '4px',
-              fontSize: '10px',
+              color: 'var(--bg)', fontSize: '10px',
               fontWeight: 500
             }}>
               Connected
@@ -186,9 +178,7 @@ const FacebookConnectionSettings: React.FC<FacebookConnectionSettingsProps> = ({
             padding: '8px 16px',
             background: disconnecting ? 'var(--text-muted)' : 'var(--danger)',
             color: 'var(--bg)',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '12px',
+            border: 'none', fontSize: '12px',
             fontWeight: 600,
             cursor: disconnecting ? 'not-allowed' : 'pointer'
           }}

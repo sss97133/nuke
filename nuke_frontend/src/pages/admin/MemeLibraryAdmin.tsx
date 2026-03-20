@@ -573,9 +573,7 @@ export default function MemeLibraryAdmin() {
                 <div
                   key={action.id}
                   style={{
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    padding: '10px',
+                    border: '1px solid var(--border)', padding: '10px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 8,
@@ -589,9 +587,7 @@ export default function MemeLibraryAdmin() {
                         width: '100%',
                         height: 120,
                         objectFit: 'cover',
-                        border: '1px solid var(--border)',
-                        borderRadius: '4px',
-                      }}
+                        border: '1px solid var(--border)', }}
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}

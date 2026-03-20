@@ -147,9 +147,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                       flex: 1,
                       padding: '4px 6px',
                       fontSize: '12px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '4px',
-                      background: 'var(--bg, #fff)',
+                      border: '1px solid var(--border)', background: 'var(--bg, #fff)',
                       color: 'var(--text)',
                       outline: 'none',
                       minWidth: 0,
@@ -164,9 +162,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                       fontWeight: 600,
                       background: saving ? 'var(--border)' : 'var(--primary, #3b82f6)',
                       color: 'var(--bg)',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: saving ? 'wait' : 'pointer',
+                      border: 'none', cursor: saving ? 'wait' : 'pointer',
                       opacity: !msrpInput.trim() ? 0.5 : 1,
                     }}
                   >
@@ -191,9 +187,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                 onClick={() => setShowMsrpForm(true)}
                 style={{
                   padding: '6px 8px',
-                  border: '1px dashed var(--border)',
-                  borderRadius: '4px',
-                  fontSize: '11px',
+                  border: '1px dashed var(--border)', fontSize: '11px',
                   color: 'var(--primary, #3b82f6)',
                   cursor: 'pointer',
                   textAlign: 'center',
@@ -227,8 +221,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
             {v.deal_score != null && anyPrice && estimate && (
               <div style={{
                 marginTop: '8px', padding: '6px 8px',
-                background: 'var(--bg-secondary, #f3f4f6)', borderRadius: '4px',
-              }}>
+                background: 'var(--bg-secondary, #f3f4f6)', }}>
                 <DealScore score={v.deal_score} price={anyPrice} estimate={estimate} />
               </div>
             )}
@@ -261,8 +254,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                         autoFocus
                         style={{
                           flex: 1, padding: '4px 6px', fontSize: '12px',
-                          border: '1px solid var(--border)', borderRadius: '4px',
-                          background: 'var(--bg, #fff)', color: 'var(--text)',
+                          border: '1px solid var(--border)', background: 'var(--bg, #fff)', color: 'var(--text)',
                           outline: 'none', minWidth: 0,
                         }}
                       />
@@ -272,8 +264,7 @@ export default function PricePortal({ vehicle, vehicleId, userId, activePortal, 
                         style={{
                           padding: '4px 8px', fontSize: '11px', fontWeight: 600,
                           background: saving ? 'var(--border)' : 'var(--primary, #3b82f6)',
-                          color: 'var(--bg)', border: 'none', borderRadius: '4px',
-                          cursor: saving ? 'wait' : 'pointer',
+                          color: 'var(--bg)', border: 'none', cursor: saving ? 'wait' : 'pointer',
                           opacity: !msrpInput.trim() ? 0.5 : 1,
                         }}
                       >
@@ -334,7 +325,7 @@ function DealScore({ score, price, estimate }: { score: number; price: number; e
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
       <span style={{
-        width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+        width: '6px', height: '6px', flexShrink: 0,
         background: isGoodDeal ? 'var(--success)' : isFair ? 'var(--success)' : score > -20 ? 'var(--warning)' : 'var(--error)',
       }} />
       <span>

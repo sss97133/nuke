@@ -344,10 +344,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
           background: 'var(--white)',
           width: '100%',
           maxWidth: '600px',
-          border: '2px solid var(--border)',
-          borderRadius: '4px',
-          boxShadow: 'var(--shadow)',
-          maxHeight: '90vh',
+          border: '2px solid var(--border)', maxHeight: '90vh',
           overflow: 'auto'
         }}
       >
@@ -372,9 +369,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
               className="button button-secondary"
               style={{
                 flex: 1,
-                fontSize: '12px',
-                borderRadius: 0,
-                borderBottom: dataType === tab.key ? '2px solid var(--accent)' : 'none',
+                fontSize: '12px', borderBottom: dataType === tab.key ? '2px solid var(--accent)' : 'none',
                 background: dataType === tab.key ? 'var(--white)' : 'var(--surface)'
               }}
             >
@@ -701,9 +696,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
                   }}
                   onClick={() => fileInputRef.current?.click()}
                   style={{
-                    border: isDragging ? '2px dashed var(--accent)' : '2px dashed var(--border)',
-                    borderRadius: '4px',
-                    padding: '30px',
+                    border: isDragging ? '2px dashed var(--accent)' : '2px dashed var(--border)', padding: '30px',
                     textAlign: 'center',
                     background: isDragging ? 'var(--accent-dim)' : 'var(--surface)',
                     cursor: 'pointer',

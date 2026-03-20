@@ -251,9 +251,7 @@ export default function NLQueryConsole() {
                   <div style={{
                     background: message.role === 'user' ? 'var(--accent)' : 'var(--grey-50)',
                     color: message.role === 'user' ? 'var(--white)' : 'var(--text)',
-                    padding: '8px 10px',
-                    borderRadius: '10px',
-                    fontSize: '11px',
+                    padding: '8px 10px', fontSize: '11px',
                     border: message.role === 'assistant' ? '1px solid var(--border-light)' : 'none',
                   }}>
                     {message.content}
@@ -311,9 +309,7 @@ export default function NLQueryConsole() {
                 width: '100%',
                 padding: '10px',
                 fontSize: '12px',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                background: 'var(--surface)',
+                border: '1px solid var(--border)', background: 'var(--surface)',
               }}
             />
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -405,9 +401,7 @@ export default function NLQueryConsole() {
                     <pre style={{
                       whiteSpace: 'pre-wrap',
                       background: 'var(--grey-50)',
-                      padding: '10px',
-                      borderRadius: '4px',
-                      fontSize: '11px',
+                      padding: '10px', fontSize: '11px',
                       border: '1px solid var(--border)',
                     }}>
                       {activeResult.response.sql}
@@ -418,7 +412,7 @@ export default function NLQueryConsole() {
                 {rows.length > 0 ? (
                   <div>
                     <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>Results</div>
-                    <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: '4px' }}>
+                    <div style={{ overflowX: 'auto', border: '1px solid var(--border)'}}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                         <thead>
                           <tr style={{ background: 'var(--grey-50)' }}>
@@ -463,9 +457,7 @@ export default function NLQueryConsole() {
                         marginTop: '8px',
                         whiteSpace: 'pre-wrap',
                         background: 'var(--grey-50)',
-                        padding: '10px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
+                        padding: '10px', fontSize: '11px',
                         border: '1px solid var(--border)',
                       }}>
                         {JSON.stringify(activeResult.response, null, 2)}

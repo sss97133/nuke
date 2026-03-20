@@ -143,7 +143,7 @@ const LivePlayer: React.FC<LivePlayerProps> = ({ userId, isOwnProfile }) => {
         {loading ? (
           <div className="text-small text-muted">Checking live status…</div>
         ) : playbackUrl ? (
-          <div className="aspect-video bg-black rounded overflow-hidden">
+          <div className="aspect-video bg-black overflow-hidden">
             <video
               src={playbackUrl}
               controls

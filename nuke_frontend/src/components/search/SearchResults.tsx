@@ -252,9 +252,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
       {(results.length > 0 || searchSummary) && (
         <div style={{
           background: 'var(--surface)',
-          border: '2px solid var(--text)',
-          borderRadius: '0px',
-          padding: '10px 14px',
+          border: '2px solid var(--text)', padding: '10px 14px',
           marginBottom: '12px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
@@ -314,9 +312,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                         gap: '4px',
                         background: isActive ? 'var(--text)' : 'var(--surface)',
                         border: `2px solid ${isActive ? 'var(--text)' : 'var(--border)'}`,
-                        padding: '3px 8px',
-                        borderRadius: '0px',
-                        fontSize: '7.5pt',
+                        padding: '3px 8px', fontSize: '7.5pt',
                         fontWeight: 700,
                         color: isActive ? 'var(--bg)' : 'var(--text)',
                         cursor: 'pointer',
@@ -352,9 +348,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           marginBottom: '20px',
           padding: '12px 16px',
           background: 'var(--surface)',
-          border: '2px solid var(--text)',
-          borderRadius: '0px'
-        }}>
+          border: '2px solid var(--text)'}}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
             <div>
               <div style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -472,9 +466,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                   fontSize: '7.5pt',
                   fontWeight: 700,
                   textTransform: 'uppercase',
-                  border: '2px solid var(--text)',
-                  borderRadius: '0px',
-                  background: viewMode === mode ? 'var(--text)' : 'var(--surface)',
+                  border: '2px solid var(--text)', background: viewMode === mode ? 'var(--text)' : 'var(--surface)',
                   color: viewMode === mode ? 'var(--surface)' : 'var(--text)',
                   cursor: 'pointer',
                   letterSpacing: '0.3px',
@@ -494,9 +486,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                 style={{
                   fontSize: '7.5pt',
                   padding: '3px 6px',
-                  border: '2px solid var(--text)',
-                  borderRadius: '0px',
-                  background: 'var(--surface)',
+                  border: '2px solid var(--text)', background: 'var(--surface)',
                   color: 'var(--text)',
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -662,9 +652,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
           {viewMode === 'list' && (
             <div style={{
               background: 'var(--surface)',
-              border: '2px solid var(--text)',
-              borderRadius: '0px',
-              overflow: 'hidden'
+              border: '2px solid var(--text)', overflow: 'hidden'
             }}>
               {filteredAndSortedResults.map((result, index) => (
                 <div
@@ -692,9 +680,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                 >
                   <div style={{
                     width: '60px',
-                    height: '60px',
-                    borderRadius: '0px',
-                    background: result.image_url ? `url(${result.image_url}) center/cover` : 'var(--bg)',
+                    height: '60px', background: result.image_url ? `url(${result.image_url}) center/cover` : 'var(--bg)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -721,9 +707,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       <div style={{
                         background: 'var(--text)',
                         color: 'var(--bg)',
-                        padding: '2px 6px',
-                        borderRadius: '0px',
-                        fontSize: '9px',
+                        padding: '2px 6px', fontSize: '9px',
                         fontWeight: 700,
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px'
@@ -784,9 +768,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                       <div style={{
                         background: 'var(--text)',
                         color: 'var(--bg)',
-                        padding: '2px 6px',
-                        borderRadius: '0px',
-                        fontSize: '9px',
+                        padding: '2px 6px', fontSize: '9px',
                         fontWeight: 700
                       }}>
                         {Math.round(result.relevance_score * 100)}% match
@@ -809,9 +791,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                         <div style={{
                           background: getStatusColor(result.metadata.build_status),
                           color: 'var(--bg)',
-                          padding: '2px 6px',
-                          borderRadius: '0px',
-                          fontSize: '9px',
+                          padding: '2px 6px', fontSize: '9px',
                           fontWeight: 700,
                           textTransform: 'uppercase'
                         }}>

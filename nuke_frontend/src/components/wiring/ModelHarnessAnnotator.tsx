@@ -418,7 +418,7 @@ export function ModelHarnessAnnotator({
           <select
             value={unitHint}
             onChange={(e) => setUnitHint(e.target.value as any)}
-            style={{ fontSize: '11px', padding: '2px 6px', border: '2px solid var(--border)', borderRadius: '2px' }}
+            style={{ fontSize: '11px', padding: '2px 6px', border: '2px solid var(--border)'}}
           >
             <option value="unknown">unknown</option>
             <option value="inches">inches</option>
@@ -433,7 +433,7 @@ export function ModelHarnessAnnotator({
             type="number"
             value={slackInches}
             onChange={(e) => setSlackInches(Number(e.target.value || 0))}
-            style={{ width: '80px', fontSize: '11px', padding: '2px 6px', border: '2px solid var(--border)', borderRadius: '2px' }}
+            style={{ width: '80px', fontSize: '11px', padding: '2px 6px', border: '2px solid var(--border)'}}
           />
           in
         </label>
@@ -448,7 +448,7 @@ export function ModelHarnessAnnotator({
           value={importUrl}
           onChange={(e) => setImportUrl(e.target.value)}
           placeholder="Paste signed URL (.fbx or .glb) to import"
-          style={{ flex: 1, minWidth: '240px', fontSize: '11px', padding: '6px', border: '2px solid var(--border)', borderRadius: '2px' }}
+          style={{ flex: 1, minWidth: '240px', fontSize: '11px', padding: '6px', border: '2px solid var(--border)'}}
           disabled={!userId || isBusy}
         />
         <button type="button" className="button-win95" onClick={importFromSignedUrl} disabled={!userId || isBusy || !importUrl.trim()}>
@@ -458,13 +458,13 @@ export function ModelHarnessAnnotator({
       </div>
 
       {modelError && (
-        <div style={{ marginBottom: '10px', padding: '8px', background: 'var(--error-dim)', border: '1px solid var(--error)', borderRadius: '2px', fontSize: '11px', color: 'var(--error)' }}>
+        <div style={{ marginBottom: '10px', padding: '8px', background: 'var(--error-dim)', border: '1px solid var(--error)', fontSize: '11px', color: 'var(--error)' }}>
           {modelError}
         </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '12px' }}>
-        <div style={{ border: '2px solid var(--border)', borderRadius: '2px', overflow: 'hidden', background: 'var(--bg-deep, #0f1115)' }}>
+        <div style={{ border: '2px solid var(--border)', overflow: 'hidden', background: 'var(--bg-deep, #0f1115)' }}>
           <div style={{ height: '420px' }}>
             <Canvas camera={{ position: [1.2, 0.8, 1.2], fov: 55 }} onPointerDown={canInteract ? handleCanvasClick : undefined}>
               <ambientLight intensity={0.7} />
@@ -499,7 +499,7 @@ export function ModelHarnessAnnotator({
                 value={pendingName}
                 onChange={(e) => setPendingName(e.target.value)}
                 placeholder="HP_..."
-                style={{ width: '100%', fontSize: '11px', padding: '6px', border: '2px solid var(--border)', borderRadius: '2px', marginBottom: '8px' }}
+                style={{ width: '100%', fontSize: '11px', padding: '6px', border: '2px solid var(--border)', marginBottom: '8px' }}
               />
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button type="button" className="button-win95" onClick={addPendingPoint}>

@@ -247,9 +247,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
                         fontWeight: 'bold',
                         padding: '4px 6px',
                         backgroundColor: 'var(--surface)',
-                        border: '1px solid ' + getRoleColor(affiliation.role),
-                        borderRadius: '3px',
-                        cursor: saving ? 'wait' : 'pointer'
+                        border: '1px solid ' + getRoleColor(affiliation.role), cursor: saving ? 'wait' : 'pointer'
                       }}
                     >
                       {ROLE_OPTIONS.map(role => (
@@ -284,9 +282,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
                         padding: '3px 6px',
                         backgroundColor: statusBadge.color,
                         color: statusBadge.color === 'var(--warning)' ? 'var(--text)' : 'var(--bg)',
-                        border: 'none',
-                        borderRadius: '3px',
-                        cursor: saving ? 'wait' : 'pointer'
+                        border: 'none', cursor: saving ? 'wait' : 'pointer'
                       }}
                     >
                       <option value="active">ACTIVE</option>
@@ -299,9 +295,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
                       fontWeight: 'bold',
                       padding: '3px 6px',
                       backgroundColor: statusBadge.color,
-                      color: statusBadge.color === 'var(--warning)' ? 'var(--text)' : 'var(--bg)',
-                      borderRadius: '3px'
-                    }}>
+                      color: statusBadge.color === 'var(--warning)' ? 'var(--text)' : 'var(--bg)'}}>
                       {statusBadge.text}
                     </span>
                   )}

@@ -62,9 +62,7 @@ const s = {
     fontVariantNumeric: 'tabular-nums lining-nums' as const,
     color: 'var(--text-secondary, #666666)',
     border: '2px solid var(--border, #bdbdbd)',
-    padding: '0 4px',
-    borderRadius: 0,
-  } as React.CSSProperties,
+    padding: '0 4px', } as React.CSSProperties,
 
   sectionDivider: {
     flex: 1,
@@ -162,9 +160,7 @@ function LoadingSkeleton({ viewMode }: { viewMode: ViewMode }) {
             key={i}
             style={{
               height: heights[viewMode],
-              backgroundColor: 'var(--border, #bdbdbd)',
-              borderRadius: 0,
-              border: '2px solid var(--border, #bdbdbd)',
+              backgroundColor: 'var(--border, #bdbdbd)', border: '2px solid var(--border, #bdbdbd)',
             }}
           />
         ))}
@@ -233,9 +229,7 @@ function EmptyState({
               letterSpacing: '0.5px',
               fontWeight: 700,
               padding: '5px 12px',
-              border: '2px solid var(--border, #bdbdbd)',
-              borderRadius: 0,
-              backgroundColor: 'transparent',
+              border: '2px solid var(--border, #bdbdbd)', backgroundColor: 'transparent',
               color: 'var(--text, #2a2a2a)',
               cursor: 'pointer',
               transition: 'border-color 0.12s ease',
@@ -253,9 +247,7 @@ function EmptyState({
               letterSpacing: '0.5px',
               fontWeight: 700,
               padding: '5px 12px',
-              border: '2px solid var(--text, #2a2a2a)',
-              borderRadius: 0,
-              backgroundColor: 'var(--text, #2a2a2a)',
+              border: '2px solid var(--text, #2a2a2a)', backgroundColor: 'var(--text, #2a2a2a)',
               color: 'var(--bg, #f5f5f5)',
               whiteSpace: 'nowrap' as const,
             }}
@@ -310,9 +302,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
           letterSpacing: '0.5px',
           fontWeight: 700,
           padding: '5px 12px',
-          border: '2px solid var(--error, #d13438)',
-          borderRadius: 0,
-          backgroundColor: 'transparent',
+          border: '2px solid var(--error, #d13438)', backgroundColor: 'transparent',
           color: 'var(--error, #d13438)',
           cursor: 'pointer',
         }}

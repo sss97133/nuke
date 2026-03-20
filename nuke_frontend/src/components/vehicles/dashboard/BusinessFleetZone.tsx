@@ -62,9 +62,7 @@ export const BusinessFleetZone: React.FC<BusinessFleetZoneProps> = ({
             fontSize: '11px',
             color: 'var(--text-muted)',
             background: 'var(--surface-hover)',
-            padding: '2px 6px',
-            borderRadius: '2px'
-          }}>
+            padding: '2px 6px'}}>
             {fleets.length} orgs, {totalVehicles} vehicles
           </span>
         </div>

@@ -227,10 +227,8 @@ export const UniversalFieldEditor: React.FC<UniversalFieldEditorProps> = ({
             style={{
               width: '100%',
               fontSize: '11px',
-              fontFamily: '"MS Sans Serif", sans-serif',
-              border: '1px solid var(--border)',
-              borderRadius: '0px',
-              padding: '2px 4px'
+              fontFamily: 'Arial, sans-serif',
+              border: '1px solid var(--border)', padding: '2px 4px'
             }}
           >
             <option value="">Select...</option>
@@ -263,10 +261,8 @@ export const UniversalFieldEditor: React.FC<UniversalFieldEditorProps> = ({
             style={{
               width: '100%',
               fontSize: '11px',
-              fontFamily: '"MS Sans Serif", sans-serif',
-              border: `1px solid ${error ? 'var(--error)' : 'var(--border)'}`,
-              borderRadius: '0px',
-              padding: '2px 4px',
+              fontFamily: 'Arial, sans-serif',
+              border: `1px solid ${error ? 'var(--error)' : 'var(--border)'}`, padding: '2px 4px',
               fontWeight: 'bold',
               textAlign: 'right'
             }}
@@ -293,9 +289,7 @@ export const UniversalFieldEditor: React.FC<UniversalFieldEditorProps> = ({
           background: 'var(--error)',
           color: 'var(--white)',
           padding: '4px 8px',
-          fontSize: '9px',
-          borderRadius: '2px',
-          whiteSpace: 'nowrap',
+          fontSize: '9px', whiteSpace: 'nowrap',
           zIndex: 1000,
           marginTop: '2px'
         }}>

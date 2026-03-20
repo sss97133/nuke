@@ -119,16 +119,14 @@ export function LivingVehicleAsciiProfile({
       {...shared}
       style={{
         ...shared.style,
-        fontFamily: 'ui-monospace, "Cascadia Code", "Fira Code", monospace',
+        fontFamily: "'Courier New', monospace",
         fontSize: 'clamp(10px, 2.5vw, 14px)',
         lineHeight: 1.2,
         margin: 0,
         padding: '1rem',
         overflow: 'auto',
         background: '#0f0f0f',
-        color: '#c0c0c0',
-        borderRadius: 4,
-      }}
+        color: '#c0c0c0', }}
     >
       {text}
     </pre>
@@ -148,7 +146,7 @@ type CanvasProps = {
 /** Cursor-quality: dark bg, light mono, crisp centering. */
 const CANVAS_BG = '#0a0a0a';
 const CANVAS_FG = '#fafafa';
-const CANVAS_FONT = '14px "JetBrains Mono", "Cascadia Code", "Fira Code", ui-monospace, monospace';
+const CANVAS_FONT = '14px "Courier New", monospace';
 const LINE_HEIGHT = 20;
 const CHAR_W = 8.4;
 const PADDING = 28;

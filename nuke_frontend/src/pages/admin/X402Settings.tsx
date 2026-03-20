@@ -180,9 +180,7 @@ Or use Supabase CLI:
 
       {/* Status Card */}
       <div style={{ 
-        border: '2px solid var(--text)',
-        borderRadius: '0px',
-        background: 'var(--surface)',
+        border: '2px solid var(--text)', background: 'var(--surface)',
         marginBottom: '20px'
       }}>
         <div style={{ 
@@ -202,9 +200,7 @@ Or use Supabase CLI:
             </div>
           </div>
           <div style={{
-            padding: '6px 12px',
-            borderRadius: '0px',
-            background: config.enabled ? 'var(--success)' : 'var(--error)',
+            padding: '6px 12px', background: config.enabled ? 'var(--success)' : 'var(--error)',
             color: 'var(--bg)',
             fontSize: '11px',
             fontWeight: 700
@@ -218,9 +214,7 @@ Or use Supabase CLI:
             <div style={{ 
               padding: '16px', 
               background: 'var(--success-dim)',
-              border: '2px solid var(--success)',
-              borderRadius: '0px',
-              marginBottom: '20px'
+              border: '2px solid var(--success)', marginBottom: '20px'
             }}>
               <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: 'var(--success)' }}>
                 ✅ x402 Configured
@@ -240,9 +234,7 @@ Or use Supabase CLI:
             <div style={{ 
               padding: '16px', 
               background: 'var(--error-dim)',
-              border: '2px solid var(--error)',
-              borderRadius: '0px',
-              marginBottom: '20px'
+              border: '2px solid var(--error)', marginBottom: '20px'
             }}>
               <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: 'var(--error)' }}>
                 ⚠️ x402 Not Configured
@@ -259,9 +251,7 @@ Or use Supabase CLI:
               padding: '8px 16px',
               background: 'var(--accent)',
               color: 'var(--bg)',
-              border: 'none',
-              borderRadius: '0px',
-              fontSize: '12px',
+              border: 'none', fontSize: '12px',
               fontWeight: 700,
               cursor: 'pointer',
               marginBottom: '20px'
@@ -274,9 +264,7 @@ Or use Supabase CLI:
 
       {/* Configuration Form */}
       <div style={{ 
-        border: '2px solid var(--text)',
-        borderRadius: '0px',
-        background: 'var(--surface)',
+        border: '2px solid var(--text)', background: 'var(--surface)',
         marginBottom: '20px'
       }}>
         <div style={{ 
@@ -310,9 +298,7 @@ Or use Supabase CLI:
               style={{
                 width: '100%',
                 padding: '8px 12px',
-                border: '2px solid var(--text)',
-                borderRadius: '0px',
-                fontSize: '12px',
+                border: '2px solid var(--text)', fontSize: '12px',
                 fontFamily: 'monospace'
               }}
             />
@@ -336,9 +322,7 @@ Or use Supabase CLI:
               style={{
                 width: '100%',
                 padding: '8px 12px',
-                border: '2px solid var(--text)',
-                borderRadius: '0px',
-                fontSize: '12px'
+                border: '2px solid var(--text)', fontSize: '12px'
               }}
             >
               <option value="base-sepolia">base-sepolia (Test - Recommended)</option>
@@ -368,9 +352,7 @@ Or use Supabase CLI:
               style={{
                 width: '100%',
                 padding: '8px 12px',
-                border: '2px solid var(--text)',
-                borderRadius: '0px',
-                fontSize: '12px'
+                border: '2px solid var(--text)', fontSize: '12px'
               }}
             />
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
@@ -383,11 +365,9 @@ Or use Supabase CLI:
             disabled={saving || !formData.wallet_address}
             style={{
               padding: '10px 20px',
-              background: saving ? '#9ca3af' : 'var(--success)',
+              background: saving ? 'var(--text-disabled)' : 'var(--success)',
               color: 'var(--bg)',
-              border: 'none',
-              borderRadius: '0px',
-              fontSize: '13px',
+              border: 'none', fontSize: '13px',
               fontWeight: 700,
               cursor: saving ? 'not-allowed' : 'pointer',
               opacity: saving || !formData.wallet_address ? 0.6 : 1
@@ -400,9 +380,7 @@ Or use Supabase CLI:
 
       {/* Instructions Card */}
       <div style={{ 
-        border: '2px solid var(--text)',
-        borderRadius: '0px',
-        background: 'var(--surface)',
+        border: '2px solid var(--text)', background: 'var(--surface)',
         marginBottom: '20px'
       }}>
         <div style={{ 
@@ -440,9 +418,7 @@ Or use Supabase CLI:
             marginTop: '20px',
             padding: '12px',
             background: 'var(--warning-dim)',
-            border: '1px solid var(--warning)',
-            borderRadius: '0px',
-            fontSize: '11px'
+            border: '1px solid var(--warning)', fontSize: '11px'
           }}>
             <strong>⚠️ Important:</strong> Environment variables must be set in Supabase Dashboard. 
             The form above only prepares the values - you need to manually set them in Supabase.

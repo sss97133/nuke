@@ -215,9 +215,7 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
             <div style={{
               padding: '12px',
               background: 'var(--success-bg)',
-              border: '2px solid var(--success)',
-              borderRadius: '4px',
-              textAlign: 'center'
+              border: '2px solid var(--success)', textAlign: 'center'
             }}>
               <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>
                 Extracted VIN:

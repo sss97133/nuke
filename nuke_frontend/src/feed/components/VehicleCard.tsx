@@ -78,7 +78,7 @@ export function VehicleCard({
       minus_3: { label: 'WAY+', color: '#fff', bg: '#a4262c' },
     };
     const HEAT_MAP: Record<string, string> = {
-      volcanic: '#d13438', fire: '#ef4444', hot: '#f59e0b', warm: '#b05a00',
+      volcanic: '#d13438', fire: 'var(--error)', hot: 'var(--warning)', warm: '#b05a00',
     };
 
     const deal = vehicle.deal_score_label && vehicle.deal_score_label !== 'fair'
@@ -147,8 +147,8 @@ export function VehicleCard({
         {/* Time */}
         <span style={{
           fontFamily: mono, fontSize: fsSm,
-          color: timeLabel?.startsWith('sold') ? '#10b981'
-            : timeLabel?.startsWith('ends') ? '#ef4444'
+          color: timeLabel?.startsWith('sold') ? 'var(--success)'
+            : timeLabel?.startsWith('ends') ? 'var(--error)'
             : 'var(--text-disabled)',
           textAlign: 'right',
         }}>
@@ -197,7 +197,7 @@ export function VehicleCard({
                 <span style={{
                   fontFamily: 'Arial, sans-serif', fontSize: 'var(--feed-font-size-xs, 7px)',
                   fontWeight: 800, textTransform: 'uppercase',
-                  color: '#3b82f6', letterSpacing: '0.3px',
+                  color: 'var(--info)', letterSpacing: '0.3px',
                 }}>
                   FOR SALE
                 </span>
@@ -246,9 +246,9 @@ export function VehicleCard({
             {timeLabel && (
               <span style={{
                 fontFamily: "'Courier New', monospace", fontSize: 'var(--feed-font-size-sm, 8px)',
-                color: timeLabel.startsWith('sold') ? '#10b981'
-                  : timeLabel.startsWith('ends') ? '#ef4444'
-                  : timeLabel.startsWith('listed') ? '#3b82f6'
+                color: timeLabel.startsWith('sold') ? 'var(--success)'
+                  : timeLabel.startsWith('ends') ? 'var(--error)'
+                  : timeLabel.startsWith('listed') ? 'var(--info)'
                   : 'var(--text-disabled)',
               }}>
                 {timeLabel}

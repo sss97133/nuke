@@ -120,31 +120,31 @@ export default function MarketplaceInsights() {
       {/* Aggregate Stats */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="bg-gray-800 rounded-lg p-4">
+          <div className="bg-gray-800 p-4">
             <div className="text-3xl font-bold text-white">
               {stats.total_listings.toLocaleString()}
             </div>
             <div className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400">Total Listings Tracked</div>
           </div>
-          <div className="bg-gray-800 rounded-lg p-4">
+          <div className="bg-gray-800 p-4">
             <div className="text-3xl font-bold text-green-400">
               {stats.total_sold.toLocaleString()}
             </div>
             <div className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400">Confirmed Sales</div>
           </div>
-          <div className="bg-gray-800 rounded-lg p-4">
+          <div className="bg-gray-800 p-4">
             <div className="text-3xl font-bold text-blue-400">
               {formatCurrency(stats.total_sale_value)}
             </div>
             <div className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400">Total Transaction Value</div>
           </div>
-          <div className="bg-gray-800 rounded-lg p-4">
+          <div className="bg-gray-800 p-4">
             <div className="text-3xl font-bold text-yellow-400">
               {stats.avg_days_to_sell.toFixed(0)}
             </div>
             <div className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-400">Avg Days to Sell</div>
           </div>
-          <div className="bg-gray-800 rounded-lg p-4">
+          <div className="bg-gray-800 p-4">
             <div className="text-3xl font-bold text-purple-400">
               {formatPct(stats.sale_capture_rate)}
             </div>
@@ -154,7 +154,7 @@ export default function MarketplaceInsights() {
       )}
 
       {/* Value Proposition Callout */}
-      <div className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 rounded-lg p-6 border border-blue-700/50">
+      <div className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 p-6 border border-blue-700/50">
         <h3 className="text-lg font-semibold text-white mb-2">
           📊 Data Nobody Else Has
         </h3>
@@ -187,12 +187,12 @@ export default function MarketplaceInsights() {
           value={filterMake}
           onChange={(e) => setFilterMake(e.target.value)}
           placeholder="Filter by make..."
-          className="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm"
+          className="bg-gray-700 border border-gray-600 px-3 py-2 text-sm"
         />
         <select
           value={filterState}
           onChange={(e) => setFilterState(e.target.value)}
-          className="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm"
+          className="bg-gray-700 border border-gray-600 px-3 py-2 text-sm"
         >
           <option value="">All States</option>
           <option value="CA">California</option>
@@ -207,7 +207,7 @@ export default function MarketplaceInsights() {
       {loading ? (
         <div className="text-center py-12 text-gray-400 dark:text-gray-500 dark:text-gray-400">Loading...</div>
       ) : insights.length === 0 ? (
-        <div className="text-center py-12 bg-gray-800 rounded-lg">
+        <div className="text-center py-12 bg-gray-800">
           <p className="text-gray-400 dark:text-gray-500 dark:text-gray-400 mb-2">No market data yet</p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Import listings to start building market intelligence
@@ -273,7 +273,7 @@ export default function MarketplaceInsights() {
       )}
 
       {/* API Teaser */}
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+      <div className="bg-gray-800 p-6 border border-gray-700">
         <h3 className="font-semibold text-white mb-2">
           Want this data via API?
         </h3>
@@ -286,7 +286,7 @@ export default function MarketplaceInsights() {
           <li>• Market timing (days to sell trends)</li>
           <li>• Geographic pricing analysis</li>
         </ul>
-        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium">
+        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-sm font-medium">
           Contact for API Access
         </button>
       </div>

@@ -181,9 +181,7 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
             <span style={{
               padding: '4px 8px',
               background: 'var(--warning)',
-              color: 'var(--bg)',
-              borderRadius: '4px',
-              fontSize: '11px'
+              color: 'var(--bg)', fontSize: '11px'
             }}>
               {proposal.confidence_score}% Match
             </span>
@@ -195,9 +193,7 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
               <div
                 style={{
                   padding: '12px',
-                  border: '2px solid var(--success)',
-                  borderRadius: '4px',
-                  background: 'var(--success-dim)',
+                  border: '2px solid var(--success)', background: 'var(--success-dim)',
                   cursor: 'pointer'
                 }}
                 onClick={() => navigate(`/vehicle/${proposal.primary_vehicle_id}`)}
@@ -240,9 +236,7 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
               <div
                 style={{
                   padding: '12px',
-                  border: '2px solid var(--error)',
-                  borderRadius: '4px',
-                  background: 'var(--error-dim)',
+                  border: '2px solid var(--error)', background: 'var(--error-dim)',
                   cursor: 'pointer'
                 }}
                 onClick={() => navigate(`/vehicle/${proposal.duplicate_vehicle_id}`)}
@@ -276,9 +270,7 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
               <div style={{
                 marginTop: '16px',
                 padding: '12px',
-                background: 'var(--bg-secondary)',
-                borderRadius: '4px'
-              }}>
+                background: 'var(--bg-secondary)'}}>
                 <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', color: 'var(--text-muted)' }}>
                   Match Reasons:
                 </div>

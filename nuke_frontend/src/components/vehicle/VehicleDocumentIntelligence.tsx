@@ -210,18 +210,14 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
               </div>
               <div style={{
                 height: '4px',
-                background: 'var(--border)',
-                borderRadius: '2px',
-                overflow: 'hidden',
+                background: 'var(--border)', overflow: 'hidden',
                 marginBottom: '8px'
               }}>
                 <div style={{
                   height: '100%',
                   width: `${analysisProgress.total > 0 ? (analysisProgress.processed / analysisProgress.total) * 100 : 0}%`,
                   background: 'var(--primary)',
-                  transition: 'width 0.5s ease',
-                  borderRadius: '2px'
-                }} />
+                  transition: 'width 0.5s ease'}} />
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 Processed {analysisProgress.processed} of {analysisProgress.total} documents...
@@ -301,9 +297,7 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
                     <span style={{
                       background: getServiceTypeColor(record.service_type),
                       color: 'var(--bg)',
-                      padding: '1px 6px',
-                      borderRadius: '2px',
-                      fontSize: '9px',
+                      padding: '1px 6px', fontSize: '9px',
                       fontWeight: 600,
                       textTransform: 'uppercase'
                     }}>
@@ -346,9 +340,7 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
                       <span key={j} style={{
                         background: 'var(--bg)',
                         border: '1px solid var(--border)',
-                        padding: '1px 6px',
-                        borderRadius: '2px',
-                        fontSize: '9px',
+                        padding: '1px 6px', fontSize: '9px',
                         color: 'var(--text-secondary)'
                       }}>
                         {part}

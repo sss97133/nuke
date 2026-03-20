@@ -65,11 +65,11 @@ const UserReputationBadge: React.FC<UserReputationBadgeProps> = ({
   }
 
   const tierConfig = {
-    novice: { label: 'Novice', color: '#9ca3af', icon: '🌱' },
-    contributor: { label: 'Contributor', color: '#3b82f6', icon: '⭐' },
+    novice: { label: 'Novice', color: 'var(--text-disabled)', icon: '🌱' },
+    contributor: { label: 'Contributor', color: 'var(--info)', icon: '⭐' },
     trusted: { label: 'Trusted', color: '#8b5cf6', icon: '💎' },
-    expert: { label: 'Expert', color: '#f59e0b', icon: '🏆' },
-    authority: { label: 'Authority', color: '#ef4444', icon: '👑' }
+    expert: { label: 'Expert', color: 'var(--warning)', icon: '🏆' },
+    authority: { label: 'Authority', color: 'var(--error)', icon: '👑' }
   };
 
   const config = tierConfig[score.reputation_tier];

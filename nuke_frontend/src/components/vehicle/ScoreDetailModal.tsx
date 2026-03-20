@@ -145,9 +145,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
             <div style={{ textAlign: 'center' }}>
               <div style={{
                 width: 56,
-                height: 56,
-                borderRadius: '50%',
-                background: scoreBg,
+                height: 56, background: scoreBg,
                 color: 'var(--bg)',
                 display: 'flex',
                 alignItems: 'center',
@@ -280,9 +278,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <div style={{
                           width: 8,
-                          height: 8,
-                          borderRadius: '50%',
-                          background: b.present ? (b.value >= 0 ? 'var(--success)' : 'var(--error)') : 'var(--border)',
+                          height: 8, background: b.present ? (b.value >= 0 ? 'var(--success)' : 'var(--error)') : 'var(--border)',
                         }} />
                         <span style={{ fontSize: '11px', fontWeight: 600 }}>{b.name}</span>
                       </div>
@@ -504,9 +500,7 @@ const modalStyle: React.CSSProperties = {
   maxWidth: '520px',
   maxHeight: '90vh',
   display: 'flex',
-  flexDirection: 'column',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-};
+  flexDirection: 'column', };
 
 const sectionHeaderStyle: React.CSSProperties = {
   fontSize: '9px',

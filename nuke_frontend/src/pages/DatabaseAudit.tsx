@@ -475,9 +475,9 @@ const DatabaseAudit: React.FC = () => {
                               {Math.round((stats.vehiclesWithImages / stats.totalVehicles) * 100)}%
                             </span>
                           </div>
-                          <div className="w-full bg-grey-200 rounded-full h-2">
+                          <div className="w-full bg-grey-200 h-2">
                             <div 
-                              className="bg-primary h-2 rounded-full" 
+                              className="bg-primary h-2" 
                               style={{ width: `${(stats.vehiclesWithImages / stats.totalVehicles) * 100}%` }}
                             ></div>
                           </div>
@@ -489,9 +489,9 @@ const DatabaseAudit: React.FC = () => {
                               {Math.round((stats.totalAuthenticatedVehicles / stats.totalVehicles) * 100)}%
                             </span>
                           </div>
-                          <div className="w-full bg-grey-200 rounded-full h-2">
+                          <div className="w-full bg-grey-200 h-2">
                             <div 
-                              className="bg-secondary h-2 rounded-full" 
+                              className="bg-secondary h-2" 
                               style={{ width: `${(stats.totalAuthenticatedVehicles / stats.totalVehicles) * 100}%` }}
                             ></div>
                           </div>

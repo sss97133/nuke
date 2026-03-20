@@ -430,9 +430,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
                     style={{
                       padding: 'var(--space-2)',
                       border: `2px solid ${category === cat.id ? 'var(--accent)' : 'var(--border)'}`,
-                      background: category === cat.id ? 'var(--accent-light)' : 'var(--surface-hover)',
-                      borderRadius: '2px',
-                      cursor: 'pointer',
+                      background: category === cat.id ? 'var(--accent-light)' : 'var(--surface-hover)', cursor: 'pointer',
                       textAlign: 'center',
                       transition: 'all 0.12s ease'
                     }}
@@ -463,9 +461,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
                   border: '2px dashed var(--border-medium)', 
                   background: 'var(--grey-50)', 
                   padding: 'var(--space-5)', 
-                  textAlign: 'center',
-                  borderRadius: '2px',
-                  transition: 'border-color 0.12s ease'
+                  textAlign: 'center', transition: 'border-color 0.12s ease'
                 }}
               >
                 <div style={{ fontSize: '43px', marginBottom: 'var(--space-2)', opacity: 0.5 }}>📎</div>
@@ -483,9 +479,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
                     padding: '8px 12px',
                     fontSize: '11px',
                     border: '2px solid var(--border)',
-                    background: 'var(--surface)',
-                    borderRadius: '2px',
-                    cursor: 'pointer'
+                    background: 'var(--surface)', cursor: 'pointer'
                   }}
                 />
               </div>
@@ -516,7 +510,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
               {(status === 'uploading' || status === 'parsing') && (
                 <div style={{ padding: 'var(--space-3)', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
                   <div style={{ marginBottom: 'var(--space-2)' }}>{message}</div>
-                  <div style={{ width: '100%', height: '4px', background: 'var(--grey-200)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{ width: '100%', height: '4px', background: 'var(--grey-200)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: '60%', background: 'var(--accent)', animation: 'pulse 1.5s ease-in-out infinite' }} />
                   </div>
                 </div>
@@ -555,14 +549,14 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
 
               {/* Error */}
               {status === 'error' && (
-                <div style={{ padding: 'var(--space-2)', background: 'var(--error-dim)', border: '1px solid color-mix(in srgb, var(--error) 30%, transparent)', borderRadius: '2px', fontSize: '11px', color: 'var(--error)' }}>
+                <div style={{ padding: 'var(--space-2)', background: 'var(--error-dim)', border: '1px solid color-mix(in srgb, var(--error) 30%, transparent)', fontSize: '11px', color: 'var(--error)' }}>
                   ❌ {message}
                 </div>
               )}
 
               {/* Success */}
               {status === 'success' && valueDelta && (
-                <div style={{ padding: 'var(--space-2)', background: 'var(--success-dim)', border: '1px solid color-mix(in srgb, var(--success) 30%, transparent)', borderRadius: '2px', fontSize: '11px' }}>
+                <div style={{ padding: 'var(--space-2)', background: 'var(--success-dim)', border: '1px solid color-mix(in srgb, var(--success) 30%, transparent)', fontSize: '11px' }}>
                   ✅ Saved! Value updated: <strong>{valueDelta.delta >= 0 ? '+' : ''}${valueDelta.delta.toLocaleString()}</strong> → ${valueDelta.newValue.toLocaleString()} ({valueDelta.confidence}% confidence)
                 </div>
               )}

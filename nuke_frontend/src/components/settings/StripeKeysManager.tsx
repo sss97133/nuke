@@ -255,9 +255,7 @@ const StripeKeysManager: React.FC = () => {
             <div style={{
               padding: 'var(--space-2)',
               background: 'var(--success-dim)',
-              border: '1px solid var(--success)',
-              borderRadius: '4px',
-              fontSize: '11px'
+              border: '1px solid var(--success)', fontSize: '11px'
             }}>
               ✓ Stripe keys are active and will be used for AI tool payments
             </div>

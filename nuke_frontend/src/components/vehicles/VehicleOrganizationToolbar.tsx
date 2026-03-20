@@ -169,11 +169,9 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
           fontSize: '9px',
           fontWeight: 600,
           border: '1px solid var(--border)',
-          background: preferences?.is_favorite ? '#fef3c7' : 'var(--surface)',
+          background: preferences?.is_favorite ? 'var(--warning-dim)' : 'var(--surface)',
           color: preferences?.is_favorite ? '#92400e' : 'var(--text-muted)',
-          cursor: 'pointer',
-          borderRadius: '3px',
-          transition: 'all 0.12s ease'
+          cursor: 'pointer', transition: 'all 0.12s ease'
         }}
         title={preferences?.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
       >
@@ -188,11 +186,9 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
           fontSize: '9px',
           fontWeight: 600,
           border: '1px solid var(--border)',
-          background: preferences?.is_hidden ? '#fee2e2' : 'var(--surface)',
+          background: preferences?.is_hidden ? 'var(--error-dim)' : 'var(--surface)',
           color: preferences?.is_hidden ? '#991b1b' : 'var(--text-muted)',
-          cursor: 'pointer',
-          borderRadius: '3px',
-          transition: 'all 0.12s ease'
+          cursor: 'pointer', transition: 'all 0.12s ease'
         }}
         title={preferences?.is_hidden ? 'Show in personal view' : 'Hide from personal view'}
       >
@@ -206,10 +202,8 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
             padding: '4px 8px',
             fontSize: '9px',
             fontWeight: 600,
-            background: '#dbeafe',
-            color: '#1e40af',
-            borderRadius: '3px',
-            border: '1px solid #93c5fd'
+            background: 'var(--info-dim)',
+            color: '#1e40af', border: '1px solid var(--info)'
           }}>
             {preferences.collection_name}
           </span>
@@ -221,9 +215,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
               border: '1px solid var(--border)',
               background: 'var(--surface)',
               color: 'var(--text-muted)',
-              cursor: 'pointer',
-              borderRadius: '3px'
-            }}
+              cursor: 'pointer'}}
             title="Remove from collection"
           >
             ×
@@ -249,9 +241,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
                 style={{
                   padding: '4px 8px',
                   fontSize: '9px',
-                  border: '1px solid var(--border)',
-                  borderRadius: '3px',
-                  width: '120px'
+                  border: '1px solid var(--border)', width: '120px'
                 }}
                 autoFocus
               />
@@ -263,9 +253,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
                   border: '1px solid var(--accent)',
                   background: 'var(--accent)',
                   color: 'var(--bg)',
-                  cursor: 'pointer',
-                  borderRadius: '3px'
-                }}
+                  cursor: 'pointer'}}
               >
                 ADD
               </button>
@@ -280,9 +268,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
                   border: '1px solid var(--border)',
                   background: 'var(--surface)',
                   color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  borderRadius: '3px'
-                }}
+                  cursor: 'pointer'}}
               >
                 CANCEL
               </button>
@@ -298,9 +284,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
                   border: '1px solid var(--border)',
                   background: 'var(--surface)',
                   color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  borderRadius: '3px',
-                  transition: 'all 0.12s ease'
+                  cursor: 'pointer', transition: 'all 0.12s ease'
                 }}
                 title="Add to collection"
               >
@@ -313,10 +297,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
                   left: 0,
                   marginTop: '4px',
                   background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                  zIndex: 1000,
+                  border: '1px solid var(--border)', zIndex: 1000,
                   minWidth: '150px',
                   maxHeight: '200px',
                   overflowY: 'auto'
@@ -337,7 +318,7 @@ const VehicleOrganizationToolbar: React.FC<VehicleOrganizationToolbarProps> = ({
                         cursor: 'pointer',
                         transition: 'background 0.12s ease'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
                       onMouseLeave={(e) => e.currentTarget.style.background = 'var(--surface)'}
                     >
                       {collection}

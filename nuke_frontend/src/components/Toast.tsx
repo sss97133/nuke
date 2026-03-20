@@ -20,7 +20,7 @@ const Toast: React.FC<ToastProps> = ({ message, type, duration = 5000, onClose }
   }, [duration, onClose]);
 
   const getToastStyles = () => {
-    const baseStyles = "fixed top-4 right-4 z-[9999] p-2 rounded shadow-md max-w-xs transition-all duration-300";
+    const baseStyles = "fixed top-4 right-4 z-[9999] p-2 max-w-xs transition-all duration-300";
     
     switch (type) {
       case 'success':

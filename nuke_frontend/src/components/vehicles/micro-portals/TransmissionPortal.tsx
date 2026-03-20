@@ -46,8 +46,7 @@ export default function TransmissionPortal({ transmission, activePortal, onOpen 
             </div>
             <div style={{ marginBottom: '4px' }}>
               <span style={{
-                padding: '1px 5px', borderRadius: '3px',
-                background: 'var(--bg-secondary, #f3f4f6)',
+                padding: '1px 5px', background: 'var(--bg-secondary, #f3f4f6)',
                 fontSize: '9px', fontWeight: 500,
                 textTransform: 'uppercase',
               }}>

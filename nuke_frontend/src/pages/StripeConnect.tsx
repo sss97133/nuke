@@ -63,9 +63,7 @@ interface StripeProduct {
 
 const cardStyle: React.CSSProperties = {
   background: 'var(--surface)',
-  border: '1px solid var(--border)',
-  borderRadius: '8px',
-  padding: '24px',
+  border: '1px solid var(--border)', padding: '24px',
   marginBottom: '24px',
 };
 
@@ -89,9 +87,7 @@ const labelStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '8px 12px',
-  border: '1px solid var(--border)',
-  borderRadius: '4px',
-  fontSize: '14px',
+  border: '1px solid var(--border)', fontSize: '14px',
   color: 'var(--text)',
   background: 'var(--bg)',
   marginBottom: '12px',
@@ -102,9 +98,7 @@ const btnPrimary: React.CSSProperties = {
   padding: '8px 16px',
   background: 'var(--primary)',
   color: 'var(--text-on-accent, #fff)',
-  border: 'none',
-  borderRadius: '4px',
-  fontSize: '14px',
+  border: 'none', fontSize: '14px',
   fontWeight: 600,
   cursor: 'pointer',
 };
@@ -113,9 +107,7 @@ const btnSecondary: React.CSSProperties = {
   padding: '8px 16px',
   background: 'transparent',
   color: 'var(--text)',
-  border: '1px solid var(--border)',
-  borderRadius: '4px',
-  fontSize: '14px',
+  border: '1px solid var(--border)', fontSize: '14px',
   fontWeight: 500,
   cursor: 'pointer',
   marginLeft: '8px',
@@ -350,7 +342,7 @@ export default function StripeConnect() {
 
           <div style={{ marginBottom: '12px' }}>
             <span style={labelStyle}>Account ID</span>
-            <code style={{ fontSize: '13px', color: 'var(--text)', background: 'var(--grey-800, #f5f5f5)', padding: '2px 6px', borderRadius: '4px' }}>
+            <code style={{ fontSize: '13px', color: 'var(--text)', background: 'var(--grey-800, #f5f5f5)', padding: '2px 6px'}}>
               {accountId}
             </code>
           </div>
@@ -474,9 +466,7 @@ export default function StripeConnect() {
                 <div
                   key={p.id}
                   style={{
-                    border: '1px solid var(--border)',
-                    borderRadius: '6px',
-                    padding: '12px 16px',
+                    border: '1px solid var(--border)', padding: '12px 16px',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-start',

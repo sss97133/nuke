@@ -336,7 +336,6 @@ const ClaimExternalIdentity: React.FC = () => {
               style={{
                 padding: 'var(--space-3) var(--space-4)',
                 border: isActive ? '2px solid var(--primary)' : '1px solid var(--border-light)',
-                borderRadius: '6px',
                 cursor: 'pointer',
                 backgroundColor: isActive ? 'var(--grey-50)' : 'var(--white)',
                 transition: 'border-color 0.15s',
@@ -382,7 +381,6 @@ const ClaimExternalIdentity: React.FC = () => {
                   border: selectedIdentity?.id === identity.id
                     ? '2px solid var(--primary)'
                     : '1px solid var(--border-light)',
-                  borderRadius: '6px',
                   cursor: 'pointer',
                   backgroundColor: selectedIdentity?.id === identity.id
                     ? 'var(--grey-50)'
@@ -442,13 +440,12 @@ const ClaimExternalIdentity: React.FC = () => {
               <div style={{
                 padding: 'var(--space-4)',
                 border: '1px solid var(--border-light)',
-                borderRadius: '6px',
                 backgroundColor: 'var(--grey-50)',
               }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
                   Import from {activePlatform.label}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 0, border: '1px solid var(--border-light)', borderRadius: '4px', overflow: 'hidden', backgroundColor: 'var(--white)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 0, border: '1px solid var(--border-light)', overflow: 'hidden', backgroundColor: 'var(--white)' }}>
                   <div style={{
                     padding: '10px 2px 10px 12px',
                     fontSize: '13px',
@@ -480,7 +477,7 @@ const ClaimExternalIdentity: React.FC = () => {
                   <button
                     className="cursor-button"
                     disabled={importStep === 'submitting' || !importUsername.trim()}
-                    style={{ padding: '10px 16px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: 0 }}
+                    style={{ padding: '10px 16px', fontSize: '12px', whiteSpace: 'nowrap' }}
                     onClick={() => doImport(searchPlatform, importUsername)}
                   >
                     {importStep === 'submitting' ? 'IMPORTING...' : 'IMPORT'}
@@ -502,7 +499,6 @@ const ClaimExternalIdentity: React.FC = () => {
                   marginTop: 'var(--space-3)',
                   padding: 'var(--space-3)',
                   backgroundColor: '#0a0a0a',
-                  borderRadius: '6px',
                   maxHeight: 220,
                   overflowY: 'auto',
                   fontFamily: 'ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace',
@@ -512,7 +508,7 @@ const ClaimExternalIdentity: React.FC = () => {
               >
                 {importLog.map((entry, i) => (
                   <div key={i} style={{
-                    color: entry.type === 'success' ? '#4ade80' : entry.type === 'dim' ? '#666' : '#a3a3a3',
+                    color: entry.type === 'success' ? 'var(--success)' : entry.type === 'dim' ? '#666' : '#a3a3a3',
                     display: 'flex',
                     gap: 8,
                   }}>
@@ -555,7 +551,6 @@ const ClaimExternalIdentity: React.FC = () => {
                           gap: 'var(--space-3)',
                           padding: 'var(--space-2) var(--space-3)',
                           border: '1px solid var(--border-light)',
-                          borderRadius: '6px',
                           textDecoration: 'none',
                           color: 'var(--text)',
                           backgroundColor: 'var(--white)',
@@ -565,10 +560,10 @@ const ClaimExternalIdentity: React.FC = () => {
                           <img
                             src={v.primary_image_url}
                             alt=""
-                            style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }}
+                            style={{ width: 56, height: 40, objectFit: 'cover', flexShrink: 0 }}
                           />
                         ) : (
-                          <div style={{ width: 56, height: 40, backgroundColor: 'var(--grey-100)', borderRadius: 4, flexShrink: 0 }} />
+                          <div style={{ width: 56, height: 40, backgroundColor: 'var(--grey-100)', borderRadius: 0, flexShrink: 0 }} />
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -587,7 +582,7 @@ const ClaimExternalIdentity: React.FC = () => {
                   <div style={{
                     padding: 'var(--space-3) var(--space-4)',
                     border: '1px solid #4ade8040',
-                    borderRadius: '6px',
+                    borderRadius: 0,
                     backgroundColor: '#4ade8008',
                     fontSize: '13px',
                   }}>
@@ -676,7 +671,7 @@ const ClaimExternalIdentity: React.FC = () => {
               <div style={{
                 padding: 'var(--space-4)',
                 backgroundColor: 'var(--grey-50)',
-                borderRadius: '6px',
+                borderRadius: 0,
                 marginBottom: 'var(--space-3)'
               }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
@@ -686,7 +681,7 @@ const ClaimExternalIdentity: React.FC = () => {
                   padding: 'var(--space-3)',
                   backgroundColor: 'var(--white)',
                   border: '2px dashed var(--border-light)',
-                  borderRadius: '4px',
+                  borderRadius: 0,
                   fontFamily: 'monospace',
                   fontSize: '19px',
                   textAlign: 'center',
@@ -703,7 +698,7 @@ const ClaimExternalIdentity: React.FC = () => {
               <div style={{
                 padding: 'var(--space-4)',
                 border: '1px solid var(--border-light)',
-                borderRadius: '6px',
+                borderRadius: 0,
                 marginBottom: 'var(--space-3)'
               }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
@@ -717,7 +712,7 @@ const ClaimExternalIdentity: React.FC = () => {
               <div style={{
                 padding: 'var(--space-4)',
                 border: '1px solid var(--border-light)',
-                borderRadius: '6px'
+                borderRadius: 0
               }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
                   Option 3: Full verification (ID + face scan)

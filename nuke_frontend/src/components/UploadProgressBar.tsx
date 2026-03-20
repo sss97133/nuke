@@ -29,12 +29,12 @@ export const UploadProgressBar: React.FC = () => {
 
   return (
     <div 
-      className={`fixed bottom-4 right-4 bg-white border border-gray-300 rounded-lg shadow-xl transition-all duration-300 z-50 ${
+      className={`fixed bottom-4 right-4 bg-white border border-gray-300   transition-all duration-300 z-50 ${
         isMinimized ? 'w-64' : isExpanded ? 'w-96 max-h-96' : 'w-80'
       }`}
     >
       {/* Header */}
-      <div className="p-3 border-b bg-gray-50 rounded-t-lg">
+      <div className="p-3 border-b bg-gray-50">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="relative">
@@ -42,7 +42,7 @@ export const UploadProgressBar: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
               {overallProgress.active > 0 && (
-                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-3 h-3 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs w-3 h-3 flex items-center justify-center">
                   {overallProgress.active}
                 </span>
               )}
@@ -59,19 +59,19 @@ export const UploadProgressBar: React.FC = () => {
           <div className="flex items-center space-x-1">
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1 hover:bg-gray-200 rounded"
+              className="p-1 hover:bg-gray-200"
             >
               {isExpanded ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
             </button>
             <button
               onClick={() => setIsMinimized(!isMinimized)}
-              className="p-1 hover:bg-gray-200 rounded"
+              className="p-1 hover:bg-gray-200"
             >
               <div className="w-3 h-0.5 bg-gray-600" />
             </button>
             <button
               onClick={() => uploadManager.clearCompleted()}
-              className="p-1 hover:bg-gray-200 rounded"
+              className="p-1 hover:bg-gray-200"
             >
               <X size={16} />
             </button>
@@ -81,9 +81,9 @@ export const UploadProgressBar: React.FC = () => {
         {/* Overall Progress Bar */}
         {!isMinimized && overallProgress.active > 0 && (
           <div className="mt-2">
-            <div className="bg-gray-200 rounded-full h-1.5">
+            <div className="bg-gray-200 h-1.5">
               <div 
-                className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                className="bg-blue-600 h-1.5 transition-all duration-300"
                 style={{ width: `${overallPercent}%` }}
               />
             </div>
@@ -105,10 +105,10 @@ export const UploadProgressBar: React.FC = () => {
                   {upload.status === 'completed' && <CheckCircle size={16} className="text-green-500" />}
                   {upload.status === 'failed' && <AlertCircle size={16} className="text-red-500" />}
                   {upload.status === 'uploading' && (
-                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent animate-spin" />
                   )}
                   {upload.status === 'paused' && <Pause size={16} className="text-yellow-500" />}
-                  {upload.status === 'queued' && <div className="w-4 h-4 border-2 border-gray-300 rounded-full" />}
+                  {upload.status === 'queued' && <div className="w-4 h-4 border-2 border-gray-300" />}
                   
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{upload.vehicleName}</div>
@@ -122,7 +122,7 @@ export const UploadProgressBar: React.FC = () => {
                   {upload.status === 'uploading' && (
                     <button
                       onClick={() => uploadManager.pauseUpload(upload.id)}
-                      className="p-1 hover:bg-gray-200 rounded"
+                      className="p-1 hover:bg-gray-200"
                     >
                       <Pause size={14} />
                     </button>
@@ -130,14 +130,14 @@ export const UploadProgressBar: React.FC = () => {
                   {upload.status === 'paused' && (
                     <button
                       onClick={() => uploadManager.resumeUpload(upload.id)}
-                      className="p-1 hover:bg-gray-200 rounded"
+                      className="p-1 hover:bg-gray-200"
                     >
                       <Play size={14} />
                     </button>
                   )}
                   <button
                     onClick={() => uploadManager.cancelUpload(upload.id)}
-                    className="p-1 hover:bg-gray-200 rounded"
+                    className="p-1 hover:bg-gray-200"
                   >
                     <X size={14} />
                   </button>
@@ -147,9 +147,9 @@ export const UploadProgressBar: React.FC = () => {
               {/* Individual Progress Bar */}
               {(upload.status === 'uploading' || upload.status === 'paused') && (
                 <div className="mt-2">
-                  <div className="bg-gray-200 rounded-full h-1">
+                  <div className="bg-gray-200 h-1">
                     <div 
-                      className={`h-1 rounded-full transition-all duration-300 ${
+                      className={`h-1  transition-all duration-300 ${
                         upload.status === 'paused' ? 'bg-yellow-400' : 'bg-blue-600'
                       }`}
                       style={{ width: `${uploadManager.getProgress(upload.id)}%` }}

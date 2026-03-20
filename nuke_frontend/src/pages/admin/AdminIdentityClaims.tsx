@@ -146,9 +146,7 @@ export default function AdminIdentityClaims() {
         gap: 'var(--space-4)',
         marginBottom: 'var(--space-4)',
         padding: 'var(--space-3)',
-        backgroundColor: 'var(--grey-50)',
-        borderRadius: '4px',
-        fontSize: '11px'
+        backgroundColor: 'var(--grey-50)', fontSize: '11px'
       }}>
         <div><strong>{stats.total.toLocaleString()}</strong> total identities</div>
         <div><strong>{stats.claimed}</strong> claimed</div>
@@ -206,9 +204,7 @@ export default function AdminIdentityClaims() {
                 alignItems: 'center',
                 gap: 'var(--space-3)',
                 padding: 'var(--space-3)',
-                border: '1px solid var(--border-light)',
-                borderRadius: '4px',
-                backgroundColor: 'var(--white)',
+                border: '1px solid var(--border-light)', backgroundColor: 'var(--white)',
               }}
             >
               {/* Platform badge */}
@@ -216,9 +212,7 @@ export default function AdminIdentityClaims() {
                 fontSize: '11px',
                 fontWeight: 600,
                 padding: '2px 6px',
-                backgroundColor: 'var(--grey-100)',
-                borderRadius: '3px',
-                minWidth: '40px',
+                backgroundColor: 'var(--grey-100)', minWidth: '40px',
                 textAlign: 'center'
               }}>
                 {PLATFORM_LABELS[identity?.platform] || identity?.platform}
@@ -272,10 +266,8 @@ export default function AdminIdentityClaims() {
                 <div style={{
                   fontSize: '11px',
                   padding: '2px 8px',
-                  backgroundColor: claim.status === 'approved' ? 'var(--success-bg)' : '#fef2f2',
-                  color: claim.status === 'approved' ? 'var(--success)' : '#dc2626',
-                  borderRadius: '3px'
-                }}>
+                  backgroundColor: claim.status === 'approved' ? 'var(--success-bg)' : 'var(--error-dim)',
+                  color: claim.status === 'approved' ? 'var(--success)' : 'var(--error)'}}>
                   {claim.status}
                 </div>
               )}

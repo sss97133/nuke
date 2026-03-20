@@ -42,9 +42,7 @@ function TechLogo({ slug, name }: { slug: string; name: string }) {
           alignItems: 'center',
           justifyContent: 'center',
           background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 4,
-        }}
+          border: '1px solid var(--border)', }}
       >
         {name.slice(0, 2)}
       </span>

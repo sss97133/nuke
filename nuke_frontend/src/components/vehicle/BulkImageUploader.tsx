@@ -322,7 +322,7 @@ export function BulkImageUploader({
       {/* Upload Area */}
       <div 
         onClick={() => fileInputRef.current?.click()}
-        className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors cursor-pointer"
+        className="border-2 border-dashed border-gray-300 p-8 text-center hover:border-blue-500 transition-colors cursor-pointer"
       >
         <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
         <p className="text-sm text-gray-600">
@@ -343,14 +343,14 @@ export function BulkImageUploader({
       
       {/* Status Message */}
       {statusMessage && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700">
+        <div className="bg-gray-50 border border-gray-200 p-3 text-sm text-gray-700">
           {statusMessage}
         </div>
       )}
       
       {/* Duplicate Detection Results */}
       {duplicateResult && duplicateResult.rejected > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="bg-yellow-50 border border-yellow-200 p-4">
           <h4 className="font-semibold text-yellow-900 mb-2 flex items-center gap-2">
             ⚠️ Duplicate Detection Results
           </h4>
@@ -375,7 +375,7 @@ export function BulkImageUploader({
                 </summary>
                 <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
                   {duplicateResult.duplicates.map((dup, idx) => (
-                    <div key={idx} className="text-xs bg-white p-2 rounded border border-yellow-100">
+                    <div key={idx} className="text-xs bg-white p-2 border border-yellow-100">
                       <div className="font-medium truncate">{dup.fileName}</div>
                       <div className="text-yellow-700">{dup.reason}</div>
                       {dup.duplicateOf && (
@@ -392,7 +392,7 @@ export function BulkImageUploader({
       
       {/* Extracted Data Summary */}
       {extractedData && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-blue-50 border border-blue-200 p-4">
           <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
             <Info className="w-4 h-4" />
             Extracted Data from Images
@@ -429,7 +429,7 @@ export function BulkImageUploader({
               <button
                 onClick={uploadImages}
                 disabled={isProcessing}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isProcessing ? (
                   <>
@@ -453,12 +453,12 @@ export function BulkImageUploader({
                 <img 
                   src={img.url} 
                   alt={`Preview ${index}`}
-                  className={`w-full h-24 object-cover rounded ${img.isDuplicate ? 'opacity-50 grayscale' : ''}`}
+                  className={`w-full h-24 object-cover  ${img.isDuplicate ? 'opacity-50 grayscale' : ''}`}
                 />
                 
                 {/* Duplicate indicator */}
                 {img.isDuplicate && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-red-500/80 rounded">
+                  <div className="absolute inset-0 flex items-center justify-center bg-red-500/80">
                     <div className="text-white text-center p-1">
                       <div className="font-bold text-xs">DUPLICATE</div>
                       <div className="text-xs">{img.duplicateReason}</div>
@@ -468,19 +468,19 @@ export function BulkImageUploader({
                 
                 {/* Upload status indicators */}
                 {img.uploaded && !img.isDuplicate && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-green-500/80 rounded">
+                  <div className="absolute inset-0 flex items-center justify-center bg-green-500/80">
                     <div className="text-white font-bold">✓</div>
                   </div>
                 )}
                 {img.uploading && !img.isDuplicate && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-blue-500/80 rounded">
+                  <div className="absolute inset-0 flex items-center justify-center bg-blue-500/80">
                     <Loader2 className="w-6 h-6 text-white animate-spin" />
                   </div>
                 )}
                 
                 <button
                   onClick={() => removeImage(index)}
-                  className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute top-1 right-1 bg-red-500 text-white p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -492,7 +492,7 @@ export function BulkImageUploader({
               </div>
             ))}
             {images.length > 20 && (
-              <div className="flex items-center justify-center bg-gray-100 rounded">
+              <div className="flex items-center justify-center bg-gray-100">
                 <span className="text-sm text-gray-600">
                   +{images.length - 20} more
                 </span>

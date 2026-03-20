@@ -1245,7 +1245,7 @@ export default function AIDataIngestionSearch() {
             border: 'none',
             outline: 'none',
             fontSize: '11px',
-            fontFamily: '"MS Sans Serif", sans-serif',
+            fontFamily: 'Arial, sans-serif',
             background: 'transparent',
             minWidth: '80px',
             maxWidth: 'none',
@@ -1290,9 +1290,7 @@ export default function AIDataIngestionSearch() {
             right: 0,
             marginTop: '4px',
             background: 'var(--white)',
-            border: '2px solid var(--border)',
-            boxShadow: '2px 2px 8px var(--overlay)',
-            zIndex: 1203,
+            border: '2px solid var(--border)', zIndex: 1203,
             maxHeight: '420px',
             overflowY: 'auto',
             fontSize: '11px'
@@ -1302,7 +1300,7 @@ export default function AIDataIngestionSearch() {
           {autocompleteAISuggestion && autocompleteResults.length === 0 && (
             <div style={{
               padding: '10px 12px',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: 'var(--accent)',
               color: 'var(--bg)',
               fontSize: '11px',
               borderBottom: '1px solid var(--border-light)'
@@ -1350,9 +1348,7 @@ export default function AIDataIngestionSearch() {
                 {/* Thumbnail */}
                 <div style={{
                   width: '40px',
-                  height: '40px',
-                  borderRadius: '4px',
-                  background: result.image_url ? `url(${result.image_url}) center/cover` : 'var(--border)',
+                  height: '40px', background: result.image_url ? `url(${result.image_url}) center/cover` : 'var(--border)',
                   flexShrink: 0,
                   display: 'flex',
                   alignItems: 'center',
@@ -1393,9 +1389,7 @@ export default function AIDataIngestionSearch() {
                   fontSize: '8px',
                   color: 'var(--bg)',
                   background: typeColors[result.type] || 'var(--text-disabled)',
-                  padding: '2px 6px',
-                  borderRadius: '3px',
-                  textTransform: 'uppercase',
+                  padding: '2px 6px', textTransform: 'uppercase',
                   fontWeight: 600,
                   flexShrink: 0
                 }}>
@@ -1454,9 +1448,7 @@ export default function AIDataIngestionSearch() {
             top: '30px',
             right: 0,
             background: 'var(--white)',
-            border: '2px solid var(--border)',
-            boxShadow: '2px 2px 8px var(--overlay)',
-            padding: '6px',
+            border: '2px solid var(--border)', padding: '6px',
             zIndex: 1200,
             display: 'flex',
             gap: '6px',
@@ -1616,9 +1608,7 @@ export default function AIDataIngestionSearch() {
           padding: '12px',
           zIndex: 1202,
           maxHeight: '400px',
-          overflowY: 'auto',
-          boxShadow: '2px 2px 8px var(--overlay)'
-        }}>
+          overflowY: 'auto'}}>
           <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' }}>
             Extracted Data Preview
           </div>
@@ -1653,9 +1643,7 @@ export default function AIDataIngestionSearch() {
               fontSize: '11px',
               background: extractionPreview.matchResult.shouldMerge ? 'var(--success-dim)' : 'var(--warning-dim)',
               border: `2px solid ${extractionPreview.matchResult.shouldMerge ? 'var(--success)' : 'var(--warning)'}`,
-              padding: '8px',
-              borderRadius: '2px'
-            }}>
+              padding: '8px'}}>
               <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
                 {extractionPreview.matchResult.shouldMerge ? 'STRONG MATCH FOUND' : 'POTENTIAL MATCH'}
               </div>
@@ -1792,9 +1780,7 @@ export default function AIDataIngestionSearch() {
           padding: '10px',
           zIndex: 1202,
           maxHeight: '360px',
-          overflowY: 'auto',
-          boxShadow: '2px 2px 8px var(--overlay)',
-          fontSize: '11px',
+          overflowY: 'auto', fontSize: '11px',
           whiteSpace: 'pre-wrap',
           lineHeight: 1.35
         }}>

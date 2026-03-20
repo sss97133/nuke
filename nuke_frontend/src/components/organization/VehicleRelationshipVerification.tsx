@@ -109,9 +109,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
           fontSize: '11px',
           border: '1px solid var(--border)',
           background: 'var(--bg)',
-          cursor: 'pointer',
-          borderRadius: '3px'
-        }}
+          cursor: 'pointer'}}
       >
         Verify Relationship
       </button>
@@ -121,9 +119,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
   return (
     <div style={{
       padding: '12px',
-      border: '2px solid var(--border)',
-      borderRadius: '4px',
-      background: 'var(--surface)',
+      border: '2px solid var(--border)', background: 'var(--surface)',
       marginTop: '8px'
     }}>
       <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '12px' }}>
@@ -134,9 +130,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
         <div style={{
           padding: '8px',
           background: '#fee',
-          border: '1px solid #fcc',
-          borderRadius: '3px',
-          fontSize: '11px',
+          border: '1px solid #fcc', fontSize: '11px',
           color: '#c00',
           marginBottom: '12px'
         }}>
@@ -157,9 +151,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
               width: '100%',
               padding: '6px',
               fontSize: '11px',
-              border: '1px solid var(--border)',
-              borderRadius: '3px'
-            }}
+              border: '1px solid var(--border)'}}
           >
             <option value="relationship">Change Relationship Type</option>
             <option value="sale">Mark as Sold (Requires Proof)</option>
@@ -180,9 +172,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
                 width: '100%',
                 padding: '6px',
                 fontSize: '11px',
-                border: '1px solid var(--border)',
-                borderRadius: '3px'
-              }}
+                border: '1px solid var(--border)'}}
             >
               <option value="">Select...</option>
               <option value="in_stock">Inventory (Owned)</option>
@@ -208,9 +198,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
                   width: '100%',
                   padding: '6px',
                   fontSize: '11px',
-                  border: '1px solid var(--border)',
-                  borderRadius: '3px'
-                }}
+                  border: '1px solid var(--border)'}}
               >
                 <option value="bat_url">BAT (Bring a Trailer) URL</option>
                 <option value="receipt">Receipt/Invoice</option>
@@ -234,9 +222,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
                   width: '100%',
                   padding: '6px',
                   fontSize: '11px',
-                  border: '1px solid var(--border)',
-                  borderRadius: '3px'
-                }}
+                  border: '1px solid var(--border)'}}
               />
             </div>
           </>
@@ -255,9 +241,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
                 width: '100%',
                 padding: '6px',
                 fontSize: '11px',
-                border: '1px solid var(--border)',
-                borderRadius: '3px'
-              }}
+                border: '1px solid var(--border)'}}
             >
               <option value="">Select...</option>
               <option value="active">Active</option>
@@ -280,9 +264,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
               width: '100%',
               padding: '6px',
               fontSize: '11px',
-              border: '1px solid var(--border)',
-              borderRadius: '3px',
-              resize: 'vertical'
+              border: '1px solid var(--border)', resize: 'vertical'
             }}
           />
         </div>
@@ -300,9 +282,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
               fontSize: '11px',
               border: '1px solid var(--border)',
               background: 'var(--bg)',
-              cursor: 'pointer',
-              borderRadius: '3px'
-            }}
+              cursor: 'pointer'}}
           >
             Cancel
           </button>
@@ -315,9 +295,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
               border: 'none',
               background: submitting ? 'var(--text-muted)' : 'var(--accent)',
               color: 'var(--bg)',
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              borderRadius: '3px',
-              fontWeight: 600
+              cursor: submitting ? 'not-allowed' : 'pointer', fontWeight: 600
             }}
           >
             {submitting ? 'Submitting...' : 'Submit Request'}

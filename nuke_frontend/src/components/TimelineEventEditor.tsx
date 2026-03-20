@@ -52,14 +52,14 @@ const TimelineEventEditor: React.FC<TimelineEventEditorProps> = ({
 
   if (!canEdit) {
     return (
-      <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
+      <div className="text-xs text-gray-500 p-2 bg-gray-50">
         You don't have permission to edit this event
       </div>
     );
   }
 
   return (
-    <div className="space-y-3 p-3 bg-gray-50 rounded">
+    <div className="space-y-3 p-3 bg-gray-50">
       <div>
         <label className="block text-xs font-medium text-gray-700 mb-1">
           Event Title
@@ -68,7 +68,7 @@ const TimelineEventEditor: React.FC<TimelineEventEditorProps> = ({
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full text-sm border rounded px-2 py-1"
+          className="w-full text-sm border px-2 py-1"
           placeholder="Event title..."
           disabled={saving}
         />
@@ -81,7 +81,7 @@ const TimelineEventEditor: React.FC<TimelineEventEditorProps> = ({
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="w-full text-sm border rounded px-2 py-1 resize-none"
+          className="w-full text-sm border px-2 py-1 resize-none"
           rows={3}
           placeholder="Add detailed notes, context, or observations about this event..."
           disabled={saving}
@@ -99,14 +99,14 @@ const TimelineEventEditor: React.FC<TimelineEventEditorProps> = ({
         <button
           onClick={handleSave}
           disabled={saving || !title.trim()}
-          className="bg-primary text-white px-3 py-1 rounded text-xs hover:bg-primary-dark disabled:opacity-50"
+          className="bg-primary text-white px-3 py-1 text-xs hover:bg-primary-dark disabled:opacity-50"
         >
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
         <button
           onClick={onCancel}
           disabled={saving}
-          className="bg-gray-300 text-gray-700 px-3 py-1 rounded text-xs hover:bg-gray-400 disabled:opacity-50"
+          className="bg-gray-300 text-gray-700 px-3 py-1 text-xs hover:bg-gray-400 disabled:opacity-50"
         >
           Cancel
         </button>

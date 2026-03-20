@@ -230,9 +230,7 @@ const PublicImageGallery: React.FC<PublicImageGalleryProps> = ({ userId, isOwnPr
                   aspectRatio: '1 / 1',
                   backgroundImage: `url(${image.image_url})`,
                   backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  borderRadius: '4px',
-                  border: '1px solid var(--border)',
+                  backgroundPosition: 'center', border: '1px solid var(--border)',
                   cursor: 'pointer'
                 }}
                 onClick={() => {

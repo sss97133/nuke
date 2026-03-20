@@ -361,7 +361,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                   padding: '4px 8px',
                   background: contract.status === 'active' ? 'var(--success)' : 'var(--text-muted)',
                   color: 'var(--white)',
-                  borderRadius: '4px',
+                  borderRadius: 0,
                   fontSize: '11px',
                   fontWeight: 700,
                   textTransform: 'uppercase'
@@ -501,7 +501,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                     tickFormatter={(v: number) => formatCurrencyFromCents(v, { maximumFractionDigits: 0 })}
                   />
                   <Tooltip
-                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px' }}
+                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 0, fontSize: '12px' }}
                     formatter={(value: number) => [formatCurrencyFromCents(value), 'NAV']}
                     labelFormatter={(label: string) => label ? new Date(label).toLocaleDateString() : ''}
                   />
@@ -581,7 +581,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
           </div>
           <div className="card-body">
             {/* Stacked bar */}
-            <div style={{ display: 'flex', height: '32px', borderRadius: '4px', overflow: 'hidden', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', height: '32px', borderRadius: 0, overflow: 'hidden', marginBottom: '12px' }}>
               {Object.entries(allocationByType).map(([type, valueCents]) => {
                 const pct = (valueCents / totalValue) * 100;
                 if (pct < 0.5) return null;
@@ -612,7 +612,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                 const pct = (valueCents / totalValue) * 100;
                 return (
                   <div key={type} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: ASSET_TYPE_COLORS[type] || 'var(--text-secondary)' }} />
+                    <div style={{ width: '10px', height: '10px', borderRadius: 0, background: ASSET_TYPE_COLORS[type] || 'var(--text-secondary)' }} />
                     <span style={{ color: 'var(--text-muted)' }}>
                       {ASSET_TYPE_LABELS[type] || type} — {pct.toFixed(1)}% ({formatCurrencyFromCents(valueCents)})
                     </span>
@@ -688,7 +688,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                           {/* Inline thumbnail for vehicles */}
                           {asset.asset_type === 'vehicle' && asset.details?.primary_image_url ? (
                             <div style={{
-                              width: '36px', height: '27px', borderRadius: '3px', overflow: 'hidden',
+                              width: '36px', height: '27px', borderRadius: 0, overflow: 'hidden',
                               flexShrink: 0, background: 'var(--surface)', border: '1px solid var(--border)',
                             }}>
                               <img
@@ -702,7 +702,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                             </div>
                           ) : (
                             <div style={{
-                              width: '27px', height: '27px', borderRadius: '3px', flexShrink: 0,
+                              width: '27px', height: '27px', borderRadius: 0, flexShrink: 0,
                               background: ASSET_TYPE_COLORS[asset.asset_type] || 'var(--text-secondary)',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               color: 'var(--bg)', fontSize: '12px', fontWeight: 900,
@@ -719,7 +719,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                                 display: 'inline-block',
                                 width: '8px',
                                 height: '8px',
-                                borderRadius: '2px',
+                                borderRadius: 0,
                                 background: ASSET_TYPE_COLORS[asset.asset_type] || 'var(--text-secondary)',
                               }} />
                               {asset.asset_type.toUpperCase()} • {asset.curator_notes || 'No notes'}
@@ -747,7 +747,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                             style={{
                               padding: '4px 8px',
                               border: '1px solid var(--primary)',
-                              borderRadius: '2px',
+                              borderRadius: 0,
                               background: 'var(--primary)',
                               color: 'var(--white)',
                               fontSize: '11px',
@@ -794,7 +794,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                 padding: '2px 6px',
                 background: 'var(--primary)',
                 color: 'var(--white)',
-                borderRadius: '4px',
+                borderRadius: 0,
                 fontSize: '9px',
                 fontWeight: 700,
               }}>CURATOR VIEW</span>
@@ -959,7 +959,7 @@ function VehicleDetail({ asset, d, navigate }: { asset: any; d: any; navigate: a
           style={{
             padding: '6px 12px',
             border: '1px solid var(--primary)',
-            borderRadius: '4px',
+            borderRadius: 0,
             background: 'var(--primary)',
             color: 'var(--white)',
             fontSize: '11px',
@@ -1029,8 +1029,8 @@ function StakeDetail({ asset, d }: { asset: any; d: any }) {
         <DetailRow label="Raised" value={formatCurrencyFromCents(raised)} />
         <DetailRow label="Progress" value={`${fundingPct.toFixed(0)}%`} />
         {/* Mini progress bar */}
-        <div style={{ marginTop: '8px', height: '6px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
-          <div style={{ width: `${Math.min(fundingPct, 100)}%`, height: '100%', background: isFundraising ? 'var(--warning)' : 'var(--success)', borderRadius: '3px' }} />
+        <div style={{ marginTop: '8px', height: '6px', background: 'var(--border)', borderRadius: 0, overflow: 'hidden' }}>
+          <div style={{ width: `${Math.min(fundingPct, 100)}%`, height: '100%', background: isFundraising ? 'var(--warning)' : 'var(--success)', borderRadius: 0 }} />
         </div>
       </div>
       <div>
@@ -1065,12 +1065,12 @@ function OrgDetail({ asset, d }: { asset: any; d: any }) {
         {d.reputation_score != null && (
           <>
             <DetailRow label="Score" value={`${d.reputation_score}/100`} />
-            <div style={{ marginTop: '8px', height: '6px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+            <div style={{ marginTop: '8px', height: '6px', background: 'var(--border)', borderRadius: 0, overflow: 'hidden' }}>
               <div style={{
                 width: `${d.reputation_score}%`,
                 height: '100%',
                 background: d.reputation_score >= 70 ? 'var(--success)' : d.reputation_score >= 40 ? 'var(--warning)' : 'var(--error)',
-                borderRadius: '3px'
+                borderRadius: 0
               }} />
             </div>
           </>
@@ -1109,7 +1109,7 @@ function RealEstateDetail({ asset, d }: { asset: any; d: any }) {
         {specs.amenities && (
           <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
             {specs.amenities.map((a: string, i: number) => (
-              <span key={i} style={{ padding: '1px 6px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '3px', fontSize: '9px', color: 'var(--text-muted)' }}>
+              <span key={i} style={{ padding: '1px 6px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 0, fontSize: '9px', color: 'var(--text-muted)' }}>
                 {a.replace('_', ' ')}
               </span>
             ))}
@@ -1125,8 +1125,8 @@ function RealEstateDetail({ asset, d }: { asset: any; d: any }) {
         {occupancy != null && (
           <>
             <DetailRow label="Occupancy" value={`${occupancy}%`} />
-            <div style={{ marginTop: '4px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
-              <div style={{ width: `${occupancy}%`, height: '100%', background: occupancy >= 80 ? 'var(--success)' : 'var(--warning)', borderRadius: '2px' }} />
+            <div style={{ marginTop: '4px', height: '4px', background: 'var(--border)', borderRadius: 0, overflow: 'hidden' }}>
+              <div style={{ width: `${occupancy}%`, height: '100%', background: occupancy >= 80 ? 'var(--success)' : 'var(--warning)', borderRadius: 0 }} />
             </div>
           </>
         )}
@@ -1160,8 +1160,8 @@ function EventDetail({ asset, d }: { asset: any; d: any }) {
         {d.vehicle_spots && <DetailRow label="Vehicle Spots" value={d.vehicle_spots} />}
         {fillPct > 0 && (
           <>
-            <div style={{ marginTop: '4px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
-              <div style={{ width: `${Math.min(fillPct, 100)}%`, height: '100%', background: fillPct >= 90 ? 'var(--error)' : fillPct >= 60 ? 'var(--warning)' : 'var(--success)', borderRadius: '2px' }} />
+            <div style={{ marginTop: '4px', height: '4px', background: 'var(--border)', borderRadius: 0, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min(fillPct, 100)}%`, height: '100%', background: fillPct >= 90 ? 'var(--error)' : fillPct >= 60 ? 'var(--warning)' : 'var(--success)', borderRadius: 0 }} />
             </div>
             <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'right' }}>{fillPct}% filled</div>
           </>
@@ -1202,7 +1202,7 @@ function CuratorPanel({
             padding: '2px 6px',
             background: isAgent ? 'var(--agent, #8b5cf6)' : 'var(--accent)',
             color: 'var(--bg)',
-            borderRadius: '4px',
+            borderRadius: 0,
             fontSize: '9px',
             fontWeight: 700,
           }}>
@@ -1257,7 +1257,7 @@ function CuratorPanel({
                     } width={220}>
                       <span style={{
                         padding: '1px 6px', background: 'var(--surface)', border: '1px solid var(--border)',
-                        borderRadius: '3px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', cursor: 'default',
+                        borderRadius: 0, fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', cursor: 'default',
                       }}>
                         {curatorProfile.user_type}
                       </span>
@@ -1288,7 +1288,7 @@ function CuratorPanel({
                   } width={200}>
                     <span style={{
                       padding: '2px 8px', background: 'var(--primary)', color: 'var(--bg)',
-                      borderRadius: '3px', fontSize: '9px', fontWeight: 700, cursor: 'default',
+                      borderRadius: 0, fontSize: '9px', fontWeight: 700, cursor: 'default',
                     }}>
                       {cred}
                     </span>
@@ -1319,7 +1319,7 @@ function CuratorPanel({
                       </div>
                     </div>
                   } width={240}>
-                    <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
+                    <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: 0, cursor: 'default' }}>
                       <div style={{ fontSize: '16px', fontWeight: 900 }}>{formatCurrencyFromCents(totalAum)}</div>
                       <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Total AUM</div>
                     </div>
@@ -1337,7 +1337,7 @@ function CuratorPanel({
                         </div>
                       </div>
                     } width={240}>
-                      <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
+                      <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: 0, cursor: 'default' }}>
                         <div style={{ fontSize: '16px', fontWeight: 900, color: avgReturn >= 0 ? 'var(--success)' : 'var(--error)' }}>
                           {avgReturn >= 0 ? '+' : ''}{avgReturn.toFixed(2)}%
                         </div>
@@ -1355,7 +1355,7 @@ function CuratorPanel({
                       </div>
                     </div>
                   } width={200}>
-                    <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
+                    <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: 0, cursor: 'default' }}>
                       <div style={{ fontSize: '16px', fontWeight: 900 }}>{allContracts.length}</div>
                       <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{activeCount} Active</div>
                     </div>
@@ -1369,7 +1369,7 @@ function CuratorPanel({
                         </div>
                       </div>
                     } width={220}>
-                      <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
+                      <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: 0, cursor: 'default' }}>
                         <div style={{ fontSize: '16px', fontWeight: 900 }}>{curatorStats.total_vehicles}</div>
                         <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Vehicles</div>
                       </div>
@@ -1385,7 +1385,7 @@ function CuratorPanel({
                         </div>
                       </div>
                     } width={220}>
-                      <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: '4px', cursor: 'default' }}>
+                      <div style={{ textAlign: 'center', padding: '6px', background: 'var(--surface)', borderRadius: 0, cursor: 'default' }}>
                         <div style={{ fontSize: '16px', fontWeight: 900, color: curatorStats.reputation_score >= 70 ? 'var(--success)' : curatorStats.reputation_score >= 40 ? 'var(--warning)' : 'var(--error)' }}>
                           {curatorStats.reputation_score}
                         </div>
@@ -1407,7 +1407,7 @@ function CuratorPanel({
 
             {/* Agent Info — "Read Their Code" */}
             {isAgent && agentInfo && (
-              <div style={{ marginTop: '12px', padding: '10px', background: 'color-mix(in srgb, var(--agent, #8b5cf6) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--agent, #8b5cf6) 25%, transparent)', borderRadius: '4px' }}>
+              <div style={{ marginTop: '12px', padding: '10px', background: 'color-mix(in srgb, var(--agent, #8b5cf6) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--agent, #8b5cf6) 25%, transparent)', borderRadius: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Bot size={14} color="var(--agent, #8b5cf6)" />
@@ -1416,7 +1416,7 @@ function CuratorPanel({
                   <button
                     onClick={() => setShowCode(!showCode)}
                     style={{
-                      padding: '2px 8px', border: '1px solid var(--agent, #8b5cf6)', borderRadius: '3px',
+                      padding: '2px 8px', border: '1px solid var(--agent, #8b5cf6)', borderRadius: 0,
                       background: showCode ? 'var(--agent, #8b5cf6)' : 'transparent', color: showCode ? 'var(--bg)' : 'var(--agent, #8b5cf6)',
                       fontSize: '9px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
                     }}
@@ -1440,7 +1440,7 @@ function CuratorPanel({
                       } width={200}>
                         <span style={{
                           padding: '1px 6px', background: 'color-mix(in srgb, var(--agent, #8b5cf6) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--agent, #8b5cf6) 25%, transparent)',
-                          borderRadius: '3px', fontSize: '9px', color: 'var(--agent, #8b5cf6)', fontWeight: 600, cursor: 'default',
+                          borderRadius: 0, fontSize: '9px', color: 'var(--agent, #8b5cf6)', fontWeight: 600, cursor: 'default',
                         }}>
                           {cap}
                         </span>
@@ -1451,14 +1451,14 @@ function CuratorPanel({
                 {showCode && agentInfo.prompt_template && (
                   <div style={{
                     marginTop: '8px', padding: '10px', background: 'var(--code-bg, #0d1117)', color: 'var(--code-text, #c9d1d9)',
-                    borderRadius: '4px', fontSize: '11px', fontFamily: 'monospace', lineHeight: '14px',
+                    borderRadius: 0, fontSize: '11px', fontFamily: 'monospace', lineHeight: '14px',
                     maxHeight: '300px', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                   }}>
                     {agentInfo.prompt_template}
                   </div>
                 )}
                 {showCode && !agentInfo.prompt_template && (
-                  <div style={{ marginTop: '8px', padding: '10px', background: 'var(--code-bg, #0d1117)', color: 'var(--code-muted, #8b949e)', borderRadius: '4px', fontSize: '11px', fontFamily: 'monospace' }}>
+                  <div style={{ marginTop: '8px', padding: '10px', background: 'var(--code-bg, #0d1117)', color: 'var(--code-muted, #8b949e)', borderRadius: 0, fontSize: '11px', fontFamily: 'monospace' }}>
                     // Agent prompt template not published.{'\n'}
                     // Agent ID: {agentInfo.id}{'\n'}
                     // Capabilities: [{agentInfo.capabilities?.join(', ')}]{'\n'}
@@ -1498,7 +1498,7 @@ function CuratorPanel({
                       onClick={(e) => { e.stopPropagation(); onSelectContract(c.id); }}
                       style={{
                         padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)',
-                        borderRadius: '4px', cursor: 'pointer', transition: 'border-color 0.12s',
+                        borderRadius: 0, cursor: 'pointer', transition: 'border-color 0.12s',
                       }}
                       onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
@@ -1596,8 +1596,8 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
             width: '340px',
             background: 'var(--bg, #fff)',
             border: '2px solid var(--border)',
-            borderRadius: '6px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+            borderRadius: 0,
+            border: '2px solid var(--border)',
             pointerEvents: 'none',
             overflow: 'hidden',
           }}
@@ -1636,7 +1636,7 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
           {asset.asset_type === 'bond' && (
             <div style={{ padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.bond, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '16px', fontWeight: 900 }}>B</div>
+                <div style={{ width: '32px', height: '32px', borderRadius: 0, background: ASSET_TYPE_COLORS.bond, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '16px', fontWeight: 900 }}>B</div>
                 <div>
                   <div style={{ fontWeight: 900, fontSize: '15px' }}>{d.issuer_name || 'Bond'}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{d.issuer_type || 'Fixed Income'}</div>
@@ -1658,7 +1658,7 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
             return (
               <div style={{ padding: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.stake, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '16px', fontWeight: 900 }}>S</div>
+                  <div style={{ width: '32px', height: '32px', borderRadius: 0, background: ASSET_TYPE_COLORS.stake, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '16px', fontWeight: 900 }}>S</div>
                   <div>
                     <div style={{ fontWeight: 900, fontSize: '15px' }}>Equity Stake</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{d.status?.toUpperCase() || 'ACTIVE'}</div>
@@ -1668,8 +1668,8 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
                 <HoverRow label="Raised" value={formatCurrencyFromCents(raised)} />
                 <HoverRow label="Target" value={formatCurrencyFromCents(target)} />
                 {d.profit_share_pct != null && <HoverRow label="Profit Share" value={`${d.profit_share_pct}%`} />}
-                <div style={{ marginTop: '6px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: ASSET_TYPE_COLORS.stake, borderRadius: '2px' }} />
+                <div style={{ marginTop: '6px', height: '4px', background: 'var(--border)', borderRadius: 0, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: ASSET_TYPE_COLORS.stake, borderRadius: 0 }} />
                 </div>
                 <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'right' }}>{pct.toFixed(0)}% funded</div>
               </div>
@@ -1680,7 +1680,7 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
           {asset.asset_type === 'organization' && (
             <div style={{ padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.organization, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '16px', fontWeight: 900 }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: 0, background: ASSET_TYPE_COLORS.organization, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '16px', fontWeight: 900 }}>
                   {(d.business_name || 'O').charAt(0).toUpperCase()}
                 </div>
                 <div>
@@ -1693,8 +1693,8 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
               {d.reputation_score != null && (
                 <>
                   <HoverRow label="Reputation" value={`${d.reputation_score}/100`} valueColor={d.reputation_score >= 70 ? 'var(--success)' : d.reputation_score >= 40 ? 'var(--warning)' : 'var(--error)'} />
-                  <div style={{ marginTop: '4px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
-                    <div style={{ width: `${d.reputation_score}%`, height: '100%', background: d.reputation_score >= 70 ? 'var(--success)' : d.reputation_score >= 40 ? 'var(--warning)' : 'var(--error)', borderRadius: '2px' }} />
+                  <div style={{ marginTop: '4px', height: '4px', background: 'var(--border)', borderRadius: 0, overflow: 'hidden' }}>
+                    <div style={{ width: `${d.reputation_score}%`, height: '100%', background: d.reputation_score >= 70 ? 'var(--success)' : d.reputation_score >= 40 ? 'var(--warning)' : 'var(--error)', borderRadius: 0 }} />
                   </div>
                 </>
               )}
@@ -1705,7 +1705,7 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
           {asset.asset_type === 'real_estate' && (
             <div style={{ padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.real_estate, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '19px', fontWeight: 900 }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: 0, background: ASSET_TYPE_COLORS.real_estate, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '19px', fontWeight: 900 }}>
                   {'\u2302'}
                 </div>
                 <div>
@@ -1726,7 +1726,7 @@ function AssetHoverPreview({ asset, children }: { asset: any; children: React.Re
           {asset.asset_type === 'event' && (
             <div style={{ padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '4px', background: ASSET_TYPE_COLORS.event, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '16px', fontWeight: 900 }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: 0, background: ASSET_TYPE_COLORS.event, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bg)', fontSize: '16px', fontWeight: 900 }}>
                   {'\u2605'}
                 </div>
                 <div>

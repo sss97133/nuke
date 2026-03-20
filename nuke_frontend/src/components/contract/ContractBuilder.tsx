@@ -175,9 +175,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
             <div
               style={{
                 width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                border: `2px solid ${step === s ? 'var(--primary)' : 'var(--border)'}`,
+                height: '24px', border: `2px solid ${step === s ? 'var(--primary)' : 'var(--border)'}`,
                 background: step === s ? 'var(--primary)' : 'transparent',
                 color: step === s ? 'var(--white)' : 'var(--text-muted)',
                 display: 'flex',
@@ -224,7 +222,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
                   value={contract.contract_name || ''}
                   onChange={(e) => updateContract({ contract_name: e.target.value })}
                   placeholder="e.g., Vintage Squarebody Collection Fund"
-                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
                 />
               </div>
 
@@ -238,7 +236,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
                   onChange={(e) => updateContract({ contract_symbol: e.target.value.toUpperCase() })}
                   placeholder="e.g., SQBD, VINT, CLASSIC"
                   maxLength={10}
-                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px', textTransform: 'uppercase' }}
+                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', textTransform: 'uppercase' }}
                 />
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                   2-10 characters, uppercase letters/numbers
@@ -254,7 +252,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
                   onChange={(e) => updateContract({ contract_description: e.target.value })}
                   placeholder="Describe this investment contract, its strategy, and target investors..."
                   rows={4}
-                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit' }}
+                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', fontFamily: 'inherit' }}
                 />
               </div>
 
@@ -265,7 +263,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
                 <select
                   value={contract.contract_type || 'etf'}
                   onChange={(e) => updateContract({ contract_type: e.target.value })}
-                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
                 >
                   <option value="etf">ETF (Exchange-Traded Fund)</option>
                   <option value="bond_fund">Bond Fund</option>
@@ -287,7 +285,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
                     value={contract.curator_name || ''}
                     onChange={(e) => updateContract({ curator_name: e.target.value })}
                     placeholder="John Smith"
-                    style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                    style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
                   />
                 </div>
 
@@ -300,7 +298,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
                     onChange={(e) => updateContract({ curator_bio: e.target.value })}
                     placeholder="Your background, credentials, investment experience..."
                     rows={2}
-                    style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit' }}
+                    style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', fontFamily: 'inherit' }}
                   />
                 </div>
               </div>
@@ -314,7 +312,7 @@ export default function ContractBuilder({ onContractCreated }: ContractBuilderPr
                   value={contract.tags?.join(', ') || ''}
                   onChange={(e) => updateContract({ tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
                   placeholder="vintage, trucks, restoration, classic"
-                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
                 />
               </div>
             </div>

@@ -231,9 +231,7 @@ const Login = () => {
             <div style={{
               display: 'flex',
               marginBottom: '24px',
-              border: '2px solid var(--border-light)',
-              borderRadius: '0px',
-            }}>
+              border: '2px solid var(--border-light)', }}>
               <button
                 type="button"
                 onClick={() => { setMode('signin'); setError(null); setMessage(null); }}
@@ -309,9 +307,7 @@ const Login = () => {
             <div style={{
               display: 'flex',
               marginBottom: '16px',
-              border: '2px solid var(--border-light)',
-              borderRadius: '0px',
-            }}>
+              border: '2px solid var(--border-light)', }}>
               <button
                 type="button"
                 onClick={() => {

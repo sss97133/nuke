@@ -339,9 +339,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
                 className="button button-secondary button-small"
                 onClick={() => setSoldFilter(k)}
                 style={{
-                  fontSize: '11px',
-                  borderRadius: 0,
-                  border: soldFilter === k ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  fontSize: '11px', border: soldFilter === k ? '1px solid var(--accent)' : '1px solid var(--border)',
                   color: soldFilter === k ? 'var(--accent)' : 'var(--text)',
                 }}
               >
@@ -358,9 +356,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
                 className="button button-secondary button-small"
                 onClick={() => setStatusFilter(k)}
                 style={{
-                  fontSize: '11px',
-                  borderRadius: 0,
-                  border: statusFilter === k ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  fontSize: '11px', border: statusFilter === k ? '1px solid var(--accent)' : '1px solid var(--border)',
                   color: statusFilter === k ? 'var(--accent)' : 'var(--text)',
                 }}
               >
@@ -377,9 +373,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
                 className="button button-secondary button-small"
                 onClick={() => setReserveFilter(k)}
                 style={{
-                  fontSize: '11px',
-                  borderRadius: 0,
-                  border: reserveFilter === k ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  fontSize: '11px', border: reserveFilter === k ? '1px solid var(--accent)' : '1px solid var(--border)',
                   color: reserveFilter === k ? 'var(--accent)' : 'var(--text)',
                 }}
               >
@@ -398,7 +392,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
             style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
             title={`${cardsPerRow} per row`}
           >
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: '"MS Sans Serif", sans-serif' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'Arial, sans-serif' }}>
               {cardsPerRow}/row
             </div>
             <input
@@ -424,9 +418,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
                   border: '1px solid var(--border)',
                   background: thumbFitMode === 'square' ? 'var(--grey-600)' : 'var(--grey-200)',
                   color: thumbFitMode === 'square' ? 'var(--white)' : 'var(--text)',
-                  cursor: 'pointer',
-                  borderRadius: '999px',
-                  fontFamily: '"MS Sans Serif", sans-serif'
+                  cursor: 'pointer', fontFamily: 'Arial, sans-serif'
                 }}
                 title="Square crop thumbnails"
               >
@@ -444,9 +436,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
                   border: '1px solid var(--border)',
                   background: thumbFitMode === 'original' ? 'var(--grey-600)' : 'var(--grey-200)',
                   color: thumbFitMode === 'original' ? 'var(--white)' : 'var(--text)',
-                  cursor: 'pointer',
-                  borderRadius: '999px',
-                  fontFamily: '"MS Sans Serif", sans-serif'
+                  cursor: 'pointer', fontFamily: 'Arial, sans-serif'
                 }}
                 title="Original aspect ratio thumbnails"
               >

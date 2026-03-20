@@ -164,14 +164,10 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ endDate, size = 'small'
         fontWeight: 700,
         color: style.color,
         background: style.bg,
-        padding,
-        borderRadius: '4px',
-        display: 'inline-block',
+        padding, display: 'inline-block',
         opacity: pulseOpacity,
         transform: pulseScale,
-        border: style.border || 'none',
-        boxShadow: style.glow || 'none',
-        transition: 'opacity 0.15s, transform 0.15s, box-shadow 0.15s',
+        border: style.border || 'none', transition: 'opacity 0.15s, transform 0.15s, box-shadow 0.15s',
       }}
     >
       {formatTime(timeRemaining)}
@@ -215,9 +211,7 @@ const TierBadge: React.FC<TierBadgeProps> = ({ bid, bidCount }) => {
     <div
       style={{
         width: '18px',
-        height: '18px',
-        borderRadius: '4px',
-        background: bg,
+        height: '18px', background: bg,
         color,
         fontSize: '10px',
         fontWeight: 900,
@@ -290,9 +284,7 @@ const PlatformBreakdownChart: React.FC<PlatformBreakdownChartProps> = ({ stats }
               style={{
                 flex: 1,
                 height: 12,
-                background: 'var(--surface-hover)',
-                borderRadius: 'var(--radius)',
-                overflow: 'hidden',
+                background: 'var(--surface-hover)', overflow: 'hidden',
                 border: '1px solid var(--border)',
               }}
             >
@@ -300,9 +292,7 @@ const PlatformBreakdownChart: React.FC<PlatformBreakdownChartProps> = ({ stats }
                 style={{
                   width: `${(s.count / maxCount) * 100}%`,
                   height: '100%',
-                  background: `hsl(${210 + i * 25}, 60%, 55%)`,
-                  borderRadius: 'var(--radius)',
-                  transition: 'width 0.3s ease',
+                  background: `hsl(${210 + i * 25}, 60%, 55%)`, transition: 'width 0.3s ease',
                 }}
               />
             </div>
@@ -362,9 +352,7 @@ const MarketHeatIndicator: React.FC<MarketHeatIndicatorProps> = ({ totalBids, to
         gap: 'var(--space-2)',
         padding: 'var(--space-2) var(--space-3)',
         background: heatBg,
-        border: '2px solid var(--border)',
-        borderRadius: 'var(--radius)',
-        marginTop: 'var(--space-3)',
+        border: '2px solid var(--border)', marginTop: 'var(--space-3)',
       }}
     >
       <div
@@ -451,20 +439,16 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ listing, onNavigate }) => {
         flex: '0 0 auto',
         width: 180,
         border: '2px solid var(--border)',
-        background: 'var(--surface)',
-        borderRadius: 'var(--radius)',
-        overflow: 'hidden',
+        background: 'var(--surface)', overflow: 'hidden',
         cursor: 'pointer',
         transition: 'transform 0.2s, box-shadow 0.2s',
       }}
       onClick={onNavigate}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = 'none';
       }}
     >
       {/* Image with tier badge overlay */}
@@ -531,11 +515,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ listing, onNavigate }) => {
             justifyContent: 'space-between',
             marginBottom: 4,
             padding: '6px 8px',
-            background: 'var(--success-dim)',
-            borderRadius: 6,
-            border: '1px solid var(--success)',
-            boxShadow: 'none',
-          }}
+            background: 'var(--success-dim)', border: '1px solid var(--success)', }}
         >
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
             <span style={{ fontSize: '12px', fontWeight: 900, color: 'var(--success)' }}>
@@ -549,9 +529,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ listing, onNavigate }) => {
               fontWeight: 600,
               color: 'var(--success)',
               background: 'var(--success-dim)',
-              padding: '2px 7px',
-              borderRadius: 10,
-              border: '1px solid var(--success)',
+              padding: '2px 7px', border: '1px solid var(--success)',
             }}
             title="Total bids"
           >
@@ -573,9 +551,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ listing, onNavigate }) => {
             padding: 'var(--space-2) var(--space-2)',
             background: 'var(--surface)',
             color: 'var(--text)',
-            border: '2px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            fontSize: 'var(--fs-9)',
+            border: '2px solid var(--border)', fontSize: 'var(--fs-9)',
             fontWeight: 700,
             cursor: 'pointer',
             textTransform: 'uppercase',
@@ -877,10 +853,7 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
           width: '100%',
           maxWidth: '1200px',
           background: 'var(--surface)',
-          border: '2px solid var(--border)',
-          borderRadius: 'var(--radius)',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-          marginTop: 'var(--space-6)',
+          border: '2px solid var(--border)', marginTop: 'var(--space-6)',
           marginBottom: 'var(--space-6)',
           overflow: 'hidden',
           transition: 'max-width 0.3s ease',
@@ -908,9 +881,7 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
                   fontSize: 'var(--fs-10)',
                   fontWeight: 700,
                   background: 'var(--surface-hover)',
-                  padding: '2px var(--space-2)',
-                  borderRadius: 'var(--radius)',
-                  border: '1px solid var(--border)',
+                  padding: '2px var(--space-2)', border: '1px solid var(--border)',
                 }}
               >
                 {totalCount != null ? `${listings.length}${totalCount > listings.length ? ` / ${totalCount}` : ''}` : listings.length}
@@ -927,9 +898,7 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
                 width: 28,
                 height: 28,
                 background: 'var(--surface)',
-                border: '2px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                color: 'var(--text)',
+                border: '2px solid var(--border)', color: 'var(--text)',
                 fontSize: 'var(--fs-12)',
                 cursor: 'pointer',
                 display: 'flex',
@@ -958,9 +927,7 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
                 <div
                   style={{
                     flex: 1,
-                    border: '2px solid var(--border)',
-                    borderRadius: 'var(--radius)',
-                    background: 'var(--surface)',
+                    border: '2px solid var(--border)', background: 'var(--surface)',
                     padding: 'var(--space-3)',
                   }}
                 >
@@ -987,9 +954,7 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
                         textAlign: 'center',
                         padding: 'var(--space-2)',
                         background: 'var(--surface)',
-                        border: '2px solid var(--border)',
-                        borderRadius: 'var(--radius)',
-                      }}
+                        border: '2px solid var(--border)', }}
                     >
                       <div style={{ fontSize: 'var(--fs-12)', fontWeight: 900, color: 'var(--text)' }}>{overallStats.totalAuctions}</div>
                       <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>AUCTIONS</div>
@@ -999,9 +964,7 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
                         textAlign: 'center',
                         padding: 'var(--space-2)',
                         background: 'var(--surface)',
-                        border: '2px solid var(--border)',
-                        borderRadius: 'var(--radius)',
-                      }}
+                        border: '2px solid var(--border)', }}
                     >
                       <div style={{ fontSize: 'var(--fs-12)', fontWeight: 900, color: 'var(--text)' }}>{overallStats.totalBids.toLocaleString()}</div>
                       <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>TOTAL BIDS</div>
@@ -1011,9 +974,7 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
                         textAlign: 'center',
                         padding: 'var(--space-2)',
                         background: 'var(--surface)',
-                        border: '2px solid var(--border)',
-                        borderRadius: 'var(--radius)',
-                      }}
+                        border: '2px solid var(--border)', }}
                     >
                       <div style={{ fontSize: 'var(--fs-12)', fontWeight: 900, color: 'var(--text)' }}>
                         ${(overallStats.avgBid / 1000).toFixed(0)}K
@@ -1037,9 +998,7 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
                       fontWeight: 600,
                       border: `2px solid ${sortBy === option ? 'var(--accent)' : 'var(--border)'}`,
                       background: sortBy === option ? 'var(--accent-dim)' : 'var(--surface)',
-                      color: sortBy === option ? 'var(--accent)' : 'var(--text-secondary)',
-                      borderRadius: 'var(--radius)',
-                      cursor: 'pointer',
+                      color: sortBy === option ? 'var(--accent)' : 'var(--text-secondary)', cursor: 'pointer',
                     }}
                   >
                     {option === 'ending_soon' ? 'ENDING SOON' : option === 'most_bids' ? 'MOST BIDS' : 'HIGHEST BID'}
@@ -1086,9 +1045,7 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
                     style={{
                       padding: 'var(--space-2) var(--space-6)',
                       background: 'var(--surface)',
-                      border: '2px solid var(--border)',
-                      borderRadius: 'var(--radius)',
-                      fontSize: 'var(--fs-10)',
+                      border: '2px solid var(--border)', fontSize: 'var(--fs-10)',
                       fontWeight: 700,
                       cursor: loadingMore ? 'wait' : 'pointer',
                       color: 'var(--text)',
@@ -1122,7 +1079,7 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
         >
           <div>Updated every 60 seconds</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-            <span style={{ width: 6, height: 6, background: 'var(--success)', borderRadius: '50%' }} />
+            <span style={{ width: 6, height: 6, background: 'var(--success)'}} />
             <span>Live</span>
           </div>
         </div>

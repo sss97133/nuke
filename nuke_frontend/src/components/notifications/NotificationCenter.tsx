@@ -318,9 +318,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
         width: '400px',
         maxHeight: '600px',
         background: 'var(--surface)',
-        border: '2px solid var(--border)',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-        zIndex: 1000,
+        border: '2px solid var(--border)', zIndex: 1000,
         display: 'flex',
         flexDirection: 'column'
       }}
@@ -344,10 +342,8 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
               style={{
                 fontSize: '9px',
                 padding: '2px 6px',
-                background: '#dc2626',
-                color: 'var(--bg)',
-                borderRadius: '10px'
-              }}
+                background: 'var(--error)',
+                color: 'var(--bg)'}}
             >
               {unreadCount}
             </span>
@@ -512,9 +508,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                         style={{
                           width: '8px',
                           height: '8px',
-                          background: '#0ea5e9',
-                          borderRadius: '50%',
-                          marginTop: '4px',
+                          background: 'var(--info)', marginTop: '4px',
                           flexShrink: 0
                         }}
                       />

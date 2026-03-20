@@ -121,9 +121,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
       <div
         style={{
           background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: '4px',
-          padding: 'var(--space-4)',
+          border: '1px solid var(--border)', padding: 'var(--space-4)',
           width: '90%',
           maxWidth: '500px',
           maxHeight: '90vh',
@@ -144,9 +142,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
           <div style={{
             padding: 'var(--space-2)',
             background: 'var(--warning-bg, #fef3c7)',
-            border: '1px solid var(--warning-border, #fbbf24)',
-            borderRadius: '4px',
-            marginBottom: 'var(--space-3)',
+            border: '1px solid var(--warning-border, #fbbf24)', marginBottom: 'var(--space-3)',
             fontSize: '11px'
           }}>
             <strong>Note:</strong> Auction bid was ${auctionBid.toLocaleString()}. This update will record the final sale price.
@@ -165,9 +161,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
                 width: '100%',
                 padding: 'var(--space-2)',
                 fontSize: '11px',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                background: 'var(--white)'
+                border: '1px solid var(--border)', background: 'var(--white)'
               }}
             >
               <option value="auction">Auction Sale</option>
@@ -189,9 +183,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
                 width: '100%',
                 padding: 'var(--space-2)',
                 fontSize: '11px',
-                border: '1px solid var(--border)',
-                borderRadius: '4px'
-              }}
+                border: '1px solid var(--border)'}}
               required
             />
           </div>
@@ -208,9 +200,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
                 width: '100%',
                 padding: 'var(--space-2)',
                 fontSize: '11px',
-                border: '1px solid var(--border)',
-                borderRadius: '4px'
-              }}
+                border: '1px solid var(--border)'}}
               required
             />
           </div>
@@ -228,9 +218,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
                 width: '100%',
                 padding: 'var(--space-2)',
                 fontSize: '11px',
-                border: '1px solid var(--border)',
-                borderRadius: '4px'
-              }}
+                border: '1px solid var(--border)'}}
             />
             {saleType === 'post_auction' && (
               <p style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px', margin: 0 }}>
@@ -252,9 +240,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
                 width: '100%',
                 padding: 'var(--space-2)',
                 fontSize: '11px',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                fontFamily: 'inherit',
+                border: '1px solid var(--border)', fontFamily: 'inherit',
                 resize: 'vertical'
               }}
             />
@@ -264,9 +250,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
             <div style={{
               padding: 'var(--space-2)',
               background: 'var(--error-bg, #fee2e2)',
-              border: '1px solid var(--error-border, #ef4444)',
-              borderRadius: '4px',
-              marginBottom: 'var(--space-3)',
+              border: '1px solid var(--error-border, #ef4444)', marginBottom: 'var(--space-3)',
               fontSize: '11px',
               color: 'var(--error-text, #dc2626)'
             }}>
@@ -284,9 +268,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
                 fontSize: '11px',
                 fontWeight: 'bold',
                 background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                cursor: saving ? 'not-allowed' : 'pointer'
+                border: '1px solid var(--border)', cursor: saving ? 'not-allowed' : 'pointer'
               }}
             >
               Cancel
@@ -300,9 +282,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
                 fontWeight: 'bold',
                 background: 'var(--accent)',
                 color: 'var(--white)',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: saving ? 'not-allowed' : 'pointer',
+                border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
                 opacity: saving ? 0.6 : 1
               }}
             >

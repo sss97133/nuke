@@ -53,9 +53,7 @@ export default function YearPortal({ year, activePortal, onOpen }: YearPortalPro
                   {data.top_makes.slice(0, 6).map((m) => (
                     <span key={m.make} style={{
                       padding: '1px 5px',
-                      background: 'var(--bg-secondary)',
-                      borderRadius: '3px',
-                      fontSize: '9px',
+                      background: 'var(--bg-secondary)', fontSize: '9px',
                     }}>
                       {m.make} ({m.count})
                     </span>
@@ -81,7 +79,7 @@ function StatRow({ label, value }: { label: string; value: any }) {
 
 function StatBox({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ padding: '4px 6px', background: 'var(--bg-secondary)', borderRadius: '4px' }}>
+    <div style={{ padding: '4px 6px', background: 'var(--bg-secondary)'}}>
       <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{label}</div>
       <div style={{ fontWeight: 600, fontSize: '12px' }}>{value}</div>
     </div>

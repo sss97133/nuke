@@ -70,9 +70,7 @@ export const EditHistoryViewer: React.FC<EditHistoryViewerProps> = ({ vehicleId 
                   key={edit.id}
                   style={{
                     padding: 'var(--space-2)',
-                    border: '2px solid var(--border)',
-                    borderRadius: '0px',
-                    background: 'var(--white)'
+                    border: '2px solid var(--border)', background: 'var(--white)'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>

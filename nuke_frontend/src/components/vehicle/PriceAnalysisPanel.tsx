@@ -26,10 +26,10 @@ interface HistPoint { as_of: string; value: number; type: string }
 
 const to8 = { fontSize: '11px' } as const;
 const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'var(--overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
-const panel: React.CSSProperties = { width: 760, maxWidth: '95%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 2 };
+const panel: React.CSSProperties = { width: 760, maxWidth: '95%', background: 'var(--surface)', border: '1px solid var(--border)'};
 const header: React.CSSProperties = { ...to8, padding: 6, borderBottom: '1px solid var(--border)', background: 'var(--bg)', fontWeight: 700 };
 const body: React.CSSProperties = { padding: 8 };
-const chip: React.CSSProperties = { ...to8, background: 'var(--bg)', border: '1px solid var(--border)', padding: '1px 4px', borderRadius: 2 };
+const chip: React.CSSProperties = { ...to8, background: 'var(--bg)', border: '1px solid var(--border)', padding: '1px 4px'};
 
 const PriceAnalysisPanel: React.FC<PriceAnalysisPanelProps> = ({ vehicleId, isOpen, onClose }) => {
   const [sig, setSig] = useState<RpcSignal | null>(null);
@@ -119,7 +119,7 @@ const PriceAnalysisPanel: React.FC<PriceAnalysisPanelProps> = ({ vehicleId, isOp
                 <div className="text text-muted" style={to8}>30–90d trend</div>
                 {spark ? (
                   <svg width={spark.w} height={spark.h} viewBox={`0 0 ${spark.w} ${spark.h}`} style={{ border: '1px solid var(--border)' }}>
-                    <polyline fill="none" stroke="#2563eb" strokeWidth="1" points={spark.pts} />
+                    <polyline fill="none" stroke="var(--info)" strokeWidth="1" points={spark.pts} />
                   </svg>
                 ) : (
                   <div className="text" style={to8}>Not enough data</div>

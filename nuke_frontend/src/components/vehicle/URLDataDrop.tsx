@@ -96,9 +96,7 @@ export const URLDataDrop: React.FC<URLDataDropProps> = ({ vehicleId, onDataImpor
           <div style={{
             padding: '12px',
             background: 'var(--grey-100)',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            fontSize: '12px'
+            border: '1px solid var(--border)', fontSize: '12px'
           }}>
             <div style={{ fontWeight: 700, marginBottom: '8px' }}>
               Extracted Data:
@@ -166,9 +164,7 @@ export const URLDataDrop: React.FC<URLDataDropProps> = ({ vehicleId, onDataImpor
           color: 'var(--text-muted)',
           marginTop: '12px',
           padding: '8px',
-          background: 'var(--grey-50)',
-          borderRadius: '4px'
-        }}>
+          background: 'var(--grey-50)'}}>
           <div style={{ fontWeight: 600, marginBottom: '4px' }}>Supported Sources:</div>
           <div>• Bring a Trailer (full parse)</div>
           <div>• eBay Motors (VIN extraction)</div>

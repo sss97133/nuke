@@ -295,7 +295,7 @@ const STATS_STACK_STYLE: React.CSSProperties = {
   left:           0,
   zIndex:         300,
   background:     TOKEN.ink,
-  color:          '#ffffff',
+  color:          'var(--surface-elevated)',
   fontFamily:     TOKEN.fontBody,
   fontSize:       8,
   fontWeight:     400,
@@ -327,7 +327,7 @@ const STATS_VALUE: React.CSSProperties = {
   fontFamily: TOKEN.fontMono,
   fontSize: 9,
   fontWeight: 700,
-  color: '#ffffff',
+  color: 'var(--surface-elevated)',
 };
 
 const YMMBadge: React.FC<YMMBadgeProps> = ({ label, dimension, value, onClick }) => {
@@ -443,7 +443,7 @@ const Badge: React.FC<BadgeProps> = ({ variant = '', label, tooltip, onClick }) 
     transform:      'translateX(-50%)',
     zIndex:         200,
     background:     TOKEN.ink,
-    color:          '#ffffff',
+    color:          'var(--surface-elevated)',
     fontFamily:     TOKEN.fontBody,
     fontSize:       7,
     fontWeight:     400,

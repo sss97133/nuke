@@ -187,7 +187,7 @@ export const ImageExpandedData: React.FC<ImageExpandedDataProps> = ({
                   <img
                     src={uploaderAvatar}
                     alt=""
-                    style={{ width: 12, height: 12, borderRadius: 0, border: '1px solid rgba(255,255,255,0.2)', flexShrink: 0 }}
+                    style={{ width: 12, height: 12, border: '1px solid rgba(255,255,255,0.2)', flexShrink: 0 }}
                   />
                 )}
                 {uploaderUsername && rawSource === 'user_upload' ? (
@@ -285,7 +285,7 @@ export const ImageExpandedData: React.FC<ImageExpandedDataProps> = ({
         const env = deep.light_and_environment;
 
         const scoreColor = (s: number) =>
-          s >= 7 ? '#4ade80' : s >= 4 ? '#facc15' : '#f87171';
+          s >= 7 ? 'var(--success)' : s >= 4 ? '#facc15' : 'var(--error)';
 
         return (
           <>
@@ -347,7 +347,7 @@ export const ImageExpandedData: React.FC<ImageExpandedDataProps> = ({
                       fontWeight: 700,
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
-                      color: deg.lifecycle_state === 'archaeological' || deg.lifecycle_state === 'terminal' ? '#f87171' :
+                      color: deg.lifecycle_state === 'archaeological' || deg.lifecycle_state === 'terminal' ? 'var(--error)' :
                              deg.lifecycle_state === 'active_decay' ? '#facc15' : 'rgba(255,255,255,0.7)',
                       border: '1px solid rgba(255,255,255,0.2)',
                     }}>

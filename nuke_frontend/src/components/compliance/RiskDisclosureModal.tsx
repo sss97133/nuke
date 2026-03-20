@@ -122,7 +122,7 @@ export function RiskDisclosureModal({
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-gray-800 max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
           <div>
@@ -155,7 +155,7 @@ export function RiskDisclosureModal({
           {disclosures.map((disclosure, index) => (
             <div
               key={disclosure.type}
-              className={`border rounded-lg overflow-hidden ${
+              className={`border  overflow-hidden ${
                 acknowledged.has(disclosure.type)
                   ? 'border-green-600/50 bg-green-900/10'
                   : 'border-gray-700'
@@ -173,7 +173,7 @@ export function RiskDisclosureModal({
                       e.stopPropagation();
                       toggleAcknowledge(disclosure.type);
                     }}
-                    className={`w-5 h-5 rounded border flex items-center justify-center cursor-pointer ${
+                    className={`w-5 h-5  border flex items-center justify-center cursor-pointer ${
                       acknowledged.has(disclosure.type)
                         ? 'bg-green-600 border-green-600'
                         : 'border-gray-500'
@@ -209,14 +209,14 @@ export function RiskDisclosureModal({
               {/* Disclosure content */}
               {expandedIndex === index && (
                 <div className="px-4 pb-4">
-                  <div className="bg-gray-900 rounded p-4 text-gray-300 text-sm leading-relaxed">
+                  <div className="bg-gray-900 p-4 text-gray-300 text-sm leading-relaxed">
                     {disclosure.content}
                   </div>
 
                   {!acknowledged.has(disclosure.type) && (
                     <button
                       onClick={() => toggleAcknowledge(disclosure.type)}
-                      className="mt-3 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white text-sm"
+                      className="mt-3 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm"
                     >
                       I acknowledge this risk
                     </button>
@@ -238,21 +238,21 @@ export function RiskDisclosureModal({
               value={typed}
               onChange={(e) => setTyped(e.target.value.toUpperCase())}
               placeholder="I UNDERSTAND"
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"
+              className="w-full bg-gray-700 border border-gray-600 px-3 py-2 text-white"
             />
           </div>
 
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white"
+              className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white"
             >
               Cancel
             </button>
             <button
               onClick={handleAcknowledge}
               disabled={saving || !allRequiredAcknowledged || typed !== 'I UNDERSTAND'}
-              className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded text-white disabled:opacity-50"
+              className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50"
             >
               {saving ? 'Processing...' : 'Continue'}
             </button>

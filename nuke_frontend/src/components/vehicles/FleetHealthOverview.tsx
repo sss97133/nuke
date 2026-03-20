@@ -272,9 +272,7 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
               flex: '1 1 120px',
               padding: '12px',
               background: activeFilter === 'healthy' ? 'var(--success-dim)' : 'var(--success-dim)',
-              border: `2px solid ${activeFilter === 'healthy' ? 'var(--success)' : 'var(--success-dim)'}`,
-              borderRadius: '4px',
-              cursor: 'pointer',
+              border: `2px solid ${activeFilter === 'healthy' ? 'var(--success)' : 'var(--success-dim)'}`, cursor: 'pointer',
               textAlign: 'left'
             }}
           >
@@ -294,9 +292,7 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
               flex: '1 1 120px',
               padding: '12px',
               background: activeFilter === 'needs_work' ? 'var(--warning-dim)' : 'var(--warning-dim)',
-              border: `2px solid ${activeFilter === 'needs_work' ? 'var(--warning)' : 'var(--warning-dim)'}`,
-              borderRadius: '4px',
-              cursor: 'pointer',
+              border: `2px solid ${activeFilter === 'needs_work' ? 'var(--warning)' : 'var(--warning-dim)'}`, cursor: 'pointer',
               textAlign: 'left'
             }}
           >
@@ -316,9 +312,7 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
               flex: '1 1 120px',
               padding: '12px',
               background: activeFilter === 'critical' ? 'var(--error-dim)' : 'var(--error-dim)',
-              border: `2px solid ${activeFilter === 'critical' ? 'var(--error)' : 'var(--error-dim)'}`,
-              borderRadius: '4px',
-              cursor: 'pointer',
+              border: `2px solid ${activeFilter === 'critical' ? 'var(--error)' : 'var(--error-dim)'}`, cursor: 'pointer',
               textAlign: 'left'
             }}
           >
@@ -348,16 +342,12 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
           </div>
           <div style={{
             height: '8px',
-            background: 'var(--border)',
-            borderRadius: '4px',
-            overflow: 'hidden'
+            background: 'var(--border)', overflow: 'hidden'
           }}>
             <div style={{
               height: '100%',
               width: `${migrationProgress.percentage}%`,
-              background: 'linear-gradient(90deg, var(--success), var(--success))',
-              borderRadius: '4px',
-              transition: 'width 0.3s ease'
+              background: 'var(--success)', transition: 'width 0.3s ease'
             }} />
           </div>
           <div style={{
@@ -410,17 +400,13 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
                       alignItems: 'center',
                       padding: '8px 12px',
                       background: 'var(--bg)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '4px'
-                    }}
+                      border: '1px solid var(--border)'}}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{
                         fontSize: '11px',
                         background: 'var(--border)',
-                        padding: '2px 6px',
-                        borderRadius: '2px'
-                      }}>
+                        padding: '2px 6px'}}>
                         {fieldIcons[field]}
                       </span>
                       <span style={{ fontSize: '11px' }}>
@@ -436,9 +422,7 @@ const FleetHealthOverview: React.FC<FleetHealthOverviewProps> = ({
                         fontWeight: 600,
                         background: 'var(--accent)',
                         color: 'var(--bg)',
-                        border: 'none',
-                        borderRadius: '3px',
-                        cursor: 'pointer',
+                        border: 'none', cursor: 'pointer',
                         textTransform: 'uppercase'
                       }}
                     >

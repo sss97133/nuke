@@ -134,31 +134,31 @@ export default function AdminPendingVehicles() {
         gap: 'var(--space-3)',
         marginBottom: 'var(--space-6)'
       }}>
-        <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', borderRadius: '0px', border: '2px solid var(--border-light)' }}>
+        <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', border: '2px solid var(--border-light)' }}>
           <div style={{ fontSize: '11px', fontWeight: 700 }}>{analysis.summary.total_pending}</div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Total Pending</div>
         </div>
-        <div style={{ padding: 'var(--space-4)', background: 'var(--warning-dim)', borderRadius: '0px', border: '2px solid var(--border-light)' }}>
+        <div style={{ padding: 'var(--space-4)', background: 'var(--warning-dim)', border: '2px solid var(--border-light)' }}>
           <div style={{ fontSize: '11px', fontWeight: 700 }}>{analysis.summary.missing_vin}</div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Missing VIN</div>
         </div>
-        <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', borderRadius: '0px', border: '2px solid var(--border-light)' }}>
+        <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', border: '2px solid var(--border-light)' }}>
           <div style={{ fontSize: '11px', fontWeight: 700 }}>{analysis.summary.missing_images}</div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Missing Images</div>
         </div>
-        <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', borderRadius: '0px', border: '2px solid var(--border-light)' }}>
+        <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', border: '2px solid var(--border-light)' }}>
           <div style={{ fontSize: '11px', fontWeight: 700 }}>{analysis.summary.missing_description}</div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Missing Description</div>
         </div>
-        <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', borderRadius: '0px', border: '2px solid var(--border-light)' }}>
+        <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', border: '2px solid var(--border-light)' }}>
           <div style={{ fontSize: '11px', fontWeight: 700 }}>{analysis.summary.missing_price}</div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Missing Price</div>
         </div>
-        <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', borderRadius: '0px', border: '2px solid var(--border-light)' }}>
+        <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', border: '2px solid var(--border-light)' }}>
           <div style={{ fontSize: '11px', fontWeight: 700 }}>{analysis.summary.missing_mileage}</div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Missing Mileage</div>
         </div>
-        <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', borderRadius: '0px', border: '2px solid var(--border-light)' }}>
+        <div style={{ padding: 'var(--space-4)', background: 'var(--bg)', border: '2px solid var(--border-light)' }}>
           <div style={{ fontSize: '11px', fontWeight: 700 }}>{analysis.summary.missing_color}</div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Missing Color</div>
         </div>
@@ -171,9 +171,7 @@ export default function AdminPendingVehicles() {
             key={vehicle.vehicle_id}
             style={{
               padding: 'var(--space-4)',
-              border: '2px solid var(--border-light)',
-              borderRadius: '0px',
-              background: 'var(--surface)'
+              border: '2px solid var(--border-light)', background: 'var(--surface)'
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-3)' }}>
@@ -209,9 +207,7 @@ export default function AdminPendingVehicles() {
                       fontSize: '11px',
                       background: 'var(--success)',
                       color: 'var(--white)',
-                      border: '2px solid var(--success)',
-                      borderRadius: '0px',
-                      cursor: sourcing ? 'not-allowed' : 'pointer'
+                      border: '2px solid var(--success)', cursor: sourcing ? 'not-allowed' : 'pointer'
                     }}
                   >
                     Source Data
@@ -227,9 +223,7 @@ export default function AdminPendingVehicles() {
                   key={need}
                   style={{
                     padding: 'var(--space-1) var(--space-2)',
-                    background: getNeedColor(need),
-                    borderRadius: '0px',
-                    fontSize: '11px',
+                    background: getNeedColor(need), fontSize: '11px',
                     fontWeight: 500
                   }}
                 >

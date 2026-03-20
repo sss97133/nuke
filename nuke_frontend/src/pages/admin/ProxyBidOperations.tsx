@@ -339,9 +339,7 @@ export default function ProxyBidOperations() {
                     <div
                       key={bid.id}
                       style={{
-                        border: '1px solid var(--border)',
-                        borderRadius: '4px',
-                        padding: '12px',
+                        border: '1px solid var(--border)', padding: '12px',
                         background: selectedBid?.id === bid.id ? 'var(--accent-dim)' : 'var(--surface)',
                         cursor: 'pointer',
                       }}
@@ -353,7 +351,7 @@ export default function ProxyBidOperations() {
                           <img
                             src={bid.vehicle.primary_image_url}
                             alt=""
-                            style={{ width: '80px', height: '60px', objectFit: 'cover', borderRadius: '4px' }}
+                            style={{ width: '80px', height: '60px', objectFit: 'cover'}}
                           />
                         )}
 
@@ -375,9 +373,7 @@ export default function ProxyBidOperations() {
                                 style={{
                                   background: getStatusColor(bid.status),
                                   color: 'var(--text-on-accent, #fff)',
-                                  padding: '2px 8px',
-                                  borderRadius: '3px',
-                                  fontSize: '9px',
+                                  padding: '2px 8px', fontSize: '9px',
                                   fontWeight: 700,
                                   textTransform: 'uppercase',
                                 }}
@@ -533,9 +529,7 @@ export default function ProxyBidOperations() {
                               <h4 style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>Execution Log</h4>
                               <div style={{
                                 background: 'var(--surface-hover)',
-                                padding: '8px',
-                                borderRadius: '4px',
-                                maxHeight: '200px',
+                                padding: '8px', maxHeight: '200px',
                                 overflowY: 'auto',
                                 fontSize: '9px'
                               }}>

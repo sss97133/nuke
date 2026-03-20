@@ -58,7 +58,7 @@ export default function MakePortal({ make, activePortal, onOpen }: MakePortalPro
             {data.sentiment_score != null && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                 <span style={{
-                  width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+                  width: '6px', height: '6px', flexShrink: 0,
                   background: data.sentiment_score > 0.6 ? 'var(--success)' : data.sentiment_score > 0.3 ? 'var(--warning)' : 'var(--error)',
                 }} />
                 <span style={{ color: 'var(--text-muted)' }}>
@@ -91,7 +91,7 @@ export default function MakePortal({ make, activePortal, onOpen }: MakePortalPro
 
 function StatBox({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div style={{ padding: '4px 6px', background: 'var(--bg-secondary, #f3f4f6)', borderRadius: '4px' }}>
+    <div style={{ padding: '4px 6px', background: 'var(--bg-secondary, #f3f4f6)'}}>
       <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{label}</div>
       <div style={{ fontWeight: 600, fontSize: '12px', color: color || 'var(--text)' }}>{value}</div>
     </div>

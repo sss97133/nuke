@@ -8,8 +8,8 @@ interface ScoreBadgeProps {
 
 const getScoreColor = (score: number): string => {
   if (score >= 75) return '#15803d'; // green
-  if (score >= 50) return '#d97706'; // amber
-  return '#dc2626'; // red
+  if (score >= 50) return 'var(--warning)'; // amber
+  return 'var(--error)'; // red
 };
 
 export const ScoreBadge: React.FC<ScoreBadgeProps> = ({
@@ -45,9 +45,7 @@ export const ScoreBadge: React.FC<ScoreBadgeProps> = ({
         alignItems: 'center',
         gap: '4px',
         padding: '2px 6px',
-        background: `${confColor}15`,
-        borderRadius: '2px'
-      }}>
+        background: `${confColor}15`}}>
         <span style={{ color: confColor, fontSize: '13px' }}>●</span>
         <span style={{ color: confColor, fontWeight: 600 }}>{confidence}%</span>
         <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>CONF</span>
@@ -57,9 +55,7 @@ export const ScoreBadge: React.FC<ScoreBadgeProps> = ({
         alignItems: 'center',
         gap: '4px',
         padding: '2px 6px',
-        background: `${intColor}15`,
-        borderRadius: '2px'
-      }}>
+        background: `${intColor}15`}}>
         <span style={{ color: intColor, fontSize: '13px' }}>●</span>
         <span style={{ color: intColor, fontWeight: 600 }}>{interaction}%</span>
         <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>INT</span>

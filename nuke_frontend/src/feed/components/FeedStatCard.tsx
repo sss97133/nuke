@@ -73,13 +73,13 @@ export function FeedStatCard({
           {stats.active_auctions > 0 && (
             <div>
               <div style={labelStyle}>LIVE AUCTIONS</div>
-              <div style={{ ...valueStyle, color: '#ef4444' }}>{stats.active_auctions}</div>
+              <div style={{ ...valueStyle, color: 'var(--error)' }}>{stats.active_auctions}</div>
             </div>
           )}
           {stats.sales_count_today > 0 && (
             <div>
               <div style={labelStyle}>SOLD TODAY</div>
-              <div style={{ ...valueStyle, color: '#10b981' }}>{stats.sales_count_today}</div>
+              <div style={{ ...valueStyle, color: 'var(--success)' }}>{stats.sales_count_today}</div>
             </div>
           )}
         </>
@@ -89,7 +89,7 @@ export function FeedStatCard({
           {stats.vehicles_added_today > 0 && (
             <div>
               <div style={labelStyle}>ADDED TODAY</div>
-              <div style={{ ...valueStyle, color: '#10b981' }}>+{stats.vehicles_added_today}</div>
+              <div style={{ ...valueStyle, color: 'var(--success)' }}>+{stats.vehicles_added_today}</div>
             </div>
           )}
           <div>

@@ -223,9 +223,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
         gridTemplateColumns: '1fr 1fr 1fr',
         gap: 8,
         padding: 8,
-        background: 'var(--grey-50)',
-        borderRadius: 4,
-        fontSize: '11px'
+        background: 'var(--grey-50)', fontSize: '11px'
       }}>
         <div>
           <div style={{ color: 'var(--text-muted)', marginBottom: 2 }}>REPORTED PROFIT</div>
@@ -251,7 +249,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
           <span>Sale: {formatUSD(summary.sale_price)}</span>
         </div>
         {Number(summary.sale_price) > 0 && (
-          <div style={{ height: 6, background: 'var(--grey-200)', borderRadius: 3, overflow: 'hidden', display: 'flex' }}>
+          <div style={{ height: 6, background: 'var(--grey-200)', overflow: 'hidden', display: 'flex' }}>
             <div style={{ width: `${Math.min(100, (Number(summary.purchase_cost) / Number(summary.sale_price)) * 100)}%`, background: 'var(--accent)' }} />
             <div style={{ width: `${Math.min(100, (Number(summary.total_recon) / Number(summary.sale_price)) * 100)}%`, background: reconPct > 80 ? 'var(--error)' : 'var(--warning-bright, #f97316)' }} />
           </div>
@@ -287,8 +285,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
         <button
           onClick={() => setShowDetails(!showDetails)}
           style={{
-            fontSize: '11px', padding: '2px 8px', border: '1px solid var(--border-medium)',
-            borderRadius: 3, background: showDetails ? 'var(--grey-100)' : 'var(--white)',
+            fontSize: '11px', padding: '2px 8px', border: '1px solid var(--border-medium)', background: showDetails ? 'var(--grey-100)' : 'var(--white)',
             cursor: 'pointer'
           }}
         >
@@ -298,8 +295,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
           <button
             onClick={() => setShowLineItems(!showLineItems)}
             style={{
-              fontSize: '11px', padding: '2px 8px', border: '1px solid var(--border-medium)',
-              borderRadius: 3, background: showLineItems ? 'var(--grey-100)' : 'var(--white)',
+              fontSize: '11px', padding: '2px 8px', border: '1px solid var(--border-medium)', background: showLineItems ? 'var(--grey-100)' : 'var(--white)',
               cursor: 'pointer'
             }}
           >
@@ -313,8 +309,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
               window.open(`/vehicle/${vehicleId}?image=${summary.image_id}`, '_blank');
             }}
             style={{
-              fontSize: '11px', padding: '2px 8px', border: '1px solid var(--border-medium)',
-              borderRadius: 3, background: 'var(--white)', cursor: 'pointer',
+              fontSize: '11px', padding: '2px 8px', border: '1px solid var(--border-medium)', background: 'var(--white)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 3
             }}
           >

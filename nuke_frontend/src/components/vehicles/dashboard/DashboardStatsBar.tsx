@@ -70,14 +70,14 @@ export const DashboardStatsBar: React.FC<DashboardStatsBarProps> = ({
         <StatItem
           value={`${avgConfidence}%`}
           label="Avg Conf"
-          valueColor={avgConfidence >= 75 ? '#15803d' : avgConfidence >= 50 ? '#d97706' : '#dc2626'}
+          valueColor={avgConfidence >= 75 ? '#15803d' : avgConfidence >= 50 ? 'var(--warning)' : 'var(--error)'}
         />
       )}
       {avgInteraction !== undefined && (
         <StatItem
           value={`${avgInteraction}%`}
           label="Avg Int"
-          valueColor={avgInteraction >= 75 ? '#15803d' : avgInteraction >= 50 ? '#d97706' : '#dc2626'}
+          valueColor={avgInteraction >= 75 ? '#15803d' : avgInteraction >= 50 ? 'var(--warning)' : 'var(--error)'}
         />
       )}
     </div>
@@ -96,9 +96,7 @@ const StatItem: React.FC<StatItemProps> = ({ value, label, valueColor }) => (
     flexDirection: 'column',
     alignItems: 'center',
     padding: 'var(--space-2)',
-    background: 'var(--surface-hover)',
-    borderRadius: '2px'
-  }}>
+    background: 'var(--surface-hover)'}}>
     <div style={{
       fontSize: '19px',
       fontWeight: 700,

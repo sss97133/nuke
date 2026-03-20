@@ -150,7 +150,7 @@ export default function AuctionListing() {
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 4 }}>Listing: <span style={{ fontFamily: 'monospace' }}>{listing.id}</span></div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span style={{ padding: '4px 8px', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '11px', fontWeight: 700, borderRadius: 4 }}>{String(listing.status || '').toUpperCase()}</span>
+              <span style={{ padding: '4px 8px', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '11px', fontWeight: 700}}>{String(listing.status || '').toUpperCase()}</span>
               <Link to={`/vehicle/${listing.vehicle_id}`} className="button button-small">View Vehicle</Link>
             </div>
           </div>

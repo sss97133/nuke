@@ -40,15 +40,11 @@ const BadgeHoverPreview: React.FC<BadgeHoverPreviewProps> = ({ badgeRect, childr
         pointerEvents: 'none',
         background: 'rgba(15,15,15,0.95)',
         backdropFilter: 'blur(8px)',
-        border: '1px solid rgba(255,255,255,0.12)',
-        borderRadius: '6px',
-        padding: '8px 10px',
+        border: '1px solid rgba(255,255,255,0.12)', padding: '8px 10px',
         color: 'var(--bg)',
         fontSize: '11px',
         lineHeight: 1.5,
-        maxWidth: '240px',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-        opacity: position ? 1 : 0,
+        maxWidth: '240px', opacity: position ? 1 : 0,
         transition: 'opacity 0.1s ease-in',
       }}
     >

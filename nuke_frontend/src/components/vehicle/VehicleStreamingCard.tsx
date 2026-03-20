@@ -224,9 +224,7 @@ const VehicleStreamingCard: React.FC<VehicleStreamingCardProps> = ({
               <span style={{
                 background: 'var(--error)',
                 color: 'var(--bg)',
-                padding: '2px 6px',
-                borderRadius: 4,
-                fontSize: '10px',
+                padding: '2px 6px', fontSize: '10px',
                 fontWeight: 700
               }}>
                 LIVE
@@ -265,7 +263,7 @@ const VehicleStreamingCard: React.FC<VehicleStreamingCardProps> = ({
             <select
               value={provider}
               onChange={(e) => setProvider(e.target.value as StreamProvider)}
-              style={{ padding: '6px 8px', borderRadius: 4, border: '1px solid var(--border)' }}
+              style={{ padding: '6px 8px', border: '1px solid var(--border)' }}
             >
               <option value="mux">Nuke Live (Mux)</option>
               <option value="twitch">Twitch</option>
@@ -277,7 +275,7 @@ const VehicleStreamingCard: React.FC<VehicleStreamingCardProps> = ({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={defaultTitle}
-                style={{ padding: '6px 8px', borderRadius: 4, border: '1px solid var(--border)' }}
+                style={{ padding: '6px 8px', border: '1px solid var(--border)' }}
               />
             </div>
 
@@ -303,7 +301,7 @@ const VehicleStreamingCard: React.FC<VehicleStreamingCardProps> = ({
                     value={twitchUrl}
                     onChange={(e) => setTwitchUrl(e.target.value)}
                     placeholder={twitchIdentity?.profile_url || 'https://www.twitch.tv/yourchannel'}
-                    style={{ padding: '6px 8px', borderRadius: 4, border: '1px solid var(--border)' }}
+                    style={{ padding: '6px 8px', border: '1px solid var(--border)' }}
                   />
                 </div>
               </div>

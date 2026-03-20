@@ -199,9 +199,7 @@ export const AnnotoriousImageTagger: React.FC<AnnotoriousImageTaggerProps> = ({
             left: '20px',
             background: 'rgba(0, 0, 0, 0.9)',
             border: '2px solid rgba(255, 255, 255, 0.3)',
-            padding: '16px',
-            borderRadius: '4px',
-            color: '#ffffff',
+            padding: '16px', color: 'var(--surface-elevated)',
             maxWidth: '300px'
           }}
         >

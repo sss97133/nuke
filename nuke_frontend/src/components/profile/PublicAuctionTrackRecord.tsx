@@ -201,16 +201,14 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ listings, loading = 
                     <img
                       src={vehicle.primary_image_url}
                       alt={vehicleTitle}
-                      style={{ width: '120px', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
+                      style={{ width: '120px', height: '80px', objectFit: 'cover'}}
                     />
                   ) : (
                     <div
                       style={{
                         width: '120px',
                         height: '80px',
-                        backgroundColor: '#ddd',
-                        borderRadius: '4px',
-                        display: 'flex',
+                        backgroundColor: '#ddd', display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontSize: '12px',
@@ -235,7 +233,7 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ listings, loading = 
                   </div>
                 </div>
 
-                <div style={{ padding: '8px', backgroundColor: 'var(--bg)', borderRadius: '4px', marginBottom: '12px' }}>
+                <div style={{ padding: '8px', backgroundColor: 'var(--bg)', marginBottom: '12px' }}>
                   <div style={{ fontSize: '10px', color: '#666' }}>Sold For</div>
                   <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{formatCurrency(salePrice)}</div>
                 </div>

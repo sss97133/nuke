@@ -156,9 +156,7 @@ export const DealerTransactionInput: React.FC<DealerTransactionInputProps> = ({
               className="form-input"
               style={{
                 width: '100%',
-                border: '2px solid var(--border)',
-                borderRadius: '0px'
-              }}
+                border: '2px solid var(--border)'}}
             />
           </div>
 
@@ -174,9 +172,7 @@ export const DealerTransactionInput: React.FC<DealerTransactionInputProps> = ({
               className="form-input"
               style={{
                 width: '100%',
-                border: '2px solid var(--border)',
-                borderRadius: '0px'
-              }}
+                border: '2px solid var(--border)'}}
             />
           </div>
 
@@ -222,9 +218,7 @@ export const DealerTransactionInput: React.FC<DealerTransactionInputProps> = ({
               className="form-input"
               style={{
                 width: '100%',
-                border: '2px solid var(--border)',
-                borderRadius: '0px'
-              }}
+                border: '2px solid var(--border)'}}
             />
           </div>
 
@@ -241,9 +235,7 @@ export const DealerTransactionInput: React.FC<DealerTransactionInputProps> = ({
               rows={2}
               style={{
                 width: '100%',
-                border: '2px solid var(--border)',
-                borderRadius: '0px',
-                resize: 'vertical'
+                border: '2px solid var(--border)', resize: 'vertical'
               }}
             />
           </div>
@@ -274,9 +266,7 @@ export const DealerTransactionInput: React.FC<DealerTransactionInputProps> = ({
                   key={t.id}
                   style={{
                     padding: 'var(--space-2)',
-                    border: '2px solid var(--border)',
-                    borderRadius: '0px',
-                    background: 'var(--white)',
+                    border: '2px solid var(--border)', background: 'var(--white)',
                     marginBottom: 'var(--space-1)'
                   }}
                 >

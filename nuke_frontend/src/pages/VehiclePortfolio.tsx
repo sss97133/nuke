@@ -451,7 +451,7 @@ const styles: Record<string, React.CSSProperties> = {
   root: {
     background: 'var(--bg)',
     minHeight: '100vh',
-    fontFamily: '"Inter", "SF Pro Display", system-ui, -apple-system, sans-serif',
+    fontFamily: 'Arial, sans-serif',
     color: 'var(--text)',
   },
 
@@ -468,7 +468,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     letterSpacing: '0.2em',
     textTransform: 'uppercase',
-    fontFamily: 'system-ui',
+    fontFamily: 'Arial, sans-serif',
   },
 
   // Header
@@ -583,7 +583,7 @@ const styles: Record<string, React.CSSProperties> = {
   specVin: {
     color: 'var(--text-secondary)',
     fontSize: '11px',
-    fontFamily: '"SF Mono", "Fira Code", monospace',
+    fontFamily: "'Courier New', monospace",
     letterSpacing: '0.06em',
   },
 
@@ -640,9 +640,7 @@ const styles: Record<string, React.CSSProperties> = {
     breakInside: 'avoid',
     marginBottom: '6px',
     cursor: 'pointer',
-    overflow: 'hidden',
-    borderRadius: '2px',
-    transition: 'opacity 0.2s',
+    overflow: 'hidden', transition: 'opacity 0.2s',
   },
   galleryTileHover: {
     opacity: 0.88,
@@ -659,9 +657,7 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '0.15em',
     textTransform: 'uppercase',
     cursor: 'pointer',
-    color: 'var(--text-secondary)',
-    borderRadius: '2px',
-    transition: 'border-color 0.15s',
+    color: 'var(--text-secondary)', transition: 'border-color 0.15s',
   },
 
   // Documents
@@ -686,23 +682,17 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '16px',
     padding: '16px 18px',
     background: 'var(--surface)',
-    border: '1px solid var(--border)',
-    borderRadius: '4px',
-    textDecoration: 'none',
+    border: '1px solid var(--border)', textDecoration: 'none',
     color: 'inherit',
     transition: 'border-color 0.15s, box-shadow 0.15s',
   },
   docCardHover: {
-    borderColor: 'var(--text-disabled)',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-  },
+    borderColor: 'var(--text-disabled)', },
   docIcon: {
     flexShrink: 0,
     width: '36px',
     height: '44px',
-    background: 'var(--bg)',
-    borderRadius: '3px',
-    display: 'flex',
+    background: 'var(--bg)', display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -755,7 +745,7 @@ const styles: Record<string, React.CSSProperties> = {
   footerVin: {
     color: 'var(--text)',
     fontSize: '11px',
-    fontFamily: '"SF Mono", monospace',
+    fontFamily: "'Courier New', monospace",
     letterSpacing: '0.06em',
   },
 
@@ -772,9 +762,7 @@ const styles: Record<string, React.CSSProperties> = {
   lightboxImg: {
     maxWidth: '92vw',
     maxHeight: '92vh',
-    objectFit: 'contain',
-    borderRadius: '2px',
-  },
+    objectFit: 'contain', },
   lightboxNavBtn: {
     position: 'absolute',
     top: '50%',

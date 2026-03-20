@@ -31,7 +31,7 @@ interface QualityMetrics {
 
 const VehicleDataQualityRating: React.FC<VehicleDataQualityRatingProps> = ({
   vehicleId,
-  className = ''
+  className =''
 }) => {
   const [metrics, setMetrics] = useState<QualityMetrics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -163,14 +163,14 @@ const VehicleDataQualityRating: React.FC<VehicleDataQualityRatingProps> = ({
     }
 
     // Convert to letter grade
-    if (score >= 95) return { grade: 'A+' as const, color: '#22c55e' };
-    if (score >= 90) return { grade: 'A' as const, color: '#16a34a' };
+    if (score >= 95) return { grade: 'A+' as const, color: 'var(--success)' };
+    if (score >= 90) return { grade: 'A' as const, color: 'var(--success)' };
     if (score >= 85) return { grade: 'B+' as const, color: '#65a30d' };
     if (score >= 80) return { grade: 'B' as const, color: '#84cc16' };
-    if (score >= 75) return { grade: 'C+' as const, color: '#eab308' };
-    if (score >= 70) return { grade: 'C' as const, color: '#f59e0b' };
-    if (score >= 60) return { grade: 'D' as const, color: '#f97316' };
-    return { grade: 'F' as const, color: '#ef4444' };
+    if (score >= 75) return { grade: 'C+' as const, color: 'var(--warning)' };
+    if (score >= 70) return { grade: 'C' as const, color: 'var(--warning)' };
+    if (score >= 60) return { grade: 'D' as const, color: 'var(--orange)' };
+    return { grade: 'F' as const, color: 'var(--error)' };
   };
 
   const calculateTrustScore = (humanPercentage: number, sourceSummary: FieldSourceSummary[]): number => {
@@ -228,8 +228,8 @@ const VehicleDataQualityRating: React.FC<VehicleDataQualityRatingProps> = ({
   if (loading) {
     return (
       <div className={`flex items-center space-x-2 ${className}`}>
-        <div className="animate-pulse bg-gray-200 h-6 w-16 rounded"></div>
-        <div className="animate-pulse bg-gray-200 h-4 w-32 rounded"></div>
+        <div className="animate-pulse bg-gray-200 h-6 w-16"></div>
+        <div className="animate-pulse bg-gray-200 h-4 w-32"></div>
       </div>
     );
   }
@@ -246,7 +246,7 @@ const VehicleDataQualityRating: React.FC<VehicleDataQualityRatingProps> = ({
     <div className={`flex items-center space-x-3 ${className}`}>
       {/* Rating Badge */}
       <div 
-        className="flex items-center justify-center w-12 h-8 rounded font-bold text-white text-sm"
+        className="flex items-center justify-center w-12 h-8 font-bold text-white text-sm"
         style={{ backgroundColor: metrics.ratingColor }}
       >
         {metrics.overallRating}

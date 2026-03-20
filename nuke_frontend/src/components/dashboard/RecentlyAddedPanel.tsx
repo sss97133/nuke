@@ -284,10 +284,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
           width: '100%',
           maxWidth: '1200px',
           background: 'var(--surface)',
-          border: '2px solid var(--border)',
-          borderRadius: 'var(--radius)',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-          marginTop: 'var(--space-6)',
+          border: '2px solid var(--border)', marginTop: 'var(--space-6)',
           marginBottom: 'var(--space-6)',
           overflow: 'hidden',
         }}
@@ -315,9 +312,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
               color: 'var(--success)',
               fontSize: 'var(--fs-8)',
               fontWeight: 700,
-              padding: '2px 8px',
-              borderRadius: '999px',
-              border: '1px solid rgba(16,185,129,0.3)',
+              padding: '2px 8px', border: '1px solid rgba(16,185,129,0.3)',
             }}>
               {summaryStats.count}
             </span>
@@ -328,9 +323,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
               width: 28, height: 28,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'transparent',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              color: 'var(--text-secondary)',
+              border: '1px solid var(--border)', color: 'var(--text-secondary)',
               cursor: 'pointer',
               fontSize: '14px',
             }}
@@ -360,9 +353,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
                 padding: '2px 4px',
                 background: 'var(--surface)',
                 color: 'var(--text)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                cursor: 'pointer',
+                border: '1px solid var(--border)', cursor: 'pointer',
               }}
             >
               {TIMEZONES.map(tz => (
@@ -379,9 +370,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
                   padding: '2px 8px',
                   fontSize: 'var(--fs-8)',
                   fontWeight: 600,
-                  border: timeSpan === s.value ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  borderRadius: 'var(--radius)',
-                  background: timeSpan === s.value ? 'var(--accent-dim)' : 'transparent',
+                  border: timeSpan === s.value ? '1px solid var(--accent)' : '1px solid var(--border)', background: timeSpan === s.value ? 'var(--accent-dim)' : 'transparent',
                   color: timeSpan === s.value ? 'var(--accent)' : 'var(--text-secondary)',
                   cursor: 'pointer',
                 }}
@@ -446,9 +435,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
               </div>
               <div style={{
                 background: 'var(--surface-hover)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: '12px',
+                border: '1px solid var(--border)', padding: '12px',
               }}>
                 <MiniLineChart
                   series={chartSeries}
@@ -478,14 +465,12 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
                     gap: '8px',
                     padding: '6px 10px',
                     background: 'var(--surface-hover)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius)',
-                    fontSize: 'var(--fs-8)',
+                    border: '1px solid var(--border)', fontSize: 'var(--fs-8)',
                   }}>
                     {row.info?.website ? (
                       <FaviconIcon url={row.info.website} size={16} />
                     ) : (
-                      <span style={{ width: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--border)', borderRadius: '2px', fontSize: '9px', color: 'var(--text-secondary)' }}>?</span>
+                      <span style={{ width: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--border)', fontSize: '9px', color: 'var(--text-secondary)' }}>?</span>
                     )}
                     <span style={{ fontWeight: 600, color: 'var(--text)', flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {row.info?.business_name || (row.orgId === '__unknown__' ? 'Unknown Source' : row.orgId.slice(0, 8))}
@@ -525,9 +510,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
                       padding: '2px 6px',
                       fontSize: 'var(--fs-8)',
                       fontWeight: 600,
-                      border: sortBy === opt.value ? '1px solid var(--accent)' : '1px solid var(--border)',
-                      borderRadius: 'var(--radius)',
-                      background: sortBy === opt.value ? 'var(--accent-dim)' : 'transparent',
+                      border: sortBy === opt.value ? '1px solid var(--accent)' : '1px solid var(--border)', background: sortBy === opt.value ? 'var(--accent-dim)' : 'transparent',
                       color: sortBy === opt.value ? 'var(--accent)' : 'var(--text-secondary)',
                       cursor: 'pointer',
                     }}
@@ -559,9 +542,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
                       gap: '8px',
                       padding: '6px 8px',
                       background: 'var(--surface-hover)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius)',
-                      cursor: onNavigateToVehicle ? 'pointer' : 'default',
+                      border: '1px solid var(--border)', cursor: onNavigateToVehicle ? 'pointer' : 'default',
                       fontSize: 'var(--fs-8)',
                       transition: 'border-color 0.15s',
                     }}
@@ -570,9 +551,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
                   >
                     {/* Thumbnail */}
                     <div style={{
-                      width: 48, height: 36,
-                      borderRadius: '3px',
-                      overflow: 'hidden',
+                      width: 48, height: 36, overflow: 'hidden',
                       flexShrink: 0,
                       background: 'var(--border)',
                     }}>
@@ -641,9 +620,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
                 padding: '4px 12px',
                 fontSize: 'var(--fs-8)',
                 fontWeight: 600,
-                border: '1px solid var(--accent)',
-                borderRadius: 'var(--radius)',
-                background: 'var(--accent-dim)',
+                border: '1px solid var(--accent)', background: 'var(--accent-dim)',
                 color: 'var(--accent)',
                 cursor: 'pointer',
               }}
@@ -662,9 +639,7 @@ const RecentlyAddedPanel: React.FC<RecentlyAddedPanelProps> = ({
 const StatCard: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div style={{
     background: 'var(--surface-hover)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius)',
-    padding: '8px 10px',
+    border: '1px solid var(--border)', padding: '8px 10px',
     textAlign: 'center',
   }}>
     <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
@@ -675,14 +650,12 @@ const StatCard: React.FC<{ label: string; value: string }> = ({ label, value }) 
 const HorizontalBar: React.FC<{ label: string; count: number; maxCount: number; color: string }> = ({ label, count, maxCount, color }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
     <span style={{ width: '60px', fontSize: 'var(--fs-8)', color: 'var(--text-secondary)', textAlign: 'right', flexShrink: 0 }}>{label}</span>
-    <div style={{ flex: 1, height: '12px', background: 'var(--surface)', borderRadius: '2px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+    <div style={{ flex: 1, height: '12px', background: 'var(--surface)', overflow: 'hidden', border: '1px solid var(--border)' }}>
       <div style={{
         width: `${maxCount > 0 ? (count / maxCount) * 100 : 0}%`,
         height: '100%',
         background: color,
-        opacity: 0.6,
-        borderRadius: '2px',
-        transition: 'width 0.3s ease',
+        opacity: 0.6, transition: 'width 0.3s ease',
       }} />
     </div>
     <span style={{ width: '28px', fontSize: 'var(--fs-8)', fontWeight: 600, color: 'var(--text)', textAlign: 'right', flexShrink: 0 }}>{count}</span>

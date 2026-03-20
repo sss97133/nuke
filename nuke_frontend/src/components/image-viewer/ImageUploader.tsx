@@ -77,9 +77,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   return (
     <div>
       <div className="relative group" style={{
-        aspectRatio: '4/3',
-        borderRadius: 'var(--radius)',
-        backgroundColor: '#f8f9fa',
+        aspectRatio: '4/3', backgroundColor: '#f8f9fa',
         border: '2px dashed #dee2e6',
         overflow: 'hidden'
       }}>
@@ -93,7 +91,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
         {uploadProgress.uploading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-3">
+            <div className="w-16 h-16 bg-blue-100 flex items-center justify-center mb-3">
               <div className="text-blue-600 font-semibold">
                 {uploadProgress.total > 0 ? Math.round((uploadProgress.completed / uploadProgress.total) * 100) : 0}%
               </div>
@@ -101,7 +99,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             <div className="text-sm font-medium text-gray-700">
               Uploading {uploadProgress.completed} of {uploadProgress.total} files...
             </div>
-            <div className="w-32 h-2 bg-gray-200 rounded-full mt-2 overflow-hidden">
+            <div className="w-32 h-2 bg-gray-200 mt-2 overflow-hidden">
               <div
                 className="h-full bg-blue-600 transition-all duration-300"
                 style={{
@@ -114,7 +112,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           </div>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 group-hover:text-gray-700 transition-colors">
-            <div className="w-12 h-12 rounded-full bg-white border-2 border-gray-300 flex items-center justify-center mb-2 group-hover:border-gray-400 transition-colors">
+            <div className="w-12 h-12 bg-white border-2 border-gray-300 flex items-center justify-center mb-2 group-hover:border-gray-400 transition-colors">
               <span className="text-xl font-light">+</span>
             </div>
             <div className="text-sm font-medium">Drop files here</div>
@@ -125,7 +123,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
       {/* Error Display */}
       {errors.length > 0 && (
-        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+        <div className="mt-2 p-2 bg-red-50 border border-red-200 text-xs text-red-700">
           <div className="font-semibold mb-1">Upload errors:</div>
           {errors.map((error, idx) => (
             <div key={idx}>• {error}</div>

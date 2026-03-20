@@ -425,9 +425,7 @@ const Profile: React.FC = () => {
             gap: 'var(--space-3)',
             padding: 'var(--space-3)',
             marginBottom: 'var(--space-4)',
-            background: 'var(--surface)',
-            borderRadius: '4px',
-            border: '1px solid var(--border)'
+            background: 'var(--surface)', border: '1px solid var(--border)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: 1 }}>
               {/* Avatar - Circular - Larger */}
@@ -457,9 +455,7 @@ const Profile: React.FC = () => {
               <div
                 style={{
                   width: '100%',
-                  height: '100%',
-                  borderRadius: '50%',
-                  border: '2px solid var(--border)',
+                  height: '100%', border: '2px solid var(--border)',
                   cursor: isOwnProfile ? 'pointer' : 'default',
                   background: 'var(--surface)',
                   overflow: 'hidden'
@@ -510,9 +506,7 @@ const Profile: React.FC = () => {
                       fontWeight: 700,
                       padding: '1px 6px',
                       background: 'var(--success, #28a745)',
-                      color: '#fff',
-                      borderRadius: '3px',
-                      lineHeight: '1.4'
+                      color: '#fff', lineHeight: '1.4'
                     }}>Verified</span>
                   )}
                   {profile.user_type && profile.user_type !== 'user' && (
@@ -521,9 +515,7 @@ const Profile: React.FC = () => {
                       fontWeight: 700,
                       padding: '1px 6px',
                       background: 'var(--text-muted)',
-                      color: 'var(--surface)',
-                      borderRadius: '3px',
-                      lineHeight: '1.4',
+                      color: 'var(--surface)', lineHeight: '1.4',
                       textTransform: 'capitalize'
                     }}>{profile.user_type}</span>
                   )}
@@ -805,9 +797,7 @@ const Profile: React.FC = () => {
                     marginBottom: 'var(--space-4)',
                     border: '2px solid var(--border-light)',
                     backgroundColor: 'var(--white)',
-                    padding: 'var(--space-4)',
-                    borderRadius: '0px',
-                  }}>
+                    padding: 'var(--space-4)', }}>
                     <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-3)' }}>
                       Get started
                     </div>

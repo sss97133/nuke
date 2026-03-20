@@ -319,9 +319,7 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
           </span>
           <span style={{
             background: 'var(--warning)',
-            color: 'var(--bg)',
-            borderRadius: '10px',
-            padding: '1px 8px',
+            color: 'var(--bg)', padding: '1px 8px',
             fontSize: '11px',
             fontWeight: 600,
           }}>
@@ -353,10 +351,10 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
                   {/* Thumbnails strip */}
                   <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
                     {thumbs.slice(0, 3).map((url, i) => (
-                      <img key={i} src={url} style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '3px', background: 'var(--border)' }} alt="" />
+                      <img key={i} src={url} style={{ width: '36px', height: '36px', objectFit: 'cover', background: 'var(--border)' }} alt="" />
                     ))}
                     {thumbs.length === 0 && (
-                      <div style={{ width: '36px', height: '36px', background: 'var(--warning-dim)', borderRadius: '3px' }} />
+                      <div style={{ width: '36px', height: '36px', background: 'var(--warning-dim)'}} />
                     )}
                   </div>
 
@@ -386,7 +384,7 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
                   <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--warning-dim)' }}>
                     {/* AI suggestion chip */}
                     {suggestion && (
-                      <div style={{ marginBottom: '10px', padding: '8px 10px', background: 'var(--warning-dim)', borderRadius: '4px', fontSize: '11px', color: 'var(--warning)', lineHeight: 1.5 }}>
+                      <div style={{ marginBottom: '10px', padding: '8px 10px', background: 'var(--warning-dim)', fontSize: '11px', color: 'var(--warning)', lineHeight: 1.5 }}>
                         <strong>AI:</strong> "{suggestion.title}" · {suggestion.event_type}
                         {suggestion.reasoning ? ` — ${suggestion.reasoning}` : ''}
                         <button
@@ -394,7 +392,7 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
                             ...prev,
                             [event.id]: { ...prev[event.id], title: suggestion.title, event_type: suggestion.event_type },
                           }))}
-                          style={{ background: 'var(--warning)', border: 'none', borderRadius: '3px', padding: '2px 8px', fontSize: '10px', color: 'var(--bg)', cursor: 'pointer', marginLeft: '8px' }}
+                          style={{ background: 'var(--warning)', border: 'none', padding: '2px 8px', fontSize: '10px', color: 'var(--bg)', cursor: 'pointer', marginLeft: '8px' }}
                         >
                           Accept
                         </button>
@@ -407,7 +405,7 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
                         <input
                           value={form.title}
                           onChange={e => updateForm(event.id, 'title', e.target.value)}
-                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '3px', boxSizing: 'border-box' }}
+                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', boxSizing: 'border-box' }}
                         />
                       </div>
                       <div>
@@ -415,7 +413,7 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
                         <select
                           value={form.event_type}
                           onChange={e => updateForm(event.id, 'event_type', e.target.value)}
-                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '3px', boxSizing: 'border-box' }}
+                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', boxSizing: 'border-box' }}
                         >
                           {EVENT_TYPE_OPTIONS.map(opt => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -428,7 +426,7 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
                           value={form.cost}
                           onChange={e => updateForm(event.id, 'cost', e.target.value)}
                           placeholder="$0.00"
-                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '3px', boxSizing: 'border-box' }}
+                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', boxSizing: 'border-box' }}
                         />
                       </div>
                       <div>
@@ -437,7 +435,7 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
                           value={form.vendor}
                           onChange={e => updateForm(event.id, 'vendor', e.target.value)}
                           placeholder="Shop name..."
-                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '3px', boxSizing: 'border-box' }}
+                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', boxSizing: 'border-box' }}
                         />
                       </div>
                     </div>
@@ -448,7 +446,7 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
                         onChange={e => updateForm(event.id, 'notes', e.target.value)}
                         placeholder="What happened during this session?"
                         rows={2}
-                        style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '3px', boxSizing: 'border-box', resize: 'vertical' }}
+                        style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid var(--border)', boxSizing: 'border-box', resize: 'vertical' }}
                       />
                     </div>
                     <button

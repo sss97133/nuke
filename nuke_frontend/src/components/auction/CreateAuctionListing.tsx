@@ -218,7 +218,7 @@ export default function CreateAuctionListing() {
           {[1, 2, 3, 4].map((s) => (
             <div key={s} className="flex items-center flex-1">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                className={`w-10 h-10  flex items-center justify-center font-bold ${
                   step >= s ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-600'
                 }`}
               >
@@ -244,11 +244,11 @@ export default function CreateAuctionListing() {
           <h2 className="text-2xl font-bold">Select Vehicle to List</h2>
 
           {vehicles.length === 0 ? (
-            <div className="bg-gray-50 p-8 rounded-lg text-center">
+            <div className="bg-gray-50 p-8 text-center">
               <p className="text-gray-600 mb-4">You don't have any vehicles yet.</p>
               <button
                 onClick={() => navigate('/add-vehicle')}
-                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="px-6 py-2 bg-blue-600 text-white hover:bg-blue-700"
               >
                 Add Your First Vehicle
               </button>
@@ -259,7 +259,7 @@ export default function CreateAuctionListing() {
                 <button
                   key={vehicle.id}
                   onClick={() => setSelectedVehicleId(vehicle.id)}
-                  className={`p-4 rounded-lg border-2 text-left transition-all ${
+                  className={`p-4  border-2 text-left transition-all ${
                     selectedVehicleId === vehicle.id
                       ? 'border-blue-600 bg-blue-50'
                       : 'border-gray-200 bg-white hover:border-gray-300'
@@ -270,7 +270,7 @@ export default function CreateAuctionListing() {
                       <img
                         src={vehicle.primary_image_url}
                         alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                        className="w-24 h-24 object-cover rounded"
+                        className="w-24 h-24 object-cover"
                       />
                     )}
                     <div className="flex-1">
@@ -293,7 +293,7 @@ export default function CreateAuctionListing() {
           <button
             onClick={() => setStep(2)}
             disabled={!selectedVehicleId}
-            className="w-full py-3 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-3 bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
             Continue
           </button>
@@ -305,7 +305,7 @@ export default function CreateAuctionListing() {
         <div className="space-y-6">
           <h2 className="text-2xl font-bold">Auction Configuration</h2>
 
-          <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
+          <div className="bg-white p-6 border border-gray-200 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Auction Type
@@ -313,7 +313,7 @@ export default function CreateAuctionListing() {
               <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={() => setSaleType('auction')}
-                  className={`p-4 rounded-lg border-2 text-left ${
+                  className={`p-4  border-2 text-left ${
                     saleType === 'auction'
                       ? 'border-blue-600 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
@@ -326,7 +326,7 @@ export default function CreateAuctionListing() {
                 </button>
                 <button
                   onClick={() => setSaleType('live_auction')}
-                  className={`p-4 rounded-lg border-2 text-left ${
+                  className={`p-4  border-2 text-left ${
                     saleType === 'live_auction'
                       ? 'border-blue-600 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
@@ -348,7 +348,7 @@ export default function CreateAuctionListing() {
                 <select
                   value={auctionDuration}
                   onChange={(e) => setAuctionDuration(parseInt(e.target.value))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="1">1 day</option>
                   <option value="3">3 days</option>
@@ -368,7 +368,7 @@ export default function CreateAuctionListing() {
                 <select
                   value={liveAuctionMinutes}
                   onChange={(e) => setLiveAuctionMinutes(parseInt(e.target.value))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="2">2 minutes (experimental)</option>
                   <option value="5">5 minutes</option>
@@ -403,7 +403,7 @@ export default function CreateAuctionListing() {
                     value={scheduledStartDate}
                     onChange={(e) => setScheduledStartDate(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
-                    className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
@@ -414,7 +414,7 @@ export default function CreateAuctionListing() {
                     type="time"
                     value={scheduledStartTime}
                     onChange={(e) => setScheduledStartTime(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -424,13 +424,13 @@ export default function CreateAuctionListing() {
           <div className="flex gap-4">
             <button
               onClick={() => setStep(1)}
-              className="flex-1 py-3 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+              className="flex-1 py-3 bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
             >
               Back
             </button>
             <button
               onClick={() => setStep(3)}
-              className="flex-1 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+              className="flex-1 py-3 bg-blue-600 text-white hover:bg-blue-700 transition-colors"
             >
               Continue
             </button>
@@ -443,7 +443,7 @@ export default function CreateAuctionListing() {
         <div className="space-y-6">
           <h2 className="text-2xl font-bold">Set Pricing</h2>
 
-          <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
+          <div className="bg-white p-6 border border-gray-200 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Starting Bid ($)
@@ -454,7 +454,7 @@ export default function CreateAuctionListing() {
                 onChange={(e) => setStartingBid(e.target.value)}
                 placeholder="1000"
                 step="100"
-                className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Minimum bid to start the auction
@@ -478,7 +478,7 @@ export default function CreateAuctionListing() {
                   onChange={(e) => setReservePrice(e.target.value)}
                   placeholder="5000"
                   step="100"
-                  className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               )}
             </div>
@@ -500,7 +500,7 @@ export default function CreateAuctionListing() {
                   onChange={(e) => setBuyNowPrice(e.target.value)}
                   placeholder="10000"
                   step="100"
-                  className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               )}
             </div>
@@ -509,14 +509,14 @@ export default function CreateAuctionListing() {
           <div className="flex gap-4">
             <button
               onClick={() => setStep(2)}
-              className="flex-1 py-3 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+              className="flex-1 py-3 bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
             >
               Back
             </button>
             <button
               onClick={() => setStep(4)}
               disabled={!startingBid}
-              className="flex-1 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 py-3 bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
               Continue
             </button>
@@ -529,7 +529,7 @@ export default function CreateAuctionListing() {
         <div className="space-y-6">
           <h2 className="text-2xl font-bold">Auction Description</h2>
 
-          <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
+          <div className="bg-white p-6 border border-gray-200 space-y-4">
             <div className="flex justify-between items-center">
               <label className="block text-sm font-medium text-gray-700">
                 Listing Description
@@ -537,7 +537,7 @@ export default function CreateAuctionListing() {
               <button
                 onClick={generateAIDescription}
                 disabled={aiGenerating}
-                className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-400 text-sm transition-colors"
+                className="px-4 py-2 bg-purple-600 text-white hover:bg-purple-700 disabled:bg-gray-400 text-sm transition-colors"
               >
                 {aiGenerating ? 'Generating...' : 'Generate with AI'}
               </button>
@@ -547,7 +547,7 @@ export default function CreateAuctionListing() {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe your vehicle's condition, history, modifications, and what makes it special..."
               rows={12}
-              className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-xs text-gray-500">
               Write a compelling description that highlights the vehicle's best features and history.
@@ -556,7 +556,7 @@ export default function CreateAuctionListing() {
           </div>
 
           {selectedVehicle && (
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <div className="bg-blue-50 p-4 border border-blue-200">
               <h3 className="font-bold mb-2">Preview</h3>
               <p className="font-bold">
                 {selectedVehicle.year} {selectedVehicle.make} {selectedVehicle.model}
@@ -574,14 +574,14 @@ export default function CreateAuctionListing() {
           <div className="flex gap-4">
             <button
               onClick={() => setStep(3)}
-              className="flex-1 py-3 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+              className="flex-1 py-3 bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
             >
               Back
             </button>
             <button
               onClick={createListing}
               disabled={loading || !description}
-              className="flex-1 py-3 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 py-3 bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Creating...' : 'Create Listing'}
             </button>

@@ -53,9 +53,7 @@ export default function DataGrowthChart() {
   const maxValue = stats ? Math.max(...statItems.map(s => s.value)) : 0;
 
   return (
-    <div style={{
-      borderRadius: '0px',
-      border: '2px solid var(--border-light)',
+    <div style={{ border: '2px solid var(--border-light)',
       backgroundColor: 'var(--white)',
       padding: 'var(--space-4)'
     }}>
@@ -99,16 +97,12 @@ export default function DataGrowthChart() {
               </div>
               <div style={{
                 height: '8px',
-                backgroundColor: 'var(--grey-100)',
-                borderRadius: '4px',
-                overflow: 'hidden'
+                backgroundColor: 'var(--grey-100)', overflow: 'hidden'
               }}>
                 <div style={{
                   height: '100%',
                   width: `${(item.value / maxValue) * 100}%`,
-                  backgroundColor: item.color,
-                  borderRadius: '4px',
-                  transition: 'width 0.3s ease'
+                  backgroundColor: item.color, transition: 'width 0.3s ease'
                 }} />
               </div>
             </div>

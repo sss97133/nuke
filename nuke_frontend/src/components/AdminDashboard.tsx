@@ -175,7 +175,7 @@ const AdminDashboard: React.FC = () => {
       <style jsx>{`
         .admin-dashboard {
           padding: 20px;
-          font-family: 'MS Sans Serif', sans-serif;
+          font-family: Arial, sans-serif;
           background: var(--bg-color);
           min-height: 100vh;
         }

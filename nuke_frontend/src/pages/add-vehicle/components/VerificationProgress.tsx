@@ -34,9 +34,7 @@ const VerificationProgress: React.FC<VerificationProgressProps> = memo(({
           flex: 1,
           maxWidth: '250px',
           height: '6px',
-          backgroundColor: 'var(--border-light)',
-          borderRadius: '3px',
-          overflow: 'hidden',
+          backgroundColor: 'var(--border-light)', overflow: 'hidden',
           position: 'relative'
         }}>
           <div style={{

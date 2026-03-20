@@ -31,10 +31,7 @@ const panelStyle: React.CSSProperties = {
   width: '400px',
   maxWidth: '95%',
   background: 'var(--surface)',
-  border: '1px solid #c0c0c0',
-  borderRadius: 2,
-  boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-};
+  border: '1px solid #c0c0c0'};
 
 const headerStyle: React.CSSProperties = {
   padding: '8px 12px',

@@ -198,9 +198,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
       {/* Submit Form */}
       {showSubmitForm && (
         <div style={{ 
-          border: '1px solid var(--border)',
-          borderRadius: '8px',
-          padding: '16px',
+          border: '1px solid var(--border)', padding: '16px',
           marginBottom: '20px',
           backgroundColor: 'var(--bg)'
         }}>
@@ -210,9 +208,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
           
           <div style={{ 
             backgroundColor: 'var(--warning-dim)',
-            border: '1px solid var(--warning)',
-            borderRadius: '6px',
-            padding: '12px',
+            border: '1px solid var(--warning)', padding: '12px',
             marginBottom: '16px'
           }}>
             <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--warning)', marginBottom: '4px' }}>
@@ -293,9 +289,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
       {/* Message */}
       {message && (
         <div style={{
-          padding: '12px',
-          borderRadius: '6px',
-          marginBottom: '16px',
+          padding: '12px', marginBottom: '16px',
           backgroundColor: message.includes('success') ? 'var(--success-dim)' : 'var(--error-dim)',
           border: `1px solid ${message.includes('success') ? 'var(--success)' : 'var(--error)'}`,
           color: message.includes('success') ? 'var(--success)' : 'var(--error)',
@@ -326,9 +320,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
             <div
               key={comparable.id}
               style={{
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                padding: '16px'
+                border: '1px solid var(--border)', padding: '16px'
               }}
             >
               {/* Comparable Header */}
@@ -394,9 +386,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
                   color: 'var(--text)',
                   marginBottom: '12px',
                   padding: '8px',
-                  backgroundColor: 'var(--bg)',
-                  borderRadius: '4px',
-                  fontStyle: 'italic'
+                  backgroundColor: 'var(--bg)', fontStyle: 'italic'
                 }}>
                   "{comparable.notes}"
                 </div>
@@ -472,9 +462,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
         <div style={{
           textAlign: 'center',
           padding: '20px',
-          backgroundColor: 'var(--bg)',
-          borderRadius: '8px',
-          marginTop: '16px'
+          backgroundColor: 'var(--bg)', marginTop: '16px'
         }}>
           <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
             <a href="/login" style={{ color: 'var(--accent)', textDecoration: 'none' }}>

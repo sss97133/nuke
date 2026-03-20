@@ -64,9 +64,7 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
             color: '#fff',
             fontSize: '13px',
             fontWeight: 700,
-            cursor: disabled ? 'not-allowed' : 'pointer',
-            borderRadius: '0px',
-            opacity: disabled ? 0.5 : 1
+            cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1
           }}
         >
           🚗 Buy This Vehicle
@@ -74,9 +72,7 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
       ) : (
         <div style={{ 
           padding: '16px', 
-          border: '2px solid var(--border)', 
-          borderRadius: '0px',
-          background: 'var(--surface)',
+          border: '2px solid var(--border)', background: 'var(--surface)',
           minWidth: '300px'
         }}>
           <h4 style={{ fontSize: '13px', marginBottom: '12px', margin: 0 }}>
@@ -105,9 +101,7 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
               style={{
                 width: '100%',
                 padding: '8px',
-                border: '2px solid var(--border)',
-                borderRadius: '0px',
-                fontSize: '12px'
+                border: '2px solid var(--border)', fontSize: '12px'
               }}
             />
           </div>
@@ -124,9 +118,7 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
                 color: 'var(--text)',
                 fontSize: '12px',
                 fontWeight: 700,
-                cursor: 'pointer',
-                borderRadius: '0px'
-              }}
+                cursor: 'pointer'}}
             >
               Cancel
             </button>
@@ -141,9 +133,7 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
                 color: '#fff',
                 fontSize: '12px',
                 fontWeight: 700,
-                cursor: loading ? 'wait' : 'pointer',
-                borderRadius: '0px'
-              }}
+                cursor: loading ? 'wait' : 'pointer'}}
             >
               {loading ? 'Processing...' : `Pay $${facilitationFee} to Start`}
             </button>

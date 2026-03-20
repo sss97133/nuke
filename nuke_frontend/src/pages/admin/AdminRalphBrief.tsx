@@ -69,9 +69,7 @@ export default function AdminRalphBrief() {
       </div>
 
       <div style={{
-        marginTop: 'var(--space-4)',
-        borderRadius: '0px',
-        border: '2px solid var(--border-light)',
+        marginTop: 'var(--space-4)', border: '2px solid var(--border-light)',
         backgroundColor: 'var(--white)',
         padding: 'var(--space-4)'
       }}>
@@ -98,9 +96,7 @@ export default function AdminRalphBrief() {
 
       {snapshot && (
         <div style={{
-          marginTop: 'var(--space-4)',
-          borderRadius: '0px',
-          border: '2px solid var(--border-light)',
+          marginTop: 'var(--space-4)', border: '2px solid var(--border-light)',
           backgroundColor: 'var(--white)',
           padding: 'var(--space-4)'
         }}>
@@ -151,9 +147,7 @@ export default function AdminRalphBrief() {
 
       {Array.isArray(output?.headlines) && output.headlines.length > 0 && (
         <div style={{
-          marginTop: 'var(--space-4)',
-          borderRadius: '0px',
-          border: '2px solid var(--border-light)',
+          marginTop: 'var(--space-4)', border: '2px solid var(--border-light)',
           backgroundColor: 'var(--white)',
           padding: 'var(--space-4)'
         }}>
@@ -168,9 +162,7 @@ export default function AdminRalphBrief() {
 
       {Array.isArray(output?.priorities_now) && output.priorities_now.length > 0 && (
         <div style={{
-          marginTop: 'var(--space-4)',
-          borderRadius: '0px',
-          border: '2px solid var(--border-light)',
+          marginTop: 'var(--space-4)', border: '2px solid var(--border-light)',
           backgroundColor: 'var(--white)',
           padding: 'var(--space-4)'
         }}>

@@ -175,9 +175,7 @@ const ShopFinancials: React.FC = () => {
                   color: dateRange === range ? 'var(--surface)' : 'var(--text)',
                   fontSize: '9px',
                   fontWeight: 700,
-                  cursor: 'pointer',
-                  borderRadius: 'var(--radius)',
-                  textTransform: 'uppercase'
+                  cursor: 'pointer', textTransform: 'uppercase'
                 }}
               >
                 {range}
@@ -192,9 +190,7 @@ const ShopFinancials: React.FC = () => {
                 color: 'var(--surface)',
                 fontSize: '9px',
                 fontWeight: 700,
-                cursor: 'pointer',
-                borderRadius: 'var(--radius)',
-                marginLeft: 'var(--space-2)'
+                cursor: 'pointer', marginLeft: 'var(--space-2)'
               }}
             >
               EXPORT
@@ -206,9 +202,7 @@ const ShopFinancials: React.FC = () => {
         {showExportOptions && (
           <div style={{
             background: 'var(--surface)',
-            border: '2px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            padding: 'var(--space-3)',
+            border: '2px solid var(--border)', padding: 'var(--space-3)',
             marginBottom: 'var(--space-4)',
             display: 'flex',
             gap: 'var(--space-2)'
@@ -221,9 +215,7 @@ const ShopFinancials: React.FC = () => {
               color: 'var(--text)',
               fontSize: '9px',
               fontWeight: 700,
-              cursor: 'pointer',
-              borderRadius: 'var(--radius)'
-            }}>
+              cursor: 'pointer'}}>
               CSV (Universal)
             </button>
             <button onClick={() => alert('QuickBooks integration coming soon')} style={{
@@ -234,9 +226,7 @@ const ShopFinancials: React.FC = () => {
               color: 'var(--text)',
               fontSize: '9px',
               fontWeight: 700,
-              cursor: 'pointer',
-              borderRadius: 'var(--radius)'
-            }}>
+              cursor: 'pointer'}}>
               QuickBooks
             </button>
             <button onClick={() => alert('Xero integration coming soon')} style={{
@@ -247,9 +237,7 @@ const ShopFinancials: React.FC = () => {
               color: 'var(--text)',
               fontSize: '9px',
               fontWeight: 700,
-              cursor: 'pointer',
-              borderRadius: 'var(--radius)'
-            }}>
+              cursor: 'pointer'}}>
               Xero
             </button>
             <button onClick={() => alert('PennyLane integration coming soon')} style={{
@@ -260,9 +248,7 @@ const ShopFinancials: React.FC = () => {
               color: 'var(--text)',
               fontSize: '9px',
               fontWeight: 700,
-              cursor: 'pointer',
-              borderRadius: 'var(--radius)'
-            }}>
+              cursor: 'pointer'}}>
               PennyLane
             </button>
           </div>
@@ -277,9 +263,7 @@ const ShopFinancials: React.FC = () => {
             {/* Revenue Card */}
             <div style={{
               background: 'var(--surface)',
-              border: '2px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: 'var(--space-3)'
+              border: '2px solid var(--border)', padding: 'var(--space-3)'
             }}>
               <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 'var(--space-2)' }}>
                 TOTAL REVENUE
@@ -299,9 +283,7 @@ const ShopFinancials: React.FC = () => {
             {/* COGS Card */}
             <div style={{
               background: 'var(--surface)',
-              border: '2px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: 'var(--space-3)'
+              border: '2px solid var(--border)', padding: 'var(--space-3)'
             }}>
               <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 'var(--space-2)' }}>
                 COST OF GOODS SOLD
@@ -317,9 +299,7 @@ const ShopFinancials: React.FC = () => {
             {/* Gross Profit Card */}
             <div style={{
               background: stats.grossProfit >= 0 ? 'var(--success-dim)' : 'var(--error-dim)',
-              border: `2px solid ${stats.grossProfit >= 0 ? 'var(--success)' : 'var(--error)'}`,
-              borderRadius: 'var(--radius)',
-              padding: 'var(--space-3)'
+              border: `2px solid ${stats.grossProfit >= 0 ? 'var(--success)' : 'var(--error)'}`, padding: 'var(--space-3)'
             }}>
               <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 'var(--space-2)' }}>
                 GROSS PROFIT
@@ -340,9 +320,7 @@ const ShopFinancials: React.FC = () => {
             {/* Net Income Card */}
             <div style={{
               background: stats.netIncome >= 0 ? 'var(--success-dim)' : 'var(--error-dim)',
-              border: `2px solid ${stats.netIncome >= 0 ? 'var(--success)' : 'var(--error)'}`,
-              borderRadius: 'var(--radius)',
-              padding: 'var(--space-3)'
+              border: `2px solid ${stats.netIncome >= 0 ? 'var(--success)' : 'var(--error)'}`, padding: 'var(--space-3)'
             }}>
               <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 'var(--space-2)' }}>
                 NET INCOME
@@ -382,9 +360,7 @@ const ShopFinancials: React.FC = () => {
               color: 'var(--text)',
               fontSize: '10px',
               fontWeight: 700,
-              cursor: 'pointer',
-              borderRadius: 'var(--radius)',
-              transition: 'var(--transition)',
+              cursor: 'pointer', transition: 'var(--transition)',
               textAlign: 'left'
             }}
           >
@@ -403,9 +379,7 @@ const ShopFinancials: React.FC = () => {
               color: 'var(--text)',
               fontSize: '10px',
               fontWeight: 700,
-              cursor: 'pointer',
-              borderRadius: 'var(--radius)',
-              transition: 'var(--transition)',
+              cursor: 'pointer', transition: 'var(--transition)',
               textAlign: 'left'
             }}
           >
@@ -424,9 +398,7 @@ const ShopFinancials: React.FC = () => {
               color: 'var(--text)',
               fontSize: '10px',
               fontWeight: 700,
-              cursor: 'pointer',
-              borderRadius: 'var(--radius)',
-              transition: 'var(--transition)',
+              cursor: 'pointer', transition: 'var(--transition)',
               textAlign: 'left'
             }}
           >
@@ -445,9 +417,7 @@ const ShopFinancials: React.FC = () => {
               color: 'var(--text)',
               fontSize: '10px',
               fontWeight: 700,
-              cursor: 'pointer',
-              borderRadius: 'var(--radius)',
-              transition: 'var(--transition)',
+              cursor: 'pointer', transition: 'var(--transition)',
               textAlign: 'left'
             }}
           >
@@ -462,9 +432,7 @@ const ShopFinancials: React.FC = () => {
         <div style={{
           marginTop: 'var(--space-6)',
           background: 'var(--surface)',
-          border: '2px solid var(--border)',
-          borderRadius: 'var(--radius)',
-          padding: 'var(--space-4)'
+          border: '2px solid var(--border)', padding: 'var(--space-4)'
         }}>
           <h2 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
             Accounting Integration
@@ -483,9 +451,7 @@ const ShopFinancials: React.FC = () => {
                 color: 'var(--surface)',
                 fontSize: '9px',
                 fontWeight: 700,
-                cursor: 'pointer',
-                borderRadius: 'var(--radius)'
-              }}
+                cursor: 'pointer'}}
             >
               DOWNLOAD CSV
             </button>
@@ -498,9 +464,7 @@ const ShopFinancials: React.FC = () => {
                 color: 'var(--text)',
                 fontSize: '9px',
                 fontWeight: 700,
-                cursor: 'pointer',
-                borderRadius: 'var(--radius)'
-              }}
+                cursor: 'pointer'}}
             >
               CONNECT QUICKBOOKS
             </button>
@@ -513,9 +477,7 @@ const ShopFinancials: React.FC = () => {
                 color: 'var(--text)',
                 fontSize: '9px',
                 fontWeight: 700,
-                cursor: 'pointer',
-                borderRadius: 'var(--radius)'
-              }}
+                cursor: 'pointer'}}
             >
               CONNECT XERO
             </button>

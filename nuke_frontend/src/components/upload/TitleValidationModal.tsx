@@ -213,7 +213,7 @@ export function TitleValidationModal({
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6">
+        <div className="bg-white p-6">
           <div className="text-center">Loading title data...</div>
         </div>
       </div>
@@ -226,7 +226,7 @@ export function TitleValidationModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
-      <div className="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
@@ -266,7 +266,7 @@ export function TitleValidationModal({
               <div
                 key={comparison.field}
                 className={`
-                  border-2 rounded-lg p-4 transition-all
+                  border-2  p-4 transition-all
                   ${comparison.status === 'conflict' ? 'border-yellow-400 bg-yellow-50' : ''}
                   ${comparison.status === 'empty' ? 'border-green-400 bg-green-50' : ''}
                   ${comparison.status === 'match' ? 'border-gray-300 bg-gray-50' : ''}
@@ -282,14 +282,13 @@ export function TitleValidationModal({
                         checked={comparison.selected}
                         onChange={() => toggleField(comparison.field)}
                         disabled={comparison.status === 'match'}
-                        className="w-5 h-5 rounded border-gray-300"
+                        className="w-5 h-5 border-gray-300"
                       />
                       <div>
                         <h4 className="font-bold text-lg">{comparison.displayName}</h4>
                         {comparison.severity && (
                           <span className={`
-                            text-xs px-2 py-1 rounded
-                            ${comparison.severity === 'high' ? 'bg-red-100 text-red-700' : ''}
+                            text-xs px-2 py-1  ${comparison.severity === 'high' ? 'bg-red-100 text-red-700' : ''}
                             ${comparison.severity === 'medium' ? 'bg-yellow-100 text-yellow-700' : ''}
                             ${comparison.severity === 'low' ? 'bg-blue-100 text-blue-700' : ''}
                           `}>
@@ -321,7 +320,7 @@ export function TitleValidationModal({
                     )}
 
                     {comparison.status === 'conflict' && (
-                      <div className="mt-3 ml-8 p-3 bg-white border border-yellow-300 rounded text-sm">
+                      <div className="mt-3 ml-8 p-3 bg-white border border-yellow-300 text-sm">
                         <strong>Conflict detected:</strong> Profile and title don't match.
                         Select checkbox to use title value, or leave unchecked to keep profile value.
                       </div>
@@ -349,7 +348,7 @@ export function TitleValidationModal({
             <div className="flex items-center space-x-3">
               <button
                 onClick={onClose}
-                className="px-6 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-100 font-medium"
+                className="px-6 py-2 border-2 border-gray-300 hover:bg-gray-100 font-medium"
               >
                 Skip for Now
               </button>
@@ -357,7 +356,7 @@ export function TitleValidationModal({
                 onClick={applySelected}
                 disabled={selectedCount === 0}
                 className={`
-                  px-6 py-2 rounded-lg font-medium
+                  px-6 py-2  font-medium
                   ${selectedCount > 0 
                     ? 'bg-blue-600 text-white hover:bg-blue-700' 
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -370,7 +369,7 @@ export function TitleValidationModal({
           </div>
 
           {conflictCount > 0 && (
-            <div className="mt-4 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+            <div className="mt-4 p-4 bg-yellow-50 border-2 border-yellow-300">
               <div className="flex items-start space-x-2">
                 <span className="text-yellow-600 text-xl">⚠️</span>
                 <div className="flex-1">

@@ -193,13 +193,13 @@ export default function UsageDashboardPage() {
     return (
       <div className="p-8 max-w-6xl mx-auto">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+          <div className="h-8 bg-gray-200 w-1/4 mb-6"></div>
           <div className="grid grid-cols-3 gap-4 mb-8">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 bg-gray-100 rounded"></div>
+              <div key={i} className="h-24 bg-gray-100"></div>
             ))}
           </div>
-          <div className="h-64 bg-gray-100 rounded"></div>
+          <div className="h-64 bg-gray-100"></div>
         </div>
       </div>
     );
@@ -217,7 +217,7 @@ export default function UsageDashboardPage() {
         <select
           value={timeRange}
           onChange={(e) => setTimeRange(e.target.value as any)}
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border"
         >
           <option value="7d">Last 7 days</option>
           <option value="30d">Last 30 days</option>
@@ -226,24 +226,24 @@ export default function UsageDashboardPage() {
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg">
+        <div className="mb-4 p-4 bg-red-50 text-red-700">
           {error}
         </div>
       )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white border rounded-lg p-6">
+        <div className="bg-white border p-6">
           <div className="text-sm text-gray-500 mb-1">Today</div>
           <div className="text-3xl font-bold">{todayRequests.toLocaleString()}</div>
           <div className="text-sm text-gray-400">requests</div>
         </div>
-        <div className="bg-white border rounded-lg p-6">
+        <div className="bg-white border p-6">
           <div className="text-sm text-gray-500 mb-1">This Week</div>
           <div className="text-3xl font-bold">{weekRequests.toLocaleString()}</div>
           <div className="text-sm text-gray-400">requests</div>
         </div>
-        <div className="bg-white border rounded-lg p-6">
+        <div className="bg-white border p-6">
           <div className="text-sm text-gray-500 mb-1">All Time</div>
           <div className="text-3xl font-bold">{totalRequests.toLocaleString()}</div>
           <div className="text-sm text-gray-400">requests</div>
@@ -251,7 +251,7 @@ export default function UsageDashboardPage() {
       </div>
 
       {/* Usage Chart */}
-      <div className="bg-white border rounded-lg p-6 mb-8">
+      <div className="bg-white border p-6 mb-8">
         <h2 className="text-lg font-semibold mb-4">Request Volume</h2>
         <div className="h-48 flex items-end gap-1">
           {dailyUsage.map((day, i) => {
@@ -263,10 +263,10 @@ export default function UsageDashboardPage() {
               >
                 <div className="relative w-full">
                   <div
-                    className="w-full bg-blue-500 rounded-t transition-all hover:bg-blue-600"
+                    className="w-full bg-blue-500 transition-all hover:bg-blue-600"
                     style={{ height: `${Math.max(height, 2)}%`, minHeight: '2px' }}
                   ></div>
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
                     {day.count} requests
                   </div>
                 </div>
@@ -283,7 +283,7 @@ export default function UsageDashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         {/* Resource Breakdown */}
-        <div className="bg-white border rounded-lg p-6">
+        <div className="bg-white border p-6">
           <h2 className="text-lg font-semibold mb-4">Endpoint Breakdown</h2>
           {resourceBreakdown.length === 0 ? (
             <p className="text-gray-500 text-sm">No API calls yet</p>
@@ -297,9 +297,9 @@ export default function UsageDashboardPage() {
                       <span className="font-mono">{item.resource}</span>
                       <span className="text-gray-500">{item.count}</span>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="w-full bg-gray-100 h-2">
                       <div
-                        className="bg-blue-500 h-2 rounded-full"
+                        className="bg-blue-500 h-2"
                         style={{ width: `${pct}%` }}
                       ></div>
                     </div>
@@ -311,7 +311,7 @@ export default function UsageDashboardPage() {
         </div>
 
         {/* API Keys Status */}
-        <div className="bg-white border rounded-lg p-6">
+        <div className="bg-white border p-6">
           <h2 className="text-lg font-semibold mb-4">API Keys</h2>
           {apiKeys.length === 0 ? (
             <div className="text-center py-6">
@@ -326,7 +326,7 @@ export default function UsageDashboardPage() {
           ) : (
             <div className="space-y-3">
               {apiKeys.map((key) => (
-                <div key={key.id} className="border rounded p-3">
+                <div key={key.id} className="border p-3">
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="font-medium">{key.name}</div>
@@ -353,13 +353,13 @@ export default function UsageDashboardPage() {
       </div>
 
       {/* Request Logs */}
-      <div className="bg-white border rounded-lg p-6">
+      <div className="bg-white border p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Recent Requests</h2>
           <select
             value={selectedResource}
             onChange={(e) => setSelectedResource(e.target.value)}
-            className="px-3 py-1 border rounded text-sm"
+            className="px-3 py-1 border text-sm"
           >
             <option value="all">All endpoints</option>
             {resourceBreakdown.map((item) => (
@@ -392,12 +392,12 @@ export default function UsageDashboardPage() {
                       {formatTime(log.timestamp)}
                     </td>
                     <td className="py-2 px-3">
-                      <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-xs">
+                      <span className="font-mono bg-gray-100 px-2 py-0.5 text-xs">
                         {log.resource}
                       </span>
                     </td>
                     <td className="py-2 px-3">
-                      <span className={`px-2 py-0.5 rounded text-xs ${
+                      <span className={`px-2 py-0.5  text-xs ${
                         log.action === 'create' ? 'bg-green-100 text-green-700' :
                         log.action === 'update' ? 'bg-yellow-100 text-yellow-700' :
                         log.action === 'delete' ? 'bg-red-100 text-red-700' :

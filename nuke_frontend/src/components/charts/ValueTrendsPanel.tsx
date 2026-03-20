@@ -333,9 +333,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
               border: '1px solid var(--border)',
               background: period === p ? 'var(--grey-600)' : 'transparent',
               color: period === p ? 'var(--white)' : 'var(--text)',
-              cursor: 'pointer',
-              borderRadius: 6,
-            }}
+              cursor: 'pointer', }}
           >
             {p}
           </button>
@@ -345,7 +343,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
       {/* Charts grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
         {/* Value Breakdown */}
-        <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px', borderRadius: 6 }}>
+        <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px'}}>
           <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: '6px' }}>
             VALUE BREAKDOWN (cumulative)
           </div>
@@ -359,7 +357,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
         </div>
 
         {/* Total Market Value */}
-        <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px', borderRadius: 6 }}>
+        <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px'}}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
             <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
               TOTAL MARKET VALUE
@@ -387,7 +385,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
         </div>
 
         {/* Sold vs Unsold Ratio */}
-        <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px', borderRadius: 6 }}>
+        <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px'}}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
             <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
               AUCTION SOLD RATE (7d rolling)
@@ -413,7 +411,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
         </div>
 
         {/* Import Velocity */}
-        <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px', borderRadius: 6 }}>
+        <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px'}}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
             <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
               IMPORT VELOCITY (daily)

@@ -8,9 +8,7 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   hasError?: boolean
 }
 
-const inputStyle: React.CSSProperties = {
-  borderRadius: 0,
-  fontSize: "var(--fs-9, 9px)",
+const inputStyle: React.CSSProperties = { fontSize: "var(--fs-9, 9px)",
   fontFamily: "Arial, sans-serif",
   height: "28px",
   width: "100%",
@@ -20,9 +18,7 @@ const inputStyle: React.CSSProperties = {
   padding: "0 var(--space-2, 8px)",
   outline: "none",
   transition: "border-color 0.12s ease",
-  boxSizing: "border-box",
-  boxShadow: "none",
-  appearance: "none",
+  boxSizing: "border-box", appearance: "none",
   WebkitAppearance: "none",
 }
 

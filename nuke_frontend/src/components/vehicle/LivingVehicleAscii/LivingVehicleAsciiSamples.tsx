@@ -9,7 +9,7 @@ import type { VehicleAsciiSlice, AuctionPulseSlice } from './types';
 const CANVAS_SIZE = 216;
 const BG = '#0a0a0a';
 const FG = '#fafafa';
-const FONT = '12px ui-monospace, "Cascadia Code", "JetBrains Mono", monospace';
+const FONT = '12px "Courier New", monospace';
 const LINE_HEIGHT = 16;
 const PADDING = 20;
 
@@ -62,9 +62,7 @@ function SampleBlock({
         style={{
           width: size,
           height: size,
-          background: BG,
-          borderRadius: 6,
-          border: '1px solid var(--border, #27272a)',
+          background: BG, border: '1px solid var(--border, #27272a)',
         }}
       />
       <pre
@@ -74,9 +72,7 @@ function SampleBlock({
           fontSize: 9,
           fontFamily: 'ui-monospace, monospace',
           background: 'var(--bg-secondary)',
-          color: 'var(--text-muted)',
-          borderRadius: 4,
-          maxWidth: size + 32,
+          color: 'var(--text-muted)', maxWidth: size + 32,
           overflow: 'auto',
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-all',

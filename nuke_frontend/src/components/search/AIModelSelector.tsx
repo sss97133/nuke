@@ -128,9 +128,7 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
           padding: 0,
           border: '1px solid var(--border)',
           background: enabledModel ? 'var(--primary-dim)' : 'var(--white)',
-          cursor: 'pointer',
-          borderRadius: '2px',
-          width: '5px',
+          cursor: 'pointer', width: '5px',
           height: '5px',
           display: 'flex',
           alignItems: 'center',
@@ -151,10 +149,7 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
             right: `${dropdownPosition.right}px`,
             minWidth: '180px',
             background: 'var(--white)',
-            border: '2px solid var(--border)',
-            borderRadius: '4px',
-            boxShadow: '2px 2px 8px rgba(0,0,0,0.2)',
-            zIndex: 99999,
+            border: '2px solid var(--border)', zIndex: 99999,
             padding: '4px'
           }}
         >
@@ -180,9 +175,7 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
               <div style={{
                 width: '16px',
                 height: '16px',
-                border: '1px solid var(--border)',
-                borderRadius: '2px',
-                background: model.enabled ? 'var(--primary)' : 'transparent',
+                border: '1px solid var(--border)', background: model.enabled ? 'var(--primary)' : 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

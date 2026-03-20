@@ -126,9 +126,7 @@ export function VehiclePricingValueCard(props: {
         justifyContent: 'space-between',
         gap: 10,
         cursor: onClick ? 'pointer' : 'default',
-        padding: '2px 4px',
-        borderRadius: '3px',
-        transition: 'background-color 0.12s ease'
+        padding: '2px 4px', transition: 'background-color 0.12s ease'
       }}
       onClick={onClick}
       onMouseEnter={(e) => {

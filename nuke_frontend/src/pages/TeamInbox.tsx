@@ -56,7 +56,7 @@ const MAILBOX_COLORS: Record<string, string> = {
   'investors@nuke.ag': 'var(--success)',
   'support@nuke.ag':   '#f39c12',
   'hello@nuke.ag':     '#1abc9c',
-  'alerts@nuke.ag':    '#f97316',
+  'alerts@nuke.ag':    'var(--orange)',
 };
 
 const ROLE_COLORS: Record<string, string> = {
@@ -67,10 +67,10 @@ const ROLE_COLORS: Record<string, string> = {
   cdo: '#ec4899',
   cwtfo: '#6366f1',
   'vp-ai': '#14b8a6',
-  'vp-extraction': '#f97316',
+  'vp-extraction': 'var(--orange)',
   'vp-platform': '#64748b',
   'vp-vehicle-intel': '#a16207',
-  'vp-deal-flow': '#0ea5e9',
+  'vp-deal-flow': 'var(--info)',
   'vp-orgs': '#84cc16',
   'vp-photos': '#d946ef',
   'vp-docs': '#fb7185',
@@ -161,9 +161,7 @@ function RolePill({ role }: { role: string }) {
       fontFamily: 'var(--font-mono)',
       fontWeight: 600,
       color: 'var(--bg)',
-      backgroundColor: roleColor(role),
-      borderRadius: 3,
-      letterSpacing: '0.02em',
+      backgroundColor: roleColor(role), letterSpacing: '0.02em',
     }}>
       {role}
     </span>
@@ -181,9 +179,7 @@ function StatusBadge({ status }: { status: InboxEmail['status'] }) {
   return (
     <span style={{
       padding: '1px 6px',
-      fontSize: '9px',
-      borderRadius: 2,
-      fontFamily: 'var(--font-mono)',
+      fontSize: '9px', fontFamily: 'var(--font-mono)',
       letterSpacing: '0.04em',
       textTransform: 'uppercase',
       ...styles[status],
@@ -202,9 +198,7 @@ function UnreadBadge({ count }: { count: number }) {
       justifyContent: 'center',
       minWidth: 18,
       height: 18,
-      padding: '0 5px',
-      borderRadius: 999,
-      background: 'var(--error)',
+      padding: '0 5px', background: 'var(--error)',
       color: 'var(--bg)',
       fontSize: '10px',
       fontWeight: 700,
@@ -222,9 +216,7 @@ function SenderAvatar({ name, email, size = 36 }: { name: string | null; email: 
   return (
     <div style={{
       width: size,
-      height: size,
-      borderRadius: '50%',
-      background: getAvatarColor(email),
+      height: size, background: getAvatarColor(email),
       color: 'var(--bg)',
       display: 'flex',
       alignItems: 'center',
@@ -247,9 +239,7 @@ function MailboxDot({ address }: { address: string }) {
     <span style={{
       display: 'inline-block',
       width: 7,
-      height: 7,
-      borderRadius: '50%',
-      background: color,
+      height: 7, background: color,
       flexShrink: 0,
     }} />
   );
@@ -412,9 +402,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                   fontSize: '11px',
                   background: statusFilter === f ? 'var(--accent)' : 'transparent',
                   color: statusFilter === f ? 'var(--bg)' : 'var(--text-muted)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 2,
-                  cursor: 'pointer',
+                  border: '1px solid var(--border)', cursor: 'pointer',
                   fontFamily: 'var(--font-mono)',
                   textTransform: 'uppercase',
                   letterSpacing: '0.04em',
@@ -586,9 +574,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                           fontSize: '12px',
                           background: 'transparent',
                           color: 'var(--text-muted)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 3,
-                          cursor: 'pointer',
+                          border: '1px solid var(--border)', cursor: 'pointer',
                           transition: 'background 0.1s',
                         }}
                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-hover)'; }}
@@ -603,9 +589,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                           fontSize: '12px',
                           background: 'transparent',
                           color: 'var(--error)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 3,
-                          cursor: 'pointer',
+                          border: '1px solid var(--border)', cursor: 'pointer',
                           transition: 'background 0.1s',
                         }}
                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-hover)'; }}
@@ -622,9 +606,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                       fontSize: '12px',
                       background: 'transparent',
                       color: 'var(--text-muted)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 3,
-                      cursor: 'pointer',
+                      border: '1px solid var(--border)', cursor: 'pointer',
                       transition: 'background 0.1s',
                     }}
                     onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-hover)'; }}
@@ -650,9 +632,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                   alignItems: 'center',
                   gap: 5,
                   padding: '2px 8px',
-                  background: 'var(--surface-hover)',
-                  borderRadius: 999,
-                  fontSize: '12px',
+                  background: 'var(--surface-hover)', fontSize: '12px',
                   color: 'var(--text)',
                   fontFamily: 'var(--font-mono)',
                 }}>
@@ -743,7 +723,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
               )}
 
               {selected.attachments && selected.attachments.length > 0 && (
-                <div style={{ marginTop: 20, padding: '10px 14px', background: 'var(--surface)', borderRadius: 4, border: '1px solid var(--border)' }}>
+                <div style={{ marginTop: 20, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 6, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Attachments ({selected.attachments.length})
                   </div>
@@ -763,7 +743,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                       <img
                         src={att.url}
                         alt={att.filename || 'attachment'}
-                        style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }}
+                        style={{ width: 80, height: 80, objectFit: 'cover', border: '1px solid var(--border)' }}
                       />
                     </a>
                   ))}
@@ -787,9 +767,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                     minHeight: 80,
                     background: 'var(--bg)',
                     color: 'var(--text)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 3,
-                    padding: '10px 12px',
+                    border: '1px solid var(--border)', padding: '10px 12px',
                     fontSize: '14px',
                     fontFamily: 'var(--font-family)',
                     resize: 'vertical',
@@ -811,9 +789,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
                       fontWeight: 600,
                       background: replyText.trim() && !sending ? 'var(--accent)' : 'var(--surface-hover)',
                       color: replyText.trim() && !sending ? 'var(--bg)' : 'var(--text-muted)',
-                      border: 'none',
-                      borderRadius: 3,
-                      cursor: replyText.trim() && !sending ? 'pointer' : 'default',
+                      border: 'none', cursor: replyText.trim() && !sending ? 'pointer' : 'default',
                       transition: 'background 0.1s',
                       letterSpacing: '0.01em',
                     }}
@@ -877,9 +853,7 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
     fontSize: '13px',
     background: 'var(--bg)',
     color: 'var(--text)',
-    border: '1px solid var(--border)',
-    borderRadius: 3,
-    fontFamily: 'var(--font-family)',
+    border: '1px solid var(--border)', fontFamily: 'var(--font-family)',
     boxSizing: 'border-box',
     outline: 'none',
   };
@@ -907,13 +881,9 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
     }}>
       <div style={{
         background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 6,
-        padding: 24,
+        border: '1px solid var(--border)', padding: 24,
         width: '100%',
-        maxWidth: 500,
-        boxShadow: '0 8px 32px var(--overlay)',
-      }}>
+        maxWidth: 500, }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>New Message to Agent</span>
           <button
@@ -976,9 +946,7 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
               fontSize: '13px',
               background: 'var(--surface-hover)',
               color: 'var(--text-muted)',
-              border: '1px solid var(--border)',
-              borderRadius: 3,
-              cursor: 'pointer',
+              border: '1px solid var(--border)', cursor: 'pointer',
             }}
           >
             Cancel
@@ -992,9 +960,7 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
               fontWeight: 600,
               background: toRole && subject.trim() && body.trim() && !sending ? 'var(--accent)' : 'var(--surface-hover)',
               color: toRole && subject.trim() && body.trim() && !sending ? 'var(--bg)' : 'var(--text-muted)',
-              border: 'none',
-              borderRadius: 3,
-              cursor: 'pointer',
+              border: 'none', cursor: 'pointer',
               transition: 'background 0.1s',
             }}
           >
@@ -1080,9 +1046,7 @@ function MessagesTab() {
   const selectStyle: React.CSSProperties = {
     fontSize: '11px',
     padding: '3px 6px',
-    border: '1px solid var(--border)',
-    borderRadius: 2,
-    background: 'var(--bg)',
+    border: '1px solid var(--border)', background: 'var(--bg)',
     color: 'var(--text)',
     fontFamily: 'var(--font-mono)',
     outline: 'none',
@@ -1120,9 +1084,7 @@ function MessagesTab() {
               fontWeight: 600,
               background: 'var(--accent)',
               color: 'var(--bg)',
-              border: 'none',
-              borderRadius: 3,
-              cursor: 'pointer',
+              border: 'none', cursor: 'pointer',
               letterSpacing: '0.01em',
             }}
           >
@@ -1196,7 +1158,7 @@ function MessagesTab() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
                         {isUnread && (
-                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+                          <div style={{ width: 6, height: 6, background: 'var(--accent)', flexShrink: 0 }} />
                         )}
                         <RolePill role={msg.from_role} />
                         <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>→</span>
@@ -1290,9 +1252,7 @@ function MessagesTab() {
                     fontSize: '12px',
                     background: 'transparent',
                     color: 'var(--text-muted)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 3,
-                    cursor: 'pointer',
+                    border: '1px solid var(--border)', cursor: 'pointer',
                     flexShrink: 0,
                     transition: 'background 0.1s',
                   }}
@@ -1620,9 +1580,7 @@ export default function TeamInbox() {
                 right: '50%',
                 transform: 'translateX(8px)',
                 minWidth: 16,
-                height: 16,
-                borderRadius: 999,
-                background: 'var(--error)',
+                height: 16, background: 'var(--error)',
                 color: 'var(--bg)',
                 fontSize: '9px',
                 display: 'flex',

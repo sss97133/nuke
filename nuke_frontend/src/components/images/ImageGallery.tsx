@@ -2428,9 +2428,7 @@ const ImageGallery = ({
         <div style={{ 
           textAlign: 'center', 
           padding: 'var(--space-6)', 
-          border: '2px dashed var(--border)',
-          borderRadius: '0px',
-          marginBottom: 'var(--space-3)'
+          border: '2px dashed var(--border)', marginBottom: 'var(--space-3)'
         }}>
           <p className="text" style={{ marginBottom: 'var(--space-2)', fontWeight: 700, fontSize: '16px' }}>
             No images yet
@@ -2673,10 +2671,10 @@ const ImageGallery = ({
 
         // Coverage color
         const coverageColor = anglesCovered >= 8
-          ? 'var(--success, #22c55e)'
+          ? 'var(--success)'
           : anglesCovered >= 5
-            ? 'var(--warning, #eab308)'
-            : 'var(--error, #ef4444)';
+            ? 'var(--warning)'
+            : 'var(--error)';
 
         // Condition sparkline per zone category (EXT, INT, ENG, etc.)
         const SPARKLINE_ZONES: { key: string; label: string; match: (z: string) => boolean }[] = [
@@ -2728,7 +2726,7 @@ const ImageGallery = ({
           parts.push(<span key="condition">Avg condition: {avgCondition.toFixed(1)}/5</span>);
         }
         parts.push(
-          <span key="damage" style={{ color: damageCount > 0 ? 'var(--error, #ef4444)' : undefined }}>
+          <span key="damage" style={{ color: damageCount > 0 ? 'var(--error)' : undefined }}>
             {damageCount} damage flag{damageCount !== 1 ? 's' : ''}
           </span>
         );
@@ -2739,7 +2737,7 @@ const ImageGallery = ({
         return (
           <div className="gallery-story-bar" style={{
             padding: '4px 12px',
-            fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+            fontFamily: "'Courier New', monospace",
             fontSize: '11px',
             color: 'var(--text-muted)',
             lineHeight: '18px',
@@ -2760,7 +2758,7 @@ const ImageGallery = ({
                   <React.Fragment key={zc.label}>
                     {i > 0 && <span style={{ margin: '0 6px', opacity: 0.3 }}> </span>}
                     <span style={{ opacity: 0.6 }}>{zc.label}:</span>
-                    <span style={{ color: zc.avg >= 3.5 ? 'var(--success, #22c55e)' : zc.avg >= 2.5 ? 'var(--warning, #eab308)' : 'var(--error, #ef4444)', letterSpacing: '-0.5px' }}>
+                    <span style={{ color: zc.avg >= 3.5 ? 'var(--success)' : zc.avg >= 2.5 ? 'var(--warning)' : 'var(--error)', letterSpacing: '-0.5px' }}>
                       {renderSparkline(zc.avg)}
                     </span>
                   </React.Fragment>
@@ -2810,9 +2808,7 @@ const ImageGallery = ({
                 padding: '4px 12px',
                 fontSize: '11px',
                 margin: 0,
-                border: 'none',
-                borderRadius: 0,
-                height: '24px',
+                border: 'none', height: '24px',
                 minHeight: '24px',
                 whiteSpace: 'nowrap',
                 flexShrink: 0
@@ -2827,9 +2823,7 @@ const ImageGallery = ({
                 padding: '4px 12px',
                 fontSize: '11px',
                 margin: 0,
-                border: 'none',
-                borderRadius: 0,
-                height: '24px',
+                border: 'none', height: '24px',
                 minHeight: '24px',
                 whiteSpace: 'nowrap',
                 flexShrink: 0
@@ -2844,9 +2838,7 @@ const ImageGallery = ({
                 padding: '4px 12px', 
                 fontSize: '11px', 
                 margin: 0, 
-                border: 'none', 
-                borderRadius: 0, 
-                height: '24px', 
+                border: 'none', height: '24px', 
                 minHeight: '24px',
                 whiteSpace: 'nowrap',
                 flexShrink: 0
@@ -2861,9 +2853,7 @@ const ImageGallery = ({
                 padding: '4px 12px',
                 fontSize: '11px',
                 margin: 0,
-                border: 'none',
-                borderRadius: 0,
-                height: '24px',
+                border: 'none', height: '24px',
                 minHeight: '24px',
                 whiteSpace: 'nowrap',
                 flexShrink: 0
@@ -2878,9 +2868,7 @@ const ImageGallery = ({
                 padding: '4px 12px',
                 fontSize: '11px',
                 margin: 0,
-                border: 'none',
-                borderRadius: 0,
-                height: '24px',
+                border: 'none', height: '24px',
                 minHeight: '24px',
                 whiteSpace: 'nowrap',
                 flexShrink: 0
@@ -3070,7 +3058,7 @@ const ImageGallery = ({
           alignItems: 'center',
           gap: '6px',
           padding: '6px 12px',
-          backgroundColor: 'var(--grey-900, #1a1a1a)',
+          backgroundColor: 'var(--surface)',
           borderBottom: '2px solid var(--border)',
         }}>
           <span style={{
@@ -3119,7 +3107,7 @@ const ImageGallery = ({
                   letterSpacing: '0.3px',
                   border: '2px solid var(--grey-600)',
                   backgroundColor: 'transparent',
-                  color: 'var(--white, #fff)',
+                  color: 'var(--surface-elevated)',
                   cursor: 'pointer',
                 }}
               >
@@ -3203,7 +3191,7 @@ const ImageGallery = ({
                     padding: '6px 12px',
                     fontSize: '10px',
                     color: 'var(--text-muted)',
-                    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+                    fontFamily: "'Courier New', monospace",
                     borderTop: '1px solid var(--border)',
                   }}>
                     ({emptySectionCount} more section{emptySectionCount !== 1 ? 's' : ''} empty)
@@ -3371,7 +3359,8 @@ const ImageGallery = ({
                             position: 'relative',
                             overflow: 'hidden',
                             aspectRatio: preserveAspectRatio ? undefined : '1 / 1',
-                            boxShadow: isRecentUpload ? 'inset 0 0 0 3px var(--warning)' : undefined,
+                            outline: isRecentUpload ? '3px solid var(--warning)' : undefined,
+                        outlineOffset: isRecentUpload ? '-3px' : undefined,
                             ...(preserveAspectRatio ? { height: 'auto' } : {})
                           }}
                           onClick={(e) => {
@@ -3444,13 +3433,11 @@ const ImageGallery = ({
                                 top: 'var(--space-1)',
                                 right: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
                                 backgroundColor: 'var(--success)',
-                                color: '#fff',
-                                borderRadius: '0px',
-                                border: '1px solid #fff',
+                                color: 'var(--surface-elevated)', border: '1px solid var(--surface-elevated)',
                                 padding: '2px 6px',
                                 fontSize: '9px',
                                 fontWeight: 'bold',
-                                fontFamily: '"MS Sans Serif", sans-serif',
+                                fontFamily: 'Arial, sans-serif',
                                 zIndex: 10,
                                 cursor: 'help',
                                 maxWidth: '60px',
@@ -3472,13 +3459,11 @@ const ImageGallery = ({
                               bottom: 'var(--space-1)',
                               left: 'var(--space-1)',
                               backgroundColor: source.color,
-                              color: '#fff',
-                              borderRadius: '0px',
-                              border: '1px solid #fff',
+                              color: 'var(--surface-elevated)', border: '1px solid var(--surface-elevated)',
                               padding: '2px 6px',
                               fontSize: '9px',
                               fontWeight: 'bold',
-                              fontFamily: '"MS Sans Serif", sans-serif',
+                              fontFamily: 'Arial, sans-serif',
                               zIndex: 10,
                               cursor: 'help'
                             }}
@@ -3495,9 +3480,7 @@ const ImageGallery = ({
                               top: 'var(--space-1)',
                               right: 'var(--space-1)',
                               backgroundColor: 'var(--text)',
-                              color: '#fff',
-                              borderRadius: '0px',
-                              border: '1px solid #fff',
+                              color: 'var(--surface-elevated)', border: '1px solid var(--surface-elevated)',
                               width: '18px',
                               height: '18px',
                               display: 'flex',
@@ -3505,7 +3488,7 @@ const ImageGallery = ({
                               justifyContent: 'center',
                               fontSize: '11px',
                               fontWeight: 'bold',
-                              fontFamily: '"MS Sans Serif", sans-serif',
+                              fontFamily: 'Arial, sans-serif',
                               zIndex: 10
                             }}>
                               {imageTagCounts[image.id]}
@@ -3535,7 +3518,8 @@ const ImageGallery = ({
                         position: 'relative',
                         overflow: 'hidden',
                         aspectRatio: preserveAspectRatio ? undefined : '1 / 1',
-                        boxShadow: isRecentUpload ? 'inset 0 0 0 3px var(--warning)' : undefined,
+                        outline: isRecentUpload ? '3px solid var(--warning)' : undefined,
+                        outlineOffset: isRecentUpload ? '-3px' : undefined,
                         ...(preserveAspectRatio ? { height: 'auto' } : {})
                       }}
                       onClick={(e) => {
@@ -3608,13 +3592,11 @@ const ImageGallery = ({
                             top: 'var(--space-1)',
                             right: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
                             backgroundColor: 'var(--success)',
-                            color: '#fff',
-                            borderRadius: '0px',
-                            border: '1px solid #fff',
+                            color: 'var(--surface-elevated)', border: '1px solid var(--surface-elevated)',
                             padding: '2px 6px',
                             fontSize: '9px',
                             fontWeight: 'bold',
-                            fontFamily: '"MS Sans Serif", sans-serif',
+                            fontFamily: 'Arial, sans-serif',
                             zIndex: 10,
                             cursor: 'help',
                             maxWidth: '60px',
@@ -3639,13 +3621,11 @@ const ImageGallery = ({
                             bottom: 'var(--space-1)',
                             left: 'var(--space-1)',
                             backgroundColor: source.color,
-                            color: '#fff',
-                            borderRadius: '0px',
-                            border: '1px solid #fff',
+                            color: 'var(--surface-elevated)', border: '1px solid var(--surface-elevated)',
                             padding: '2px 6px',
                             fontSize: '9px',
                             fontWeight: 'bold',
-                            fontFamily: '"MS Sans Serif", sans-serif',
+                            fontFamily: 'Arial, sans-serif',
                             zIndex: 10,
                             cursor: 'help'
                           }}
@@ -3663,9 +3643,7 @@ const ImageGallery = ({
                           top: 'var(--space-1)',
                           right: 'var(--space-1)',
                           backgroundColor: 'var(--text)',
-                          color: '#fff',
-                          borderRadius: '0px',
-                          border: '1px solid #fff',
+                          color: 'var(--surface-elevated)', border: '1px solid var(--surface-elevated)',
                           width: '18px',
                           height: '18px',
                           display: 'flex',
@@ -3673,7 +3651,7 @@ const ImageGallery = ({
                           justifyContent: 'center',
                           fontSize: '11px',
                           fontWeight: 'bold',
-                          fontFamily: '"MS Sans Serif", sans-serif',
+                          fontFamily: 'Arial, sans-serif',
                           zIndex: 10
                         }}>
                           {imageTagCounts[image.id]}
@@ -3778,13 +3756,11 @@ const ImageGallery = ({
                     top: 'var(--space-1)',
                     right: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
                     backgroundColor: 'var(--success)',
-                    color: '#fff',
-                    borderRadius: '0px',
-                    border: '1px solid #fff',
+                    color: 'var(--surface-elevated)', border: '1px solid var(--surface-elevated)',
                     padding: '2px 6px',
                     fontSize: '9px',
                     fontWeight: 'bold',
-                    fontFamily: '"MS Sans Serif", sans-serif',
+                    fontFamily: 'Arial, sans-serif',
                     zIndex: 10,
                     cursor: 'help',
                     maxWidth: '60px',
@@ -3811,18 +3787,14 @@ const ImageGallery = ({
                       bottom: '4px',
                       left: '4px',
                       width: '24px',
-                      height: '24px',
-                      borderRadius: '50%',
-                      backgroundColor: 'var(--overlay)',
+                      height: '24px', backgroundColor: 'var(--overlay)',
                       border: `2px solid ${source.color}`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       overflow: 'hidden',
                       zIndex: 10,
-                      cursor: 'help',
-                      boxShadow: '0 2px 4px color-mix(in srgb, var(--text) 30%, transparent)'
-                    }}
+                      cursor: 'help'}}
                     title={`Verified by: ${source.label}`}
                   >
                     {source.logoUrl ? (
@@ -3861,9 +3833,7 @@ const ImageGallery = ({
                   top: 'var(--space-1)',
                   right: 'var(--space-1)',
                   backgroundColor: 'var(--text)',
-                  color: '#fff',
-                  borderRadius: '0px',
-                  border: '1px solid #fff',
+                  color: 'var(--surface-elevated)', border: '1px solid var(--surface-elevated)',
                   width: '18px',
                   height: '18px',
                   display: 'flex',
@@ -3871,7 +3841,7 @@ const ImageGallery = ({
                   justifyContent: 'center',
                   fontSize: '11px',
                   fontWeight: 'bold',
-                  fontFamily: '"MS Sans Serif", sans-serif',
+                  fontFamily: 'Arial, sans-serif',
                   zIndex: 10
                 }}>
                   {imageTagCounts[image.id]}
@@ -3885,13 +3855,11 @@ const ImageGallery = ({
                   top: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
                   right: 'var(--space-1)',
                   backgroundColor: 'var(--accent)',
-                  color: '#fff',
-                  borderRadius: '0px',
-                  border: '1px solid #fff',
+                  color: 'var(--surface-elevated)', border: '1px solid var(--surface-elevated)',
                   padding: '2px 6px',
                   fontSize: '9px',
                   fontWeight: 'bold',
-                  fontFamily: '"MS Sans Serif", sans-serif',
+                  fontFamily: 'Arial, sans-serif',
                   zIndex: 10
                 }}>
                   {imageSetCounts[image.id]} SETS
@@ -3905,13 +3873,11 @@ const ImageGallery = ({
                   bottom: 'var(--space-1)',
                   right: 'var(--space-1)',
                   backgroundColor: image.manual_priority >= 90 ? 'var(--warning)' : image.manual_priority >= 70 ? 'var(--border)' : 'var(--warning)',
-                  color: 'var(--text)',
-                  borderRadius: '0px',
-                  border: '2px solid #fff',
+                  color: 'var(--text)', border: '2px solid var(--surface-elevated)',
                   padding: '2px 6px',
                   fontSize: '9px',
                   fontWeight: 'bold',
-                  fontFamily: '"MS Sans Serif", sans-serif',
+                  fontFamily: 'Arial, sans-serif',
                   zIndex: 10
                 }}>
                   {image.manual_priority}
@@ -3919,7 +3885,7 @@ const ImageGallery = ({
               )}
 
               {/* Image Info Overlay */}
-              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)', padding: 'var(--space-2)' }}>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'color-mix(in srgb, var(--text) 70%, transparent)', padding: 'var(--space-2)' }}>
                 {image.is_primary && (
                   <div className="button button-small" style={{ fontSize: '8px', padding: '2px 6px', marginBottom: 'var(--space-1)', backgroundColor: 'var(--grey-600)', color: 'var(--white)' }}>
                     PRIMARY
@@ -3974,7 +3940,8 @@ const ImageGallery = ({
                 position: 'relative', 
                 overflow: 'hidden', 
                 backgroundColor: 'var(--grey-100)',
-                boxShadow: recentUploadSet.has(String(image?.id || '')) ? 'inset 0 0 0 3px var(--warning)' : undefined,
+                outline: recentUploadSet.has(String(image?.id || '')) ? '3px solid var(--warning)' : undefined,
+                outlineOffset: recentUploadSet.has(String(image?.id || '')) ? '-3px' : undefined,
                 width: '100%'
               }}
               onClick={() => openLightbox(index)}
@@ -4007,13 +3974,11 @@ const ImageGallery = ({
                     top: 'var(--space-1)',
                     right: 'var(--space-1)',
                     backgroundColor: 'var(--success)',
-                    color: '#fff',
-                    borderRadius: '0px',
-                    border: '1px solid #fff',
+                    color: 'var(--surface-elevated)', border: '1px solid var(--surface-elevated)',
                     padding: '2px 6px',
                     fontSize: '9px',
                     fontWeight: 'bold',
-                    fontFamily: '"MS Sans Serif", sans-serif',
+                    fontFamily: 'Arial, sans-serif',
                     zIndex: 10
                   }}
                   title={angle ? `Analyzed: ${angle}` : 'AI analyzed'}
@@ -4034,18 +3999,14 @@ const ImageGallery = ({
                       bottom: '50px',
                       left: '8px',
                       width: '28px',
-                      height: '28px',
-                      borderRadius: '50%',
-                      backgroundColor: 'var(--overlay)',
+                      height: '28px', backgroundColor: 'var(--overlay)',
                       border: `2px solid ${source.color}`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       overflow: 'hidden',
                       zIndex: 10,
-                      cursor: 'help',
-                      boxShadow: '0 2px 4px color-mix(in srgb, var(--text) 30%, transparent)'
-                    }}
+                      cursor: 'help'}}
                     title={`Verified by: ${source.label}`}
                   >
                     {source.logoUrl ? (
@@ -4068,7 +4029,7 @@ const ImageGallery = ({
               })()}
 
               {/* Image Info Overlay */}
-              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)', padding: 'var(--space-2)' }}>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'color-mix(in srgb, var(--text) 70%, transparent)', padding: 'var(--space-2)' }}>
                 {image.is_primary && (
                   <div className="button button-small" style={{ fontSize: '8px', padding: '2px 6px', marginBottom: 'var(--space-1)', backgroundColor: 'var(--grey-600)', color: 'var(--white)' }}>
                     PRIMARY
@@ -4137,18 +4098,14 @@ const ImageGallery = ({
                         bottom: '4px',
                         left: '4px',
                         width: '20px',
-                        height: '20px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--overlay)',
+                        height: '20px', backgroundColor: 'var(--overlay)',
                         border: `2px solid ${source.color}`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         overflow: 'hidden',
                         zIndex: 10,
-                        cursor: 'help',
-                        boxShadow: '0 1px 2px color-mix(in srgb, var(--text) 30%, transparent)'
-                      }}
+                        cursor: 'help'}}
                       title={`Verified by: ${source.label}`}
                     >
                       {source.logoUrl ? (
@@ -4284,12 +4241,12 @@ const ImageGallery = ({
               : 'Unknown date';
             const durationMin = session.duration_minutes ? Math.round(Number(session.duration_minutes)) : null;
             const categoryColors: Record<string, string> = {
-              inspection: 'var(--gulf-blue, #00205B)',
-              restoration: 'var(--martini-red, #B71234)',
-              documentation: 'var(--grey-700, #555)',
-              lifestyle: 'var(--brg, #004225)',
+              inspection: 'var(--gulf-blue)',
+              restoration: 'var(--martini-red)',
+              documentation: 'var(--text-secondary)',
+              lifestyle: 'var(--brg)',
             };
-            const badgeColor = categoryColors[session.session_type_category] || 'var(--grey-600)';
+            const badgeColor = categoryColors[session.session_type_category] || 'var(--text-secondary)';
 
             return (
               <div key={sid} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -4306,7 +4263,7 @@ const ImageGallery = ({
                       <span style={{
                         display: 'inline-block', fontSize: '8px', fontWeight: 700,
                         textTransform: 'uppercase', letterSpacing: '0.08em',
-                        padding: '1px 5px', color: '#fff',
+                        padding: '1px 5px', color: 'var(--surface-elevated)',
                         backgroundColor: badgeColor,
                       }}>
                         {session.session_type_label || 'UNCLASSIFIED'}

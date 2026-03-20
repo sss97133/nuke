@@ -87,9 +87,7 @@ const VehicleImageGallery = ({ vehicleId, showThumbnails = true, maxImages }: Ve
       <div style={{
         textAlign: 'center',
         padding: '40px',
-        background: '#f8fafc',
-        borderRadius: '8px',
-        border: '2px dashed #d1d5db'
+        background: '#f8fafc', border: '2px dashed var(--border)'
       }}>
         <span style={{ fontSize: '32px', display: 'block', marginBottom: '8px' }}>+</span>
         <p className="text text-muted">No images uploaded yet</p>
@@ -113,11 +111,9 @@ const VehicleImageGallery = ({ vehicleId, showThumbnails = true, maxImages }: Ve
               key={image.id}
               onClick={() => openLightbox(index)}
               style={{
-                aspectRatio: '1',
-                borderRadius: '8px',
-                overflow: 'hidden',
+                aspectRatio: '1', overflow: 'hidden',
                 cursor: 'pointer',
-                border: '1px solid #e5e7eb',
+                border: '1px solid var(--border)',
                 background: `url(${image.thumbnail_url || image.medium_url || image.image_url}) center/cover`,
                 position: 'relative',
                 transition: 'transform 0.2s'
@@ -131,7 +127,7 @@ const VehicleImageGallery = ({ vehicleId, showThumbnails = true, maxImages }: Ve
                 bottom: 0,
                 left: 0,
                 right: 0,
-                background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+                background: 'rgba(0,0,0,0.6)',
                 color: 'white',
                 padding: '4px',
                 fontSize: '10px'
@@ -145,9 +141,7 @@ const VehicleImageGallery = ({ vehicleId, showThumbnails = true, maxImages }: Ve
                 top: '4px',
                 right: '4px',
                 background: 'rgba(59, 130, 246, 0.8)',
-                color: 'white',
-                borderRadius: '12px',
-                padding: '2px 6px',
+                color: 'white', padding: '2px 6px',
                 fontSize: '10px',
                 fontWeight: 'bold'
               }}>
@@ -180,7 +174,7 @@ const VehicleImageGallery = ({ vehicleId, showThumbnails = true, maxImages }: Ve
           textAlign: 'center',
           marginTop: '8px',
           fontSize: '14px',
-          color: '#6b7280'
+          color: 'var(--text-secondary)'
         }}>
           {images.length} image{images.length !== 1 ? 's' : ''} • Click to view and tag
         </div>

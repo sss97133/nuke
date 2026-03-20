@@ -187,9 +187,7 @@ const WalkAroundCarousel: React.FC<WalkAroundCarouselProps> = ({ images, onSlotC
               <div
                 style={{
                   width: '120px',
-                  height: '80px',
-                  borderRadius: '2px',
-                  overflow: 'hidden',
+                  height: '80px', overflow: 'hidden',
                   backgroundColor: 'var(--grey-100, #f5f5f5)',
                 }}
               >
@@ -210,9 +208,7 @@ const WalkAroundCarousel: React.FC<WalkAroundCarouselProps> = ({ images, onSlotC
               <div
                 style={{
                   width: '120px',
-                  height: '80px',
-                  borderRadius: '2px',
-                  border: '1px dashed var(--border, #d4d4d4)',
+                  height: '80px', border: '1px dashed var(--border, #d4d4d4)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -222,7 +218,7 @@ const WalkAroundCarousel: React.FC<WalkAroundCarouselProps> = ({ images, onSlotC
                 <span
                   style={{
                     fontSize: '9px',
-                    fontFamily: 'var(--font-mono, "SF Mono", "Fira Code", "Fira Mono", monospace)',
+                    fontFamily: "'Courier New', monospace",
                     color: 'var(--text-muted, #a3a3a3)',
                     letterSpacing: '0.04em',
                     textTransform: 'uppercase',
@@ -237,7 +233,7 @@ const WalkAroundCarousel: React.FC<WalkAroundCarouselProps> = ({ images, onSlotC
             <span
               style={{
                 fontSize: '10px',
-                fontFamily: 'var(--font-mono, "SF Mono", "Fira Code", "Fira Mono", monospace)',
+                fontFamily: "'Courier New', monospace",
                 color: bestImage ? 'var(--text-muted, #a3a3a3)' : 'var(--text-muted, #a3a3a3)',
                 letterSpacing: '0.04em',
                 lineHeight: 1.2,
@@ -253,7 +249,7 @@ const WalkAroundCarousel: React.FC<WalkAroundCarouselProps> = ({ images, onSlotC
               <span
                 style={{
                   fontSize: '9px',
-                  fontFamily: 'var(--font-mono, "SF Mono", "Fira Code", "Fira Mono", monospace)',
+                  fontFamily: "'Courier New', monospace",
                   color: 'var(--text-muted, #a3a3a3)',
                   opacity: 0.7,
                   lineHeight: 1,
@@ -283,7 +279,7 @@ const WalkAroundCarousel: React.FC<WalkAroundCarouselProps> = ({ images, onSlotC
             style={{
               fontSize: '13px',
               fontWeight: 700,
-              fontFamily: 'var(--font-mono, "SF Mono", "Fira Code", "Fira Mono", monospace)',
+              fontFamily: "'Courier New', monospace",
               color: coverageColor,
               lineHeight: 1,
             }}
@@ -293,7 +289,7 @@ const WalkAroundCarousel: React.FC<WalkAroundCarouselProps> = ({ images, onSlotC
           <span
             style={{
               fontSize: '9px',
-              fontFamily: 'var(--font-mono, "SF Mono", "Fira Code", "Fira Mono", monospace)',
+              fontFamily: "'Courier New', monospace",
               color: 'var(--text-muted, #a3a3a3)',
               lineHeight: 1,
             }}

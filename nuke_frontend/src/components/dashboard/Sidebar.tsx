@@ -31,7 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div key={category.id}>
         <div
           style={{
-            fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+            fontFamily: "'Courier New', monospace" ,
             fontSize: '11px',
             padding: '4px 8px',
             cursor: 'pointer',
@@ -92,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         background: 'var(--surface)',
         height: '100%',
         overflowY: 'auto',
-        fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+        fontFamily: "'Courier New', monospace" ,
         fontSize: '11px'
       }}
     >

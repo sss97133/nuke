@@ -145,7 +145,7 @@ export default function VehicleSearch() {
           fontSize: '12px', 
           marginRight: '4px',
           color: '#999',
-          fontFamily: '"MS Sans Serif", sans-serif',
+          fontFamily: 'Arial, sans-serif',
           whiteSpace: 'nowrap'
         }}>
           search
@@ -163,7 +163,7 @@ export default function VehicleSearch() {
             border: 'none',
             outline: 'none',
             fontSize: '12px',
-            fontFamily: '"MS Sans Serif", sans-serif',
+            fontFamily: 'Arial, sans-serif',
             background: 'transparent',
             minWidth: 0,
             height: '100%',
@@ -191,9 +191,7 @@ export default function VehicleSearch() {
             borderTop: 'none',
             maxHeight: '400px',
             overflowY: 'auto',
-            zIndex: 1000,
-            boxShadow: '2px 2px 8px rgba(0,0,0,0.2)'
-          }}
+            zIndex: 1000}}
         >
           {results.map(result => (
             <div

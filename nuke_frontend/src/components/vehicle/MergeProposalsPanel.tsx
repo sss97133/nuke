@@ -253,9 +253,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
             <div
               key={proposal.id}
               style={{
-                border: '1px solid var(--warning)',
-                borderRadius: '4px',
-                padding: '12px',
+                border: '1px solid var(--warning)', padding: '12px',
                 marginBottom: '12px',
                 background: 'var(--surface)'
               }}
@@ -265,9 +263,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                 <div style={{
                   background: proposal.confidence_score >= 90 ? 'var(--success)' : 'var(--warning)',
                   color: 'var(--bg)',
-                  padding: '3px 8px',
-                  borderRadius: '2px',
-                  fontSize: '9px',
+                  padding: '3px 8px', fontSize: '9px',
                   fontWeight: 700
                 }}>
                   {proposal.confidence_score}% MATCH
@@ -287,9 +283,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                 {/* PRIMARY (Keep) */}
                 <div style={{
                   padding: '10px',
-                  border: '2px solid var(--success)',
-                  borderRadius: '3px',
-                  background: 'var(--success-dim)'
+                  border: '2px solid var(--success)', background: 'var(--success-dim)'
                 }}>
                   <div style={{
                     fontSize: '9px',
@@ -332,9 +326,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                 {/* DUPLICATE (Merge) */}
                 <div style={{
                   padding: '10px',
-                  border: '2px solid var(--error)',
-                  borderRadius: '3px',
-                  background: 'var(--error-dim)'
+                  border: '2px solid var(--error)', background: 'var(--error-dim)'
                 }}>
                   <div style={{
                     fontSize: '9px',
@@ -372,9 +364,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                 <div style={{
                   padding: '8px',
                   background: 'var(--bg)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '3px',
-                  fontSize: '11px',
+                  border: '1px solid var(--border)', fontSize: '11px',
                   color: 'var(--text-secondary)',
                   marginBottom: '12px'
                 }}>
@@ -417,9 +407,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
           marginTop: '16px',
           padding: '12px',
           background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: '3px',
-          fontSize: '11px',
+          border: '1px solid var(--border)', fontSize: '11px',
           color: 'var(--text-muted)'
         }}>
           <strong>How merging works:</strong> All images, timeline events, and data from the duplicate profile will be moved to the primary profile. The duplicate will then be deleted. This action cannot be undone.

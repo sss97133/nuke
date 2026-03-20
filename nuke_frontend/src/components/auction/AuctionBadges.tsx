@@ -57,9 +57,7 @@ export const AuctionStatusBadge: React.FC<{
         borderColor: s.color,
         fontWeight: 700,
         fontSize: '10px',
-        padding: '3px 8px',
-        borderRadius: '4px',
-        opacity,
+        padding: '3px 8px', opacity,
         display,
         transition: 'opacity 0.3s ease',
       }}
@@ -177,9 +175,7 @@ export const LiveAuctionBadge: React.FC<{
         borderStyle: 'solid',
         fontWeight: 700,
         fontSize: '10px',
-        padding: '3px 8px',
-        borderRadius: '4px',
-        display: 'inline-block',
+        padding: '3px 8px', display: 'inline-block',
         ...style,
       }}
     >

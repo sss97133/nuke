@@ -148,9 +148,7 @@ export default function DropboxImporter({ organizationId, isOwner }: DropboxImpo
                     style={{
                       padding: '8px 12px',
                       marginBottom: '8px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '4px',
-                      background: 'var(--surface)'
+                      border: '1px solid var(--border)', background: 'var(--surface)'
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -159,9 +157,7 @@ export default function DropboxImporter({ organizationId, isOwner }: DropboxImpo
                       </div>
                       <div style={{
                         fontSize: '9px',
-                        padding: '2px 6px',
-                        borderRadius: '2px',
-                        background: job.status === 'completed' ? '#d4edda' :
+                        padding: '2px 6px', background: job.status === 'completed' ? '#d4edda' :
                                    job.status === 'failed' ? '#f8d7da' :
                                    '#fff3cd',
                         color: job.status === 'completed' ? '#155724' :
@@ -191,9 +187,7 @@ export default function DropboxImporter({ organizationId, isOwner }: DropboxImpo
             </div>
             <div style={{
               padding: '12px',
-              background: '#f8f9fa',
-              borderRadius: '4px',
-              marginBottom: '12px',
+              background: '#f8f9fa', marginBottom: '12px',
               fontSize: '11px',
               color: 'var(--text-secondary)'
             }}>

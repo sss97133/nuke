@@ -150,9 +150,7 @@ export default function StreamActionPanel({
                       fontSize: '11px',
                       border: '1px solid var(--border)',
                       background: owned ? 'var(--success-dim)' : 'var(--surface)',
-                      color: 'var(--text)',
-                      borderRadius: '0px',
-                      cursor: owned ? 'default' : 'pointer',
+                      color: 'var(--text)', cursor: owned ? 'default' : 'pointer',
                       opacity: !canInteract ? 0.6 : 1,
                     }}
                     title={p.description || p.name}
@@ -175,9 +173,7 @@ export default function StreamActionPanel({
                       fontSize: '11px',
                       border: '1px solid var(--border)',
                       background: 'var(--text)',
-                      color: 'var(--bg)',
-                      borderRadius: '0px',
-                      cursor: 'pointer',
+                      color: 'var(--bg)', cursor: 'pointer',
                       opacity: !canInteract ? 0.6 : 1,
                     }}
                     title={a.render_text || a.title}

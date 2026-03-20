@@ -187,9 +187,7 @@ const MyOrganizations: React.FC = () => {
           }
           style={{
             padding: '6px 12px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            fontSize: '12px',
+            border: '1px solid var(--border)', fontSize: '12px',
           }}
         >
           <option value="all">All</option>
@@ -207,9 +205,7 @@ const MyOrganizations: React.FC = () => {
           }
           style={{
             padding: '6px 12px',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            fontSize: '12px',
+            border: '1px solid var(--border)', fontSize: '12px',
           }}
         >
           <option value="recent">Recently Active</option>

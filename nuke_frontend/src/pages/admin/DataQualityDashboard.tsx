@@ -116,9 +116,7 @@ function ProgressBar({ pct }: { pct: number }) {
     <div style={{
       width: '140px',
       height: '6px',
-      background: 'rgba(0,0,0,0.1)',
-      borderRadius: '3px',
-      overflow: 'hidden',
+      background: 'rgba(0,0,0,0.1)', overflow: 'hidden',
       display: 'inline-block',
       verticalAlign: 'middle',
       marginRight: '8px',
@@ -273,9 +271,7 @@ export default function DataQualityDashboard() {
             fontSize: '11px',
             padding: '8px 14px',
             background: 'var(--grey-100)',
-            border: '2px solid var(--border-light)',
-            borderRadius: '0px',
-            cursor: 'pointer',
+            border: '2px solid var(--border-light)', cursor: 'pointer',
             fontWeight: 600,
             textTransform: 'uppercase',
             letterSpacing: '1px',
@@ -289,9 +285,7 @@ export default function DataQualityDashboard() {
       {message && (
         <div style={{
           background: 'rgba(34, 197, 94, 0.1)',
-          border: '1px solid rgba(34, 197, 94, 0.3)',
-          borderRadius: '0px',
-          padding: '10px 14px',
+          border: '1px solid rgba(34, 197, 94, 0.3)', padding: '10px 14px',
           fontSize: '11px',
           marginBottom: '16px',
           color: 'var(--success)',
@@ -307,9 +301,7 @@ export default function DataQualityDashboard() {
       {!latest && (
         <div style={{
           background: 'rgba(245, 158, 11, 0.1)',
-          border: '2px solid rgba(245, 158, 11, 0.3)',
-          borderRadius: '0px',
-          padding: '16px',
+          border: '2px solid rgba(245, 158, 11, 0.3)', padding: '16px',
           marginBottom: '24px',
           fontSize: '11px',
         }}>
@@ -320,9 +312,7 @@ export default function DataQualityDashboard() {
       {/* Workforce Status Panel */}
       <div style={{
         background: 'var(--white)',
-        border: '2px solid var(--border-light)',
-        borderRadius: '0px',
-        marginBottom: '24px',
+        border: '2px solid var(--border-light)', marginBottom: '24px',
         overflow: 'hidden',
       }}>
         <div style={{
@@ -346,9 +336,7 @@ export default function DataQualityDashboard() {
               padding: '4px 10px',
               background: 'var(--accent)',
               color: 'var(--bg)',
-              border: 'none',
-              borderRadius: '0px',
-              cursor: 'pointer',
+              border: 'none', cursor: 'pointer',
               fontWeight: 600,
               textTransform: 'uppercase',
               letterSpacing: '1px',
@@ -371,9 +359,7 @@ export default function DataQualityDashboard() {
               }}>
                 <div style={{
                   width: '20px',
-                  height: '20px',
-                  borderRadius: '50%',
-                  background: isLlm ? 'rgba(245, 158, 11, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                  height: '20px', background: isLlm ? 'rgba(245, 158, 11, 0.15)' : 'rgba(34, 197, 94, 0.15)',
                   border: `2px solid ${isLlm ? 'var(--warning)' : 'var(--success)'}`,
                   display: 'flex',
                   alignItems: 'center',
@@ -397,9 +383,7 @@ export default function DataQualityDashboard() {
                   fontSize: '9px',
                   fontWeight: 700,
                   textTransform: 'uppercase',
-                  padding: '2px 6px',
-                  borderRadius: '2px',
-                  background: isLlm ? 'rgba(245, 158, 11, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                  padding: '2px 6px', background: isLlm ? 'rgba(245, 158, 11, 0.1)' : 'rgba(34, 197, 94, 0.1)',
                   color: isLlm ? 'var(--warning)' : 'var(--success)',
                   border: `1px solid ${isLlm ? 'var(--warning)' : 'var(--success)'}`,
                 }}>
@@ -412,9 +396,7 @@ export default function DataQualityDashboard() {
                     fontSize: '10px',
                     padding: '5px 10px',
                     background: isLoading ? 'var(--grey-100)' : 'transparent',
-                    border: '1px solid var(--border-light)',
-                    borderRadius: '0px',
-                    cursor: 'pointer',
+                    border: '1px solid var(--border-light)', cursor: 'pointer',
                     fontWeight: 600,
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px',
@@ -453,9 +435,7 @@ export default function DataQualityDashboard() {
             </h2>
             <div style={{
               background: 'var(--white)',
-              border: '2px solid var(--border-light)',
-              borderRadius: '0px',
-              overflow: 'hidden',
+              border: '2px solid var(--border-light)', overflow: 'hidden',
             }}>
               {sorted.map((f, i) => {
                 const eta = formatEta(f.field, f.pct, f.delta1h);
@@ -485,9 +465,7 @@ export default function DataQualityDashboard() {
                       <div style={{
                         width: '100%',
                         height: '6px',
-                        background: 'rgba(0,0,0,0.06)',
-                        borderRadius: '3px',
-                        overflow: 'hidden',
+                        background: 'rgba(0,0,0,0.06)', overflow: 'hidden',
                       }}>
                         <div style={{
                           width: `${Math.min(f.pct, 100)}%`,

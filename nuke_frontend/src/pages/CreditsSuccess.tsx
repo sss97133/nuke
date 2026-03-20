@@ -42,9 +42,7 @@ export default function CreditsSuccess() {
         maxWidth: '500px',
         width: '100%',
         background: 'var(--surface)',
-        border: '2px solid var(--border)',
-        borderRadius: '8px',
-        padding: '32px',
+        border: '2px solid var(--border)', padding: '32px',
         textAlign: 'center'
       }}>
         {/* Success Icon */}
@@ -53,9 +51,7 @@ export default function CreditsSuccess() {
           height: '64px',
           margin: '0 auto 24px',
           background: 'var(--success-dim)',
-          border: '2px solid var(--success)',
-          borderRadius: '50%',
-          display: 'flex',
+          border: '2px solid var(--success)', display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: '32px'
@@ -87,9 +83,7 @@ export default function CreditsSuccess() {
         {!loading && (
           <div style={{
             background: 'var(--accent-dim)',
-            border: '2px solid var(--accent)',
-            borderRadius: '8px',
-            padding: '16px',
+            border: '2px solid var(--accent)', padding: '16px',
             marginBottom: '24px'
           }}>
             <div style={{
@@ -149,9 +143,7 @@ export default function CreditsSuccess() {
               fontWeight: 600,
               fontFamily: 'Arial, sans-serif',
               cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px',
-              width: '100%'
+              transition: '0.12s', width: '100%'
             }}
           >
             View Portfolio
@@ -168,9 +160,7 @@ export default function CreditsSuccess() {
               fontWeight: 600,
               fontFamily: 'Arial, sans-serif',
               cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px',
-              width: '100%'
+              transition: '0.12s', width: '100%'
             }}
           >
             Return to Home

@@ -85,9 +85,7 @@ export const FaviconIcon: React.FC<FaviconIconProps> = ({
               backgroundColor: 'rgba(255,255,255,0.1)',
               color: '#fff',
               fontSize: `${iconSize * 0.6}px`,
-              fontWeight: 'bold',
-              borderRadius: '2px',
-              ...style
+              fontWeight: 'bold', ...style
             }}
           >
             {letter}
@@ -132,9 +130,7 @@ export const FaviconIcon: React.FC<FaviconIconProps> = ({
           className={className}
           style={{
             width: `${badgeSize}px`,
-            height: `${badgeSize}px`,
-            borderRadius: '50%',
-            background: circleBadgeBg,
+            height: `${badgeSize}px`, background: circleBadgeBg,
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',

@@ -174,7 +174,7 @@
   max-width: 220px;
   background: var(--surface) !important;
   border: 2px solid var(--border) !important;
-  box-shadow: 4px 4px 0 rgba(0,0,0,0.2) !important;
+  box-shadow: none !important;
   z-index: 10001 !important;
   overflow: hidden;
 }

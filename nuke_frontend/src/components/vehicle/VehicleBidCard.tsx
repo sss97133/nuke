@@ -95,9 +95,7 @@ function BidTooltip({ active, payload }: any) {
   if (!d) return null;
   return (
     <div style={{
-      background: 'var(--grey-800, #1f2937)', color: 'var(--bg)', padding: '4px 8px',
-      borderRadius: 0, fontSize: '11px', fontFamily: 'monospace', boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-    }}>
+      background: 'var(--grey-800, #1f2937)', color: 'var(--bg)', padding: '4px 8px', fontSize: '11px', fontFamily: 'monospace', }}>
       <div style={{ fontWeight: 700 }}>{formatUsd(d.amount)}</div>
       <div style={{ opacity: 0.7 }}>{d.username} &middot; {formatTime(d.timestamp)}</div>
       {d.jump > 0 && <div style={{ color: 'var(--success)' }}>+{formatUsd(d.jump)}</div>}
@@ -191,14 +189,13 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
             {data?.platform && data.platform !== 'bat' && (
               <span style={{
                 fontSize: '9px', background: data.platform === 'cars_and_bids' ? '#e8590c' : 'var(--text-secondary)',
-                color: 'var(--bg)', borderRadius: 10, padding: '1px 6px', fontWeight: 600,
+                color: 'var(--bg)', padding: '1px 6px', fontWeight: 600,
               }}>
                 {data.platform === 'cars_and_bids' ? 'C&B' : data.platform}
               </span>
             )}
             <span style={{
-              fontSize: '11px', background: 'var(--primary, #3b82f6)', color: 'var(--bg)',
-              borderRadius: 10, padding: '1px 8px', fontWeight: 600,
+              fontSize: '11px', background: 'var(--primary, #3b82f6)', color: 'var(--bg)', padding: '1px 8px', fontWeight: 600,
             }}>
               {summary.bid_count} bids
             </span>
@@ -224,8 +221,8 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
                 <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                   <defs>
                     <linearGradient id="bidGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
+                      <stop offset="5%" stopColor="var(--info)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--info)" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light, #e5e7eb)" />
@@ -250,7 +247,7 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
                   {winner && (
                     <ReferenceLine
                       y={summary.final_bid}
-                      stroke="#22c55e"
+                      stroke="var(--success)"
                       strokeDasharray="4 4"
                       strokeWidth={1}
                     />
@@ -258,11 +255,11 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
                   <Area
                     type="monotone"
                     dataKey="amount"
-                    stroke="#3b82f6"
+                    stroke="var(--info)"
                     fill="url(#bidGradient)"
                     strokeWidth={2}
-                    dot={{ r: 2, fill: '#3b82f6', strokeWidth: 0 }}
-                    activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                    dot={{ r: 2, fill: 'var(--info)', strokeWidth: 0 }}
+                    activeDot={{ r: 5, fill: 'var(--info)', stroke: '#fff', strokeWidth: 2 }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -308,8 +305,7 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
           <button
             onClick={() => setShowTimeline(!showTimeline)}
             style={{
-              background: 'none', border: '1px solid var(--border-light, #e5e7eb)',
-              borderRadius: 0, padding: '4px 10px', fontSize: '11px', cursor: 'pointer',
+              background: 'none', border: '1px solid var(--border-light, #e5e7eb)', padding: '4px 10px', fontSize: '11px', cursor: 'pointer',
               color: 'var(--text-muted)', width: '100%',
             }}
           >
@@ -353,8 +349,7 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
                         </span>
                         {b.is_winning && (
                           <span style={{
-                            marginLeft: 4, fontSize: '9px', background: 'var(--success)', color: 'var(--bg)',
-                            borderRadius: 4, padding: '1px 4px',
+                            marginLeft: 4, fontSize: '9px', background: 'var(--success)', color: 'var(--bg)', padding: '1px 4px',
                           }}>
                             winner
                           </span>

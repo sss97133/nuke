@@ -482,9 +482,7 @@ const Library: React.FC = () => {
                   <div style={{ 
                     marginTop: '8px',
                     padding: '6px',
-                    background: book.extraction.status === 'pending_review' ? '#fef3c7' : '#f0fdf4',
-                    borderRadius: '4px',
-                    fontSize: '9px'
+                    background: book.extraction.status === 'pending_review' ? 'var(--warning-dim)' : 'var(--success-dim)', fontSize: '9px'
                   }}>
                     <div style={{ fontWeight: 600, marginBottom: '4px' }}>
                       {book.extraction.status === 'pending_review' ? 'Processing...' : 
@@ -614,7 +612,7 @@ const Library: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                 {/* File info */}
                 {uploadForm.file && (
-                  <div style={{ padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px' }}>
+                  <div style={{ padding: '8px', background: 'var(--bg-secondary)'}}>
                     <div style={{ fontSize: '11px', fontWeight: 600 }}>{uploadForm.file.name}</div>
                     <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                       {formatBytes(uploadForm.file.size)}

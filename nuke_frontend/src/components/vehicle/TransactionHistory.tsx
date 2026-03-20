@@ -126,7 +126,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) =>
               return (
                 <div key={transaction.id} className="relative pl-16">
                   {/* Timeline dot */}
-                  <div className={`absolute left-3 w-6 h-6 rounded-full flex items-center justify-center ${
+                  <div className={`absolute left-3 w-6 h-6  flex items-center justify-center ${
                     isFirst ? 'bg-green-100 border-2 border-green-500' :
                     isLast ? 'bg-gray-100 border-2 border-gray-300' :
                     'bg-blue-100 border-2 border-blue-400'
@@ -139,7 +139,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) =>
                   </div>
 
                   {/* Transaction card */}
-                  <div className={`p-4 rounded-lg border ${
+                  <div className={`p-4  border ${
                     isFirst ? 'border-green-200 bg-green-50' :
                     isLast ? 'border-gray-200 bg-gray-50' :
                     'border-gray-200 bg-white'
@@ -147,11 +147,11 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) =>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <span className={`px-2 py-1 rounded text-xs font-medium bg-${config.color}-100 text-${config.color}-800`}>
+                          <span className={`px-2 py-1  text-xs font-medium bg-${config.color}-100 text-${config.color}-800`}>
                             {config.label}
                           </span>
                           {isFirst && (
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                            <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800">
                               Most Recent
                             </span>
                           )}
@@ -223,7 +223,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) =>
 
         {/* Summary */}
         {transactions.length >= 2 && (
-          <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <div className="mt-6 p-4 bg-gray-50 border border-gray-200">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
                 <div className="text-2xl font-bold text-gray-900">

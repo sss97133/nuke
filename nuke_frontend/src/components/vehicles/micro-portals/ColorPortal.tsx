@@ -40,9 +40,7 @@ export default function ColorPortal({ make, color, year, activePortal, onOpen }:
             </div>
             <div style={{
               padding: '6px 8px',
-              border: '1px dashed var(--border)',
-              borderRadius: '4px',
-              fontSize: '11px',
+              border: '1px dashed var(--border)', fontSize: '11px',
               color: 'var(--primary, #3b82f6)',
               cursor: 'pointer',
               textAlign: 'center',
@@ -57,9 +55,7 @@ export default function ColorPortal({ make, color, year, activePortal, onOpen }:
               {/* Color swatch */}
               <div style={{
                 width: '28px',
-                height: '28px',
-                borderRadius: '50%',
-                background: data.hex_color || 'var(--border)',
+                height: '28px', background: data.hex_color || 'var(--border)',
                 border: '2px solid var(--border)',
                 flexShrink: 0,
               }} />
@@ -84,9 +80,7 @@ export default function ColorPortal({ make, color, year, activePortal, onOpen }:
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <div style={{
                 width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                background: data.hex_color || 'var(--border)',
+                height: '32px', background: data.hex_color || 'var(--border)',
                 border: '2px solid var(--border)',
                 flexShrink: 0,
               }} />

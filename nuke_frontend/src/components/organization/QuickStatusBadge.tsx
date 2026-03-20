@@ -11,10 +11,10 @@ interface Props {
 }
 
 const STATUS_BADGES = [
-  { value: 'active', label: 'FOR SALE', color: '#10b981' },
-  { value: 'sold', label: 'SOLD', color: '#6b7280' },
-  { value: 'service', label: 'SERVICE', color: '#f59e0b' },
-  { value: 'archived', label: 'ARCHIVED', color: '#9ca3af' },
+  { value: 'active', label: 'FOR SALE', color: 'var(--success)' },
+  { value: 'sold', label: 'SOLD', color: 'var(--text-secondary)' },
+  { value: 'service', label: 'SERVICE', color: 'var(--warning)' },
+  { value: 'archived', label: 'ARCHIVED', color: 'var(--text-disabled)' },
 ];
 
 const QuickStatusBadge: React.FC<Props> = ({
@@ -92,9 +92,7 @@ const QuickStatusBadge: React.FC<Props> = ({
           background: currentBadge.color,
           color: 'var(--bg)',
           fontSize: '9px',
-          fontWeight: 700,
-          borderRadius: '3px',
-          cursor: updating ? 'wait' : 'pointer',
+          fontWeight: 700, cursor: updating ? 'wait' : 'pointer',
           userSelect: 'none',
           opacity: updating ? 0.6 : 1,
           transition: 'all 0.12s ease'
@@ -116,10 +114,7 @@ const QuickStatusBadge: React.FC<Props> = ({
             right: 0,
             marginTop: '4px',
             background: 'var(--surface)',
-            border: '2px solid var(--border)',
-            borderRadius: '4px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            zIndex: 1000,
+            border: '2px solid var(--border)', zIndex: 1000,
             minWidth: '120px'
           }}
         >
@@ -152,9 +147,7 @@ const QuickStatusBadge: React.FC<Props> = ({
                   style={{
                     width: '12px',
                     height: '12px',
-                    background: badge.color,
-                    borderRadius: '2px'
-                  }}
+                    background: badge.color}}
                 />
                 {badge.label}
               </div>

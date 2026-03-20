@@ -146,14 +146,10 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
       padding: '20px'
     }}>
       <div style={{
-        background: 'var(--background)',
-        borderRadius: '8px',
-        maxWidth: '800px',
+        background: 'var(--background)', maxWidth: '800px',
         width: '100%',
         maxHeight: '90vh',
-        overflow: 'auto',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-      }}>
+        overflow: 'auto'}}>
         {/* Header */}
         <div style={{
           padding: '20px',
@@ -254,9 +250,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                         key={supplier.id}
                         style={{
                           padding: '16px',
-                          border: '1px solid var(--border)',
-                          borderRadius: '8px',
-                          display: 'flex',
+                          border: '1px solid var(--border)', display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center'
                         }}
@@ -285,9 +279,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                               padding: '8px 16px',
                               background: 'var(--background-secondary)',
                               color: 'var(--text)',
-                              textDecoration: 'none',
-                              borderRadius: '4px',
-                              fontSize: '12px',
+                              textDecoration: 'none', fontSize: '12px',
                               border: '1px solid var(--border)'
                             }}
                           >
@@ -301,9 +293,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                                 padding: '8px 16px',
                                 background: 'var(--color-primary)',
                                 color: '#fff',
-                                border: 'none',
-                                borderRadius: '4px',
-                                fontSize: '12px',
+                                border: 'none', fontSize: '12px',
                                 cursor: loading ? 'not-allowed' : 'pointer'
                               }}
                             >
@@ -329,9 +319,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
               <h3 style={{ marginBottom: '16px' }}>Order Tracking</h3>
               <div style={{
                 padding: '16px',
-                background: 'var(--background-secondary)',
-                borderRadius: '8px',
-                marginBottom: '16px'
+                background: 'var(--background-secondary)', marginBottom: '16px'
               }}>
                 <p><strong>Part:</strong> {orderTracking.part_name}</p>
                 <p><strong>Supplier:</strong> {orderTracking.supplier_name}</p>
@@ -350,9 +338,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                   padding: '12px 24px',
                   background: 'var(--color-primary)',
                   color: '#fff',
-                  textDecoration: 'none',
-                  borderRadius: '4px',
-                  fontSize: '13px'
+                  textDecoration: 'none', fontSize: '13px'
                 }}
               >
                 View Order on {orderTracking.supplier_name}
@@ -377,9 +363,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                     style={{
                       width: '100%',
                       padding: '8px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '4px',
-                      fontSize: '13px'
+                      border: '1px solid var(--border)', fontSize: '13px'
                     }}
                   />
                 </div>
@@ -394,9 +378,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                     style={{
                       width: '100%',
                       padding: '8px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '4px',
-                      fontSize: '13px'
+                      border: '1px solid var(--border)', fontSize: '13px'
                     }}
                   >
                     <option value="easy">Easy</option>
@@ -419,9 +401,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                     style={{
                       width: '100%',
                       padding: '8px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '4px',
-                      fontSize: '13px'
+                      border: '1px solid var(--border)', fontSize: '13px'
                     }}
                   />
                 </div>
@@ -438,9 +418,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                     style={{
                       width: '100%',
                       padding: '8px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '4px',
-                      fontSize: '13px',
+                      border: '1px solid var(--border)', fontSize: '13px',
                       fontFamily: 'inherit'
                     }}
                   />
@@ -453,9 +431,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                     padding: '12px 24px',
                     background: 'var(--color-primary)',
                     color: '#fff',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '13px',
+                    border: 'none', fontSize: '13px',
                     cursor: loading ? 'not-allowed' : 'pointer',
                     fontWeight: 600
                   }}

@@ -174,9 +174,7 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
               padding: '8px 16px',
               background: 'var(--primary)',
               color: 'var(--bg)',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '13px',
+              border: 'none', fontSize: '13px',
               fontWeight: 600,
               cursor: 'pointer',
               display: 'flex',
@@ -197,10 +195,7 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
               right: 0,
               marginTop: '8px',
               background: 'var(--surface)',
-              border: '1px solid var(--border-light)',
-              borderRadius: '8px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              minWidth: '200px',
+              border: '1px solid var(--border-light)', minWidth: '200px',
               zIndex: 1000
             }}>
               {/* Upload option */}
@@ -292,9 +287,7 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
           padding: '48px 24px', 
           textAlign: 'center', 
           color: 'var(--text-muted)',
-          border: '1px dashed var(--border-light)',
-          borderRadius: '8px',
-          background: 'var(--surface)'
+          border: '1px dashed var(--border-light)', background: 'var(--surface)'
         }}>
           <p style={{ margin: '0 0 16px 0', fontSize: '14px' }}>
             No videos yet. Click "Add / Connect" to upload videos or connect a source.
@@ -312,9 +305,7 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
               <div
                 key={video.id}
                 style={{
-                  border: '1px solid var(--border-light)',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
+                  border: '1px solid var(--border-light)', overflow: 'hidden',
                   background: 'var(--surface)'
                 }}
               >
@@ -348,9 +339,7 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
                       right: '8px',
                       padding: '4px 8px',
                       background: badge.color,
-                      color: 'var(--bg)',
-                      borderRadius: '4px',
-                      fontSize: '10px',
+                      color: 'var(--bg)', fontSize: '10px',
                       fontWeight: 600
                     }}>
                       Source: {badge.label}
@@ -395,9 +384,7 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
                       right: '8px',
                       padding: '4px 8px',
                       background: badge.color,
-                      color: 'var(--bg)',
-                      borderRadius: '4px',
-                      fontSize: '10px',
+                      color: 'var(--bg)', fontSize: '10px',
                       fontWeight: 600
                     }}>
                       Source: {badge.label}

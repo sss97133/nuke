@@ -1071,9 +1071,9 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div className="comment-avatar" style={{ width: 16, height: 16 }}>
                         {comment.avatar_url ? (
-                          <img src={comment.avatar_url} alt="Profile" className="avatar-image" style={{ width: 16, height: 16, borderRadius: '50%' }} />
+                          <img src={comment.avatar_url} alt="Profile" className="avatar-image" style={{ width: 16, height: 16}} />
                         ) : (
-                          <div className="avatar-placeholder" style={{ width: 16, height: 16, borderRadius: '50%', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div className="avatar-placeholder" style={{ width: 16, height: 16, fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             {(comment.user_name || comment.user_email || 'U').charAt(0).toUpperCase()}
                           </div>
                         )}
@@ -1139,9 +1139,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
                           style={{ 
                             width: '80px', 
                             height: '80px', 
-                            objectFit: 'cover', 
-                            borderRadius: '4px',
-                            border: '1px solid var(--border)'
+                            objectFit: 'cover', border: '1px solid var(--border)'
                           }} 
                         />
                       </div>

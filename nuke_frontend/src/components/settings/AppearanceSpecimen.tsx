@@ -41,9 +41,7 @@ function contrastRatio(fgHex: string, bgHex: string): number | null {
 
 const CHIP_STYLE: React.CSSProperties = {
   width: 14,
-  height: 14,
-  borderRadius: 3,
-  border: '2px solid var(--border)',
+  height: 14, border: '2px solid var(--border)',
   display: 'inline-block',
 };
 

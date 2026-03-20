@@ -8,9 +8,7 @@ export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextArea
   hasError?: boolean
 }
 
-const textareaStyle: React.CSSProperties = {
-  borderRadius: 0,
-  fontSize: "var(--fs-9, 9px)",
+const textareaStyle: React.CSSProperties = { fontSize: "var(--fs-9, 9px)",
   fontFamily: "Arial, sans-serif",
   minHeight: "60px",
   width: "100%",
@@ -20,9 +18,7 @@ const textareaStyle: React.CSSProperties = {
   padding: "var(--space-1, 4px) var(--space-2, 8px)",
   outline: "none",
   transition: "border-color 0.12s ease",
-  boxSizing: "border-box",
-  boxShadow: "none",
-  resize: "vertical",
+  boxSizing: "border-box", resize: "vertical",
   lineHeight: 1.5,
 }
 

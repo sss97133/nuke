@@ -688,9 +688,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             background: 'var(--surface)', 
             padding: '24px', 
             border: '2px solid var(--border)',
-            maxWidth: '500px',
-            borderRadius: '8px'
-          }}
+            maxWidth: '500px'}}
           onClick={(e) => e.stopPropagation()}
         >
           <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '12px' }}>
@@ -719,9 +717,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 fontStyle: 'italic',
                 marginBottom: '16px',
                 padding: '8px',
-                background: 'var(--grey-50)',
-                borderRadius: '4px'
-              }}>
+                background: 'var(--grey-50)'}}>
                 Note: Full receipt details are not available. This is a summary based on available event data.
               </div>
             </>
@@ -743,9 +739,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               backgroundColor: 'var(--surface)',
               border: '2px solid var(--border)',
               color: 'var(--text)',
-              cursor: 'pointer',
-              borderRadius: '4px',
-              transition: 'var(--transition)'
+              cursor: 'pointer', transition: 'var(--transition)'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--grey-100)';
@@ -939,9 +933,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     height: '48px',
                     objectFit: 'cover',
                     border: '1px solid var(--border)',
-                    cursor: 'pointer',
-                    borderRadius: '2px'
-                  }}
+                    cursor: 'pointer'}}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.border = '2px solid var(--text)';
                   }}
@@ -963,9 +955,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     alignItems: 'center',
                     justifyContent: 'center',
                     background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '2px',
-                    fontSize: '9px',
+                    border: '1px solid var(--border)', fontSize: '9px',
                     fontWeight: 'bold',
                     cursor: 'pointer'
                   }}
@@ -1017,7 +1007,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                   const statusLabel = done ? 'Analyzed' : failed ? 'AI failed' : processing ? 'Analyzing' : 'AI pending';
                   // TODO: Status badge colors use semantic hex for light tints. Replace when
                   // a JS theme bridge is available (e.g. success-dim, error-dim tokens).
-                  const statusBg = done ? '#d1fae5' : failed ? '#fee2e2' : processing ? '#fef3c7' : '#f3f4f6';
+                  const statusBg = done ? '#d1fae5' : failed ? 'var(--error-dim)' : processing ? 'var(--warning-dim)' : 'var(--bg-secondary)';
 
                   return (
                     <>
@@ -1065,9 +1055,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 marginTop: '6px',
                 padding: '10px',
                 border: '1px solid var(--border)',
-                background: 'var(--surface)',
-                borderRadius: '4px'
-              }}>
+                background: 'var(--surface)'}}>
                 <div style={{
                   fontSize: '9px',
                   fontWeight: 'bold',
@@ -1103,9 +1091,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     marginTop: '8px',
                     padding: '6px',
                     fontSize: '11px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '3px',
-                    resize: 'vertical'
+                    border: '1px solid var(--border)', resize: 'vertical'
                   }}
                 />
                 <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
@@ -1132,9 +1118,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     aspectRatio: '1',
                     border: '1px solid var(--border)',
                     overflow: 'hidden',
-                    cursor: 'pointer',
-                    borderRadius: '2px',
-                    transition: 'border 0.12s'
+                    cursor: 'pointer', transition: 'border 0.12s'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.border = '2px solid var(--text)';

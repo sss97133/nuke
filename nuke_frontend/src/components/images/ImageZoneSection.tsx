@@ -399,9 +399,7 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
                       bottom: '4px',
                       left: conditionScore != null ? '42px' : '4px',
                       width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      backgroundColor: '#e53e3e',
+                      height: '8px', backgroundColor: '#e53e3e',
                       border: '1px solid rgba(255,255,255,0.8)',
                       zIndex: 10,
                     }}

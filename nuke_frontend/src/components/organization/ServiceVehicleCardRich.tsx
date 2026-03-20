@@ -130,11 +130,9 @@ export function ServiceVehicleCardRich({
       <div style={{ 
         padding: '16px', 
         marginBottom: '12px', 
-        border: '2px solid var(--border)', 
-        borderRadius: '4px',
-        background: 'var(--card-bg)'
+        border: '2px solid var(--border)', background: 'var(--card-bg)'
       }}>
-        <div style={{ height: 64, background: 'var(--border)', borderRadius: 2, opacity: 0.5 }} />
+        <div style={{ height: 64, background: 'var(--border)', opacity: 0.5 }} />
       </div>
     );
   }
@@ -145,9 +143,7 @@ export function ServiceVehicleCardRich({
       style={{ 
         padding: '0', 
         marginBottom: '12px', 
-        border: '2px solid var(--border)', 
-        borderRadius: '4px',
-        background: 'var(--card-bg)',
+        border: '2px solid var(--border)', background: 'var(--card-bg)',
         overflow: 'hidden',
         cursor: 'pointer',
         transition: 'border-color 0.12s ease'
@@ -208,9 +204,7 @@ export function ServiceVehicleCardRich({
             {stats.workTypes.map(type => (
               <span key={type} style={{
                 fontSize: '11px',
-                padding: '2px 6px',
-                borderRadius: '2px',
-                background: 'var(--accent-dim)',
+                padding: '2px 6px', background: 'var(--accent-dim)',
                 color: 'var(--accent)',
                 fontWeight: 600
               }}>

@@ -781,9 +781,7 @@ function TabSkeleton() {
           style={{
             height: 80,
             background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 2,
-            animation: 'pulse 1.5s ease-in-out infinite',
+            border: '1px solid var(--border)', animation: 'pulse 1.5s ease-in-out infinite',
           }}
         />
       ))}
@@ -927,9 +925,7 @@ export default function HomePage() {
                   background: active ? 'var(--bg)' : 'transparent',
                   color: active ? 'var(--text)' : 'var(--text-disabled)',
                   cursor: 'pointer',
-                  transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1), background 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-                  borderRadius: 0,
-                }}
+                  transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1), background 180ms cubic-bezier(0.16, 1, 0.3, 1)', }}
                 onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)'; }}
                 onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-disabled)'; }}
               >

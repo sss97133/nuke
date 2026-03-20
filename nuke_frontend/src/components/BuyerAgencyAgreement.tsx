@@ -150,7 +150,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
     canvas.width = 400;
     canvas.height = 150;
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = 'var(--surface-elevated)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.strokeStyle = '#cccccc';
@@ -160,7 +160,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
     ctx.lineTo(canvas.width - 20, canvas.height - 20);
     ctx.stroke();
 
-    ctx.strokeStyle = '#000000';
+    ctx.strokeStyle = 'var(--text)';
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -212,7 +212,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = 'var(--surface-elevated)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.strokeStyle = '#cccccc';
@@ -222,7 +222,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
     ctx.lineTo(canvas.width - 20, canvas.height - 20);
     ctx.stroke();
 
-    ctx.strokeStyle = '#000000';
+    ctx.strokeStyle = 'var(--text)';
     ctx.lineWidth = 2;
 
     setSignatureExists(false);
@@ -355,12 +355,10 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
       <div className="card-body">
         {error && (
           <div style={{
-            background: '#fef2f2',
+            background: 'var(--error-dim)',
             border: '1px solid #fecaca',
             color: '#991b1b',
-            padding: '10px 12px',
-            borderRadius: '4px',
-            marginBottom: '16px',
+            padding: '10px 12px', marginBottom: '16px',
             fontSize: '12px'
           }}>
             {error}
@@ -378,9 +376,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
             <div key={s} style={{
               flex: 1,
               padding: '8px',
-              textAlign: 'center',
-              borderRadius: '4px',
-              background: step === s ? 'var(--accent-dim)' : 'var(--surface-hover)',
+              textAlign: 'center', background: step === s ? 'var(--accent-dim)' : 'var(--surface-hover)',
               color: step === s ? 'var(--accent)' : 'var(--text-muted)',
               fontWeight: step === s ? 700 : 400,
             }}>
@@ -394,9 +390,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
           <div>
             <div style={{
               background: 'var(--surface-hover)',
-              padding: '16px',
-              borderRadius: '4px',
-              maxHeight: '400px',
+              padding: '16px', maxHeight: '400px',
               overflowY: 'auto',
               fontSize: '12px',
               lineHeight: '1.6',
@@ -678,9 +672,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
 
             <div style={{
               background: 'var(--surface-hover)',
-              padding: '12px',
-              borderRadius: '4px',
-              marginBottom: '16px',
+              padding: '12px', marginBottom: '16px',
               fontSize: '11px'
             }}>
               <p><strong>Signer:</strong> {legalName}</p>
@@ -702,9 +694,7 @@ export default function BuyerAgencyAgreement({ onComplete, onCancel }: BuyerAgen
                 Sign in the area below:
               </label>
               <div style={{
-                border: '2px solid var(--border)',
-                borderRadius: '4px',
-                overflow: 'hidden',
+                border: '2px solid var(--border)', overflow: 'hidden',
                 display: 'inline-block'
               }}>
                 <canvas

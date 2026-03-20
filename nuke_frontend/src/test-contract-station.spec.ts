@@ -233,9 +233,9 @@ describe('Contract Station - Plan Implementation', () => {
       const source = await import('./components/contract/ContractTransparency?raw');
       const code = (source as any).default || source;
       expect(code).toContain("ASSET_TYPE_COLORS");
-      expect(code).toContain("vehicle: '#3b82f6'");
-      expect(code).toContain("bond: '#10b981'");
-      expect(code).toContain("stake: '#f59e0b'");
+      expect(code).toContain("vehicle: 'var(--info)'");
+      expect(code).toContain("bond: 'var(--success)'");
+      expect(code).toContain("stake: 'var(--warning)'");
       expect(code).toContain("organization: '#8b5cf6'");
     });
 

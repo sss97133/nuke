@@ -213,9 +213,7 @@ export default function BuilderDashboard() {
               fontSize: '9px',
               fontWeight: 600,
               cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px'
-            }}
+              transition: '0.12s'}}
           >
             ← Back
           </button>
@@ -230,9 +228,7 @@ export default function BuilderDashboard() {
         }}>
           <div style={{
             background: 'var(--surface)',
-            border: '2px solid var(--border)',
-            borderRadius: '4px',
-            padding: '16px'
+            border: '2px solid var(--border)', padding: '16px'
           }}>
             <div style={{
               fontSize: '8px',
@@ -254,9 +250,7 @@ export default function BuilderDashboard() {
 
           <div style={{
             background: 'var(--surface)',
-            border: '2px solid var(--border)',
-            borderRadius: '4px',
-            padding: '16px'
+            border: '2px solid var(--border)', padding: '16px'
           }}>
             <div style={{
               fontSize: '8px',
@@ -278,9 +272,7 @@ export default function BuilderDashboard() {
 
           <div style={{
             background: 'var(--surface)',
-            border: '2px solid var(--border)',
-            borderRadius: '4px',
-            padding: '16px'
+            border: '2px solid var(--border)', padding: '16px'
           }}>
             <div style={{
               fontSize: '8px',
@@ -302,9 +294,7 @@ export default function BuilderDashboard() {
 
           <div style={{
             background: 'var(--surface)',
-            border: '2px solid var(--border)',
-            borderRadius: '4px',
-            padding: '16px'
+            border: '2px solid var(--border)', padding: '16px'
           }}>
             <div style={{
               fontSize: '8px',
@@ -328,9 +318,7 @@ export default function BuilderDashboard() {
         {/* Your Vehicles */}
         <div style={{
           background: 'var(--surface)',
-          border: '2px solid var(--border)',
-          borderRadius: '4px',
-          overflow: 'hidden',
+          border: '2px solid var(--border)', overflow: 'hidden',
           marginBottom: '24px'
         }}>
           <div style={{
@@ -410,9 +398,7 @@ export default function BuilderDashboard() {
                         fontSize: '8px',
                         fontWeight: 600,
                         cursor: 'pointer',
-                        transition: '0.12s',
-                        borderRadius: '4px',
-                        whiteSpace: 'nowrap'
+                        transition: '0.12s', whiteSpace: 'nowrap'
                       }}
                     >
                       Create Funding Round
@@ -428,9 +414,7 @@ export default function BuilderDashboard() {
                         fontSize: '8px',
                         fontWeight: 600,
                         cursor: 'pointer',
-                        transition: '0.12s',
-                        borderRadius: '4px',
-                        whiteSpace: 'nowrap'
+                        transition: '0.12s', whiteSpace: 'nowrap'
                       }}
                     >
                       Issue Bond
@@ -446,9 +430,7 @@ export default function BuilderDashboard() {
                         fontSize: '8px',
                         fontWeight: 600,
                         cursor: 'pointer',
-                        transition: '0.12s',
-                        borderRadius: '4px',
-                        whiteSpace: 'nowrap'
+                        transition: '0.12s', whiteSpace: 'nowrap'
                       }}
                     >
                       List for Sale
@@ -470,9 +452,7 @@ export default function BuilderDashboard() {
           {fundingRounds.length > 0 && (
             <div style={{
               background: 'var(--surface)',
-              border: '2px solid var(--border)',
-              borderRadius: '4px',
-              overflow: 'hidden'
+              border: '2px solid var(--border)', overflow: 'hidden'
             }}>
               <div style={{
                 padding: '12px',
@@ -515,9 +495,7 @@ export default function BuilderDashboard() {
                       <div style={{
                         width: '100%',
                         height: '6px',
-                        background: 'var(--bg)',
-                        borderRadius: '3px',
-                        overflow: 'hidden'
+                        background: 'var(--bg)', overflow: 'hidden'
                       }}>
                         <div style={{
                           width: `${Math.min(progress, 100)}%`,
@@ -544,9 +522,7 @@ export default function BuilderDashboard() {
           {bonds.length > 0 && (
             <div style={{
               background: 'var(--surface)',
-              border: '2px solid var(--border)',
-              borderRadius: '4px',
-              overflow: 'hidden'
+              border: '2px solid var(--border)', overflow: 'hidden'
             }}>
               <div style={{
                 padding: '12px',
@@ -595,9 +571,7 @@ export default function BuilderDashboard() {
                       <div style={{
                         width: '100%',
                         height: '6px',
-                        background: 'var(--bg)',
-                        borderRadius: '3px',
-                        overflow: 'hidden',
+                        background: 'var(--bg)', overflow: 'hidden',
                         marginTop: '8px'
                       }}>
                         <div style={{

@@ -241,7 +241,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
       position: 'relative',
       border: '2px inset var(--border)',
       background: 'var(--surface)',
-      fontFamily: 'MS Sans Serif, sans-serif',
+      fontFamily: 'Arial, sans-serif',
       fontSize: '11px'
     }}>
 
@@ -381,9 +381,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
               color: 'white',
               padding: '2px 4px',
               fontSize: '9px',
-              whiteSpace: 'nowrap',
-              borderRadius: '2px',
-              pointerEvents: 'none',
+              whiteSpace: 'nowrap', pointerEvents: 'none',
               maxWidth: '150px',
               overflow: 'hidden',
               textOverflow: 'ellipsis'
@@ -666,7 +664,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
         position: 'relative',
         border: '2px inset var(--border)',
         background: 'var(--surface)',
-        fontFamily: 'MS Sans Serif, sans-serif',
+        fontFamily: 'Arial, sans-serif',
         fontSize: '11px'
       }}>
 
@@ -806,9 +804,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
                 color: 'white',
                 padding: '2px 4px',
                 fontSize: '9px',
-                whiteSpace: 'nowrap',
-                borderRadius: '2px',
-                pointerEvents: 'none',
+                whiteSpace: 'nowrap', pointerEvents: 'none',
                 maxWidth: '150px',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis'

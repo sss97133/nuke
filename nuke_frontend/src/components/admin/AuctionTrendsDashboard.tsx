@@ -21,11 +21,11 @@ const PLATFORM_DISPLAY: Record<string, { name: string; color: string }> = {
 // TODO: These are gauge/badge colors used in SVG rendering and dynamic backgrounds.
 // CSS variables don't resolve in inline SVG attributes. Keeping as hex for now.
 const SENTIMENT_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  hot: { bg: '#dc2626', text: '#ffffff', label: 'HOT' },
-  warm: { bg: '#f97316', text: '#ffffff', label: 'WARM' },
-  neutral: { bg: '#6b7280', text: '#ffffff', label: 'NEUTRAL' },
-  cool: { bg: '#3b82f6', text: '#ffffff', label: 'COOL' },
-  soft: { bg: '#8b5cf6', text: '#ffffff', label: 'SOFT' },
+  hot: { bg: 'var(--error)', text: 'var(--surface-elevated)', label: 'HOT' },
+  warm: { bg: 'var(--orange)', text: 'var(--surface-elevated)', label: 'WARM' },
+  neutral: { bg: 'var(--text-secondary)', text: 'var(--surface-elevated)', label: 'NEUTRAL' },
+  cool: { bg: 'var(--info)', text: 'var(--surface-elevated)', label: 'COOL' },
+  soft: { bg: '#8b5cf6', text: 'var(--surface-elevated)', label: 'SOFT' },
 };
 
 interface PlatformStats {
@@ -161,9 +161,7 @@ export default function AuctionTrendsDashboard() {
             left: 0,
             right: 0,
             height: '90px',
-            borderRadius: '90px 90px 0 0',
-            /* TODO: Gauge gradient uses hardcoded hex - CSS variables don't work in linear-gradient with inline styles */
-            background: 'linear-gradient(90deg, #8b5cf6 0%, #3b82f6 25%, #6b7280 50%, #f97316 75%, #dc2626 100%)',
+            background: 'var(--surface-hover)',
             opacity: 0.3,
           }} />
           {/* Needle */}
@@ -176,9 +174,7 @@ export default function AuctionTrendsDashboard() {
             background: sentimentConfig.bg,
             transformOrigin: 'bottom center',
             transform: `translateX(-50%) rotate(${rotation}deg)`,
-            transition: 'transform 0.5s ease-out',
-            borderRadius: '2px',
-          }} />
+            transition: 'transform 0.5s ease-out', }} />
           {/* Center dot */}
           <div style={{
             position: 'absolute',
@@ -195,9 +191,7 @@ export default function AuctionTrendsDashboard() {
           marginTop: 'var(--space-2)',
           padding: '4px 12px',
           background: sentimentConfig.bg,
-          color: sentimentConfig.text,
-          borderRadius: '4px',
-          display: 'inline-block',
+          color: sentimentConfig.text, display: 'inline-block',
           fontSize: '13px',
           fontWeight: 700,
         }}>
@@ -317,9 +311,7 @@ export default function AuctionTrendsDashboard() {
                 style={{
                   flex: 1,
                   height: `${Math.max(height, 2)}%`,
-                  background: isPeak ? 'var(--error)' : 'var(--grey-300)',
-                  borderRadius: '2px 2px 0 0',
-                  transition: 'height 0.3s ease',
+                  background: isPeak ? 'var(--error)' : 'var(--grey-300)', transition: 'height 0.3s ease',
                 }}
                 title={`${formatHour(hour)}: ${endings} auctions ending`}
               />
@@ -394,9 +386,7 @@ export default function AuctionTrendsDashboard() {
   };
 
   return (
-    <div style={{
-      borderRadius: '0px',
-      border: '2px solid var(--border-light)',
+    <div style={{ border: '2px solid var(--border-light)',
       backgroundColor: 'var(--white)',
       padding: 'var(--space-4)',
     }}>
@@ -496,16 +486,12 @@ export default function AuctionTrendsDashboard() {
                   </div>
                   <div style={{
                     height: '6px',
-                    backgroundColor: 'var(--grey-100)',
-                    borderRadius: '3px',
-                    overflow: 'hidden',
+                    backgroundColor: 'var(--grey-100)', overflow: 'hidden',
                   }}>
                     <div style={{
                       height: '100%',
                       width: `${(platform.active_auctions / maxActiveAuctions) * 100}%`,
-                      backgroundColor: config.color,
-                      borderRadius: '3px',
-                      transition: 'width 0.3s ease',
+                      backgroundColor: config.color, transition: 'width 0.3s ease',
                     }} />
                   </div>
                 </div>

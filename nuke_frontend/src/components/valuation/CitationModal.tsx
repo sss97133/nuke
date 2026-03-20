@@ -90,31 +90,31 @@ export default function CitationModal({
   // cannot be CSS variables directly. Replace when a JS theme bridge is available.
   const getEvidenceBadge = (evidenceType: string) => {
     const badges: Record<string, { label: string; color: string }> = {
-      receipt: { label: '🧾 Receipt', color: '#10b981' },
-      invoice: { label: '📄 Invoice', color: '#10b981' },
-      title: { label: '📋 Title', color: '#3b82f6' },
+      receipt: { label: '🧾 Receipt', color: 'var(--success)' },
+      invoice: { label: '📄 Invoice', color: 'var(--success)' },
+      title: { label: '📋 Title', color: 'var(--info)' },
       image_tag: { label: '🏷️ Tag', color: '#8b5cf6' },
-      market_listing: { label: '📊 Market', color: '#f59e0b' },
-      appraisal_doc: { label: '✓ Appraisal', color: '#059669' },
-      user_input: { label: '👤 User', color: '#6b7280' },
+      market_listing: { label: '📊 Market', color: 'var(--warning)' },
+      appraisal_doc: { label: '✓ Appraisal', color: 'var(--success)' },
+      user_input: { label: '👤 User', color: 'var(--text-secondary)' },
       ai_extraction: { label: 'AI', color: '#ec4899' },
       system_calculation: { label: '⚙️ System', color: '#64748b' }
     };
-    return badges[evidenceType] || { label: evidenceType, color: '#9ca3af' };
+    return badges[evidenceType] || { label: evidenceType, color: 'var(--text-disabled)' };
   };
 
   // TODO: Role badge colors are used with hex-opacity suffix, cannot be CSS variables.
   const getRoleBadge = (role: string | null) => {
     if (!role) return null;
     const colors: Record<string, string> = {
-      owner: '#059669',
-      mechanic: '#3b82f6',
+      owner: 'var(--success)',
+      mechanic: 'var(--info)',
       appraiser: '#8b5cf6',
-      uploader: '#6b7280',
+      uploader: 'var(--text-secondary)',
       ai: '#ec4899',
       system: '#64748b'
     };
-    return { color: colors[role] || '#9ca3af' };
+    return { color: colors[role] || 'var(--text-disabled)' };
   };
 
   return ReactDOM.createPortal(
@@ -139,9 +139,7 @@ export default function CitationModal({
           maxWidth: '100%',
           maxHeight: '90vh',
           overflow: 'auto',
-          border: '2px solid var(--border)',
-          borderRadius: '4px'
-        }}
+          border: '2px solid var(--border)'}}
       >
         {/* Header */}
         <div style={{
@@ -190,9 +188,7 @@ export default function CitationModal({
                   <div
                     key={cit.id}
                     style={{
-                      border: '1px solid var(--border)',
-                      borderRadius: '4px',
-                      padding: '12px',
+                      border: '1px solid var(--border)', padding: '12px',
                       background: idx === 0 ? 'var(--surface)' : 'var(--bg)'
                     }}
                   >
@@ -208,9 +204,7 @@ export default function CitationModal({
                                 fontSize: '9px',
                                 padding: '2px 6px',
                                 background: roleBadge?.color ? `${roleBadge.color}22` : 'var(--bg-secondary)',
-                                color: roleBadge?.color || '#6b7280',
-                                borderRadius: '2px',
-                                fontWeight: 'normal'
+                                color: roleBadge?.color || 'var(--text-secondary)', fontWeight: 'normal'
                               }}
                             >
                               {cit.submitter_role}
@@ -241,9 +235,7 @@ export default function CitationModal({
                           fontSize: '9px',
                           padding: '3px 8px',
                           background: `${evidenceBadge.color}22`,
-                          color: evidenceBadge.color,
-                          borderRadius: '2px',
-                          fontWeight: 600
+                          color: evidenceBadge.color, fontWeight: 600
                         }}
                       >
                         {evidenceBadge.label}
@@ -253,9 +245,7 @@ export default function CitationModal({
                           fontSize: '9px',
                           padding: '3px 8px',
                           background: cit.confidence_score >= 80 ? '#10b98122' : '#f59e0b22',
-                          color: cit.confidence_score >= 80 ? '#10b981' : '#f59e0b',
-                          borderRadius: '2px'
-                        }}
+                          color: cit.confidence_score >= 80 ? 'var(--success)' : 'var(--warning)'}}
                       >
                         {cit.confidence_score}% confidence
                       </span>
@@ -269,12 +259,10 @@ export default function CitationModal({
                             cit.verification_status === 'disputed' ? '#ef444422' :
                             'var(--bg-secondary)',
                           color:
-                            cit.verification_status === 'receipt_confirmed' ? '#10b981' :
-                            cit.verification_status === 'professional_verified' ? '#3b82f6' :
-                            cit.verification_status === 'disputed' ? '#ef4444' :
-                            '#6b7280',
-                          borderRadius: '2px'
-                        }}
+                            cit.verification_status === 'receipt_confirmed' ? 'var(--success)' :
+                            cit.verification_status === 'professional_verified' ? 'var(--info)' :
+                            cit.verification_status === 'disputed' ? 'var(--error)' :
+                            'var(--text-secondary)'}}
                       >
                         {cit.verification_status.replace(/_/g, ' ')}
                       </span>
@@ -330,7 +318,7 @@ export default function CitationModal({
 
                     {/* Labor details */}
                     {(cit.shop_id || cit.laborer_user_id || cit.mitchell_operation_code) && (
-                      <div style={{ fontSize: '11px', background: 'var(--bg)', padding: '8px', borderRadius: '2px' }}>
+                      <div style={{ fontSize: '11px', background: 'var(--bg)', padding: '8px'}}>
                         <div style={{ fontWeight: 600, marginBottom: '4px' }}>Labor Details:</div>
                         {cit.shop_id && <div>Shop: {cit.shop_id.slice(0, 8)}...</div>}
                         {cit.laborer_user_id && <div>Laborer: {cit.laborer_user_id.slice(0, 8)}...</div>}
@@ -390,9 +378,7 @@ export default function CitationModal({
                 border: 'none',
                 padding: '8px 12px',
                 fontSize: '12px',
-                cursor: 'pointer',
-                borderRadius: '4px'
-              }}
+                cursor: 'pointer'}}
             >
               Close
             </button>

@@ -210,9 +210,7 @@ const AdminDashboard: React.FC = () => {
               <span style={{
                 marginLeft: '8px',
                 backgroundColor: 'var(--error)',
-                color: 'var(--bg)',
-                borderRadius: '2px',
-                padding: '1px 4px',
+                color: 'var(--bg)', padding: '1px 4px',
                 fontSize: '11px',
                 fontWeight: '700'
               }}>
@@ -258,7 +256,7 @@ const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
+                  <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-light)' }}>
                     <div style={{ fontWeight: '700', marginBottom: '4px', fontSize: '11px' }}>JUSTIFICATION</div>
                     <div style={{ fontSize: '11px', color: 'var(--text)' }}>{approval.role_justification}</div>
                   </div>

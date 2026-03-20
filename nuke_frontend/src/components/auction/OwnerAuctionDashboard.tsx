@@ -163,7 +163,7 @@ export default function OwnerAuctionDashboard({ listingId, onClose }: OwnerAucti
         {onClose && (
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 border border-gray-300 hover:bg-gray-50 transition-colors"
           >
             Close
           </button>
@@ -173,7 +173,7 @@ export default function OwnerAuctionDashboard({ listingId, onClose }: OwnerAucti
       {/* Status Badge */}
       <div className="flex items-center gap-4">
         <span
-          className={`px-3 py-1 rounded text-sm font-medium ${
+          className={`px-3 py-1  text-sm font-medium ${
             listing.status === 'active'
               ? 'bg-green-100 text-green-800'
               : listing.status === 'draft'
@@ -184,7 +184,7 @@ export default function OwnerAuctionDashboard({ listingId, onClose }: OwnerAucti
           {listing.status.toUpperCase()}
         </span>
         {isExtended && (
-          <span className="px-3 py-1 rounded text-sm font-medium bg-yellow-100 text-yellow-800">
+          <span className="px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-800">
             Auction Extended
           </span>
         )}
@@ -192,17 +192,17 @@ export default function OwnerAuctionDashboard({ listingId, onClose }: OwnerAucti
 
       {/* Key Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-4 border border-gray-200 rounded">
+        <div className="p-4 border border-gray-200">
           <div className="text-sm text-gray-600">Current High Bid</div>
           <div className="text-2xl font-bold">
             {formatCurrency(currentHighBid || listing.current_high_bid_cents)}
           </div>
         </div>
-        <div className="p-4 border border-gray-200 rounded">
+        <div className="p-4 border border-gray-200">
           <div className="text-sm text-gray-600">Total Bids</div>
           <div className="text-2xl font-bold">{bidCount || listing.bid_count}</div>
         </div>
-        <div className="p-4 border border-gray-200 rounded">
+        <div className="p-4 border border-gray-200">
           <div className="text-sm text-gray-600">Reserve Price</div>
           <div className="text-2xl font-bold">
             {formatCurrency(listing.reserve_price_cents)}
@@ -213,7 +213,7 @@ export default function OwnerAuctionDashboard({ listingId, onClose }: OwnerAucti
             </div>
           )}
         </div>
-        <div className="p-4 border border-gray-200 rounded">
+        <div className="p-4 border border-gray-200">
           <div className="text-sm text-gray-600">Time Remaining</div>
           <div className="text-2xl font-bold">
             {formatTimeRemaining(auctionEndTime?.toISOString() || listing.auction_end_time || null)}
@@ -226,13 +226,13 @@ export default function OwnerAuctionDashboard({ listingId, onClose }: OwnerAucti
         <div className="flex gap-4">
           <button
             onClick={handleStartAuction}
-            className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            className="px-6 py-2 bg-blue-600 text-white hover:bg-blue-700 transition-colors"
           >
             Start Auction
           </button>
           <button
             onClick={handleCancelAuction}
-            className="px-6 py-2 border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors"
+            className="px-6 py-2 border border-red-300 text-red-600 hover:bg-red-50 transition-colors"
           >
             Cancel Auction
           </button>
@@ -243,7 +243,7 @@ export default function OwnerAuctionDashboard({ listingId, onClose }: OwnerAucti
         <div>
           <button
             onClick={handleCancelAuction}
-            className="px-6 py-2 border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors"
+            className="px-6 py-2 border border-red-300 text-red-600 hover:bg-red-50 transition-colors"
           >
             Cancel Auction
           </button>
@@ -260,7 +260,7 @@ export default function OwnerAuctionDashboard({ listingId, onClose }: OwnerAucti
             {bids.map((bid) => (
               <div
                 key={bid.id}
-                className="p-4 border border-gray-200 rounded flex items-center justify-between"
+                className="p-4 border border-gray-200 flex items-center justify-between"
               >
                 <div>
                   <div className="font-medium">
@@ -271,7 +271,7 @@ export default function OwnerAuctionDashboard({ listingId, onClose }: OwnerAucti
                   </div>
                 </div>
                 {bid.is_winning && (
-                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs">
                     Winning
                   </span>
                 )}
@@ -282,7 +282,7 @@ export default function OwnerAuctionDashboard({ listingId, onClose }: OwnerAucti
       </div>
 
       {/* Auction Settings */}
-      <div className="p-4 border border-gray-200 rounded">
+      <div className="p-4 border border-gray-200">
         <h3 className="text-lg font-semibold mb-4">Auction Settings</h3>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">

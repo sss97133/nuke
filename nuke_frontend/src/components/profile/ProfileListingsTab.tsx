@@ -58,9 +58,7 @@ export const ProfileListingsTab: React.FC<ProfileListingsTabProps> = ({ listings
         fontSize: '9px',
         padding: '2px 6px',
         background: statusInfo.color,
-        color: 'var(--white)',
-        borderRadius: '2px',
-        fontWeight: 'bold',
+        color: 'var(--white)', fontWeight: 'bold',
       }}>
         {statusInfo.label}
       </span>
@@ -100,9 +98,7 @@ export const ProfileListingsTab: React.FC<ProfileListingsTabProps> = ({ listings
               gap: 'var(--space-3)',
               padding: 'var(--space-3)',
               background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              transition: 'all 0.12s ease',
+              border: '1px solid var(--border)', transition: 'all 0.12s ease',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'var(--surface-hover)';

@@ -211,9 +211,7 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
           marginTop: '8px',
           padding: '8px',
           background: 'var(--accent-dim, #f0f9ff)',
-          border: '1px solid var(--accent-border, #bfdbfe)',
-          borderRadius: '4px',
-          fontSize: '9px'
+          border: '1px solid var(--accent-border, #bfdbfe)', fontSize: '9px'
         }}
       >
         <div style={{ fontWeight: 700, marginBottom: '6px', color: 'var(--accent)' }}>
@@ -269,9 +267,7 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
             marginTop: '6px', 
             padding: '4px 6px', 
             background: 'var(--warning-dim)',
-            border: '1px solid var(--warning)',
-            borderRadius: '2px'
-          }}>
+            border: '1px solid var(--warning)'}}>
             <div style={{ fontSize: '8px', color: 'var(--warning)', marginBottom: '2px' }}>
               OWNER OPERATOR VALUE
             </div>

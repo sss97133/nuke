@@ -36,13 +36,13 @@ interface QueueStats {
 
 const STATUS_COLORS: Record<string, string> = {
   active: '#2d8a4e',
-  monitoring: '#2563eb',
-  investigating: '#d97706',
-  degraded: '#dc2626',
+  monitoring: 'var(--info)',
+  investigating: 'var(--warning)',
+  degraded: 'var(--error)',
   blocked: '#991b1b',
-  pending: '#6b7280',
-  not_started: '#9ca3af',
-  archived: '#4b5563',
+  pending: 'var(--text-secondary)',
+  not_started: 'var(--text-disabled)',
+  archived: 'var(--text-secondary)',
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -158,7 +158,7 @@ export default function SourcesDashboard() {
           <h1 style={{ fontFamily: 'Arial, sans-serif', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
             SOURCES
           </h1>
-          <p style={{ fontFamily: 'Arial, sans-serif', fontSize: '9px', color: '#6b7280', margin: '4px 0 0 0', textTransform: 'uppercase' }}>
+          <p style={{ fontFamily: 'Arial, sans-serif', fontSize: '9px', color: 'var(--text-secondary)', margin: '4px 0 0 0', textTransform: 'uppercase' }}>
             {sources.length} REGISTERED / {statusCounts['active'] || 0} ACTIVE / {statusCounts['monitoring'] || 0} MONITORING
           </p>
         </div>
@@ -166,14 +166,14 @@ export default function SourcesDashboard() {
 
       {/* Add Source */}
       <div style={{
-        border: '2px solid #d1d5db',
+        border: '2px solid var(--border)',
         padding: '12px',
         marginBottom: '16px',
         display: 'flex',
         gap: '8px',
         alignItems: 'center',
       }}>
-        <span style={{ fontFamily: 'Arial, sans-serif', fontSize: '8px', textTransform: 'uppercase', fontWeight: 700, color: '#6b7280', whiteSpace: 'nowrap' }}>
+        <span style={{ fontFamily: 'Arial, sans-serif', fontSize: '8px', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
           ADD SOURCE
         </span>
         <input
@@ -186,7 +186,7 @@ export default function SourcesDashboard() {
             flex: 1,
             fontFamily: 'Courier New, monospace',
             fontSize: '11px',
-            border: '2px solid #e5e7eb',
+            border: '2px solid var(--border)',
             padding: '6px 8px',
             outline: 'none',
           }}
@@ -201,8 +201,8 @@ export default function SourcesDashboard() {
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
             border: '2px solid #111',
-            background: onboarding ? '#e5e7eb' : '#111',
-            color: onboarding ? '#6b7280' : '#fff',
+            background: onboarding ? 'var(--border)' : '#111',
+            color: onboarding ? 'var(--text-secondary)' : '#fff',
             padding: '6px 16px',
             cursor: onboarding ? 'not-allowed' : 'pointer',
           }}
@@ -214,7 +214,7 @@ export default function SourcesDashboard() {
       {/* Onboard Result */}
       {onboardResult && (
         <div style={{
-          border: `2px solid ${onboardResult.success ? '#2d8a4e' : '#dc2626'}`,
+          border: `2px solid ${onboardResult.success ? '#2d8a4e' : 'var(--error)'}`,
           padding: '12px',
           marginBottom: '16px',
           fontFamily: 'Courier New, monospace',
@@ -237,14 +237,14 @@ export default function SourcesDashboard() {
               {onboardResult.queued > 0 && <div>Queued: {onboardResult.queued} listings</div>}
             </>
           ) : (
-            <div style={{ color: '#dc2626' }}>Error: {onboardResult.error}</div>
+            <div style={{ color: 'var(--error)' }}>Error: {onboardResult.error}</div>
           )}
         </div>
       )}
 
       {/* Data Flow */}
       <div style={{
-        border: '2px solid #d1d5db',
+        border: '2px solid var(--border)',
         padding: '12px',
         marginBottom: '16px',
         display: 'grid',
@@ -252,20 +252,20 @@ export default function SourcesDashboard() {
         gap: '12px',
       }}>
         <div>
-          <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '8px', textTransform: 'uppercase', fontWeight: 700, color: '#6b7280' }}>QUEUE PENDING</div>
+          <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '8px', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-secondary)' }}>QUEUE PENDING</div>
           <div style={{ fontFamily: 'Courier New, monospace', fontSize: '16px', fontWeight: 700 }}>{formatNum(queueStats.pending)}</div>
         </div>
         <div>
-          <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '8px', textTransform: 'uppercase', fontWeight: 700, color: '#6b7280' }}>PROCESSING</div>
-          <div style={{ fontFamily: 'Courier New, monospace', fontSize: '16px', fontWeight: 700, color: '#2563eb' }}>{formatNum(queueStats.processing)}</div>
+          <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '8px', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-secondary)' }}>PROCESSING</div>
+          <div style={{ fontFamily: 'Courier New, monospace', fontSize: '16px', fontWeight: 700, color: 'var(--info)' }}>{formatNum(queueStats.processing)}</div>
         </div>
         <div>
-          <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '8px', textTransform: 'uppercase', fontWeight: 700, color: '#6b7280' }}>COMPLETE (24H)</div>
+          <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '8px', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-secondary)' }}>COMPLETE (24H)</div>
           <div style={{ fontFamily: 'Courier New, monospace', fontSize: '16px', fontWeight: 700, color: '#2d8a4e' }}>{formatNum(queueStats.complete)}</div>
         </div>
         <div>
-          <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '8px', textTransform: 'uppercase', fontWeight: 700, color: '#6b7280' }}>FAILED (24H)</div>
-          <div style={{ fontFamily: 'Courier New, monospace', fontSize: '16px', fontWeight: 700, color: '#dc2626' }}>{formatNum(queueStats.failed)}</div>
+          <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '8px', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-secondary)' }}>FAILED (24H)</div>
+          <div style={{ fontFamily: 'Courier New, monospace', fontSize: '16px', fontWeight: 700, color: 'var(--error)' }}>{formatNum(queueStats.failed)}</div>
         </div>
       </div>
 
@@ -282,9 +282,9 @@ export default function SourcesDashboard() {
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
               border: '2px solid',
-              borderColor: filter === f ? '#111' : '#d1d5db',
+              borderColor: filter === f ? '#111' : 'var(--border)',
               background: filter === f ? '#111' : 'transparent',
-              color: filter === f ? '#fff' : '#6b7280',
+              color: filter === f ? '#fff' : 'var(--text-secondary)',
               padding: '4px 10px',
               cursor: 'pointer',
             }}
@@ -296,9 +296,9 @@ export default function SourcesDashboard() {
 
       {/* Sources list */}
       {loading ? (
-        <div style={{ fontFamily: 'Courier New, monospace', fontSize: '10px', color: '#6b7280', padding: '20px' }}>Loading...</div>
+        <div style={{ fontFamily: 'Courier New, monospace', fontSize: '10px', color: 'var(--text-secondary)', padding: '20px' }}>Loading...</div>
       ) : (
-        <div style={{ border: '2px solid #d1d5db' }}>
+        <div style={{ border: '2px solid var(--border)' }}>
           {filtered.map((s, idx) => {
             const pct = completionPct(s);
             return (
@@ -306,7 +306,7 @@ export default function SourcesDashboard() {
                 key={s.slug}
                 style={{
                   padding: '10px 12px',
-                  borderBottom: idx < filtered.length - 1 ? '1px solid #e5e7eb' : 'none',
+                  borderBottom: idx < filtered.length - 1 ? '1px solid var(--border)' : 'none',
                   display: 'grid',
                   gridTemplateColumns: '28px 1fr 80px 80px 100px 80px',
                   gap: '8px',
@@ -314,11 +314,11 @@ export default function SourcesDashboard() {
                 }}
               >
                 {/* Logo */}
-                <div style={{ width: '24px', height: '24px', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                <div style={{ width: '24px', height: '24px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                   {s.logo_url ? (
                     <img src={s.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                   ) : (
-                    <span style={{ fontFamily: 'Arial, sans-serif', fontSize: '10px', fontWeight: 700, color: '#9ca3af' }}>
+                    <span style={{ fontFamily: 'Arial, sans-serif', fontSize: '10px', fontWeight: 700, color: 'var(--text-disabled)' }}>
                       {(s.display_name || s.slug).charAt(0).toUpperCase()}
                     </span>
                   )}
@@ -336,7 +336,7 @@ export default function SourcesDashboard() {
                       fontWeight: 700,
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
-                      color: '#6b7280',
+                      color: 'var(--text-secondary)',
                     }}>
                       {CATEGORY_LABELS[s.obs_category || s.category] || (s.obs_category || s.category || '').toUpperCase()}
                     </span>
@@ -345,7 +345,7 @@ export default function SourcesDashboard() {
                       fontSize: '7px',
                       fontWeight: 700,
                       textTransform: 'uppercase',
-                      color: STATUS_COLORS[s.status] || '#6b7280',
+                      color: STATUS_COLORS[s.status] || 'var(--text-secondary)',
                     }}>
                       {s.status.replace('_', ' ')}
                     </span>
@@ -353,7 +353,7 @@ export default function SourcesDashboard() {
                       <a href={s.base_url} target="_blank" rel="noopener noreferrer" style={{
                         fontFamily: 'Courier New, monospace',
                         fontSize: '8px',
-                        color: '#9ca3af',
+                        color: 'var(--text-disabled)',
                         textDecoration: 'none',
                       }}>
                         {s.base_url.replace('https://', '').replace('http://', '')}
@@ -367,7 +367,7 @@ export default function SourcesDashboard() {
                   <div style={{ fontFamily: 'Courier New, monospace', fontSize: '11px', fontWeight: 700 }}>
                     {formatNum(s.universe_total)}
                   </div>
-                  <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '7px', textTransform: 'uppercase', color: '#9ca3af' }}>TOTAL</div>
+                  <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '7px', textTransform: 'uppercase', color: 'var(--text-disabled)' }}>TOTAL</div>
                 </div>
 
                 {/* Extracted */}
@@ -375,21 +375,21 @@ export default function SourcesDashboard() {
                   <div style={{ fontFamily: 'Courier New, monospace', fontSize: '11px', fontWeight: 700 }}>
                     {formatNum(s.total_extracted)}
                   </div>
-                  <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '7px', textTransform: 'uppercase', color: '#9ca3af' }}>EXTRACTED</div>
+                  <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '7px', textTransform: 'uppercase', color: 'var(--text-disabled)' }}>EXTRACTED</div>
                 </div>
 
                 {/* Completion bar */}
                 <div>
                   {pct !== null ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <div style={{ flex: 1, height: '6px', border: '1px solid #e5e7eb', position: 'relative' }}>
+                      <div style={{ flex: 1, height: '6px', border: '1px solid var(--border)', position: 'relative' }}>
                         <div style={{
                           position: 'absolute',
                           top: 0,
                           left: 0,
                           height: '100%',
                           width: `${pct}%`,
-                          background: pct > 90 ? '#2d8a4e' : pct > 50 ? '#2563eb' : '#d97706',
+                          background: pct > 90 ? '#2d8a4e' : pct > 50 ? 'var(--info)' : 'var(--warning)',
                         }} />
                       </div>
                       <span style={{ fontFamily: 'Courier New, monospace', fontSize: '9px', fontWeight: 700, minWidth: '28px' }}>
@@ -397,13 +397,13 @@ export default function SourcesDashboard() {
                       </span>
                     </div>
                   ) : (
-                    <span style={{ fontFamily: 'Courier New, monospace', fontSize: '9px', color: '#d1d5db' }}>-</span>
+                    <span style={{ fontFamily: 'Courier New, monospace', fontSize: '9px', color: 'var(--border)' }}>-</span>
                   )}
                 </div>
 
                 {/* Last active */}
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontFamily: 'Courier New, monospace', fontSize: '9px', color: '#6b7280' }}>
+                  <div style={{ fontFamily: 'Courier New, monospace', fontSize: '9px', color: 'var(--text-secondary)' }}>
                     {timeAgo(s.last_successful_at)}
                   </div>
                 </div>
@@ -412,7 +412,7 @@ export default function SourcesDashboard() {
           })}
 
           {filtered.length === 0 && (
-            <div style={{ padding: '20px', textAlign: 'center', fontFamily: 'Courier New, monospace', fontSize: '10px', color: '#9ca3af' }}>
+            <div style={{ padding: '20px', textAlign: 'center', fontFamily: 'Courier New, monospace', fontSize: '10px', color: 'var(--text-disabled)' }}>
               No sources match filter
             </div>
           )}

@@ -33,7 +33,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 onChange={(e) => updateField('minimum_investment_cents', Math.round((parseFloat(e.target.value) || 0) * 100))}
                 min="0"
                 step="100"
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               />
             </div>
 
@@ -47,7 +47,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 onChange={(e) => updateField('maximum_investment_cents', e.target.value ? Math.round(parseFloat(e.target.value) * 100) : null)}
                 min="0"
                 step="1000"
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               />
             </div>
 
@@ -58,7 +58,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
               <select
                 value={contract.share_structure || 'shares'}
                 onChange={(e) => updateField('share_structure', e.target.value)}
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               >
                 <option value="shares">Shares</option>
                 <option value="units">Units</option>
@@ -77,7 +77,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 onChange={(e) => updateField('initial_share_price_cents', e.target.value ? Math.round(parseFloat(e.target.value) * 100) : null)}
                 min="0"
                 step="0.01"
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               />
             </div>
           </div>
@@ -102,7 +102,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 min="0"
                 max="10"
                 step="0.01"
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               />
             </div>
 
@@ -117,7 +117,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 min="0"
                 max="20"
                 step="0.1"
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               />
             </div>
 
@@ -132,7 +132,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 min="0"
                 step="0.1"
                 placeholder="Only charge if return > hurdle"
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               />
             </div>
 
@@ -147,7 +147,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 min="0"
                 max="5"
                 step="0.01"
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               />
             </div>
 
@@ -161,7 +161,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 onChange={(e) => updateField('setup_fee_cents', Math.round((parseFloat(e.target.value) || 0) * 100))}
                 min="0"
                 step="10"
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               />
             </div>
 
@@ -176,7 +176,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 min="0"
                 max="10"
                 step="0.1"
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               />
             </div>
           </div>
@@ -197,7 +197,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
               <select
                 value={contract.liquidity_type || 'daily'}
                 onChange={(e) => updateField('liquidity_type', e.target.value)}
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               >
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
@@ -220,7 +220,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                   value={contract.lockup_period_days || ''}
                   onChange={(e) => updateField('lockup_period_days', e.target.value ? parseInt(e.target.value) : null)}
                   min="0"
-                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
                 />
               </div>
             )}
@@ -232,7 +232,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
               <select
                 value={contract.redemption_frequency || 'daily'}
                 onChange={(e) => updateField('redemption_frequency', e.target.value)}
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               >
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
@@ -250,7 +250,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 value={contract.redemption_notice_days || 0}
                 onChange={(e) => updateField('redemption_notice_days', parseInt(e.target.value) || 0)}
                 min="0"
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               />
             </div>
           </div>
@@ -271,7 +271,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
               <select
                 value={contract.legal_entity_type || 'limited_partnership'}
                 onChange={(e) => updateField('legal_entity_type', e.target.value)}
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               >
                 <option value="limited_partnership">Limited Partnership</option>
                 <option value="llc">LLC</option>
@@ -291,7 +291,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 value={contract.legal_entity_name || ''}
                 onChange={(e) => updateField('legal_entity_name', e.target.value)}
                 placeholder="e.g., Vintage Fund LP"
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               />
             </div>
 
@@ -303,7 +303,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 type="text"
                 value={contract.jurisdiction || 'Delaware, USA'}
                 onChange={(e) => updateField('jurisdiction', e.target.value)}
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               />
             </div>
 
@@ -314,7 +314,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
               <select
                 value={contract.regulatory_status || 'private_placement'}
                 onChange={(e) => updateField('regulatory_status', e.target.value)}
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               >
                 <option value="private_placement">Private Placement</option>
                 <option value="reg_d">Reg D</option>
@@ -344,7 +344,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 onChange={(e) => updateField('investment_strategy', e.target.value)}
                 placeholder="Describe your investment strategy, target market, and approach..."
                 rows={4}
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px', fontFamily: 'inherit' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', fontFamily: 'inherit' }}
               />
             </div>
 
@@ -360,7 +360,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                   min="0"
                   step="0.1"
                   placeholder="Optional"
-                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
                 />
               </div>
 
@@ -371,7 +371,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 <select
                   value={contract.risk_level || 'moderate'}
                   onChange={(e) => updateField('risk_level', e.target.value)}
-                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
                 >
                   <option value="conservative">Conservative</option>
                   <option value="moderate">Moderate</option>
@@ -387,7 +387,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 <select
                   value={contract.rebalancing_frequency || 'quarterly'}
                   onChange={(e) => updateField('rebalancing_frequency', e.target.value)}
-                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                  style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
                 >
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
@@ -415,7 +415,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
               <select
                 value={contract.transparency_level || 'full'}
                 onChange={(e) => updateField('transparency_level', e.target.value)}
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               >
                 <option value="full">Full (All assets visible, real-time)</option>
                 <option value="partial">Partial (Aggregated data, periodic)</option>
@@ -430,7 +430,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
               <select
                 value={contract.reporting_frequency || 'monthly'}
                 onChange={(e) => updateField('reporting_frequency', e.target.value)}
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               >
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
@@ -460,7 +460,7 @@ export default function TermsEditor({ contract, onContractUpdate, onBack, onNext
                 value={contract.custodian_name || ''}
                 onChange={(e) => updateField('custodian_name', e.target.value)}
                 placeholder="e.g., Bank of America, Fidelity"
-                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)', borderRadius: '4px' }}
+                style={{ width: '100%', padding: '8px', border: '2px solid var(--border)'}}
               />
             </div>
           </div>

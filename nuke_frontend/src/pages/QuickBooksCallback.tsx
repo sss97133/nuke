@@ -88,21 +88,21 @@ export default function QuickBooksCallback() {
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
       <div className="max-w-md w-full mx-4">
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 text-center">
+        <div className="bg-zinc-900 border border-zinc-800 p-8 text-center">
           {/* Status Icon */}
           <div className="mb-6">
             {status === 'processing' && (
-              <div className="inline-flex p-4 bg-blue-500/10 rounded-full">
+              <div className="inline-flex p-4 bg-blue-500/10">
                 <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
               </div>
             )}
             {status === 'success' && (
-              <div className="inline-flex p-4 bg-green-500/10 rounded-full">
+              <div className="inline-flex p-4 bg-green-500/10">
                 <CheckCircle2 className="w-12 h-12 text-green-500" />
               </div>
             )}
             {status === 'error' && (
-              <div className="inline-flex p-4 bg-red-500/10 rounded-full">
+              <div className="inline-flex p-4 bg-red-500/10">
                 <XCircle className="w-12 h-12 text-red-500" />
               </div>
             )}
@@ -123,13 +123,13 @@ export default function QuickBooksCallback() {
             <div className="space-y-3">
               <button
                 onClick={() => navigate('/business/settings')}
-                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium text-white transition-colors"
+                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 font-medium text-white transition-colors"
               >
                 Back to Settings
               </button>
               <button
                 onClick={() => window.location.reload()}
-                className="w-full px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium text-white transition-colors"
+                className="w-full px-4 py-2 bg-zinc-800 hover:bg-zinc-700 font-medium text-white transition-colors"
               >
                 Try Again
               </button>

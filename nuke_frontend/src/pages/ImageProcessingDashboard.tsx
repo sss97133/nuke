@@ -263,7 +263,7 @@ export default function ImageProcessingDashboard() {
           <div style={{ fontSize: '19px', fontWeight: 700, marginBottom: '8px' }}>
             {stats.tier1Complete.toLocaleString()}
           </div>
-          <div style={{ height: '4px', background: 'var(--bg-secondary)', borderRadius: '2px', overflow: 'hidden' }}>
+          <div style={{ height: '4px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
             <div style={{ width: `${tier1Percent}%`, height: '100%', background: 'var(--accent)' }} />
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -279,7 +279,7 @@ export default function ImageProcessingDashboard() {
           <div style={{ fontSize: '19px', fontWeight: 700, marginBottom: '8px' }}>
             {stats.tier2Complete.toLocaleString()}
           </div>
-          <div style={{ height: '4px', background: 'var(--bg-secondary)', borderRadius: '2px', overflow: 'hidden' }}>
+          <div style={{ height: '4px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
             <div style={{ width: `${tier2Percent}%`, height: '100%', background: 'var(--success)' }} />
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -295,7 +295,7 @@ export default function ImageProcessingDashboard() {
           <div style={{ fontSize: '19px', fontWeight: 700, marginBottom: '8px' }}>
             {stats.tier3Complete.toLocaleString()}
           </div>
-          <div style={{ height: '4px', background: 'var(--bg-secondary)', borderRadius: '2px', overflow: 'hidden' }}>
+          <div style={{ height: '4px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
             <div style={{ width: `${tier3Percent}%`, height: '100%', background: 'var(--purple, #8b5cf6)' }} />
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -404,7 +404,7 @@ export default function ImageProcessingDashboard() {
                     <span style={{ color: score.color, fontWeight: 600 }}>{score.label}</span>
                     <span>{score.count}</span>
                   </div>
-                  <div style={{ height: '4px', background: 'var(--bg-secondary)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{ height: '4px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
                     <div style={{ width: `${(score.count / stats.total) * 100}%`, height: '100%', background: score.color }} />
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'right' }}>

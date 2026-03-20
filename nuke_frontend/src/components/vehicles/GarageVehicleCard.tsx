@@ -108,12 +108,10 @@ const BASE: React.CSSProperties = {
   fontSize: '9px',
   color: 'var(--text, #2a2a2a)',
   backgroundColor: 'var(--surface, #ebebeb)',
-  border: '2px solid var(--border, #bdbdbd)',
-  borderRadius: 0,
-  display: 'flex',
+  border: '2px solid var(--border, #bdbdbd)', display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
-  transition: 'border-color 0.12s ease',
+  transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
   cursor: 'pointer',
 };
 
@@ -145,9 +143,7 @@ const TOOLTIP_STYLE: React.CSSProperties = {
   letterSpacing: '0.5px',
   color: 'var(--bg, #f5f5f5)',
   backgroundColor: 'var(--text, #2a2a2a)',
-  border: '2px solid var(--text, #2a2a2a)',
-  borderRadius: 0,
-  whiteSpace: 'nowrap',
+  border: '2px solid var(--text, #2a2a2a)', whiteSpace: 'nowrap',
   pointerEvents: 'none',
   transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)',
 };
@@ -158,10 +154,10 @@ const TOOLTIP_STYLE: React.CSSProperties = {
 
 const BARCODE_COLORS: Record<number, string> = {
   0: 'var(--bg, #f5f5f5)',
-  1: '#a7f3d0',
-  2: '#34d399',
-  3: '#059669',
-  4: '#047857',
+  1: 'var(--success-dim, rgba(22, 130, 93, 0.1))',
+  2: 'var(--success, #16825d)',
+  3: 'var(--success, #16825d)',
+  4: 'var(--accent, #2a2a2a)',
 };
 
 // ---------------------------------------------------------------------------
@@ -350,9 +346,7 @@ function RelationshipBadge({ rel }: { rel: RelationshipType }) {
         ...LABEL,
         color: accent.color,
         border: `2px solid ${accent.border}`,
-        backgroundColor: accent.bg,
-        borderRadius: 0,
-        padding: '1px 4px',
+        backgroundColor: accent.bg, padding: '1px 4px',
         display: 'inline-block',
         whiteSpace: 'nowrap',
       }}
@@ -369,9 +363,7 @@ function MissingTag({ label }: { label: string }) {
         ...LABEL,
         fontSize: '8px',
         color: 'var(--warning, #b05a00)',
-        border: '2px solid var(--warning, #b05a00)',
-        borderRadius: 0,
-        padding: '1px 4px',
+        border: '2px solid var(--warning, #b05a00)', padding: '1px 4px',
         display: 'inline-block',
       }}
     >
@@ -406,9 +398,7 @@ function HealthBar({ score, vehicle }: { score: number | null; vehicle: GarageVe
           style={{
             flex: 1,
             height: 2,
-            backgroundColor: 'var(--border, #bdbdbd)',
-            borderRadius: 0,
-            position: 'relative',
+            backgroundColor: 'var(--border, #bdbdbd)', position: 'relative',
             overflow: 'hidden',
           }}
         >
@@ -420,7 +410,7 @@ function HealthBar({ score, vehicle }: { score: number | null; vehicle: GarageVe
               height: '100%',
               width: pct != null ? `${pct}%` : '0%',
               backgroundColor: barColor,
-              transition: 'width 0.12s ease',
+              transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
             }}
           />
         </div>
@@ -524,9 +514,7 @@ function QuickAssignStrip({
               fontFamily: FONT_BODY,
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
-              border: `2px solid ${isDismiss ? 'var(--error, #d13438)' : 'var(--border, #bdbdbd)'}`,
-              borderRadius: 0,
-              backgroundColor: assigning === chip.label
+              border: `2px solid ${isDismiss ? 'var(--error, #d13438)' : 'var(--border, #bdbdbd)'}`, backgroundColor: assigning === chip.label
                 ? 'var(--text, #2a2a2a)'
                 : isDismiss
                 ? 'var(--error-dim, rgba(209, 52, 56, 0.1))'
@@ -538,7 +526,7 @@ function QuickAssignStrip({
                 : 'var(--text, #2a2a2a)',
               cursor: assigning ? 'wait' : 'pointer',
               opacity: assigning && assigning !== chip.label ? 0.5 : 1,
-              transition: 'background-color 0.12s ease, color 0.12s ease',
+              transition: 'background-color 180ms cubic-bezier(0.16, 1, 0.3, 1), color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
               marginLeft: isDismiss ? 'auto' : undefined,
             }}
           >
@@ -739,9 +727,7 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
             <div
               style={{
                 backgroundColor: 'var(--surface, #ebebeb)',
-                border: '2px solid var(--border, #bdbdbd)',
-                borderRadius: 0,
-                padding: '1px 4px',
+                border: '2px solid var(--border, #bdbdbd)', padding: '1px 4px',
               }}
             >
               <span style={{ ...LABEL, fontSize: '8px', color: 'var(--text-secondary, #666666)' }}>
@@ -803,7 +789,7 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
                     maxWidth: 130,
-                    transition: 'color 180ms ease',
+                    transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                 >
                   {vinCopied ? 'COPIED' : truncateVin(vehicle.vin)}
@@ -987,7 +973,7 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
-                transition: 'color 180ms ease',
+                transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
               }}>
                 {vinCopied ? 'COPIED' : truncateVin(vehicle.vin)}
               </span>

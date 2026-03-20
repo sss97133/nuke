@@ -50,10 +50,10 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
   const navigate = useNavigate();
 
   const statusColors = {
-    in_progress: '#3b82f6',
-    completed: '#10b981',
-    on_hold: '#f59e0b',
-    pending: '#6b7280'
+    in_progress: 'var(--info)',
+    completed: 'var(--success)',
+    on_hold: 'var(--warning)',
+    pending: 'var(--text-secondary)'
   };
 
   const statusLabels = {
@@ -82,11 +82,9 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = '';
       }}
       onClick={() => navigate(`/vehicle/${vehicleId}`)}
     >
@@ -101,7 +99,7 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
           height: '200px',
           backgroundImage: primaryImageUrl
             ? `url(${primaryImageUrl})`
-            : 'linear-gradient(135deg, var(--grey-200) 0%, var(--grey-300) 100%)',
+            : 'var(--surface)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           position: 'relative',
@@ -124,18 +122,14 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
                 key={receipt.id}
                 style={{
                   width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: 'var(--surface-glass)',
+                  height: '32px', background: 'var(--surface-glass)',
                   border: '2px solid var(--accent)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '12px',
                   fontWeight: 'bold',
-                  color: 'var(--accent)',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                }}
+                  color: 'var(--accent)'}}
                 title={`Receipt ${index + 1}: ${formatCurrency(receipt.total)}`}
               >
                 R{index + 1}
@@ -145,18 +139,14 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
               <div
                 style={{
                   width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: 'var(--surface-glass)',
+                  height: '32px', background: 'var(--surface-glass)',
                   border: '2px solid var(--grey-400)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '11px',
                   fontWeight: 'bold',
-                  color: 'var(--grey-600)',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                }}
+                  color: 'var(--grey-600)'}}
                 title={`${receipts.length - 5} more receipts`}
               >
                 +{receipts.length - 5}
@@ -185,9 +175,7 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
             gap: '8px',
             marginBottom: '12px',
             padding: '12px',
-            background: 'var(--grey-100)',
-            borderRadius: '4px'
-          }}
+            background: 'var(--grey-100)'}}
         >
           <div>
             <div style={{ fontSize: '11px', color: 'var(--grey-600)', marginBottom: '4px' }}>
@@ -219,9 +207,7 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
         <div
           style={{
             display: 'inline-block',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            fontSize: '11px',
+            padding: '4px 8px', fontSize: '11px',
             fontWeight: 600,
             background: statusColors[currentStatus] + '20',
             color: statusColors[currentStatus],
@@ -251,9 +237,7 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
                   style={{
                     fontSize: '12px',
                     padding: '6px',
-                    background: 'var(--grey-50)',
-                    borderRadius: '4px',
-                    display: 'flex',
+                    background: 'var(--grey-50)', display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center'
                   }}

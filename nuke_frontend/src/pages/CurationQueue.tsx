@@ -213,9 +213,9 @@ export default function CurationQueue() {
           </div>
           
           {/* Progress Bar */}
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-gray-200 h-2">
             <div 
-              className="bg-orange-500 h-2 rounded-full transition-all"
+              className="bg-orange-500 h-2 transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -226,13 +226,13 @@ export default function CurationQueue() {
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="max-w-2xl w-full">
           {/* Vehicle Context */}
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-4">
+          <div className="bg-white p-6 mb-4">
             <div className="flex gap-4 items-start mb-6">
               {currentItem.vehicle_image && (
                 <img 
                   src={currentItem.vehicle_image}
                   alt={currentItem.vehicle_name}
-                  className="w-24 h-24 object-cover rounded"
+                  className="w-24 h-24 object-cover"
                 />
               )}
               <div>
@@ -247,7 +247,7 @@ export default function CurationQueue() {
             </div>
 
             {/* Item to Review */}
-            <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-4">
+            <div className="bg-orange-50 border-2 border-orange-200 p-4">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <div className="text-sm text-gray-600 uppercase tracking-wide mb-1">
@@ -283,7 +283,7 @@ export default function CurationQueue() {
           <div className="grid grid-cols-4 gap-3">
             <button
               onClick={handleApprove}
-              className="bg-green-500 hover:bg-green-600 text-white p-6 rounded-lg flex flex-col items-center gap-2 transition-colors"
+              className="bg-green-500 hover:bg-green-600 text-white p-6 flex flex-col items-center gap-2 transition-colors"
             >
               <Check className="w-8 h-8" />
               <span className="font-bold">Approve</span>
@@ -292,7 +292,7 @@ export default function CurationQueue() {
 
             <button
               onClick={handleReject}
-              className="bg-red-500 hover:bg-red-600 text-white p-6 rounded-lg flex flex-col items-center gap-2 transition-colors"
+              className="bg-red-500 hover:bg-red-600 text-white p-6 flex flex-col items-center gap-2 transition-colors"
             >
               <X className="w-8 h-8" />
               <span className="font-bold">Reject</span>
@@ -301,7 +301,7 @@ export default function CurationQueue() {
 
             <button
               onClick={handleEdit}
-              className="bg-blue-500 hover:bg-blue-600 text-white p-6 rounded-lg flex flex-col items-center gap-2 transition-colors"
+              className="bg-blue-500 hover:bg-blue-600 text-white p-6 flex flex-col items-center gap-2 transition-colors"
             >
               <Pencil className="w-8 h-8" />
               <span className="font-bold">Correct</span>
@@ -310,7 +310,7 @@ export default function CurationQueue() {
 
             <button
               onClick={handleSkip}
-              className="bg-gray-400 hover:bg-gray-500 text-white p-6 rounded-lg flex flex-col items-center gap-2 transition-colors"
+              className="bg-gray-400 hover:bg-gray-500 text-white p-6 flex flex-col items-center gap-2 transition-colors"
             >
               <SkipForward className="w-8 h-8" />
               <span className="font-bold">Skip</span>
@@ -319,7 +319,7 @@ export default function CurationQueue() {
           </div>
 
           {/* Stats Bar */}
-          <div className="mt-4 bg-white rounded-lg p-4 flex justify-around text-sm">
+          <div className="mt-4 bg-white p-4 flex justify-around text-sm">
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
               <div className="text-gray-600">Approved</div>

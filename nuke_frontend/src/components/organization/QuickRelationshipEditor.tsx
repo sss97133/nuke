@@ -184,9 +184,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
                 backgroundImage: `url(${vehicleImage})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                border: '2px solid var(--border)',
-                borderRadius: '4px',
-                flexShrink: 0
+                border: '2px solid var(--border)', flexShrink: 0
               }} />
             )}
             <div style={{ flex: 1 }}>
@@ -203,9 +201,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
             <div style={{
               padding: '12px',
               background: 'var(--error-dim)',
-              border: '1px solid var(--error)',
-              borderRadius: '4px',
-              fontSize: '12px',
+              border: '1px solid var(--error)', fontSize: '12px',
               color: 'var(--error)'
             }}>
               {error}
@@ -232,9 +228,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
                     padding: '12px',
                     border: '2px solid',
                     borderColor: relationship === type.value ? 'var(--accent)' : 'var(--border-light)',
-                    background: relationship === type.value ? 'var(--accent-dim)' : 'transparent',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
+                    background: relationship === type.value ? 'var(--accent-dim)' : 'transparent', cursor: 'pointer',
                     transition: 'all 0.12s ease',
                     textAlign: 'left'
                   }}
@@ -255,9 +249,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
             <div style={{
               padding: '12px',
               backgroundColor: 'var(--blue-50)',
-              border: '2px solid var(--blue-300)',
-              borderRadius: '4px'
-            }}>
+              border: '2px solid var(--blue-300)'}}>
               <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>
                 Storage Relationship
               </div>
@@ -314,9 +306,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
                     padding: '10px',
                     border: '2px solid',
                     borderColor: status === opt.value ? 'var(--accent)' : 'var(--border-light)',
-                    background: status === opt.value ? 'var(--accent-dim)' : 'transparent',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
+                    background: status === opt.value ? 'var(--accent-dim)' : 'transparent', cursor: 'pointer',
                     fontSize: '11px',
                     fontWeight: 700,
                     transition: 'all 0.12s ease'
@@ -347,9 +337,7 @@ const QuickRelationshipEditor: React.FC<Props> = ({
                 minHeight: '80px',
                 padding: '8px',
                 fontSize: '12px',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                fontFamily: 'inherit',
+                border: '1px solid var(--border)', fontFamily: 'inherit',
                 resize: 'vertical'
               }}
             />
