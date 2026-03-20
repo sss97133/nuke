@@ -3,11 +3,15 @@
  *
  * Strategies (pass as "strategy" in body):
  *
- *   vin_decode       — NHTSA batch VIN decode (body_style, engine, transmission, fuel, HP, doors)
- *   mine_descriptions — Regex extraction from existing descriptions (VIN, mileage, color, engine, trans)
- *   cross_reference   — Pull sale_price from vehicle_events
- *   derive_fields     — Compute decade, country_of_origin, body_style from make/model
- *   stats             — Show enrichment gaps across all sources
+ *   vin_decode          — NHTSA batch VIN decode (body_style, engine, transmission, fuel, HP, doors)
+ *   mine_descriptions   — Regex extraction from descriptions (VIN, mileage, color, engine, trans, body_style)
+ *   cross_reference     — Pull sale_price, asking_price, description from vehicle_events + snapshots
+ *   derive_fields       — Compute country_of_origin, body_style from make/model
+ *   estimate_hp         — HP estimation from displacement + known engine families
+ *   backfill_location   — Parse listing_location, pull from events, reverse-geocode iPhoto GPS
+ *   smart_primary_image — Score vehicle images and pick best hero shot
+ *   vin_link_suggestions — Find VIN-linked records, suggest enrichment candidates (no auto-merge)
+ *   stats               — Show enrichment gaps across all sources
  *
  * Designed for cron: each invocation processes a batch and returns stats.
  * Target: 500-1000 vehicles per invocation depending on strategy.
@@ -208,24 +212,47 @@ async function handleVinDecode(
 
 // ─── Description Mining ──────────────────────────────────────────────
 
+// VIN check digit validation (position 9)
+function isValidVinCheckDigit(vin: string): boolean {
+  const transliteration: Record<string, number> = {
+    A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8,J:1,K:2,L:3,M:4,N:5,P:7,R:9,
+    S:2,T:3,U:4,V:5,W:6,X:7,Y:8,Z:9,
+  };
+  const weights = [8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2];
+  let sum = 0;
+  for (let i = 0; i < 17; i++) {
+    const c = vin[i];
+    const val = /\d/.test(c) ? parseInt(c, 10) : (transliteration[c] || 0);
+    sum += val * weights[i];
+  }
+  const remainder = sum % 11;
+  const checkChar = remainder === 10 ? "X" : String(remainder);
+  return vin[8] === checkChar;
+}
+
 async function handleMineDescriptions(
   supabase: ReturnType<typeof createClient>,
   body: Record<string, unknown>
 ) {
   const limit = Math.min(Number(body.limit) || 200, 500);
-  const source = String(body.source || "bat");
-  const results = { total: 0, source, mileage_set: 0, trans_set: 0, body_set: 0 };
+  const source = body.source ? String(body.source) : null;
+  const results = {
+    total: 0, source: source || "all",
+    mileage_set: 0, trans_set: 0, body_set: 0,
+    vin_set: 0, color_set: 0, engine_set: 0,
+  };
 
-  // Fetch vehicles with descriptions that need fields — source-filtered for index use
+  // Fetch vehicles with descriptions that need fields
   let query = supabase.from("vehicles")
-    .select("id, description, model, mileage, transmission, body_style")
-    .eq("discovery_source", source)
+    .select("id, description, model, mileage, transmission, body_style, vin, color, engine_type")
     .is("deleted_at", null)
     .not("description", "is", null)
     .limit(limit);
 
+  if (source) query = query.eq("discovery_source", source);
+
   // Filter to vehicles missing at least one mineable field
-  query = query.or("mileage.is.null,transmission.is.null,body_style.is.null");
+  query = query.or("mileage.is.null,transmission.is.null,body_style.is.null,vin.is.null,color.is.null,engine_type.is.null");
 
   const { data: vehicles, error } = await query;
   if (error) throw new Error(`Fetch error: ${error.message}`);
@@ -259,14 +286,83 @@ async function handleMineDescriptions(
 
   const MILEAGE_RE = /(\d[\d,]*\d)\s+(?:actual\s+)?(?:original\s+)?miles/i;
 
+  // VIN patterns: "VIN: ...", "Chassis #...", "VIN ...", or standalone 17-char
+  const VIN_PATTERNS = [
+    /VIN[:#\s]+([A-HJ-NPR-Z0-9]{17})\b/i,
+    /Chassis\s*#?\s*:?\s*([A-HJ-NPR-Z0-9]{17})\b/i,
+    /Serial\s*#?\s*:?\s*([A-HJ-NPR-Z0-9]{17})\b/i,
+    /\b([A-HJ-NPR-Z0-9]{17})\b/,  // standalone 17-char — validated by check digit
+  ];
+
+  // Color patterns: common colors + contextual phrases
+  const COLOR_WORDS = "black|white|silver|gray|grey|red|blue|green|yellow|gold|orange|brown|tan|beige|cream|maroon|burgundy|navy|bronze|copper|champagne|pearl|ivory|charcoal|gunmetal|platinum|midnight|arctic|alpine|british racing green|guards red|signal red|arrow blue|rally red|hugger orange|cranberry|aqua|teal|purple|lavender|lime|olive|rust|wine|pewter|slate|denim|cobalt|emerald|saffron|papaya|rosso corsa|azzurro|giallo|grigio|nero|bianco|verde|argento|blu|rosa";
+  const COLOR_RE = new RegExp(`(?:painted\\s+(?:in\\s+)?|finished\\s+in\\s+|exterior\\s+(?:is\\s+|in\\s+|color\\s+(?:is\\s+)?)?|color[:\\s]+)((?:${COLOR_WORDS})(?:\\s+(?:metallic|pearl|mica|mist|frost|crystal|clearcoat))?)\\b`, "i");
+  const SIMPLE_COLOR_RE = new RegExp(`\\b(${COLOR_WORDS})\\s+(?:exterior|paint|finish)\\b`, "i");
+
+  // Engine patterns
+  const ENGINE_PATTERNS = [
+    /\b(\d\.\d)\s*(?:L|liter|litre)\s*(V\d+|inline[- ]?\d+|flat[- ]?\d+|I\d+|H\d+)?/i,
+    /\b(V[68]|V10|V12|I[46]|flat[- ]?[46]|inline[- ]?[46]|straight[- ]?[46])\b/i,
+    /\b(\d{3})\s*(?:ci|cid|cubic[- ]?inch)/i,
+  ];
+
   // Process each vehicle and build updates
   const updates: { id: string; patch: Record<string, unknown> }[] = [];
 
   for (const v of vehicles) {
     const desc = v.description || "";
     const model = v.model || "";
-    const searchText = model + " " + desc.slice(0, 500);
+    const searchText = model + " " + desc.slice(0, 2000);
     const patch: Record<string, unknown> = {};
+
+    // VIN extraction (only if vehicle has no VIN)
+    if (!v.vin) {
+      for (const re of VIN_PATTERNS) {
+        const m = desc.match(re);
+        if (m && m[1]) {
+          const candidate = m[1].toUpperCase();
+          // Validate: must start with 1-9 or A-Z, check digit validates
+          if (/^[1-9A-HJ-NPR-Z]/.test(candidate) && isValidVinCheckDigit(candidate)) {
+            patch.vin = candidate;
+            results.vin_set++;
+            break;
+          }
+        }
+      }
+    }
+
+    // Color extraction (only if vehicle has no color)
+    if (!v.color) {
+      const cm = desc.match(COLOR_RE) || desc.match(SIMPLE_COLOR_RE);
+      if (cm && cm[1]) {
+        // Capitalize first letter of each word
+        patch.color = cm[1].trim().replace(/\b\w/g, (c: string) => c.toUpperCase());
+        results.color_set++;
+      }
+    }
+
+    // Engine extraction (only if vehicle has no engine_type)
+    if (!v.engine_type) {
+      for (const re of ENGINE_PATTERNS) {
+        const m = desc.match(re);
+        if (m) {
+          if (re === ENGINE_PATTERNS[0]) {
+            // "X.XL V8" pattern
+            patch.engine_type = `${m[1]}L${m[2] ? " " + m[2] : ""}`.trim();
+          } else if (re === ENGINE_PATTERNS[2]) {
+            // "XXXci" pattern — convert to liters
+            const ci = parseInt(m[1], 10);
+            const liters = (ci * 0.016387).toFixed(1);
+            patch.engine_type = `${liters}L (${ci}ci)`;
+          } else {
+            // "V8" / "inline-6" pattern
+            patch.engine_type = m[1];
+          }
+          results.engine_set++;
+          break;
+        }
+      }
+    }
 
     if (!v.mileage) {
       const m = desc.match(MILEAGE_RE);
@@ -325,7 +421,7 @@ async function handleCrossReference(
   body: Record<string, unknown>
 ) {
   const limit = Math.min(Number(body.limit) || 200, 500);
-  const results = { sale_price_from_bat: 0, sale_price_from_ext: 0, total: 0 };
+  const results = { sale_price_from_bat: 0, sale_price_from_ext: 0, asking_price_set: 0, description_set: 0, total: 0 };
 
   // 1. Get vehicle_events (bat) with final_price that aren't on the vehicle yet
   const { data: batListings } = await supabase
@@ -402,7 +498,89 @@ async function handleCrossReference(
     }
   }
 
-  results.total = results.sale_price_from_bat + results.sale_price_from_ext;
+  // 3. Backfill asking_price from listing events
+  {
+    const { data: listingEvents } = await supabase
+      .from("vehicle_events")
+      .select("vehicle_id, metadata")
+      .eq("event_type", "listing")
+      .not("vehicle_id", "is", null)
+      .not("metadata", "is", null)
+      .limit(limit);
+
+    if (listingEvents?.length) {
+      const withPrice = listingEvents.filter((e: any) =>
+        e.metadata?.asking_price && Number(e.metadata.asking_price) > 0
+      );
+      if (withPrice.length) {
+        const vehicleIds = [...new Set(withPrice.map((e: any) => e.vehicle_id))];
+        const { data: vehicles } = await supabase
+          .from("vehicles")
+          .select("id")
+          .in("id", vehicleIds)
+          .is("asking_price", null)
+          .is("sale_price", null)
+          .is("deleted_at", null);
+
+        if (vehicles?.length) {
+          const needsPrice = new Set(vehicles.map((v: any) => v.id));
+          const updates = withPrice.filter((e: any) => needsPrice.has(e.vehicle_id));
+          const seen = new Set<string>();
+          const deduped = updates.filter((e: any) => {
+            if (seen.has(e.vehicle_id)) return false;
+            seen.add(e.vehicle_id);
+            return true;
+          });
+          for (let i = 0; i < deduped.length; i += 20) {
+            await Promise.all(
+              deduped.slice(i, i + 20).map((e: any) =>
+                supabase.from("vehicles").update({
+                  asking_price: Math.round(Number(e.metadata.asking_price)),
+                }).eq("id", e.vehicle_id)
+              )
+            );
+          }
+          results.asking_price_set = deduped.length;
+        }
+      }
+    }
+  }
+
+  // 4. Backfill description from listing_page_snapshots
+  {
+    const { data: snapshots } = await supabase.rpc("execute_sql", {
+      query: `
+        SELECT DISTINCT ON (lps.vehicle_id) lps.vehicle_id,
+          COALESCE(
+            lps.metadata->>'description',
+            left(lps.markdown_content, 2000)
+          ) as desc_text
+        FROM listing_page_snapshots lps
+        JOIN vehicles v ON v.id = lps.vehicle_id
+        WHERE v.description IS NULL AND v.deleted_at IS NULL
+          AND lps.vehicle_id IS NOT NULL
+          AND (lps.metadata->>'description' IS NOT NULL OR lps.markdown_content IS NOT NULL)
+        ORDER BY lps.vehicle_id, lps.created_at DESC
+        LIMIT ${limit}
+      `,
+    });
+
+    const rows = Array.isArray(snapshots) ? snapshots : [];
+    if (rows.length) {
+      for (let i = 0; i < rows.length; i += 20) {
+        await Promise.all(
+          rows.slice(i, i + 20).map((r: any) =>
+            supabase.from("vehicles").update({
+              description: r.desc_text?.slice(0, 10000),
+            }).eq("id", r.vehicle_id)
+          )
+        );
+      }
+      results.description_set = rows.length;
+    }
+  }
+
+  results.total = results.sale_price_from_bat + results.sale_price_from_ext + results.asking_price_set + results.description_set;
   return okJson({ success: true, strategy: "cross_reference", ...results });
 }
 
@@ -447,8 +625,8 @@ async function handleDeriveFields(
   body: Record<string, unknown>
 ) {
   const limit = Math.min(Number(body.limit) || 200, 500);
-  const source = String(body.source || "bat");
-  const results = { source, body_style_inferred: 0, country_set: 0, total: 0 };
+  const source = body.source ? String(body.source) : null;
+  const results = { source: source || "all", body_style_inferred: 0, country_set: 0, total: 0 };
 
   const BODY_PATTERNS: [RegExp, string][] = [
     [/\b(coupe|coupé|berlinetta|fastback)\b/i, "Coupe"],
@@ -456,20 +634,21 @@ async function handleDeriveFields(
     [/\b(sedan|saloon|berlina|limousine)\b/i, "Sedan"],
     [/\b(wagon|estate|touring|avant|sportwagen|allroad|variant|kombi)\b/i, "Wagon"],
     [/\b(hatchback)\b/i, "Hatchback"],
-    [/\b(pickup|truck|raptor|f-150|f-250|f-350|silverado|sierra|ram|ranger|tacoma|tundra)\b/i, "Truck"],
-    [/\b(suv|wrangler|bronco|blazer|tahoe|suburban|4runner|land cruiser|defender|range rover|cayenne|urus|x5|q7|gls)\b/i, "SUV"],
+    [/\b(pickup|truck|raptor|f-150|f-250|f-350|silverado|sierra|ram|ranger|tacoma|tundra|k10|k20|k30|c10|c20|c30|k1500|k2500|k3500|c1500|c2500|c3500|s10|s15|colorado|canyon|el camino|ranchero|power wagon|dakota|comanche|luv|d100|d150|d200|d250|w100|w150|w200|w250)\b/i, "Truck"],
+    [/\b(suv|wrangler|bronco|blazer|tahoe|suburban|4runner|land cruiser|defender|range rover|cayenne|urus|x5|q7|gls|k5|scout|jimmy|ramcharger|trailblazer|yukon|expedition|explorer|cherokee|grand cherokee|wagoneer|fj40|fj60|fj80|trooper|samurai)\b/i, "SUV"],
     [/\b(van|minivan|bus|transporter|vanagon|westfalia)\b/i, "Van"],
   ];
 
   // 1. Fetch vehicles missing body_style with a model name
-  const { data: bodyVehicles } = await supabase
+  let bodyQuery = supabase
     .from("vehicles")
     .select("id, model")
-    .eq("discovery_source", source)
     .is("deleted_at", null)
     .is("body_style", null)
     .not("model", "is", null)
     .limit(limit);
+  if (source) bodyQuery = bodyQuery.eq("discovery_source", source);
+  const { data: bodyVehicles } = await bodyQuery;
 
   if (bodyVehicles?.length) {
     const updates: { id: string; body_style: string }[] = [];
@@ -492,13 +671,14 @@ async function handleDeriveFields(
   }
 
   // 2. Fetch vehicles needing country_of_origin
-  const { data: countryVehicles } = await supabase
+  let countryQuery = supabase
     .from("vehicles")
     .select("id, make, origin_metadata")
-    .eq("discovery_source", source)
     .is("deleted_at", null)
     .not("make", "is", null)
     .limit(limit);
+  if (source) countryQuery = countryQuery.eq("discovery_source", source);
+  const { data: countryVehicles } = await countryQuery;
 
   if (countryVehicles?.length) {
     const updates: { id: string; origin_metadata: Record<string, unknown> }[] = [];
@@ -1196,6 +1376,376 @@ async function handleEstimateHP(
   return okJson({ success: true, strategy: "estimate_hp", ...results });
 }
 
+// ─── Backfill Location ──────────────────────────────────────────────
+
+// US state abbreviation to full name (for validation)
+const US_STATES: Record<string, string> = {
+  AL:"Alabama",AK:"Alaska",AZ:"Arizona",AR:"Arkansas",CA:"California",CO:"Colorado",
+  CT:"Connecticut",DE:"Delaware",FL:"Florida",GA:"Georgia",HI:"Hawaii",ID:"Idaho",
+  IL:"Illinois",IN:"Indiana",IA:"Iowa",KS:"Kansas",KY:"Kentucky",LA:"Louisiana",
+  ME:"Maine",MD:"Maryland",MA:"Massachusetts",MI:"Michigan",MN:"Minnesota",MS:"Mississippi",
+  MO:"Missouri",MT:"Montana",NE:"Nebraska",NV:"Nevada",NH:"New Hampshire",NJ:"New Jersey",
+  NM:"New Mexico",NY:"New York",NC:"North Carolina",ND:"North Dakota",OH:"Ohio",OK:"Oklahoma",
+  OR:"Oregon",PA:"Pennsylvania",RI:"Rhode Island",SC:"South Carolina",SD:"South Dakota",
+  TN:"Tennessee",TX:"Texas",UT:"Utah",VT:"Vermont",VA:"Virginia",WA:"Washington",
+  WV:"West Virginia",WI:"Wisconsin",WY:"Wyoming",DC:"District of Columbia",
+};
+
+// Metro lookup table: lat/lng → city, state (for iPhoto GPS reverse geocode)
+const US_METROS: { lat: number; lng: number; city: string; state: string; radius: number }[] = [
+  { lat: 33.45, lng: -112.07, city: "Phoenix", state: "AZ", radius: 0.5 },
+  { lat: 34.05, lng: -118.24, city: "Los Angeles", state: "CA", radius: 0.6 },
+  { lat: 37.77, lng: -122.42, city: "San Francisco", state: "CA", radius: 0.3 },
+  { lat: 32.72, lng: -117.16, city: "San Diego", state: "CA", radius: 0.4 },
+  { lat: 37.34, lng: -121.89, city: "San Jose", state: "CA", radius: 0.3 },
+  { lat: 33.83, lng: -117.91, city: "Anaheim", state: "CA", radius: 0.3 },
+  { lat: 38.58, lng: -121.49, city: "Sacramento", state: "CA", radius: 0.3 },
+  { lat: 39.74, lng: -104.99, city: "Denver", state: "CO", radius: 0.4 },
+  { lat: 25.76, lng: -80.19, city: "Miami", state: "FL", radius: 0.4 },
+  { lat: 28.54, lng: -81.38, city: "Orlando", state: "FL", radius: 0.4 },
+  { lat: 27.95, lng: -82.46, city: "Tampa", state: "FL", radius: 0.4 },
+  { lat: 30.33, lng: -81.66, city: "Jacksonville", state: "FL", radius: 0.3 },
+  { lat: 33.75, lng: -84.39, city: "Atlanta", state: "GA", radius: 0.5 },
+  { lat: 41.88, lng: -87.63, city: "Chicago", state: "IL", radius: 0.5 },
+  { lat: 39.77, lng: -86.16, city: "Indianapolis", state: "IN", radius: 0.3 },
+  { lat: 39.10, lng: -94.58, city: "Kansas City", state: "MO", radius: 0.3 },
+  { lat: 38.25, lng: -85.76, city: "Louisville", state: "KY", radius: 0.3 },
+  { lat: 29.95, lng: -90.07, city: "New Orleans", state: "LA", radius: 0.3 },
+  { lat: 42.36, lng: -71.06, city: "Boston", state: "MA", radius: 0.3 },
+  { lat: 39.29, lng: -76.61, city: "Baltimore", state: "MD", radius: 0.3 },
+  { lat: 42.33, lng: -83.05, city: "Detroit", state: "MI", radius: 0.4 },
+  { lat: 44.98, lng: -93.27, city: "Minneapolis", state: "MN", radius: 0.4 },
+  { lat: 35.15, lng: -90.05, city: "Memphis", state: "TN", radius: 0.3 },
+  { lat: 36.16, lng: -86.78, city: "Nashville", state: "TN", radius: 0.3 },
+  { lat: 35.23, lng: -80.84, city: "Charlotte", state: "NC", radius: 0.3 },
+  { lat: 35.78, lng: -78.64, city: "Raleigh", state: "NC", radius: 0.3 },
+  { lat: 41.26, lng: -95.94, city: "Omaha", state: "NE", radius: 0.3 },
+  { lat: 36.17, lng: -115.14, city: "Las Vegas", state: "NV", radius: 0.4 },
+  { lat: 40.71, lng: -74.01, city: "New York", state: "NY", radius: 0.3 },
+  { lat: 39.96, lng: -75.17, city: "Philadelphia", state: "PA", radius: 0.4 },
+  { lat: 40.44, lng: -80.00, city: "Pittsburgh", state: "PA", radius: 0.3 },
+  { lat: 45.52, lng: -122.68, city: "Portland", state: "OR", radius: 0.3 },
+  { lat: 33.45, lng: -111.94, city: "Scottsdale", state: "AZ", radius: 0.2 },
+  { lat: 47.61, lng: -122.33, city: "Seattle", state: "WA", radius: 0.3 },
+  { lat: 38.63, lng: -90.20, city: "St. Louis", state: "MO", radius: 0.4 },
+  { lat: 32.78, lng: -96.80, city: "Dallas", state: "TX", radius: 0.5 },
+  { lat: 29.76, lng: -95.37, city: "Houston", state: "TX", radius: 0.5 },
+  { lat: 29.42, lng: -98.49, city: "San Antonio", state: "TX", radius: 0.4 },
+  { lat: 30.27, lng: -97.74, city: "Austin", state: "TX", radius: 0.3 },
+  { lat: 32.45, lng: -100.45, city: "Abilene", state: "TX", radius: 0.3 },
+  { lat: 40.76, lng: -111.89, city: "Salt Lake City", state: "UT", radius: 0.3 },
+  { lat: 38.91, lng: -77.04, city: "Washington", state: "DC", radius: 0.3 },
+  { lat: 43.04, lng: -87.91, city: "Milwaukee", state: "WI", radius: 0.3 },
+  { lat: 39.10, lng: -84.51, city: "Cincinnati", state: "OH", radius: 0.3 },
+  { lat: 41.50, lng: -81.69, city: "Cleveland", state: "OH", radius: 0.3 },
+  { lat: 39.96, lng: -82.99, city: "Columbus", state: "OH", radius: 0.3 },
+  { lat: 36.12, lng: -97.07, city: "Stillwater", state: "OK", radius: 0.3 },
+  { lat: 35.47, lng: -97.52, city: "Oklahoma City", state: "OK", radius: 0.3 },
+  { lat: 36.15, lng: -95.99, city: "Tulsa", state: "OK", radius: 0.3 },
+  { lat: 37.69, lng: -97.34, city: "Wichita", state: "KS", radius: 0.3 },
+  { lat: 26.12, lng: -80.14, city: "Fort Lauderdale", state: "FL", radius: 0.3 },
+  { lat: 33.52, lng: -86.80, city: "Birmingham", state: "AL", radius: 0.3 },
+  { lat: 32.37, lng: -86.30, city: "Montgomery", state: "AL", radius: 0.3 },
+];
+
+function reverseGeocodeMetro(lat: number, lng: number): { city: string; state: string } | null {
+  let best: typeof US_METROS[0] | null = null;
+  let bestDist = Infinity;
+  for (const m of US_METROS) {
+    const dist = Math.sqrt((lat - m.lat) ** 2 + (lng - m.lng) ** 2);
+    if (dist < m.radius && dist < bestDist) {
+      bestDist = dist;
+      best = m;
+    }
+  }
+  return best ? { city: best.city, state: best.state } : null;
+}
+
+async function handleBackfillLocation(
+  supabase: ReturnType<typeof createClient>,
+  body: Record<string, unknown>
+) {
+  const limit = Math.min(Number(body.limit) || 200, 500);
+  const results = {
+    total: 0,
+    listing_location_parsed: 0,
+    event_location_pulled: 0,
+    gps_geocoded: 0,
+  };
+
+  // Pass 1: Parse listing_location into city/state
+  {
+    const { data: vehicles } = await supabase
+      .from("vehicles")
+      .select("id, listing_location")
+      .is("deleted_at", null)
+      .is("city", null)
+      .not("listing_location", "is", null)
+      .limit(limit);
+
+    if (vehicles?.length) {
+      const updates: { id: string; patch: Record<string, unknown> }[] = [];
+      for (const v of vehicles) {
+        const loc = (v.listing_location || "").trim();
+        // Match "City, ST" or "City, State"
+        const m = loc.match(/^([A-Za-z\s.'-]+),\s*([A-Z]{2})\b/) ||
+                  loc.match(/^([A-Za-z\s.'-]+),\s*([A-Za-z\s]+)$/);
+        if (m) {
+          const city = m[1].trim();
+          const stateRaw = m[2].trim();
+          // Validate state: either 2-letter abbreviation or full state name
+          const stateAbbr = stateRaw.length === 2 ? stateRaw.toUpperCase() : null;
+          const stateFromName = Object.entries(US_STATES).find(
+            ([, name]) => name.toLowerCase() === stateRaw.toLowerCase()
+          )?.[0];
+          const state = stateAbbr && US_STATES[stateAbbr] ? stateAbbr :
+                        stateFromName ? stateFromName : null;
+          if (city && state) {
+            updates.push({ id: v.id, patch: { city, state } });
+            results.listing_location_parsed++;
+          }
+        }
+      }
+      for (let i = 0; i < updates.length; i += 20) {
+        await Promise.all(
+          updates.slice(i, i + 20).map(({ id, patch }) =>
+            supabase.from("vehicles").update(patch).eq("id", id)
+          )
+        );
+      }
+    }
+  }
+
+  // Pass 2: Pull location from vehicle_events metadata
+  {
+    const { data: events } = await supabase.rpc("execute_sql", {
+      query: `
+        SELECT DISTINCT ON (ve.vehicle_id) ve.vehicle_id,
+          ve.metadata->>'location_city' as city,
+          ve.metadata->>'location_state' as state
+        FROM vehicle_events ve
+        JOIN vehicles v ON v.id = ve.vehicle_id
+        WHERE v.city IS NULL AND v.deleted_at IS NULL
+          AND ve.metadata->>'location_city' IS NOT NULL
+          AND ve.metadata->>'location_state' IS NOT NULL
+        ORDER BY ve.vehicle_id, ve.created_at DESC
+        LIMIT ${limit}
+      `,
+    });
+
+    const rows = Array.isArray(events) ? events : [];
+    if (rows.length) {
+      for (let i = 0; i < rows.length; i += 20) {
+        const chunk = rows.slice(i, i + 20);
+        await Promise.all(
+          chunk.map((r: any) =>
+            supabase.from("vehicles").update({
+              city: r.city,
+              state: r.state,
+            }).eq("id", r.vehicle_id)
+          )
+        );
+      }
+      results.event_location_pulled = rows.length;
+    }
+  }
+
+  // Pass 3: Reverse geocode iPhoto GPS coordinates
+  {
+    const { data: gpsVehicles } = await supabase.rpc("execute_sql", {
+      query: `
+        SELECT DISTINCT ON (vi.vehicle_id) vi.vehicle_id,
+          vi.gps_latitude as lat, vi.gps_longitude as lng
+        FROM vehicle_images vi
+        JOIN vehicles v ON v.id = vi.vehicle_id
+        WHERE v.city IS NULL AND v.deleted_at IS NULL
+          AND vi.gps_latitude IS NOT NULL AND vi.gps_longitude IS NOT NULL
+          AND vi.gps_latitude BETWEEN 24.0 AND 50.0
+          AND vi.gps_longitude BETWEEN -125.0 AND -66.0
+        ORDER BY vi.vehicle_id, vi.created_at DESC
+        LIMIT ${limit}
+      `,
+    });
+
+    const gpsRows = Array.isArray(gpsVehicles) ? gpsVehicles : [];
+    if (gpsRows.length) {
+      const updates: { id: string; city: string; state: string }[] = [];
+      for (const r of gpsRows) {
+        const loc = reverseGeocodeMetro(parseFloat(r.lat), parseFloat(r.lng));
+        if (loc) {
+          updates.push({ id: r.vehicle_id, ...loc });
+        }
+      }
+      for (let i = 0; i < updates.length; i += 20) {
+        await Promise.all(
+          updates.slice(i, i + 20).map(({ id, city, state }) =>
+            supabase.from("vehicles").update({ city, state }).eq("id", id)
+          )
+        );
+      }
+      results.gps_geocoded = updates.length;
+    }
+  }
+
+  results.total = results.listing_location_parsed + results.event_location_pulled + results.gps_geocoded;
+  return okJson({ success: true, strategy: "backfill_location", ...results });
+}
+
+// ─── Smart Primary Image ────────────────────────────────────────────
+
+async function handleSmartPrimaryImage(
+  supabase: ReturnType<typeof createClient>,
+  body: Record<string, unknown>
+) {
+  const limit = Math.min(Number(body.limit) || 100, 500);
+  const results = { total: 0, updated: 0, skipped: 0 };
+
+  // Find vehicles with images but potentially bad primaries
+  const { data: vehicles } = await supabase
+    .from("vehicles")
+    .select("id, primary_image_url")
+    .is("deleted_at", null)
+    .not("primary_image_url", "is", null)
+    .gt("image_count", 1)
+    .limit(limit);
+
+  if (!vehicles?.length) return okJson({ ...results, message: "No candidates" });
+  results.total = vehicles.length;
+
+  for (const v of vehicles) {
+    // Get all images for this vehicle with scoring-relevant fields
+    const { data: images } = await supabase
+      .from("vehicle_images")
+      .select("id, image_url, angle, source, display_order, is_duplicate, photo_quality_score")
+      .eq("vehicle_id", v.id)
+      .limit(50);
+
+    if (!images?.length || images.length < 2) { results.skipped++; continue; }
+
+    // Score each image
+    let bestImage: typeof images[0] | null = null;
+    let bestScore = -Infinity;
+
+    for (const img of images) {
+      let score = 0;
+      const angle = (img.angle || "").toLowerCase();
+
+      // Exterior front is ideal hero shot
+      if (angle.includes("ext_front") || angle.includes("exterior_front")) score += 100;
+      else if (angle.includes("exterior") || angle.includes("ext_")) score += 50;
+
+      // BaT hero shot (first image from BaT import)
+      if ((img.source === "bat_import" || img.source === "bat") && img.display_order === 0) score += 40;
+
+      // Good quality
+      if (img.photo_quality_score && img.photo_quality_score >= 4) score += 20;
+      else if (img.photo_quality_score && img.photo_quality_score >= 3) score += 10;
+
+      // Penalize bad angles
+      if (angle.includes("receipt") || angle.includes("document") || angle.includes("detail") || angle.includes("paperwork")) score -= 50;
+      if (angle.includes("dashboard") || angle.includes("odometer")) score -= 30;
+
+      // Penalize duplicates
+      if (img.is_duplicate) score -= 100;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestImage = img;
+      }
+    }
+
+    // Only update if the best candidate is different from current primary
+    if (bestImage && bestImage.image_url !== v.primary_image_url && bestScore > 0) {
+      await supabase.from("vehicles").update({
+        primary_image_url: bestImage.image_url,
+      }).eq("id", v.id);
+      results.updated++;
+    } else {
+      results.skipped++;
+    }
+  }
+
+  return okJson({ success: true, strategy: "smart_primary_image", ...results });
+}
+
+// ─── VIN Link Suggestions ───────────────────────────────────────────
+
+async function handleVinLinkSuggestions(
+  supabase: ReturnType<typeof createClient>,
+  body: Record<string, unknown>
+) {
+  const limit = Math.min(Number(body.limit) || 100, 500);
+  const results = { total: 0, suggestions_created: 0 };
+
+  // Find VINs that appear on multiple vehicles
+  const { data: dupeVins } = await supabase.rpc("execute_sql", {
+    query: `
+      SELECT vin, array_agg(id ORDER BY data_quality_score DESC NULLS LAST) as vehicle_ids,
+             count(*) as cnt
+      FROM vehicles
+      WHERE vin IS NOT NULL AND length(vin) = 17 AND deleted_at IS NULL
+        AND status IN ('active', 'inactive', 'pending', 'discovered')
+      GROUP BY vin
+      HAVING count(*) > 1
+      LIMIT ${limit}
+    `,
+  });
+
+  const rows = Array.isArray(dupeVins) ? dupeVins : [];
+  if (!rows.length) return okJson({ ...results, message: "No VIN duplicates found" });
+
+  results.total = rows.length;
+
+  for (const row of rows) {
+    const ids: string[] = row.vehicle_ids || [];
+    if (ids.length < 2) continue;
+
+    // Fetch all records sharing this VIN
+    const { data: vehicles } = await supabase
+      .from("vehicles")
+      .select("id, year, make, model, vin, description, color, engine_type, mileage, sale_price, city, state, image_count, data_quality_score, discovery_source, origin_metadata")
+      .in("id", ids);
+
+    if (!vehicles?.length || vehicles.length < 2) continue;
+
+    // Find the richest record (highest quality score)
+    const sorted = vehicles.sort((a: any, b: any) => (b.data_quality_score || 0) - (a.data_quality_score || 0));
+    const richest = sorted[0];
+
+    // For each other record, note what fields the richest has that they don't
+    for (let i = 1; i < sorted.length; i++) {
+      const target = sorted[i];
+      // Skip if already has enrichment candidate
+      if (target.origin_metadata?.enrichment_candidate) continue;
+
+      const enrichable: string[] = [];
+      const fields = ["description", "color", "engine_type", "mileage", "sale_price", "city", "state"];
+      for (const f of fields) {
+        if (!target[f] && richest[f]) enrichable.push(f);
+      }
+      if (richest.image_count > (target.image_count || 0)) enrichable.push("images");
+
+      if (enrichable.length > 0) {
+        await supabase.from("vehicles").update({
+          origin_metadata: {
+            ...(target.origin_metadata || {}),
+            enrichment_candidate: {
+              source_vehicle_id: richest.id,
+              source_quality_score: richest.data_quality_score,
+              enrichable_fields: enrichable,
+              source_discovery: richest.discovery_source,
+              flagged_at: new Date().toISOString(),
+            },
+          },
+        }).eq("id", target.id);
+        results.suggestions_created++;
+      }
+    }
+  }
+
+  return okJson({ success: true, strategy: "vin_link_suggestions", ...results });
+}
+
 // ─── Stats ───────────────────────────────────────────────────────────
 
 async function handleStats(supabase: ReturnType<typeof createClient>) {
@@ -1272,38 +1822,27 @@ serve(async (req) => {
 
     let response: Response;
 
+    // deno-lint-ignore no-explicit-any
+    const STRATEGY_MAP: Record<string, (s: any, b: Record<string, unknown>) => Promise<Response>> = {
+      vin_decode: handleVinDecode,
+      mine_descriptions: handleMineDescriptions,
+      cross_reference: handleCrossReference,
+      derive_fields: handleDeriveFields,
+      estimate_hp: handleEstimateHP,
+      backfill_location: handleBackfillLocation,
+      smart_primary_image: handleSmartPrimaryImage,
+      vin_link_suggestions: handleVinLinkSuggestions,
+    };
+
     switch (strategy) {
-      case "vin_decode":
-        response = await handleVinDecode(supabase, body);
-        break;
-      case "mine_descriptions":
-        response = await handleMineDescriptions(supabase, body);
-        break;
-      case "cross_reference":
-        response = await handleCrossReference(supabase, body);
-        break;
-      case "derive_fields":
-        response = await handleDeriveFields(supabase, body);
-        break;
-      case "estimate_hp":
-        response = await handleEstimateHP(supabase, body);
-        break;
       case "stats":
         response = await handleStats(supabase);
         break;
       case "all": {
-        // Run all strategies for a given source
         const allResults: Record<string, unknown> = { strategy: "all", source: body.source };
-        const strategies = ["vin_decode", "mine_descriptions", "derive_fields", "cross_reference", "estimate_hp"];
-        for (const s of strategies) {
+        for (const [s, handler] of Object.entries(STRATEGY_MAP)) {
           try {
-            const r = await (
-              s === "vin_decode" ? handleVinDecode(supabase, body) :
-              s === "mine_descriptions" ? handleMineDescriptions(supabase, body) :
-              s === "derive_fields" ? handleDeriveFields(supabase, body) :
-              s === "estimate_hp" ? handleEstimateHP(supabase, body) :
-              handleCrossReference(supabase, body)
-            );
+            const r = await handler(supabase, body);
             const text = await r.text();
             allResults[s] = JSON.parse(text);
           } catch (e: unknown) {
@@ -1313,8 +1852,17 @@ serve(async (req) => {
         response = okJson({ success: true, ...allResults });
         break;
       }
-      default:
-        return okJson({ success: false, error: `Unknown strategy: ${strategy}`, available: ["vin_decode", "mine_descriptions", "cross_reference", "derive_fields", "estimate_hp", "stats", "all"] }, 400);
+      default: {
+        const handler = STRATEGY_MAP[strategy];
+        if (!handler) {
+          return okJson({
+            success: false,
+            error: `Unknown strategy: ${strategy}`,
+            available: [...Object.keys(STRATEGY_MAP), "stats", "all"],
+          }, 400);
+        }
+        response = await handler(supabase, body);
+      }
     }
 
     const duration = Date.now() - startTime;
