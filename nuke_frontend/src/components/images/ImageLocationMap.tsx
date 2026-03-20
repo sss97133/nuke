@@ -62,7 +62,7 @@ function createClusterIcon(cluster: any): L.DivIcon {
       font-size:${fontSize}px;
       font-weight:700;
       border:2px solid #fff;
-      box-shadow:0 2px 8px rgba(0,0,0,.45);
+      box-shadow:none;
       font-family:Arial,sans-serif;
       line-height:1;
     ">${count}</div>`,
@@ -265,7 +265,7 @@ const ImageLocationMap: React.FC<ImageLocationMapProps> = ({
           border: 1px solid #333 !important;
           border-radius: 0 !important;
           padding: 0 !important;
-          box-shadow: 0 4px 12px rgba(0,0,0,.6) !important;
+          box-shadow: none !important;
         }
         .image-map-tooltip::before {
           border-top-color: #333 !important;

@@ -278,7 +278,6 @@ const ExtractionReview: React.FC = () => {
                 fontSize: '9px',
                 background: 'var(--bg)',
                 padding: '8px',
-                borderRadius: 0,
                 overflow: 'auto',
                 maxHeight: '200px'
               }}>
@@ -297,7 +296,6 @@ const ExtractionReview: React.FC = () => {
                 fontSize: '9px',
                 background: 'var(--bg)',
                 padding: '8px',
-                borderRadius: 0,
                 overflow: 'auto'
               }}>
                 {JSON.stringify(selectedExtraction.extracted_data.trim_levels, null, 2)}
@@ -314,7 +312,6 @@ const ExtractionReview: React.FC = () => {
               fontSize: '9px',
               background: 'var(--bg)',
               padding: '8px',
-              borderRadius: 0,
               overflow: 'auto',
               maxHeight: '400px',
               marginTop: '8px'
