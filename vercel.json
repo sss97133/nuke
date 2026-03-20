@@ -14,7 +14,7 @@
     },
     {
       "source": "/api/functions/v1/:path*",
-      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/:path*"
+      "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/:path*"
     },
     {
       "source": "/api/:path+",
