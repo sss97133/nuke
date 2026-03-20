@@ -441,7 +441,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ listing, onNavigate }) => {
         border: '2px solid var(--border)',
         background: 'var(--surface)', overflow: 'hidden',
         cursor: 'pointer',
-        transition: 'transform 0.2s, box-shadow 0.2s',
+        transition: 'transform 0.2s',
       }}
       onClick={onNavigate}
       onMouseEnter={(e) => {

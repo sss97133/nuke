@@ -78,7 +78,7 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
       style={{
         marginBottom: '16px',
         cursor: 'pointer',
-        transition: 'transform 0.12s ease, box-shadow 0.12s ease'
+        transition: 'transform 0.12s ease'
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-2px)';

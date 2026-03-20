@@ -176,7 +176,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
               <div
                 key={contract.id}
                 className="card"
-                style={{ cursor: 'pointer', transition: 'transform 0.12s ease, box-shadow 0.12s ease', overflow: 'hidden' }}
+                style={{ cursor: 'pointer', transition: 'transform 0.12s ease', overflow: 'hidden' }}
                 onClick={() => onSelectContract(contract.id)}
                 onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
