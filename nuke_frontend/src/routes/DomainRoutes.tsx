@@ -9,6 +9,7 @@ const PrivacyPolicy = React.lazy(() => import('../pages/PrivacyPolicy'));
 const TermsOfService = React.lazy(() => import('../pages/TermsOfService'));
 const DataDeletion = React.lazy(() => import('../pages/DataDeletion'));
 const EULA = React.lazy(() => import('../pages/EULA'));
+const Extension = React.lazy(() => import('../pages/Extension'));
 
 // Search: lazy-loaded (chunk retry logic in main.tsx handles failures)
 const Search = React.lazy(() => import('../pages/Search'));
@@ -103,6 +104,7 @@ export const DomainRoutes = () => {
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/eula" element={<EULA />} />
+        <Route path="/extension" element={<Extension />} />
         <Route path="/data-deletion" element={<DataDeletion />} />
 
         {/* ── Domain Modules ────────────────────────────────────────────── */}
