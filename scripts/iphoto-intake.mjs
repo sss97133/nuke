@@ -648,13 +648,13 @@ async function mapOnlyAlbum(albumName, vehicleId = null) {
   const mappingFile = join(mappingDir, `${vehicleId}.json`);
 
   // Merge with existing mappings if file already exists
-  let existing = [];
+  let savedMappings = [];
   if (existsSync(mappingFile)) {
-    try { existing = JSON.parse(readFileSync(mappingFile, 'utf8')); } catch {}
+    try { savedMappings = JSON.parse(readFileSync(mappingFile, 'utf8')); } catch {}
   }
-  const existingFileNames = new Set(existing.map(r => r.file_name));
+  const existingFileNames = new Set(savedMappings.map(r => r.file_name));
   const newMappings = mappings.filter(r => !existingFileNames.has(r.file_name));
-  const merged = [...existing, ...newMappings];
+  const merged = [...savedMappings, ...newMappings];
   writeFileSync(mappingFile, JSON.stringify(merged, null, 2));
 
   console.log(`  Saved ${newMappings.length} photo mappings to ${mappingFile} (${skipped} dupe, ${noGps} no GPS)`);

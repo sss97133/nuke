@@ -64,6 +64,7 @@ const arg = (name) => { const i = args.indexOf(name); return i !== -1 ? args[i +
 const DRY_RUN = flag('--dry-run');
 const NOTIFY_PHONE = arg('--notify');
 const LIBRARY_PATH = arg('--library'); // External Photos library (e.g. SSD)
+const TO_DATE = arg('--to-date'); // End date for query range
 
 // ─── Apple ML label scoring ────────────────────────────────────────────────
 const VEHICLE_LABELS = new Set([
@@ -181,6 +182,7 @@ function extractPlaceName(photo) {
 // ─── Camera roll query ──────────────────────────────────────────────────────
 function queryCameraRoll(sinceDate) {
   const args = ['query', '--from-date', sinceDate, '--json'];
+  if (TO_DATE) args.push('--to-date', TO_DATE);
   if (LIBRARY_PATH) args.push('--library', LIBRARY_PATH);
   const libLabel = LIBRARY_PATH ? basename(LIBRARY_PATH) : 'system library';
   console.log(`Querying ${libLabel} since ${sinceDate}...`);
@@ -306,6 +308,8 @@ async function uploadClusterPhotos(jpegDir, photoMeta) {
         takenAt: meta?.date || null,
         latitude: meta?.latitude || null,
         longitude: meta?.longitude || null,
+        appleLabels: meta?.labels || [],
+        vehicleScore: meta?._vehicleScore || null,
       });
     }));
     process.stdout.write(`\r  Uploaded ${Math.min(i + batch.length, files.length)}/${files.length} (${errors} err)  `);
@@ -321,6 +325,10 @@ async function callImageIntake(cluster, uploadedPhotos) {
     images: uploadedPhotos.map(p => ({
       url: p.url,
       takenAt: p.takenAt,
+      latitude: p.latitude,
+      longitude: p.longitude,
+      appleLabels: p.appleLabels,
+      vehicleScore: p.vehicleScore,
       caption: `Photo sync session ${cluster.startTime.toISOString().slice(0, 16)}${cluster.locationName ? ' @ ' + cluster.locationName : ''}`,
     })),
   };
@@ -350,22 +358,7 @@ async function callImageIntake(cluster, uploadedPhotos) {
 
 // ─── Update sync state cursor ───────────────────────────────────────────────
 async function updateSyncState(lastDate, processed, uploaded, skipped) {
-  const { error } = await supabase
-    .from('photo_sync_state')
-    .update({
-      last_processed_date: lastDate,
-      last_poll_at: new Date().toISOString(),
-      photos_processed_total: supabase.rpc ? undefined : undefined, // Use raw SQL for increment
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', USER_ID);
-
-  // Increment counters with SQL (can't do atomic increment via PostgREST easily)
-  if (!error) {
-    await supabase.rpc('', {}).catch(() => {}); // noop - use execute_sql below
-  }
-
-  // Use direct SQL for atomic counter increments
+  // Use direct update for counter values
   const { error: sqlErr } = await supabase.from('photo_sync_state')
     .update({
       last_processed_date: lastDate,
