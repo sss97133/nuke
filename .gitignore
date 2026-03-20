@@ -1,3 +1,7 @@
+# DB dumps and backups
+backups/
+*.dump
+
 # Root agent debris
 .ralph_session*
 .response_analysis
