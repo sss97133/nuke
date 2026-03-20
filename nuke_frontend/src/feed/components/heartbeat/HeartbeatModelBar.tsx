@@ -26,8 +26,8 @@ function TreemapCell(props: any) {
 
   const showLabel = width > 40 && height > 28;
   const showCount = width > 55 && height > 40;
-  const fill = colors?.[index] ?? '#888';
-  const textColor = index < 3 ? '#fff' : '#222';
+  const fill = colors?.[index] ?? 'var(--text-disabled)';
+  const textColor = index < 3 ? 'var(--surface-elevated)' : '#222';
 
   return (
     <g>

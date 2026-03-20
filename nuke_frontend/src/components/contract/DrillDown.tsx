@@ -315,7 +315,7 @@ export default function DrillDown({ concept, value, children, inline = true }: D
           <div style={{
             padding: '10px 12px',
             background: color,
-            color: '#fff',
+            color: 'var(--surface-elevated)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',

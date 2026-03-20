@@ -842,7 +842,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                           position: 'absolute', top: '8px', left: '8px',
                           background: 'rgba(0,0,0,0.75)', padding: '3px 6px',
                           fontFamily: 'Arial, sans-serif', fontSize: '8px',
-                          fontWeight: 700, color: '#fff', letterSpacing: '0.05em',
+                          fontWeight: 700, color: 'var(--surface-elevated)', letterSpacing: '0.05em',
                         }}>
                           {getSourceLabel(source)}
                         </div>

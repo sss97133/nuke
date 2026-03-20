@@ -37,7 +37,7 @@ const platformNames: Record<string, string> = {
 };
 
 const platformColors: Record<string, { bg: string; text: string; accent: string }> = {
-  bat: { bg: '#1a1a1a', text: 'var(--bg)', accent: 'var(--warning)' },
+  bat: { bg: 'var(--text)', text: 'var(--bg)', accent: 'var(--warning)' },
   cars_and_bids: { bg: 'var(--error)', text: 'var(--bg)', accent: 'var(--warning)' },
   ebay_motors: { bg: '#0064d2', text: 'var(--bg)', accent: '#f5af02' },
   hemmings: { bg: '#8b0000', text: 'var(--bg)', accent: '#ffd700' },

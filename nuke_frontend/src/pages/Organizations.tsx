@@ -571,7 +571,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
           top: '8px',
           left: '8px',
           background: 'rgba(0,0,0,0.75)',
-          color: '#fff',
+          color: 'var(--surface-elevated)',
           padding: '2px 7px', fontSize: '9px',
           fontWeight: 600,
           backdropFilter: 'blur(4px)',

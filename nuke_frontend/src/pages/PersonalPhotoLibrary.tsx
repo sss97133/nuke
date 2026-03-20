@@ -1332,7 +1332,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                 zIndex: 4,
                 padding: '2px 8px',
                 background: 'rgba(0,0,0,0.7)',
-                color: '#fff',
+                color: 'var(--surface-elevated)',
                 fontSize: '9px',
                 fontFamily: 'Arial, sans-serif',
                 fontWeight: 800,

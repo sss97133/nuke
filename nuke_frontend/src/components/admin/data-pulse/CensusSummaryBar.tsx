@@ -9,7 +9,7 @@ const bigNum: CSSProperties = {
   fontSize: '22px',
   fontWeight: 700,
   lineHeight: 1,
-  color: '#e0e0e0',
+  color: 'var(--surface-hover)',
 };
 
 const label: CSSProperties = {
@@ -18,7 +18,7 @@ const label: CSSProperties = {
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '1px',
-  color: '#888',
+  color: 'var(--text-disabled)',
   marginTop: '4px',
 };
 

@@ -298,8 +298,8 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
             onClick={handleExportPDF}
             style={{
               padding: '6px 14px',
-              background: '#1a1a1a',
-              color: '#fff',
+              background: 'var(--text)',
+              color: 'var(--surface-elevated)',
               border: '1px solid var(--border-medium)',
               fontSize: '9px',
               fontWeight: 'bold',

@@ -18,8 +18,8 @@ import type { HeartbeatType } from '../../components/admin/data-pulse/heartbeatC
 const S = {
   page: {
     fontFamily: 'Arial, sans-serif',
-    background: '#1a1a1a',
-    color: '#e0e0e0',
+    background: 'var(--text)',
+    color: 'var(--surface-hover)',
     minHeight: '100vh',
     padding: '16px 20px',
   } as CSSProperties,
@@ -39,13 +39,13 @@ const S = {
   } as CSSProperties,
   subtitle: {
     fontSize: '9px',
-    color: '#888',
+    color: 'var(--text-disabled)',
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   } as CSSProperties,
   meta: {
     fontSize: '9px',
-    color: '#888',
+    color: 'var(--text-disabled)',
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   } as CSSProperties,
@@ -55,7 +55,7 @@ const S = {
     justifyContent: 'center',
     height: '50vh',
     fontSize: '9px',
-    color: '#888',
+    color: 'var(--text-disabled)',
     textTransform: 'uppercase' as const,
     letterSpacing: '2px',
   } as CSSProperties,
@@ -73,7 +73,7 @@ const S = {
     fontWeight: 700,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
-    color: '#888',
+    color: 'var(--text-disabled)',
   } as CSSProperties,
   dot: (color: string) => ({
     display: 'inline-block',

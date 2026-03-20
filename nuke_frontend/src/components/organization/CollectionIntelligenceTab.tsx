@@ -236,7 +236,7 @@ const CollectionIntelligenceTab: React.FC<Props> = ({ organizationId }) => {
                     width: `${(count / maxMakeCount) * 100}%`,
                     height: '100%',
                     background: 'var(--accent, #3B82F6)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '6px',
-                    fontSize: '11px', color: '#fff', fontWeight: 600,
+                    fontSize: '11px', color: 'var(--surface-elevated)', fontWeight: 600,
                   }}>
                     {count}
                   </div>

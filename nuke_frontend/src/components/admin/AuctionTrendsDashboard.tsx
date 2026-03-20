@@ -242,7 +242,7 @@ export default function AuctionTrendsDashboard() {
       });
 
       // TODO: Fallback chart color kept as hex for SVG stroke compatibility
-      const platformConfig = PLATFORM_DISPLAY[platform] || { name: platform, color: '#888' };
+      const platformConfig = PLATFORM_DISPLAY[platform] || { name: platform, color: 'var(--text-disabled)' };
       paths.push({
         platform,
         path: `M ${points.join(' L ')}`,
@@ -466,7 +466,7 @@ export default function AuctionTrendsDashboard() {
             </div>
             {data.source_leaderboard.slice(0, 6).map((platform) => {
               // TODO: Fallback chart color kept as hex for SVG/bar rendering compatibility
-              const config = PLATFORM_DISPLAY[platform.platform] || { name: platform.platform, color: '#888' };
+              const config = PLATFORM_DISPLAY[platform.platform] || { name: platform.platform, color: 'var(--text-disabled)' };
               return (
                 <div key={platform.platform} style={{ marginBottom: 'var(--space-2)' }}>
                   <div style={{

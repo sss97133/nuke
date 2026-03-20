@@ -76,7 +76,7 @@ const S = {
     padding: '4px 8px',
     cursor: 'pointer',
     userSelect: 'none' as const,
-    background: '#f5f5f5',
+    background: 'var(--bg)',
   } as React.CSSProperties,
 
   label: {
@@ -85,7 +85,7 @@ const S = {
     fontWeight: 700,
     letterSpacing: '0.08em',
     textTransform: 'uppercase' as const,
-    color: '#666',
+    color: 'var(--text-secondary)',
   } as React.CSSProperties,
 
   badge: {
@@ -96,8 +96,8 @@ const S = {
     textTransform: 'uppercase' as const,
     padding: '1px 4px',
     border: '1px solid #999',
-    background: '#eee',
-    color: '#333',
+    background: 'var(--bg)',
+    color: 'var(--text)',
   } as React.CSSProperties,
 
   conflictBadge: {
@@ -141,7 +141,7 @@ const S = {
   confidenceBar: {
     width: '40px',
     height: '4px',
-    background: '#e0e0e0',
+    background: 'var(--surface-hover)',
     position: 'relative' as const,
     flexShrink: 0,
   } as React.CSSProperties,
@@ -160,7 +160,7 @@ const S = {
     fontFamily: 'Arial, Helvetica, sans-serif',
     fontSize: '8px',
     fontWeight: 700,
-    color: '#888',
+    color: 'var(--text-disabled)',
     width: '28px',
     textAlign: 'right' as const,
     flexShrink: 0,
@@ -169,14 +169,14 @@ const S = {
   timestamp: {
     fontFamily: 'Arial, Helvetica, sans-serif',
     fontSize: '8px',
-    color: '#aaa',
+    color: 'var(--border)',
     flexShrink: 0,
   } as React.CSSProperties,
 
   chevron: {
     fontFamily: 'Arial, Helvetica, sans-serif',
     fontSize: '9px',
-    color: '#999',
+    color: 'var(--text-disabled)',
     flexShrink: 0,
     transition: 'transform 0.15s ease-out',
   } as React.CSSProperties,
@@ -242,7 +242,7 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
           borderBottom: '1px solid #ddd',
         }}>
           <span style={S.label}>SOURCES</span>
-          <span style={{ ...S.label, color: '#999' }}>
+          <span style={{ ...S.label, color: 'var(--text-disabled)' }}>
             {totalSources} INPUT{totalSources !== 1 ? 'S' : ''}
           </span>
           {agreementCount > 1 && (
@@ -273,8 +273,8 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
               {/* Source badge */}
               <span style={{
                 ...S.badge,
-                borderColor: isPrimary ? '#333' : '#999',
-                background: isPrimary ? '#ddd' : '#eee',
+                borderColor: isPrimary ? 'var(--text)' : 'var(--text-disabled)',
+                background: isPrimary ? 'var(--surface-hover)' : 'var(--bg)',
               }}>
                 {getSourceLabel(row.source_type)}
               </span>
@@ -301,7 +301,7 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
                 style={{
                   fontFamily: 'Arial, Helvetica, sans-serif',
                   fontSize: '8px',
-                  color: '#888',
+                  color: 'var(--text-disabled)',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap' as const,
@@ -368,9 +368,9 @@ export const SourceBadge: React.FC<SourceBadgeProps> = ({ group, onClick }) => {
         ...S.badge,
         fontSize: '8px',
         padding: '0px 3px',
-        borderColor: hasConflict ? '#c00' : '#999',
-        background: hasConflict ? '#fee' : '#eee',
-        color: hasConflict ? '#900' : '#333',
+        borderColor: hasConflict ? '#c00' : 'var(--text-disabled)',
+        background: hasConflict ? '#fee' : 'var(--bg)',
+        color: hasConflict ? '#900' : 'var(--text)',
       }}>
         {getSourceLabel(primary.source_type)}
       </span>
@@ -378,7 +378,7 @@ export const SourceBadge: React.FC<SourceBadgeProps> = ({ group, onClick }) => {
         <span style={{
           fontFamily: 'Arial, Helvetica, sans-serif',
           fontSize: '8px',
-          color: '#999',
+          color: 'var(--text-disabled)',
         }}>
           +{totalSources - 1}
         </span>

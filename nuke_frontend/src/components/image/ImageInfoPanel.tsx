@@ -516,7 +516,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
             {subj?.primary_focus && (
               <div style={{ marginBottom: '8px' }}>
                 <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: '2px' }}>SUBJECT</div>
-                <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11px', color: '#fff', lineHeight: 1.4 }}>
+                <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11px', color: 'var(--surface-elevated)', lineHeight: 1.4 }}>
                   {subj.primary_focus}
                 </div>
               </div>
@@ -532,7 +532,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                       fontFamily: "'Courier New', Courier, monospace",
                       fontSize: '12px',
                       fontWeight: 700,
-                      color: '#000',
+                      color: 'var(--text)',
                       backgroundColor: scoreColor(cond.overall_score),
                     }}>
                       {cond.overall_score}/10
@@ -638,7 +638,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                       }} />
                     ))}
                     {color.paint_color_name && (
-                      <span style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11px', color: '#fff', marginLeft: '6px' }}>
+                      <span style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11px', color: 'var(--surface-elevated)', marginLeft: '6px' }}>
                         {color.paint_color_name}
                       </span>
                     )}
@@ -701,7 +701,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
             {subj?.text_visible?.length > 0 && (
               <div style={{ marginBottom: '8px' }}>
                 <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: '2px' }}>TEXT VISIBLE</div>
-                <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11px', color: '#fff' }}>
+                <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11px', color: 'var(--surface-elevated)' }}>
                   {subj.text_visible.join(', ')}
                 </div>
               </div>

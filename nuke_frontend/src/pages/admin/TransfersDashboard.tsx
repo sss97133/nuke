@@ -327,7 +327,7 @@ export default function TransfersDashboard() {
         <button
           onClick={() => setShowLogDeal(true)}
           style={{
-            background: 'var(--accent)', color: '#fff', border: 'none', padding: '8px 16px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            background: 'var(--accent)', color: 'var(--surface-elevated)', border: 'none', padding: '8px 16px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
           }}
         >
           + Log a Deal
@@ -576,7 +576,7 @@ export default function TransfersDashboard() {
                                   onClick={() => advanceMilestone(t.id, m.milestone_type)}
                                   disabled={isAdvancing || !!advancing}
                                   style={{
-                                    background: 'var(--success)', color: '#fff', border: 'none', padding: '2px 8px', fontSize: '11px',
+                                    background: 'var(--success)', color: 'var(--surface-elevated)', border: 'none', padding: '2px 8px', fontSize: '11px',
                                     fontWeight: 600, cursor: isAdvancing ? 'wait' : 'pointer',
                                     marginLeft: '4px', opacity: advancing && !isAdvancing ? 0.5 : 1,
                                   }}
@@ -719,7 +719,7 @@ export default function TransfersDashboard() {
                     onClick={submitLogDeal}
                     disabled={dealSubmitting || !dealForm.vehicle_id.trim()}
                     style={{
-                      background: 'var(--accent)', color: '#fff', border: 'none', padding: '8px 20px', fontSize: '13px', fontWeight: 600, cursor: dealSubmitting ? 'wait' : 'pointer',
+                      background: 'var(--accent)', color: 'var(--surface-elevated)', border: 'none', padding: '8px 20px', fontSize: '13px', fontWeight: 600, cursor: dealSubmitting ? 'wait' : 'pointer',
                       opacity: !dealForm.vehicle_id.trim() ? 0.5 : 1,
                     }}
                   >

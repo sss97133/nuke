@@ -38,7 +38,7 @@ interface ImageLocationMapProps {
 // Small dot marker — minimal footprint, data-point aesthetic
 const IMAGE_DOT = L.divIcon({
   className: '',
-  html: `<div style="background:var(--info);width:5px;height:5px;border-radius:50%;border:1px solid rgba(255,255,255,.7);box-shadow:0 0 3px rgba(59,130,246,.6)"></div>`,
+  html: `<div style="background:var(--info);width:5px;height:5px;border:1px solid rgba(255,255,255,.7)"></div>`,
   iconSize: [5, 5],
   iconAnchor: [2.5, 2.5],
   popupAnchor: [0, -3],
@@ -55,7 +55,7 @@ function createClusterIcon(cluster: any): L.DivIcon {
       color:#fff;
       width:${size}px;
       height:${size}px;
-      border-radius:50%;
+      border-radius:0;
       display:flex;
       align-items:center;
       justify-content:center;
@@ -215,7 +215,7 @@ const ImageLocationMap: React.FC<ImageLocationMapProps> = ({
                       fontFamily: 'Arial, sans-serif',
                       fontSize: '10px',
                       background: '#1a1a2e',
-                      color: '#ccc',
+                      color: 'var(--border)',
                       padding: 0, }}
                   >
                     {thumb && (
@@ -235,7 +235,7 @@ const ImageLocationMap: React.FC<ImageLocationMapProps> = ({
                       />
                     )}
                     {locationLabel && (
-                      <div style={{ padding: '3px 5px', color: '#999' }}>
+                      <div style={{ padding: '3px 5px', color: 'var(--text-disabled)' }}>
                         {locationLabel}
                       </div>
                     )}
@@ -243,7 +243,7 @@ const ImageLocationMap: React.FC<ImageLocationMapProps> = ({
                       <div
                         style={{
                           padding: '0 5px 3px',
-                          color: '#666',
+                          color: 'var(--text-secondary)',
                           fontSize: '9px',
                         }}
                       >

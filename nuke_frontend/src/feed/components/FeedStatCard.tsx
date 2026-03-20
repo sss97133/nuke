@@ -43,7 +43,7 @@ export function FeedStatCard({
         alignItems: 'center',
         gap: '20px',
         padding: '8px 12px',
-        background: '#ebebeb',
+        background: 'var(--surface)',
         border: '2px solid var(--border)',
         margin: '4px 0',
       }}

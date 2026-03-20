@@ -83,7 +83,7 @@ export const FaviconIcon: React.FC<FaviconIconProps> = ({
               width: `${iconSize}px`,
               height: `${iconSize}px`,
               backgroundColor: 'rgba(255,255,255,0.1)',
-              color: '#fff',
+              color: 'var(--surface-elevated)',
               fontSize: `${iconSize * 0.6}px`,
               fontWeight: 'bold', ...style
             }}

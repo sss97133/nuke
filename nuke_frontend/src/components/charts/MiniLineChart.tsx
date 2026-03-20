@@ -202,7 +202,7 @@ export const MiniLineChart: React.FC<MiniLineChartProps> = ({
             cx={hoveredPoint.x}
             cy={hoveredPoint.y}
             r={4}
-            fill={series.find(s => s.id === hoveredPoint.seriesId)?.color || '#fff'}
+            fill={series.find(s => s.id === hoveredPoint.seriesId)?.color || 'var(--surface-elevated)'}
             stroke="var(--bg)"
             strokeWidth={2}
           />

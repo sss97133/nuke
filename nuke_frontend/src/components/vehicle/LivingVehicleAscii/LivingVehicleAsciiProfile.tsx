@@ -145,7 +145,7 @@ type CanvasProps = {
 
 /** Cursor-quality: dark bg, light mono, crisp centering. */
 const CANVAS_BG = '#0a0a0a';
-const CANVAS_FG = '#fafafa';
+const CANVAS_FG = 'var(--bg-secondary)';
 const CANVAS_FONT = '14px "Courier New", monospace';
 const LINE_HEIGHT = 20;
 const CHAR_W = 8.4;

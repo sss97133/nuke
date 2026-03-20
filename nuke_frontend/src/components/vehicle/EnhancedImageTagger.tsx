@@ -425,9 +425,9 @@ export default function EnhancedImageTagger({
 
   const getTagColor = (tag: Tag) => {
     if (tag.source_type === 'ai') {
-      return tag.verified ? '#28a745' : '#fd7e14'; // Green if verified, orange if unverified
+      return tag.verified ? 'var(--success)' : '#fd7e14'; // Green if verified, orange if unverified
     } else if (tag.source_type === 'manual') {
-      return '#007bff'; // Blue for manual
+      return 'var(--info)'; // Blue for manual
     } else if (tag.source_type === 'corrected') {
       return '#6f42c1'; // Purple for corrected
     }

@@ -712,7 +712,7 @@ function AuctionCard({ auction, now }: { auction: LiveAuction; now: number }) {
             fontWeight: 700,
             textTransform: 'uppercase' as const,
             letterSpacing: '0.5px',
-            color: '#fff',
+            color: 'var(--surface-elevated)',
           }}>
             {platformLabel}
           </span>
@@ -720,7 +720,7 @@ function AuctionCard({ auction, now }: { auction: LiveAuction; now: number }) {
             fontFamily: '"Courier New", monospace',
             fontSize: 'var(--fs-9)',
             fontWeight: 700,
-            color: timeColor === 'default' ? '#fff' : timeColor === 'red' ? '#ff6b6b' : '#ffb347',
+            color: timeColor === 'default' ? 'var(--surface-elevated)' : timeColor === 'red' ? '#ff6b6b' : '#ffb347',
             letterSpacing: '0.5px',
           }}>
             {timeStr}

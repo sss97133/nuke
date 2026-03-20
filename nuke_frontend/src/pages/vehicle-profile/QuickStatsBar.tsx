@@ -40,7 +40,7 @@ const QuickStatsBar: React.FC = () => {
         fontFamily: "'Courier New', Courier, monospace",
         fontSize: '8px',
         fontWeight: 400,
-        color: '#888',
+        color: 'var(--text-disabled)',
         letterSpacing: '0.08em',
         textTransform: 'uppercase' as const,
         display: 'flex',

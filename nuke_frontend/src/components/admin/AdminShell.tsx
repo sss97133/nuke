@@ -78,7 +78,7 @@ function NavBadge({ count }: { count: number }) {
       fontSize: '9px',
       fontWeight: 700,
       fontFamily: 'monospace',
-      color: '#fff',
+      color: 'var(--surface-elevated)',
       backgroundColor: 'var(--error-dark, var(--error))', lineHeight: '14px',
       verticalAlign: 'middle',
     }}>

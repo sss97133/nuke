@@ -27,7 +27,7 @@ const FIELD_LABEL_STYLE: React.CSSProperties = {
 const FIELD_VALUE_STYLE: React.CSSProperties = {
   fontFamily: "'Courier New', Courier, monospace",
   fontSize: '11px',
-  color: '#fff',
+  color: 'var(--surface-elevated)',
   lineHeight: 1.5,
   marginTop: '1px',
   wordBreak: 'break-word',
@@ -300,7 +300,7 @@ export const ImageExpandedData: React.FC<ImageExpandedDataProps> = ({
                       fontFamily: "'Courier New', Courier, monospace",
                       fontSize: '13px',
                       fontWeight: 700,
-                      color: '#000',
+                      color: 'var(--text)',
                       backgroundColor: scoreColor(cond.overall_score),
                       border: '2px solid ' + scoreColor(cond.overall_score),
                     }}>

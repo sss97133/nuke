@@ -31,14 +31,14 @@ const S = {
     fontWeight: 700,
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
-    color: '#e0e0e0',
+    color: 'var(--surface-hover)',
   } as CSSProperties,
   typeLabel: {
     fontFamily: 'Arial, sans-serif',
     fontSize: '8px',
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
-    color: '#666',
+    color: 'var(--text-secondary)',
     marginBottom: '8px',
   } as CSSProperties,
   metricsRow: {
@@ -52,14 +52,14 @@ const S = {
     fontWeight: 700,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
-    color: '#888',
+    color: 'var(--text-disabled)',
     marginTop: '2px',
   } as CSSProperties,
   metricValue: {
     fontFamily: '"Courier New", monospace',
     fontSize: '13px',
     fontWeight: 700,
-    color: '#e0e0e0',
+    color: 'var(--surface-hover)',
     lineHeight: 1,
   } as CSSProperties,
   fillRow: {
@@ -74,7 +74,7 @@ const S = {
     fontWeight: 700,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
-    color: '#888',
+    color: 'var(--text-disabled)',
   } as CSSProperties,
   gapRow: {
     display: 'flex',
@@ -98,7 +98,7 @@ const S = {
     fontSize: '8px',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
-    color: '#666',
+    color: 'var(--text-secondary)',
     marginTop: '6px',
     display: 'flex' as const,
     justifyContent: 'space-between' as const,
@@ -124,7 +124,7 @@ const S = {
     fontFamily: '"Courier New", monospace',
     fontSize: '9px',
     fontWeight: 700,
-    color: dir === 'up' ? '#16825d' : dir === 'down' ? '#d13438' : '#666',
+    color: dir === 'up' ? '#16825d' : dir === 'down' ? '#d13438' : 'var(--text-secondary)',
   } as CSSProperties),
 };
 

@@ -59,7 +59,7 @@ export const MobileBottomNav: React.FC = () => {
               top: -2,
               right: -2,
               background: 'var(--error, #d13438)',
-              color: '#fff',
+              color: 'var(--surface-elevated)',
               fontSize: '7px',
               fontWeight: 700,
               fontFamily: 'Arial, sans-serif',

@@ -8,7 +8,7 @@ import type { VehicleAsciiSlice, AuctionPulseSlice } from './types';
 /** Cursor-quality: match cursor.com/cli */
 const CANVAS_SIZE = 216;
 const BG = '#0a0a0a';
-const FG = '#fafafa';
+const FG = 'var(--bg-secondary)';
 const FONT = '12px "Courier New", monospace';
 const LINE_HEIGHT = 16;
 const PADDING = 20;

@@ -193,7 +193,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                   <div style={{
                     padding: '4px 8px',
                     background: platformColor,
-                    color: '#fff', fontSize: '11px',
+                    color: 'var(--surface-elevated)', fontSize: '11px',
                     fontWeight: 700
                   }}>
                     {platformName.toUpperCase()}
@@ -201,7 +201,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                   <div style={{
                     padding: '4px 8px',
                     background: isActive ? 'var(--accent)' : isSold ? 'var(--success)' : 'var(--text-secondary)',
-                    color: '#fff', fontSize: '11px',
+                    color: 'var(--surface-elevated)', fontSize: '11px',
                     fontWeight: 700
                   }}>
                     {listing.event_status.toUpperCase().replace('_', ' ')}
@@ -210,7 +210,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                     <div style={{
                       padding: '4px 8px',
                       background: 'var(--warning)',
-                      color: '#fff', fontSize: '11px',
+                      color: 'var(--surface-elevated)', fontSize: '11px',
                       fontWeight: 700
                     }}>
                       RESERVE NOT MET

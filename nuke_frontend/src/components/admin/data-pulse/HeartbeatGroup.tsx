@@ -25,18 +25,18 @@ const S = {
     fontWeight: 700,
     textTransform: 'uppercase' as const,
     letterSpacing: '2px',
-    color: '#888',
+    color: 'var(--text-disabled)',
   } as CSSProperties,
   count: {
     fontFamily: '"Courier New", monospace',
     fontSize: '9px',
     fontWeight: 700,
-    color: '#666',
+    color: 'var(--text-secondary)',
   } as CSSProperties,
   chevron: {
     fontFamily: '"Courier New", monospace',
     fontSize: '10px',
-    color: '#666',
+    color: 'var(--text-secondary)',
     width: '12px',
   } as CSSProperties,
   grid: {

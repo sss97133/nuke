@@ -259,7 +259,7 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
                     fill="url(#bidGradient)"
                     strokeWidth={2}
                     dot={{ r: 2, fill: 'var(--info)', strokeWidth: 0 }}
-                    activeDot={{ r: 5, fill: 'var(--info)', stroke: '#fff', strokeWidth: 2 }}
+                    activeDot={{ r: 5, fill: 'var(--info)', stroke: 'var(--surface-elevated)', strokeWidth: 2 }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
