@@ -15,7 +15,7 @@ const Extension: React.FC = () => {
             Nuke — Vehicle Intelligence
           </h1>
           <p style={{ fontSize: '14px', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
-            The automotive knowledge graph. Every vehicle at full resolution. Every claim with provenance.
+            Fully normalized vehicle ontology at component resolution with provenance tracking.
           </p>
         </div>
 
@@ -25,18 +25,19 @@ const Extension: React.FC = () => {
             WHAT THIS IS
           </h2>
           <p style={{ fontSize: '13px', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>
-            Fully normalized domain ontology at component resolution with full provenance tracking.
             The database doesn't describe the vehicle. The database IS the vehicle.
+            120 subsystem tables. Every component has five dimensional shadows: specification,
+            current state, condition, provenance, evidence. Every cell cites its source.
           </p>
           <p style={{ fontSize: '13px', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>
-            Every data point cites its source. Every claim has a confidence score and a decay rate.
-            120 subsystem tables per vehicle. Observations from 112+ calibrated sources.
-            Multi-model verification. The schema IS the specification.
+            Descriptions are testimony with half-lives. Each claim decays by category.
+            Photos are primary evidence. The schema IS the specification — a mold the
+            data fills at whatever resolution it can reach.
           </p>
           <p style={{ fontSize: '13px', lineHeight: '1.7' }}>
-            This extension connects Claude to the Nuke knowledge graph — giving it deep automotive
-            intelligence. Your interactions feed the graph. Your photos become evidence.
-            Your knowledge becomes provenance.
+            This extension connects Claude to the Nuke knowledge graph. Your photos become
+            observations. Your corrections become the highest-confidence data in the system.
+            Your expertise becomes provenance that outlives you.
           </p>
         </section>
 
@@ -114,12 +115,15 @@ const Extension: React.FC = () => {
             HOW DATA FLOWS
           </h2>
           <p style={{ fontSize: '13px', lineHeight: '1.7', marginBottom: 'var(--space-3)' }}>
-            Every interaction is a data event. Search queries reveal market interest. Listing extractions
-            create vehicle profiles. Photo analyses generate observations with confidence scores.
-            Corrections from domain experts are the highest-confidence data source in the system.
+            You send a photo of your engine bay. The casting number becomes an observation
+            with source provenance. The block gets matched to a factory specification.
+            The VIN decode confirms or contradicts. Three independent sources now
+            triangulate what engine is in your car — each with a confidence score.
           </p>
           <p style={{ fontSize: '13px', lineHeight: '1.7' }}>
-            You talk to Claude about a car. The knowledge graph gets deeper. That's it.
+            You talk to Claude about a car. The knowledge graph resolves deeper. Every
+            conversation is a data event. Every correction is the most trusted signal
+            in the system.
           </p>
         </section>
 
