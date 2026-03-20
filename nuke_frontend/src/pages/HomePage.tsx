@@ -8,6 +8,7 @@ import { useAppLayoutContext } from '../components/layout/AppLayoutContext';
 import { GarageToolbar } from '../components/garage/GarageToolbar';
 import { applyNonAutoFilters } from '../lib/nonAutoExclusion';
 import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlideshow';
+import { MiniDistribution, PriceDistributionChart } from '../components/charts/PriceDistribution';
 
 /** v3 landing page data — single RPC, all sections. */
 interface LandingDataV3 {
@@ -15,6 +16,7 @@ interface LandingDataV3 {
   platform: { total_observations: number; total_images: number; total_comments: number; total_sources: number; schema_tables: number; schema_columns: number; vehicle_columns: number; pipeline_entries: number } | null;
   makes: { make: string; vehicle_count: number; avg_price: number; model_count: number }[] | null;
   make_models: { make: string; model: string; vehicle_count: number; avg_price: number }[] | null;
+  price_histograms: Record<string, { b: number; n: number }[]> | null;
   source_categories: { category: string; source_count: number; avg_trust: number; min_trust: number; max_trust: number }[] | null;
   sources: { slug: string; display_name: string; category: string; base_trust_score: number }[] | null;
   observation_kinds: { kind: string; cnt: number }[] | null;
@@ -27,7 +29,7 @@ function useLandingDataV3() {
 
   useEffect(() => {
     let cancelled = false;
-    supabase.rpc('landing_page_v3').then(({ data: result }) => {
+    supabase.rpc('landing_page_v3_cached').then(({ data: result }) => {
       if (!cancelled && result) setData(result as unknown as LandingDataV3);
     });
     return () => { cancelled = true; };
@@ -285,84 +287,111 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
   // Max observation count for bar widths
   const maxObsCount = d?.observation_kinds ? Math.max(...d.observation_kinds.map(o => o.cnt)) : 1;
 
-  const renderTreemapCell = (m: typeof makes[0], minHeight: number) => (
-    <button
-      key={m.make}
-      onClick={() => setExpandedMake(expandedMake === m.make ? null : m.make)}
-      style={{
-        flex: m.vehicle_count,
-        minHeight,
-        padding: '8px 10px',
-        border: '2px solid var(--border)',
-        borderColor: expandedMake === m.make ? 'var(--text)' : 'var(--border)',
-        background: 'var(--surface)',
-        cursor: 'pointer',
-        textAlign: 'left',
-        fontFamily: 'Arial, sans-serif',
-        color: 'var(--text)',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        transition: `border-color ${easeOut}`,
-        overflow: 'hidden',
-        minWidth: 0,
-      }}
-    >
-      <div style={{
-        fontSize: 9,
-        fontWeight: 700,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-      }}>
-        {m.make}
-      </div>
-      <div style={{ display: 'flex', gap: 8, fontSize: 10, fontFamily: 'Courier New, monospace', flexWrap: 'wrap' }}>
-        <span style={{ color: 'var(--text-secondary)' }}>{fmtNum(m.vehicle_count)}</span>
-        <span style={{ fontWeight: 700 }}>{formatAvgPrice(m.avg_price)}</span>
-      </div>
-    </button>
-  );
+  const histograms = d?.price_histograms || {};
+
+  const renderTreemapCell = (m: typeof makes[0], minHeight: number) => {
+    const bins = histograms[m.make];
+    return (
+      <button
+        key={m.make}
+        onClick={() => setExpandedMake(expandedMake === m.make ? null : m.make)}
+        style={{
+          flex: m.vehicle_count,
+          minHeight,
+          padding: '8px 10px',
+          border: '2px solid var(--border)',
+          borderColor: expandedMake === m.make ? 'var(--text)' : 'var(--border)',
+          background: 'var(--surface)',
+          cursor: 'pointer',
+          textAlign: 'left',
+          fontFamily: 'Arial, sans-serif',
+          color: 'var(--text)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          transition: `border-color ${easeOut}`,
+          overflow: 'hidden',
+          minWidth: 0,
+        }}
+      >
+        <div style={{
+          fontSize: 9,
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}>
+          {m.make}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+          <span style={{ fontSize: 10, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)', flexShrink: 0 }}>{fmtNum(m.vehicle_count)}</span>
+          {bins ? (
+            <MiniDistribution bins={bins} width={Math.min(80, Math.max(40, m.vehicle_count / 100))} height={minHeight > 60 ? 20 : 14} />
+          ) : (
+            <span style={{ fontSize: 10, fontFamily: 'Courier New, monospace', fontWeight: 700 }}>{formatAvgPrice(m.avg_price)}</span>
+          )}
+        </div>
+      </button>
+    );
+  };
 
   const renderMakeAccordion = () => {
-    if (!expandedMake || modelsForMake.length === 0) return null;
+    if (!expandedMake) return null;
+    const bins = histograms[expandedMake];
     return (
       <div style={{
         width: '100%',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-        gap: 4,
         padding: '8px 0',
         animation: 'fadeIn 180ms ease-out',
       }}>
-        {modelsForMake.map(mm => (
-          <button
-            key={`${mm.make}-${mm.model}`}
-            onClick={() => navigate(`/search?make=${encodeURIComponent(mm.make)}&model=${encodeURIComponent(mm.model)}`)}
-            style={{
-              padding: '8px 10px',
-              border: '1px solid var(--border)',
-              background: 'var(--surface)',
-              cursor: 'pointer',
-              textAlign: 'left',
-              fontFamily: 'Arial, sans-serif',
-              color: 'var(--text)',
-              transition: `border-color ${easeOut}`,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
-          >
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {mm.model}
-            </div>
-            <div style={{ display: 'flex', gap: 8, fontSize: 10, fontFamily: 'Courier New, monospace' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>{fmtNum(mm.vehicle_count)}</span>
-              <span style={{ fontWeight: 700 }}>{formatAvgPrice(mm.avg_price)}</span>
-            </div>
-          </button>
-        ))}
+        {/* Price distribution chart */}
+        {bins && (
+          <div style={{
+            border: '2px solid var(--border)',
+            background: 'var(--surface)',
+            padding: '12px 16px',
+            marginBottom: 8,
+          }}>
+            <PriceDistributionChart bins={bins} make={expandedMake} />
+          </div>
+        )}
+        {/* Model grid */}
+        {modelsForMake.length > 0 && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+            gap: 4,
+          }}>
+            {modelsForMake.map(mm => (
+              <button
+                key={`${mm.make}-${mm.model}`}
+                onClick={() => navigate(`/search?make=${encodeURIComponent(mm.make)}&model=${encodeURIComponent(mm.model)}`)}
+                style={{
+                  padding: '8px 10px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  fontFamily: 'Arial, sans-serif',
+                  color: 'var(--text)',
+                  transition: `border-color ${easeOut}`,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+              >
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {mm.model}
+                </div>
+                <div style={{ display: 'flex', gap: 8, fontSize: 10, fontFamily: 'Courier New, monospace' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>{fmtNum(mm.vehicle_count)}</span>
+                  <span style={{ fontWeight: 700 }}>{formatAvgPrice(mm.avg_price)}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
