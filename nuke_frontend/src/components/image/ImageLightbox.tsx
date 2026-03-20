@@ -929,12 +929,11 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           background: rgba(0, 0, 0, 0.9);
           color: white;
           padding: 16px 20px;
-          border-radius: 8px;
+          border-radius: 0;
           border: 2px solid var(--border);
           z-index: 10001;
           font-size: 12px;
           max-width: 300px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         `;
         const relationshipText = organizationInfo.relationshipLabel 
           ? `${organizationInfo.relationshipLabel} • ${organizationInfo.name}`
