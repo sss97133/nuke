@@ -1,0 +1,16 @@
+{
+  "name": "nuke-ops",
+  "version": "1.0.0",
+  "description": "Nuke platform operational skills — health checks, debug playbooks, integration testing, design audits",
+  "skills": [
+    "skills/health-check.md",
+    "skills/debug-extraction.md",
+    "skills/audit-design.md",
+    "skills/smoke-test.md",
+    "skills/integration-check.md",
+    "skills/nightly-regression.md"
+  ],
+  "agents": [
+    "agents/debug-team.md"
+  ]
+}

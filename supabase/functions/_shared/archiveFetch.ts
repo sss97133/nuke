@@ -160,7 +160,25 @@ export async function archiveFetch(
   if (!options?.forceRefresh && !options?.skipCache) {
     try {
       const cutoff = new Date(Date.now() - maxAgeSec * 1000).toISOString();
-      const { data: cached } = await supabase
+      const useFirecrawl = options?.useFirecrawl ?? needsFirecrawl(url);
+
+      // Prefer snapshots matching the requested fetch method (direct vs firecrawl).
+      // This prevents firecrawl markdown-only snapshots from masking direct HTML
+      // snapshots that contain structured data (e.g. __NEXT_DATA__).
+      const preferredMethod = useFirecrawl ? "firecrawl" : "direct";
+      let query = supabase
+        .from("listing_page_snapshots")
+        .select("id, html, markdown, fetched_at, html_storage_path, markdown_storage_path")
+        .eq("listing_url", url)
+        .eq("success", true)
+        .gte("fetched_at", cutoff)
+        .order("fetched_at", { ascending: false })
+        .limit(1);
+
+      // Try preferred method first
+      const { data: preferred } = await query.eq("fetch_method", preferredMethod).maybeSingle();
+      // Fall back to any method if preferred not found
+      const cached = preferred ?? (await supabase
         .from("listing_page_snapshots")
         .select("id, html, markdown, fetched_at, html_storage_path, markdown_storage_path")
         .eq("listing_url", url)
@@ -168,7 +186,7 @@ export async function archiveFetch(
         .gte("fetched_at", cutoff)
         .order("fetched_at", { ascending: false })
         .limit(1)
-        .maybeSingle();
+        .maybeSingle()).data;
 
       if (cached && (cached.html || cached.html_storage_path)) {
         let cachedHtml = cached.html ?? null;

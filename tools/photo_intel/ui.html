@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHOTO INTEL</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, sans-serif; background: #fff; color: #000; padding: 24px; }
+h1 { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 20px; }
+
+.stats-bar { display: flex; gap: 24px; margin-bottom: 20px; padding: 12px 0; border-bottom: 2px solid #000; }
+.stat { display: flex; flex-direction: column; }
+.stat-label { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; color: #666; }
+.stat-value { font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; }
+
+.phase-bar { margin-bottom: 16px; }
+.phase-label { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.phase-track { height: 4px; background: #eee; position: relative; }
+.phase-fill { height: 100%; background: #000; transition: width 180ms cubic-bezier(0.16, 1, 0.3, 1); }
+.phase-status { font-family: 'Courier New', monospace; font-size: 11px; margin-top: 4px; }
+
+.controls { margin-bottom: 24px; display: flex; gap: 8px; }
+button { font-family: Arial, sans-serif; font-size: 9px; text-transform: uppercase; letter-spacing: 1px;
+  padding: 8px 16px; border: 2px solid #000; background: #fff; cursor: pointer; transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1); }
+button:hover { background: #000; color: #fff; }
+button:disabled { border-color: #ccc; color: #ccc; cursor: not-allowed; }
+button:disabled:hover { background: #fff; color: #ccc; }
+button.primary { background: #000; color: #fff; }
+button.primary:hover { background: #333; }
+
+.profiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.profile-card { border: 2px solid #000; padding: 16px; }
+.profile-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+.profile-title { font-family: 'Courier New', monospace; font-size: 14px; font-weight: bold; }
+.profile-id { font-family: 'Courier New', monospace; font-size: 9px; color: #999; }
+.profile-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.profile-stat { display: flex; flex-direction: column; }
+.profile-stat .stat-label { font-size: 7px; }
+.profile-stat .stat-value { font-family: 'Courier New', monospace; font-size: 13px; }
+
+.yono-badge { display: inline-block; font-family: 'Courier New', monospace; font-size: 10px; padding: 2px 6px; border: 1px solid #000; margin-bottom: 8px; }
+.date-range { font-family: 'Courier New', monospace; font-size: 10px; color: #666; margin-bottom: 8px; }
+.locations { font-size: 10px; color: #666; margin-bottom: 8px; }
+.upload-row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; }
+.upload-status { font-family: 'Courier New', monospace; font-size: 10px; }
+.no-match { font-size: 9px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+
+.log { font-family: 'Courier New', monospace; font-size: 10px; margin-top: 24px; padding: 12px; border: 2px solid #000; max-height: 200px; overflow-y: auto; background: #fafafa; }
+.log-line { white-space: pre-wrap; margin-bottom: 2px; }
+.log-line.error { color: #c00; }
+</style>
+</head>
+<body>
+
+<h1>PHOTO INTEL</h1>
+
+<div class="stats-bar" id="stats">
+  <div class="stat"><span class="stat-label">PHOTOS</span><span class="stat-value" id="s-photos">--</span></div>
+  <div class="stat"><span class="stat-label">VEHICLES</span><span class="stat-value" id="s-vehicles">--</span></div>
+  <div class="stat"><span class="stat-label">SESSIONS</span><span class="stat-value" id="s-sessions">--</span></div>
+  <div class="stat"><span class="stat-label">PROFILES</span><span class="stat-value" id="s-profiles">--</span></div>
+  <div class="stat"><span class="stat-label">CLASSIFIED</span><span class="stat-value" id="s-classified">--</span></div>
+  <div class="stat"><span class="stat-label">UPLOADED</span><span class="stat-value" id="s-uploaded">--</span></div>
+</div>
+
+<div class="phase-bar">
+  <div class="phase-label" id="phase-label">IDLE</div>
+  <div class="phase-track"><div class="phase-fill" id="phase-fill" style="width:0%"></div></div>
+  <div class="phase-status" id="phase-status"></div>
+</div>
+
+<div class="controls">
+  <button class="primary" id="btn-run" onclick="runPipeline()">RUN PIPELINE</button>
+  <button id="btn-run-fast" onclick="runPipeline(true)">RUN (SKIP CLASSIFY)</button>
+  <button id="btn-refresh" onclick="refresh()">REFRESH</button>
+</div>
+
+<div class="profiles" id="profiles"></div>
+
+<div class="log" id="log"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let es = null;
+
+function log(msg, isError) {
+  const el = $('log');
+  const line = document.createElement('div');
+  line.className = 'log-line' + (isError ? ' error' : '');
+  line.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function connectSSE() {
+  if (es) es.close();
+  es = new EventSource('/events');
+  es.addEventListener('state', e => { const d = JSON.parse(e.data); updatePhase(d); });
+  es.addEventListener('phase', e => { const d = JSON.parse(e.data); updatePhase(d); log('Phase: ' + d.phase + (d.message ? ' - ' + d.message : '')); });
+  es.addEventListener('progress', e => { const d = JSON.parse(e.data); updateProgress(d); });
+  es.addEventListener('upload', e => { const d = JSON.parse(e.data); updateProgress(d); });
+  es.addEventListener('error', e => { try { const d = JSON.parse(e.data); log('ERROR: ' + d.message, true); } catch {} });
+  es.onerror = () => { log('SSE connection lost, reconnecting...', true); };
+}
+
+function updatePhase(d) {
+  $('phase-label').textContent = (d.phase || 'IDLE').toUpperCase();
+  if (d.message) $('phase-status').textContent = d.message;
+  if (d.phase === 'complete') {
+    $('phase-fill').style.width = '100%';
+    $('btn-run').disabled = false;
+    $('btn-run-fast').disabled = false;
+    refresh();
+  }
+  if (d.phase === 'error') {
+    $('btn-run').disabled = false;
+    $('btn-run-fast').disabled = false;
+  }
+}
+
+function updateProgress(d) {
+  if (d.total > 0) {
+    const pct = Math.round(d.progress / d.total * 100);
+    $('phase-fill').style.width = pct + '%';
+    $('phase-status').textContent = d.progress.toLocaleString() + ' / ' + d.total.toLocaleString();
+  }
+}
+
+async function refresh() {
+  try {
+    const [stats, stories] = await Promise.all([
+      fetch('/api/stats').then(r => r.json()),
+      fetch('/api/stories').then(r => r.json()),
+    ]);
+    $('s-photos').textContent = (stats.photos || 0).toLocaleString();
+    $('s-vehicles').textContent = (stats.vehicles || 0).toLocaleString();
+    $('s-sessions').textContent = (stats.sessions || 0).toLocaleString();
+    $('s-profiles').textContent = (stats.profiles || 0).toLocaleString();
+    $('s-classified').textContent = (stats.classified || 0).toLocaleString();
+    $('s-uploaded').textContent = (stats.uploaded || 0).toLocaleString();
+    renderProfiles(stories);
+  } catch (e) { log('Refresh failed: ' + e.message, true); }
+}
+
+function renderProfiles(profiles) {
+  const el = $('profiles');
+  if (!profiles.length) { el.innerHTML = '<div class="no-match">NO PROFILES YET — RUN PIPELINE</div>'; return; }
+
+  el.innerHTML = profiles.map(p => {
+    const s = p.story || {};
+    const c = p.yono_consensus;
+    const types = s.type_breakdown || {};
+    const locs = (s.locations || []).slice(0, 3);
+    const firstDate = (p.first_photo || '').slice(0, 10);
+    const lastDate = (p.last_photo || '').slice(0, 10);
+
+    return `<div class="profile-card">
+      <div class="profile-header">
+        <span class="profile-title">${p.year} ${p.make} ${p.model}</span>
+        <span class="profile-id">${p.id}</span>
+      </div>
+      ${c ? `<span class="yono-badge">YONO: ${c.make} ${c.agreement}%</span>` : ''}
+      ${firstDate ? `<div class="date-range">${firstDate} — ${lastDate}</div>` : ''}
+      <div class="profile-stats">
+        <div class="profile-stat"><span class="stat-label">PHOTOS</span><span class="stat-value">${p.photo_count || 0}</span></div>
+        <div class="profile-stat"><span class="stat-label">SESSIONS</span><span class="stat-value">${p.session_count || 0}</span></div>
+        <div class="profile-stat"><span class="stat-label">EXT/INT/ENG</span><span class="stat-value">${types.exterior||0}/${types.interior||0}/${types.engine||0}</span></div>
+      </div>
+      ${locs.length ? `<div class="locations">${locs.join(' | ')}</div>` : ''}
+      <div class="upload-row">
+        ${p.supabase_vehicle_id
+          ? `<span class="upload-status">DB: ${p.supabase_vehicle_id.slice(0,8)}</span>
+             <button onclick="uploadProfile('${p.id}')">UPLOAD</button>`
+          : '<span class="no-match">NO DB MATCH</span>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function runPipeline(skipClassify) {
+  $('btn-run').disabled = true;
+  $('btn-run-fast').disabled = true;
+  log('Starting pipeline...');
+  try {
+    await fetch('/api/run', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({skip_classify: !!skipClassify}),
+    });
+  } catch (e) { log('Failed to start: ' + e.message, true); }
+}
+
+async function uploadProfile(profileId) {
+  log('Uploading profile ' + profileId + '...');
+  try {
+    const r = await fetch('/api/upload/' + profileId, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+    const d = await r.json();
+    log('Upload done: ' + d.uploaded + ' new, ' + d.skipped + ' skipped, ' + d.errors + ' errors');
+    refresh();
+  } catch (e) { log('Upload failed: ' + e.message, true); }
+}
+
+connectSSE();
+refresh();
+</script>
+</body>
+</html>

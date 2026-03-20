@@ -185,15 +185,15 @@ function parseTitle(title: string): {
   cleanPrice: number | null;
 } {
   let cleanPrice: number | null = null;
-  const priceMatch = title.match(/^\$?([\d,]+)/);
+  // Match price at start, stopping at whitespace or end-of-string
+  // This prevents capturing concatenated price+year (e.g. "$800001967")
+  const priceMatch = title.match(/^\$?([\d,]+)(?:\s|$)/);
   if (priceMatch) {
     const priceStr = priceMatch[1].replace(/,/g, "");
-    const yearInPrice = priceStr.match(/(19[2-9]\d|20[0-2]\d)/);
-    if (yearInPrice) {
-      const yearStart = priceStr.indexOf(yearInPrice[1]);
-      cleanPrice = yearStart > 0 ? parseInt(priceStr.slice(0, yearStart), 10) : null;
-    } else if (priceStr.length <= 7) {
-      cleanPrice = parseInt(priceStr, 10);
+    const val = parseInt(priceStr, 10);
+    // Sanity check: real vehicle prices are $100 - $50M
+    if (val >= 100 && val <= 50_000_000) {
+      cleanPrice = val;
     }
   }
 
