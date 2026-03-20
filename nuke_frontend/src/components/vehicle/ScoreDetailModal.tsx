@@ -326,7 +326,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
               padding: '12px',
               background: 'var(--bg)',
               border: '1px solid var(--border)',
-              fontFamily: 'monospace',
+              fontFamily: "'Courier New', monospace",
               fontSize: '12px',
               color: 'var(--text)',
               position: 'relative',

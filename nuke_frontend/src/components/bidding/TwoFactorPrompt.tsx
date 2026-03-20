@@ -310,7 +310,7 @@ export default function TwoFactorPrompt({
               fontSize: '15px',
               fontWeight: 700,
               color: isExpired ? 'var(--error)' : 'var(--warning)',
-              fontFamily: 'monospace'
+              fontFamily: "'Courier New', monospace"
             }}>
               {formatTime(timeRemaining)}
             </span>
@@ -350,7 +350,7 @@ export default function TwoFactorPrompt({
                   width: '100%',
                   padding: '14px 16px',
                   border: '2px solid var(--border)', fontSize: '21px',
-                  fontFamily: 'monospace',
+                  fontFamily: "'Courier New', monospace",
                   textAlign: 'center',
                   letterSpacing: '8px',
                   fontWeight: 600

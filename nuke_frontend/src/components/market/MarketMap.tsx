@@ -470,8 +470,8 @@ export default function MarketMap() {
           <div style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Market Map</div>
           {stats && (
             <div style={{ display: 'flex', gap: '20px', fontSize: '10px', color: 'var(--text-secondary)' }}>
-              <span><b style={{ color: 'var(--text)', fontFamily: 'monospace' }}>{fmtMoney(stats.totalValue)}</b> <small style={{ textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.4px' }}>Total</small></span>
-              <span><b style={{ color: 'var(--text)', fontFamily: 'monospace' }}>{fmtNum(stats.totalCount)}</b> <small style={{ textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.4px' }}>Vehicles</small></span>
+              <span><b style={{ color: 'var(--text)', fontFamily: "'Courier New', monospace" }}>{fmtMoney(stats.totalValue)}</b> <small style={{ textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.4px' }}>Total</small></span>
+              <span><b style={{ color: 'var(--text)', fontFamily: "'Courier New', monospace" }}>{fmtNum(stats.totalCount)}</b> <small style={{ textTransform: 'uppercase', fontSize: '8px', letterSpacing: '0.4px' }}>Vehicles</small></span>
             </div>
           )}
         </div>
@@ -537,11 +537,11 @@ export default function MarketMap() {
           background: 'var(--surface)', border: '1px solid var(--border)', padding: '10px 14px', pointerEvents: 'none', zIndex: 1000,
           minWidth: '180px', maxWidth: '280px', fontSize: '10px', }}>
           <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: '4px', fontSize: '11px' }}>{tooltip.name}</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'monospace', color: 'var(--success)', marginBottom: '8px' }}>{tooltip.value}</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: "'Courier New', monospace", color: 'var(--success)', marginBottom: '8px' }}>{tooltip.value}</div>
           <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '6px 0' }} />
           {tooltip.rows.map((r, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px', color: 'var(--text-disabled)' }}>
-              <span style={{ fontFamily: 'monospace', color: 'var(--text)', fontWeight: 600, fontSize: '10px' }}>{r.pct}</span>
+              <span style={{ fontFamily: "'Courier New', monospace", color: 'var(--text)', fontWeight: 600, fontSize: '10px' }}>{r.pct}</span>
               <span style={{ fontSize: '9px', textAlign: 'right', marginLeft: '12px' }}>{r.label}</span>
             </div>
           ))}

@@ -130,15 +130,15 @@ export default function DeveloperDashboard() {
       {/* Stats Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
         <div style={{ background: 'var(--surface)', border: '2px solid var(--border)', padding: 12 }}>
-          <div style={{ fontSize: 'var(--fs-11, 11px)', fontWeight: 700, fontFamily: 'monospace' }}>{activeKeys.length}</div>
+          <div style={{ fontSize: 'var(--fs-11, 11px)', fontWeight: 700, fontFamily: "'Courier New', monospace" }}>{activeKeys.length}</div>
           <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-8, 8px)' }}>Active Keys</div>
         </div>
         <div style={{ background: 'var(--surface)', border: '2px solid var(--border)', padding: 12 }}>
-          <div style={{ fontSize: 'var(--fs-11, 11px)', fontWeight: 700, fontFamily: 'monospace' }}>{totalRequests.toLocaleString()}</div>
+          <div style={{ fontSize: 'var(--fs-11, 11px)', fontWeight: 700, fontFamily: "'Courier New', monospace" }}>{totalRequests.toLocaleString()}</div>
           <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-8, 8px)' }}>Requests (24h)</div>
         </div>
         <div style={{ background: 'var(--surface)', border: '2px solid var(--border)', padding: 12 }}>
-          <div style={{ fontSize: 'var(--fs-11, 11px)', fontWeight: 700, fontFamily: 'monospace' }}>Free</div>
+          <div style={{ fontSize: 'var(--fs-11, 11px)', fontWeight: 700, fontFamily: "'Courier New', monospace" }}>Free</div>
           <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-8, 8px)' }}>Current Plan</div>
         </div>
       </div>
@@ -149,7 +149,7 @@ export default function DeveloperDashboard() {
           <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--error, #ef4444)' }}>
             Save this key now. You will not see it again.
           </div>
-          <div style={{ fontFamily: 'monospace', fontSize: 'var(--fs-8, 8px)', wordBreak: 'break-all', padding: '8px', background: 'var(--bg)', border: '1px solid var(--border)', marginBottom: 8 }}>
+          <div style={{ fontFamily: "'Courier New', monospace", fontSize: 'var(--fs-8, 8px)', wordBreak: 'break-all', padding: '8px', background: 'var(--bg)', border: '1px solid var(--border)', marginBottom: 8 }}>
             {newKey}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -208,8 +208,8 @@ export default function DeveloperDashboard() {
                   {key.name}
                   {!key.is_active && <span style={{ marginLeft: 6, color: 'var(--error, #ef4444)', fontSize: 'var(--fs-7, 7px)', textTransform: 'uppercase' }}>revoked</span>}
                 </td>
-                <td style={{ padding: '8px', fontFamily: 'monospace' }}>nk_live_{key.key_prefix}...</td>
-                <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{key.requests_24h || 0}</td>
+                <td style={{ padding: '8px', fontFamily: "'Courier New', monospace" }}>nk_live_{key.key_prefix}...</td>
+                <td style={{ padding: '8px', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>{key.requests_24h || 0}</td>
                 <td style={{ padding: '8px', textAlign: 'right', color: 'var(--text-secondary)' }}>
                   {key.last_used_at ? new Date(key.last_used_at).toLocaleDateString() : 'Never'}
                 </td>

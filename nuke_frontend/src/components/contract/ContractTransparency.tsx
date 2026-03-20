@@ -1451,14 +1451,14 @@ function CuratorPanel({
                 {showCode && agentInfo.prompt_template && (
                   <div style={{
                     marginTop: '8px', padding: '10px', background: 'var(--code-bg, #0d1117)', color: 'var(--code-text, #c9d1d9)',
-                    borderRadius: 0, fontSize: '11px', fontFamily: 'monospace', lineHeight: '14px',
+                    borderRadius: 0, fontSize: '11px', fontFamily: "'Courier New', monospace", lineHeight: '14px',
                     maxHeight: '300px', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                   }}>
                     {agentInfo.prompt_template}
                   </div>
                 )}
                 {showCode && !agentInfo.prompt_template && (
-                  <div style={{ marginTop: '8px', padding: '10px', background: 'var(--code-bg, #0d1117)', color: 'var(--code-muted, #8b949e)', borderRadius: 0, fontSize: '11px', fontFamily: 'monospace' }}>
+                  <div style={{ marginTop: '8px', padding: '10px', background: 'var(--code-bg, #0d1117)', color: 'var(--code-muted, #8b949e)', borderRadius: 0, fontSize: '11px', fontFamily: "'Courier New', monospace" }}>
                     // Agent prompt template not published.{'\n'}
                     // Agent ID: {agentInfo.id}{'\n'}
                     // Capabilities: [{agentInfo.capabilities?.join(', ')}]{'\n'}

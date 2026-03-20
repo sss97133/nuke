@@ -38,7 +38,7 @@ const About: React.FC = () => {
               Every vehicle profile processes information through three distinct layers to ensure accuracy and context:
             </p>
             
-            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: "'Courier New', monospace", fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`┌──────────────────────────────────────────────────────────────────────────┐
 │                  THREE-LAYER DATA ARCHITECTURE                           │
 └──────────────────────────────────────────────────────────────────────────┘
@@ -146,7 +146,7 @@ Components:
               Nuke employs a sophisticated knowledge work architecture to process, validate, and enrich vehicle data:
             </p>
             
-            <div style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: "'Courier New', monospace", fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`KNOWLEDGE WORK PIPELINE
 
 [INPUT SOURCES]

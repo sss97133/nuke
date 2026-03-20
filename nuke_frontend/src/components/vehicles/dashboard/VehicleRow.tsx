@@ -143,7 +143,7 @@ export const VehicleRow: React.FC<VehicleRowProps> = ({
           gap: '12px',
           fontSize: '11px',
           color: 'var(--text-muted)',
-          fontFamily: 'monospace'
+          fontFamily: "'Courier New', monospace"
         }}>
           {eventCount !== undefined && (
             <span title="Timeline Events">{eventCount}ev</span>

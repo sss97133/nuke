@@ -214,7 +214,7 @@ export default function SystemStatus() {
           <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '8px', textTransform: 'uppercase' }}>
             TIER 1 ANALYSIS {expandedSection === 'tier1' ? '▼' : '▶'}
           </div>
-          <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: 'monospace' }}>
+          <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: "'Courier New', monospace" }}>
             {stats.images.analyzed.toLocaleString()}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
@@ -254,7 +254,7 @@ export default function SystemStatus() {
           <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '8px', textTransform: 'uppercase' }}>
             LMC CATALOG {expandedSection === 'catalog' ? '▼' : '▶'}
           </div>
-          <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: 'monospace' }}>
+          <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: "'Courier New', monospace" }}>
             {stats.catalog.total_parts.toLocaleString()}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
@@ -285,7 +285,7 @@ export default function SystemStatus() {
           <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '8px', textTransform: 'uppercase' }}>
             VEHICLES {expandedSection === 'vehicles' ? '▼' : '▶'}
           </div>
-          <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: 'monospace' }}>
+          <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: "'Courier New', monospace" }}>
             {stats.vehicles.active.toLocaleString()}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
@@ -316,7 +316,7 @@ export default function SystemStatus() {
           <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '8px', textTransform: 'uppercase' }}>
             AUCTION DATA {expandedSection === 'auctions' ? '▼' : '▶'}
           </div>
-          <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: 'monospace' }}>
+          <div style={{ fontSize: '21px', fontWeight: 700, marginBottom: '4px', fontFamily: "'Courier New', monospace" }}>
             {stats.auctions.comments.toLocaleString()}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
@@ -366,7 +366,7 @@ export default function SystemStatus() {
                     >
                       {expandedSection === 'tier1' && (
                         <>
-                          <td style={{ padding: '6px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{item.id.substring(0, 8)}</td>
+                          <td style={{ padding: '6px', fontFamily: "'Courier New', monospace", color: 'var(--text-secondary)' }}>{item.id.substring(0, 8)}</td>
                           <td style={{ padding: '6px' }}>{item.ai_processing_status || 'pending'}</td>
                           <td style={{ padding: '6px' }}>{item.ai_scan_metadata?.tier_1_analysis?.category || 'unknown'}</td>
                           <td style={{ padding: '6px' }}>{item.ai_scan_metadata?.tier_1_analysis?.angle || 'unknown'}</td>
@@ -374,7 +374,7 @@ export default function SystemStatus() {
                       )}
                       {expandedSection === 'catalog' && (
                         <>
-                          <td style={{ padding: '6px', fontFamily: 'monospace' }}>{item.part_number}</td>
+                          <td style={{ padding: '6px', fontFamily: "'Courier New', monospace" }}>{item.part_number}</td>
                           <td style={{ padding: '6px' }}>{item.name || 'No name'}</td>
                           <td style={{ padding: '6px', fontSize: '9px', color: 'var(--text-secondary)' }}>{item.category || 'Uncategorized'}</td>
                           <td style={{ padding: '6px', fontSize: '9px', color: 'var(--text-secondary)' }}>
@@ -395,7 +395,7 @@ export default function SystemStatus() {
                       )}
                       {expandedSection === 'auctions' && (
                         <>
-                          <td style={{ padding: '6px', fontFamily: 'monospace', fontSize: '11px' }}>{item.id.substring(0, 8)}</td>
+                          <td style={{ padding: '6px', fontFamily: "'Courier New', monospace", fontSize: '11px' }}>{item.id.substring(0, 8)}</td>
                           <td style={{ padding: '6px' }}>{item.outcome || 'unknown'}</td>
                           <td style={{ padding: '6px' }}>${item.high_bid?.toLocaleString() || 'N/A'}</td>
                           <td style={{ padding: '6px', color: 'var(--text-disabled)' }}>{new Date(item.created_at).toLocaleDateString()}</td>
@@ -444,7 +444,7 @@ export default function SystemStatus() {
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <div style={{
                       fontSize: '11px',
-                      fontFamily: 'monospace',
+                      fontFamily: "'Courier New', monospace",
                       color: 'var(--text-secondary)'
                     }}>
                       {img.id.substring(0, 8)}
@@ -492,7 +492,7 @@ export default function SystemStatus() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     <div style={{ 
                       fontSize: '11px', 
-                      fontFamily: 'monospace', 
+                      fontFamily: "'Courier New', monospace", 
                       fontWeight: 600
                     }}>
                       {part.part_number}
@@ -624,7 +624,7 @@ export default function SystemStatus() {
 
             <div style={{ fontSize: '11px', marginBottom: '8px' }}>
               <div style={{ fontWeight: 700, marginBottom: '4px' }}>ID:</div>
-              <div style={{ fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{selectedImage.id}</div>
+              <div style={{ fontFamily: "'Courier New', monospace", color: 'var(--text-secondary)' }}>{selectedImage.id}</div>
             </div>
 
             <div style={{ fontSize: '11px', marginBottom: '8px' }}>

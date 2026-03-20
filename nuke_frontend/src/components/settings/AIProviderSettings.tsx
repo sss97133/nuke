@@ -227,7 +227,7 @@ const AIProviderSettings: React.FC = () => {
                     {provider.provider.toUpperCase()}
                     {provider.is_default && ' (PRIMARY)'}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: "'Courier New', monospace" }}>
                     {(() => {
                       if (!provider.api_key_encrypted) return '••••••••';
                       try {

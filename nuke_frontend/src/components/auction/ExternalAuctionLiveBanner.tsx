@@ -253,7 +253,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
         {/* Timer - with urgency colors (NO YELLOW - BaT uses yellow) */}
         <div
           style={{
-            fontFamily: 'monospace',
+            fontFamily: "'Courier New', monospace",
             fontSize: ['lastMinute', 'critical'].includes(timeState.urgency) ? '11pt' : '9pt',
             fontWeight: 700,
             color: urgencyColors[timeState.urgency].color === 'inherit' ? colors.text : urgencyColors[timeState.urgency].color,

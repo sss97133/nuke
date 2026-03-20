@@ -287,7 +287,7 @@ export const IDHoverCard: React.FC<IDHoverCardProps> = ({
           cursor: 'pointer',
           textDecoration: 'underline',
           textDecorationStyle: 'dotted',
-          fontFamily: 'monospace',
+          fontFamily: "'Courier New', monospace",
           fontSize: 'inherit'
         }}
       >
@@ -332,7 +332,7 @@ export const IDHoverCard: React.FC<IDHoverCardProps> = ({
                     </div>
                   )}
                   {data.vin && (
-                    <div style={{ fontSize: '11px', marginBottom: 'var(--space-1)', fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: '11px', marginBottom: 'var(--space-1)', fontFamily: "'Courier New', monospace" }}>
                       <strong>VIN:</strong> {data.vin}
                     </div>
                   )}
@@ -394,7 +394,7 @@ export const IDHoverCard: React.FC<IDHoverCardProps> = ({
                   <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
                     ID Reference
                   </div>
-                  <div style={{ fontSize: '11px', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                  <div style={{ fontSize: '11px', fontFamily: "'Courier New', monospace", wordBreak: 'break-all' }}>
                     {id}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>

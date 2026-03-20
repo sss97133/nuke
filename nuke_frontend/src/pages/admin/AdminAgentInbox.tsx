@@ -52,7 +52,7 @@ function RolePill({ role }: { role: string }) {
       display: 'inline-block',
       padding: '1px 6px',
       fontSize: '9px',
-      fontFamily: 'monospace',
+      fontFamily: "'Courier New', monospace",
       fontWeight: 600,
       color: 'var(--bg)',
       backgroundColor: roleColor(role), }}>
@@ -158,7 +158,7 @@ export default function AdminAgentInbox() {
         <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>
           Agent Inbox
           {unreadCount > 0 && (
-            <span style={{ marginLeft: 8, color: 'var(--error)', fontFamily: 'monospace' }}>
+            <span style={{ marginLeft: 8, color: 'var(--error)', fontFamily: "'Courier New', monospace" }}>
               {unreadCount} unread (founder)
             </span>
           )}
@@ -249,7 +249,7 @@ export default function AdminAgentInbox() {
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>→</span>
                     <RolePill role={msg.to_role} />
                   </div>
-                  <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace', flexShrink: 0 }}>
+                  <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace", flexShrink: 0 }}>
                     {timeAgo(msg.created_at)}
                   </span>
                 </div>
@@ -301,12 +301,12 @@ export default function AdminAgentInbox() {
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>→</span>
                     <RolePill role={selected.to_role} />
                     {selected.sent_via === 'resend' && (
-                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>
                         (real email)
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: 4, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: 4, fontFamily: "'Courier New', monospace" }}>
                     {new Date(selected.created_at).toLocaleString()}
                     {selected.thread_id && (
                       <span> · thread: {selected.thread_id.slice(0, 8)}</span>
@@ -333,7 +333,7 @@ export default function AdminAgentInbox() {
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
               {thread.length > 1 ? (
                 <div>
-                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: 12, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: 12, fontFamily: "'Courier New', monospace" }}>
                     {thread.length} messages in thread
                   </div>
                   {thread.map((m, idx) => (
@@ -349,7 +349,7 @@ export default function AdminAgentInbox() {
                         <RolePill role={m.from_role} />
                         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>→</span>
                         <RolePill role={m.to_role} />
-                        <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace', marginLeft: 'auto' }}>
+                        <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace", marginLeft: 'auto' }}>
                           {timeAgo(m.created_at)}
                         </span>
                       </div>
@@ -360,7 +360,7 @@ export default function AdminAgentInbox() {
                         wordBreak: 'break-word',
                         lineHeight: 1.5,
                         margin: 0,
-                        fontFamily: 'monospace',
+                        fontFamily: "'Courier New', monospace",
                       }}>
                         {m.body}
                       </pre>
@@ -375,7 +375,7 @@ export default function AdminAgentInbox() {
                   wordBreak: 'break-word',
                   lineHeight: 1.6,
                   margin: 0,
-                  fontFamily: 'monospace',
+                  fontFamily: "'Courier New', monospace",
                 }}>
                   {selected.body}
                 </pre>

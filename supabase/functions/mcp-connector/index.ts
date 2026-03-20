@@ -753,6 +753,45 @@ const TOOLS: ToolDef[] = [
       required: ["vehicle_id", "source_slug", "kind"],
     },
   },
+
+  // ── Auction Readiness ───────────────────────────────────────────────
+  {
+    name: "get_auction_readiness",
+    description:
+      "Get the Auction Readiness Score for a vehicle. Returns a 6-dimension score (0-100) indicating how ready the vehicle is for auction submission, with specific coaching prompts for closing gaps.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vehicle_id: { type: "string", description: "Vehicle UUID" },
+        vin: { type: "string", description: "Vehicle VIN (if no vehicle_id)" },
+      },
+    },
+  },
+  {
+    name: "get_coaching_plan",
+    description:
+      "Get a prioritized coaching plan for improving a vehicle's auction readiness. Returns ordered actions (photo uploads, data entry, narrative writing) with specific prompts and point values.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vehicle_id: { type: "string", description: "Vehicle UUID" },
+      },
+      required: ["vehicle_id"],
+    },
+  },
+  {
+    name: "prepare_listing",
+    description:
+      "Generate a listing package preview for a vehicle. Pulls identity, ordered photos, structured fields, and valuation data into a submission-ready bundle. Vehicle should be TIER 1 or TIER 2.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vehicle_id: { type: "string", description: "Vehicle UUID" },
+        platform: { type: "string", description: "Target platform (default: 'bat')" },
+      },
+      required: ["vehicle_id"],
+    },
+  },
 ];
 
 // =============================================================================

@@ -81,7 +81,7 @@ export default function AdminRalphBrief() {
           <b>Status</b>: {pausedHint ? 'PAUSED' : 'ACTIVE'}
         </div>
         {!pausedHint && (
-          <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+          <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace", whiteSpace: 'pre-wrap' }}>
             Set Supabase Edge Function secret:
             {'\n'}NUKE_ANALYSIS_PAUSED=1
           </div>
@@ -124,7 +124,7 @@ export default function AdminRalphBrief() {
           <div style={{ marginTop: 'var(--space-4)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 'var(--space-4)' }}>
             <div style={{ border: '1px solid var(--border-light)', background: 'var(--grey-50)', padding: 'var(--space-3)' }}>
               <div style={{ fontSize: '11px', fontWeight: 600 }}>Top failing domains</div>
-              <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace', color: 'var(--text)' }}>
+              <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: "'Courier New', monospace", color: 'var(--text)' }}>
                 {(snapshot.triage?.top_failed_domains || []).slice(0, 10).map((d: any, idx: number) => (
                   <div key={idx}>{String(d?.count ?? 0).padStart(4, ' ')}  {String(d?.key || '')}</div>
                 ))}
@@ -134,7 +134,7 @@ export default function AdminRalphBrief() {
 
             <div style={{ border: '1px solid var(--border-light)', background: 'var(--grey-50)', padding: 'var(--space-3)' }}>
               <div style={{ fontSize: '11px', fontWeight: 600 }}>Top error patterns</div>
-              <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace', color: 'var(--text)' }}>
+              <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: "'Courier New', monospace", color: 'var(--text)' }}>
                 {(snapshot.triage?.top_error_patterns || []).slice(0, 10).map((e: any, idx: number) => (
                   <div key={idx}>{String(e?.count ?? 0).padStart(4, ' ')}  {String(e?.key || '')}</div>
                 ))}

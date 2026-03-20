@@ -299,7 +299,7 @@ Or use Supabase CLI:
                 width: '100%',
                 padding: '8px 12px',
                 border: '2px solid var(--text)', fontSize: '12px',
-                fontFamily: 'monospace'
+                fontFamily: "'Courier New', monospace"
               }}
             />
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>

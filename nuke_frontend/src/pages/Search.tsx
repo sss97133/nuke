@@ -773,7 +773,7 @@ export default function Search() {
                   flex: 1,
                   padding: '8px 10px',
                   fontSize: '13px',
-                  fontFamily: 'monospace',
+                  fontFamily: "'Courier New', monospace",
                   border: '2px solid var(--text)',
                   background: 'var(--surface)',
                   letterSpacing: '0.05em',
@@ -839,7 +839,7 @@ export default function Search() {
                         <div style={{ fontSize: '12px', fontWeight: 700 }}>
                           {[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown vehicle'}
                         </div>
-                        <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{v.vin || '—'}</div>
+                        <div style={{ fontSize: '11px', fontFamily: "'Courier New', monospace", color: 'var(--text-secondary)' }}>{v.vin || '—'}</div>
                         {v.color && <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{v.color}{v.mileage ? ` · ${v.mileage.toLocaleString()} mi` : ''}</div>}
                       </div>
                     </a>

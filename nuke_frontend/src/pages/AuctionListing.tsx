@@ -147,7 +147,7 @@ export default function AuctionListing() {
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: '16px', fontWeight: 800 }}>{vehicleTitle}</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 4 }}>Listing: <span style={{ fontFamily: 'monospace' }}>{listing.id}</span></div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 4 }}>Listing: <span style={{ fontFamily: "'Courier New', monospace" }}>{listing.id}</span></div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <span style={{ padding: '4px 8px', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '11px', fontWeight: 700}}>{String(listing.status || '').toUpperCase()}</span>

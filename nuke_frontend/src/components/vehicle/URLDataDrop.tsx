@@ -111,7 +111,7 @@ export const URLDataDrop: React.FC<URLDataDropProps> = ({ vehicleId, onDataImpor
               {previewData.vin && (
                 <>
                   <div style={{ color: 'var(--text-muted)' }}>VIN:</div>
-                  <div style={{ fontWeight: 700, fontFamily: 'monospace' }}>{previewData.vin}</div>
+                  <div style={{ fontWeight: 700, fontFamily: "'Courier New', monospace" }}>{previewData.vin}</div>
                 </>
               )}
               {previewData.year && (

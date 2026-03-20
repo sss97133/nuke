@@ -868,7 +868,7 @@ const AdminMissionControl: React.FC = () => {
           </h2>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {platformHealth.updatedAt && (
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>
                 {platformHealth.updatedAt.toLocaleTimeString()}
               </span>
             )}
@@ -931,7 +931,7 @@ const AdminMissionControl: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
             <div style={{ border: '1px solid var(--border)', background: 'var(--surface)', padding: '10px' }}>
               <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>TOP FAILING DOMAINS</div>
-              <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text)' }}>
+              <div style={{ fontSize: '11px', fontFamily: "'Courier New', monospace", color: 'var(--text)' }}>
                 {(platformHealth.ralphSnapshot.snapshot.triage.top_failed_domains || []).slice(0, 8).map((d: any, idx: number) => (
                   <div key={idx} style={{ color: 'var(--error)' }}>
                     {String(d?.count ?? 0).padStart(4, ' ')}  {String(d?.key || '')}
@@ -944,7 +944,7 @@ const AdminMissionControl: React.FC = () => {
             </div>
             <div style={{ border: '1px solid var(--border)', background: 'var(--surface)', padding: '10px' }}>
               <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>TOP ERROR PATTERNS</div>
-              <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text)' }}>
+              <div style={{ fontSize: '11px', fontFamily: "'Courier New', monospace", color: 'var(--text)' }}>
                 {(platformHealth.ralphSnapshot.snapshot.triage.top_error_patterns || []).slice(0, 8).map((e: any, idx: number) => (
                   <div key={idx} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }} title={String(e?.key || '')}>
                     {String(e?.count ?? 0).padStart(4, ' ')}  {String(e?.key || '')}
@@ -964,7 +964,7 @@ const AdminMissionControl: React.FC = () => {
             <summary style={{ fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
               SOURCE EXTRACTION COVERAGE ({platformHealth.dbStats.details.target_coverage.total_extracted?.toLocaleString()} total)
             </summary>
-            <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '6px', fontSize: '11px', fontFamily: 'monospace' }}>
+            <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '6px', fontSize: '11px', fontFamily: "'Courier New', monospace" }}>
               {(platformHealth.dbStats.details.target_coverage.sources || [])
                 .filter((s: any) => s.extracted > 0)
                 .slice(0, 20)
@@ -1164,7 +1164,7 @@ const AdminMissionControl: React.FC = () => {
                 <tbody>
                   {batDomFieldBreakdown.map((r: any) => (
                     <tr key={String(r.field_key)}>
-                      <td style={{ padding: 8, borderBottom: '1px solid var(--border)', fontFamily: 'monospace' }}>{String(r.field_key)}</td>
+                      <td style={{ padding: 8, borderBottom: '1px solid var(--border)', fontFamily: "'Courier New', monospace" }}>{String(r.field_key)}</td>
                       <td style={{ padding: 8, borderBottom: '1px solid var(--border)', textAlign: 'right' }}>{typeof r.ok_pct === 'number' ? `${r.ok_pct}%` : String(r.ok_pct ?? '—')}</td>
                       <td style={{ padding: 8, borderBottom: '1px solid var(--border)', textAlign: 'right' }}>{String(r.ok_listings ?? '—')}</td>
                       <td style={{ padding: 8, borderBottom: '1px solid var(--border)', textAlign: 'right' }}>{String(r.missing_listings ?? '—')}</td>
@@ -1199,8 +1199,8 @@ const AdminMissionControl: React.FC = () => {
         <div className="card-body">
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>
             Computes a strict BaT “base data” checklist (VIN/specs/location/colors/body_style/sale outcome), writes missing-field reasons into
-            <span style={{ fontFamily: 'monospace' }}> vehicles.origin_metadata.bat_base_check</span>, and re-queues
-            <span style={{ fontFamily: 'monospace' }}> bat_extraction_queue</span> even when status is “complete”.
+            <span style={{ fontFamily: "'Courier New', monospace" }}> vehicles.origin_metadata.bat_base_check</span>, and re-queues
+            <span style={{ fontFamily: "'Courier New', monospace" }}> bat_extraction_queue</span> even when status is “complete”.
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -1652,7 +1652,7 @@ const AdminMissionControl: React.FC = () => {
                         <span style={{ color: 'var(--text-disabled)' }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: 8, borderBottom: '1px solid var(--border)', fontFamily: 'monospace', maxWidth: 520, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.key}>
+                    <td style={{ padding: 8, borderBottom: '1px solid var(--border)', fontFamily: "'Courier New', monospace", maxWidth: 520, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.key}>
                       {r.key}
                     </td>
                     <td style={{ padding: 8, borderBottom: '1px solid var(--border)' }}>
@@ -1849,7 +1849,7 @@ const AdminMissionControl: React.FC = () => {
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', fontFamily: "'Courier New', monospace" }}>
                       ORG: {queue.organization_id.slice(0, 8)}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -1933,7 +1933,7 @@ const AdminMissionControl: React.FC = () => {
                       {event.description || 'No description'}
                     </div>
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-disabled)', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-disabled)', whiteSpace: 'nowrap', fontFamily: "'Courier New', monospace" }}>
                     {new Date(event.created_at).toLocaleString()}
                   </div>
                 </div>

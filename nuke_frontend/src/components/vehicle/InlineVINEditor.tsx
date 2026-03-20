@@ -130,7 +130,7 @@ export const InlineVINEditor: React.FC<InlineVINEditorProps> = ({
           </div>
           <div style={{ 
             fontSize: '13px', 
-            fontFamily: 'monospace',
+            fontFamily: "'Courier New', monospace",
             color: isFakeVIN ? 'var(--warning)' : 'var(--text)'
           }}>
             {displayVIN}
@@ -184,7 +184,7 @@ export const InlineVINEditor: React.FC<InlineVINEditorProps> = ({
           className="form-input"
           style={{
             width: '100%',
-            fontFamily: 'monospace',
+            fontFamily: "'Courier New', monospace",
             border: `2px solid ${error ? 'var(--error)' : 'var(--border)'}`, marginBottom: 'var(--space-2)'
           }}
         />

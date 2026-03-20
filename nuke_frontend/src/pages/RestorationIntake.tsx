@@ -578,7 +578,7 @@ export default function RestorationIntake() {
                             {sub.technician?.display_name || 'Tech'} • {new Date(sub.received_at).toLocaleDateString()}
                           </div>
                           {sub.vehicle?.vin && (
-                            <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                            <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>
                               ...{sub.vehicle.vin.slice(-6)}
                             </div>
                           )}
@@ -663,7 +663,7 @@ export default function RestorationIntake() {
                     const isMaxedOut = code.uses_count >= code.max_uses;
                     return (
                       <tr key={code.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                        <td style={{ padding: 'var(--space-2)', fontFamily: 'monospace', fontWeight: 600 }}>
+                        <td style={{ padding: 'var(--space-2)', fontFamily: "'Courier New', monospace", fontWeight: 600 }}>
                           {code.code}
                         </td>
                         <td style={{ padding: 'var(--space-2)', color: 'var(--text-muted)' }}>
@@ -768,7 +768,7 @@ export default function RestorationIntake() {
                             : '-'
                           }
                         </td>
-                        <td style={{ padding: 'var(--space-2)', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                        <td style={{ padding: 'var(--space-2)', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>
                           {tech.active_vin
                             ? `...${tech.active_vin.slice(-6)}`
                             : '-'
@@ -912,7 +912,7 @@ export default function RestorationIntake() {
                     <div style={{ fontWeight: 600 }}>
                       {selectedSubmission.vehicle.year} {selectedSubmission.vehicle.make} {selectedSubmission.vehicle.model}
                     </div>
-                    <div style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                    <div style={{ fontFamily: "'Courier New', monospace", color: 'var(--text-muted)' }}>
                       {selectedSubmission.vehicle.vin}
                     </div>
                   </div>

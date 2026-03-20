@@ -79,7 +79,7 @@ function CompareTooltip({ active, payload }: any) {
   const diff = d.vehicle - d.market;
   return (
     <div style={{
-      background: 'var(--grey-800, #1f2937)', color: 'var(--bg)', padding: '6px 10px', fontSize: '11px', fontFamily: 'monospace', }}>
+      background: 'var(--grey-800, #1f2937)', color: 'var(--bg)', padding: '6px 10px', fontSize: '11px', fontFamily: "'Courier New', monospace", }}>
       <div>Time: {d.pctTime}%</div>
       <div style={{ color: 'var(--accent)' }}>Vehicle: {d.vehicle}%</div>
       <div style={{ color: 'var(--warning)' }}>Market: {d.market}%</div>

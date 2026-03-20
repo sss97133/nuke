@@ -219,7 +219,7 @@ export const MiniLineChart: React.FC<MiniLineChartProps> = ({
             background: 'var(--grey-800)',
             color: 'var(--white)',
             padding: '2px 6px', fontSize: '9px',
-            fontFamily: 'monospace',
+            fontFamily: "'Courier New', monospace",
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
             zIndex: 10,

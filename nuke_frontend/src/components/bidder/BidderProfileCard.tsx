@@ -47,7 +47,7 @@ function StatRow({ label, value }: { label: string; value: string | number }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '12px' }}>
       <span style={{ color: 'var(--text-muted)' }}>{label}</span>
-      <span style={{ fontWeight: 600, fontFamily: 'monospace' }}>{value}</span>
+      <span style={{ fontWeight: 600, fontFamily: "'Courier New', monospace" }}>{value}</span>
     </div>
   );
 }
@@ -262,7 +262,7 @@ export default function BidderProfileCard({ username, isOpen, onClose }: BidderP
                       }}
                     >
                       <span>{a.year} {a.make} {a.model}</span>
-                      <span style={{ fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontFamily: "'Courier New', monospace", display: 'flex', alignItems: 'center', gap: 6 }}>
                         {formatUsd(a.highest_bid)}
                         {a.won && (
                           <span style={{ color: 'var(--success)', fontSize: '9px', fontWeight: 700 }}>WON</span>

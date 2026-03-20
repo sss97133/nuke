@@ -110,7 +110,7 @@ const TestContributions: React.FC = () => {
                 
                 <div style={{ marginTop: 16 }}>
                   <h4>Recent Contributions</h4>
-                  <div style={{ fontSize: 12, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: 12, fontFamily: "'Courier New', monospace" }}>
                     {contributions.slice(0, 10).map((contrib, i) => (
                       <div key={i}>
                         {contrib.contribution_date}: {contrib.contribution_type} ({contrib.contribution_count})

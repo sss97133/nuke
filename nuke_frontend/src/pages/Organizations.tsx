@@ -589,7 +589,7 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
             color: '#00ff00',
             padding: '2px 7px', fontSize: '9px',
             fontWeight: 700,
-            fontFamily: 'monospace',
+            fontFamily: "'Courier New', monospace",
           }}>
             ${org.stock_symbol}
           </div>

@@ -95,7 +95,7 @@ function BidTooltip({ active, payload }: any) {
   if (!d) return null;
   return (
     <div style={{
-      background: 'var(--grey-800, #1f2937)', color: 'var(--bg)', padding: '4px 8px', fontSize: '11px', fontFamily: 'monospace', }}>
+      background: 'var(--grey-800, #1f2937)', color: 'var(--bg)', padding: '4px 8px', fontSize: '11px', fontFamily: "'Courier New', monospace", }}>
       <div style={{ fontWeight: 700 }}>{formatUsd(d.amount)}</div>
       <div style={{ opacity: 0.7 }}>{d.username} &middot; {formatTime(d.timestamp)}</div>
       {d.jump > 0 && <div style={{ color: 'var(--success)' }}>+{formatUsd(d.jump)}</div>}
@@ -355,11 +355,11 @@ export default function VehicleBidCard({ vehicleId, make, model, onBidderClick }
                           </span>
                         )}
                       </td>
-                      <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, fontFamily: 'monospace' }}>
+                      <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, fontFamily: "'Courier New', monospace" }}>
                         {formatUsd(b.amount)}
                       </td>
                       <td style={{
-                        padding: '4px 6px', textAlign: 'right', fontFamily: 'monospace',
+                        padding: '4px 6px', textAlign: 'right', fontFamily: "'Courier New', monospace",
                         color: b.jump > 0 ? 'var(--success)' : 'var(--text-muted)',
                       }}>
                         {b.jump > 0 ? `+${formatUsd(b.jump)}` : '—'}

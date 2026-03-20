@@ -254,7 +254,7 @@ export default function ApiKeysPage() {
             gap: '8px',
             background: 'var(--bg)',
             padding: '12px',
-            fontFamily: 'monospace',
+            fontFamily: "'Courier New', monospace",
             fontSize: '13px',
           }}>
             <code style={{ flex: 1, wordBreak: 'break-all' }}>{newlyCreatedKey.key}</code>

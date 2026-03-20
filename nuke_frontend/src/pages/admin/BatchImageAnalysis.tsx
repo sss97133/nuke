@@ -179,7 +179,7 @@ export default function BatchImageAnalysis() {
               style={{
                 width: '100%',
                 fontSize: '11px',
-                fontFamily: 'monospace'
+                fontFamily: "'Courier New', monospace"
               }}
             />
           </div>
@@ -332,7 +332,7 @@ export default function BatchImageAnalysis() {
               border: '2px solid var(--error)',
               background: 'var(--bg)',
               fontSize: '11px',
-              fontFamily: 'monospace'
+              fontFamily: "'Courier New', monospace"
             }}>
               <div className="card-body">
                 {result.error}
@@ -352,7 +352,7 @@ export default function BatchImageAnalysis() {
                     background: 'var(--bg)',
                     marginBottom: '8px',
                     fontSize: '11px',
-                    fontFamily: 'monospace'
+                    fontFamily: "'Courier New', monospace"
                   }}>
                     <div className="card-body">
                       <div><strong>Image:</strong> {failure.image_id}</div>

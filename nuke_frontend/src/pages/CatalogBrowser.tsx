@@ -303,7 +303,7 @@ export default function CatalogBrowser() {
                 <div style={{ 
                   fontSize: '13px', 
                   fontWeight: 700, 
-                  fontFamily: 'monospace',
+                  fontFamily: "'Courier New', monospace",
                   marginBottom: '4px'
                 }}>
                   {part.part_number}

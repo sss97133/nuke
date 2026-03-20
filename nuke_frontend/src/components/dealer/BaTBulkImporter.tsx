@@ -193,7 +193,7 @@ const BaTBulkImporter: React.FC<Props> = ({
                 width: '100%',
                 padding: '8px',
                 fontSize: '12px',
-                border: '1px solid var(--border)', fontFamily: 'monospace'
+                border: '1px solid var(--border)', fontFamily: "'Courier New', monospace"
               }}
               disabled={importing}
             />

@@ -47,7 +47,7 @@ const GlobalUploadIndicator: React.FC = () => {
         borderColor: 'var(--bg) var(--text-disabled) var(--text-disabled) var(--bg)',
         cursor: 'pointer',
         fontSize: '11px',
-        fontFamily: 'monospace',
+        fontFamily: "'Courier New', monospace",
         userSelect: 'none'
       }}
     >
@@ -100,7 +100,7 @@ const GlobalUploadIndicator: React.FC = () => {
           borderColor: 'var(--bg) var(--text) var(--text) var(--bg)',
           padding: '4px',
           fontSize: '10px',
-          fontFamily: 'monospace',
+          fontFamily: "'Courier New', monospace",
           zIndex: 10001}}>
           <div style={{ 
             backgroundColor: 'var(--accent)',

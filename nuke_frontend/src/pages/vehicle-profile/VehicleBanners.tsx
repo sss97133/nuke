@@ -42,7 +42,7 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
                 {missing.length > 0 && (
                   <div style={{ marginTop: 6 }}>
                     <span style={{ fontWeight: 700 }}>Missing:</span>{' '}
-                    <span style={{ fontFamily: 'monospace' }}>{missing.join(', ')}</span>
+                    <span style={{ fontFamily: "'Courier New', monospace" }}>{missing.join(', ')}</span>
                   </div>
                 )}
                 <div style={{ marginTop: 6, fontSize: '11px', color: 'var(--text-muted)' }}>

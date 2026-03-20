@@ -456,7 +456,7 @@ export default function TransfersDashboard() {
                       {!t.seller_handle && !t.buyer_handle && <span style={{ color: 'var(--border)' }}>No party info</span>}
                     </div>
                     {t.inbox_email && (
-                      <div style={{ fontSize: '10px', color: 'var(--border)', marginTop: '2px', fontFamily: 'monospace' }}>{t.inbox_email}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--border)', marginTop: '2px', fontFamily: "'Courier New', monospace" }}>{t.inbox_email}</div>
                     )}
                   </div>
 

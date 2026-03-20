@@ -542,7 +542,7 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
           placeholder="Enter VIN or chassis ID"
           maxLength={17}
           style={{ 
-            fontFamily: 'monospace', 
+            fontFamily: "'Courier New', monospace", 
             fontSize: '16px',
             letterSpacing: '2px'
           }}

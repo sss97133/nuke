@@ -173,7 +173,7 @@ export default function StorefrontInventory({ organization }: Props) {
                       {v.transmission && <span>{v.transmission}</span>}
                     </div>
                     {formatPrice(v) && (
-                      <span style={{ fontSize: 'var(--fs-9, 9px)', fontWeight: 700, color: 'var(--accent)', fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: 'var(--fs-9, 9px)', fontWeight: 700, color: 'var(--accent)', fontFamily: "'Courier New', monospace" }}>
                         {formatPrice(v)}
                       </span>
                     )}

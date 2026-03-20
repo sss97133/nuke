@@ -192,7 +192,7 @@ export default function DropboxImporter({ organizationId, isOwner }: DropboxImpo
               color: 'var(--text-secondary)'
             }}>
               <div style={{ fontWeight: 700, marginBottom: '8px' }}>Expected folder structure:</div>
-              <div style={{ fontFamily: 'monospace', fontSize: '9px' }}>
+              <div style={{ fontFamily: "'Courier New', monospace", fontSize: '9px' }}>
                 /Viva Inventory/<br />
                 &nbsp;&nbsp;├── /In Stock/<br />
                 &nbsp;&nbsp;│   ├── /1977 K5 Blazer - #VIN123/<br />

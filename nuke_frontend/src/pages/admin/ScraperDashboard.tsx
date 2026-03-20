@@ -688,7 +688,7 @@ export default function ScraperDashboard() {
                     display: 'flex',
                     justifyContent: 'space-between'
                   }}>
-                    <span style={{ fontFamily: 'monospace' }}>{scraper.functionName}</span>
+                    <span style={{ fontFamily: "'Courier New', monospace" }}>{scraper.functionName}</span>
                     {scraper.lastRun && (
                       <span>{new Date(scraper.lastRun).toLocaleTimeString()}</span>
                     )}

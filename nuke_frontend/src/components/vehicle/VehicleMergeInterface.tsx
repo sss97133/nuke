@@ -211,7 +211,7 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
                 )}
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   {proposal.primary_vehicle?.vin ? (
-                    <div style={{ fontFamily: 'monospace', marginBottom: '4px' }}>
+                    <div style={{ fontFamily: "'Courier New', monospace", marginBottom: '4px' }}>
                       VIN: {proposal.primary_vehicle.vin}
                     </div>
                   ) : (
@@ -254,7 +254,7 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
                 )}
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   {proposal.duplicate_vehicle?.vin ? (
-                    <div style={{ fontFamily: 'monospace', marginBottom: '4px' }}>
+                    <div style={{ fontFamily: "'Courier New', monospace", marginBottom: '4px' }}>
                       VIN: {proposal.duplicate_vehicle.vin}
                     </div>
                   ) : (

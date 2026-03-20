@@ -196,7 +196,7 @@ export default function DeveloperSignup() {
             Save this key now. You will not be able to see it again.
           </p>
 
-          <div style={{ background: 'var(--surface)', border: '2px solid var(--border)', padding: 12, fontFamily: 'monospace', fontSize: 'var(--fs-8, 8px)', wordBreak: 'break-all', marginBottom: 8 }}>
+          <div style={{ background: 'var(--surface)', border: '2px solid var(--border)', padding: 12, fontFamily: "'Courier New', monospace", fontSize: 'var(--fs-8, 8px)', wordBreak: 'break-all', marginBottom: 8 }}>
             {apiKey}
           </div>
 
@@ -213,7 +213,7 @@ export default function DeveloperSignup() {
           </button>
 
           <h2 style={{ fontSize: 'var(--fs-10, 10px)', fontWeight: 700, marginBottom: 12 }}>Quick Start</h2>
-          <div style={{ background: 'var(--surface)', border: '2px solid var(--border)', padding: 12, fontFamily: 'monospace', fontSize: 'var(--fs-8, 8px)', whiteSpace: 'pre', overflow: 'auto', marginBottom: 24, lineHeight: 1.6 }}>
+          <div style={{ background: 'var(--surface)', border: '2px solid var(--border)', padding: 12, fontFamily: "'Courier New', monospace", fontSize: 'var(--fs-8, 8px)', whiteSpace: 'pre', overflow: 'auto', marginBottom: 24, lineHeight: 1.6 }}>
 {`npm install @nuke1/sdk
 
 import Nuke from '@nuke1/sdk';

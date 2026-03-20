@@ -487,7 +487,7 @@ const DealerBulkEditor: React.FC = () => {
                       padding: '4px',
                       fontSize: '11px',
                       border: '1px solid var(--border)',
-                      fontFamily: 'monospace'
+                      fontFamily: "'Courier New', monospace"
                     }}
                     placeholder="VIN/chassis ID"
                     maxLength={17}

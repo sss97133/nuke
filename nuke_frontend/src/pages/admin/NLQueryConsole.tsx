@@ -230,7 +230,7 @@ export default function NLQueryConsole() {
           Query Chat
         </h1>
         <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          Chat to query <span style={{ fontFamily: 'monospace' }}>public.vehicles</span>. Results and SQL are shown on the right.
+          Chat to query <span style={{ fontFamily: "'Courier New', monospace" }}>public.vehicles</span>. Results and SQL are shown on the right.
         </p>
       </div>
 

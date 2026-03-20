@@ -77,7 +77,7 @@ function NavBadge({ count }: { count: number }) {
       padding: '0 5px',
       fontSize: '9px',
       fontWeight: 700,
-      fontFamily: 'monospace',
+      fontFamily: "'Courier New', monospace",
       color: 'var(--surface-elevated)',
       backgroundColor: 'var(--error-dark, var(--error))', lineHeight: '14px',
       verticalAlign: 'middle',
@@ -173,14 +173,14 @@ function Section({
             }}
             title={collapsed ? 'Expand' : 'Collapse'}
           >
-            <span style={{ fontFamily: 'monospace' }}>{collapsed ? '+' : '-'}</span>
+            <span style={{ fontFamily: "'Courier New', monospace" }}>{collapsed ? '+' : '-'}</span>
             <span>{title}</span>
-            <span style={{ fontFamily: 'monospace', opacity: 0.7 }}>({items.length})</span>
+            <span style={{ fontFamily: "'Courier New', monospace", opacity: 0.7 }}>({items.length})</span>
             {sectionTotal > 0 && <NavBadge count={sectionTotal} />}
           </button>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {title} <span style={{ fontFamily: 'monospace', opacity: 0.7 }}>({items.length})</span>
+            {title} <span style={{ fontFamily: "'Courier New', monospace", opacity: 0.7 }}>({items.length})</span>
             {sectionTotal > 0 && <NavBadge count={sectionTotal} />}
           </div>
         )}
@@ -363,7 +363,7 @@ export default function AdminShell() {
             />
           </div>
           <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
-            Tip: press <span style={{ fontFamily: 'monospace' }}>⌘K</span> to focus.
+            Tip: press <span style={{ fontFamily: "'Courier New', monospace" }}>⌘K</span> to focus.
           </div>
         </div>
 
@@ -381,7 +381,7 @@ export default function AdminShell() {
               justifyContent: 'space-between',
               gap: 'var(--space-2)',
             }}>
-              <div>Search results <span style={{ fontFamily: 'monospace', opacity: 0.7 }}>({searchResults.length})</span></div>
+              <div>Search results <span style={{ fontFamily: "'Courier New', monospace", opacity: 0.7 }}>({searchResults.length})</span></div>
               <button
                 type="button"
                 onClick={() => setQuery('')}
@@ -411,7 +411,7 @@ export default function AdminShell() {
                       {item.label}
                       {item.countKey && navCounts[item.countKey] > 0 && <NavBadge count={navCounts[item.countKey]} />}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{item._section}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>{item._section}</div>
                   </div>
                   {item.description ? (
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{item.description}</div>
@@ -435,7 +435,7 @@ export default function AdminShell() {
               counts={navCounts}
               collapsed={!showTools}
               onToggle={() => setShowTools((v) => !v)}
-              right={<span style={{ fontFamily: 'monospace' }}>{showTools ? 'shown' : 'hidden'}</span>}
+              right={<span style={{ fontFamily: "'Courier New', monospace" }}>{showTools ? 'shown' : 'hidden'}</span>}
             />
             <Section
               title="Experimental"
@@ -443,7 +443,7 @@ export default function AdminShell() {
               counts={navCounts}
               collapsed={!showExperimental}
               onToggle={() => setShowExperimental((v) => !v)}
-              right={<span style={{ fontFamily: 'monospace' }}>{showExperimental ? 'shown' : 'hidden'}</span>}
+              right={<span style={{ fontFamily: "'Courier New', monospace" }}>{showExperimental ? 'shown' : 'hidden'}</span>}
             />
           </>
         )}

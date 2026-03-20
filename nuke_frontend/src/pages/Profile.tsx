@@ -804,7 +804,7 @@ const Profile: React.FC = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                       {!profileData.completion?.avatar_uploaded && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '11px' }}>
-                          <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>[ ]</span>
+                          <span style={{ color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>[ ]</span>
                           <button
                             style={{ all: 'unset', cursor: 'pointer', color: 'var(--text)', textDecoration: 'underline' }}
                             onClick={() => setShowProfileDetails(true)}
@@ -815,7 +815,7 @@ const Profile: React.FC = () => {
                       )}
                       {!profileData.completion?.bio_added && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '11px' }}>
-                          <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>[ ]</span>
+                          <span style={{ color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>[ ]</span>
                           <button
                             style={{ all: 'unset', cursor: 'pointer', color: 'var(--text)', textDecoration: 'underline' }}
                             onClick={() => setShowProfileDetails(true)}
@@ -826,7 +826,7 @@ const Profile: React.FC = () => {
                       )}
                       {!profileData.completion?.first_vehicle_added && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '11px' }}>
-                          <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>[ ]</span>
+                          <span style={{ color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>[ ]</span>
                           <button
                             style={{ all: 'unset', cursor: 'pointer', color: 'var(--text)', textDecoration: 'underline' }}
                             onClick={() => navigate('/vehicle/add')}

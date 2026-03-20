@@ -969,7 +969,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             >
               <span>{context?.inserted_by_name || provenance?.inserted_by_name || 'Unknown'}</span>
               {provenance?.inserted_at && (
-                <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>
                   {new Date(provenance.inserted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   {' '}
                   {new Date(provenance.inserted_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
@@ -1216,7 +1216,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                         <span style={{
                           fontWeight: 700,
                           color: idx === 0 ? 'var(--success)' : 'var(--text)',
-                          fontFamily: 'monospace'
+                          fontFamily: "'Courier New', monospace"
                         }}>
                           ${bid.amount.toLocaleString()}
                         </span>

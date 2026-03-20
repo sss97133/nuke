@@ -94,7 +94,7 @@ export const AsciiAvatar: React.FC<AsciiAvatarProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontFamily: 'monospace',
+          fontFamily: "'Courier New', monospace",
           whiteSpace: 'pre',
           textAlign: 'center',
           transform: 'scale(0.7)',

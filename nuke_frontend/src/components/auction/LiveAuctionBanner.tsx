@@ -294,7 +294,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
             <span style={{ color: 'var(--text-muted)' }}>•</span>
             <span
               style={{
-                fontFamily: 'monospace',
+                fontFamily: "'Courier New', monospace",
                 color: urgencyColors[urgencyLevel].color,
                 textShadow: urgencyColors[urgencyLevel].glow || 'none',
                 fontWeight: ['lastMinute', 'critical', 'urgent'].includes(urgencyLevel) ? 700 : 400,
@@ -328,7 +328,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
               BID NOW
             </button>
           ) : (
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>
               settling…
             </span>
           )}

@@ -392,7 +392,7 @@ export default function ImportDataPage() {
                           justifyContent: 'center',
                           background: 'var(--bg)',
                           fontSize: '11px',
-                          fontFamily: 'monospace',
+                          fontFamily: "'Courier New', monospace",
                           color: 'var(--accent)',
                         }}>
                           {getFileIcon(upload.file)}
