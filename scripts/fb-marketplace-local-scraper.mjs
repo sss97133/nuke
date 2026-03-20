@@ -453,6 +453,25 @@ const MOTORCYCLE_MODEL_PATTERNS = [
  * Classify a vehicle as auto or non-auto, and return a vehicle type.
  * Returns { isAuto: bool, vehicleType: string|null }
  */
+function deriveBodyStyle(text) {
+  if (!text) return null;
+  const t = text.toLowerCase();
+  const patterns = [
+    [/\b(coupe|coupé|berlinetta|fastback)\b/, "Coupe"],
+    [/\b(convertible|cabriolet|roadster|spider|spyder|targa|speedster)\b/, "Convertible"],
+    [/\b(sedan|saloon|berlina)\b/, "Sedan"],
+    [/\b(wagon|estate|touring|avant|sportwagen)\b/, "Wagon"],
+    [/\b(hatchback)\b/, "Hatchback"],
+    [/\b(pickup|truck|f-150|f-250|f-350|silverado|sierra|ram|ranger|tacoma|tundra|k10|k20|k30|c10|c20|c30|k1500|k2500|k3500|c1500|c2500|c3500|s10|s15|colorado|canyon|el camino|ranchero|power wagon|dakota|comanche)\b/, "Truck"],
+    [/\b(suv|wrangler|bronco|blazer|tahoe|suburban|4runner|land cruiser|defender|range rover|cayenne|k5|scout|jimmy|ramcharger|yukon|expedition|explorer|cherokee|wagoneer|fj40|fj60|fj80|trooper|samurai)\b/, "SUV"],
+    [/\b(van|minivan|bus|transporter|vanagon)\b/, "Van"],
+  ];
+  for (const [re, value] of patterns) {
+    if (re.test(t)) return value;
+  }
+  return null;
+}
+
 function classifyVehicle(make, model) {
   if (!make) return { isAuto: false, vehicleType: null };
   const makeLc = make.toLowerCase().trim();
@@ -909,6 +928,8 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
       asking_price: price ? Math.round(price) : null,
       description: description || null,
       listing_location: location,
+      city: city || null,
+      state: state || null,
       gps_latitude: listingLat,
       gps_longitude: listingLng,
       status: isAuto ? "active" : "rejected",
@@ -919,6 +940,10 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
     // Classify at extraction time so the feed can filter/sort
     if (vehicleType) insertData.canonical_vehicle_type = vehicleType;
     if (signal > 0) insertData.discovery_priority = signal;
+    // Derive body_style from model name
+    const titleForBody = `${model || ''} ${make || ''}`;
+    const bodyStyle = deriveBodyStyle(titleForBody);
+    if (bodyStyle) insertData.body_style = bodyStyle;
 
     const { data: newVeh, error: vehErr } = await supabase
       .from("vehicles")
