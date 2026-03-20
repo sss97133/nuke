@@ -600,5 +600,143 @@ export class PersonalPhotoLibraryService {
 
     return counts;
   }
+
+  /**
+   * Cursor-based paginated photo fetch for virtualized grid.
+   * Uses (created_at, id) keyset for stable pagination.
+   */
+  static async getPhotosCursorPaginated(params: {
+    cursor?: { created_at: string; id: string };
+    limit?: number;
+    filterStatus?: string;
+    filterAngle?: string;
+    hideOrganized?: boolean;
+  }): Promise<{ photos: PersonalPhoto[]; totalCount: number }> {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) {
+      throw new Error('Not authenticated');
+    }
+
+    const userId = session.session.user.id;
+    const limit = params.limit || 200;
+
+    let query = supabase
+      .from('vehicle_images')
+      .select('*', { count: 'exact' })
+      .eq('user_id', userId)
+      .is('vehicle_id', null);
+
+    // Organization filter
+    if (params.hideOrganized !== false) {
+      query = query.or('organization_status.eq.unorganized,organization_status.is.null');
+    } else {
+      query = query.or('organization_status.eq.unorganized,organization_status.is.null,organization_status.eq.ignored');
+    }
+
+    // AI status filter
+    if (params.filterStatus) {
+      if (params.filterStatus === 'ai_complete') {
+        query = query.or('ai_processing_status.eq.complete,ai_processing_status.eq.completed');
+      } else if (params.filterStatus === 'ai_pending') {
+        query = query.eq('ai_processing_status', 'pending');
+      } else if (params.filterStatus === 'ai_processing') {
+        query = query.eq('ai_processing_status', 'processing');
+      } else if (params.filterStatus === 'ai_failed') {
+        query = query.eq('ai_processing_status', 'failed');
+      } else if (params.filterStatus === 'vehicle_found') {
+        query = query.not('ai_detected_vehicle', 'is', null);
+      } else if (params.filterStatus === 'no_vehicle') {
+        query = query.is('ai_detected_vehicle', null);
+      } else if (params.filterStatus.startsWith('angle_')) {
+        const angle = params.filterStatus.replace('angle_', '');
+        query = query.ilike('ai_detected_angle', `%${angle}%`);
+      }
+    }
+
+    // Cursor-based pagination: fetch rows older than cursor
+    if (params.cursor) {
+      query = query.or(
+        `created_at.lt.${params.cursor.created_at},` +
+        `and(created_at.eq.${params.cursor.created_at},id.lt.${params.cursor.id})`
+      );
+    }
+
+    query = query
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(limit);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      console.error('Error fetching paginated photos:', error);
+      throw error;
+    }
+
+    return {
+      photos: (data || []).map((img: any) => ({
+        ...img,
+        album_count: 0, // Skip album counts for perf — fetch on demand
+      })),
+      totalCount: count || 0,
+    };
+  }
+
+  /**
+   * Get photo counts grouped by month for the timeline scrubber.
+   * Returns [{month: '2024-06', count: 342}, ...] sorted newest first.
+   */
+  static async getPhotoDateSummary(
+    hideOrganized = true
+  ): Promise<Array<{ month: string; count: number }>> {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) {
+      throw new Error('Not authenticated');
+    }
+
+    const userId = session.session.user.id;
+
+    // Use raw SQL via RPC for date_trunc grouping
+    const { data, error } = await supabase.rpc('get_photo_date_summary', {
+      p_user_id: userId,
+      p_hide_organized: hideOrganized,
+    });
+
+    if (!error && data) {
+      return data as Array<{ month: string; count: number }>;
+    }
+
+    // Fallback: fetch created_at values and group client-side
+    console.warn('[PhotoLibrary] RPC get_photo_date_summary not available, using fallback');
+    let query = supabase
+      .from('vehicle_images')
+      .select('created_at')
+      .eq('user_id', userId)
+      .is('vehicle_id', null);
+
+    if (hideOrganized) {
+      query = query.or('organization_status.eq.unorganized,organization_status.is.null');
+    }
+
+    const { data: rows, error: fallbackError } = await query
+      .order('created_at', { ascending: false });
+
+    if (fallbackError) {
+      console.error('Error fetching date summary:', fallbackError);
+      return [];
+    }
+
+    const monthCounts: Record<string, number> = {};
+    for (const row of rows || []) {
+      const month = (row.created_at || '').substring(0, 7); // '2024-06'
+      if (month) {
+        monthCounts[month] = (monthCounts[month] || 0) + 1;
+      }
+    }
+
+    return Object.entries(monthCounts)
+      .map(([month, count]) => ({ month, count }))
+      .sort((a, b) => b.month.localeCompare(a.month));
+  }
 }
 

@@ -6,10 +6,11 @@
  * Version: 2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { PersonalPhotoLibraryService } from '../services/personalPhotoLibraryService';
-import type { PersonalPhoto, VehicleSuggestion } from '../services/personalPhotoLibraryService';
+import type { VehicleSuggestion } from '../services/personalPhotoLibraryService';
 import { ImageUploadService } from '../services/imageUploadService';
 import { supabase } from '../lib/supabase';
 import { readCachedSession } from '../utils/cachedSession';
@@ -17,34 +18,45 @@ import { ImageSetService } from '../services/imageSetService';
 import type { ImageSet } from '../services/imageSetService';
 import { useToast } from '../hooks/useToast';
 import { InputDialog } from '../components/common/InputDialog';
-
-type GridDensity = 'small' | 'medium' | 'large';
+import { usePhotoLibrary } from '../hooks/usePhotoLibrary';
+import { PhotoGrid } from '../components/photos/PhotoGrid';
+import { TimelineScrubber } from '../components/photos/TimelineScrubber';
+import { QuickLook } from '../components/photos/QuickLook';
+import { usePersistedState } from '../hooks/usePersistedState';
+import type { Virtualizer } from '@tanstack/react-virtual';
 
 export const PersonalPhotoLibrary: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  
-  // Core data
-  const [allPhotos, setAllPhotos] = useState<PersonalPhoto[]>([]);
-  const [displayPhotos, setDisplayPhotos] = useState<PersonalPhoto[]>([]);
+  const queryClient = useQueryClient();
+  const virtualizerRef = useRef<Virtualizer<HTMLDivElement, Element> | null>(null);
+
+  // Core data — photos come from usePhotoLibrary (virtualized infinite query)
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<VehicleSuggestion[]>([]);
   const [loading, setLoading] = useState(() => readCachedSession() === null);
   const [personalAlbums, setPersonalAlbums] = useState<ImageSet[]>([]);
   
-  // UI state  
-  const [hideOrganized, setHideOrganized] = useState(true); // Default: hide organized photos
+  // UI state — persisted across sessions
+  const [hideOrganized, setHideOrganized] = usePersistedState('nuke:photolib:hideOrganized', true);
+  const [gridColumns, setGridColumns] = usePersistedState<number>('nuke:photolib:columns', 5);
+  const [sidebarCollapsed, setSidebarCollapsed] = usePersistedState('nuke:photolib:sidebar', false);
+
+  // UI state — transient
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  const [gridDensity, setGridDensity] = useState<GridDensity>('medium');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [vehicleSearch, setVehicleSearch] = useState('');
   const [activeVehicleId, setActiveVehicleId] = useState<string | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Drag-and-drop state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
   const [isTouchSelecting, setIsTouchSelecting] = useState(false);
   const [touchVisitedIds, setTouchVisitedIds] = useState<Set<string>>(new Set());
-  const [aiStatusCollapsed, setAiStatusCollapsed] = useState(false);
+  const [aiStatusCollapsed, setAiStatusCollapsed] = useState(true); // collapsed by default, expands when counts load
+  const [quickLookPhotoId, setQuickLookPhotoId] = useState<string | null>(null);
   const [showRestartWizard, setShowRestartWizard] = useState(false);
   const [showSubmitWizard, setShowSubmitWizard] = useState(false);
   const [submitVehicleId, setSubmitVehicleId] = useState<string | null>(null);
@@ -75,105 +87,174 @@ export const PersonalPhotoLibrary: React.FC = () => {
 
   const isAiCompleted = (status?: string | null) => status === 'complete' || status === 'completed';
 
+  // Virtualized infinite photo query — replaces allPhotos/displayPhotos/loadData/applyFilters
+  const {
+    photos: displayPhotos,
+    totalCount,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+    isLoading: photosLoading,
+    refetch: refetchPhotos,
+  } = usePhotoLibrary({
+    hideOrganized,
+    filterStatus: activeFilter,
+  });
+
+  // Sticky date label state
+  const [currentDateLabel, setCurrentDateLabel] = useState<string | null>(null);
+
+  // Timeline scrubber data
+  const [dateSummary, setDateSummary] = useState<Array<{ month: string; count: number }>>([]);
+
+  // Map month → first virtual row index (computed from displayPhotos)
+  const monthToRowIndex = React.useMemo(() => {
+    const map = new Map<string, number>();
+    // Simplified: we store month labels and their first occurrence index
+    // PhotoGrid builds its own date groups, so this is for the scrubber jump
+    const monthFormatter = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long' });
+    let currentMonth = '';
+    let virtualRowIdx = 0;
+    const columns = gridColumns;
+
+    for (let i = 0; i < displayPhotos.length; i++) {
+      const photo = displayPhotos[i];
+      const dateStr = photo.taken_at || photo.created_at;
+      const month = dateStr ? monthFormatter.format(new Date(dateStr)) : 'Unknown';
+      const monthKey = dateStr ? dateStr.substring(0, 7) : 'unknown';
+
+      if (month !== currentMonth) {
+        // Header row
+        if (!map.has(monthKey)) {
+          map.set(monthKey, virtualRowIdx);
+        }
+        virtualRowIdx++; // header row
+        currentMonth = month;
+        // Photo rows for this group start here
+      }
+    }
+    return map;
+  }, [displayPhotos, gridColumns]);
+
+  // Load sidebar data (stats, vehicles, suggestions, albums) — separate from photos
   useEffect(() => {
-    loadData();
+    loadSidebarData();
   }, []);
 
+  // Load date summary for timeline scrubber
   useEffect(() => {
-    applyFilters();
-  }, [allPhotos, hideOrganized, activeFilter]);
+    PersonalPhotoLibraryService.getPhotoDateSummary(hideOrganized)
+      .then(setDateSummary)
+      .catch(console.error);
+  }, [hideOrganized]);
+
+  // QuickLook navigation helpers
+  const quickLookNavigate = useCallback(
+    (direction: 1 | -1) => {
+      setQuickLookPhotoId((currentId) => {
+        if (!currentId) return null;
+        const idx = displayPhotos.findIndex((p) => p.id === currentId);
+        if (idx < 0) return currentId;
+        const nextIdx = idx + direction;
+        if (nextIdx >= 0 && nextIdx < displayPhotos.length) {
+          return displayPhotos[nextIdx].id;
+        }
+        return currentId;
+      });
+    },
+    [displayPhotos],
+  );
 
   useEffect(() => {
-    // Keyboard shortcuts
-    const handler = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't capture when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
       if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
         e.preventDefault();
         setSelectedPhotos(new Set(displayPhotos.map(p => p.id)));
+        return;
       }
       if (e.key === 'Escape') {
-        setSelectedPhotos(new Set());
+        // Close QuickLook first, then clear selection
+        if (quickLookPhotoId) {
+          setQuickLookPhotoId(null);
+        } else {
+          setSelectedPhotos(new Set());
+        }
+        return;
+      }
+      // Spacebar quick-look: toggle preview for last-clicked/selected photo
+      if (e.key === ' ' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setQuickLookPhotoId((prev) => {
+          if (prev) return null;
+          const sel = Array.from(selectedPhotos);
+          return sel.length > 0 ? sel[sel.length - 1] : null;
+        });
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [displayPhotos]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [displayPhotos, selectedPhotos, quickLookPhotoId]);
 
-  const loadData = async () => {
+  const loadSidebarData = async () => {
     setLoading(true);
     try {
-      // Use optimized RPC functions for better performance
-      const [photosResult, statsResult, vehiclesData, suggestionsData, albumsData] = await Promise.all([
-        PersonalPhotoLibraryService.getUnorganizedPhotos(10000, 0),
+      const [statsResult, vehiclesData, suggestionsData, albumsData] = await Promise.all([
         PersonalPhotoLibraryService.getLibraryStats(),
-        supabase.from('vehicles').select('id, year, make, model, trim').order('year', { ascending: false }).then(r => r.data || []),
+        supabase.from('vehicles').select('id, year, make, model, trim').in('status', ['active', 'pending', 'sold', 'discovered', 'inactive', 'pending_backfill']).order('year', { ascending: false }).limit(500).then(r => {
+          if (r.error) console.error('[PhotoLibrary] Vehicle query error:', r.error);
+          return r.data || [];
+        }),
         PersonalPhotoLibraryService.getVehicleSuggestions(),
         ImageSetService.getPersonalAlbums()
       ]);
 
-      const photosData = photosResult.photos;
-      setAllPhotos(photosData);
       setVehicles(vehiclesData);
       setSuggestions(suggestionsData);
       setPersonalAlbums(albumsData);
-      
-      // Use stats from optimized RPC if available, otherwise calculate from photos
+
       const newCounts = {
-        total: statsResult.total_photos || photosData.length,
-        organized: statsResult.organized_photos || photosData.filter(p => p.organization_status === 'organized').length,
-        unorganized: statsResult.unorganized_photos || photosData.filter(p => p.organization_status === 'unorganized').length,
-        aiComplete: statsResult.ai_status_breakdown?.complete || photosData.filter(p => isAiCompleted(p.ai_processing_status)).length,
-        aiPending: statsResult.ai_status_breakdown?.pending || photosData.filter(p => p.ai_processing_status === 'pending').length,
-        aiProcessing: statsResult.ai_status_breakdown?.processing || photosData.filter(p => p.ai_processing_status === 'processing').length,
-        aiFailed: statsResult.ai_status_breakdown?.failed || photosData.filter(p => p.ai_processing_status === 'failed').length,
-        vehicleFound: statsResult.vehicle_detection?.found || photosData.filter(p => p.ai_detected_vehicle).length,
-        noVehicle: statsResult.vehicle_detection?.not_found || photosData.filter(p => !p.ai_detected_vehicle).length,
-        anglesFront: statsResult.angle_breakdown?.front || photosData.filter(p => p.ai_detected_angle?.includes('front')).length,
-        anglesRear: statsResult.angle_breakdown?.rear || photosData.filter(p => p.ai_detected_angle?.includes('rear')).length,
-        anglesSide: statsResult.angle_breakdown?.side || photosData.filter(p => p.ai_detected_angle?.includes('side')).length,
-        anglesInterior: statsResult.angle_breakdown?.interior || photosData.filter(p => p.ai_detected_angle === 'interior').length,
-        anglesEngineBay: statsResult.angle_breakdown?.engine_bay || photosData.filter(p => p.ai_detected_angle === 'engine_bay').length,
-        anglesUndercarriage: statsResult.angle_breakdown?.undercarriage || photosData.filter(p => p.ai_detected_angle === 'undercarriage').length,
-        anglesDetail: statsResult.angle_breakdown?.detail || photosData.filter(p => p.ai_detected_angle === 'detail').length
+        total: statsResult.total_photos || 0,
+        organized: statsResult.organized_photos || 0,
+        unorganized: statsResult.unorganized_photos || 0,
+        aiComplete: statsResult.ai_status_breakdown?.complete || 0,
+        aiPending: statsResult.ai_status_breakdown?.pending || 0,
+        aiProcessing: statsResult.ai_status_breakdown?.processing || 0,
+        aiFailed: statsResult.ai_status_breakdown?.failed || 0,
+        vehicleFound: statsResult.vehicle_detection?.found || 0,
+        noVehicle: statsResult.vehicle_detection?.not_found || 0,
+        anglesFront: statsResult.angle_breakdown?.front || 0,
+        anglesRear: statsResult.angle_breakdown?.rear || 0,
+        anglesSide: statsResult.angle_breakdown?.side || 0,
+        anglesInterior: statsResult.angle_breakdown?.interior || 0,
+        anglesEngineBay: statsResult.angle_breakdown?.engine_bay || 0,
+        anglesUndercarriage: statsResult.angle_breakdown?.undercarriage || 0,
+        anglesDetail: statsResult.angle_breakdown?.detail || 0
       };
       setCounts(newCounts);
-      
+
+      // Auto-expand sections only when they have non-zero counts
+      const hasAiData = newCounts.aiComplete + newCounts.aiPending + newCounts.aiProcessing + newCounts.aiFailed > 0;
+      if (hasAiData) setAiStatusCollapsed(false);
+      const hasVehicleData = newCounts.vehicleFound + newCounts.noVehicle > 0;
+      if (hasVehicleData) setVehicleSectionCollapsed(false);
+      const hasAngleData = newCounts.anglesFront + newCounts.anglesRear + newCounts.anglesSide + newCounts.anglesInterior + newCounts.anglesEngineBay + newCounts.anglesDetail > 0;
+      if (hasAngleData) setAnglesSectionCollapsed(false);
+
     } catch (error) {
-      console.error('Error loading:', error);
+      console.error('Error loading sidebar:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const applyFilters = () => {
-    let filtered = [...allPhotos];
-
-    // Hide organized filter
-    if (hideOrganized) {
-      filtered = filtered.filter(p => p.organization_status === 'unorganized');
-    }
-
-    // Active filter
-    if (activeFilter) {
-      if (activeFilter === 'ai_complete') {
-        filtered = filtered.filter(p => isAiCompleted(p.ai_processing_status));
-      } else if (activeFilter === 'ai_pending') {
-        filtered = filtered.filter(p => p.ai_processing_status === 'pending');
-      } else if (activeFilter === 'ai_processing') {
-        filtered = filtered.filter(p => p.ai_processing_status === 'processing');
-      } else if (activeFilter === 'ai_failed') {
-        filtered = filtered.filter(p => p.ai_processing_status === 'failed');
-      } else if (activeFilter === 'vehicle_found') {
-        filtered = filtered.filter(p => p.ai_detected_vehicle);
-      } else if (activeFilter === 'no_vehicle') {
-        filtered = filtered.filter(p => !p.ai_detected_vehicle);
-      } else if (activeFilter.startsWith('angle_')) {
-        const angle = activeFilter.replace('angle_', '');
-        filtered = filtered.filter(p => p.ai_detected_angle?.includes(angle));
-      }
-    }
-
-    setDisplayPhotos(filtered);
-  };
+  /** Invalidate photo queries and reload sidebar data after mutations */
+  const invalidateAndReload = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['photo-library'] });
+    await loadSidebarData();
+  }, [queryClient]);
 
   const handleBulkUpload = async (files: File[]) => {
     setUploading(true);
@@ -189,7 +270,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
     }
 
     setUploading(false);
-    loadData();
+    invalidateAndReload();
   };
 
   const handleLinkToVehicle = async (vehicleId: string) => {
@@ -201,7 +282,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
     try {
       await PersonalPhotoLibraryService.bulkLinkToVehicle(Array.from(selectedPhotos), vehicleId);
       setSelectedPhotos(new Set());
-      loadData();
+      invalidateAndReload();
     } catch (error) {
       alert('Failed to link photos');
     }
@@ -211,7 +292,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
     try {
       await PersonalPhotoLibraryService.markAsOrganized(Array.from(selectedPhotos));
       setSelectedPhotos(new Set());
-      loadData();
+      invalidateAndReload();
     } catch (error) {
       alert('Failed');
     }
@@ -222,7 +303,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
     try {
       await PersonalPhotoLibraryService.deletePhotos(Array.from(selectedPhotos));
       setSelectedPhotos(new Set());
-      loadData();
+      invalidateAndReload();
     } catch (error) {
       alert('Failed to delete');
     }
@@ -237,17 +318,9 @@ export const PersonalPhotoLibrary: React.FC = () => {
         trim: suggestion.suggested_trim,
         vin: suggestion.suggested_vin
       });
-      loadData();
+      invalidateAndReload();
     } catch (error) {
       alert('Failed to accept suggestion');
-    }
-  };
-
-  const getGridColumns = () => {
-    switch (gridDensity) {
-      case 'small': return 8;
-      case 'medium': return 5;
-      case 'large': return 3;
     }
   };
 
@@ -274,7 +347,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
           showToast(`Added ${added} photo${added > 1 ? 's' : ''} to album.`, 'success');
           setSelectedPhotos(new Set());
         }
-        await loadData();
+        await invalidateAndReload();
       } catch (error: any) {
         console.error('Failed to add to album:', error);
         const message = error?.message || 'Failed to add photos to album.';
@@ -312,7 +385,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
 
       showToast('AI processing restarted. Photos will be processed shortly.', 'success');
       setShowRestartWizard(false);
-      await loadData();
+      await invalidateAndReload();
     } catch (error) {
       console.error('Failed to restart AI processing:', error);
       showToast('Failed to restart AI processing.', 'error');
@@ -344,7 +417,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
       setSelectedPhotos(new Set());
       setShowSubmitWizard(false);
       setSubmitVehicleId(null);
-      await loadData();
+      await invalidateAndReload();
     } catch (error) {
       console.error('Failed to submit photos:', error);
       showToast('Failed to submit photos to vehicle.', 'error');
@@ -361,7 +434,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
       await ImageSetService.updateImageSet(albumId, { name: newName.trim() });
       setEditingAlbumId(null);
       setEditingAlbumName('');
-      await loadData();
+      await invalidateAndReload();
       showToast('Album name updated', 'success');
     } catch (error) {
       console.error('Failed to update album name:', error);
@@ -455,7 +528,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
 
         // Reload data so inbox updates, then navigate to new profile
         setVehicleConversionDialog({ isOpen: false, album: null, step: 'year', values: {} });
-        await loadData();
+        await invalidateAndReload();
         showToast(`Album converted to vehicle profile: ${vehicleName}`, 'success');
         navigate(`/vehicle/${vehicleId}`);
       } catch (error) {
@@ -489,7 +562,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
       }
 
       setAlbumNameDialog({ isOpen: false, defaultName: '' });
-      await loadData();
+      await invalidateAndReload();
     } catch (error: any) {
       console.error('Failed to create album:', error);
       const message = error?.message || error?.toString() || 'Failed to create album. Check console for details.';
@@ -503,8 +576,8 @@ export const PersonalPhotoLibrary: React.FC = () => {
     }
   };
 
-  const [vehicleSectionCollapsed, setVehicleSectionCollapsed] = useState(false);
-  const [anglesSectionCollapsed, setAnglesSectionCollapsed] = useState(false);
+  const [vehicleSectionCollapsed, setVehicleSectionCollapsed] = useState(true);
+  const [anglesSectionCollapsed, setAnglesSectionCollapsed] = useState(true);
   const [vehicleProfilesCollapsed, setVehicleProfilesCollapsed] = useState(false);
 
   const handleAiStatusClick = () => {
@@ -585,6 +658,86 @@ export const PersonalPhotoLibrary: React.FC = () => {
     setTouchVisitedIds(new Set());
   };
 
+  // Drag-and-drop: handle drops on sidebar targets
+  const handleDragOverTarget = useCallback((e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setDragOverTarget(targetId);
+  }, []);
+
+  const handleDragLeaveTarget = useCallback(() => {
+    setDragOverTarget(null);
+  }, []);
+
+  const handleDropOnVehicle = useCallback(async (e: React.DragEvent, vehicleId: string) => {
+    e.preventDefault();
+    setDragOverTarget(null);
+    setIsDragging(false);
+    const photoIdsJson = e.dataTransfer.getData('application/x-nuke-photos');
+    if (!photoIdsJson) return;
+    const photoIds: string[] = JSON.parse(photoIdsJson);
+    if (photoIds.length === 0) return;
+
+    const v = vehicles.find(vh => vh.id === vehicleId);
+    const label = v ? `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'vehicle' : 'vehicle';
+    try {
+      await PersonalPhotoLibraryService.bulkLinkToVehicle(photoIds, vehicleId);
+      showToast(`Linked ${photoIds.length} photo${photoIds.length > 1 ? 's' : ''} to ${label}`, 'success');
+      setSelectedPhotos(new Set());
+      invalidateAndReload();
+    } catch {
+      showToast('Failed to link photos', 'error');
+    }
+  }, [vehicles, showToast, invalidateAndReload]);
+
+  const handleDropOnAlbum = useCallback(async (e: React.DragEvent, albumId: string) => {
+    e.preventDefault();
+    setDragOverTarget(null);
+    setIsDragging(false);
+    const photoIdsJson = e.dataTransfer.getData('application/x-nuke-photos');
+    if (!photoIdsJson) return;
+    const photoIds: string[] = JSON.parse(photoIdsJson);
+    if (photoIds.length === 0) return;
+
+    try {
+      const added = await ImageSetService.addImagesToSet(albumId, photoIds);
+      if (added === 0) {
+        showToast('Photos already in album', 'info');
+      } else {
+        showToast(`Added ${added} photo${added > 1 ? 's' : ''} to album`, 'success');
+        setSelectedPhotos(new Set());
+      }
+      invalidateAndReload();
+    } catch {
+      showToast('Failed to add to album', 'error');
+    }
+  }, [showToast, invalidateAndReload]);
+
+  const handleDropNewAlbum = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverTarget(null);
+    setIsDragging(false);
+    const photoIdsJson = e.dataTransfer.getData('application/x-nuke-photos');
+    if (!photoIdsJson) return;
+    const photoIds: string[] = JSON.parse(photoIdsJson);
+    if (photoIds.length === 0) return;
+    setAlbumNameDialog({ isOpen: true, defaultName: `Album ${new Date().toLocaleDateString()}` });
+    // Temporarily select the dragged photos so the album creation picks them up
+    setSelectedPhotos(new Set(photoIds));
+  }, []);
+
+  // Listen for drag state from tiles
+  useEffect(() => {
+    const onDragStart = () => setIsDragging(true);
+    const onDragEnd = () => { setIsDragging(false); setDragOverTarget(null); };
+    window.addEventListener('nuke:photo-drag-start', onDragStart);
+    window.addEventListener('nuke:photo-drag-end', onDragEnd);
+    return () => {
+      window.removeEventListener('nuke:photo-drag-start', onDragStart);
+      window.removeEventListener('nuke:photo-drag-end', onDragEnd);
+    };
+  }, []);
+
   if (loading) {
     return (
       <div style={{ padding: '40px', textAlign: 'center' }}>
@@ -597,11 +750,14 @@ export const PersonalPhotoLibrary: React.FC = () => {
     <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
       {/* LEFT SIDEBAR - Clickable Filters */}
       <div style={{
-        width: sidebarCollapsed ? '40px' : '170px',
+        width: sidebarCollapsed ? '40px' : '200px',
+        minWidth: sidebarCollapsed ? '40px' : '200px',
         borderRight: '1px solid var(--border-light)',
         background: 'var(--white)',
-        overflowY: 'auto',
-        flexShrink: 0
+        overflow: 'hidden',
+        flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
       }}>
         {/* Sidebar header / collapse toggle */}
         <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -621,7 +777,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
         </div>
 
         {!sidebarCollapsed && (
-          <>
+          <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         {/* Upload Button */}
         <div style={{ padding: '12px', borderBottom: '1px solid var(--border-light)' }}>
           <input
@@ -868,6 +1024,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                   filteredVehicles.map(v => {
                     const label = `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'Untitled';
                     const isActive = activeVehicleId === v.id;
+                    const isDropTarget = dragOverTarget === `vehicle-${v.id}`;
                     return (
                       <div
                         key={v.id}
@@ -879,13 +1036,17 @@ export const PersonalPhotoLibrary: React.FC = () => {
                             setActiveVehicleId(isActive ? null : v.id);
                           }
                         }}
+                        onDragOver={(e) => handleDragOverTarget(e, `vehicle-${v.id}`)}
+                        onDragLeave={handleDragLeaveTarget}
+                        onDrop={(e) => handleDropOnVehicle(e, v.id)}
                         style={{
                           padding: '4px 6px',
                           marginBottom: '2px',
                           cursor: 'pointer',
-                          background: isActive ? 'var(--grey-200)' : 'transparent',
-                          border: isActive ? '1px solid var(--border-medium)' : '1px solid transparent',
-                          fontSize: '11px'
+                          background: isDropTarget ? 'var(--primary-light, rgba(0,0,0,0.08))' : isActive ? 'var(--grey-200)' : 'transparent',
+                          border: isDropTarget ? '2px solid var(--primary, #333)' : isActive ? '1px solid var(--border-medium)' : '1px solid transparent',
+                          fontSize: '11px',
+                          transition: 'border 0.12s, background 0.12s',
                         }}
                       >
                         {label}
@@ -921,13 +1082,19 @@ export const PersonalPhotoLibrary: React.FC = () => {
             </div>
           ) : (
             <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '6px' }}>
-              {personalAlbums.map(album => (
+              {personalAlbums.map(album => {
+                const isAlbumDropTarget = dragOverTarget === `album-${album.id}`;
+                return (
                 <div
                   key={album.id}
+                  onDragOver={(e) => handleDragOverTarget(e, `album-${album.id}`)}
+                  onDragLeave={handleDragLeaveTarget}
+                  onDrop={(e) => handleDropOnAlbum(e, album.id)}
                   style={{
-                    border: '1px solid var(--border-light)',
+                    border: isAlbumDropTarget ? '2px solid var(--primary, #333)' : '1px solid var(--border-light)',
                     padding: '4px 6px',
-                    background: 'var(--grey-50)'
+                    background: isAlbumDropTarget ? 'var(--primary-light, rgba(0,0,0,0.08))' : 'var(--grey-50)',
+                    transition: 'border 0.12s, background 0.12s',
                   }}
                 >
                   {editingAlbumId === album.id ? (
@@ -996,9 +1163,32 @@ export const PersonalPhotoLibrary: React.FC = () => {
                     CONVERT TO PROFILE
                   </button>
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
+
+          {/* New Album drop zone — visible during drag */}
+          {isDragging && (
+            <div
+              onDragOver={(e) => handleDragOverTarget(e, 'new-album')}
+              onDragLeave={handleDragLeaveTarget}
+              onDrop={handleDropNewAlbum}
+              style={{
+                border: dragOverTarget === 'new-album' ? '2px solid var(--primary, #333)' : '2px dashed var(--border-medium)',
+                padding: '8px',
+                marginBottom: '6px',
+                textAlign: 'center',
+                background: dragOverTarget === 'new-album' ? 'var(--primary-light, rgba(0,0,0,0.08))' : 'transparent',
+                transition: 'border 0.12s, background 0.12s',
+              }}
+            >
+              <span className="text text-small text-muted" style={{ fontSize: '9px', textTransform: 'uppercase' }}>
+                DROP TO CREATE ALBUM
+              </span>
+            </div>
+          )}
+
           {selectedPhotos.size > 0 && (
             <button
               onClick={() => handleAddToAlbum()}
@@ -1043,7 +1233,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
             ))}
           </div>
         )}
-        </>
+        </div>
         )}
       </div>
 
@@ -1073,35 +1263,36 @@ export const PersonalPhotoLibrary: React.FC = () => {
             </button>
           )}
 
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '0' }}>
-            <span className="text text-small text-muted" style={{ marginRight: '8px', alignSelf: 'center' }}>
-              Grid:
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="text text-small text-muted" style={{ fontSize: '9px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+              {gridColumns} COL
             </span>
-            {(['small', 'medium', 'large'] as GridDensity[]).map((size, idx) => (
-              <button
-                key={size}
-                onClick={() => setGridDensity(size)}
-                className={`button ${gridDensity === size ? 'button-primary' : 'button-secondary'}`}
-                style={{
-                  padding: '6px 10px',
-                  fontSize: '11px',
-                  marginLeft: idx > 0 ? '-1px' : '0',
-                  textTransform: 'uppercase'
-                }}
-              >
-                {size[0]}
-              </button>
-            ))}
+            <input
+              type="range"
+              min={1}
+              max={20}
+              value={gridColumns}
+              onChange={(e) => setGridColumns(Number(e.target.value))}
+              style={{
+                width: '100px',
+                height: '2px',
+                accentColor: 'var(--text)',
+                cursor: 'pointer',
+              }}
+            />
           </div>
         </div>
 
-        {/* Photo Grid */}
-        <div style={{ flex: 1, overflowY: 'auto', background: 'var(--grey-100)', position: 'relative' }}>
+        {/* Photo Grid — Virtualized */}
+        <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden' }}>
+          {/* Upload progress overlay */}
           {uploading && (
             <div
               style={{
-                position: 'sticky',
+                position: 'absolute',
                 top: 0,
+                left: 0,
+                right: 0,
                 zIndex: 5,
                 padding: '8px 12px',
                 background: 'var(--white)',
@@ -1133,169 +1324,94 @@ export const PersonalPhotoLibrary: React.FC = () => {
               </div>
             </div>
           )}
-          {displayPhotos.length === 0 ? (
-            <div style={{ 
-              padding: '80px 20px', 
-              textAlign: 'center',
-              background: 'var(--white)',
-              border: '1px solid var(--border-light)',
-              margin: '20px'
-            }}>
-              <div className="text font-bold" style={{ fontSize: '16px', marginBottom: '8px' }}>
-                {activeFilter ? 'No photos match filter' : hideOrganized ? 'All photos organized!' : 'No photos yet'}
-              </div>
-              <div className="text text-small text-muted">
-                {activeFilter ? 'Try a different filter' : 'Upload photos to get started'}
-              </div>
-            </div>
-          ) : (
+
+          {/* Sticky date label */}
+          {currentDateLabel && displayPhotos.length > 0 && (
             <div
               style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${getGridColumns()}, 1fr)`,
-                gap: '0'
+                position: 'absolute',
+                top: uploading ? '52px' : '4px',
+                left: '8px',
+                zIndex: 4,
+                padding: '2px 8px',
+                background: 'rgba(0,0,0,0.7)',
+                color: '#fff',
+                fontSize: '9px',
+                fontFamily: 'Arial, sans-serif',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                pointerEvents: 'none',
+              }}
+            >
+              {currentDateLabel}
+            </div>
+          )}
+
+          {displayPhotos.length === 0 && !photosLoading ? (
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'var(--grey-100)',
+            }}>
+              <div style={{
+                padding: '80px 20px',
+                textAlign: 'center',
+                background: 'var(--white)',
+                border: '1px solid var(--border-light)',
+              }}>
+                <div className="text font-bold" style={{ fontSize: '16px', marginBottom: '8px' }}>
+                  {activeFilter ? 'No photos match filter' : hideOrganized ? 'All photos organized!' : 'No photos yet'}
+                </div>
+                <div className="text text-small text-muted">
+                  {activeFilter ? 'Try a different filter' : 'Upload photos to get started'}
+                </div>
+              </div>
+            </div>
+          ) : photosLoading ? (
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'var(--grey-100)',
+            }}>
+              <div className="text text-muted">Loading photos...</div>
+            </div>
+          ) : (
+            <PhotoGrid
+              photos={displayPhotos}
+              selectedPhotos={selectedPhotos}
+              columns={gridColumns}
+              hasNextPage={!!hasNextPage}
+              isFetchingNextPage={!!isFetchingNextPage}
+              fetchNextPage={fetchNextPage}
+              onPhotoClick={(photoId, e) => {
+                const newSel = new Set(selectedPhotos);
+                if (newSel.has(photoId)) {
+                  newSel.delete(photoId);
+                } else {
+                  newSel.add(photoId);
+                }
+                setSelectedPhotos(newSel);
               }}
               onTouchStart={startTouchSelection}
               onTouchMove={moveTouchSelection}
               onTouchEnd={endTouchSelection}
-              onTouchCancel={endTouchSelection}
-            >
-              {displayPhotos.map(photo => {
-                const isSelected = selectedPhotos.has(photo.id);
-                const thumbnailUrl =
-                  gridDensity === 'large'
-                    ? (photo.variants?.medium || photo.variants?.large || photo.image_url)
-                    : gridDensity === 'medium'
-                      ? (photo.variants?.small || photo.variants?.medium || photo.image_url)
-                      : (photo.variants?.thumbnail || photo.variants?.small || photo.image_url);
+              onDateChange={setCurrentDateLabel}
+              virtualizerRef={virtualizerRef}
+            />
+          )}
 
-                return (
-                  <div
-                    key={photo.id}
-                    data-photo-id={photo.id}
-                    onClick={(e) => {
-                      if (e.metaKey || e.ctrlKey) {
-                        const newSel = new Set(selectedPhotos);
-                        if (newSel.has(photo.id)) newSel.delete(photo.id);
-                        else newSel.add(photo.id);
-                        setSelectedPhotos(newSel);
-                      } else {
-                        const newSel = new Set(selectedPhotos);
-                        if (newSel.has(photo.id)) {
-                          newSel.delete(photo.id);
-                        } else {
-                          newSel.add(photo.id);
-                        }
-                        setSelectedPhotos(newSel);
-                      }
-                    }}
-                    style={{
-                      position: 'relative',
-                      paddingBottom: '100%',
-                      background: 'var(--grey-200)',
-                      border: isSelected ? '3px solid var(--primary)' : '1px solid var(--border-light)',
-                      cursor: 'pointer',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <img
-                      src={thumbnailUrl}
-                      alt=""
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover'
-                      }}
-                      loading="lazy"
-                    />
-
-                    {/* Album count badge (personal or vehicle albums) */}
-                    {photo.album_count > 0 && (
-                      <div style={{
-                        position: 'absolute',
-                        bottom: '4px',
-                        right: '4px',
-                        padding: '2px 4px',
-                        background: 'rgba(0,0,0,0.75)',
-                        color: 'var(--bg)',
-                        fontSize: '9px',
-                        borderRadius: '0px',
-                        border: '1px solid var(--border)'
-                      }}>
-                        {photo.album_count} ALBUM{photo.album_count > 1 ? 'S' : ''}
-                      </div>
-                    )}
-
-                    {isSelected && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '6px',
-                        left: '6px',
-                        width: '18px',
-                        height: '18px',
-                        background: 'var(--primary)',
-                        border: '2px solid var(--border)',
-                        color: 'var(--accent-bright)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '11px',
-                        fontWeight: 'bold'
-                      }}>
-                        ✓
-                      </div>
-                    )}
-
-                    {/* AI Status (if not complete) */}
-                    {photo.ai_processing_status !== 'complete' && gridDensity !== 'small' && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '6px',
-                        right: '6px',
-                        padding: '2px 5px',
-                        background: photo.ai_processing_status === 'processing' ? 'var(--warning)' : 'var(--text-disabled)',
-                        color: 'var(--bg)',
-                        fontSize: '9px',
-                        fontWeight: 'bold'
-                      }}>
-                        {photo.ai_processing_status === 'processing'
-                          ? 'AI'
-                          : photo.ai_processing_status === 'pending'
-                            ? 'PEND'
-                            : photo.ai_processing_status === 'failed'
-                              ? 'ERR'
-                              : 'AI'}
-                      </div>
-                    )}
-
-                    {/* Vehicle info (large only) */}
-                    {gridDensity === 'large' && photo.ai_detected_vehicle && (
-                      <div style={{
-                        position: 'absolute',
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        background: 'var(--surface-glass)',
-                        borderTop: '1px solid var(--border)',
-                        padding: '4px 6px'
-                      }}>
-                        <div className="text font-bold" style={{ fontSize: '11px' }}>
-                          {photo.ai_detected_vehicle.year} {photo.ai_detected_vehicle.make}
-                        </div>
-                        {photo.ai_detected_angle && (
-                          <div className="text text-muted" style={{ fontSize: '9px' }}>
-                            {photo.ai_detected_angle.replace('_', ' ').toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+          {/* Timeline Scrubber */}
+          {dateSummary.length > 0 && displayPhotos.length > 0 && (
+            <TimelineScrubber
+              dateSummary={dateSummary}
+              virtualizer={virtualizerRef.current}
+              monthToRowIndex={monthToRowIndex}
+            />
           )}
         </div>
 
@@ -1380,6 +1496,20 @@ export const PersonalPhotoLibrary: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* QuickLook overlay */}
+      {quickLookPhotoId && (() => {
+        const photo = displayPhotos.find((p) => p.id === quickLookPhotoId);
+        if (!photo) return null;
+        return (
+          <QuickLook
+            photo={photo}
+            onClose={() => setQuickLookPhotoId(null)}
+            onNext={() => quickLookNavigate(1)}
+            onPrev={() => quickLookNavigate(-1)}
+          />
+        );
+      })()}
 
       {/* Restart AI Processing Wizard Modal */}
       {showRestartWizard && (
