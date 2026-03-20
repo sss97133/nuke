@@ -377,7 +377,7 @@ async function uploadPhotos(vehicleId, jpegDir, metaMap = new Map()) {
         .from(BUCKET)
         .upload(storagePath, fileData, { contentType: mimeType, upsert: true });
 
-      if (uploadError) { errors++; return; }
+      if (uploadError) { errors++; if (errors <= 3) console.error(`  Upload error [${filename}]: ${uploadError.message || JSON.stringify(uploadError)}`); return; }
 
       const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
 
@@ -775,7 +775,7 @@ async function syncAlbum(albumName, vehicleId = null) {
           if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1000));
         }
         if (uploadError) {
-          if (errors < 5) console.error(`\n  Upload error (${filename}): ${uploadError.message}`);
+          if (errors < 5) { process.stdout.write('\n'); console.error(`  *** UPLOAD ERROR (${filename}): ${uploadError.message || JSON.stringify(uploadError)}`); }
           errors++;
           return;
         }
@@ -816,8 +816,10 @@ async function syncAlbum(albumName, vehicleId = null) {
             ...(meta.exif_data && { exif_data: meta.exif_data }),
           };
           const { error: insErr } = await supabase.from('vehicle_images').insert(row);
-          if (insErr && !insErr.message.includes('duplicate')) { errors++; }
-          else { uploaded++; }
+          if (insErr && !insErr.message.includes('duplicate')) {
+            if (errors < 5) { process.stdout.write('\n'); console.error(`  *** INSERT ERROR (${filename}): ${insErr.message || JSON.stringify(insErr)}`); }
+            errors++;
+          } else { uploaded++; }
         }
       }));
       process.stdout.write(`\r  ${i + batch.length}/${files.length} (${uploaded} up, ${replaced} replaced, ${skipped} skip, ${errors} err)  `);
