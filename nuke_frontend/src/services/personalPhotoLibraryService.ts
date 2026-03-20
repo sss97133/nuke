@@ -603,10 +603,13 @@ export class PersonalPhotoLibraryService {
 
   /**
    * Cursor-based paginated photo fetch for virtualized grid.
-   * Uses (created_at, id) keyset for stable pagination.
+   * Sort: taken_at ASC NULLS LAST, created_at ASC, id ASC
+   * This puts EXIF-dated photos (18%) first in chronological order,
+   * then the bulk-import cluster (82% with NULL taken_at) after.
+   * Pages arrive in display order — no client-side re-sort needed.
    */
   static async getPhotosCursorPaginated(params: {
-    cursor?: { created_at: string; id: string };
+    cursor?: { taken_at: string | null; created_at: string; id: string };
     limit?: number;
     filterStatus?: string;
     filterAngle?: string;
@@ -653,17 +656,34 @@ export class PersonalPhotoLibraryService {
       }
     }
 
-    // Cursor-based pagination: fetch rows older than cursor
+    // Cursor-based keyset pagination matching the sort order:
+    // taken_at ASC NULLS LAST, created_at ASC, id ASC
     if (params.cursor) {
-      query = query.or(
-        `created_at.lt.${params.cursor.created_at},` +
-        `and(created_at.eq.${params.cursor.created_at},id.lt.${params.cursor.id})`
-      );
+      if (params.cursor.taken_at) {
+        // Cursor is in the EXIF section — next rows are:
+        // later taken_at, OR same taken_at + later created_at, OR same both + later id,
+        // OR any row with NULL taken_at (those all come after)
+        query = query.or(
+          `taken_at.gt.${params.cursor.taken_at},` +
+          `and(taken_at.eq.${params.cursor.taken_at},created_at.gt.${params.cursor.created_at}),` +
+          `and(taken_at.eq.${params.cursor.taken_at},created_at.eq.${params.cursor.created_at},id.gt.${params.cursor.id}),` +
+          `taken_at.is.null`
+        );
+      } else {
+        // Cursor is in the NULL-taken_at section — only NULL rows remain
+        query = query
+          .is('taken_at', null)
+          .or(
+            `created_at.gt.${params.cursor.created_at},` +
+            `and(created_at.eq.${params.cursor.created_at},id.gt.${params.cursor.id})`
+          );
+      }
     }
 
     query = query
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false })
+      .order('taken_at', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
       .limit(limit);
 
     const { data, error, count } = await query;

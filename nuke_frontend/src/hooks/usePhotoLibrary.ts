@@ -4,6 +4,10 @@
  * Wraps PersonalPhotoLibraryService.getPhotosCursorPaginated with
  * useInfiniteQuery for cursor-based pagination.
  *
+ * Server sorts: taken_at ASC NULLS LAST, created_at ASC, id ASC
+ * Pages arrive in display order — EXIF-dated photos first, then bulk-import.
+ * No client-side re-sort needed.
+ *
  * Usage:
  *   const { photos, totalCount, hasNextPage, fetchNextPage, isFetching } = usePhotoLibrary(filters);
  */
@@ -19,10 +23,16 @@ export interface PhotoLibraryFilters {
   filterAngle?: string | null;
 }
 
+interface PhotoCursor {
+  taken_at: string | null;
+  created_at: string;
+  id: string;
+}
+
 interface PhotoPage {
   photos: PersonalPhoto[];
   totalCount: number;
-  nextCursor?: { created_at: string; id: string };
+  nextCursor?: PhotoCursor;
 }
 
 const PAGE_SIZE = 200;
@@ -33,7 +43,7 @@ export function usePhotoLibrary(filters: PhotoLibraryFilters = {}) {
   const query = useInfiniteQuery<PhotoPage>({
     queryKey,
     queryFn: async ({ pageParam }) => {
-      const cursor = pageParam as { created_at: string; id: string } | undefined;
+      const cursor = pageParam as PhotoCursor | undefined;
 
       // Map filter status
       let filterStatus: string | undefined;
@@ -48,11 +58,12 @@ export function usePhotoLibrary(filters: PhotoLibraryFilters = {}) {
         hideOrganized: filters.hideOrganized !== false,
       });
 
-      // Compute next cursor from last photo
+      // Compute next cursor from last photo — includes taken_at for keyset pagination
       const lastPhoto = result.photos[result.photos.length - 1];
-      const nextCursor = result.photos.length >= PAGE_SIZE && lastPhoto
-        ? { created_at: lastPhoto.created_at, id: lastPhoto.id }
-        : undefined;
+      const nextCursor: PhotoCursor | undefined =
+        result.photos.length >= PAGE_SIZE && lastPhoto
+          ? { taken_at: lastPhoto.taken_at || null, created_at: lastPhoto.created_at, id: lastPhoto.id }
+          : undefined;
 
       return {
         photos: result.photos,
@@ -61,33 +72,17 @@ export function usePhotoLibrary(filters: PhotoLibraryFilters = {}) {
       };
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    initialPageParam: undefined as { created_at: string; id: string } | undefined,
+    initialPageParam: undefined as PhotoCursor | undefined,
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     retry: 1,
   });
 
-  // Flatten all pages and sort by actual photo date (EXIF taken_at when available)
-  // DB keeps created_at order for stable keyset pagination; client sort gives chronological display.
-  // Photos WITH taken_at (EXIF dates) sort first (oldest→newest ASC), then photos
-  // WITHOUT taken_at sort by created_at ASC. This keeps real-dated photos (2017-2026)
-  // visibly separated from the bulk-import cluster (all created_at ~March 2026).
+  // Flatten pages in order — server already sorts taken_at ASC NULLS LAST,
+  // created_at ASC, id ASC so pages arrive in display order.
   const photos = useMemo(() => {
-    const flat = query.data?.pages.flatMap((p) => p.photos) ?? [];
-    return flat.sort((a, b) => {
-      const aHasExif = !!a.taken_at;
-      const bHasExif = !!b.taken_at;
-      // EXIF-dated photos first
-      if (aHasExif !== bHasExif) return aHasExif ? -1 : 1;
-      // Within each group, sort chronologically (oldest first)
-      const dateA = a.taken_at || a.created_at;
-      const dateB = b.taken_at || b.created_at;
-      const cmp = dateA.localeCompare(dateB);
-      if (cmp !== 0) return cmp;
-      // Stable tiebreak on id for deterministic order
-      return a.id.localeCompare(b.id);
-    });
+    return query.data?.pages.flatMap((p) => p.photos) ?? [];
   }, [query.data]);
 
   const totalCount = query.data?.pages[0]?.totalCount ?? 0;
