@@ -144,7 +144,7 @@ export default function VehicleSearch() {
         <span style={{ 
           fontSize: '12px', 
           marginRight: '4px',
-          color: '#999',
+          color: 'var(--text-disabled)',
           fontFamily: 'Arial, sans-serif',
           whiteSpace: 'nowrap'
         }}>

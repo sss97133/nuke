@@ -106,7 +106,7 @@ export default function SubdomainRouter() {
         height: '100vh',
         fontFamily: 'Arial, sans-serif',
         fontSize: '12px',
-        color: '#888',
+        color: 'var(--text-disabled)',
       }}>
         loading...
       </div>
@@ -124,7 +124,7 @@ export default function SubdomainRouter() {
             height: '100vh',
             fontFamily: 'Arial, sans-serif',
             fontSize: '12px',
-            color: '#888',
+            color: 'var(--text-disabled)',
           }}>
             loading storefront...
           </div>

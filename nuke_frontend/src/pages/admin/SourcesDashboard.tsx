@@ -202,7 +202,7 @@ export default function SourcesDashboard() {
             letterSpacing: '0.05em',
             border: '2px solid #111',
             background: onboarding ? 'var(--border)' : '#111',
-            color: onboarding ? 'var(--text-secondary)' : '#fff',
+            color: onboarding ? 'var(--text-secondary)' : 'var(--surface-elevated)',
             padding: '6px 16px',
             cursor: onboarding ? 'not-allowed' : 'pointer',
           }}
@@ -284,7 +284,7 @@ export default function SourcesDashboard() {
               border: '2px solid',
               borderColor: filter === f ? '#111' : 'var(--border)',
               background: filter === f ? '#111' : 'transparent',
-              color: filter === f ? '#fff' : 'var(--text-secondary)',
+              color: filter === f ? 'var(--surface-elevated)' : 'var(--text-secondary)',
               padding: '4px 10px',
               cursor: 'pointer',
             }}

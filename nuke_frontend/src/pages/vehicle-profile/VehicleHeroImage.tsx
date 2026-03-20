@@ -36,7 +36,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
       <div style={{
         width: '100%',
         height: 'var(--h-hero, 420px)',
-        backgroundColor: '#2a2a2a',
+        backgroundColor: 'var(--text)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -46,7 +46,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
           flexDirection: 'column',
           alignItems: 'center',
           gap: '8px',
-          color: '#888',
+          color: 'var(--text-disabled)',
         }}>
           <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="4" y="12" width="40" height="28" stroke="currentColor" strokeWidth="2" fill="none"/>
@@ -80,7 +80,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                 height: 'var(--h-hero, 420px)',
                 position: 'relative',
                 overflow: 'hidden',
-                backgroundColor: '#2a2a2a',
+                backgroundColor: 'var(--text)',
                 cursor: isMobile ? 'pointer' : 'default',
               }}
               onClick={() => isMobile && setShowGallery(true)}
@@ -132,7 +132,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                   bottom: '10px',
                   right: '10px',
                   background: 'rgba(0,0,0,0.55)',
-                  color: '#fff',
+                  color: 'var(--surface-elevated)',
                   border: 'none', padding: '2px 6px',
                   fontFamily: 'Arial, Helvetica, sans-serif',
                   fontSize: '8px',

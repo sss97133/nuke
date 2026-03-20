@@ -292,7 +292,7 @@ export function PhotoGrid({
       style={{
         flex: 1,
         overflowY: 'auto',
-        background: '#1a1a1a',
+        background: 'var(--text)',
         position: 'relative',
       }}
       onTouchStart={onTouchStart}
@@ -335,7 +335,7 @@ export function PhotoGrid({
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px',
                   color: 'rgba(255,255,255,0.5)',
-                  background: '#1a1a1a',
+                  background: 'var(--text)',
                 }}
               >
                 {row.label}

@@ -70,12 +70,12 @@ export function VehicleCard({
 
   if (viewMode === 'technical') {
     const DEAL_MAP: Record<string, { label: string; color: string; bg: string }> = {
-      plus_3: { label: 'STEAL', color: '#fff', bg: '#16825d' },
-      plus_2: { label: 'GREAT', color: '#fff', bg: '#1a7a54' },
-      plus_1: { label: 'GOOD', color: '#fff', bg: '#2d9d78' },
-      minus_1: { label: 'ABOVE', color: '#fff', bg: '#b05a00' },
-      minus_2: { label: 'OVER', color: '#fff', bg: '#d13438' },
-      minus_3: { label: 'WAY+', color: '#fff', bg: '#a4262c' },
+      plus_3: { label: 'STEAL', color: 'var(--surface-elevated)', bg: '#16825d' },
+      plus_2: { label: 'GREAT', color: 'var(--surface-elevated)', bg: '#1a7a54' },
+      plus_1: { label: 'GOOD', color: 'var(--surface-elevated)', bg: '#2d9d78' },
+      minus_1: { label: 'ABOVE', color: 'var(--surface-elevated)', bg: '#b05a00' },
+      minus_2: { label: 'OVER', color: 'var(--surface-elevated)', bg: '#d13438' },
+      minus_3: { label: 'WAY+', color: 'var(--surface-elevated)', bg: '#a4262c' },
     };
     const HEAT_MAP: Record<string, string> = {
       volcanic: '#d13438', fire: 'var(--error)', hot: 'var(--warning)', warm: '#b05a00',

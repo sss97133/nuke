@@ -511,7 +511,7 @@ const VehicleSilhouetteMap: React.FC<VehicleSilhouetteMapProps> = ({
             padding: '4px 8px',
             fontSize: '10px',
             fontFamily: "'Courier New', monospace",
-            color: '#fff',
+            color: 'var(--surface-elevated)',
             pointerEvents: 'none',
             whiteSpace: 'nowrap',
             zIndex: 10,

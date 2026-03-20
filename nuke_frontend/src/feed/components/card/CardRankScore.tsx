@@ -120,7 +120,7 @@ const badgeStyle: CSSProperties = {
   fontWeight: 700,
   padding: '1px 3px',
   background: 'rgba(0, 0, 0, 0.75)',
-  color: '#fff',
+  color: 'var(--surface-elevated)',
   zIndex: 5,
   cursor: 'default',
   lineHeight: 1.3,
@@ -188,7 +188,7 @@ export function CardRankScore({ vehicle, compact }: CardRankScoreProps) {
             borderTop: '1px solid rgba(255,255,255,0.2)',
             marginTop: '2px', paddingTop: '2px',
           }}>
-            <span style={{ color: '#fff' }}>TOTAL (est)</span>
+            <span style={{ color: 'var(--surface-elevated)' }}>TOTAL (est)</span>
             <span style={{ color: scoreColor, fontWeight: 700 }}>{Math.round(total)}</span>
           </span>
           <span style={{

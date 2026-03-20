@@ -60,8 +60,8 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
           style={{
             padding: '12px 24px',
             border: '2px solid #000',
-            background: '#000',
-            color: '#fff',
+            background: 'var(--text)',
+            color: 'var(--surface-elevated)',
             fontSize: '13px',
             fontWeight: 700,
             cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1
@@ -129,8 +129,8 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
                 flex: 2,
                 padding: '8px',
                 border: '2px solid #000',
-                background: '#000',
-                color: '#fff',
+                background: 'var(--text)',
+                color: 'var(--surface-elevated)',
                 fontSize: '12px',
                 fontWeight: 700,
                 cursor: loading ? 'wait' : 'pointer'}}

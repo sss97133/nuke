@@ -243,7 +243,7 @@ export default function StorefrontVehicleDetail({ organization }: Props) {
                   fontFamily: 'Arial, sans-serif',
                   fontWeight: 600,
                   background: 'var(--accent)',
-                  color: '#fff',
+                  color: 'var(--surface-elevated)',
                   border: 'none',
                   cursor: 'pointer',
                   textTransform: 'uppercase',

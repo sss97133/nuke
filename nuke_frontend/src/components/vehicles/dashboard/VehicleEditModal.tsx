@@ -187,7 +187,7 @@ const FIELD_SECTIONS = [
     id: 'timestamps',
     title: 'TIMESTAMPS',
     subtitle: 'System dates (read-only)',
-    color: '#d4d4d4',
+    color: 'var(--surface-hover)',
     readonly: true,
     fields: ['created_at', 'updated_at', 'uploaded_at', 'deleted_at', 'quality_last_assessed', 'last_quality_check', 'last_signal_assessed_at', 'description_generated_at'],
   },

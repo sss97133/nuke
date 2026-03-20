@@ -133,7 +133,7 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
               justifyContent: 'center',
               fontSize: '11px',
               fontWeight: 700,
-              color: '#fff',
+              color: 'var(--surface-elevated)',
               position: 'relative',
               zIndex: 1}}>
               {new Date(date).getDate()}

@@ -65,8 +65,8 @@ const SIGNAL_COLORS: Record<Signal, string> = {
 const S = {
   page: {
     fontFamily: 'Arial, sans-serif',
-    background: '#1a1a1a',
-    color: '#e0e0e0',
+    background: 'var(--text)',
+    color: 'var(--surface-hover)',
     minHeight: '100vh',
     padding: '16px 20px',
   } as React.CSSProperties,
@@ -86,7 +86,7 @@ const S = {
   } as React.CSSProperties,
   meta: {
     fontSize: '9px',
-    color: '#888',
+    color: 'var(--text-disabled)',
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   } as React.CSSProperties,
@@ -105,7 +105,7 @@ const S = {
     fontWeight: 700,
     textTransform: 'uppercase' as const,
     letterSpacing: '2px',
-    color: '#888',
+    color: 'var(--text-disabled)',
     marginBottom: '10px',
   } as React.CSSProperties,
   row: {
@@ -120,7 +120,7 @@ const S = {
     fontSize: '9px',
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
-    color: '#999',
+    color: 'var(--text-disabled)',
   } as React.CSSProperties,
   value: {
     fontFamily: '"Courier New", monospace',
@@ -161,7 +161,7 @@ function Metric({ label, value, sig }: { label: string; value: string | number; 
         {sig && <span style={S.dot(SIGNAL_COLORS[sig])} />}
         <span style={S.label}>{label}</span>
       </div>
-      <span style={{ ...S.value, color: sig ? SIGNAL_COLORS[sig] : '#e0e0e0' }}>{value}</span>
+      <span style={{ ...S.value, color: sig ? SIGNAL_COLORS[sig] : 'var(--surface-hover)' }}>{value}</span>
     </div>
   );
 }
@@ -177,11 +177,11 @@ function QueueSection({ title, data }: { title: string; data: Record<string, num
     <div style={{ marginBottom: '10px' }}>
       <div style={{ ...S.label, marginBottom: '4px', fontSize: '10px', color: '#bbb' }}>{title}</div>
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-        <span style={{ ...S.value, color: '#e0e0e0' }}>{fmt(pending)} <span style={S.label}>PENDING</span></span>
+        <span style={{ ...S.value, color: 'var(--surface-hover)' }}>{fmt(pending)} <span style={S.label}>PENDING</span></span>
         <span style={{ ...S.value, color: '#4a9eff' }}>{fmt(processing)} <span style={S.label}>PROC</span></span>
         <span style={{ ...S.value, color: SIGNAL_COLORS.green }}>{fmt(complete)} <span style={S.label}>DONE</span></span>
         {failed > 0 && <span style={{ ...S.value, color: SIGNAL_COLORS.red }}>{fmt(failed)} <span style={S.label}>FAIL</span></span>}
-        {total > 0 && <span style={{ ...S.label, color: '#666' }}>({fmt(total)} total)</span>}
+        {total > 0 && <span style={{ ...S.label, color: 'var(--text-secondary)' }}>({fmt(total)} total)</span>}
       </div>
     </div>
   );
@@ -320,7 +320,7 @@ const AdminPulse: React.FC = () => {
           <div style={{ marginBottom: '10px' }}>
             <div style={{ ...S.label, marginBottom: '4px', fontSize: '10px', color: '#bbb' }}>SNAPSHOT REEXTRACTION</div>
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              <span style={{ ...S.value, color: '#e0e0e0' }}>{fmt(snapPending)} <span style={S.label}>PENDING</span></span>
+              <span style={{ ...S.value, color: 'var(--surface-hover)' }}>{fmt(snapPending)} <span style={S.label}>PENDING</span></span>
               <span style={{ ...S.value, color: SIGNAL_COLORS.green }}>{fmt(snapCompleted)} <span style={S.label}>DONE</span></span>
             </div>
             {/* Per-platform breakdown */}
@@ -333,7 +333,7 @@ const AdminPulse: React.FC = () => {
                   if (s.status === 'completed') platforms[s.platform].completed = s.cnt;
                 }
                 return Object.entries(platforms).map(([p, v]) => (
-                  <span key={p} style={{ ...S.label, fontSize: '8px', color: v.pending > 0 ? '#4a9eff' : '#555' }}>
+                  <span key={p} style={{ ...S.label, fontSize: '8px', color: v.pending > 0 ? '#4a9eff' : 'var(--text-secondary)' }}>
                     {p.toUpperCase()}: {fmt(v.pending > 0 ? v.pending : v.completed)}
                   </span>
                 ));

@@ -2227,7 +2227,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     fontSize: '10px',
                     fontWeight: 'bold',
                     backgroundColor: claimSubmitting ? 'var(--text-disabled)' : 'var(--surface-elevated)',
-                    color: claimSubmitting ? 'rgba(255,255,255,0.6)' : '#000',
+                    color: claimSubmitting ? 'rgba(255,255,255,0.6)' : 'var(--text)',
                     border: '1px solid rgba(255,255,255,0.25)',
                     cursor: claimSubmitting ? 'not-allowed' : 'pointer',
                     textTransform: 'uppercase'

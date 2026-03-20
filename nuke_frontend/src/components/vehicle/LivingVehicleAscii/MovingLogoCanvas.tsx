@@ -10,7 +10,7 @@ import {
 const CANVAS_SIZE = 431;
 const DISPLAY_SIZE_PX = 215.984;
 const BG = '#0a0a0a';
-const FG = '#fafafa';
+const FG = 'var(--bg-secondary)';
 const FONT = '14px "Courier New", monospace';
 const LINE_HEIGHT = 20;
 const CHAR_WIDTH_APPROX = 8.4;

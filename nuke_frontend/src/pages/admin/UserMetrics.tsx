@@ -556,13 +556,13 @@ export default function UserMetrics() {
               <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                 <XAxis
                   dataKey="bucket"
-                  tick={{ fontSize: 9, fill: '#666' }}
-                  axisLine={{ stroke: '#bdbdbd' }}
+                  tick={{ fontSize: 9, fill: 'var(--text-secondary)' }}
+                  axisLine={{ stroke: 'var(--border)' }}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 9, fill: '#666', fontFamily: "'Courier New', monospace" }}
-                  axisLine={{ stroke: '#bdbdbd' }}
+                  tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontFamily: "'Courier New', monospace" }}
+                  axisLine={{ stroke: 'var(--border)' }}
                   tickLine={false}
                   tickFormatter={(v: number) =>
                     v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)

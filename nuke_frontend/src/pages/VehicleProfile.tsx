@@ -253,7 +253,7 @@ const VehicleProfileInner: React.FC = () => {
 
         {/* Main Content */}
         <div style={{ marginTop: '0' }}>
-          <React.Suspense fallback={<div style={{ padding: '10px 16px', textAlign: 'center', color: '#888', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Loading...</div>}>
+          <React.Suspense fallback={<div style={{ padding: '10px 16px', textAlign: 'center', color: 'var(--text-disabled)', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Loading...</div>}>
             {vehicle ? (
               <WorkspaceContent
                 valuationIntel={valuationIntel}

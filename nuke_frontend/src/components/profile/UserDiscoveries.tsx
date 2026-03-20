@@ -465,7 +465,7 @@ const DiscoveryCard: React.FC<{
             fontSize: '8px',
             padding: '1px 5px',
             background: statusColor,
-            color: '#fff',
+            color: 'var(--surface-elevated)',
             fontWeight: 700,
             fontFamily: '"Courier New", Courier, monospace',
             textTransform: 'uppercase',

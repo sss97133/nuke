@@ -60,7 +60,7 @@ const cardStyle: React.CSSProperties = {
 const btnPrimary: React.CSSProperties = {
   padding: '10px 20px',
   background: 'var(--primary)',
-  color: '#fff',
+  color: 'var(--surface-elevated)',
   border: 'none', fontSize: '14px',
   fontWeight: 600,
   cursor: 'pointer',

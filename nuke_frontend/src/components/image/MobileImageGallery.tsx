@@ -112,7 +112,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: '#000',
+        backgroundColor: 'var(--text)',
         zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
@@ -134,7 +134,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
           alignItems: 'center'
         }}
       >
-        <div style={{ color: '#fff', fontSize: '13px' }}>
+        <div style={{ color: 'var(--surface-elevated)', fontSize: '13px' }}>
           {currentIndex + 1} / {images.length}
         </div>
         <button
@@ -142,7 +142,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
           style={{
             background: 'transparent',
             border: 'none',
-            color: '#fff',
+            color: 'var(--surface-elevated)',
             fontSize: '24px',
             cursor: 'pointer',
             padding: 'var(--space-2)',
@@ -187,7 +187,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
                 transform: 'translateY(-50%)',
                 background: 'rgba(0,0,0,0.5)',
                 border: 'none',
-                color: '#fff',
+                color: 'var(--surface-elevated)',
                 fontSize: '24px',
                 width: '44px',
                 height: '44px', cursor: 'pointer',
@@ -207,7 +207,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
                 transform: 'translateY(-50%)',
                 background: 'rgba(0,0,0,0.5)',
                 border: 'none',
-                color: '#fff',
+                color: 'var(--surface-elevated)',
                 fontSize: '24px',
                 width: '44px',
                 height: '44px', cursor: 'pointer',
@@ -232,7 +232,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
             right: 0,
             padding: 'var(--space-4)',
             background: 'rgba(0,0,0,0.6)',
-            color: '#fff'
+            color: 'var(--surface-elevated)'
           }}
         >
           {currentImage.angle_tag && (

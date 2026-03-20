@@ -75,7 +75,7 @@ export const PhotoTile = React.memo(function PhotoTile({
       style={{
         position: 'relative',
         paddingBottom: '100%',
-        background: '#1a1a1a',
+        background: 'var(--text)',
         border: isSelected ? '2px solid #fff' : 'none',
         cursor: 'pointer',
         boxSizing: 'border-box',
@@ -107,7 +107,7 @@ export const PhotoTile = React.memo(function PhotoTile({
           right: '4px',
           padding: '2px 4px',
           background: 'rgba(0,0,0,0.75)',
-          color: '#fff',
+          color: 'var(--surface-elevated)',
           fontSize: '9px',
           border: '1px solid var(--border)',
         }}>
@@ -144,7 +144,7 @@ export const PhotoTile = React.memo(function PhotoTile({
           right: '6px',
           padding: '2px 5px',
           background: photo.ai_processing_status === 'processing' ? 'var(--warning)' : 'var(--text-disabled)',
-          color: '#fff',
+          color: 'var(--surface-elevated)',
           fontSize: '9px',
           fontWeight: 'bold',
         }}>

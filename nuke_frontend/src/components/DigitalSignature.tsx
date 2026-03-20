@@ -56,7 +56,7 @@ export default function DigitalSignature({
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Add signature line
-    ctx.strokeStyle = '#cccccc';
+    ctx.strokeStyle = 'var(--border)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(20, canvas.height - 20);
@@ -123,7 +123,7 @@ export default function DigitalSignature({
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Redraw signature line
-    ctx.strokeStyle = '#cccccc';
+    ctx.strokeStyle = 'var(--border)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(20, canvas.height - 20);

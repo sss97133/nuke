@@ -501,18 +501,18 @@ const ClaimExternalIdentity: React.FC = () => {
                   backgroundColor: '#0a0a0a',
                   maxHeight: 220,
                   overflowY: 'auto',
-                  fontFamily: 'ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace',
+                  fontFamily: "'Courier New', monospace",
                   fontSize: '12px',
                   lineHeight: 1.7,
                 }}
               >
                 {importLog.map((entry, i) => (
                   <div key={i} style={{
-                    color: entry.type === 'success' ? 'var(--success)' : entry.type === 'dim' ? '#666' : '#a3a3a3',
+                    color: entry.type === 'success' ? 'var(--success)' : entry.type === 'dim' ? 'var(--text-secondary)' : '#a3a3a3',
                     display: 'flex',
                     gap: 8,
                   }}>
-                    <span style={{ color: '#555', flexShrink: 0 }}>
+                    <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
                       {entry.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </span>
                     <span>
@@ -522,7 +522,7 @@ const ClaimExternalIdentity: React.FC = () => {
                   </div>
                 ))}
                 {importStep === 'polling' && (
-                  <div style={{ color: '#555', display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ color: 'var(--text-secondary)', display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span style={{ flexShrink: 0 }}>
                       {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </span>

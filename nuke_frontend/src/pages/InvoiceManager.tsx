@@ -599,7 +599,6 @@ const InvoiceManager: React.FC = () => {
                       fontSize: '9px',
                       fontWeight: 600,
                       cursor: 'pointer',
-                      borderRadius: 0,
                       transition: 'var(--transition)'
                     }}
                   >
@@ -617,7 +616,6 @@ const InvoiceManager: React.FC = () => {
                         fontSize: '9px',
                         fontWeight: 700,
                         cursor: 'pointer',
-                        borderRadius: 0,
                         transition: 'var(--transition)'
                       }}
                     >
@@ -641,7 +639,6 @@ const InvoiceManager: React.FC = () => {
                         fontSize: '9px',
                         fontWeight: 700,
                         cursor: 'pointer',
-                        borderRadius: 0,
                         transition: 'var(--transition)'
                       }}
                     >
@@ -674,7 +671,6 @@ const InvoiceManager: React.FC = () => {
             style={{
               background: 'var(--surface)',
               border: '2px solid var(--border)',
-              borderRadius: 0,
               maxWidth: '900px',
               width: '100%',
               maxHeight: '90vh',
@@ -704,7 +700,6 @@ const InvoiceManager: React.FC = () => {
                   fontSize: '9px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  borderRadius: 0
                 }}
               >
                 CLOSE
@@ -718,7 +713,6 @@ const InvoiceManager: React.FC = () => {
                   background: 'var(--surface)',
                   padding: 'var(--space-4)',
                   border: '1px solid var(--border)',
-                  borderRadius: 0
                 }}
                 dangerouslySetInnerHTML={{ __html: previewInvoice.html_content }}
               />
@@ -755,7 +749,6 @@ const InvoiceManager: React.FC = () => {
                   fontSize: '9px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  borderRadius: 0,
                   transition: 'var(--transition)'
                 }}
               >
@@ -775,7 +768,6 @@ const InvoiceManager: React.FC = () => {
                   fontSize: '9px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  borderRadius: 0,
                   transition: 'var(--transition)'
                 }}
               >
@@ -795,7 +787,6 @@ const InvoiceManager: React.FC = () => {
                   fontSize: '9px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  borderRadius: 0,
                   transition: 'var(--transition)'
                 }}
               >

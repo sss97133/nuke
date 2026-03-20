@@ -7,8 +7,8 @@ import { NODE_WIDTH, NODE_HEIGHT } from './HarnessCanvasNode';
 // Map wire color abbreviations to CSS colors for rendering
 const WIRE_COLOR_MAP: Record<string, string> = {
   'RED': '#cc2222',
-  'BLK': '#333333',
-  'WHT': '#cccccc',
+  'BLK': 'var(--text)',
+  'WHT': 'var(--border)',
   'GRN': '#228b22',
   'BLU': '#2266cc',
   'YEL': '#ccaa00',
@@ -16,7 +16,7 @@ const WIRE_COLOR_MAP: Record<string, string> = {
   'BRN': '#8b4513',
   'VIO': '#7744aa',
   'PNK': '#cc6699',
-  'GRY': '#888888',
+  'GRY': 'var(--text-disabled)',
   'TAN': '#d2b48c',
   'LT GRN': '#66cc66',
   'DK GRN': '#226622',

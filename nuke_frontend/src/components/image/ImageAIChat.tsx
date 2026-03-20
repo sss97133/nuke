@@ -181,7 +181,7 @@ export const ImageAIChat: React.FC<ImageAIChatProps> = ({
             }}>
               {msg.role === 'user' ? 'You' : msg.role === 'system' ? 'System' : 'AI'}
             </div>
-            <div style={{ color: '#fff', wordBreak: 'break-word' }}>
+            <div style={{ color: 'var(--surface-elevated)', wordBreak: 'break-word' }}>
               {msg.content}
             </div>
             {msg.actions && msg.actions.length > 0 && (
@@ -230,7 +230,7 @@ export const ImageAIChat: React.FC<ImageAIChatProps> = ({
             fontSize: '9px',
             backgroundColor: 'rgba(0,0,0,0.5)',
             border: '2px inset rgba(255,255,255,0.2)',
-            color: '#fff',
+            color: 'var(--surface-elevated)',
             fontFamily: 'Arial, sans-serif'
           }}
         />
@@ -245,7 +245,7 @@ export const ImageAIChat: React.FC<ImageAIChatProps> = ({
               ? 'rgba(255,255,255,0.2)' 
               : 'rgba(255,255,255,0.05)',
             border: '2px outset rgba(255,255,255,0.3)',
-            color: '#fff',
+            color: 'var(--surface-elevated)',
             cursor: input.trim() && !isProcessing ? 'pointer' : 'not-allowed',
             fontFamily: 'Arial, sans-serif',
             textTransform: 'uppercase'

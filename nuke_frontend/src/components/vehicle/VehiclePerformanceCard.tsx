@@ -137,7 +137,7 @@ function drawRadar(
   ctx.closePath();
   ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
   ctx.fill();
-  ctx.strokeStyle = '#000';
+  ctx.strokeStyle = 'var(--text)';
   ctx.lineWidth = 2;
   ctx.stroke();
 
@@ -149,13 +149,13 @@ function drawRadar(
     const y = cy + r * Math.sin(a);
     ctx.beginPath();
     ctx.arc(x, y, 3, 0, 2 * Math.PI);
-    ctx.fillStyle = values[i] != null ? '#000' : '#ccc';
+    ctx.fillStyle = values[i] != null ? 'var(--text)' : 'var(--border)';
     ctx.fill();
   }
 
   // Labels
   ctx.font = '600 8px system-ui, -apple-system, sans-serif';
-  ctx.fillStyle = '#000';
+  ctx.fillStyle = 'var(--text)';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (let i = 0; i < n; i++) {

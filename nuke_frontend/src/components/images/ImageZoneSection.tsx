@@ -377,7 +377,7 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
                       bottom: '4px',
                       left: '4px',
                       backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                      color: '#fff',
+                      color: 'var(--surface-elevated)',
                       padding: '1px 5px',
                       fontSize: '9px',
                       fontWeight: 700,

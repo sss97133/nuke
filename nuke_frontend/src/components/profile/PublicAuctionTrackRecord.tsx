@@ -119,7 +119,7 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ listings, loading = 
         <h2 className="heading-2" style={{ marginBottom: 'var(--space-2)' }}>
           Auction Track Record
         </h2>
-        <p style={{ color: '#666', fontSize: '14px' }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
           Pulls directly from Bring a Trailer telemetry that's been linked to this profile. If a source can't be verified, it stays out.
         </p>
       </div>
@@ -135,19 +135,19 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ listings, loading = 
         }}
       >
         <div>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>Total Auctions</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Total Auctions</div>
           <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{stats.totalAuctions}</div>
         </div>
         <div>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>Total Views</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Total Views</div>
           <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{stats.totalViews.toLocaleString()}</div>
         </div>
         <div>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>Total Bids</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Total Bids</div>
           <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{stats.totalBids.toLocaleString()}</div>
         </div>
         <div>
-          <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>Gross Sold Value</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Gross Sold Value</div>
           <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{formatCurrency(stats.totalGross)}</div>
         </div>
       </div>
@@ -184,13 +184,13 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ listings, loading = 
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
                     {seller && (
                       <>
-                        <span style={{ fontSize: '10px', color: '#666' }}>Seller:</span>
+                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Seller:</span>
                         <ParticipantBadge kind="bat_user" label={String(seller)} leadingIconUrl="https://bringatrailer.com" />
                       </>
                     )}
                     {buyer && (
                       <>
-                        <span style={{ fontSize: '10px', color: '#666' }}>Buyer:</span>
+                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Buyer:</span>
                         <ParticipantBadge kind="bat_user" label={String(buyer)} leadingIconUrl="https://bringatrailer.com" />
                       </>
                     )}
@@ -208,11 +208,11 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ listings, loading = 
                       style={{
                         width: '120px',
                         height: '80px',
-                        backgroundColor: '#ddd', display: 'flex',
+                        backgroundColor: 'var(--surface-hover)', display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontSize: '12px',
-                        color: '#666',
+                        color: 'var(--text-secondary)',
                       }}
                     >
                       No Image
@@ -223,10 +223,10 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ listings, loading = 
                       {vehicleTitle}
                     </div>
                     {vehicle?.trim ? (
-                      <div style={{ fontSize: '11px', color: '#666' }}>{vehicle.trim}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{vehicle.trim}</div>
                     ) : null}
                     {saleDate ? (
-                      <div style={{ fontSize: '11px', color: '#666', marginTop: '6px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px' }}>
                         Sale date: {new Date(saleDate).toLocaleDateString()}
                       </div>
                     ) : null}
@@ -234,17 +234,17 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ listings, loading = 
                 </div>
 
                 <div style={{ padding: '8px', backgroundColor: 'var(--bg)', marginBottom: '12px' }}>
-                  <div style={{ fontSize: '10px', color: '#666' }}>Sold For</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Sold For</div>
                   <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{formatCurrency(salePrice)}</div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '11px' }}>
                   <div>
-                    <div style={{ color: '#666' }}>Bids</div>
+                    <div style={{ color: 'var(--text-secondary)' }}>Bids</div>
                     <div style={{ fontWeight: 'bold' }}>{(listing.bid_count || 0).toLocaleString()}</div>
                   </div>
                   <div>
-                    <div style={{ color: '#666' }}>Views</div>
+                    <div style={{ color: 'var(--text-secondary)' }}>Views</div>
                     <div style={{ fontWeight: 'bold' }}>{(listing.view_count || 0).toLocaleString()}</div>
                   </div>
                 </div>

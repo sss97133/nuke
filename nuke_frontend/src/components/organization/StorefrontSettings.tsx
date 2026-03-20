@@ -176,7 +176,7 @@ export default function StorefrontSettings({ organization, onSave }: Props) {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <input
                 type="color"
-                value={primaryColor || '#888888'}
+                value={primaryColor || 'var(--text-disabled)'}
                 onChange={(e) => setPrimaryColor(e.target.value)}
                 style={{ width: 32, height: 24, border: '2px solid var(--border)', padding: 0, cursor: 'pointer' }}
               />

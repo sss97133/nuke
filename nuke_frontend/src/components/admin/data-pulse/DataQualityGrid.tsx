@@ -18,7 +18,7 @@ const S = {
     fontWeight: 700,
     textTransform: 'uppercase' as const,
     letterSpacing: '2px',
-    color: '#888',
+    color: 'var(--text-disabled)',
     marginBottom: '8px',
   } as CSSProperties,
   table: {
@@ -33,7 +33,7 @@ const S = {
     fontWeight: 700,
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
-    color: '#888',
+    color: 'var(--text-disabled)',
     padding: '4px 8px',
     textAlign: 'left' as const,
     borderBottom: '1px solid #333',
@@ -46,7 +46,7 @@ const S = {
     fontFamily: 'Arial, sans-serif',
     fontSize: '9px',
     fontWeight: 700,
-    color: '#ccc',
+    color: 'var(--border)',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
     whiteSpace: 'nowrap' as const,
@@ -108,7 +108,7 @@ export const DataQualityGrid: React.FC<DataQualityGridProps> = ({ census }) => {
           {rows.map((c) => (
             <tr key={c.canonical_platform}>
               <td style={{ ...S.td, ...S.platformName }}>{c.platform_display_name}</td>
-              <td style={{ ...S.td, textAlign: 'right', color: '#e0e0e0' }}>
+              <td style={{ ...S.td, textAlign: 'right', color: 'var(--surface-hover)' }}>
                 {c.total_vehicles.toLocaleString()}
               </td>
               <PctCell num={c.has_vin} total={c.total_vehicles} />

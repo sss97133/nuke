@@ -147,7 +147,7 @@ export function TimelineScrubber({
             top: `${hoveredY - 10}px`,
             padding: '2px 6px',
             background: 'rgba(0,0,0,0.85)',
-            color: '#fff',
+            color: 'var(--surface-elevated)',
             fontSize: '9px',
             fontFamily: 'Courier New, monospace',
             fontWeight: 'bold',

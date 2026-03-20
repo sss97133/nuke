@@ -506,7 +506,7 @@ const Profile: React.FC = () => {
                       fontWeight: 700,
                       padding: '1px 6px',
                       background: 'var(--success, #28a745)',
-                      color: '#fff', lineHeight: '1.4'
+                      color: 'var(--surface-elevated)', lineHeight: '1.4'
                     }}>Verified</span>
                   )}
                   {profile.user_type && profile.user_type !== 'user' && (

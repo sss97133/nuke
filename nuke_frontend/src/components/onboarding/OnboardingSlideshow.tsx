@@ -191,14 +191,14 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
           <div
             style={{
               width: '100%',
-              backgroundColor: '#1a1a1a',
+              backgroundColor: 'var(--text)',
               border: '1px solid #333',
               padding: '20px 16px',
               marginBottom: 'var(--space-4)',
               fontFamily: 'monospace',
               fontSize: '11px',
               lineHeight: '1.5',
-              color: '#ccc',
+              color: 'var(--border)',
               whiteSpace: 'pre',
               overflow: 'auto',
             }}

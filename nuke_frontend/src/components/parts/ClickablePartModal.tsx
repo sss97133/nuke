@@ -183,7 +183,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
             style={{
               padding: '12px 24px',
               background: activeTab === 'search' ? 'var(--color-primary)' : 'transparent',
-              color: activeTab === 'search' ? '#fff' : 'var(--text)',
+              color: activeTab === 'search' ? 'var(--surface-elevated)' : 'var(--text)',
               border: 'none',
               cursor: 'pointer',
               fontSize: '13px',
@@ -199,7 +199,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                 style={{
                   padding: '12px 24px',
                   background: activeTab === 'order' ? 'var(--color-primary)' : 'transparent',
-                  color: activeTab === 'order' ? '#fff' : 'var(--text)',
+                  color: activeTab === 'order' ? 'var(--surface-elevated)' : 'var(--text)',
                   border: 'none',
                   cursor: 'pointer',
                   fontSize: '13px',
@@ -213,7 +213,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                 style={{
                   padding: '12px 24px',
                   background: activeTab === 'install' ? 'var(--color-primary)' : 'transparent',
-                  color: activeTab === 'install' ? '#fff' : 'var(--text)',
+                  color: activeTab === 'install' ? 'var(--surface-elevated)' : 'var(--text)',
                   border: 'none',
                   cursor: 'pointer',
                   fontSize: '13px',
@@ -292,7 +292,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                               style={{
                                 padding: '8px 16px',
                                 background: 'var(--color-primary)',
-                                color: '#fff',
+                                color: 'var(--surface-elevated)',
                                 border: 'none', fontSize: '12px',
                                 cursor: loading ? 'not-allowed' : 'pointer'
                               }}
@@ -337,7 +337,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                   display: 'inline-block',
                   padding: '12px 24px',
                   background: 'var(--color-primary)',
-                  color: '#fff',
+                  color: 'var(--surface-elevated)',
                   textDecoration: 'none', fontSize: '13px'
                 }}
               >
@@ -430,7 +430,7 @@ export const ClickablePartModal: React.FC<ClickablePartModalProps> = ({
                   style={{
                     padding: '12px 24px',
                     background: 'var(--color-primary)',
-                    color: '#fff',
+                    color: 'var(--surface-elevated)',
                     border: 'none', fontSize: '13px',
                     cursor: loading ? 'not-allowed' : 'pointer',
                     fontWeight: 600

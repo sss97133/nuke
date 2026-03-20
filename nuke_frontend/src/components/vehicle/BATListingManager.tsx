@@ -161,7 +161,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
             padding: '6px 12px',
             fontSize: '12px',
             background: mode === 'import' ? 'var(--color-primary)' : 'var(--background-secondary)',
-            color: mode === 'import' ? '#fff' : 'var(--text)',
+            color: mode === 'import' ? 'var(--surface-elevated)' : 'var(--text)',
             border: '1px solid var(--border)', cursor: 'pointer'
           }}
         >
@@ -173,7 +173,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
             padding: '6px 12px',
             fontSize: '12px',
             background: mode === 'extract' ? 'var(--color-primary)' : 'var(--background-secondary)',
-            color: mode === 'extract' ? '#fff' : 'var(--text)',
+            color: mode === 'extract' ? 'var(--surface-elevated)' : 'var(--text)',
             border: '1px solid var(--border)', cursor: 'pointer'
           }}
         >
@@ -223,7 +223,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
             padding: '6px 16px',
             fontSize: '12px',
             background: (mode === 'import' ? importing : extracting) ? 'var(--background-secondary)' : 'var(--color-primary)',
-            color: '#fff',
+            color: 'var(--surface-elevated)',
             border: 'none', cursor: (mode === 'import' ? importing : extracting) ? 'not-allowed' : 'pointer',
             opacity: (mode === 'import' ? importing : extracting) ? 0.6 : 1
           }}

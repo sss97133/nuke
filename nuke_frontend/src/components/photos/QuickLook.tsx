@@ -128,7 +128,7 @@ export const QuickLook: React.FC<QuickLookProps> = ({
                   : photo.ai_processing_status === 'failed'
                     ? 'rgba(244, 67, 54, 0.3)'
                     : 'rgba(255, 255, 255, 0.15)',
-              color: '#fff',
+              color: 'var(--surface-elevated)',
               textTransform: 'uppercase',
             }}
           >
@@ -141,7 +141,7 @@ export const QuickLook: React.FC<QuickLookProps> = ({
             style={{
               fontFamily: 'Arial, sans-serif',
               fontSize: '10px',
-              color: '#fff',
+              color: 'var(--surface-elevated)',
               fontWeight: 700,
             }}
           >

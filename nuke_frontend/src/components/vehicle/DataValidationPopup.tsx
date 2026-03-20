@@ -349,7 +349,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
                         </div>
                         <div style={{
                           padding: '2px 8px', background: getConfidenceColor(validation.confidence_score),
-                          color: '#fff',
+                          color: 'var(--surface-elevated)',
                           fontSize: '11px',
                           fontWeight: 700
                         }}>

@@ -25,7 +25,7 @@ const S = {
     fontWeight: 700,
     textTransform: 'uppercase' as const,
     letterSpacing: '2px',
-    color: '#888',
+    color: 'var(--text-disabled)',
     marginBottom: '8px',
   } as CSSProperties,
 };
@@ -67,7 +67,7 @@ export const IngestionTimeline: React.FC<IngestionTimelineProps> = ({ timeSeries
 
   if (!chartData.length) {
     return (
-      <div style={{ ...S.section, textAlign: 'center', padding: '32px', color: '#666', fontSize: '11px' }}>
+      <div style={{ ...S.section, textAlign: 'center', padding: '32px', color: 'var(--text-secondary)', fontSize: '11px' }}>
         NO TIME SERIES DATA
       </div>
     );
@@ -80,23 +80,23 @@ export const IngestionTimeline: React.FC<IngestionTimelineProps> = ({ timeSeries
         <AreaChart data={chartData}>
           <XAxis
             dataKey="day"
-            tick={{ fontSize: 8, fill: '#888', fontFamily: 'Courier New' }}
+            tick={{ fontSize: 8, fill: 'var(--text-disabled)', fontFamily: 'Courier New' }}
             tickLine={false}
-            axisLine={{ stroke: '#333' }}
+            axisLine={{ stroke: 'var(--text)' }}
           />
           <YAxis
-            tick={{ fontSize: 8, fill: '#888', fontFamily: 'Courier New' }}
+            tick={{ fontSize: 8, fill: 'var(--text-disabled)', fontFamily: 'Courier New' }}
             tickLine={false}
             axisLine={false}
             width={40}
           />
           <Tooltip
             contentStyle={{
-              background: '#1a1a1a',
+              background: 'var(--text)',
               border: '1px solid #333',
               fontSize: '10px',
               fontFamily: 'Courier New',
-              color: '#e0e0e0',
+              color: 'var(--surface-hover)',
             }}
           />
           <Legend
