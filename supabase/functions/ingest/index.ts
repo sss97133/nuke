@@ -739,6 +739,82 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       await supabaseAdmin.from("vehicles")
         .update(fbUpdates)
         .eq("id", match.vehicleId);
+
+      // Create observation in the ontology layer
+      try {
+        const title = [parsed.year, parsed.make, parsed.model].filter(Boolean).join(" ");
+        const structuredData: Record<string, unknown> = {
+          year: parsed.year, make: parsed.make, model: parsed.model,
+          sold: isSold, is_for_sale: !isSold,
+        };
+        if (input.price) structuredData.price = input.price;
+        if (input.mileage) structuredData.mileage = input.mileage;
+        if (input.transmission) structuredData.transmission = input.transmission;
+        if (input.color) structuredData.color = input.color;
+        if (input.seller_name) structuredData.seller_name = input.seller_name;
+        if (input.location) structuredData.location = input.location;
+
+        const contentText = [title, input.price ? `$${input.price}` : null, input.location].filter(Boolean).join(" ");
+
+        // Look up source_id for facebook-saved
+        const { data: srcRow } = await supabaseAdmin
+          .from("observation_sources")
+          .select("id")
+          .eq("slug", "facebook-saved")
+          .single();
+
+        if (srcRow) {
+          await supabaseAdmin.from("vehicle_observations").upsert({
+            vehicle_id: match.vehicleId,
+            vehicle_match_confidence: 1.0,
+            observed_at: new Date().toISOString(),
+            source_id: srcRow.id,
+            source_url: input.url || null,
+            source_identifier: `fb-saved-${match.vehicleId}`,
+            kind: "listing",
+            content_text: contentText,
+            content_hash: await crypto.subtle.digest("SHA-256",
+              new TextEncoder().encode(`facebook-saved:listing:${match.vehicleId}:${contentText}`)
+            ).then(buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("")),
+            structured_data: structuredData,
+          }, { onConflict: "source_id,source_identifier,kind,content_hash", ignoreDuplicates: true });
+
+          // Create field_evidence for each non-null spec
+          const evidenceRows: Array<Record<string, unknown>> = [];
+          const specs: Array<[string, unknown, string]> = [
+            ["asking_price", input.price, "FB Marketplace listing price"],
+            ["mileage", input.mileage, "Seller-reported mileage on FB listing"],
+            ["transmission", input.transmission, "Seller-reported transmission on FB listing"],
+            ["color", input.color, "Seller-reported color on FB listing"],
+            ["year", parsed.year, "Year from FB listing title"],
+            ["make", parsed.make, "Make from FB listing title"],
+            ["model", parsed.model, "Model from FB listing title"],
+            ["seller_name", input.seller_name, "FB Marketplace seller profile name"],
+          ];
+          for (const [field, val, ctx] of specs) {
+            if (val) {
+              evidenceRows.push({
+                vehicle_id: match.vehicleId,
+                field_name: field,
+                proposed_value: String(val),
+                source_type: "fb_marketplace_listing",
+                source_confidence: 55,
+                extraction_context: ctx,
+                status: "accepted",
+              });
+            }
+          }
+          if (evidenceRows.length > 0) {
+            await supabaseAdmin.from("field_evidence")
+              .upsert(evidenceRows, {
+                onConflict: "vehicle_id,field_name,source_type,proposed_value",
+                ignoreDuplicates: true,
+              });
+          }
+        }
+      } catch (obsErr: any) {
+        console.error("Observation creation error (non-fatal):", obsErr.message);
+      }
     }
 
     // If flagged for review, mark the vehicle

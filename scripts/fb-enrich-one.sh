@@ -42,10 +42,21 @@ while IFS= read -r URL; do
       IS_PRIMARY="false"
       [ "$COUNT" = "0" ] && IS_PRIMARY="true" && PRIMARY="$PUBLIC_URL"
 
-      # Insert vehicle_image record
+      # Insert vehicle_image record + media observation
       PGPASSWORD="RbzKq32A0uhqvJMQ" psql -q -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
-        -U postgres.qkgaybvrernstplzjaam -d postgres \
-        -c "INSERT INTO vehicle_images (vehicle_id, image_url, is_primary, source) VALUES ('${VEHICLE_ID}', '${PUBLIC_URL}', ${IS_PRIMARY}, 'facebook-saved') ON CONFLICT DO NOTHING;"
+        -U postgres.qkgaybvrernstplzjaam -d postgres <<EOSQL
+INSERT INTO vehicle_images (vehicle_id, image_url, is_primary, source)
+VALUES ('${VEHICLE_ID}', '${PUBLIC_URL}', ${IS_PRIMARY}, 'facebook-saved')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO vehicle_observations (vehicle_id, vehicle_match_confidence, observed_at, source_id, source_identifier, kind, content_hash, structured_data)
+SELECT '${VEHICLE_ID}', 1.0, NOW(),
+  (SELECT id FROM observation_sources WHERE slug = 'facebook-saved'),
+  'fb-img-${VEHICLE_ID}-${PADDED}', 'media',
+  encode(sha256(('facebook-saved:media:${VEHICLE_ID}:${PUBLIC_URL}')::bytea), 'hex'),
+  jsonb_build_object('image_url', '${PUBLIC_URL}', 'is_primary', ${IS_PRIMARY}, 'source', 'facebook-saved')
+ON CONFLICT (source_id, source_identifier, kind, content_hash) DO NOTHING;
+EOSQL
 
       COUNT=$((COUNT + 1))
     fi

@@ -177,14 +177,45 @@ Deno.serve(async (req) => {
 
     console.log(`[photo-pipeline] Processing image ${image_id}`);
 
-    // Step 1: Mark as processing
+    // Step 1: Mark as processing + read pre-computed Apple ML data
+    const { data: imageRow } = await supabase
+      .from("vehicle_images")
+      .select("apple_ml_labels, vehicle_score, latitude, longitude, taken_at")
+      .eq("id", image_id)
+      .maybeSingle();
+
     await supabase
       .from("vehicle_images")
       .update({ ai_processing_status: "processing" })
       .eq("id", image_id);
 
-    // Step 2: Classify image type
+    const appleLabels: string[] = imageRow?.apple_ml_labels || [];
+    const vehicleScore: number | null = imageRow?.vehicle_score;
+
+    // Fast-path: if Apple ML pre-scored this as non-automotive (score 0), skip Gemini
+    if (vehicleScore !== null && vehicleScore === 0 && appleLabels.length > 0) {
+      console.log(`[photo-pipeline] Apple ML score=0, skipping Gemini (labels: ${appleLabels.join(', ')})`);
+      await supabase.from("vehicle_images").update({
+        ai_processing_status: "completed",
+        ai_scan_metadata: {
+          pipeline_version: "v2",
+          skipped: "apple_ml_non_automotive",
+          apple_ml_labels: appleLabels,
+          vehicle_score: vehicleScore,
+        },
+      }).eq("id", image_id);
+      return new Response(
+        JSON.stringify({ success: true, image_id, classification: "non_automotive_apple_ml", skipped: true, duration_ms: Date.now() - startedAt }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Step 2: Classify image type (Gemini Flash)
     const classification = await classifyImage(image_url);
+    // Merge Apple ML hints into classification if Gemini didn't detect vehicle hints
+    if (appleLabels.length > 0 && !classification.vehicle_hints?.make) {
+      classification.description = `${classification.description} [Apple ML: ${appleLabels.join(', ')}]`;
+    }
     console.log(`[photo-pipeline] Classified as: ${classification.image_type} (${classification.confidence})`);
 
     // Step 3: If no vehicle_id, try to resolve

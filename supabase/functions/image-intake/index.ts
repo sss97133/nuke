@@ -64,6 +64,10 @@ interface ImageInput {
   takenAt?: string;
   caption?: string;
   localPath?: string;
+  latitude?: number;
+  longitude?: number;
+  appleLabels?: string[];
+  vehicleScore?: number;
 }
 
 interface VehicleMatch {
@@ -328,8 +332,9 @@ serve(async (req) => {
         const img = batch[j];
         const analysis = analyses[j] || { isVehiclePhoto: false, vehicleId: null, confidence: 0, hints: {}, description: "" };
 
-        // Skip non-vehicle photos
-        if (!analysis.isVehiclePhoto) {
+        // Skip non-vehicle photos — but trust Apple ML labels if AI classification failed
+        const hasAppleVehicleSignal = (img.vehicleScore ?? 0) >= 0.3;
+        if (!analysis.isVehiclePhoto && !hasAppleVehicleSignal) {
           results.push({
             imageUrl: img.url,
             vehicleId: null,
@@ -337,6 +342,12 @@ serve(async (req) => {
             confidence: 0,
           });
           continue;
+        }
+        // If AI said not-vehicle but Apple ML says vehicle, override
+        if (!analysis.isVehiclePhoto && hasAppleVehicleSignal) {
+          console.log(`Apple ML override: score=${img.vehicleScore}, labels=${(img.appleLabels || []).join(',')}`);
+          analysis.isVehiclePhoto = true;
+          analysis.confidence = Math.max(analysis.confidence, img.vehicleScore ?? 0);
         }
 
         let vehicleId = analysis.vehicleId;
@@ -394,13 +405,18 @@ serve(async (req) => {
             category: "work",
             caption: analysis.description,
             source: "image_intake",
-            metadata: {
+            ai_scan_metadata: {
               source: "image_intake",
-              taken_at: img.takenAt,
               ai_confidence: analysis.confidence,
               ai_hints: analysis.hints,
             },
           };
+          // Write structured fields to real columns (not just metadata JSONB)
+          if (img.takenAt) insertPayload.taken_at = img.takenAt;
+          if (img.latitude) insertPayload.latitude = img.latitude;
+          if (img.longitude) insertPayload.longitude = img.longitude;
+          if (img.appleLabels?.length) insertPayload.apple_ml_labels = img.appleLabels;
+          if (img.vehicleScore != null) insertPayload.vehicle_score = img.vehicleScore;
           if (fileHash) insertPayload.file_hash = fileHash;
           if (isDuplicate) {
             insertPayload.is_duplicate = true;
@@ -426,16 +442,51 @@ serve(async (req) => {
             });
           }
         } else {
-          // Store in pending queue
-          await supabase.from("pending_image_assignments").upsert({
-            image_url: img.url,
-            user_id: effectiveUserId,
-            ai_hints: analysis.hints,
-            ai_description: analysis.description,
-            ai_confidence: analysis.confidence,
-            status: "pending",
-            created_at: new Date().toISOString(),
-          }, { onConflict: "image_url" });
+          // If photo has GPS/Apple ML data, insert into vehicle_images for pipeline resolution
+          // Otherwise fall back to pending_image_assignments
+          if (img.latitude || img.appleLabels?.length) {
+            const unassignedPayload: Record<string, unknown> = {
+              image_url: img.url,
+              user_id: effectiveUserId,
+              category: "work",
+              caption: analysis.description || img.caption,
+              source: "image_intake",
+              organization_status: "unorganized",
+              ai_processing_status: "pending",
+              ai_scan_metadata: {
+                source: "image_intake",
+                ai_confidence: analysis.confidence,
+                ai_hints: analysis.hints,
+                needs_vehicle_resolution: true,
+              },
+            };
+            if (img.takenAt) unassignedPayload.taken_at = img.takenAt;
+            if (img.latitude) unassignedPayload.latitude = img.latitude;
+            if (img.longitude) unassignedPayload.longitude = img.longitude;
+            if (img.appleLabels?.length) unassignedPayload.apple_ml_labels = img.appleLabels;
+            if (img.vehicleScore != null) unassignedPayload.vehicle_score = img.vehicleScore;
+            if (fileHash) unassignedPayload.file_hash = fileHash;
+
+            const { data: viData, error: viErr } = await supabase.from("vehicle_images").insert(unassignedPayload).select("id").maybeSingle();
+            if (viErr) {
+              console.error(`vehicle_images insert failed: ${viErr.message} code=${viErr.code}`, JSON.stringify(viErr));
+              // Surface error in response for debugging
+              (analysis as any)._insertError = viErr.message;
+            } else {
+              console.log(`Inserted unassigned photo id=${viData?.id} GPS=${!!img.latitude} labels=${(img.appleLabels||[]).length}`);
+              (analysis as any)._insertedId = viData?.id;
+            }
+          } else {
+            await supabase.from("pending_image_assignments").upsert({
+              image_url: img.url,
+              user_id: effectiveUserId,
+              ai_hints: analysis.hints,
+              ai_description: analysis.description,
+              ai_confidence: analysis.confidence,
+              status: "pending",
+              created_at: new Date().toISOString(),
+            }, { onConflict: "image_url" });
+          }
         }
 
         results.push({
@@ -443,6 +494,7 @@ serve(async (req) => {
           vehicleId,
           status,
           confidence: analysis.confidence,
+          _debug: { insertError: (analysis as any)._insertError, insertedId: (analysis as any)._insertedId },
         });
       }
     }
@@ -458,6 +510,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
+      version: "v3-apple-ml",
       summary: {
         total: images.length,
         matched,
