@@ -22,7 +22,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { archiveFetch } from "../_shared/archiveFetch.ts";
+import { archiveFetch, readArchivedPage } from "../_shared/archiveFetch.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
 
@@ -478,6 +478,43 @@ function parseMarkdown(markdown: string, url: string): MecumVehicle {
 // ─── Fetch + parse (tries __NEXT_DATA__ first, falls back to markdown) ──
 
 async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): Promise<MecumVehicle> {
+  // Step 0: Try archived snapshots first (any age) — "Fetch once, extract forever"
+  // Query for the largest direct snapshot (most likely to have __NEXT_DATA__ with post data)
+  const supabaseInner = (() => {
+    const u = Deno.env.get("SUPABASE_URL") ?? "";
+    const k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
+    return createClient(u, k, { auth: { persistSession: false } });
+  })();
+  const { data: bestSnapshot } = await supabaseInner
+    .from("listing_page_snapshots")
+    .select("id, html, html_storage_path")
+    .eq("listing_url", url)
+    .eq("success", true)
+    .eq("fetch_method", "direct")
+    .order("content_length", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (bestSnapshot) {
+    let archiveHtml = bestSnapshot.html;
+    if (!archiveHtml && bestSnapshot.html_storage_path) {
+      try {
+        const { data: blob } = await supabaseInner.storage
+          .from("listing-snapshots")
+          .download(bestSnapshot.html_storage_path);
+        if (blob) archiveHtml = await blob.text();
+      } catch (_) {}
+    }
+    if (archiveHtml) {
+      if (archiveHtml.includes("404 - PAGE NOT FOUND")) throw new Error("PAGE_NOT_FOUND");
+      const fromArchive = parseNextData(archiveHtml, url);
+      if (fromArchive && fromArchive.year && fromArchive.make) {
+        console.log(`[MECUM] Parsed via archived __NEXT_DATA__ (snapshot ${bestSnapshot.id}): ${fromArchive.year} ${fromArchive.make} ${fromArchive.model}`);
+        return fromArchive;
+      }
+    }
+  }
+
   // Step 1: Try direct HTTP fetch for __NEXT_DATA__ (free, no Firecrawl)
   const directResult = await archiveFetch(url, {
     platform: "mecum",

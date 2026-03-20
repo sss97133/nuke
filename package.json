@@ -103,7 +103,16 @@
     "condition:expand": "dotenvx run -- python3 scripts/expand-condition-taxonomy.py",
     "condition:bridge": "dotenvx run -- python3 -m yono.condition_spectrometer bridge",
     "condition:score-all": "dotenvx run -- python3 -m yono.condition_spectrometer score-all",
-    "condition:distribute": "dotenvx run -- python3 -m yono.condition_spectrometer distribute --all"
+    "condition:distribute": "dotenvx run -- python3 -m yono.condition_spectrometer distribute --all",
+    "discover:local": "dotenvx run -- node scripts/local-description-discovery.mjs",
+    "discover:qwen": "dotenvx run -- node scripts/local-description-discovery.mjs --provider ollama --model qwen2.5:7b --batch 50 --parallel 2 --max 5000 --continue",
+    "discover:llama": "dotenvx run -- node scripts/local-description-discovery.mjs --provider ollama --model llama3.1:8b --batch 50 --parallel 2 --max 5000 --continue",
+    "ops:health": "dotenvx run -- bash scripts/scheduled/morning-health-check.sh",
+    "ops:smoke": "dotenvx run -- bash scripts/scheduled/smoke-test.sh",
+    "ops:regression": "dotenvx run -- bash scripts/scheduled/nightly-regression.sh",
+    "discover:openai": "dotenvx run -- node scripts/local-description-discovery.mjs --provider openai --batch 50 --parallel 10 --max 5000 --continue",
+    "discover:gemini": "dotenvx run -- node scripts/local-description-discovery.mjs --provider gemini --batch 50 --parallel 5 --max 1000 --continue",
+    "discover:groq": "dotenvx run -- node scripts/local-description-discovery.mjs --provider groq --batch 50 --parallel 10 --max 5000 --continue"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",
