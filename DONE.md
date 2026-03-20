@@ -4437,3 +4437,12 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - **Mapper script**: `scripts/iphoto-album-mapper.sh` — explicit album→vehicle_id mapping for all 72 albums, runs iphoto-intake per album.
 - **iPhoto intake**: Running in background via mapper script. Albums process sequentially through osxphotos export → HEIC→JPEG → Supabase upload. ~13K photos across 72 albums.
 - Vehicle count: 72 active, 38 discovered, 6 inactive, 2 merged = 116 total (was ~100 pre-mapping).
+
+### [extraction] Session Close-Out Summary (2026-03-20)
+- archiveFetch cache fix: 93.6% of snapshots now cache-hittable (was 0%)
+- discover-description-data: fixed dead query, 244K vehicles now processable
+- batch-comment-discovery: deployed (was never live), 3,918 remaining
+- extract-mecum: archive-first approach, 462 images backfilled from snapshots
+- Multi-model pipeline: qwen2.5:7b grinding at ~100/hr (3,385 done), 0 API cost
+- Schema: description_discoveries now (vehicle_id, model_used) unique — multi-model provenance enabled
+- Total description_discoveries: 13,121 across 4 models

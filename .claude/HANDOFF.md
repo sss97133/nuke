@@ -1,46 +1,97 @@
-# Session Handoff — 2026-03-20 08:30 UTC
+# Session Handoff — 2026-03-20 Overnight Autonomous
+
+**Branch:** `overnight-data-quality` (10 commits ahead of main)
+
+---
+
+## Overnight Autonomous Agent — 6 Blocks Complete
+
+### BLOCK 1: Flush & Ship ✅
+- Deployed db-stats, extract-mecum, refine-fb-listing, mcp-connector
+- nuke.ag 200 OK, MCP connector 200 OK
+
+### BLOCK 2: Design System Border-Radius Purge ✅
+- **1,800+ violations → 0** across 400+ files (3 parallel agents)
+- JSX borderRadius, Tailwind rounded-*, CSS border-radius all fixed
+- Preserved borderRadius: '50%' for circles. TypeScript clean.
+
+### BLOCK 3: Deno Import Modernization ✅
+- **260 edge functions** cleaned of ALL deno.land/std@ imports
+- serve/crypto/base64 removed, serve() → Deno.serve()
+- 35+ functions deployed in 3 batches
+
+### BLOCK 4: Data Quality Enrichment ✅
+- 73 vehicles enriched, profile_origin backfilled, strategies mostly exhausted
+
+### BLOCK 5: Comment Mining ✅
+- **1,312 new extractions** across 71 groups for $1.08
+- Library doubled: 1,161 → 2,473 items, 142 make/model groups
+
+### BLOCK 6: Hardcoded Colors ✅
+- **200 replacements** across 71 files, hex → CSS variables
+- 1,675 → 499 remaining (chart/brand-specific colors)
+
+---
 
 ## ARS-BUILD Agent — Auction Readiness System (Sprint 1+2)
 
-### What Was Completed
+- 3 tables: auction_readiness, ars_tier_transitions, photo_coverage_requirements
+- 3 SQL functions: compute/persist/recompute (~65ms/vehicle)
+- 3 triggers on image/observation/evidence insert
+- 3 MCP tools + generate-listing-package edge function
+- 2,142 vehicles scored: 3 NEEDS_WORK, 279 EARLY_STAGE, 1860 DISCOVERY_ONLY
 
-**Database (all via Supabase migrations):**
-- 3 tables: `auction_readiness`, `ars_tier_transitions`, `photo_coverage_requirements`
-- 3 SQL functions: `compute_auction_readiness(uuid)` (~65ms), `persist_auction_readiness(uuid)`, `recompute_ars_dimension(uuid, text)`
-- 3 triggers: `trg_ars_on_image_insert`, `trg_ars_on_observation_insert`, `trg_ars_on_evidence_insert`
-- 1 index: `idx_vehicle_images_vehicle_zone(vehicle_id, vehicle_zone)` on 33M rows
-- 20 seed rows in `photo_coverage_requirements` (8 required + 12 competitive zones with coaching prompts)
-- 2 pipeline_registry entries
+---
 
-**Edge Functions:**
-- `generate-listing-package` — new, deployed. Assembles submission bundles with BaT field mapping skeleton.
-- `mcp-connector` — added 3 tools: `get_auction_readiness`, `get_coaching_plan`, `prepare_listing`. Deployed.
+## What's Next
 
-**Batch Results (2,142 vehicles scored):**
-- NEEDS_WORK (55-74): 3 vehicles, avg 65
-- EARLY_STAGE (35-54): 279 vehicles, avg 42
-- DISCOVERY_ONLY (0-34): 1,860 vehicles, avg 22
-- Zero TIER 1-2. Top: 1991 Mercedes 300SL at 67.
+1. **Merge overnight-data-quality → main** (10 commits)
+2. Deploy remaining ~220 modernized functions
+3. Continue color migration (499 remaining)
+4. Batch compute ARS for ~182K vehicles
+5. YONO zone classifier on unclassified images
+6. Expand library: GM makes, pre-war era
 
-### Known Issue
-mcp-connector was reverted by a linter once during session. Re-applied and redeployed. Deployed version is correct. If local file is reverted again, re-add the 3 ARS handlers between the ingestion handlers and TOOL_DISPATCH section.
+---
+# Auto-Checkpoint — 2026-03-20 08:00:42
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
 
-### Files Changed
-- `supabase/functions/mcp-connector/index.ts` (+237 lines: 3 tools, 3 handlers)
-- `supabase/functions/generate-listing-package/index.ts` (new, 272 lines)
-- `DONE.md`, `TOOLS.md`, `auction-readiness-strategy.md` (docs updated)
+## Recent Commits (last 30 min)
+1004d7426 ARS build session handoff: Sprint 1+2 complete
+01aaea724 chore: overnight session infrastructure + listing package + library mining
 
-### What's Next (Sprint 3+)
-1. Batch compute remaining ~182K vehicles (500/batch, stays under 120s)
-2. Run YONO zone classifier on unclassified images → lifts photo_score
-3. AI description generation in `generate-listing-package`
-4. BaT form automation (Sprint 4)
-5. Coaching delivery: profile page widget + email
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
 
-### Quick Verify
-```sql
-SELECT count(*) FROM auction_readiness;
-SELECT tier, count(*) FROM auction_readiness GROUP BY tier;
-SELECT persist_auction_readiness('e08bf694-970f-4cbe-8a74-8715158a0f2e');
-SELECT tgname FROM pg_trigger WHERE tgname LIKE 'trg_ars%';
-```
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 08:00:42
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+1004d7426 ARS build session handoff: Sprint 1+2 complete
+01aaea724 chore: overnight session infrastructure + listing package + library mining
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`

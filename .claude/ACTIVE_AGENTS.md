@@ -5,4 +5,6 @@
 
 ---
 
-00:00 | OVERNIGHT-AUTO | 8-hour autonomous session: stabilize, db cleanup, data enrichment, extraction repair, library expansion | DB tables, crons, git commits, DONE.md
+**Background process (no agent):**
+- Ollama discovery: PID 15508, `scripts/local-description-discovery.mjs --batch 50 --parallel 2 --max 5000 --continue`
+  - Started ~02:00, will self-terminate at 5000 or no candidates
