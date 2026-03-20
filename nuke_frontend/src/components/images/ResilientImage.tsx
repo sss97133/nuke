@@ -32,6 +32,9 @@ function normalizeSources(sources: Array<string | null | undefined>, size: Image
     // Apply CDN optimization (BaT ?w=, Supabase render API, etc.)
     const optimized = optimizeImageUrl(v, size) || v;
     if (!out.includes(optimized)) out.push(optimized);
+    // Add original URL as fallback if it was transformed (e.g., Supabase render API
+    // returns 422 "Invalid source image" for large files — fall back to direct URL)
+    if (optimized !== v && !out.includes(v)) out.push(v);
   }
   return out;
 }

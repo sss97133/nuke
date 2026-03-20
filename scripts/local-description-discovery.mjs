@@ -51,10 +51,11 @@ const DEFAULT_MODELS = {
   openai: "gpt-4o-mini",
   gemini: "gemini-2.0-flash-lite",
   groq: "llama-3.1-8b-instant",
+  modal: "qwen2.5-7b",
 };
 const MODEL = getArg("model", DEFAULT_MODELS[PROVIDER] || "qwen2.5:7b");
 const BATCH_SIZE = parseInt(getArg("batch", "20"), 10);
-const DEFAULT_PARALLEL = { ollama: 2, openai: 10, gemini: 5, groq: 10 };
+const DEFAULT_PARALLEL = { ollama: 2, openai: 10, gemini: 5, groq: 10, modal: 8 };
 const PARALLEL = parseInt(getArg("parallel", String(DEFAULT_PARALLEL[PROVIDER] || 2)), 10);
 const MIN_PRICE = parseInt(getArg("min-price", "0"), 10);
 const MAX_TOTAL = parseInt(getArg("max", "1000"), 10);
@@ -188,7 +189,30 @@ async function callGroq(prompt) {
   return { content: r.choices?.[0]?.message?.content || "", tokensPerSec };
 }
 
-const PROVIDERS = { ollama: callOllama, openai: callOpenAI, gemini: callGemini, groq: callGroq };
+const MODAL_URL = process.env.MODAL_LLM_URL || "https://sss97133--nuke-vllm-serve.modal.run";
+
+async function callModal(prompt) {
+  const resp = await fetch(`${MODAL_URL}/v1/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "qwen2.5-7b",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.1,
+      max_tokens: 2048,
+    }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`Modal ${resp.status}: ${text.slice(0, 200)}`);
+  }
+  const r = await resp.json();
+  const meta = r._meta || {};
+  const tokensPerSec = meta.tokens_per_sec || "?";
+  return { content: r.choices?.[0]?.message?.content || "", tokensPerSec };
+}
+
+const PROVIDERS = { ollama: callOllama, openai: callOpenAI, gemini: callGemini, groq: callGroq, modal: callModal };
 
 // ─── Extract + parse ────────────────────────────────────────────────────
 
@@ -300,6 +324,7 @@ async function main() {
     openai: `~$${((MAX_TOTAL * 6000 * 0.15 / 1e6) + (MAX_TOTAL * 1000 * 0.6 / 1e6)).toFixed(2)} (gpt-4o-mini)`,
     gemini: "FREE (1000 RPD limit)",
     groq: "FREE (14,400 RPD limit)",
+    modal: `~$${(MAX_TOTAL * 4 / 3600 * 0.59).toFixed(2)} (T4 GPU, ~$0.59/hr)`,
   };
 
   console.log(`\n  Multi-Model Description Discovery`);
