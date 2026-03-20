@@ -91,9 +91,9 @@ serve(async (req) => {
     }
     const userId = auth.userId;
 
-    // Detect agent staging
-    const isStageOnly = auth.scopes?.includes('stage_write') && !auth.scopes?.includes('write');
+    // Detect agent staging: agent identity + stage_write scope = must go through staging
     const agentId = auth.agentId;
+    const isStageOnly = agentId ? auth.scopes?.includes('stage_write') : false;
 
     let body: BatchRequest;
     try {
