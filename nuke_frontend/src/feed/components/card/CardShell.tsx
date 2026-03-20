@@ -65,6 +65,7 @@ export function CardShell({
           background: 'var(--surface)',
           border: '2px solid var(--border)',
           overflow: 'hidden',
+          height: '100%',
           textDecoration: 'none',
           color: 'inherit',
           transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
