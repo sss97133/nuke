@@ -14,7 +14,6 @@
  *   { "batch_size": 200, "dry_run": false, "nominatim_delay_ms": 1100 }
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -189,7 +188,7 @@ function normalizeStateCode(state: string | null): string | null {
   return STATE_ABBR[state.toLowerCase()] || null;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

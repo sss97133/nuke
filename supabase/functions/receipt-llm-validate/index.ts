@@ -3,7 +3,6 @@
 // Secrets required: ANTHROPIC_API_KEY
 // Deploy: supabase functions deploy receipt-llm-validate
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -39,7 +38,7 @@ interface ParsedReceipt {
   raw_json?: any;
 }
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   try {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 

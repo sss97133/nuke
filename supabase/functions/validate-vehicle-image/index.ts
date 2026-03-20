@@ -3,7 +3,6 @@
  * Validates if an image actually shows the expected vehicle vs pollution/UI elements
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -29,7 +28,7 @@ interface ValidationResult {
   image_type: 'vehicle_exterior' | 'vehicle_interior' | 'engine_bay' | 'undercarriage' | 'documentation' | 'ui_element' | 'unrelated';
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }

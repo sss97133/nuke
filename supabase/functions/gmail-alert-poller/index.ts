@@ -25,7 +25,6 @@
  *   SUPABASE_SERVICE_ROLE_KEY — Auto-set by Supabase runtime
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -189,7 +188,7 @@ function parseMessage(message: any): {
 
 // ─── Main handler ──────────────────────────────────────────────────────────────
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

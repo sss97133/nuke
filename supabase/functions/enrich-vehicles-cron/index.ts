@@ -20,7 +20,6 @@
  *   curl -X POST ... -d '{"action": "stats"}'
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -45,7 +44,7 @@ const SOURCE_TO_EXTRACTOR: Record<string, string> = {
   // collecting_cars removed — extract-vehicle-data-ai has no batch re_enrich action
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

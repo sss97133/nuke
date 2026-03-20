@@ -12,7 +12,6 @@
  * Authentication: Bearer JWT, service role key, or X-API-Key header
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { authenticateRequest, logApiUsage } from "../_shared/apiKeyAuth.ts";
 
@@ -78,7 +77,7 @@ const MAX_LIMIT_SERVICE_ROLE = 100_000;
 const MAX_LIMIT_API_KEY = 10_000;
 const MAX_LIMIT_USER = 5_000;
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

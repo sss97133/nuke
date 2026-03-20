@@ -10,7 +10,6 @@
  * Webhook URL: POST /functions/v1/sms-work-intake
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { evaluatePhotoCoaching, formatCoachingForSms } from "../_shared/photoCoaching.ts";
 import type { PhotoCoachingContext } from "../_shared/photoCoaching.ts";
@@ -474,7 +473,7 @@ function escapeXml(text: string): string {
     .replace(/'/g, "&apos;");
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }

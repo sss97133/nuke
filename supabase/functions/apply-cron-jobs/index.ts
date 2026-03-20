@@ -2,7 +2,6 @@
  * apply-cron-jobs
  * Applies vehicle intelligence cron jobs using direct SQL execution.
  */
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,7 +29,7 @@ const cronJobs = [
   },
 ];
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

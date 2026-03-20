@@ -3,7 +3,6 @@
 // Actions: send (SMS OTP), verify (confirm code)
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER
 
-import { serve } from "https://deno.land/std@0.177.1/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -65,7 +64,7 @@ async function twilioVerifyCheck(to: string, code: string) {
   }
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   try {
     if (req.method === "OPTIONS") {
       return new Response("ok", { headers: corsHeaders });

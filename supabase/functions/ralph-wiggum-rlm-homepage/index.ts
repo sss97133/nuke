@@ -15,7 +15,6 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  * Secrets required (at least one):
  *   OPENAI_API_KEY (recommended)
  */
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { callOpenAiChatCompletions } from "../_shared/openaiChat.ts";
@@ -210,7 +209,7 @@ function getMissingColumn(err: any): string | null {
   return match?.[1] || null;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return okJson({ success: false, error: "Method not allowed" }, 405);
 

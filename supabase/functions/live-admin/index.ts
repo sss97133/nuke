@@ -2,7 +2,6 @@
 // Supabase Edge Function: live-admin
 // Ensures a per-user Mux live stream and stores stream key + playback id in user_live_state
 
-import { serve } from "https://deno.land/std@0.177.1/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -62,7 +61,7 @@ async function ensureLiveStream(user_id: string) {
   return up;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   const origin = req.headers.get('origin') || '';
   const allowedOrigins = new Set([
     'http://localhost:5173',

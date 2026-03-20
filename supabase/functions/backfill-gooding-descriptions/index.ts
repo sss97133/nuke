@@ -24,7 +24,6 @@
  * Deploy: supabase functions deploy backfill-gooding-descriptions --no-verify-jwt
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const BACKFILL_VERSION = '2.0.0';
@@ -192,7 +191,7 @@ function okJson(body: unknown, status = 200): Response {
   });
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

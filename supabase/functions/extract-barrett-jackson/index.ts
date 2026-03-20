@@ -23,7 +23,6 @@
  *   POST { "action": "stats" }                       -- Queue statistics
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
@@ -1101,7 +1100,7 @@ async function saveVehicle(
 
 // ─── Main handler ───────────────────────────────────────────────────────────
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

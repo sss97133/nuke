@@ -8,7 +8,6 @@
  * Output: { title, event_type, confidence, reasoning }
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callLLM, getLLMConfig } from '../_shared/llmProvider.ts'
 
@@ -25,7 +24,7 @@ const VALID_EVENT_TYPES = [
   'purchase', 'service', 'other', 'work_completed'
 ]
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
