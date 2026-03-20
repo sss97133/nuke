@@ -162,6 +162,8 @@ serve(async (req) => {
     const offset: number = offsetRaw ? Math.max(0, Math.min(Number(offsetRaw), 10000)) : 0;
     const types: string[] | undefined = urlParams.get('types')?.split(',') ?? body.types;
     const includeAI: boolean = urlParams.has('includeAI') ? urlParams.get('includeAI') !== 'false' : (body.includeAI ?? true);
+    const locationFilter: string | undefined = urlParams.get('location') || (body as any).location || undefined;
+    const bodyStyleFilter: string | undefined = urlParams.get('body_style') || (body as any).body_style || undefined;
 
     if (!query || typeof query !== 'string' || !query.trim()) {
       return new Response(JSON.stringify({
@@ -184,7 +186,7 @@ serve(async (req) => {
     const results: SearchResult[] = [];
 
     // Shared rich vehicle SELECT — includes all fields needed for tier calculation and UI display
-    const VEHICLE_SELECT = 'id, year, make, model, vin, color, status, sale_price, current_value, asking_price, primary_image_url, seller_name, bat_seller, data_quality_score, view_count, bat_view_count, profile_origin, ownership_verified, comment_count, mileage, transmission, engine_size, canonical_vehicle_type, canonical_body_style, image_count, observation_count, updated_at';
+    const VEHICLE_SELECT = 'id, year, make, model, vin, color, status, sale_price, current_value, asking_price, primary_image_url, seller_name, bat_seller, data_quality_score, view_count, bat_view_count, profile_origin, ownership_verified, comment_count, mileage, transmission, engine_size, canonical_vehicle_type, canonical_body_style, body_style, image_count, observation_count, city, state, listing_location, updated_at';
 
     // Exclude non-automobile types from all search results
     const NON_AUTO_TYPES = new Set(['MOTORCYCLE', 'BOAT', 'TRAILER', 'ATV', 'BUS', 'RV', 'SNOWMOBILE', 'OTHER', 'EQUIPMENT']);
@@ -219,6 +221,10 @@ serve(async (req) => {
       mileage: v.mileage,
       transmission: v.transmission,
       engine_size: v.engine_size,
+      body_style: v.body_style || v.canonical_body_style || undefined,
+      city: v.city,
+      state: v.state,
+      location: v.city && v.state ? `${v.city}, ${v.state}` : v.listing_location || undefined,
       updated_at: v.updated_at,
     });
 
@@ -340,6 +346,25 @@ serve(async (req) => {
     const searchPattern = `%${escapeIlike(trimmedQuery)}%`;
     const allowedTypes = types || ['vehicle', 'organization', 'user', 'tag', 'external_identity'];
 
+    // Apply optional vehicle filters (location, body_style) to any query builder
+    const applyVehicleFilters = (q: any): any => {
+      if (locationFilter) {
+        const loc = escapeIlike(escapePostgrestValue(locationFilter));
+        if (locationFilter.length === 2) {
+          // 2-letter state code
+          q = q.ilike('state', loc);
+        } else {
+          // City name or longer location string
+          q = q.or(`city.ilike.%${loc}%,state.ilike.%${loc}%,listing_location.ilike.%${loc}%`);
+        }
+      }
+      if (bodyStyleFilter) {
+        const bs = escapeIlike(escapePostgrestValue(bodyStyleFilter));
+        q = q.or(`body_style.ilike.%${bs}%,canonical_body_style.ilike.%${bs}%`);
+      }
+      return q;
+    };
+
     // Parallel searches
     const searches: Promise<void>[] = [];
     let vehicleTotalCount = 0;
@@ -359,13 +384,13 @@ serve(async (req) => {
         // Pagination (offset > 0): use ILIKE directly for consistent results.
         // The RPC uses cascading strategies with independent limits that don't paginate well.
         if (offset > 0 && tsqueryStr) {
-          let paginationQuery = supabase
+          let paginationQuery = applyVehicleFilters(supabase
             .from('vehicles')
             .select(VEHICLE_SELECT)
             .eq('is_public', true)
             .not('year', 'is', null)
             .not('make', 'is', null)
-            .not('model', 'is', null);
+            .not('model', 'is', null));
 
           const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
           if (yearMatch) {
@@ -458,14 +483,14 @@ serve(async (req) => {
         const skipIlike = vehicles.length >= Math.ceil(vehicleLimit / 2);
         if (!skipIlike) {
           const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
-          let ilikeQuery = supabase
+          let ilikeQuery = applyVehicleFilters(supabase
             .from('vehicles')
             .select(VEHICLE_SELECT)
             .eq('is_public', true)
             // Filter stub vehicles (no year/make/model) from search results
             .not('year', 'is', null)
             .not('make', 'is', null)
-            .not('model', 'is', null);
+            .not('model', 'is', null));
 
           if (yearMatch) {
             // "1973 Porsche 911" → year=1973 AND (make|model ILIKE '%porsche 911%')
@@ -530,6 +555,27 @@ serve(async (req) => {
               }
             }
           }
+        }
+
+        // JS-level post-filter for location/body_style (FTS results bypass PostgREST filters)
+        if (vehicles?.length && (locationFilter || bodyStyleFilter)) {
+          vehicles = vehicles.filter((v: any) => {
+            if (locationFilter) {
+              const loc = locationFilter.toLowerCase();
+              const matchesLoc = loc.length === 2
+                ? (v.state || '').toLowerCase() === loc
+                : [v.city, v.state, v.listing_location].some(
+                    (f: string | null) => f && f.toLowerCase().includes(loc)
+                  );
+              if (!matchesLoc) return false;
+            }
+            if (bodyStyleFilter) {
+              const bs = bodyStyleFilter.toLowerCase();
+              if (!(v.body_style || '').toLowerCase().includes(bs) &&
+                  !(v.canonical_body_style || '').toLowerCase().includes(bs)) return false;
+            }
+            return true;
+          });
         }
 
         if (vehicles?.length) {
