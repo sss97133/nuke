@@ -162,7 +162,7 @@ export async function archiveFetch(
       const cutoff = new Date(Date.now() - maxAgeSec * 1000).toISOString();
       const { data: cached } = await supabase
         .from("listing_page_snapshots")
-        .select("id, html, markdown, fetched_at")
+        .select("id, html, markdown, fetched_at, html_storage_path, markdown_storage_path")
         .eq("listing_url", url)
         .eq("success", true)
         .gte("fetched_at", cutoff)
@@ -170,14 +170,37 @@ export async function archiveFetch(
         .limit(1)
         .maybeSingle();
 
-      if (cached?.html) {
-        console.log(`[archiveFetch] Cache HIT for ${url} (snapshot ${cached.id}, fetched ${cached.fetched_at})`);
-        result.html = cached.html;
-        result.markdown = cached.markdown ?? null;
-        result.source = "cache";
-        result.cached = true;
-        result.snapshotId = cached.id;
-        return result;
+      if (cached && (cached.html || cached.html_storage_path)) {
+        let cachedHtml = cached.html ?? null;
+        let cachedMarkdown = cached.markdown ?? null;
+
+        // Fetch from storage if content was migrated out of postgres
+        if (!cachedHtml && cached.html_storage_path) {
+          try {
+            const { data: blob } = await supabase.storage
+              .from("listing-snapshots")
+              .download(cached.html_storage_path);
+            if (blob) cachedHtml = await blob.text();
+          } catch (_) { /* storage read failed, fall through to re-fetch */ }
+        }
+        if (!cachedMarkdown && cached.markdown_storage_path) {
+          try {
+            const { data: blob } = await supabase.storage
+              .from("listing-snapshots")
+              .download(cached.markdown_storage_path);
+            if (blob) cachedMarkdown = await blob.text();
+          } catch (_) { /* non-fatal */ }
+        }
+
+        if (cachedHtml) {
+          console.log(`[archiveFetch] Cache HIT for ${url} (snapshot ${cached.id}, fetched ${cached.fetched_at}, from ${cached.html_storage_path ? "storage" : "inline"})`);
+          result.html = cachedHtml;
+          result.markdown = cachedMarkdown;
+          result.source = "cache";
+          result.cached = true;
+          result.snapshotId = cached.id;
+          return result;
+        }
       }
     } catch (e: any) {
       console.warn(`[archiveFetch] Cache check failed (non-fatal): ${e?.message}`);
