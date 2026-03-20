@@ -109,7 +109,12 @@ const ResilientImage: React.FC<ResilientImageProps> = ({
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [sourceList, loading]);
+  // Use join('|') so the effect is stable when the same URLs re-render as a new
+  // array reference (e.g. sources={[thumbnailUrl]} creates a new array each render).
+  // Without this, the observer is disconnected before it fires, keeping images
+  // permanently at the placeholder opacity.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceList.join('|'), loading]);
 
   const current = !failed ? (sourceList[idx] || '') : '';
 

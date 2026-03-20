@@ -528,12 +528,18 @@ Deno.serve(async (req) => {
         .single();
 
       if (cacheRow) {
+        const totalVehicles = cacheRow.total_vehicles ?? 0;
+        const totalValue = cacheRow.total_value ?? 0;
+        // avg_value is often 0/null in the cache — compute from totals when needed
+        const avgPrice = (cacheRow.avg_value && cacheRow.avg_value > 0)
+          ? cacheRow.avg_value
+          : (totalVehicles > 0 ? Math.round(totalValue / totalVehicles) : 0);
         stats = {
-          total_vehicles: cacheRow.total_vehicles ?? 0,
-          total_value: cacheRow.total_value ?? 0,
+          total_vehicles: totalVehicles,
+          total_value: totalValue,
           for_sale_count: cacheRow.for_sale_count ?? 0,
           active_auctions: cacheRow.active_auctions ?? 0,
-          avg_price: cacheRow.avg_value ?? 0,
+          avg_price: avgPrice,
           vehicles_added_today: cacheRow.vehicles_added_today ?? 0,
           sales_count_today: cacheRow.sales_count_today ?? 0,
           sales_volume_today: cacheRow.sales_volume_today ?? 0,
