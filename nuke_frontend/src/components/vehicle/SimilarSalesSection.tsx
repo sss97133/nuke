@@ -287,7 +287,7 @@ function SaleCard({ sale }: { sale: SimilarSale }) {
       gap: '12px',
       padding: '12px', border: '1px solid var(--border-light)',
       backgroundColor: 'var(--surface)',
-      transition: 'border-color 0.12s ease, box-shadow 0.12s ease',
+      transition: 'border-color 0.12s ease',
       cursor: sale.listing_url ? 'pointer' : 'default',
       textDecoration: 'none',
       color: 'inherit',

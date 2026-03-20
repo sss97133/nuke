@@ -84,7 +84,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
       className="card"
       style={{
         cursor: 'pointer',
-        transition: 'transform 0.2s, box-shadow 0.2s',
+        transition: 'transform 0.2s',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-2px)';

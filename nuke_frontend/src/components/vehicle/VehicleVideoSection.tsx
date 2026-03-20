@@ -313,7 +313,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
                       cursor: 'pointer', overflow: 'hidden',
                       background: 'var(--surface-raised)',
                       border: '1px solid var(--border)',
-                      transition: 'transform 0.15s, box-shadow 0.15s'
+                      transition: 'transform 0.15s'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'scale(1.02)';

@@ -478,7 +478,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                 border: '1px solid var(--border)', overflow: 'hidden',
                 background: 'var(--white)',
                 cursor: 'pointer',
-                transition: 'transform 0.12s, box-shadow 0.12s'
+                transition: 'transform 0.12s'
               }}
               className="hover-lift"
             >
