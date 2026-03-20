@@ -96,7 +96,7 @@ const s = {
     background: 'var(--grey-100)',
     border: '1px solid var(--border-light)',
     padding: 'var(--space-3)',
-    fontFamily: 'monospace',
+    fontFamily: "'Courier New', monospace",
     fontSize: '11px',
     overflow: 'auto' as const,
     whiteSpace: 'pre' as const,
@@ -106,7 +106,7 @@ const s = {
   inlineCode: {
     background: 'var(--grey-200)',
     padding: '1px 4px',
-    fontFamily: 'monospace',
+    fontFamily: "'Courier New', monospace",
     fontSize: '11px',
     border: '1px solid var(--border-light)',
   },
@@ -120,7 +120,7 @@ const s = {
     display: 'inline-block',
     padding: '2px 6px',
     fontSize: '11px',
-    fontFamily: 'monospace',
+    fontFamily: "'Courier New', monospace",
     fontWeight: 'bold' as const,
     background: method === 'GET' ? '#e8f5e9' : method === 'POST' ? '#e3f2fd' : method === 'PATCH' ? '#fff3e0' : method === 'DELETE' ? '#ffebee' : 'var(--grey-100)',
     border: '1px solid var(--border-medium)',
@@ -160,7 +160,7 @@ const s = {
     color: 'var(--white)',
     border: '2px solid var(--text)',
     cursor: 'pointer',
-    fontFamily: 'monospace',
+    fontFamily: "'Courier New', monospace",
     fontWeight: 'bold' as const,
   },
   buttonSecondary: {
@@ -169,7 +169,7 @@ const s = {
     background: 'var(--grey-200)',
     border: '2px outset var(--border-light)',
     cursor: 'pointer',
-    fontFamily: 'monospace',
+    fontFamily: "'Courier New', monospace",
   },
   endpoint: {
     padding: 'var(--space-3)',
@@ -182,7 +182,7 @@ const s = {
     alignItems: 'center',
     gap: 'var(--space-2)',
     marginBottom: 'var(--space-2)',
-    fontFamily: 'monospace',
+    fontFamily: "'Courier New', monospace",
     fontSize: '12px',
   },
   paramRequired: {
@@ -217,7 +217,7 @@ function CodeBlock({ code, title }: { code: string; title?: string }) {
           border: '1px solid var(--border-light)',
           borderBottom: 'none',
           padding: '3px var(--space-3)',
-          fontFamily: 'monospace',
+          fontFamily: "'Courier New', monospace",
         }}>
           {title}
         </div>
@@ -261,7 +261,7 @@ function ParamTable({ params }: { params: { name: string; type: string; required
                 <span style={s.paramOptional}>optional</span>
               )}
             </td>
-            <td style={{ ...s.td, fontFamily: 'monospace' }}>{p.type}</td>
+            <td style={{ ...s.td, fontFamily: "'Courier New', monospace" }}>{p.type}</td>
             <td style={s.td}>{p.description}</td>
           </tr>
         ))}
@@ -1032,7 +1032,7 @@ fetch(\`\${API_BASE}/api-v1-vehicles\`, {
             { ep: 'db-stats', anon: 'Read', api: 'Read', jwt: 'Read' },
           ].map((row) => (
             <tr key={row.ep}>
-              <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.ep}</td>
+              <td style={{ ...s.td, fontFamily: "'Courier New', monospace" }}>{row.ep}</td>
               <td style={s.td}>{row.anon}</td>
               <td style={s.td}>{row.api}</td>
               <td style={s.td}>{row.jwt}</td>
@@ -1235,7 +1235,7 @@ function SearchSection() {
             ].map((row) => (
               <tr key={row.type}>
                 <td style={s.td}>{row.pattern}</td>
-                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.type}</td>
+                <td style={{ ...s.td, fontFamily: "'Courier New', monospace" }}>{row.type}</td>
                 <td style={s.td}>{row.behavior}</td>
               </tr>
             ))}
@@ -1482,8 +1482,8 @@ console.log(profile.counts); // { listings: 2, observations: 15, images: 24 }`}
               { field: 'images', type: 'array', desc: 'First 5 images, sorted by primary flag' },
             ].map((row) => (
               <tr key={row.field}>
-                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.field}</td>
-                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.type}</td>
+                <td style={{ ...s.td, fontFamily: "'Courier New', monospace" }}>{row.field}</td>
+                <td style={{ ...s.td, fontFamily: "'Courier New', monospace" }}>{row.type}</td>
                 <td style={s.td}>{row.desc}</td>
               </tr>
             ))}
@@ -1669,7 +1669,7 @@ console.log(auction.sentiment?.overall, auction.sentiment?.score);`}
               { field: 'details', desc: 'Full AI extraction: themes, concerns, price opinions, etc.' },
             ].map((row) => (
               <tr key={row.field}>
-                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.field}</td>
+                <td style={{ ...s.td, fontFamily: "'Courier New', monospace" }}>{row.field}</td>
                 <td style={s.td}>{row.desc}</td>
               </tr>
             ))}
@@ -1781,7 +1781,7 @@ for (const p of trends.periods) {
               { period: '3y', bucket: '3 months', use: 'Long-term market cycles' },
             ].map((row) => (
               <tr key={row.period}>
-                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.period}</td>
+                <td style={{ ...s.td, fontFamily: "'Courier New', monospace" }}>{row.period}</td>
                 <td style={s.td}>{row.bucket}</td>
                 <td style={s.td}>{row.use}</td>
               </tr>
@@ -2018,7 +2018,7 @@ function ObservationsSection() {
             { field: 'provenance', desc: 'Source URL, document ID, and extraction method' },
           ].map((row) => (
             <tr key={row.field}>
-              <td style={{ ...s.td, fontFamily: 'monospace', fontWeight: 'bold' }}>{row.field}</td>
+              <td style={{ ...s.td, fontFamily: "'Courier New', monospace", fontWeight: 'bold' }}>{row.field}</td>
               <td style={s.td}>{row.desc}</td>
             </tr>
           ))}
@@ -2256,7 +2256,7 @@ function ValuationsSection() {
             ].map((row) => (
               <tr key={row.signal}>
                 <td style={{ ...s.td, fontWeight: 'bold' }}>{row.signal}</td>
-                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.weight}</td>
+                <td style={{ ...s.td, fontFamily: "'Courier New', monospace" }}>{row.weight}</td>
                 <td style={s.td}>{row.source}</td>
               </tr>
             ))}
@@ -2283,7 +2283,7 @@ function ValuationsSection() {
               { label: 'minus_3', range: '-50 to -100', meaning: 'Significantly overpriced' },
             ].map((row) => (
               <tr key={row.label}>
-                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.label}</td>
+                <td style={{ ...s.td, fontFamily: "'Courier New', monospace" }}>{row.label}</td>
                 <td style={s.td}>{row.range}</td>
                 <td style={s.td}>{row.meaning}</td>
               </tr>
@@ -2392,8 +2392,8 @@ console.log(score.heat_score);       // 72`}
               { score: '0–29', label: 'overpriced', interp: 'Significantly above comparable sales' },
             ].map((row) => (
               <tr key={row.label}>
-                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.score}</td>
-                <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.label}</td>
+                <td style={{ ...s.td, fontFamily: "'Courier New', monospace" }}>{row.score}</td>
+                <td style={{ ...s.td, fontFamily: "'Courier New', monospace" }}>{row.label}</td>
                 <td style={s.td}>{row.interp}</td>
               </tr>
             ))}
@@ -2605,7 +2605,7 @@ function McpSection() {
         },
       ].map((tool) => (
         <div key={tool.name} style={s.endpoint}>
-          <div style={{ fontFamily: 'monospace', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
+          <div style={{ fontFamily: "'Courier New', monospace", fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
             {tool.name}
           </div>
           <div style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-2)', lineHeight: '1.4' }}>
@@ -2670,7 +2670,7 @@ function WebhooksSection() {
             { event: 'price.alert', desc: 'A vehicle hit your price threshold' },
           ].map((row) => (
             <tr key={row.event}>
-              <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.event}</td>
+              <td style={{ ...s.td, fontFamily: "'Courier New', monospace" }}>{row.event}</td>
               <td style={s.td}>{row.desc}</td>
             </tr>
           ))}
@@ -2763,8 +2763,8 @@ function ErrorsSection() {
             { http: '500', code: 'INTERNAL_ERROR', desc: 'Server error — retry or contact support' },
           ].map((row) => (
             <tr key={row.code}>
-              <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.http}</td>
-              <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.code}</td>
+              <td style={{ ...s.td, fontFamily: "'Courier New', monospace" }}>{row.http}</td>
+              <td style={{ ...s.td, fontFamily: "'Courier New', monospace" }}>{row.code}</td>
               <td style={s.td}>{row.desc}</td>
             </tr>
           ))}
@@ -2854,7 +2854,7 @@ function ChangelogSection() {
       {changelog.map((release) => (
         <div key={release.version} style={s.card}>
           <div style={{ marginBottom: 'var(--space-2)' }}>
-            <span style={{ fontWeight: 'bold', fontFamily: 'monospace', marginRight: 'var(--space-2)' }}>
+            <span style={{ fontWeight: 'bold', fontFamily: "'Courier New', monospace", marginRight: 'var(--space-2)' }}>
               {release.version}
             </span>
             <span style={{ color: 'var(--text-muted)' }}>{release.date}</span>
@@ -2865,7 +2865,7 @@ function ChangelogSection() {
                 display: 'inline-block',
                 padding: '1px 6px',
                 fontSize: '9px',
-                fontFamily: 'monospace',
+                fontFamily: "'Courier New', monospace",
                 background: change.type === 'new' ? '#e8f5e9' : change.type === 'fix' ? '#ffebee' : 'var(--grey-100)',
                 border: '1px solid var(--border-light)',
                 marginRight: 'var(--space-2)',

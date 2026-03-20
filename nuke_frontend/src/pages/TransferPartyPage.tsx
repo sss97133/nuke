@@ -339,7 +339,7 @@ export default function TransferPartyPage() {
           <div style={{ padding: '20px' }}>
             <h1 style={{ margin: '0 0 8px', fontSize: '22px', fontWeight: 700, color: 'var(--text)' }}>{vehicleName}</h1>
             {vehicle?.vin && (
-              <div style={{ fontSize: '12px', color: 'var(--text-disabled)', marginBottom: '8px', fontFamily: 'monospace' }}>VIN: {vehicle.vin}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-disabled)', marginBottom: '8px', fontFamily: "'Courier New', monospace" }}>VIN: {vehicle.vin}</div>
             )}
             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
               {transfer.agreed_price && (

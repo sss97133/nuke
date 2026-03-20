@@ -455,7 +455,7 @@ export default function DataQualityDashboard() {
                       fontWeight: 500,
                       flexShrink: 0,
                       color: 'var(--text)',
-                      fontFamily: 'monospace',
+                      fontFamily: "'Courier New', monospace",
                     }}>
                       {f.label}
                     </div>
@@ -481,7 +481,7 @@ export default function DataQualityDashboard() {
                       width: '50px',
                       fontSize: '12px',
                       fontWeight: 700,
-                      fontFamily: 'monospace',
+                      fontFamily: "'Courier New', monospace",
                       textAlign: 'right',
                       color,
                       flexShrink: 0,
@@ -500,7 +500,7 @@ export default function DataQualityDashboard() {
                       fontSize: '10px',
                       color: 'var(--text-muted)',
                       flexShrink: 0,
-                      fontFamily: 'monospace',
+                      fontFamily: "'Courier New', monospace",
                     }}>
                       {eta}
                     </div>

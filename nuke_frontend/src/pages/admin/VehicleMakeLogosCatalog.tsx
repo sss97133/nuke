@@ -295,7 +295,7 @@ export default function VehicleMakeLogosCatalog() {
                           {String(s).toUpperCase()}
                         </span>
                       </td>
-                      <td style={{ padding: '10px', fontFamily: 'monospace' }}>{years}</td>
+                      <td style={{ padding: '10px', fontFamily: "'Courier New', monospace" }}>{years}</td>
                       <td style={{ padding: '10px' }}>{it.country || '—'}</td>
                       <td style={{ padding: '10px', fontSize: '9px', color: 'var(--text)' }}>
                         {(it.types || []).slice(0, 3).join(' • ') || '—'}

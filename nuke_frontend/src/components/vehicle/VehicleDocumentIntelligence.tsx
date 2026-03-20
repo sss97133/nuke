@@ -308,7 +308,7 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
                     </span>
                   </div>
                   {record.cost && (
-                    <span style={{ fontWeight: 700, fontSize: '12px', color: 'var(--text)', fontFamily: 'monospace' }}>
+                    <span style={{ fontWeight: 700, fontSize: '12px', color: 'var(--text)', fontFamily: "'Courier New', monospace" }}>
                       {formatCurrency(record.cost)}
                     </span>
                   )}

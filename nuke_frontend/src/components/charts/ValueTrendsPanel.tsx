@@ -319,7 +319,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
     <div style={{ ...style }}>
       {/* Period selector */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', alignItems: 'center' }}>
-        <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>PERIOD:</span>
+        <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>PERIOD:</span>
         {(['30d', '90d', '1y'] as TrendPeriod[]).map(p => (
           <button
             key={p}
@@ -328,7 +328,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
             style={{
               padding: '2px 8px',
               fontSize: '9px',
-              fontFamily: 'monospace',
+              fontFamily: "'Courier New', monospace",
               fontWeight: 700,
               border: '1px solid var(--border)',
               background: period === p ? 'var(--grey-600)' : 'transparent',
@@ -344,7 +344,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
         {/* Value Breakdown */}
         <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px'}}>
-          <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: '6px' }}>
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace", marginBottom: '6px' }}>
             VALUE BREAKDOWN (cumulative)
           </div>
           <MiniLineChart
@@ -359,7 +359,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
         {/* Total Market Value */}
         <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px'}}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-            <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>
               TOTAL MARKET VALUE
             </div>
             {trends && (
@@ -387,7 +387,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
         {/* Sold vs Unsold Ratio */}
         <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px'}}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-            <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>
               AUCTION SOLD RATE (7d rolling)
             </div>
             {trends && (
@@ -413,7 +413,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
         {/* Import Velocity */}
         <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px'}}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-            <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>
               IMPORT VELOCITY (daily)
             </div>
             {trends && (
@@ -440,7 +440,7 @@ export const ValueTrendsPanel: React.FC<ValueTrendsPanelProps> = ({
       </div>
 
       {/* Summary stats */}
-      <div style={{ marginTop: '12px', fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+      <div style={{ marginTop: '12px', fontSize: '9px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>
         Data as of {data?.generated_at ? new Date(data.generated_at).toLocaleString() : '--'} ({period} window)
       </div>
     </div>

@@ -211,7 +211,7 @@ export default function AuctionCountdown({
         <div style={{
           fontSize: sizeStyle.fontSize,
           fontWeight: 700,
-          fontFamily: 'monospace',
+          fontFamily: "'Courier New', monospace",
           color: urgencyStyle.color,
           letterSpacing: '1px'
         }}>

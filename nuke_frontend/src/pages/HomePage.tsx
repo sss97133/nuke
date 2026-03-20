@@ -460,7 +460,7 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
                   <span>{[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown Vehicle'}</span>
-                  {formatPrice(v) && <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)', fontSize: 12 }}>{formatPrice(v)}</span>}
+                  {formatPrice(v) && <span style={{ fontFamily: "'Courier New', monospace", color: 'var(--text-muted)', fontSize: 12 }}>{formatPrice(v)}</span>}
                 </button>
               ))}
               {noResults && <div style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: 12 }}>No vehicles found for "{searchInput.trim()}"</div>}

@@ -725,7 +725,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                           </span>
                         )}
                         {result.metadata?.vin && (
-                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontFamily: "'Courier New', monospace" }}>
                             {result.metadata.vin}
                           </span>
                         )}

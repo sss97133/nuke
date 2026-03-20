@@ -469,7 +469,7 @@ export default function PlatformCredentialForm({
                         width: '100%',
                         padding: '10px 12px',
                         border: '1px solid var(--border)', fontSize: '12px',
-                        fontFamily: 'monospace'
+                        fontFamily: "'Courier New', monospace"
                       }}
                     />
                     <p style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>

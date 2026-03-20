@@ -122,15 +122,15 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
             </span>
           )}
         </td>
-        <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'right', fontFamily: 'monospace' }}>
+        <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>
           {fmt(entry.asking_price)}
         </td>
-        <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'right', fontFamily: 'monospace' }}>
+        <td style={{ padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>
           {fmt(entry.comp_median)}
         </td>
         <td style={{
           padding: 'var(--space-2)', border: '1px solid var(--border-light)', textAlign: 'right',
-          fontFamily: 'monospace', fontWeight: 700,
+          fontFamily: "'Courier New', monospace", fontWeight: 700,
         }}>
           {profit > 0 ? '+' : ''}{fmt(profit)}
         </td>
@@ -162,12 +162,12 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
                     ].map(([k, v]) => (
                       <tr key={k}>
                         <td style={{ padding: '1px 0', color: 'var(--text-muted)' }}>{k}</td>
-                        <td style={{ padding: '1px 0', textAlign: 'right', fontFamily: 'monospace' }}>{v}</td>
+                        <td style={{ padding: '1px 0', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>{v}</td>
                       </tr>
                     ))}
                     <tr style={{ fontWeight: 700 }}>
                       <td style={{ padding: '2px 0', borderTop: '1px solid var(--border)' }}>Net Profit</td>
-                      <td style={{ padding: '2px 0', borderTop: '1px solid var(--border)', textAlign: 'right', fontFamily: 'monospace' }}>
+                      <td style={{ padding: '2px 0', borderTop: '1px solid var(--border)', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>
                         {profit > 0 ? '+' : ''}{fmt(profit)} ({roi}%)
                       </td>
                     </tr>
@@ -193,7 +193,7 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
                       ].map(([k, v]) => (
                         <tr key={k}>
                           <td style={{ padding: '1px 0', color: 'var(--text-muted)' }}>{k}</td>
-                          <td style={{ padding: '1px 0', textAlign: 'right', fontFamily: 'monospace' }}>{v}</td>
+                          <td style={{ padding: '1px 0', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>{v}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -269,7 +269,7 @@ function DealRow({ entry, onAction }: { entry: PipelineEntry; onAction: (id: str
                         onChange={e => setInlineInput({ ...inlineInput, value: e.target.value })}
                         onKeyDown={e => { if (e.key === 'Enter') submitInlineInput(); if (e.key === 'Escape') setInlineInput(null); }}
                         autoFocus
-                        style={{ flex: 1, padding: '4px 8px', fontFamily: 'monospace', border: '1px solid var(--border-dark)', background: 'var(--surface)', color: 'var(--text)', fontSize: '11px' }}
+                        style={{ flex: 1, padding: '4px 8px', fontFamily: "'Courier New', monospace", border: '1px solid var(--border-dark)', background: 'var(--surface)', color: 'var(--text)', fontSize: '11px' }}
                       />
                       <button className="button button-primary" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={submitInlineInput}>✓</button>
                       <button className="button" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={() => setInlineInput(null)}>✕</button>

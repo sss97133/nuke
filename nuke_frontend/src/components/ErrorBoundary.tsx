@@ -216,7 +216,7 @@ class ErrorBoundary extends Component<Props, State> {
                 padding: '12px',
                 backgroundColor: 'var(--text)',
                 color: 'var(--bg-secondary)', fontSize: '10px',
-                fontFamily: 'monospace',
+                fontFamily: "'Courier New', monospace",
                 whiteSpace: 'pre-wrap',
                 overflow: 'auto',
                 maxHeight: '200px'

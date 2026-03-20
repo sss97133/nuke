@@ -679,7 +679,7 @@ const ClaimExternalIdentity: React.FC = () => {
                   padding: 'var(--space-3)',
                   backgroundColor: 'var(--white)',
                   border: '2px dashed var(--border-light)',
-                  fontFamily: 'monospace',
+                  fontFamily: "'Courier New', monospace",
                   fontSize: '19px',
                   textAlign: 'center',
                   userSelect: 'all',

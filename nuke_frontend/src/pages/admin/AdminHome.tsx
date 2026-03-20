@@ -209,7 +209,7 @@ export default function AdminHome() {
           </div>
           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
             {ralphLoading && (
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>
                 {ralphLoadMode === 'explain' ? 'asking LLM…' : 'loading…'}
               </div>
             )}
@@ -358,7 +358,7 @@ export default function AdminHome() {
         {opData != null && opData.agentTasksByType.length > 0 && (
           <div style={{ marginTop: 'var(--space-3)', fontSize: '11px', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
             {opData.agentTasksByType.map(({ agent_type, count }) => (
-              <span key={agent_type} style={{ fontFamily: 'monospace' }}>
+              <span key={agent_type} style={{ fontFamily: "'Courier New', monospace" }}>
                 {agent_type}:{count}
               </span>
             ))}
@@ -399,7 +399,7 @@ export default function AdminHome() {
                     fontSize: '11px',
                     fontWeight: 600,
                     color: count > 0 ? 'var(--error)' : 'var(--text-muted)',
-                    fontFamily: 'monospace',
+                    fontFamily: "'Courier New', monospace",
                     flexShrink: 0,
                   }}>
                     {count > 0 ? `${count} pending` : 'clear'}

@@ -161,7 +161,7 @@ export default function AdminInbox() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', fontFamily: 'monospace' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', fontFamily: "'Courier New', monospace" }}>
       {/* Header */}
       <div style={{
         padding: '12px 16px',
@@ -371,7 +371,7 @@ export default function AdminInbox() {
                   wordBreak: 'break-word',
                   lineHeight: 1.5,
                   maxWidth: 700,
-                  fontFamily: 'monospace',
+                  fontFamily: "'Courier New', monospace",
                 }}>
                   {selected.body_text}
                 </pre>
@@ -404,7 +404,7 @@ export default function AdminInbox() {
                   color: 'var(--text)',
                   border: '1px solid var(--border)', padding: 10,
                   fontSize: '12px',
-                  fontFamily: 'monospace',
+                  fontFamily: "'Courier New', monospace",
                   resize: 'vertical',
                   boxSizing: 'border-box',
                 }}

@@ -24,7 +24,7 @@ export const ScoreBadge: React.FC<ScoreBadgeProps> = ({
     return (
       <span style={{
         fontSize: '11px',
-        fontFamily: 'monospace',
+        fontFamily: "'Courier New', monospace",
         whiteSpace: 'nowrap'
       }}>
         <span style={{ color: confColor }}>●{confidence}%</span>

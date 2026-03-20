@@ -249,7 +249,7 @@ const ShippingSettings: React.FC = () => {
             color: 'var(--success)',
             padding: '12px', fontSize: '11px',
             overflow: 'auto',
-            fontFamily: 'monospace'
+            fontFamily: "'Courier New', monospace"
           }}>
 {`supabase secrets set CENTRAL_DISPATCH_CLIENT_ID="your_client_id"
 supabase secrets set CENTRAL_DISPATCH_CLIENT_SECRET="your_secret"

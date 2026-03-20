@@ -137,7 +137,7 @@ export default function LiveImageAnalysisMonitor() {
           {/* Progress Bar */}
           <div style={{ marginBottom: '24px' }}>
             <div style={{ 
-              fontFamily: 'monospace', 
+              fontFamily: "'Courier New', monospace", 
               fontSize: '13px', 
               marginBottom: '8px',
               letterSpacing: '1px'

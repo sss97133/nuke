@@ -159,7 +159,7 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ endDate, size = 'small'
   return (
     <div
       style={{
-        fontFamily: 'monospace',
+        fontFamily: "'Courier New', monospace",
         fontSize,
         fontWeight: 700,
         color: style.color,

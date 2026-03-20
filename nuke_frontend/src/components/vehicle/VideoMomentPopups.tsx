@@ -309,7 +309,7 @@ export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
                       <span style={{ fontSize: '11px' }}>
                         {comp.year} {comp.make} {comp.model}
                       </span>
-                      <span style={{ fontSize: '11px', fontWeight: 600, fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, fontFamily: "'Courier New', monospace" }}>
                         ${comp.winning_bid.toLocaleString()}
                       </span>
                     </div>
@@ -591,13 +591,13 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: "'Courier New', monospace" }}>
                       {Math.floor(duration / 60)}:{String(duration % 60).padStart(2, '0')}
                     </div>
                     <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Time on block</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: "'Courier New', monospace" }}>
                       {hourOfDay}:{String(minuteOfHour).padStart(2, '0')}
                     </div>
                     <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Broadcast time</div>
@@ -631,7 +631,7 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                       <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Sell rate</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'monospace' }}>
+                      <div style={{ fontSize: '16px', fontWeight: 700, fontFamily: "'Courier New', monospace" }}>
                         ${(currentSlotStats.avgPrice / 1000).toFixed(0)}K
                       </div>
                       <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Avg price</div>

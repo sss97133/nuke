@@ -725,7 +725,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                       border: '1px solid var(--info-dim)', padding: '6px 10px',
                       fontSize: '11px'
                     }}>
-                      <div style={{ fontWeight: 'bold', fontFamily: 'monospace', color: 'var(--accent)' }}>
+                      <div style={{ fontWeight: 'bold', fontFamily: "'Courier New', monospace", color: 'var(--accent)' }}>
                         {formatCurrency(mention.amount)}
                       </div>
                       <div style={{ color: 'var(--text-secondary)', fontSize: '9px' }}>

@@ -283,7 +283,7 @@ export default function ScriptControlCenter() {
                   <div>
                     <h3 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>{script.name}</h3>
                     <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>{script.description}</p>
-                    <p style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{script.purpose}</p>
+                    <p style={{ fontSize: '11px', fontFamily: "'Courier New', monospace", color: 'var(--text-muted)' }}>{script.purpose}</p>
                   </div>
                   <div style={{ 
                     fontSize: '11px', 
@@ -300,7 +300,7 @@ export default function ScriptControlCenter() {
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
                     <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>PROGRESS</span>
-                    <span style={{ fontFamily: 'monospace' }}>
+                    <span style={{ fontFamily: "'Courier New', monospace" }}>
                       {script.progress.current.toLocaleString()} / {script.progress.total.toLocaleString()}
                     </span>
                   </div>

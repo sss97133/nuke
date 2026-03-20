@@ -579,7 +579,7 @@ const ExtractionMonitor: React.FC = () => {
                     color: 'var(--text-muted)',
                     marginTop: '4px',
                     wordBreak: 'break-all',
-                    fontFamily: 'monospace'
+                    fontFamily: "'Courier New', monospace"
                   }}>
                     <IDHoverCard id={failure.id} type="image">
                       {failure.id.substring(0, 8)}...

@@ -588,7 +588,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
             {vehicle && (
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                 {[vehicle.year, vehicle.make, vehicle.model, vehicle.trim].filter(Boolean).join(' ')}
-                {vehicle.vin && <span style={{ marginLeft: '8px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>VIN: {vehicle.vin}</span>}
+                {vehicle.vin && <span style={{ marginLeft: '8px', fontFamily: "'Courier New', monospace", color: 'var(--text-secondary)' }}>VIN: {vehicle.vin}</span>}
               </div>
             )}
           </div>

@@ -680,7 +680,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
             <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
               <span>Owner</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--success)' }}>
+                <span style={{ fontFamily: "'Courier New', monospace", fontSize: '11px', color: 'var(--success)' }}>
                   @{currentOwnerUsername}
                 </span>
                 <span style={{ 
@@ -965,7 +965,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                   color: (vehicle as any).data_quality_score >= 70 ? 'var(--success)' :
                          (vehicle as any).data_quality_score >= 40 ? 'var(--warning)' : 'var(--error)',
                   fontSize: '12px',
-                  fontFamily: 'monospace'
+                  fontFamily: "'Courier New', monospace"
                 }}>
                   {(vehicle as any).data_quality_score}/100
                 </span>

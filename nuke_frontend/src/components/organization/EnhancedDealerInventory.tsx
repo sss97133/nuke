@@ -669,7 +669,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             <div style={{ fontSize: '12px', marginBottom: '8px' }}>
               {searchTerm ? 'Try adjusting your search' : 'No vehicles in this category'}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '16px', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '16px', fontFamily: "'Courier New', monospace" }}>
               Debug: Total loaded: {vehicles.length} | Filtered: {filteredAndSorted.length} | Category: {category} | Search: {searchTerm || 'none'}
             </div>
           </div>
@@ -842,7 +842,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                         )}
                         {v.vehicles.vin && (
                           <span style={{ 
-                            fontFamily: 'monospace',
+                            fontFamily: "'Courier New', monospace",
                             display: 'flex',
                             alignItems: 'center',
                             gap: '4px'
@@ -974,7 +974,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                             flexWrap: 'wrap'
                           }}>
                             {v.vehicles.vin && (
-                              <span style={{ fontFamily: 'monospace' }}>VIN: {v.vehicles.vin}</span>
+                              <span style={{ fontFamily: "'Courier New', monospace" }}>VIN: {v.vehicles.vin}</span>
                             )}
                             {v.vehicles.mileage && (
                               <span>{v.vehicles.mileage.toLocaleString()} mi</span>
@@ -1104,7 +1104,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                           <td style={{ padding: '8px', textAlign: 'center' }}>
                             {displayCategory !== 'sold' && v.days_on_lot > 0 ? v.days_on_lot : '—'}
                           </td>
-                          <td style={{ padding: '8px', fontFamily: 'monospace', fontSize: '9px' }}>
+                          <td style={{ padding: '8px', fontFamily: "'Courier New', monospace", fontSize: '9px' }}>
                             {v.vehicles.vin || '—'}
                           </td>
                           {editMode && (
@@ -1491,7 +1491,7 @@ const AddVehiclesModal: React.FC<AddVehiclesModalProps> = ({
                     {v.vin && (
                       <div
                         style={{
-                          fontFamily: 'monospace',
+                          fontFamily: "'Courier New', monospace",
                           color: 'var(--text-muted)',
                           marginBottom: '4px',
                         }}

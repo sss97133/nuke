@@ -704,7 +704,7 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
                     <td style={{ 
                       padding: '4px 8px',
                       borderRight: '1px solid var(--border-light)',
-                      fontFamily: 'monospace'
+                      fontFamily: "'Courier New', monospace"
                     }}>
                       {tool.part_number || '-'}
                     </td>
@@ -829,7 +829,7 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
                   placeholder="Copy and paste your receipt text here..."
                   style={{
                     height: '200px',
-                    fontFamily: 'monospace',
+                    fontFamily: "'Courier New', monospace",
                     fontSize: '12px'
                   }}
                 />

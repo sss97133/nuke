@@ -157,7 +157,7 @@ const VideoModal: React.FC<{
               )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '11px', fontFamily: "'Courier New', monospace", color: 'var(--text-muted)' }}>
                 {formatTimestamp(video.broadcast_timestamp_start)} ({formatDuration(duration)})
               </span>
               {video.winning_bid && video.outcome === 'sold' && (
@@ -365,7 +365,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
                         background: 'rgba(0,0,0,0.8)',
                         color: 'var(--bg)',
                         padding: '2px 5px', fontSize: '9px',
-                        fontFamily: 'monospace'
+                        fontFamily: "'Courier New', monospace"
                       }}>
                         {formatTimestamp(video.broadcast_timestamp_start)}
                       </div>

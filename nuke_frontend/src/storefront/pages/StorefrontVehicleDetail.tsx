@@ -199,7 +199,7 @@ export default function StorefrontVehicleDetail({ organization }: Props) {
             </h1>
 
             {price && (
-              <div style={{ fontSize: 'var(--fs-11, 11px)', fontWeight: 700, color: 'var(--accent)', fontFamily: 'monospace', marginBottom: 16 }}>
+              <div style={{ fontSize: 'var(--fs-11, 11px)', fontWeight: 700, color: 'var(--accent)', fontFamily: "'Courier New', monospace", marginBottom: 16 }}>
                 ${price.toLocaleString()}
               </div>
             )}

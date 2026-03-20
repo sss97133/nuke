@@ -265,7 +265,7 @@ export default function TechCapture() {
 
   if (!user) {
     return (
-      <div style={{ minHeight: '100dvh', backgroundColor: 'var(--text)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace' }}>
+      <div style={{ minHeight: '100dvh', backgroundColor: 'var(--text)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: "'Courier New', monospace" }}>
         <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--border)', marginBottom: '0.5rem' }}>Nuke</div>
         <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '2rem' }}>Techs take photos, we do the rest.</div>
         <a
@@ -274,7 +274,7 @@ export default function TechCapture() {
             padding: '0.75rem 2rem',
             backgroundColor: 'var(--border)',
             color: 'var(--text)',
-            fontFamily: 'monospace',
+            fontFamily: "'Courier New', monospace",
             fontWeight: 700,
             fontSize: '0.9rem',
             textDecoration: 'none', }}
@@ -290,7 +290,7 @@ export default function TechCapture() {
       minHeight: '100dvh',
       backgroundColor: 'var(--text)',
       color: 'var(--border)',
-      fontFamily: 'monospace',
+      fontFamily: "'Courier New', monospace",
       display: 'flex',
       flexDirection: 'column',
       maxWidth: '480px',
@@ -330,7 +330,7 @@ export default function TechCapture() {
             backgroundColor: 'var(--text)',
             border: '1px solid var(--surface)', color: 'var(--border)',
             fontSize: '0.95rem',
-            fontFamily: 'monospace',
+            fontFamily: "'Courier New', monospace",
             appearance: 'auto',
           }}
         >
@@ -372,7 +372,7 @@ export default function TechCapture() {
             backgroundColor: isUploading ? 'var(--text)' : 'transparent',
             color: isUploading ? 'var(--warning)' : 'var(--border)',
             fontSize: '1rem',
-            fontFamily: 'monospace',
+            fontFamily: "'Courier New', monospace",
             fontWeight: 700,
             cursor: isUploading ? 'wait' : 'pointer',
             transition: 'all 0.2s',

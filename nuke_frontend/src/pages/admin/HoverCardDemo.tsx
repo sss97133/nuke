@@ -41,7 +41,7 @@ export default function HoverCardDemo() {
           </div>
           <div style={{ fontSize: '11px' }}>
             Image ID: <ImageHoverPreview imageUrl="https://example.com/image.jpg" imageId={exampleImageId}>
-              <span style={{ fontFamily: 'monospace', textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}>
+              <span style={{ fontFamily: "'Courier New', monospace", textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}>
                 {exampleImageId.substring(0, 8)}...
               </span>
             </ImageHoverPreview>
@@ -52,7 +52,7 @@ export default function HoverCardDemo() {
             backgroundColor: 'var(--bg)', 
             fontSize: '11px',
             color: 'var(--text-muted)',
-            fontFamily: 'monospace'
+            fontFamily: "'Courier New', monospace"
           }}>
             Hover preview shows:
             <ul style={{ marginTop: 'var(--space-1)', paddingLeft: 'var(--space-4)' }}>
@@ -122,7 +122,7 @@ export default function HoverCardDemo() {
           </div>
           <div style={{ fontSize: '11px' }}>
             Vehicle ID: <IDHoverCard id={exampleVehicleId} type="vehicle">
-              <span style={{ fontFamily: 'monospace', textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}>
+              <span style={{ fontFamily: "'Courier New', monospace", textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}>
                 {exampleVehicleId.substring(0, 8)}...
               </span>
             </IDHoverCard>
@@ -161,7 +161,7 @@ export default function HoverCardDemo() {
           </div>
           <div style={{ fontSize: '11px' }}>
             User ID: <IDHoverCard id={exampleUserId} type="user">
-              <span style={{ fontFamily: 'monospace', textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}>
+              <span style={{ fontFamily: "'Courier New', monospace", textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer' }}>
                 {exampleUserId.substring(0, 8)}...
               </span>
             </IDHoverCard>
@@ -198,7 +198,7 @@ export default function HoverCardDemo() {
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
             Automatically detects and makes IDs hoverable in any text
           </div>
-          <div style={{ fontSize: '11px', fontFamily: 'monospace', padding: 'var(--space-2)', backgroundColor: 'var(--bg)', border: '1px solid var(--border-light)' }}>
+          <div style={{ fontSize: '11px', fontFamily: "'Courier New', monospace", padding: 'var(--space-2)', backgroundColor: 'var(--bg)', border: '1px solid var(--border-light)' }}>
             <IDText>
               Image ID: {exampleImageId}, Vehicle: {exampleVehicleId}, User: {exampleUserId}, Short: {exampleShortId}
             </IDText>

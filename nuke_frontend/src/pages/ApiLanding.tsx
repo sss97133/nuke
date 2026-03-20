@@ -332,7 +332,7 @@ function LiveSearch() {
         {loading && (
           <span style={{
             position: 'absolute', right: 'var(--space-3)', top: '50%',
-            transform: 'translateY(-50%)', color: 'var(--text-muted)', fontFamily: 'monospace',
+            transform: 'translateY(-50%)', color: 'var(--text-muted)', fontFamily: "'Courier New', monospace",
           }}>...</span>
         )}
       </div>
@@ -354,7 +354,7 @@ function LiveSearch() {
           ))}
           <div style={{
             padding: 'var(--space-2) var(--space-3)', color: 'var(--text-muted)',
-            fontFamily: 'monospace', display: 'flex', justifyContent: 'space-between',
+            fontFamily: "'Courier New', monospace", display: 'flex', justifyContent: 'space-between',
           }}>
             <span>{total} result{total !== 1 ? 's' : ''}</span>
             {ms !== null && <span>{ms}ms</span>}
@@ -362,7 +362,7 @@ function LiveSearch() {
         </div>
       )}
       {error && (
-        <div style={{ color: 'var(--text-muted)', padding: 'var(--space-3)', fontFamily: 'monospace', fontSize: '10px' }}>
+        <div style={{ color: 'var(--text-muted)', padding: 'var(--space-3)', fontFamily: "'Courier New', monospace", fontSize: '10px' }}>
           {error}
         </div>
       )}

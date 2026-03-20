@@ -224,10 +224,10 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
                           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{sc.share_class_code}</div>
                         )}
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'monospace' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>
                         {formatNumber(sc.authorized_shares)}
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'monospace' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>
                         {formatNumber(sc.outstanding_shares)}
                       </td>
                       <td style={{ padding: '10px 12px', textAlign: 'center' }}>
@@ -236,7 +236,7 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
                         {sc.voting_rights === 'limited' && <span title="Limited voting">◐</span>}
                         {sc.voting_rights === 'super' && <span title="Super voting">✓✓</span>}
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', fontFamily: 'monospace' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', fontFamily: "'Courier New', monospace" }}>
                         {sc.liquidation_preference ? `${sc.liquidation_preference}x` : '-'}
                       </td>
                     </tr>
@@ -410,18 +410,18 @@ const OrganizationLegalTab: React.FC<Props> = ({ organizationId, organization, i
                       <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                         {fs.statement_type?.replace(/_/g, ' ')}
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'monospace' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>
                         {formatCurrency(fs.revenue)}
                       </td>
                       <td style={{
                         padding: '10px 12px',
                         textAlign: 'right',
-                        fontFamily: 'monospace',
+                        fontFamily: "'Courier New', monospace",
                         color: (fs.net_income || 0) >= 0 ? 'var(--success)' : 'var(--error)',
                       }}>
                         {formatCurrency(fs.net_income)}
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'monospace' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: "'Courier New', monospace" }}>
                         {formatCurrency(fs.total_assets)}
                       </td>
                       <td style={{ padding: '10px 12px', textAlign: 'center' }}>

@@ -195,7 +195,7 @@ export const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({ isOpen
               border: '1px solid #333',
               padding: '20px 16px',
               marginBottom: 'var(--space-4)',
-              fontFamily: 'monospace',
+              fontFamily: "'Courier New', monospace",
               fontSize: '11px',
               lineHeight: '1.5',
               color: 'var(--border)',
