@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -84,7 +83,7 @@ const SQUAREBODY_SEARCH_TERMS = [
   '73-91 GMC'
 ]
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }

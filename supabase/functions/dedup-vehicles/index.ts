@@ -4,7 +4,6 @@
 // capped at `max_merges` total merge operations (default 500).
 // Safe: re-points child records to primary vehicle, soft-deletes duplicates.
 
-import { serve } from "https://deno.land/std@0.177.1/http/server.ts";
 import postgres from "https://deno.land/x/postgresjs@v3.4.4/mod.js";
 
 const corsHeaders = {
@@ -12,7 +11,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

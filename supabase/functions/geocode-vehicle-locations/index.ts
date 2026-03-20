@@ -15,7 +15,6 @@
  *   { "batch_size": 500, "dry_run": false, "nominatim_delay_ms": 1100 }
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parseLocation } from "../_shared/parseLocation.ts";
 
@@ -96,7 +95,7 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

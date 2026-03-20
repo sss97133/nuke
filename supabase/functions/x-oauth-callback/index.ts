@@ -7,7 +7,6 @@
  * X API v2 uses OAuth 2.0 with PKCE
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -17,7 +16,7 @@ const corsHeaders = {
 
 const X_API_BASE = 'https://api.twitter.com/2';
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

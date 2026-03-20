@@ -7,7 +7,6 @@
  * Expects: { inquiry_id } or { vehicle_id, organization_id, name, email, phone, message }
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { sendEmail } from "../_shared/email.ts";
 
@@ -17,7 +16,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

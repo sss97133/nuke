@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -50,7 +49,7 @@ function bytesToHex(bytes: Uint8Array): string {
   return '\\x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

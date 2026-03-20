@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractAndCacheFavicon } from "../_shared/extractFavicon.ts";
 import { extractBrandAssetsFromHtml } from "../_shared/extractBrandAssets.ts";
@@ -525,7 +524,7 @@ interface ScrapeRequest {
   organization_id?: string; // Optional: link inventory directly to existing organization
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

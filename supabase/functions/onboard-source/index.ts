@@ -14,7 +14,6 @@
  * No custom extractor needed. Unknown sources fall back to extract-vehicle-data-ai.
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { firecrawlScrape, firecrawlMap } from '../_shared/firecrawl.ts';
@@ -183,7 +182,7 @@ function estimateFromBrowsePage(markdown: string): number | null {
 
 // ─── Main Handler ───────────────────────────────────────────────────────────
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

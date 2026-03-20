@@ -8,7 +8,6 @@
  * Output: { year, make, model, trim, body_style, confidence, reasoning, model_used }
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getLLMConfig, callLLM, type AnalysisTier } from '../_shared/llmProvider.ts'
 import { callTierVision, parseJsonResponse } from '../_shared/agentTiers.ts'
@@ -353,7 +352,7 @@ async function identifyWithHaiku(
   }
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }

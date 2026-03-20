@@ -19,7 +19,6 @@
  *   Uses X-Twilio-Signature HMAC-SHA1 on the full webhook URL + sorted params.
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -28,7 +27,7 @@ const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
 const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
 const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return twiml(''); // Twilio doesn't send OPTIONS but just in case
   }

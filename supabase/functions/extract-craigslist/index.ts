@@ -2,7 +2,6 @@
 // Craigslist uses clean JSON-LD structured data + HTML attributes
 // Uses archiveFetch to archive all fetched pages to listing_page_snapshots
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { archiveFetch } from '../_shared/archiveFetch.ts';
 
@@ -188,7 +187,7 @@ async function extractCraigslistListing(url: string): Promise<CraigslistExtracte
   };
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

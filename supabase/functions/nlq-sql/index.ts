@@ -1,5 +1,4 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { callLLM, getLLMConfig, type AnalysisTier, type LLMProvider } from "../_shared/llmProvider.ts"
 import { corsHeaders } from "../_shared/cors.ts"
@@ -258,7 +257,7 @@ async function execSql(supabase: any, sql: string): Promise<{ data?: any[]; erro
   return { error: errors.join(" | ") }
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors })
   if (req.method !== "POST") return json(405, { error: "Method not allowed" })
 

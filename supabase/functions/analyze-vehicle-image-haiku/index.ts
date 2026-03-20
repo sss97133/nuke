@@ -14,7 +14,6 @@
  *   { mode: "batch", vehicle_id }
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { callTierVision } from "../_shared/agentTiers.ts";
@@ -419,7 +418,7 @@ Return JSON:
 
 // ── Serve ────────────────────────────────────────────────────
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

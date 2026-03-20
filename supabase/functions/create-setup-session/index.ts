@@ -3,7 +3,6 @@
 // Secrets required: STRIPE_SECRET_KEY
 // POST body: { success_url: string, cancel_url: string }
 
-import { serve } from "https://deno.land/std@0.177.1/http/server.ts";
 import Stripe from "npm:stripe@12.9.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
@@ -27,7 +26,7 @@ function json(body: unknown, status = 200) {
   });
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
 

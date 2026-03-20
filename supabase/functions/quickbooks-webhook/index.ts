@@ -5,7 +5,6 @@
  * Used to keep financial data in sync.
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -15,7 +14,7 @@ const corsHeaders = {
 
 const QUICKBOOKS_WEBHOOK_VERIFIER = Deno.env.get('QUICKBOOKS_WEBHOOK_VERIFIER');
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });

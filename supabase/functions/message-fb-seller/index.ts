@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -17,7 +16,7 @@ function buildMessage(listing: { parsed_year: number | null; parsed_make: string
   return `Hi! I'm interested in your ${vehicle || 'vehicle'}. Could you share the VIN number and a few more photos (engine bay, interior, undercarriage)? Thanks!`;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

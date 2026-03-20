@@ -2,7 +2,6 @@
 // Real extraction via Azure Form Recognizer prebuilt-receipt model
 // Deploy: supabase functions deploy receipt-extract
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 // Basic CORS for local dev and app usage
 const corsHeaders: Record<string, string> = {
@@ -436,7 +435,7 @@ function mapTextractExpenseToParsed(result: any) {
   };
 }
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   try {
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {

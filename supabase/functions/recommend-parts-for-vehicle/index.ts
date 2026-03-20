@@ -3,7 +3,6 @@
  * Analyzes vehicle images and recommends replacement/upgrade parts
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 
 const corsHeaders = {
@@ -16,7 +15,7 @@ function escapePostgrestValue(s: string): string {
   return String(s || '').replace(/[",().\\]/g, '');
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }

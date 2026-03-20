@@ -10,7 +10,6 @@
  * POST /functions/v1/sms-verification-intake
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const supabase = createClient(
@@ -251,7 +250,7 @@ Return JSON:
   };
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }

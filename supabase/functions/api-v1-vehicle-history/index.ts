@@ -5,7 +5,6 @@
  * GET /v1/vehicles/{vin}/history
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { authenticateRequest, logApiUsage } from "../_shared/apiKeyAuth.ts";
 
@@ -22,7 +21,7 @@ function jsonResponse(data: any, status = 200) {
   });
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
