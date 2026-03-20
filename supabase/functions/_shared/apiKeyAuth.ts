@@ -20,6 +20,10 @@ import { checkRateLimit, getClientIp, rateLimitResponse, rateLimitHeaders } from
 export interface AuthResult {
   userId: string | null;
   isServiceRole?: boolean;
+  /** Agent registration ID (if caller is a registered agent) */
+  agentId?: string | null;
+  /** API key scopes (e.g. ['read', 'write', 'stage_write']) */
+  scopes?: string[];
   error?: string;
   /** HTTP status code when error is set */
   status?: number;
@@ -115,6 +119,7 @@ export async function authenticateRequest(
       reset_at?: string;
       user_id?: string;
       scopes?: string[];
+      agent_registration_id?: string | null;
       error?: string;
       retry_after?: number;
     };
@@ -164,7 +169,15 @@ export async function authenticateRequest(
       rlHeaders['X-RateLimit-Reset'] = result.reset_at;
     }
 
-    return { userId: result.user_id ?? null, headers: rlHeaders };
+    // For agent keys, user_id is null — use agent_registration_id as identity
+    const effectiveUserId = result.user_id || (result.agent_registration_id ? `agent:${result.agent_registration_id}` : null);
+
+    return {
+      userId: effectiveUserId,
+      agentId: result.agent_registration_id ?? null,
+      scopes: result.scopes ?? [],
+      headers: rlHeaders,
+    };
   }
 
   // --- 4. Anonymous / unauthenticated — IP-based rate limiting ---

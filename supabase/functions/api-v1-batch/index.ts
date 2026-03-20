@@ -23,10 +23,10 @@ interface BatchVehicle {
   model?: string;
   vin?: string;
   mileage?: number;
-  exterior_color?: string;
+  color?: string;
   interior_color?: string;
   transmission?: string;
-  engine?: string;
+  engine_type?: string;
   drivetrain?: string;
   body_style?: string;
   sale_price?: number;
@@ -35,11 +35,11 @@ interface BatchVehicle {
 }
 
 interface BatchObservation {
-  source_type: string;
-  observation_kind: string;
+  source_id: string;
+  kind: string;
   observed_at?: string;
-  data: Record<string, any>;
-  confidence?: number;
+  structured_data: Record<string, any>;
+  confidence_score?: number;
 }
 
 interface BatchRequest {
@@ -91,6 +91,10 @@ serve(async (req) => {
     }
     const userId = auth.userId;
 
+    // Detect agent staging
+    const isStageOnly = auth.scopes?.includes('stage_write') && !auth.scopes?.includes('write');
+    const agentId = auth.agentId;
+
     let body: BatchRequest;
     try {
       body = await req.json();
@@ -112,6 +116,14 @@ serve(async (req) => {
     if (body.vehicles.length > 1000) {
       return new Response(
         JSON.stringify({ error: "Maximum batch size is 1000 vehicles" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Tier 1 agent batch cap: 10 vehicles
+    if (isStageOnly && body.vehicles.length > 10) {
+      return new Response(
+        JSON.stringify({ error: "Tier 1 agents are limited to 10 vehicles per batch. Submit more observations to earn Tier 2." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -184,10 +196,10 @@ serve(async (req) => {
             if (vehicle.make) updateData.make = vehicle.make;
             if (vehicle.model) updateData.model = vehicle.model;
             if (vehicle.mileage) updateData.mileage = vehicle.mileage;
-            if (vehicle.exterior_color) updateData.exterior_color = vehicle.exterior_color;
+            if (vehicle.color) updateData.color = vehicle.color;
             if (vehicle.interior_color) updateData.interior_color = vehicle.interior_color;
             if (vehicle.transmission) updateData.transmission = vehicle.transmission;
-            if (vehicle.engine) updateData.engine = vehicle.engine;
+            if (vehicle.engine_type) updateData.engine_type = vehicle.engine_type;
             if (vehicle.drivetrain) updateData.drivetrain = vehicle.drivetrain;
             if (vehicle.body_style) updateData.body_style = vehicle.body_style;
             if (vehicle.sale_price) updateData.sale_price = vehicle.sale_price;
@@ -200,7 +212,11 @@ serve(async (req) => {
 
             // Process observations for existing vehicle
             if (vehicle.observations?.length) {
-              await insertObservations(supabase, existingVehicle.id, vehicle.vin, vehicle.observations, userId);
+              if (isStageOnly && agentId) {
+                await insertStagedObservations(supabase, existingVehicle.id, vehicle, vehicle.observations, agentId);
+              } else {
+                await insertObservations(supabase, existingVehicle.id, vehicle.vin, vehicle.observations, userId, agentId);
+              }
             }
 
             result.updated++;
@@ -218,10 +234,10 @@ serve(async (req) => {
             model: vehicle.model,
             vin: vehicle.vin,
             mileage: vehicle.mileage,
-            exterior_color: vehicle.exterior_color,
+            color: vehicle.color,
             interior_color: vehicle.interior_color,
             transmission: vehicle.transmission,
-            engine: vehicle.engine,
+            engine_type: vehicle.engine_type,
             drivetrain: vehicle.drivetrain,
             body_style: vehicle.body_style,
             sale_price: vehicle.sale_price,
@@ -238,7 +254,11 @@ serve(async (req) => {
 
         // Process observations for new vehicle
         if (vehicle.observations?.length) {
-          await insertObservations(supabase, newVehicle.id, vehicle.vin, vehicle.observations, userId);
+          if (isStageOnly && agentId) {
+            await insertStagedObservations(supabase, newVehicle.id, vehicle, vehicle.observations, agentId);
+          } else {
+            await insertObservations(supabase, newVehicle.id, vehicle.vin, vehicle.observations, userId, agentId);
+          }
         }
 
         result.created++;
@@ -278,28 +298,78 @@ serve(async (req) => {
 async function insertObservations(
   supabase: any,
   vehicleId: string,
-  vin: string | undefined,
+  _vin: string | undefined,
   observations: BatchObservation[],
-  userId: string
+  userId: string,
+  agentId?: string | null
 ) {
   const obsRecords = observations.map(obs => ({
     vehicle_id: vehicleId,
-    vin,
-    source_type: obs.source_type,
-    observation_kind: obs.observation_kind,
+    source_id: obs.source_id,
+    kind: obs.kind,
     observed_at: obs.observed_at || new Date().toISOString(),
-    data: obs.data,
-    confidence: obs.confidence ?? 0.8,
-    provenance: {
+    structured_data: obs.structured_data,
+    confidence_score: obs.confidence_score ?? 0.8,
+    extraction_metadata: {
       ingested_by: userId,
       ingested_via: "api-v1-batch",
     },
-    created_at: new Date().toISOString(),
   }));
 
   const { error } = await supabase.from("vehicle_observations").insert(obsRecords);
   if (error) {
     console.error(`[batch] Failed to insert observations:`, error instanceof Error ? error.message : String(error));
+  }
+
+  // Record agent metrics for Tier 2+ agents
+  if (agentId) {
+    for (const obs of observations) {
+      await supabase.rpc('record_agent_submission', {
+        p_agent_id: agentId,
+        p_outcome: 'accepted',
+        p_kind: obs.kind,
+      });
+    }
+  }
+}
+
+async function insertStagedObservations(
+  supabase: any,
+  vehicleId: string,
+  vehicle: BatchVehicle,
+  observations: BatchObservation[],
+  agentId: string
+) {
+  const stagingRecords = observations.map(obs => {
+    const hashInput = JSON.stringify(obs.structured_data) + (obs.kind || '');
+    return {
+      vehicle_id: vehicleId,
+      vehicle_hints: vehicle.vin ? { vin: vehicle.vin, year: vehicle.year, make: vehicle.make, model: vehicle.model } : { year: vehicle.year, make: vehicle.make, model: vehicle.model },
+      source_id: obs.source_id,
+      kind: obs.kind,
+      observed_at: obs.observed_at || new Date().toISOString(),
+      structured_data: obs.structured_data,
+      confidence_score: obs.confidence_score ?? 0.8,
+      extraction_metadata: {
+        ingested_by: agentId,
+        ingested_via: "api-v1-batch",
+      },
+      agent_id: agentId,
+    };
+  });
+
+  const { error } = await supabase.from("agent_submissions_staging").insert(stagingRecords);
+  if (error) {
+    console.error(`[batch] Failed to insert staged observations:`, error instanceof Error ? error.message : String(error));
+  }
+
+  // Record each submission
+  for (const obs of observations) {
+    await supabase.rpc('record_agent_submission', {
+      p_agent_id: agentId,
+      p_outcome: 'pending',
+      p_kind: obs.kind,
+    });
   }
 }
 

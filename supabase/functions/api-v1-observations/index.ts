@@ -52,6 +52,10 @@ serve(async (req) => {
     }
     const userId = auth.userId;
 
+    // Detect agent staging: stage_write scope without write scope → sandbox mode
+    const isStageOnly = auth.scopes?.includes('stage_write') && !auth.scopes?.includes('write');
+    const agentId = auth.agentId;
+
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
 
@@ -71,19 +75,34 @@ serve(async (req) => {
         );
       }
 
+      // Resolve VIN to vehicle_id (vin column doesn't exist on vehicle_observations)
+      let resolvedVehicleId = vehicleId;
+      if (!resolvedVehicleId && vin) {
+        const { data: vehicle } = await supabase
+          .from("vehicles")
+          .select("id")
+          .eq("vin", vin.trim().toUpperCase())
+          .maybeSingle();
+
+        if (!vehicle) {
+          return new Response(
+            JSON.stringify({ error: "No vehicle found for VIN", vin }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        resolvedVehicleId = vehicle.id;
+      }
+
       let query = supabase
         .from("vehicle_observations")
         .select(`
           id, vehicle_id, source_id, kind,
-          observed_at, structured_data, confidence,
+          observed_at, structured_data, confidence_score,
           created_at
         `, { count: "estimated" });
 
-      if (vehicleId) {
-        query = query.eq("vehicle_id", vehicleId);
-      }
-      if (vin) {
-        query = query.eq("vin", vin);
+      if (resolvedVehicleId) {
+        query = query.eq("vehicle_id", resolvedVehicleId);
       }
       if (kind) {
         query = query.eq("kind", kind);
@@ -138,6 +157,105 @@ serve(async (req) => {
         );
       }
 
+      // Validate source_id exists in observation_sources
+      const { data: sourceRow } = await supabase
+        .from("observation_sources")
+        .select("id")
+        .eq("id", body.source_id)
+        .maybeSingle();
+
+      if (!sourceRow) {
+        return new Response(
+          JSON.stringify({ error: "Invalid source_id: not found in observation_sources", field: "source_id" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Validate kind is a valid observation type
+      const validKinds = [
+        'listing', 'sale_result', 'comment', 'bid', 'sighting', 'work_record',
+        'ownership', 'specification', 'provenance', 'valuation', 'condition',
+        'media', 'social_mention', 'expert_opinion',
+      ];
+      if (!validKinds.includes(body.kind)) {
+        return new Response(
+          JSON.stringify({ error: `Invalid kind: '${body.kind}'. Must be one of: ${validKinds.join(', ')}`, field: "kind" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Validate structured_data is non-empty
+      if (typeof body.structured_data !== 'object' || Object.keys(body.structured_data).length === 0) {
+        return new Response(
+          JSON.stringify({ error: "structured_data must be a non-empty object", field: "structured_data" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Validate confidence if provided (0-1 numeric)
+      if (body.confidence !== undefined) {
+        const c = Number(body.confidence);
+        if (isNaN(c) || c < 0 || c > 1) {
+          return new Response(
+            JSON.stringify({ error: "confidence must be a number between 0 and 1", field: "confidence" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      // --- Agent staging path: write to staging table instead ---
+      if (isStageOnly && agentId) {
+        // Compute content hash for dedup
+        const hashInput = JSON.stringify(body.structured_data) + (body.kind || '');
+        const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(hashInput));
+        const contentHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+        const { data: staged, error: stageError } = await supabase
+          .from("agent_submissions_staging")
+          .insert({
+            vehicle_id: body.vehicle_id || null,
+            vehicle_hints: body.vin ? { vin: body.vin } : (body as any).vehicle_hints || {},
+            source_id: body.source_id,
+            kind: body.kind,
+            observed_at: body.observed_at || new Date().toISOString(),
+            content_text: (body as any).content_text || null,
+            content_hash: contentHash,
+            structured_data: body.structured_data,
+            confidence_score: body.confidence ?? 0.8,
+            extraction_metadata: {
+              ...body.provenance,
+              ingested_by: agentId,
+              ingested_via: "api-v1",
+            },
+            source_url: body.provenance?.url || null,
+            agent_id: agentId,
+          })
+          .select("id")
+          .single();
+
+        if (stageError) throw stageError;
+
+        // Record submission metric
+        await supabase.rpc('record_agent_submission', {
+          p_agent_id: agentId,
+          p_outcome: 'pending',
+          p_kind: body.kind,
+        });
+
+        await logApiUsage(supabase, userId, "observations", "stage", staged?.id);
+
+        return new Response(
+          JSON.stringify({
+            staged: true,
+            staging_id: staged?.id,
+            message: "Observation staged for review. Tier 1 agents have submissions reviewed before promotion to production.",
+          }),
+          { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json", ...auth.headers } }
+        );
+      }
+
+      // --- Direct write path (Tier 2+ or non-agent) ---
+
       // If VIN provided but not vehicle_id, try to find or create vehicle
       let vehicleId = body.vehicle_id;
       if (!vehicleId && body.vin) {
@@ -189,6 +307,15 @@ serve(async (req) => {
 
       if (error) {
         throw error;
+      }
+
+      // Record agent metric if this is a Tier 2+ agent
+      if (agentId) {
+        await supabase.rpc('record_agent_submission', {
+          p_agent_id: agentId,
+          p_outcome: 'accepted',
+          p_kind: body.kind,
+        });
       }
 
       // Log API usage

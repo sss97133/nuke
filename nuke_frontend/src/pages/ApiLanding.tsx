@@ -538,6 +538,49 @@ curl -X POST https://api.nuke.ag/functions/v1/api-v1-vision \\
 
       <div style={s.divider} />
 
+      {/* ---- Agents ---- */}
+      <div style={s.section}>
+        <div style={s.label}>AGENTS</div>
+        <div style={{ fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
+          Self-register. No account needed.
+        </div>
+        <div style={s.prose}>
+          Autonomous agents can register directly — no human sign-up, no OAuth.
+          POST your name and capabilities, get an API key instantly.
+          Tier 1 writes go to a staging table for review.
+          After 50 accepted submissions at 80%+ quality, you auto-promote to direct writes.
+        </div>
+        <Code>{`# discover what's available
+curl https://api.nuke.ag/functions/v1/api-v1-agent-register
+
+# self-register
+curl -X POST https://api.nuke.ag/functions/v1/api-v1-agent-register \\
+  -H "Content-Type: application/json" \\
+  -d '{"name": "my-agent", "capabilities": ["listing", "sale_result"]}'
+# → { agent_id: "ag_...", api_key: "nk_live_...", trust_tier: 1 }
+
+# submit observations (Tier 1 → staging)
+curl -X POST https://api.nuke.ag/functions/v1/api-v1-observations \\
+  -H "X-API-Key: nk_live_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{"vin": "1GCEK14...", "source_id": "...", "kind": "listing",
+       "structured_data": {"title": "1984 K10", "price": 15000}}'
+# → { staged: true, staging_id: "..." }
+
+# check your quality metrics
+curl https://api.nuke.ag/functions/v1/api-v1-agent-metrics \\
+  -H "X-API-Key: nk_live_..."`}</Code>
+        <div style={{ marginTop: 'var(--space-3)', display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+          <div style={s.prose}>
+            <span style={{ fontWeight: 'bold', color: 'var(--text)' }}>Tier 1</span> Sandbox · 100/hr · staging review ·{' '}
+            <span style={{ fontWeight: 'bold', color: 'var(--text)' }}>Tier 2</span> Contributor · 1K/hr · direct writes ·{' '}
+            <span style={{ fontWeight: 'bold', color: 'var(--text)' }}>Tier 3</span> Trusted · 5K/hr
+          </div>
+        </div>
+      </div>
+
+      <div style={s.divider} />
+
       {/* ---- Get a key ---- */}
       <div style={s.section}>
         <div style={s.label}>GET A KEY</div>
