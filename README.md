@@ -8,6 +8,11 @@ Nuke turns minimal low signal data points lets say anywhere from 10-100 data poi
 every claim traced to origin, confidence-scored, time-ordered.
 Nothing overwrites. Everything compounds.
 
+- Fully Normalized — no duplication, every fact lives in one place
+  - Domain Ontology — formal spec of everything that can be true about a vehicle
+  - Component Resolution — granularity goes down to individual parts, not just "the car"
+  - Full Provenance Tracking — every cell knows where it came from, who said it, and when
+
 ```
 input:  1 auction listing, 1 VIN, 247 photos, 32 comments
 output: factory spec (every option code, every part number)
@@ -18,7 +23,12 @@ output: factory spec (every option code, every part number)
         visual inspection (41-zone classification, damage, paint, gaps)
         source conflicts flagged, multi-model jury scored
 ```
-
+  
+  We are
+  - Ontology Engineers — the people who formally define what can be true in a domain
+  - Knowledge Graph Engineers — build the graph structures and reasoning layers 
+  - Domain Data Modelers — translate real-world domains into relational schema
+  - Information Architects — structure and classify at the conceptual level before any code exists
 
 ---
 
