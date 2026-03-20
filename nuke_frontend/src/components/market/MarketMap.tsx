@@ -276,7 +276,7 @@ export default function MarketMap() {
           if (lw < 2 || lh < 2) continue;
 
           const lDiv = document.createElement('div');
-          lDiv.style.cssText = `position:absolute;left:${lx}px;top:${ly}px;width:${lw}px;height:${lh}px;overflow:hidden;cursor:pointer;border:1px solid #2a2a2a;border-radius:1px;background:#f0efe8;transition:filter 0.1s;`;
+          lDiv.style.cssText = `position:absolute;left:${lx}px;top:${ly}px;width:${lw}px;height:${lh}px;overflow:hidden;cursor:pointer;border:1px solid #2a2a2a;border-radius:0;background:#f0efe8;transition:filter 0.1s;`;
 
           const inner = document.createElement('div');
           inner.style.cssText = 'padding:3px 4px;height:100%;display:flex;flex-direction:column;';
@@ -356,7 +356,7 @@ export default function MarketMap() {
         if (w < 2 || h < 2) continue;
 
         const div = document.createElement('div');
-        div.style.cssText = `position:absolute;left:${leaf.x0}px;top:${leaf.y0}px;width:${w}px;height:${h}px;overflow:hidden;cursor:pointer;border:1px solid #2a2a2a;border-radius:1px;background:#f0efe8;transition:filter 0.1s;`;
+        div.style.cssText = `position:absolute;left:${leaf.x0}px;top:${leaf.y0}px;width:${w}px;height:${h}px;overflow:hidden;cursor:pointer;border:1px solid #2a2a2a;border-radius:0;background:#f0efe8;transition:filter 0.1s;`;
 
         const inner = document.createElement('div');
         inner.style.cssText = 'padding:3px 4px;height:100%;display:flex;flex-direction:column;';

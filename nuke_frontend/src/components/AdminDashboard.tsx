@@ -343,7 +343,7 @@ const AdminDashboard: React.FC = () => {
         .client-status {
           display: inline-block;
           padding: 2px 6px;
-          border-radius: 3px;
+          border-radius: 0;
           font-size: 10px;
           text-transform: uppercase;
         }
@@ -389,7 +389,7 @@ const AdminDashboard: React.FC = () => {
           height: 40px;
           border: 4px solid var(--border-color);
           border-top: 4px solid var(--primary);
-          border-radius: 50%;
+          border-radius: 0;
           animation: spin 1s linear infinite;
         }
 
