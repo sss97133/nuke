@@ -455,6 +455,21 @@ const TOOLS: ToolDef[] = [
   },
 
   {
+    name: "decode_vin",
+    description:
+      "Decode a VIN to factory specifications via NHTSA VPIC database. Returns year, make, model, trim, engine, " +
+      "transmission, drivetrain, body style, plant of manufacture, and more. Works for all US-market vehicles 1981+. " +
+      "Also checks if the VIN exists as a vehicle in the Nuke database.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vin: { type: "string", description: "Vehicle Identification Number (full 17-char or partial 11+)" },
+      },
+      required: ["vin"],
+    },
+  },
+
+  {
     name: "browse_inventory",
     description:
       "Browse vehicles with location, body style, status, and price filters. Use this for queries like 'find me a truck in Las Vegas' or 'show Porsches under $80K in California'. " +
@@ -983,6 +998,78 @@ async function handleSearchVehiclesAdvanced(args: Record<string, unknown>): Prom
   return toolOk(data);
 }
 
+async function handleDecodeVin(args: Record<string, unknown>): Promise<ToolResult> {
+  const vin = String(args.vin).trim().toUpperCase();
+  if (vin.length < 5) return toolErr("VIN must be at least 5 characters");
+
+  // 1. Decode via NHTSA VPIC API
+  let nhtsaDecode: Record<string, string> | null = null;
+  if (vin.length >= 11) {
+    try {
+      const nhtsaRes = await fetch(
+        `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${encodeURIComponent(vin)}?format=json`,
+      );
+      if (nhtsaRes.ok) {
+        const nhtsaData = await nhtsaRes.json();
+        const raw = nhtsaData?.Results?.[0] ?? {};
+        nhtsaDecode = {};
+        for (const [k, v] of Object.entries(raw)) {
+          if (v && typeof v === "string" && v.trim() && v !== "Not Applicable") {
+            (nhtsaDecode as Record<string, string>)[k] = (v as string).trim();
+          }
+        }
+      }
+    } catch { /* NHTSA unavailable */ }
+  }
+
+  // 2. Check local Nuke DB
+  const supabase = sb();
+  const { data: vehicle } = await supabase
+    .from("vehicles")
+    .select("id, vin, year, make, model, trim, status, sale_price, primary_image_url, listing_url")
+    .ilike("vin", vin)
+    .limit(1)
+    .maybeSingle();
+
+  if (!nhtsaDecode && !vehicle) {
+    return toolErr(`VIN ${vin} not found in NHTSA or Nuke database`);
+  }
+
+  const result: Record<string, unknown> = { vin };
+
+  if (nhtsaDecode) {
+    result.nhtsa_decode = {
+      year: nhtsaDecode.ModelYear,
+      make: nhtsaDecode.Make,
+      model: nhtsaDecode.Model,
+      trim: nhtsaDecode.Trim,
+      series: nhtsaDecode.Series,
+      body_class: nhtsaDecode.BodyClass,
+      vehicle_type: nhtsaDecode.VehicleType,
+      drive_type: nhtsaDecode.DriveType,
+      engine_cylinders: nhtsaDecode.EngineCylinders,
+      engine_displacement_l: nhtsaDecode.DisplacementL,
+      engine_configuration: nhtsaDecode.EngineConfiguration,
+      fuel_type: nhtsaDecode.FuelTypePrimary,
+      doors: nhtsaDecode.Doors,
+      gvwr: nhtsaDecode.GVWR,
+      plant_city: nhtsaDecode.PlantCity,
+      plant_state: nhtsaDecode.PlantState,
+      plant_country: nhtsaDecode.PlantCountry,
+      manufacturer: nhtsaDecode.Manufacturer,
+      error_code: nhtsaDecode.ErrorCode,
+      error_text: nhtsaDecode.ErrorText,
+    };
+  }
+
+  result.in_nuke = !!vehicle;
+  if (vehicle) {
+    result.nuke_vehicle = vehicle;
+  }
+
+  return toolOk(result);
+}
+
 async function handleBrowseInventory(args: Record<string, unknown>): Promise<ToolResult> {
   const supabase = sb();
   const limit = Math.min(Number(args.limit) || 25, 100);
@@ -1014,9 +1101,9 @@ async function handleBrowseInventory(args: Record<string, unknown>): Promise<Too
     query = query.eq("status", String(args.status));
   }
 
-  // Make / model
+  // Make / model — use wildcard matching to catch variants
   if (args.make) {
-    query = query.ilike("make", String(args.make));
+    query = query.ilike("make", `%${args.make}%`);
   }
   if (args.model) {
     query = query.ilike("model", `%${args.model}%`);
@@ -2143,6 +2230,7 @@ const TOOL_HANDLERS: Record<string, (args: Record<string, unknown>) => Promise<T
   get_pipeline_registry: handleGetPipelineRegistry,
   search_vehicles: handleSearchVehicles,
   search_vehicles_advanced: handleSearchVehiclesAdvanced,
+  decode_vin: handleDecodeVin,
   browse_inventory: handleBrowseInventory,
   get_vehicle: handleGetVehicle,
   query_vehicle_deep: handleQueryVehicleDeep,
