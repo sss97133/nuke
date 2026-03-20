@@ -15,9 +15,14 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
   process.exit(1);
 }
 
-const platform = process.argv[2] || "all";
-const maxBatches = parseInt(process.argv[3]) || 100;
-const batchSize = parseInt(process.argv[4]) || 200;
+const rawArgs = process.argv.slice(2);
+const modeIdx = rawArgs.indexOf("--mode");
+const extractMode = modeIdx >= 0 ? rawArgs[modeIdx + 1] : "sparse";
+const positionalArgs = rawArgs.filter((a, i) => !a.startsWith("--") && (i === 0 || !rawArgs[i - 1].startsWith("--")));
+
+const platform = positionalArgs[0] || "all";
+const maxBatches = parseInt(positionalArgs[1]) || 100;
+const batchSize = parseInt(positionalArgs[2]) || 200;
 
 const PLATFORMS = ["barrett-jackson", "mecum", "carsandbids", "bonhams", "bat"];
 
@@ -31,8 +36,9 @@ async function runBatch(platform, offset) {
     body: JSON.stringify({
       platform,
       batch_size: batchSize,
-      mode: "sparse",
+      mode: extractMode,
       offset,
+      use_queue: true,
     }),
   });
   return res.json();
@@ -103,6 +109,7 @@ async function runPlatform(plat) {
 
 async function main() {
   console.log(`Mass Extraction Runner — ${new Date().toISOString()}`);
+  console.log(`Mode: ${extractMode}, Platform: ${platform}, Batch: ${batchSize}, Max batches: ${maxBatches}`);
 
   const platforms = platform === "all" ? PLATFORMS : [platform];
   const results = [];
