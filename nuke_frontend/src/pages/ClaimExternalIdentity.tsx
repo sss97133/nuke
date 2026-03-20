@@ -695,7 +695,6 @@ const ClaimExternalIdentity: React.FC = () => {
               <div style={{
                 padding: 'var(--space-4)',
                 border: '1px solid var(--border-light)',
-                borderRadius: 0,
                 marginBottom: 'var(--space-3)'
               }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
@@ -709,7 +708,6 @@ const ClaimExternalIdentity: React.FC = () => {
               <div style={{
                 padding: 'var(--space-4)',
                 border: '1px solid var(--border-light)',
-                borderRadius: 0
               }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
                   Option 3: Full verification (ID + face scan)

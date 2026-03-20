@@ -2688,8 +2688,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             right: 0,
             bottom: 0,
             padding: '8px',
-            background: 'rgba(0,0,0,0.7)',
-            color: '#fff',
+            background: 'rgba(0,0,0,0.75)',
+            color: 'var(--surface-elevated)',
           }}
         >
           {/* Vehicle name - with truncation */}
@@ -2989,7 +2989,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               }),
               width: 'min(360px, calc(100vw - 24px))',
               background: 'var(--surface)',
-              border: '1px solid var(--border)', padding: '10px', color: 'var(--text)',
+              border: '1px solid var(--border)',
+              padding: '10px',
+              color: 'var(--text)',
             }}
             ref={specPopoverRef}
             onClick={(e) => {
