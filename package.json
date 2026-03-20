@@ -112,7 +112,15 @@
     "ops:regression": "dotenvx run -- bash scripts/scheduled/nightly-regression.sh",
     "discover:openai": "dotenvx run -- node scripts/local-description-discovery.mjs --provider openai --batch 50 --parallel 10 --max 5000 --continue",
     "discover:gemini": "dotenvx run -- node scripts/local-description-discovery.mjs --provider gemini --batch 50 --parallel 5 --max 1000 --continue",
-    "discover:groq": "dotenvx run -- node scripts/local-description-discovery.mjs --provider groq --batch 50 --parallel 10 --max 5000 --continue"
+    "discover:groq": "dotenvx run -- node scripts/local-description-discovery.mjs --provider groq --batch 50 --parallel 10 --max 5000 --continue",
+    "mine:ollama": "dotenvx run -- node scripts/mine-comments-for-library.mjs --run 80 --provider ollama",
+    "mine:anthropic": "dotenvx run -- node scripts/mine-comments-for-library.mjs --run 80 --provider anthropic",
+    "mine:stats": "dotenvx run -- node scripts/mine-comments-for-library.mjs --stats",
+    "mine:loop": "dotenvx run -- bash scripts/run-mine-library.sh --provider ollama",
+    "promote:library": "dotenvx run -- node scripts/promote-library-extractions.mjs",
+    "promote:library:dry": "dotenvx run -- node scripts/promote-library-extractions.mjs --dry-run",
+    "promote:library:stats": "dotenvx run -- node scripts/promote-library-extractions.mjs --stats",
+    "overnight": "dotenvx run -- bash scripts/overnight-run.sh"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",

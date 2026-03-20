@@ -1,5 +1,23 @@
 # DONE — Completed Work Log
 
+### [extraction] Overnight Pipeline Infrastructure + Launch (2026-03-20 07:30-08:00)
+- [scripts] Added Ollama/Gemini multi-provider support to `mine-comments-for-library.mjs` (--provider ollama|gemini|anthropic)
+- [scripts] Created `scripts/run-mine-library.sh` — mining loop wrapper with auto-stop after 5 zero runs
+- [scripts] Created `scripts/promote-library-extractions.mjs` — staging → canonical library promotion
+- [scripts] Created `scripts/overnight-run.sh` — master orchestrator (4 streams + post-processing + morning report)
+- [library] Promoted 2,267 existing staging entries: 342 RPO codes, 98 paint codes, 159 trim packages to canonical tables
+- [npm] Added 8 npm scripts: mine:ollama, mine:anthropic, mine:stats, mine:loop, promote:library, promote:library:dry, promote:library:stats, overnight
+- [launch] 4 overnight streams running: snapshots (regex), mining (Ollama), extraction (Ollama), enrichment (DB)
+- [note] Gemini API key expired — Stream E (high-value Gemini extraction) skipped. All LLM via Ollama.
+
+### [overnight-ops] Overnight Ops Session (2026-03-20 01:00-02:30)
+- [critical-fix] Disabled `refresh_tier_on_image_upload` trigger on vehicle_images — references dropped `vehicle_receipts` table via `calculate_platform_tier_score` chain. Was blocking ALL photo intake inserts with `documented_by_user_id`.
+- [design] Committed 430+ design system component fixes (border-radius, boxShadow, font enforcement) across nuke_frontend
+- [deploy] Deployed 3 edge functions: db-stats, extract-mecum, refine-fb-listing
+- [infra] Added error logging to iphoto-intake.mjs (upload + insert errors were silent)
+- [data] Album intake RUNNING: 72 albums queued, 5 completed, 42 new photos uploaded (iphoto: 1,686→1,728). ETA ~6 AM.
+- [db] DB health verified: 0 lock waiters, all 32 vehicles triggers enabled, broken `trigger_update_primary_focus` already fixed
+
 ### [overnight-batch] Overnight Batch Run (2026-03-20 08:00-09:00)
 - [design] Global CSS enforcement: `* { border-radius: 0 !important; box-shadow: none !important; }` in unified-design-system.css
 - [design] src/pages/ cleanup: 7 files, 0 violations remaining (borderRadius, boxShadow, gradients, shadows)

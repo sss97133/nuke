@@ -13,19 +13,43 @@
  *   dotenvx run -- node scripts/mine-comments-for-library.mjs --run 80
  *   dotenvx run -- node scripts/mine-comments-for-library.mjs --stats
  *   dotenvx run -- node scripts/mine-comments-for-library.mjs --run 80 --cap=5
+ *   dotenvx run -- node scripts/mine-comments-for-library.mjs --run 80 --provider ollama
+ *   dotenvx run -- node scripts/mine-comments-for-library.mjs --run 80 --provider gemini
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import pg from 'pg';
 import crypto from 'crypto';
 
-const API_KEY = process.env.VITE_NUKE_CLAUDE_API;
-const MODEL = 'claude-haiku-4-5-20251001';
-const CONCURRENCY = 5;
+// ─── CLI arg helpers ────────────────────────────────────────────────────────
+const cliArgs = process.argv.slice(2);
+const getArg = (name, def) => { const i = cliArgs.indexOf(`--${name}`); return i === -1 ? def : cliArgs[i + 1] || def; };
+
+// ─── Provider Config ────────────────────────────────────────────────────────
+const PROVIDER = getArg('provider', 'anthropic');
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+
+const PROVIDER_MODELS = {
+  anthropic: 'claude-haiku-4-5-20251001',
+  ollama: 'qwen2.5:7b',
+  gemini: 'gemini-2.0-flash-lite',
+};
+const MODEL = getArg('model', PROVIDER_MODELS[PROVIDER] || 'qwen2.5:7b');
+
+const PROVIDER_CONCURRENCY = { anthropic: 5, ollama: 2, gemini: 5 };
+const CONCURRENCY = parseInt(getArg('concurrency', String(PROVIDER_CONCURRENCY[PROVIDER] || 2)));
+
 const DB_HOST = '54.177.55.191';
 const BATCH_ID = `mine-${new Date().toISOString().slice(0,10)}-${crypto.randomBytes(3).toString('hex')}`;
 
-const anthropic = new Anthropic({ apiKey: API_KEY });
+// Lazy-load Anthropic only when needed
+let anthropic = null;
+async function getAnthropic() {
+  if (!anthropic) {
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    anthropic = new Anthropic({ apiKey: process.env.VITE_NUKE_CLAUDE_API });
+  }
+  return anthropic;
+}
 
 // ─── DB Connection ──────────────────────────────────────────────────────────
 async function getDb() {
@@ -122,7 +146,7 @@ function buildPrompt(make, model, minYear, maxYear, comments) {
   prompt += `COMMENTS (${comments.length} selected, sorted by expertise):\n\n`;
 
   let totalChars = 0;
-  const MAX_CHARS = 12000; // Keep under token limits
+  const MAX_CHARS = PROVIDER === 'ollama' ? 6000 : 12000; // Smaller context for local models
 
   for (const c of comments) {
     const prefix = c.is_seller ? '[SELLER] ' : '';
@@ -138,37 +162,104 @@ function buildPrompt(make, model, minYear, maxYear, comments) {
   return prompt;
 }
 
-// ─── Call Claude ─────────────────────────────────────────────────────────────
+// ─── Provider Call Functions ─────────────────────────────────────────────────
+
+async function callAnthropic(systemPrompt, userPrompt) {
+  const client = await getAnthropic();
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 4096,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userPrompt }],
+  });
+  return {
+    text: response.content[0]?.text?.trim() || '',
+    input_tokens: response.usage.input_tokens,
+    output_tokens: response.usage.output_tokens,
+    cost: (response.usage.input_tokens * 1.0 + response.usage.output_tokens * 5.0) / 1_000_000,
+  };
+}
+
+async function callOllama(systemPrompt, userPrompt) {
+  const resp = await fetch(`${OLLAMA_URL}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      prompt: `${systemPrompt}\n\n${userPrompt}`,
+      stream: false,
+      options: { temperature: 0.1, num_predict: 4096 },
+    }),
+  });
+  if (!resp.ok) throw new Error(`Ollama ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
+  const r = await resp.json();
+  return { text: r.response || '', input_tokens: 0, output_tokens: 0, cost: 0 };
+}
+
+async function callGemini(systemPrompt, userPrompt) {
+  const key = process.env.GOOGLE_AI_API_KEY;
+  if (!key) throw new Error('GOOGLE_AI_API_KEY not set');
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ parts: [{ text: userPrompt }] }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: 'application/json' },
+      }),
+    }
+  );
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    throw new Error(`Gemini ${resp.status}: ${text.slice(0, 200)}`);
+  }
+  const r = await resp.json();
+  return { text: r.candidates?.[0]?.content?.parts?.[0]?.text || '', input_tokens: 0, output_tokens: 0, cost: 0 };
+}
+
+const PROVIDERS = { anthropic: callAnthropic, ollama: callOllama, gemini: callGemini };
+
+// ─── Parse JSON from LLM output ─────────────────────────────────────────────
+function parseJsonResponse(text) {
+  text = text.replace(/^```json?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+
+  // Extract first complete JSON object via brace matching
+  let depth = 0, start = -1, end = -1;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '{') { if (start === -1) start = i; depth++; }
+    else if (text[i] === '}') { depth--; if (depth === 0) { end = i + 1; break; } }
+  }
+  if (start === -1 || end === -1) throw new Error('No JSON object found');
+
+  let jsonStr = text.substring(start, end);
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    // Fix common 7B model JSON issues: trailing commas
+    jsonStr = jsonStr.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+    return JSON.parse(jsonStr);
+  }
+}
+
+// ─── Mine Group (multi-provider) ────────────────────────────────────────────
 async function mineGroup(make, model, minYear, maxYear, comments) {
   const userPrompt = buildPrompt(make, model, minYear, maxYear, comments);
   const startMs = Date.now();
+  const callFn = PROVIDERS[PROVIDER];
+  if (!callFn) throw new Error(`Unknown provider: ${PROVIDER}`);
 
   try {
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 4096,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-    });
-
-    let text = response.content[0]?.text?.trim();
-    text = text.replace(/^```json?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
-
-    // Extract first complete JSON object
-    let depth = 0, start = -1, end = -1;
-    for (let i = 0; i < text.length; i++) {
-      if (text[i] === '{') { if (start === -1) start = i; depth++; }
-      else if (text[i] === '}') { depth--; if (depth === 0) { end = i + 1; break; } }
-    }
-    if (start === -1 || end === -1) throw new Error('No JSON object found');
-    const parsed = JSON.parse(text.substring(start, end));
+    const { text, input_tokens, output_tokens, cost } = await callFn(SYSTEM_PROMPT, userPrompt);
+    const parsed = parseJsonResponse(text);
 
     return {
       success: true,
       extraction: parsed,
-      input_tokens: response.usage.input_tokens,
-      output_tokens: response.usage.output_tokens,
-      cost: (response.usage.input_tokens * 1.0 + response.usage.output_tokens * 5.0) / 1_000_000,
+      input_tokens,
+      output_tokens,
+      cost,
       elapsed_ms: Date.now() - startMs,
     };
   } catch (err) {
@@ -229,7 +320,7 @@ async function runTest(count) {
 
   for (const g of groups) {
     console.log(`\n── ${g.make} ${g.model} (${g.min_year}-${g.max_year}) ──`);
-    console.log(`   ${g.vehicle_count} vehicles, ${g.substantive_comments} substantive comments`);
+    console.log(`   ${g.vehicle_count} vehicles, ${g.total_comments} comments`);
 
     const comments = await fetchComments(db, g.make, g.model);
     console.log(`   Fetched ${comments.length} top comments`);
@@ -288,10 +379,11 @@ async function runBatch(limit) {
   console.log(`\n=== BATCH: Mining ${limit} make/model groups ===`);
   console.log(`Batch ID: ${BATCH_ID}\n`);
 
-  const COST_CAP = parseFloat(process.env.COST_CAP || '10');
+  const COST_CAP = PROVIDER === 'anthropic' ? parseFloat(process.env.COST_CAP || '10') : Infinity;
   const groups = await fetchGroups(db, limit);
   if (groups.length === 0) { console.log('No groups to mine (all done?).'); await db.end(); return; }
-  console.log(`Found ${groups.length} groups to mine (cost cap: $${COST_CAP})\n`);
+  const capStr = COST_CAP === Infinity ? 'none (free)' : `$${COST_CAP}`;
+  console.log(`Found ${groups.length} groups to mine (cost cap: ${capStr})\n`);
 
   let processed = 0, errors = 0, totalCost = 0, totalExtractions = 0;
   const startTime = Date.now();
@@ -400,20 +492,25 @@ async function showStats() {
 
 // ─── Entry ──────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
-const cmd = args[0];
+const cmd = args.find(a => a.startsWith('--') && !['--provider', '--model', '--concurrency'].includes(a) && !a.startsWith('--cap='));
 
 for (const arg of args) {
   if (arg.startsWith('--cap=')) process.env.COST_CAP = arg.split('=')[1];
 }
 
+console.log(`Provider: ${PROVIDER} | Model: ${MODEL} | Concurrency: ${CONCURRENCY}`);
+
 switch (cmd) {
-  case '--test': runTest(parseInt(args[1]) || 3); break;
-  case '--run': runBatch(parseInt(args.find(a => /^\d+$/.test(a))) || 80); break;
+  case '--test': runTest(parseInt(args[args.indexOf('--test') + 1]) || 3); break;
+  case '--run': runBatch(parseInt(args[args.indexOf('--run') + 1]) || 80); break;
   case '--stats': showStats(); break;
   default:
     console.log('Usage:');
-    console.log('  --test N    Test mine N make/model groups (default: 3)');
-    console.log('  --run N     Batch mine N groups (default: 80)');
-    console.log('  --stats     Show mining progress');
-    console.log('  --cap=N     Cost cap in dollars (default: $10)');
+    console.log('  --test N              Test mine N make/model groups (default: 3)');
+    console.log('  --run N               Batch mine N groups (default: 80)');
+    console.log('  --stats               Show mining progress');
+    console.log('  --provider <name>     anthropic|ollama|gemini (default: anthropic)');
+    console.log('  --model <name>        Override model name');
+    console.log('  --concurrency <n>     Override concurrency');
+    console.log('  --cap=N               Cost cap in dollars (default: $10)');
 }

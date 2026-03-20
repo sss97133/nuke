@@ -1270,3 +1270,47 @@ Owner contributes data → ARS increases → Vehicle reaches TIER 1
 ```
 
 The key insight: **every successful sale makes the entire system more valuable.** The comp database grows. The valuation confidence increases. The market timing models improve. The coaching system gets smarter about what makes a listing succeed. This is the network effect that makes Nuke defensible.
+
+---
+
+## Appendix: Sprint 1+2 Implementation Results (2026-03-20)
+
+### What Was Built
+- `auction_readiness` table (persisted scores)
+- `ars_tier_transitions` table (audit log)
+- `photo_coverage_requirements` table (20 zones seeded for `universal` platform)
+- `compute_auction_readiness()` — 6-dimension plpgsql scorer, ~65ms/vehicle
+- `persist_auction_readiness()` — upsert wrapper with tier transition logging
+- `recompute_ars_dimension()` — trigger-friendly recompute
+- 3 triggers: `trg_ars_on_image_insert`, `trg_ars_on_observation_insert`, `trg_ars_on_evidence_insert`
+- Index: `idx_vehicle_images_vehicle_zone(vehicle_id, vehicle_zone)` on 33M rows
+- 3 MCP tools: `get_auction_readiness`, `get_coaching_plan`, `prepare_listing`
+- Pipeline registry entries for governed writes
+
+### First Batch Results (2,142 vehicles, data_quality_score >= 95)
+
+| Tier | Count | Avg Score | Avg Identity | Avg Photo | Avg Doc | Avg Desc | Avg Market | Avg Condition |
+|------|-------|-----------|-------------|-----------|---------|----------|------------|---------------|
+| NEEDS_WORK (55-74) | 3 | 65 | 55 | 82 | 28 | 92 | 63 | 65 |
+| EARLY_STAGE (35-54) | 279 | 42 | 53 | 10 | 27 | 82 | 60 | 39 |
+| DISCOVERY_ONLY (0-34) | 1,860 | 22 | 50 | 5 | 6 | 28 | 50 | 6 |
+
+**Zero vehicles in TIER 1 (AUCTION_READY) or TIER 2 (NEARLY_READY).** This confirms the strategy prediction that ~99% of vehicles would be TIER 4-5.
+
+### Key Bottlenecks Identified
+1. **Photo zone classification** — Most BaT vehicles have 50-200+ photos but `vehicle_zone` is NULL for the vast majority. Only 292K of 33M images have zone data. Running YONO zone classifier at scale would immediately lift photo scores.
+2. **Documentation depth** — avg 6-28 across tiers. Only 139 vehicle_documents in the entire DB. First-party owner data is the unlock.
+3. **Condition confidence** — avg 6-39. Requires YONO vision analysis (ai_processing_status = 'completed') which is globally paused.
+4. **Description** — highest dimension for BaT vehicles (avg 82 in EARLY_STAGE) because BaT listings have rich text. But 87% of all vehicles have no description at all.
+
+### Top 3 Vehicles
+1. **1991 Mercedes-Benz 300SL** — Score 67 (NEEDS_WORK), 15 zones covered, photo 88
+2. **2001 Honda S2000** — Score 65 (NEEDS_WORK), 12 zones, photo 80
+3. **1997 Mercedes-Benz G320** — Score 62 (NEEDS_WORK), 11 zones, photo 79
+
+### Path to TIER 2 (75+)
+For the top-3 vehicles to reach NEARLY_READY:
+- Fill documentation gaps: title_status, ownership history, documents (+20-30 pts in doc dimension)
+- Complete MVPS photo zones: detail_odometer, detail_vin are the most common missing required zones
+- Run YONO condition analysis on existing photos (+15-30 pts in condition dimension)
+- These 3 actions alone could push top vehicles from 65 → 80+

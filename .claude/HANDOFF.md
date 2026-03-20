@@ -1,47 +1,399 @@
-# Overnight Batch Handoff — 2026-03-20
+# Session Handoff — 2026-03-20 08:00 AM (Overnight Pipeline Agent)
 
-## All 7 Tasks Complete
+## What Was Done
 
-### Phase 0: Safety Commit
-- Committed 34 dirty files as `876a2a661` before any modifications
+### Phase 0: Infrastructure Built
+- **mine-comments-for-library.mjs** — Added `--provider ollama|gemini|anthropic` flag with Ollama HTTP calls, Gemini API calls, and auto concurrency (2 for Ollama, 5 for others). Tested: BMW M5 extracted 7 library entries via Ollama in 27s.
+- **scripts/run-mine-library.sh** — Mining loop wrapper. Runs batches of 80 groups, stops after 5 consecutive zero-extraction runs.
+- **scripts/promote-library-extractions.mjs** — Promotes staging table entries to canonical tables (vintage_rpo_codes, paint_codes, oem_trim_levels). Fixed column name mismatches (rpo_code not code, model_family not model, trim_name not name).
+- **scripts/overnight-run.sh** — Master orchestrator with 4 streams + post-processing + morning report.
+- **package.json** — Added 8 npm scripts (mine:ollama, mine:loop, promote:library, overnight, etc.)
 
-### Phase 1: Design System (52% → ~90%+)
-- **1A Global CSS**: Added `* { border-radius: 0 !important; box-shadow: none !important; }` to unified-design-system.css. Tailwind config already zeroed. Build passes.
-- **1B-A Pages**: 7 files cleaned — borderRadius, boxShadow, gradients, shadows all resolved. 0 violations remain in src/pages/.
-- **1B-B Components**: 20+ files cleaned — 4 boxShadow, 6 gradients, 12 borderRadius: '50%', 8 CSS-in-string border-radius, 8 dead shadow transitions, 4 shadow Tailwind classes. 0 violations remain in src/components/.
+### Library Promotion (existing data)
+- Promoted 2,267 existing staging entries to canonical tables:
+  - 342 new RPO codes → vintage_rpo_codes (was 419, now 761)
+  - 98 new paint codes → paint_codes (was 3,361, now 3,459)
+  - 159 new trim packages → oem_trim_levels (was 420, now 579)
+  - 1,668 engine_specs/transmission_specs/production_facts/known_issues marked reviewed
 
-### Phase 2: Infrastructure
-- **2A Broken Cron**: `review-agent-submissions` fixed — `get_service_url()` now hardcodes URL instead of reading missing GUC param. 6 consecutive successes, 0 failures since fix. All 13 crons using it are healthy.
-- **2B Dead Functions**: 12 edge functions deleted (widget-broker-exposure, widget-buyer-qualification, widget-commission-optimizer, widget-deal-readiness, widget-sell-through-cliff, widget-rerun-decay, widget-time-kills-deals, widget-presentation-roi, widget-completion-discount, widget-geographic-arbitrage, concierge-webhook, pipeline-dashboard). Active count: 243 → 231.
+### Phase 1: 4 Overnight Streams Running
+| Stream | PID | Status | Notes |
+|--------|-----|--------|-------|
+| A: Snapshots (regex) | 15389 | RUNNING | Barrett-Jackson low yield (noSnap). Will move to Mecum/C&B. |
+| B: Mining (Ollama) | 15436 | RUNNING | First batch of 80 groups in progress. ~30s/group, GPU shared. |
+| C: Extraction (Ollama) | 15499 | RUNNING | 8 vehicles extracted so far. ~60-130s/vehicle. |
+| D: Enrichment (DB) | 15546 | RUNNING | 15 rounds done. Fast (pure DB). |
 
-### Phase 3: Data Enrichment
-- **3A FB Sweep**: 58 metros, 4,608 scanned, 1,610 vintage vehicles upserted (59 ECONNRESET errors — normal). Sweep ID: `65d0439c-0eb9-4781-81b5-d887ce096e0f`.
-- **3B Image Backfill**: primary_image_url fill rate 88.5% (256,530/289,926). Remaining 33,396 have zero images — nothing to backfill. No stale locks. Dead tuples moderate, autovacuum handling.
+### Gemini API Key EXPIRED
+- `GOOGLE_AI_API_KEY` returns "API key expired. Please renew."
+- Stream E (Gemini high-value extraction) was **skipped** entirely
+- User should renew key at https://aistudio.google.com/apikey
 
-## Key Numbers
+### Other Cleanup
+- Killed stale description discovery from 1:10 AM (PID 19553/19546) — was competing for GPU
 
-| Area | Before | After |
-|------|--------|-------|
-| Design compliance | ~52% | ~90%+ |
-| Border-radius violations (source) | ~1,860 | 0 (visually enforced + source cleaned) |
-| Shadow violations (source) | ~220 | 0 |
-| Broken crons | 1 (41 fails/day) | 0 |
-| Edge functions | 243 | 231 (12 deleted) |
-| FB Marketplace vehicles | — | +1,610 |
-| primary_image_url fill | 61% | 88.5% |
-| Git commits | — | 17 new commits |
+## What Needs Attention
 
-## Branch
-`overnight-data-quality` — 17+ commits ahead
+### After Streams Complete (check `ps aux | grep -E "mass-extract|run-mine|local-description|run-enrichment"`)
+1. Run post-processing: `dotenvx run -- bash scripts/overnight-run.sh --post-only`
+2. This runs bridge → validate → promote sequence
+3. Check logs: `tail -20 logs/overnight-*.log`
 
-## What's Next
-1. Deploy frontend to Vercel (design system changes committed but not deployed)
-2. Remaining ~10% design compliance — mostly hardcoded colors in charts/visualizations
-3. bat_extraction_queue — 141K pending, needs API credits or local approach
-4. Consider merging `overnight-data-quality` → main
+### Morning Verification Commands
+```bash
+# Mining stats
+dotenvx run -- node scripts/mine-comments-for-library.mjs --stats
+
+# Promotion stats
+dotenvx run -- node scripts/promote-library-extractions.mjs --stats
+
+# Check for errors
+grep -c "ERR\|FAIL\|error" logs/overnight-mining-2026-03-20.log
+grep -c "ERR\|FAIL\|error" logs/overnight-extraction-2026-03-20.log
+
+# DB stats
+dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/functions/v1/db-stats" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"' | jq
+```
+
+### Throughput Reality (Ollama shared GPU)
+- With 2 streams sharing GPU: ~30 total Ollama calls/hour (not 60 each)
+- Expected 8hr total: ~240 mining groups + ~240 vehicle extractions
+- Snapshots and enrichment don't use GPU so they run independently
+
+---
+# Auto-Checkpoint — 2026-03-20 07:52:05
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+auction-readiness-strategy.md
+package.json
+scripts/iphoto-intake.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/mcp-connector/index.ts
+
+## Staged
+none
 
 ## On Next Session
-1. `cat PROJECT_STATE.md`
-2. `tail -40 DONE.md`
-3. `cat .claude/HANDOFF.md` — this file
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 07:52:16
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+auction-readiness-strategy.md
+package.json
+scripts/iphoto-intake.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/mcp-connector/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 07:52:35
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+auction-readiness-strategy.md
+package.json
+scripts/iphoto-intake.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/mcp-connector/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 07:52:36
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+auction-readiness-strategy.md
+package.json
+scripts/iphoto-intake.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/mcp-connector/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 07:52:49
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+auction-readiness-strategy.md
+package.json
+scripts/iphoto-intake.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/mcp-connector/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 07:52:51
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+auction-readiness-strategy.md
+package.json
+scripts/iphoto-intake.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/mcp-connector/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 07:52:59
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+auction-readiness-strategy.md
+package.json
+scripts/iphoto-intake.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/mcp-connector/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 07:53:05
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+auction-readiness-strategy.md
+package.json
+scripts/iphoto-intake.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/mcp-connector/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 07:53:11
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+auction-readiness-strategy.md
+package.json
+scripts/iphoto-intake.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/mcp-connector/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 07:53:18
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+auction-readiness-strategy.md
+package.json
+scripts/iphoto-intake.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/mcp-connector/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 07:53:47
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+auction-readiness-strategy.md
+package.json
+scripts/iphoto-intake.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/mcp-connector/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 07:54:55
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+auction-readiness-strategy.md
+package.json
+scripts/iphoto-intake.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/mcp-connector/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-20 07:55:16
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+auction-readiness-strategy.md
+package.json
+scripts/iphoto-intake.mjs
+scripts/mine-comments-for-library.mjs
+supabase/functions/mcp-connector/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
 4. Register in `.claude/ACTIVE_AGENTS.md`

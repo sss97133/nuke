@@ -1721,6 +1721,240 @@ async function handleSubmitObservation(args: Record<string, unknown>): Promise<T
   return toolOk(data);
 }
 
+// ── Auction Readiness ────────────────────────────────────────────────────────
+
+async function handleGetAuctionReadiness(
+  args: Record<string, unknown>,
+): Promise<ToolResult> {
+  const supabase = sb();
+  let vehicleId = args.vehicle_id as string | undefined;
+
+  if (!vehicleId && args.vin) {
+    const { data } = await supabase
+      .from("vehicles")
+      .select("id")
+      .eq("vin", String(args.vin))
+      .eq("status", "active")
+      .limit(1)
+      .single();
+    if (!data) return toolErr(`No active vehicle found for VIN: ${args.vin}`);
+    vehicleId = data.id;
+  }
+  if (!vehicleId) return toolErr("Provide vehicle_id or vin");
+
+  const { data: cached } = await supabase
+    .from("auction_readiness")
+    .select("*")
+    .eq("vehicle_id", vehicleId)
+    .single();
+
+  if (cached && !cached.is_stale) {
+    const { data: v } = await supabase
+      .from("vehicles")
+      .select("year, make, model, vin, trim")
+      .eq("id", vehicleId)
+      .single();
+    return toolOk({ ...cached, vehicle: v });
+  }
+
+  const { data: result, error } = await supabase.rpc(
+    "persist_auction_readiness",
+    { p_vehicle_id: vehicleId },
+  );
+  if (error) return toolErr(error.message);
+
+  const { data: v } = await supabase
+    .from("vehicles")
+    .select("year, make, model, vin, trim")
+    .eq("id", vehicleId)
+    .single();
+
+  return toolOk({ ...result, vehicle: v });
+}
+
+async function handleGetCoachingPlan(
+  args: Record<string, unknown>,
+): Promise<ToolResult> {
+  const supabase = sb();
+  const vehicleId = args.vehicle_id as string;
+  if (!vehicleId) return toolErr("vehicle_id required");
+
+  let { data: ars } = await supabase
+    .from("auction_readiness")
+    .select("*")
+    .eq("vehicle_id", vehicleId)
+    .single();
+
+  if (!ars) {
+    await supabase.rpc("persist_auction_readiness", {
+      p_vehicle_id: vehicleId,
+    });
+    const res = await supabase
+      .from("auction_readiness")
+      .select("*")
+      .eq("vehicle_id", vehicleId)
+      .single();
+    ars = res.data;
+  }
+  if (!ars) return toolErr("Could not compute ARS for this vehicle");
+
+  const { data: v } = await supabase
+    .from("vehicles")
+    .select("year, make, model, vin, trim")
+    .eq("id", vehicleId)
+    .single();
+
+  const { data: zones } = await supabase
+    .from("photo_coverage_requirements")
+    .select("*")
+    .eq("platform", "universal")
+    .order("sort_position");
+
+  const missingZones = (ars.photo_zones_missing || []).map((z: string) => {
+    const req = zones?.find((r: Record<string, unknown>) => r.zone === z);
+    return {
+      zone: z,
+      requirement: req?.requirement || "unknown",
+      points: req?.points || 0,
+      coaching: req?.coaching_prompt || null,
+    };
+  });
+
+  return toolOk({
+    vehicle: v,
+    current_score: ars.composite_score,
+    current_tier: ars.tier,
+    dimensions: {
+      identity: ars.identity_score,
+      photos: ars.photo_score,
+      documentation: ars.doc_score,
+      description: ars.desc_score,
+      market: ars.market_score,
+      condition: ars.condition_score,
+    },
+    coaching_plan: ars.coaching_plan,
+    missing_photo_zones: missingZones,
+    mvps_complete: ars.mvps_complete,
+    _note:
+      "Actions are sorted by impact (points gained). Focus on the top items first.",
+  });
+}
+
+async function handlePrepareListing(
+  args: Record<string, unknown>,
+): Promise<ToolResult> {
+  const supabase = sb();
+  const vehicleId = args.vehicle_id as string;
+  const platform = (args.platform as string) || "bat";
+  if (!vehicleId) return toolErr("vehicle_id required");
+
+  let { data: ars } = await supabase
+    .from("auction_readiness")
+    .select("composite_score, tier")
+    .eq("vehicle_id", vehicleId)
+    .single();
+
+  if (!ars) {
+    await supabase.rpc("persist_auction_readiness", {
+      p_vehicle_id: vehicleId,
+    });
+    const res = await supabase
+      .from("auction_readiness")
+      .select("composite_score, tier")
+      .eq("vehicle_id", vehicleId)
+      .single();
+    ars = res.data;
+  }
+
+  const tierWarning =
+    ars?.tier === "AUCTION_READY"
+      ? null
+      : ars?.tier === "NEARLY_READY"
+        ? "Vehicle is NEARLY_READY — listing may have gaps. Review coaching plan."
+        : `Vehicle is ${ars?.tier || "UNKNOWN"} — not recommended for submission yet. Run get_coaching_plan first.`;
+
+  const { data: v, error: vErr } = await supabase
+    .from("vehicles")
+    .select(
+      "id, year, make, model, trim, vin, engine_type, engine_code, transmission, " +
+        "drivetrain, body_style, mileage, condition_rating, title_status, " +
+        "description, highlights, equipment, modifications, known_flaws, recent_service_history, " +
+        "documents_on_hand, city, state, location, " +
+        "nuke_estimate, nuke_estimate_confidence, deal_score, heat_score, " +
+        "sale_price, asking_price, primary_image_url, listing_url",
+    )
+    .eq("id", vehicleId)
+    .single();
+  if (vErr || !v) return toolErr(vErr?.message || "Vehicle not found");
+
+  const { data: photos } = await supabase
+    .from("vehicle_images")
+    .select(
+      "id, image_url, vehicle_zone, photo_quality_score, caption, display_order",
+    )
+    .eq("vehicle_id", vehicleId)
+    .or("is_duplicate.is.null,is_duplicate.eq.false")
+    .order("display_order", { ascending: true, nullsFirst: false })
+    .order("photo_quality_score", { ascending: false, nullsFirst: true })
+    .limit(100);
+
+  const { data: valuation } = await supabase
+    .from("nuke_estimates")
+    .select(
+      "estimated_value, value_low, value_high, confidence_score, deal_score, heat_score, price_tier",
+    )
+    .eq("vehicle_id", vehicleId)
+    .order("calculated_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  return toolOk({
+    platform,
+    tier_warning: tierWarning,
+    ars_score: ars?.composite_score,
+    vehicle: {
+      year: v.year,
+      make: v.make,
+      model: v.model,
+      trim: v.trim,
+      vin: v.vin,
+      engine: v.engine_type,
+      engine_code: v.engine_code,
+      transmission: v.transmission,
+      drivetrain: v.drivetrain,
+      body_style: v.body_style,
+      mileage: v.mileage,
+      condition_rating: v.condition_rating,
+      title_status: v.title_status,
+      location:
+        [v.city, v.state].filter(Boolean).join(", ") || v.location,
+    },
+    listing_content: {
+      title: `${v.year} ${v.make} ${v.model}${v.trim ? " " + v.trim : ""}`,
+      description: v.description,
+      highlights: v.highlights,
+      equipment: v.equipment,
+      modifications: v.modifications,
+      known_flaws: v.known_flaws,
+      recent_service_history: v.recent_service_history,
+      documents_on_hand: v.documents_on_hand,
+    },
+    photos: {
+      count: photos?.length || 0,
+      hero_image: v.primary_image_url,
+      ordered: photos?.map((p: Record<string, unknown>) => ({
+        url: p.image_url,
+        zone: p.vehicle_zone,
+        quality: p.photo_quality_score,
+        caption: p.caption,
+      })),
+    },
+    valuation: valuation || null,
+    _note:
+      "This is a preview package. Full AI description generation and platform-specific formatting available in prepare_listing v2.",
+  });
+}
+
 // =============================================================================
 // TOOL DISPATCH
 // =============================================================================
@@ -1749,6 +1983,9 @@ const TOOL_HANDLERS: Record<string, (args: Record<string, unknown>) => Promise<T
   get_organization: handleGetOrganization,
   extract_listing: handleExtractListing,
   submit_observation: handleSubmitObservation,
+  get_auction_readiness: handleGetAuctionReadiness,
+  get_coaching_plan: handleGetCoachingPlan,
+  prepare_listing: handlePrepareListing,
 };
 
 // =============================================================================
