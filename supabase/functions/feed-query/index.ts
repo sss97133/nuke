@@ -392,6 +392,21 @@ serve(async (req) => {
       }
     }
 
+    // Pass 3: For vehicles STILL missing, use vehicles.primary_image_url
+    const stillMissingIds = vehicleIds.filter((id: string) => !thumbMap.has(id));
+    if (stillMissingIds.length > 0) {
+      const { data: vehicleRows } = await supabase
+        .from("vehicles")
+        .select("id, primary_image_url")
+        .in("id", stillMissingIds)
+        .not("primary_image_url", "is", null);
+      for (const v of vehicleRows ?? []) {
+        if (v.primary_image_url) {
+          thumbMap.set(v.id, { vehicle_id: v.id, image_url: v.primary_image_url });
+        }
+      }
+    }
+
     const auctionMap = new Map<string, any>();
     for (const listing of auctionResult.data ?? []) {
       if (!auctionMap.has(listing.vehicle_id)) {
