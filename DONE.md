@@ -43,6 +43,10 @@
 - [npm] Added 8 npm scripts: mine:ollama, mine:anthropic, mine:stats, mine:loop, promote:library, promote:library:dry, promote:library:stats, overnight
 - [launch] 4 overnight streams running: snapshots (regex), mining (Ollama), extraction (Ollama), enrichment (DB)
 - [note] Gemini API key expired — Stream E (high-value Gemini extraction) skipped. All LLM via Ollama.
+- [modal] Deployed `nuke-vllm` — Qwen2.5-7B on T4 via Modal ($0.59/hr, 2 containers, scales to 0). `yono/modal_vllm_serve.py`
+- [modal] Added `--provider modal` to both mining and extraction scripts. Redirected streams to Modal.
+- [modal] URL: `https://sss97133--nuke-vllm-serve.modal.run` (OpenAI-compatible API)
+- [npm] Added `mine:modal`, `discover:modal` npm scripts
 
 ### [overnight-ops] Overnight Ops Session (2026-03-20 01:00-02:30)
 - [critical-fix] Disabled `refresh_tier_on_image_upload` trigger on vehicle_images — references dropped `vehicle_receipts` table via `calculate_platform_tier_score` chain. Was blocking ALL photo intake inserts with `documented_by_user_id`.

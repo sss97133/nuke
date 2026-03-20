@@ -16,6 +16,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callTier, parseJsonResponse } from "../_shared/agentTiers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -174,21 +175,24 @@ Deno.serve(async (req) => {
       try {
         let snapshotHtml: string | null = null;
 
+        let snapshot: any = null; // Full snapshot record for AI fallback
+
         if (useQueue) {
           // Queue mode: we already know the snapshot URL
           const snapUrl = queueSnapshotMap.get(vehicle.id);
           if (snapUrl) {
             const { data: snaps } = await supabase
               .from("listing_page_snapshots")
-              .select("html, html_storage_path")
+              .select("html, html_storage_path, markdown")
               .eq("listing_url", snapUrl)
               .eq("platform", platform)
               .eq("success", true)
               .limit(1);
-            if (snaps?.[0]?.html && snaps[0].html.length > 500) {
-              snapshotHtml = snaps[0].html;
-            } else if (snaps?.[0]?.html_storage_path) {
-              snapshotHtml = await readHtmlFromStorage(snaps[0].html_storage_path);
+            snapshot = snaps?.[0] || null;
+            if (snapshot?.html && snapshot.html.length > 500) {
+              snapshotHtml = snapshot.html;
+            } else if (snapshot?.html_storage_path) {
+              snapshotHtml = await readHtmlFromStorage(snapshot.html_storage_path);
             }
           }
         } else {
@@ -223,19 +227,22 @@ Deno.serve(async (req) => {
           // First try inline HTML, then fall back to storage
           const { data: snaps } = await supabase
             .from("listing_page_snapshots")
-            .select("html, html_storage_path")
+            .select("html, html_storage_path, markdown")
             .in("listing_url", [...normalizedUrls])
             .eq("platform", platform)
             .eq("success", true)
             .order("fetched_at", { ascending: false })
             .limit(1);
 
-          if (snaps?.[0]?.html && snaps[0].html.length > 500) {
-            snapshotHtml = snaps[0].html;
-          } else if (snaps?.[0]?.html_storage_path) {
-            snapshotHtml = await readHtmlFromStorage(snaps[0].html_storage_path);
+          snapshot = snaps?.[0] || null;
+          if (snapshot?.html && snapshot.html.length > 500) {
+            snapshotHtml = snapshot.html;
+          } else if (snapshot?.html_storage_path) {
+            snapshotHtml = await readHtmlFromStorage(snapshot.html_storage_path);
           }
         }
+
+        const vehicleUrl = vehicle.listing_url || vehicle.bat_auction_url || vehicle.discovery_url || "";
 
         if (!snapshotHtml) {
           noSnapshot++;
@@ -248,9 +255,17 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Parse based on platform
+        // Parse based on platform — try regex first, fall back to AI
         let parsed: Record<string, any>;
-        if (platform === "bat") {
+        const useAI = mode === "ai";
+
+        if (useAI) {
+          // AI mode: skip regex entirely, go straight to LLM
+          // Prefer markdown over raw HTML (cleaner for LLM)
+          const snapshotMarkdown = snapshot?.markdown || null;
+          const content = snapshotMarkdown || snapshotHtml;
+          parsed = await parseWithAI(content, vehicleUrl, platform);
+        } else if (platform === "bat") {
           parsed = parseBatHtml(snapshotHtml);
         } else if (platform === "bonhams") {
           parsed = parseBonhamsHtml(snapshotHtml);
@@ -261,8 +276,20 @@ Deno.serve(async (req) => {
         } else if (platform === "carsandbids") {
           parsed = parseCarsAndBidsHtml(snapshotHtml);
         } else {
-          skipped++;
-          continue;
+          // Unknown platform: try AI extraction
+          const snapshotMarkdown = snapshot?.markdown || null;
+          const content = snapshotMarkdown || snapshotHtml;
+          parsed = await parseWithAI(content, vehicleUrl, platform);
+        }
+
+        // AI FALLBACK: If regex parser returned 0 useful fields, try AI
+        if (!useAI && Object.keys(parsed).filter(k => parsed[k] != null).length === 0) {
+          const snapshotMarkdown = snapshot?.markdown || null;
+          const content = snapshotMarkdown || snapshotHtml;
+          if (content && content.length > 500) {
+            console.log(`[AI-fallback] Regex returned 0 fields for ${vehicle.id}, trying AI...`);
+            parsed = await parseWithAI(content, vehicleUrl, platform);
+          }
         }
 
         // Extract primary image URL from HTML (works for all platforms)
@@ -541,6 +568,73 @@ function normalizeDrivetrain(raw: string): string | null {
   if (/\bfwd\b|front.wheel.drive/i.test(raw)) return "FWD";
   if (/\brwd\b|rear.wheel.drive/i.test(raw)) return "RWD";
   return null;
+}
+
+// ============================================================
+// 0. UNIVERSAL AI EXTRACTOR — Haiku-powered, works on any platform
+// ============================================================
+
+const AI_EXTRACTION_SYSTEM = `You are a vehicle data extraction expert. Extract structured data from the provided listing page content.
+
+Return ONLY a JSON object with these fields (use null for missing data):
+{
+  "year": number or null,
+  "make": "string or null",
+  "model": "string or null",
+  "trim": "string or null",
+  "vin": "string or null (17 chars, no I/O/Q)",
+  "mileage": number or null,
+  "engine_type": "string or null (e.g. '5.7L V8')",
+  "engine_displacement": "string or null (e.g. '5.7L')",
+  "horsepower": number or null,
+  "torque": number or null,
+  "transmission": "string or null (e.g. '4-Speed Manual')",
+  "drivetrain": "string or null (RWD/FWD/AWD/4WD)",
+  "body_style": "string or null (e.g. 'Coupe', 'Convertible')",
+  "color": "string or null (exterior color)",
+  "interior_color": "string or null",
+  "sale_price": number or null (final hammer/sold price in USD, no commas),
+  "lot_number": "string or null",
+  "description": "string or null (2-4 sentence summary of the vehicle)"
+}
+
+Rules:
+- Extract ONLY from the provided content. Never guess or hallucinate.
+- VINs must be exactly 17 characters, alphanumeric, no I/O/Q.
+- Prices should be numbers only (no $ or commas). Use the SOLD/HAMMER price, not bid or estimate.
+- For mileage, convert "XXk miles" to the full number.
+- If "Reserve Not Met" or "Not Sold", sale_price should be null.
+- Description should summarize the vehicle, not copy the entire listing text.`;
+
+async function parseWithAI(content: string, url: string, platform: string): Promise<Record<string, any>> {
+  try {
+    // Truncate content to ~15K chars for cost efficiency
+    const truncated = content.length > 15000 ? content.slice(0, 15000) + "\n[truncated]" : content;
+
+    const userMsg = `Platform: ${platform}\nURL: ${url}\n\nListing content:\n${truncated}`;
+
+    const result = await callTier("haiku", AI_EXTRACTION_SYSTEM, userMsg, {
+      maxTokens: 1024,
+      temperature: 0.0,
+    });
+
+    const parsed = parseJsonResponse<Record<string, any>>(result.content);
+
+    // Log cost for monitoring
+    console.log(`[AI] ${platform} cost=$${result.costCents.toFixed(4)} tokens=${result.inputTokens}+${result.outputTokens} dur=${result.durationMs}ms`);
+
+    // Clean up the parsed result
+    const cleaned: Record<string, any> = {};
+    for (const [key, val] of Object.entries(parsed)) {
+      if (val === null || val === undefined || val === "null" || val === "") continue;
+      if (typeof val === "string" && val.trim() === "") continue;
+      cleaned[key] = val;
+    }
+    return cleaned;
+  } catch (e) {
+    console.error(`[AI] extraction failed for ${url}: ${(e as Error).message?.slice(0, 200)}`);
+    return {};
+  }
 }
 
 // ============================================================
