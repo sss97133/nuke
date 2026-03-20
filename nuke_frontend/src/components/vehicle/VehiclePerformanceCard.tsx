@@ -154,7 +154,7 @@ function drawRadar(
   }
 
   // Labels
-  ctx.font = '600 8px system-ui, -apple-system, sans-serif';
+  ctx.font = '600 8px Arial, sans-serif';
   ctx.fillStyle = 'var(--text)';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
