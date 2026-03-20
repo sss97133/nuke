@@ -387,7 +387,6 @@ const InvoiceManager: React.FC = () => {
                   fontSize: '9px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  borderRadius: 0,
                   transition: 'var(--transition)',
                   textTransform: 'uppercase'
                 }}
@@ -402,7 +401,6 @@ const InvoiceManager: React.FC = () => {
         <div style={{
           background: 'var(--surface)',
           border: '2px solid var(--border)',
-          borderRadius: 0,
           padding: 'var(--space-3)',
           marginBottom: 'var(--space-3)'
         }}>
@@ -457,7 +455,6 @@ const InvoiceManager: React.FC = () => {
                 fontSize: '9px',
                 fontWeight: 700,
                 cursor: draftBusy ? 'not-allowed' : 'pointer',
-                borderRadius: 0,
               }}
             >
               DRY RUN
@@ -473,7 +470,6 @@ const InvoiceManager: React.FC = () => {
                 fontSize: '9px',
                 fontWeight: 800,
                 cursor: draftBusy ? 'not-allowed' : 'pointer',
-                borderRadius: 0,
               }}
             >
               {draftBusy ? 'WORKING…' : 'GENERATE DRAFTS'}
@@ -504,7 +500,6 @@ const InvoiceManager: React.FC = () => {
                 style={{
                   background: 'var(--surface)',
                   border: '2px solid var(--border)',
-                  borderRadius: 0,
                   padding: 'var(--space-3)',
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -534,7 +529,6 @@ const InvoiceManager: React.FC = () => {
                       color: 'var(--text)',
                       background: 'var(--bg)',
                       padding: '4px 8px',
-                      borderRadius: 0,
                       border: '1px solid var(--border)',
                       display: 'inline-block',
                       marginBottom: '4px'

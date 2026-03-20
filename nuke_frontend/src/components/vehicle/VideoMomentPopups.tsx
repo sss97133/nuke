@@ -776,7 +776,6 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                           <span style={{
                             width: '20px',
                             height: '20px',
-                            borderRadius: '50%',
                             background: idx === 0 ? 'gold' : idx === 1 ? 'silver' : '#cd7f32',
                             display: 'flex',
                             alignItems: 'center',

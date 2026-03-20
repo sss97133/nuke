@@ -1036,7 +1036,6 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
               color: 'white',
               width: '40px',
               height: '40px',
-              borderRadius: '50%',
               cursor: 'pointer',
               fontSize: '20px',
               zIndex: 1003,
@@ -1131,9 +1130,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                       height: '12px',
                       background: tag.isEditing ? 'var(--primary)' : getTagColor(tag.type),
                       border: selectedTagId === tag.id ? '3px solid var(--primary)' : '2px solid var(--white)',
-                      borderRadius: '50%',
                       cursor: draggingTagId === tag.id ? 'grabbing' : (selectedTagId === tag.id ? 'move' : 'pointer'),
-                      boxShadow: tag.isEditing ? '0 0 8px var(--primary)' : (selectedTagId === tag.id ? '0 0 8px var(--warning)' : 'none'),
                       transition: draggingTagId === tag.id ? 'none' : 'all 0.2s ease'
                     }}
                     onClick={(e) => {
@@ -1216,7 +1213,6 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                             width: '8px',
                             height: '8px',
                             backgroundColor: getTagColor(tag.type),
-                            borderRadius: '50%',
                             marginRight: '6px'
                           }}
                         />
@@ -1419,7 +1415,6 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                     border: 'none',
                     color: 'white',
                     padding: '16px 20px',
-                    borderRadius: '50%',
                     cursor: 'pointer',
                     fontSize: '24px',
                     transition: 'background 0.2s'
@@ -1438,7 +1433,6 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                     border: 'none',
                     color: 'white',
                     padding: '16px 20px',
-                    borderRadius: '50%',
                     cursor: 'pointer',
                     fontSize: '24px',
                     transition: 'all 0.3s'
@@ -1745,7 +1739,6 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                                   style={{
                                     width: '12px',
                                     height: '12px',
-                                    borderRadius: '50%',
                                     backgroundColor: getTagColor(tag.type),
                                     flexShrink: 0
                                   }}

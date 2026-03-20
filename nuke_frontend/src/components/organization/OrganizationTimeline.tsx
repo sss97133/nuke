@@ -126,7 +126,6 @@ export const OrganizationTimeline: React.FC<OrganizationTimelineProps> = ({ orga
             <div style={{
               width: '40px',
               height: '40px',
-              borderRadius: '50%',
               background: 'var(--accent)',
               border: '3px solid var(--white)',
               display: 'flex',
