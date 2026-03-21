@@ -764,6 +764,7 @@ const TOOLS: ToolDef[] = [
         structured_data: { type: "object", description: "Structured fields extracted from the observation" },
         confidence_score: { type: "number", description: "Confidence 0-1" },
         source_url: { type: "string", description: "URL where this was observed" },
+        submitted_by_user_id: { type: "string", description: "User UUID for attribution (from create_profile)" },
       },
       required: ["vehicle_id", "source_slug", "kind"],
     },
@@ -805,6 +806,87 @@ const TOOLS: ToolDef[] = [
         platform: { type: "string", description: "Target platform (default: 'bat')" },
       },
       required: ["vehicle_id"],
+    },
+  },
+
+  // ── User Onboarding & Account Linking ────────────────────────────
+  {
+    name: "create_profile",
+    description:
+      "Create a new Nuke user profile via email. Zero-friction onboarding — call this when a user wants to join Nuke. " +
+      "If the email already exists, returns the existing profile (idempotent). " +
+      "Returns user_id, email, full_name, and an API key for future MCP access.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        email: { type: "string", description: "User's email address (required)" },
+        full_name: { type: "string", description: "User's full name" },
+        phone: { type: "string", description: "Phone number (E.164 format preferred)" },
+        location: { type: "string", description: "User's location (e.g. 'Boulder City, NV')" },
+      },
+      required: ["email"],
+    },
+  },
+  {
+    name: "get_profile",
+    description:
+      "Look up an existing Nuke user profile by email or user_id. Returns profile details, linked accounts, and vehicle count.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        email: { type: "string", description: "User's email address" },
+        user_id: { type: "string", description: "User UUID" },
+      },
+    },
+  },
+  {
+    name: "link_account",
+    description:
+      "Request to link an external platform account (BaT, Cars & Bids, Hemmings, Instagram, etc.) to a Nuke user. " +
+      "Creates a pending claim that must be verified. Returns a preview of what data would be linked (comments, bids, vehicles).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        user_id: { type: "string", description: "Nuke user UUID" },
+        platform: {
+          type: "string",
+          enum: ["bat", "cars_and_bids", "hemmings", "hagerty", "instagram", "youtube", "facebook", "ebay_motors", "craigslist"],
+          description: "External platform to link",
+        },
+        handle: { type: "string", description: "Username/handle on the platform" },
+        profile_url: { type: "string", description: "URL to the user's profile on the platform (optional)" },
+      },
+      required: ["user_id", "platform", "handle"],
+    },
+  },
+  {
+    name: "verify_account_link",
+    description:
+      "Complete verification of a pending account link claim. Methods: email_match (compare emails), profile_url_proof (user provides proof URL), manual_review (submit for admin review).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        claim_id: { type: "string", description: "UUID of the pending claim (from link_account)" },
+        method: {
+          type: "string",
+          enum: ["email_match", "profile_url_proof", "manual_review"],
+          description: "Verification method",
+        },
+        proof: { type: "string", description: "Proof URL or text (for profile_url_proof or manual_review)" },
+      },
+      required: ["claim_id", "method"],
+    },
+  },
+  {
+    name: "list_linked_accounts",
+    description:
+      "Show all external platform accounts linked to a Nuke user, with verification status and data counts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        user_id: { type: "string", description: "Nuke user UUID" },
+      },
+      required: ["user_id"],
     },
   },
 
@@ -1793,20 +1875,42 @@ async function handleSearchOrganizations(args: Record<string, unknown>): Promise
   const supabase = sb();
   const limit = Number(args.limit) || 20;
 
+  // State name → abbreviation map for location matching
+  const STATE_ABBREVS: Record<string, string> = {
+    alabama:"AL",alaska:"AK",arizona:"AZ",arkansas:"AR",california:"CA",
+    colorado:"CO",connecticut:"CT",delaware:"DE",florida:"FL",georgia:"GA",
+    hawaii:"HI",idaho:"ID",illinois:"IL",indiana:"IN",iowa:"IA",kansas:"KS",
+    kentucky:"KY",louisiana:"LA",maine:"ME",maryland:"MD",massachusetts:"MA",
+    michigan:"MI",minnesota:"MN",mississippi:"MS",missouri:"MO",montana:"MT",
+    nebraska:"NE",nevada:"NV","new hampshire":"NH","new jersey":"NJ",
+    "new mexico":"NM","new york":"NY","north carolina":"NC","north dakota":"ND",
+    ohio:"OH",oklahoma:"OK",oregon:"OR",pennsylvania:"PA","rhode island":"RI",
+    "south carolina":"SC","south dakota":"SD",tennessee:"TN",texas:"TX",
+    utah:"UT",vermont:"VT",virginia:"VA",washington:"WA","west virginia":"WV",
+    wisconsin:"WI",wyoming:"WY",
+  };
+
   let query = supabase
     .from("organizations")
     .select("id, name, slug, business_type, website, city, state, country, description, created_at")
     .limit(limit);
 
   if (args.query) {
-    query = query.ilike("name", `%${args.query}%`);
+    // Search name AND description for broader matches
+    query = query.or(`name.ilike.%${args.query}%,description.ilike.%${args.query}%`);
   }
   if (args.type) {
     query = query.eq("business_type", String(args.type));
   }
   if (args.location) {
-    const loc = String(args.location);
-    query = query.or(`city.ilike.%${loc}%,state.ilike.%${loc}%`);
+    const loc = String(args.location).trim();
+    // Resolve full state name → abbreviation for matching (DB stores "nv" not "Nevada")
+    const abbrev = STATE_ABBREVS[loc.toLowerCase()];
+    if (abbrev) {
+      query = query.or(`city.ilike.%${loc}%,state.ilike.%${loc}%,state.ilike.%${abbrev}%`);
+    } else {
+      query = query.or(`city.ilike.%${loc}%,state.ilike.%${loc}%`);
+    }
   }
 
   const { data, error } = await query;
@@ -1851,6 +1955,7 @@ async function handleSubmitObservation(args: Record<string, unknown>): Promise<T
     structured_data: args.structured_data || {},
     confidence_score: args.confidence_score || 0.5,
     source_url: args.source_url || null,
+    submitted_by_user_id: args.submitted_by_user_id || null,
   });
   return toolOk(data);
 }
@@ -2220,6 +2325,453 @@ async function handleIngestPhotos(args: Record<string, unknown>): Promise<ToolRe
   });
 }
 
+// ── User Onboarding & Account Linking ────────────────────────────────────────
+
+async function handleCreateProfile(args: Record<string, unknown>): Promise<ToolResult> {
+  const email = String(args.email).trim().toLowerCase();
+  if (!email || !email.includes("@")) return toolErr("Valid email required");
+
+  const fullName = args.full_name ? String(args.full_name) : undefined;
+  const phone = args.phone ? String(args.phone) : undefined;
+  const location = args.location ? String(args.location) : undefined;
+
+  const supabase = sb();
+
+  // Check if user already exists (profiles table or auth.users)
+  const { data: existingProfiles } = await supabase
+    .from("profiles")
+    .select("id, email, full_name, location, created_at")
+    .eq("email", email)
+    .limit(1);
+
+  if (existingProfiles && existingProfiles.length > 0) {
+    const profile = existingProfiles[0];
+    const { data: keyData } = await supabase.rpc("mcp_create_api_key", {
+      p_user_id: profile.id,
+      p_name: "MCP Auto-Generated",
+    });
+    const apiKey = keyData?.[0]?.api_key || null;
+
+    return toolOk({
+      user_id: profile.id,
+      email: profile.email,
+      full_name: profile.full_name,
+      location: profile.location,
+      api_key: apiKey,
+      is_new: false,
+      message: "Existing profile found. Welcome back!",
+    });
+  }
+
+  // Try to create user via Auth Admin API
+  const authRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      apikey: SERVICE_ROLE_KEY,
+    },
+    body: JSON.stringify({
+      email,
+      phone: phone || undefined,
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        source: "mcp",
+      },
+    }),
+  });
+
+  let userId: string;
+
+  if (authRes.ok) {
+    const authData = await authRes.json();
+    userId = authData.id;
+  } else {
+    const errText = await authRes.text();
+    // User exists in auth but not profiles — try to find and return
+    if (authRes.status === 422 || errText.includes("already been registered") || errText.includes("23505") || errText.includes("duplicate key")) {
+      // Search auth.users via admin API to find the user_id
+      try {
+        const lookupRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=50`, {
+          headers: { Authorization: `Bearer ${SERVICE_ROLE_KEY}`, apikey: SERVICE_ROLE_KEY },
+        });
+        if (lookupRes.ok) {
+          const lookupData = await lookupRes.json();
+          const users = lookupData?.users || [];
+          const found = users.find((u: any) => u.email?.toLowerCase() === email);
+          if (found) {
+            // User exists in auth — try to get/create their API key
+            const { data: keyData } = await supabase.rpc("mcp_create_api_key", {
+              p_user_id: found.id,
+              p_name: "MCP Auto-Generated",
+            });
+            return toolOk({
+              user_id: found.id,
+              email,
+              full_name: found.user_metadata?.full_name || fullName || null,
+              api_key: keyData?.[0]?.api_key || null,
+              is_new: false,
+              message: "User found in auth system. Welcome back!",
+            });
+          }
+        }
+      } catch { /* lookup failed */ }
+      return toolErr(`Account conflict for ${email}. The username derived from this email may already be taken. Try a different email or contact support.`);
+    }
+    return toolErr(`Auth error: ${errText.slice(0, 200)}`);
+  }
+
+  // Wait briefly for the handle_new_user trigger to create the profile
+  await new Promise((r) => setTimeout(r, 500));
+
+  // Update profile with additional info
+  const updates: Record<string, unknown> = { onboarded_via: "mcp" };
+  if (fullName) updates.full_name = fullName;
+  if (location) updates.location = location;
+
+  await supabase.from("profiles").update(updates).eq("id", userId);
+
+  // Generate API key
+  const { data: keyData } = await supabase.rpc("mcp_create_api_key", {
+    p_user_id: userId,
+    p_name: "MCP Auto-Generated",
+  });
+  const apiKey = keyData?.[0]?.api_key || null;
+
+  return toolOk({
+    user_id: userId,
+    email,
+    full_name: fullName || null,
+    location: location || null,
+    api_key: apiKey,
+    is_new: true,
+    message: `Welcome to Nuke! Profile created.${apiKey ? " Your API key is included — save it securely." : ""}`,
+  });
+}
+
+async function handleGetProfile(args: Record<string, unknown>): Promise<ToolResult> {
+  const supabase = sb();
+  const email = args.email ? String(args.email).trim().toLowerCase() : null;
+  const userId = args.user_id ? String(args.user_id) : null;
+
+  if (!email && !userId) return toolErr("Provide email or user_id");
+
+  // Look up profile
+  let query = supabase.from("profiles").select("id, email, full_name, avatar_url, location, bio, website, user_type, onboarded_via, created_at");
+  if (userId) {
+    query = query.eq("id", userId);
+  } else if (email) {
+    query = query.eq("email", email);
+  }
+
+  const { data: profiles, error } = await query.limit(1);
+  if (error) return toolErr(error.message);
+  if (!profiles || profiles.length === 0) return toolErr("Profile not found");
+
+  const profile = profiles[0];
+
+  // Get vehicle count
+  const { count: vehicleCount } = await supabase
+    .from("vehicles")
+    .select("id", { count: "exact", head: true })
+    .or(`owner_id.eq.${profile.id},created_by_user_id.eq.${profile.id}`);
+
+  // Get linked accounts
+  const { data: linkedAccounts } = await supabase
+    .from("user_external_profiles")
+    .select("platform, username, profile_url, verified, last_synced_at")
+    .eq("user_id", profile.id);
+
+  // Get pending claims
+  const { data: pendingClaims } = await supabase
+    .from("account_link_claims")
+    .select("id, platform, handle, status, created_at")
+    .eq("user_id", profile.id)
+    .in("status", ["pending", "pending_review"]);
+
+  return toolOk({
+    profile: {
+      ...profile,
+      vehicle_count: vehicleCount ?? 0,
+    },
+    linked_accounts: linkedAccounts || [],
+    pending_claims: pendingClaims || [],
+  });
+}
+
+async function handleLinkAccount(args: Record<string, unknown>): Promise<ToolResult> {
+  const supabase = sb();
+  const userId = String(args.user_id);
+  const platform = String(args.platform);
+  const handle = String(args.handle).trim();
+  const profileUrl = args.profile_url ? String(args.profile_url) : null;
+
+  if (!userId || !platform || !handle) return toolErr("user_id, platform, and handle required");
+
+  // Check external_identities for matching platform+handle
+  const { data: extIds } = await supabase
+    .from("external_identities")
+    .select("id, platform, handle, display_name, metadata, claimed_by_user_id, first_seen_at, last_seen_at")
+    .eq("platform", platform)
+    .ilike("handle", handle)
+    .limit(5);
+
+  const matchedIdentity = extIds?.[0] || null;
+
+  // If already claimed by this user, return info
+  if (matchedIdentity?.claimed_by_user_id === userId) {
+    return toolOk({
+      status: "already_linked",
+      identity: matchedIdentity,
+      message: `This ${platform} account is already linked to your profile.`,
+    });
+  }
+
+  // If claimed by someone else, reject
+  if (matchedIdentity?.claimed_by_user_id && matchedIdentity.claimed_by_user_id !== userId) {
+    return toolErr(`This ${platform} handle is already claimed by another user.`);
+  }
+
+  // Get preview of what would be linked (data counts)
+  let preview: Record<string, unknown> = {};
+  if (matchedIdentity) {
+    // Count related data
+    const { count: commentCount } = await supabase
+      .from("auction_comments")
+      .select("id", { count: "exact", head: true })
+      .eq("commenter_handle", handle);
+
+    preview = {
+      identity_found: true,
+      display_name: matchedIdentity.display_name,
+      first_seen: matchedIdentity.first_seen_at,
+      last_seen: matchedIdentity.last_seen_at,
+      comment_count: commentCount ?? 0,
+      metadata: matchedIdentity.metadata,
+    };
+  } else {
+    preview = { identity_found: false, message: "No existing data found for this handle on this platform." };
+  }
+
+  // Upsert into user_external_profiles
+  const { error: uepErr } = await supabase
+    .from("user_external_profiles")
+    .upsert({
+      user_id: userId,
+      platform,
+      username: handle,
+      profile_url: profileUrl || "",
+      verified: false,
+    }, { onConflict: "user_id,platform" });
+
+  if (uepErr && !uepErr.message.includes("duplicate")) {
+    return toolErr(`Failed to save profile link: ${uepErr.message}`);
+  }
+
+  // Create pending claim
+  const { data: claim, error: claimErr } = await supabase
+    .from("account_link_claims")
+    .upsert({
+      user_id: userId,
+      platform,
+      handle,
+      external_identity_id: matchedIdentity?.id || null,
+      status: "pending",
+    }, { onConflict: "user_id,platform,handle" })
+    .select("id, status, created_at")
+    .single();
+
+  if (claimErr) return toolErr(`Failed to create claim: ${claimErr.message}`);
+
+  // Determine verification options
+  const verificationOptions = ["manual_review"];
+  if (matchedIdentity?.metadata?.email) {
+    verificationOptions.unshift("email_match");
+  }
+  verificationOptions.unshift("profile_url_proof");
+
+  return toolOk({
+    status: "pending_verification",
+    claim_id: claim.id,
+    platform,
+    handle,
+    preview,
+    verification_options: verificationOptions,
+    message: `Account link request created. Choose a verification method to complete the link.`,
+  });
+}
+
+async function handleVerifyAccountLink(args: Record<string, unknown>): Promise<ToolResult> {
+  const supabase = sb();
+  const claimId = String(args.claim_id);
+  const method = String(args.method);
+  const proof = args.proof ? String(args.proof) : null;
+
+  // Look up pending claim
+  const { data: claim, error } = await supabase
+    .from("account_link_claims")
+    .select("*")
+    .eq("id", claimId)
+    .single();
+
+  if (error || !claim) return toolErr("Claim not found");
+  if (claim.status === "verified") return toolOk({ status: "already_verified", claim });
+  if (claim.status === "rejected" || claim.status === "expired") {
+    return toolErr(`Claim is ${claim.status}. Create a new link request.`);
+  }
+
+  let newStatus = "pending";
+  let confidence = 0;
+
+  switch (method) {
+    case "email_match": {
+      // Compare user's email to what we have for the platform identity
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("email")
+        .eq("id", claim.user_id)
+        .single();
+
+      if (!profile?.email) return toolErr("User has no email on file");
+
+      let platformEmail: string | null = null;
+      if (claim.external_identity_id) {
+        const { data: extId } = await supabase
+          .from("external_identities")
+          .select("metadata")
+          .eq("id", claim.external_identity_id)
+          .single();
+        platformEmail = extId?.metadata?.email || null;
+      }
+
+      if (!platformEmail) {
+        return toolErr("No email available for this platform identity. Try profile_url_proof or manual_review.");
+      }
+
+      if (profile.email.toLowerCase() === platformEmail.toLowerCase()) {
+        newStatus = "verified";
+        confidence = 85;
+      } else {
+        return toolOk({
+          status: "email_mismatch",
+          message: "Emails don't match. Try profile_url_proof or manual_review instead.",
+        });
+      }
+      break;
+    }
+
+    case "profile_url_proof": {
+      if (!proof) return toolErr("Proof URL required for profile_url_proof method");
+      newStatus = "pending_review";
+      confidence = 75;
+      break;
+    }
+
+    case "manual_review": {
+      newStatus = "pending_review";
+      confidence = 0;
+      break;
+    }
+
+    default:
+      return toolErr(`Unknown verification method: ${method}`);
+  }
+
+  // Update claim
+  const updates: Record<string, unknown> = {
+    status: newStatus,
+    verification_method: method,
+    claim_confidence: confidence,
+    updated_at: new Date().toISOString(),
+  };
+  if (proof) updates.proof_url = proof;
+
+  await supabase.from("account_link_claims").update(updates).eq("id", claimId);
+
+  // If verified, update external_identities
+  if (newStatus === "verified" && claim.external_identity_id) {
+    await supabase
+      .from("external_identities")
+      .update({
+        claimed_by_user_id: claim.user_id,
+        claimed_at: new Date().toISOString(),
+        claim_confidence: confidence,
+      })
+      .eq("id", claim.external_identity_id);
+
+    // Also mark user_external_profiles as verified
+    await supabase
+      .from("user_external_profiles")
+      .update({ verified: true })
+      .eq("user_id", claim.user_id)
+      .eq("platform", claim.platform);
+  }
+
+  return toolOk({
+    status: newStatus,
+    claim_confidence: confidence,
+    claim_id: claimId,
+    data_unlocked: newStatus === "verified",
+    message: newStatus === "verified"
+      ? `Account verified! ${claim.platform} data is now linked to your profile.`
+      : `Claim submitted for review. You'll be notified when verified.`,
+  });
+}
+
+async function handleListLinkedAccounts(args: Record<string, unknown>): Promise<ToolResult> {
+  const supabase = sb();
+  const userId = String(args.user_id);
+
+  // Get user_external_profiles
+  const { data: profiles, error } = await supabase
+    .from("user_external_profiles")
+    .select("platform, username, profile_url, verified, last_synced_at, created_at")
+    .eq("user_id", userId);
+
+  if (error) return toolErr(error.message);
+
+  // Get claimed external_identities with data counts
+  const { data: claimed } = await supabase
+    .from("external_identities")
+    .select("id, platform, handle, display_name, first_seen_at, last_seen_at, claim_confidence")
+    .eq("claimed_by_user_id", userId);
+
+  // Get pending claims
+  const { data: pendingClaims } = await supabase
+    .from("account_link_claims")
+    .select("id, platform, handle, status, verification_method, claim_confidence, created_at")
+    .eq("user_id", userId)
+    .in("status", ["pending", "pending_review"]);
+
+  // Merge into unified view
+  const accounts = (profiles || []).map((p: any) => {
+    const identity = (claimed || []).find((c: any) => c.platform === p.platform);
+    return {
+      platform: p.platform,
+      username: p.username,
+      profile_url: p.profile_url,
+      verified: p.verified,
+      last_synced: p.last_synced_at,
+      identity_linked: !!identity,
+      display_name: identity?.display_name || null,
+      data_available: identity ? {
+        first_seen: identity.first_seen_at,
+        last_seen: identity.last_seen_at,
+        confidence: identity.claim_confidence,
+      } : null,
+    };
+  });
+
+  return toolOk({
+    user_id: userId,
+    linked_accounts: accounts,
+    pending_claims: pendingClaims || [],
+    total_linked: accounts.filter((a: any) => a.verified).length,
+    total_pending: (pendingClaims || []).length,
+  });
+}
+
 // =============================================================================
 // TOOL DISPATCH
 // =============================================================================
@@ -2249,6 +2801,11 @@ const TOOL_HANDLERS: Record<string, (args: Record<string, unknown>) => Promise<T
   get_organization: handleGetOrganization,
   extract_listing: handleExtractListing,
   submit_observation: handleSubmitObservation,
+  create_profile: handleCreateProfile,
+  get_profile: handleGetProfile,
+  link_account: handleLinkAccount,
+  verify_account_link: handleVerifyAccountLink,
+  list_linked_accounts: handleListLinkedAccounts,
   get_auction_readiness: handleGetAuctionReadiness,
   get_coaching_plan: handleGetCoachingPlan,
   prepare_listing: handlePrepareListing,

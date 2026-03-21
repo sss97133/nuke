@@ -19,3 +19,5 @@
   - BJ markdown bridge running in background (PID 38616)
   - batch-extract-snapshots deployed with AI fallback mode
 09:20 | LOCAL-LLM-SETUP | Downloading DeepSeek R1 32B + Qwen3 30B-A3B to SSD, built Modelfile + Modal fine-tuning pipeline | yono/Modelfile.nuke, yono/Modelfile.nuke-agent, yono/export_nuke_training_data.py, yono/modal_nuke_agent_train.py
+Fri Mar 20 17:31:17 PDT 2026
+17:31 | MCP-ONBOARDING | Implementing user onboarding + account linking (5 MCP tools, migration, both servers) | supabase/functions/mcp-connector/index.ts, mcp-server/src/index.ts, DB migration
