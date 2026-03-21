@@ -14,13 +14,14 @@ output: 10,000+ sourced observations — every claim traced to origin,
 
 | What | Scale |
 |------|-------|
-| Vehicles | 645,725 entities |
-| Images | 32.7M classified by 41-zone taxonomy |
-| Auction comments | 11.6M sentiment-scored |
-| Sale events | 192,539 across 10+ platforms |
-| Valuations | 609,433 nuke estimates (94.4% coverage) |
+| Vehicles | 645,725 entities (292K active) |
+| Images | 32.8M classified by 41-zone taxonomy |
+| Auction comments | 11.6M sentiment-scored, 99.9% identity-linked |
+| Sale events | 313,539 across 10+ platforms |
+| Valuations | 503,337 nuke estimates |
 | Organizations | 4,973 dealers, shops, auction houses |
-| Observations | append-only, source-tagged, scored 0-1 |
+| External identities | 510,086 seller/buyer/commenter profiles |
+| Field evidence | 746,963 source-attributed citations |
 
 ## The library
 
