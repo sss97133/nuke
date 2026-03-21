@@ -2533,21 +2533,33 @@ async function handleLinkAccount(args: Record<string, unknown>): Promise<ToolRes
     return toolErr(`This ${platform} handle is already claimed by another user.`);
   }
 
-  // Get preview of what would be linked (data counts)
+  // Get preview of what would be linked (engagement stats from materialized view)
   let preview: Record<string, unknown> = {};
   if (matchedIdentity) {
-    // Count related data
-    const { count: commentCount } = await supabase
-      .from("auction_comments")
-      .select("id", { count: "exact", head: true })
-      .eq("commenter_handle", handle);
+    // Try engagement stats view first (fast, pre-computed)
+    const { data: stats } = await supabase
+      .from("identity_engagement_stats")
+      .select("total_comments, vehicles_commented_on, total_bids, highest_bid, total_likes_received, avg_expertise_score, first_activity, last_activity, active_months, seller_comments")
+      .eq("identity_id", matchedIdentity.id)
+      .single();
 
     preview = {
       identity_found: true,
       display_name: matchedIdentity.display_name,
       first_seen: matchedIdentity.first_seen_at,
       last_seen: matchedIdentity.last_seen_at,
-      comment_count: commentCount ?? 0,
+      engagement: stats ? {
+        total_comments: stats.total_comments,
+        vehicles_discussed: stats.vehicles_commented_on,
+        total_bids: stats.total_bids,
+        highest_bid: stats.highest_bid,
+        likes_received: stats.total_likes_received,
+        expertise_score: stats.avg_expertise_score ? Math.round(Number(stats.avg_expertise_score) * 100) / 100 : null,
+        seller_comments: stats.seller_comments,
+        first_activity: stats.first_activity,
+        last_activity: stats.last_activity,
+        active_months: stats.active_months,
+      } : null,
       metadata: matchedIdentity.metadata,
     };
   } else {
