@@ -2,6 +2,16 @@
 
 ## 2026-03-21
 
+### [frontend] Click-to-Expand Cards + Zero Dead Ends (Phases 3-5)
+- CardShell: single click expands card in-place instead of navigating away
+- Expanded view shows BadgePortals for every vehicle dimension (year, make, model, body, trans, deal, source)
+- Explicit "OPEN PROFILE →" button for navigation. Cmd/Ctrl+click → new tab.
+- VehicleHeroImage no-photo state: shows vehicle identity + BadgePortals instead of black void
+- BarcodeTimeline empty: suggests comparable vehicles
+- PriceHistoryModal empty: explains data accumulation
+- FeedEmptyState: always links to Search + Auctions (no dead ends)
+- DetailPanel component created (slide-in overlay, not yet wired to feed)
+
 ### [frontend] BadgePortal System — End-to-End Design Foundation
 - `BadgePortal` component: every badge is clickable, expands inline cluster panel, collapses back
 - `BadgeClusterPanel`: 6-item preview grid with vehicle thumbnails, prices
