@@ -89,9 +89,8 @@ def export_training_data(limit: int = 100000, notify: bool = True):
     while len(examples) < limit:
         resp = supabase.table("vehicles").select(
             "id, year, make, model, trim, vin, sale_price, mileage, "
-            "exterior_color, interior_color, transmission, engine, "
-            "description, highlights, flaws, equipment, auction_source, "
-            "location_city, location_state"
+            "color, interior_color, transmission, engine_type, engine_size, "
+            "drivetrain, body_style, description, highlights, equipment, auction_source"
         ).not_.is_("description", "null").not_.is_("make", "null").range(offset, offset + page_size - 1).execute()
 
         if not resp.data:
@@ -105,8 +104,8 @@ def export_training_data(limit: int = 100000, notify: bool = True):
             # Build the structured output
             structured = {}
             for field in ["year", "make", "model", "trim", "vin", "sale_price", "mileage",
-                          "exterior_color", "interior_color", "transmission", "engine",
-                          "highlights", "flaws", "equipment", "location_city", "location_state"]:
+                          "color", "interior_color", "transmission", "engine_type", "engine_size",
+                          "drivetrain", "body_style", "highlights", "equipment"]:
                 val = v.get(field)
                 if val is not None and val != "" and val != []:
                     structured[field] = val
@@ -136,7 +135,7 @@ def export_training_data(limit: int = 100000, notify: bool = True):
     offset = 0
     while stats["evidence"] < min(limit // 4, 25000):
         resp = supabase.table("field_evidence").select(
-            "vehicle_id, field_name, field_value, confidence, source_type, source_excerpt, extraction_id"
+            "vehicle_id, field_name, proposed_value, source_confidence, source_type, extraction_context, status"
         ).range(offset, offset + page_size - 1).execute()
 
         if not resp.data:
@@ -155,9 +154,9 @@ def export_training_data(limit: int = 100000, notify: bool = True):
                 continue
 
             evidence_text = "\n".join(
-                f"- {r['field_name']}: \"{r.get('field_value', '?')}\" "
-                f"(confidence: {r.get('confidence', '?')}, source: {r.get('source_type', '?')}, "
-                f"excerpt: \"{(r.get('source_excerpt') or '')[:200]}\")"
+                f"- {r['field_name']}: \"{r.get('proposed_value', '?')}\" "
+                f"(confidence: {r.get('source_confidence', '?')}, source: {r.get('source_type', '?')}, "
+                f"context: \"{(r.get('extraction_context') or '')[:200]}\")"
                 for r in evidence_rows[:20]
             )
 
@@ -181,39 +180,37 @@ def export_training_data(limit: int = 100000, notify: bool = True):
     offset = 0
     while stats["comments"] < min(limit // 4, 25000):
         resp = supabase.table("comment_discoveries").select(
-            "vehicle_id, overall_sentiment, sentiment_score, key_themes, "
-            "notable_claims, red_flags, analysis_model"
-        ).eq("analysis_model", "claude-3-haiku-20240307").range(offset, offset + page_size - 1).execute()
+            "vehicle_id, overall_sentiment, sentiment_score, total_fields, "
+            "raw_extraction, model_used, data_quality_score, missing_data_flags"
+        ).not_.is_("raw_extraction", "null").range(offset, offset + page_size - 1).execute()
 
         if not resp.data:
             break
 
         for disc in resp.data:
-            themes = disc.get("key_themes") or []
-            claims = disc.get("notable_claims") or []
-            flags = disc.get("red_flags") or []
-
-            if not themes and not claims:
+            raw = disc.get("raw_extraction")
+            if not raw or (isinstance(raw, dict) and len(raw) < 2):
                 continue
 
             analysis = {
                 "sentiment": disc.get("overall_sentiment"),
                 "sentiment_score": disc.get("sentiment_score"),
-                "themes": themes,
-                "notable_claims": claims,
-                "red_flags": flags,
+                "total_fields_extracted": disc.get("total_fields"),
+                "data_quality_score": disc.get("data_quality_score"),
+                "missing_data_flags": disc.get("missing_data_flags"),
+                "extraction": raw if isinstance(raw, dict) else str(raw)[:2000],
             }
 
             # Get some actual comments for this vehicle
             comments_resp = supabase.table("auction_comments").select(
-                "comment_text, username"
+                "comment_text, author_username"
             ).eq("vehicle_id", disc["vehicle_id"]).limit(15).execute()
 
             if not comments_resp.data or len(comments_resp.data) < 3:
                 continue
 
             comment_block = "\n".join(
-                f"@{c.get('username', 'anon')}: {(c.get('comment_text') or '')[:300]}"
+                f"@{c.get('author_username', 'anon')}: {(c.get('comment_text') or '')[:300]}"
                 for c in comments_resp.data
             )
 
@@ -341,14 +338,14 @@ def export_training_data(limit: int = 100000, notify: bool = True):
 def _generate_evidence_review(evidence_rows):
     """Generate a review assessment from evidence rows."""
     import json
-    high_conf = [r for r in evidence_rows if (r.get("confidence") or 0) >= 0.8]
-    low_conf = [r for r in evidence_rows if (r.get("confidence") or 0) < 0.5]
+    high_conf = [r for r in evidence_rows if (r.get("source_confidence") or 0) >= 0.8]
+    low_conf = [r for r in evidence_rows if (r.get("source_confidence") or 0) < 0.5]
     fields = list(set(r["field_name"] for r in evidence_rows))
 
     review = {
         "total_evidence_points": len(evidence_rows),
         "high_confidence_fields": [r["field_name"] for r in high_conf[:10]],
-        "low_confidence_fields": [{"field": r["field_name"], "confidence": r.get("confidence"), "reason": "low extraction confidence"} for r in low_conf[:5]],
+        "low_confidence_fields": [{"field": r["field_name"], "confidence": r.get("source_confidence"), "reason": "low extraction confidence"} for r in low_conf[:5]],
         "fields_covered": fields[:20],
         "data_quality_assessment": "strong" if len(high_conf) > len(evidence_rows) * 0.7 else "moderate" if len(high_conf) > len(evidence_rows) * 0.4 else "needs_verification",
     }
