@@ -29,6 +29,20 @@
 - MCP connector: 28 → 33 tools. mcp-server npm: 7 → 12 tools
 - All tools tested end-to-end: create → lookup → link → verify → list
 
+### [data-integrity] Comment→Identity Linking + Engagement Stats
+- **11.6M auction_comments linked** to external_identities via `author_external_identity_id` (was 0% → 99.9%)
+- `external_identity_id` backfill running (46K+ done in first batch)
+- Created `idx_auction_comments_author_username` index for fast join
+- Built `identity_engagement_stats` materialized view: comments, bids, expertise score, activity per handle
+- `link_account` MCP tool now shows engagement preview from matview
+- RPO library: 23 → 174 codes (engines, transmissions, axles, suspension, packages, 1955-2010)
+- Skylar profile: location set to Boulder City NV, 41 vehicles linked by owner_id
+- Data integrity audit: 20K orphan images, 62K vehicles w/o snapshots, 752 vehicles w/o events
+
+### [pipeline] Markdown Bridge + AI Extraction
+- 5 markdown bridges launched in parallel: BaT, BJ, Mecum, C&B, Bonhams
+- BJ AI extraction: 53+ vehicles extracted, 2.2 avg fields, $0.01 cost, zero errors
+
 ## 2026-03-20
 
 ### [frontend] Vehicle card image rendering fix + AVG PRICE fix
