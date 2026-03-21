@@ -97,83 +97,77 @@ const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
   return (
     <div
       style={{
-        background: 'var(--warning-dim)',
-        border: '1px solid var(--warning)', padding: '8px 12px',
-        margin: '8px var(--space-2)', position: 'relative'
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '2px 12px',
+        fontSize: '9px',
+        fontFamily: 'Arial, sans-serif',
+        fontWeight: 600,
+        textTransform: 'uppercase' as const,
+        letterSpacing: '0.04em',
+        color: 'var(--text-secondary)',
+        borderBottom: '1px solid var(--border)',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '12px' }}>⚠️</span>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: '#92400e' }}>
-            Incomplete profile
-          </span>
-          {issues.length > 0 && (
-            <span style={{ fontSize: '11px', color: '#78350f' }}>
-              • Missing: {issues.join(', ')}
-            </span>
-          )}
-          
-          <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto', flexWrap: 'wrap' }}>
-            {!hasVIN && (
-              <button
-                onClick={handleCompleteProfile}
-                style={{
-                  background: 'var(--warning)',
-                  color: 'var(--bg)',
-                  border: 'none',
-                  padding: '4px 10px', fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = 'var(--warning)'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'var(--warning)'}
-              >
-                Add VIN
-              </button>
-            )}
-            
-            {session?.user?.id && !vehicle?.uploaded_by && (
-              <button
-                onClick={handleClaim}
-                disabled={isClaiming}
-                style={{
-                  background: 'transparent',
-                  color: '#92400e',
-                  border: '1px solid var(--warning)',
-                  padding: '4px 10px', fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: isClaiming ? 'wait' : 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-                onMouseOver={(e) => !isClaiming && (e.currentTarget.style.background = '#fde68a')}
-                onMouseOut={(e) => !isClaiming && (e.currentTarget.style.background = 'transparent')}
-              >
-                {isClaiming ? 'Claiming...' : 'Claim'}
-              </button>
-            )}
-          </div>
-        </div>
-
-        <button
-          onClick={handleDismiss}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#92400e',
-            fontSize: '16px',
-            cursor: 'pointer',
-            padding: '2px 4px',
-            lineHeight: 1,
-            opacity: 0.6,
-            flexShrink: 0
-          }}
-          title="Dismiss"
-        >
-          ×
-        </button>
+      <span style={{ color: 'var(--warning)', fontSize: '10px' }}>&#9650;</span>
+      <span>{issues.join(' \u00B7 ')}</span>
+      <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
+        {!hasVIN && (
+          <button
+            onClick={handleCompleteProfile}
+            style={{
+              background: 'transparent',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border)',
+              padding: '1px 6px', fontSize: '8px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.04em',
+              fontFamily: 'Arial, sans-serif',
+            }}
+          >
+            ADD VIN
+          </button>
+        )}
+        {session?.user?.id && !vehicle?.uploaded_by && (
+          <button
+            onClick={handleClaim}
+            disabled={isClaiming}
+            style={{
+              background: 'transparent',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border)',
+              padding: '1px 6px', fontSize: '8px',
+              fontWeight: 600,
+              cursor: isClaiming ? 'wait' : 'pointer',
+              whiteSpace: 'nowrap',
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.04em',
+              fontFamily: 'Arial, sans-serif',
+            }}
+          >
+            {isClaiming ? 'CLAIMING...' : 'CLAIM'}
+          </button>
+        )}
       </div>
+      <button
+        onClick={handleDismiss}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: 'var(--text-disabled)',
+          fontSize: '10px',
+          cursor: 'pointer',
+          padding: '0 2px',
+          lineHeight: 1,
+        }}
+        title="Dismiss"
+      >
+        &#215;
+      </button>
     </div>
   );
 };

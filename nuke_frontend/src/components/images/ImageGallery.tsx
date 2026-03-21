@@ -319,7 +319,7 @@ const ImageGallery = ({
   const chronologicalMode = galleryView === 'CHRONO' ? 'desc' : chronologicalModeInternal;
   const setChronologicalMode = useCallback((v: 'off' | 'asc' | 'desc') => setChronologicalModeInternal(v), []);
   const [imagesPerRow, setImagesPerRow] = useState(3); // 1-16
-  const [preserveAspectRatio, setPreserveAspectRatio] = useState(false); // Original image ratio
+  const [preserveAspectRatio, setPreserveAspectRatio] = useState(true); // Default: show full image, don't crop
   const [auctionStartDate, setAuctionStartDate] = useState<string | null>(null); // For date calculations
   const [batListingMetaByUrl, setBatListingMetaByUrl] = useState<Record<string, { end_date: string | null; sold_at: string | null; lot_number: string | null }>>({});
   const [autoLoad, setAutoLoad] = useState(false);

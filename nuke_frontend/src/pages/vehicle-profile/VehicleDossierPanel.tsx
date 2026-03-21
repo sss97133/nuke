@@ -390,79 +390,12 @@ const VehicleDossierPanel: React.FC = () => {
 
   return (
     <div>
-      {/* Header Bar */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        background: 'var(--surface-elevated)',
-        border: '2px solid var(--accent)',
-        padding: '8px 12px',
-      }}>
-        <span style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
-          fontSize: '11px',
-          fontWeight: 700,
-          letterSpacing: '1.5px',
-          textTransform: 'uppercase',
-        }}>
-          VEHICLE DOSSIER
-        </span>
-        <span style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-          <span style={{
-            fontFamily: "'Courier New', Courier, monospace",
-            fontSize: '8px',
-            fontWeight: 700,
-            letterSpacing: '0.5px',
-            textTransform: 'uppercase',
-            padding: '2px 6px',
-            border: `2px solid ${verificationClass === 'verified' ? 'var(--success)' : 'var(--warning)'}`,
-            color: verificationClass === 'verified' ? 'var(--success)' : 'var(--warning)',
-            background: 'var(--surface-elevated)',
-          }}>
-            {verificationLabel}
-          </span>
-          {canEdit && (
-            <button
-              onClick={() => navigate(`/vehicle/${vehicle!.id}/edit`)}
-              style={{
-                border: '2px solid var(--accent)',
-                background: 'var(--accent)',
-                color: 'var(--surface-elevated)',
-                fontSize: '9px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                padding: '2px 8px',
-                cursor: 'pointer',
-                fontFamily: 'Arial, Helvetica, sans-serif',
-                lineHeight: 1.4,
-              }}
-            >
-              EDIT
-            </button>
-          )}
-        </span>
-      </div>
-
-      {/* Identity Block */}
-      <div style={{
-        background: 'var(--surface-elevated)',
-        border: '2px solid var(--accent)',
-        borderTop: 'none',
-        padding: '10px 12px 8px',
-        marginBottom: '8px',
-      }}>
-        <div className="dossier-identity-ymm" style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
-          fontSize: '16px',
-          fontWeight: 700,
-          letterSpacing: '1px',
-          textTransform: 'uppercase',
-          lineHeight: 1.2,
-        }}>
-          {ymm || 'UNKNOWN VEHICLE'}
-        </div>
+      {/* Identity stripped — YMM, VIN, owner, badges are in the sticky badge bar.
+           Go straight to the spec table. */}
+      <div style={{ display: 'none' }}>
+        <span data-verification={verificationLabel} data-class={verificationClass} />
+        {canEdit && <span data-can-edit="true" data-vehicle-id={vehicle?.id} />}
+        <span>{ymm}</span>
         {v.vin && (
           <div style={{
             fontFamily: "'Courier New', Courier, monospace",
@@ -578,6 +511,9 @@ const VehicleDossierPanel: React.FC = () => {
             pv = group.primary.field_value;
           }
           const displayValue = fmtVal(field, pv);
+
+          // Hide empty rows — don't show "—" for missing data
+          if (!displayValue) return null;
 
           return (
             <FieldRow
