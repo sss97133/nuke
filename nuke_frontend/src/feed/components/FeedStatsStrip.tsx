@@ -75,7 +75,12 @@ export function FeedStatsStrip({ stats, isLoading, searchText, onSearchChange, r
         overflowX: 'auto',
       }}
     >
-      <Stat label="VEHICLES" value={formatCompact(stats.total_vehicles)} />
+      <Stat
+        label={resultCount != null && resultCount !== stats.total_vehicles ? 'SHOWN' : 'VEHICLES'}
+        value={resultCount != null && resultCount !== stats.total_vehicles
+          ? `${formatCompact(resultCount)} / ${formatCompact(stats.total_vehicles)}`
+          : formatCompact(stats.total_vehicles)}
+      />
       <Stat label="VALUE" value={`$${formatCompact(stats.total_value)}`} />
       {stats.vehicles_added_today > 0 && (
         <Stat

@@ -253,11 +253,28 @@ const FieldRow: React.FC<{
           {displayValue || '\u2014'}
         </span>
 
-        {/* Source badges */}
-        <span style={{ display: 'flex', gap: '3px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {sourceBadges.map(c => (
-            <Badge key={c.key} text={c.key} cls={c.cls} />
-          ))}
+        {/* Source badges — only visible on hover or when expanded to reduce clutter */}
+        <span style={{
+          display: 'flex',
+          gap: '3px',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          opacity: hovered || isOpen ? 1 : 0.3,
+          transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+        }}>
+          {sourceBadges.length > 0 && !hovered && !isOpen ? (
+            <span style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: '7px',
+              color: 'var(--text-disabled)',
+            }}>
+              {sourceBadges.length}×
+            </span>
+          ) : (
+            sourceBadges.map(c => (
+              <Badge key={c.key} text={c.key} cls={c.cls} />
+            ))
+          )}
           {isMod && <Badge text="MOD" cls="badge-mod" />}
         </span>
 
@@ -337,8 +354,13 @@ const VehicleDossierPanel: React.FC = () => {
     return FIELD_ORDER.filter(f => evidence[f] && evidence[f].sources.length > 0).length;
   }, [evidence]);
   const coverage = withEvidence / FIELD_ORDER.length;
-  const verificationLabel = coverage >= 0.75 ? 'MULTI-SOURCE VERIFIED' : 'PARTIAL VERIFICATION';
-  const verificationClass = coverage >= 0.75 ? 'verified' : 'partial';
+  // Count fields with 2+ distinct sources for "multi-source" label
+  const multiSourceCount = useMemo(() => {
+    return FIELD_ORDER.filter(f => evidence[f] && evidence[f].sources.length >= 2).length;
+  }, [evidence]);
+  const isMultiSource = multiSourceCount >= 5 && coverage >= 0.5;
+  const verificationLabel = isMultiSource ? 'MULTI-SOURCE VERIFIED' : coverage >= 0.5 ? 'PARTIAL VERIFICATION' : 'UNVERIFIED';
+  const verificationClass = isMultiSource ? 'verified' : 'partial';
 
   // Identity badges
   const badges = useMemo(() => {

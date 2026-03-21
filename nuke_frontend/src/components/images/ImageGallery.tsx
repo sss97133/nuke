@@ -2370,7 +2370,7 @@ const ImageGallery = ({
     const category = humanizeMetadataToken(image?.category);
     if (category) return `${toTitleCase(category)} image`;
 
-    return 'Vehicle image';
+    return `Vehicle photo ${image?.id ? `#${String(image.id).slice(0, 6)}` : ''}`.trim();
   };
 
   // Load tags for the current image (disabled - using new tagging system)

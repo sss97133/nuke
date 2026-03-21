@@ -82,10 +82,26 @@ export default function Search() {
       .not('year', 'is', null);
     q = applyNonAutoFilters(q);
     q = q.is('origin_organization_id', null);
-    q.order('sale_price', { ascending: false, nullsFirst: false })
+    q.not('feed_rank_score', 'is', null)
+      .order('feed_rank_score', { ascending: false })
       .limit(24)
       .then(({ data }) => {
-        if (data) setFeaturedVehicles(data);
+        if (data && data.length > 0) {
+          setFeaturedVehicles(data);
+        } else {
+          // Fallback: sort by updated_at if feed_rank_score unavailable
+          supabase
+            .from('vehicles')
+            .select('id,year,make,model,primary_image_url,sale_price')
+            .eq('is_public', true)
+            .not('primary_image_url', 'is', null)
+            .not('year', 'is', null)
+            .order('updated_at', { ascending: false })
+            .limit(24)
+            .then(({ data: fallback }) => {
+              if (fallback) setFeaturedVehicles(fallback);
+            });
+        }
       })
       .catch(() => {});
   }, [searchQuery]);

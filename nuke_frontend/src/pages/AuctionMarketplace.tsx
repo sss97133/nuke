@@ -63,6 +63,7 @@ const SIXTY_DAYS_MS = 60 * 24 * 60 * 60 * 1000;
 
 export default function AuctionMarketplace() {
   const [auctions, setAuctions] = useState<LiveAuction[]>([]);
+  const [recentAuctions, setRecentAuctions] = useState<LiveAuction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [platformFilter, setPlatformFilter] = useState<string | null>(null);
@@ -264,6 +265,75 @@ export default function AuctionMarketplace() {
     }
 
     setAuctions(results);
+
+    // If no live auctions, load recently ended (last 30 days)
+    if (results.length === 0) {
+      try {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: recentEvents } = await supabase
+          .from('vehicle_events')
+          .select(`
+            id, vehicle_id, source_platform, source_url, ended_at, end_date,
+            current_price, current_bid, bid_count, event_status, listing_status,
+            reserve_status, no_reserve, metadata, created_at, updated_at,
+            currency, currency_code, price_currency,
+            vehicle:vehicles (
+              id, year, make, model, trim, mileage, primary_image_url,
+              bat_comments
+            )
+          `)
+          .in('source_platform', [...AUCTION_PLATFORMS])
+          .in('event_status', ['sold', 'ended', 'no_sale', 'reserve_not_met'])
+          .gte('ended_at', thirtyDaysAgo)
+          .order('ended_at', { ascending: false })
+          .limit(50);
+
+        if (recentEvents) {
+          const recent: LiveAuction[] = [];
+          for (const ev of recentEvents as any[]) {
+            const v = ev.vehicle;
+            if (!v?.id || !v?.year || !v?.make) continue;
+            const rawEnd = ev.ended_at ?? ev.end_date;
+            const endDate = rawEnd ? new Date(rawEnd) : null;
+            const endMs = endDate && Number.isFinite(endDate.getTime()) ? endDate.getTime() : null;
+            const rawPrice = ev.current_price ?? ev.current_bid;
+            const priceCents = rawPrice ? Math.round(Number(rawPrice) * 100) : null;
+            const currCode = resolveCurrencyCode(
+              ev.currency, ev.currency_code, ev.price_currency,
+              ev.metadata?.currency, ev.metadata?.currency_code,
+              ev.metadata?.priceCurrency,
+            );
+            recent.push({
+              id: ev.id,
+              vehicle_id: ev.vehicle_id,
+              platform: ev.source_platform,
+              source_url: ev.source_url ?? null,
+              end_time: endMs !== null ? endDate!.toISOString() : null,
+              current_price_cents: Number.isFinite(priceCents) && priceCents! > 0 ? priceCents : null,
+              currency_code: currCode,
+              bid_count: typeof ev.bid_count === 'number' ? ev.bid_count : 0,
+              comment_count: typeof v.bat_comments === 'number' ? v.bat_comments : null,
+              no_reserve: ev.no_reserve === true || ev.reserve_status === 'no_reserve',
+              vehicle: {
+                id: v.id,
+                year: v.year,
+                make: v.make,
+                model: v.model,
+                trim: v.trim ?? null,
+                mileage: typeof v.mileage === 'number' ? v.mileage : null,
+                primary_image_url: v.primary_image_url ?? null,
+              },
+            });
+          }
+          setRecentAuctions(recent);
+        }
+      } catch {
+        // fail silently
+      }
+    } else {
+      setRecentAuctions([]);
+    }
+
     setLoading(false);
   };
 
@@ -555,8 +625,49 @@ export default function AuctionMarketplace() {
           </div>
         )}
 
-        {/* Empty state */}
-        {!loading && filtered.length === 0 && (
+        {/* Recently Ended — shown when no live auctions */}
+        {!loading && filtered.length === 0 && recentAuctions.length > 0 && (
+          <div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 'var(--space-2)',
+              marginBottom: 'var(--space-2)',
+              borderBottom: '2px solid var(--border)',
+              paddingBottom: 'var(--space-1)',
+            }}>
+              <span style={{
+                fontFamily: 'Arial, sans-serif',
+                fontSize: 'var(--fs-10)',
+                fontWeight: 700,
+                textTransform: 'uppercase' as const,
+                letterSpacing: '0.5px',
+                color: 'var(--text)',
+              }}>
+                RECENT AUCTIONS
+              </span>
+              <span style={{
+                fontFamily: '"Courier New", monospace',
+                fontSize: 'var(--fs-9)',
+                color: 'var(--text-secondary)',
+              }}>
+                {recentAuctions.length} IN LAST 30 DAYS
+              </span>
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: 'var(--space-3)',
+            }}>
+              {recentAuctions.map(a => (
+                <AuctionCard key={`recent-${a.id}`} auction={a} now={nowTick} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty state — only when zero live AND zero recent */}
+        {!loading && filtered.length === 0 && recentAuctions.length === 0 && (
           <div style={{
             border: '2px solid var(--border)',
             padding: 'var(--space-6)',
@@ -571,7 +682,7 @@ export default function AuctionMarketplace() {
               color: 'var(--text)',
               marginBottom: 'var(--space-2)',
             }}>
-              NO LIVE AUCTIONS
+              NO AUCTIONS
             </div>
             <div style={{
               fontFamily: 'Arial, sans-serif',

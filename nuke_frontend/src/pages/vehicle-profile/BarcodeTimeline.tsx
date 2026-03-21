@@ -421,6 +421,35 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
 
   const receiptEvent = receiptDate ? eventMap[receiptDate] : null;
 
+  // If no timeline events at all, show a minimal empty state instead of grey boxes
+  if (timelineEvents.length === 0) {
+    return (
+      <div
+        className="barcode-strip barcode-strip--collapsed"
+        style={{ opacity: 0.5 }}
+      >
+        <div className="barcode-bar" style={{ cursor: 'default' }}>
+          <span className="barcode-bar__label-left">TIMELINE</span>
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '8px',
+            fontWeight: 700,
+            textTransform: 'uppercase' as const,
+            letterSpacing: '0.5px',
+            color: 'var(--text-disabled)',
+          }}>
+            NO TIMELINE DATA
+          </div>
+          <span className="barcode-bar__label-right" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div
