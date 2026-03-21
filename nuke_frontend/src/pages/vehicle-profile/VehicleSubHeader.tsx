@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
+import { BadgePortal } from '../../components/badges/BadgePortal';
 
 /** Capitalize first letter of each word for display (e.g. "K5 JIMMY" -> "K5 Jimmy") */
 function toTitleCase(s: string): string {
@@ -592,48 +593,42 @@ const VehicleSubHeader: React.FC = () => {
     msOverflowStyle: 'none' as any,
   };
 
-  const garageBase = '/?tab=garage';
-  const onYearClick = year ? () => navigate(`${garageBase}&year=${encodeURIComponent(String(year))}`) : undefined;
-  const onMakeClick = make ? () => navigate(`${garageBase}&make=${encodeURIComponent(String(make).trim())}`) : undefined;
-  const onModelClick = model ? () => navigate(`${garageBase}&model=${encodeURIComponent(String(model).trim())}`) : undefined;
-  const onTrimClick = trim ? () => navigate(`${garageBase}&trim=${encodeURIComponent(String(trim).trim())}`) : undefined;
-
   return (
     <div className="vp-sub-header" style={containerStyle}>
-      {/* Left: YMM (+ trim) as StatsStack badges, then mileage */}
+      {/* Left: YMM (+ trim) as BadgePortal — click expands cluster inline, no navigation */}
       <div className="vp-sub-header__left" style={leftStyle}>
         {titleStr ? (
           <>
             {year && (
-              <YMMBadge
-                label={String(year)}
+              <BadgePortal
                 dimension="year"
                 value={year}
-                onClick={onYearClick}
+                label={String(year)}
+                variant="source"
               />
             )}
             {make && (
-              <YMMBadge
-                label={toTitleCase(String(make))}
+              <BadgePortal
                 dimension="make"
                 value={make}
-                onClick={onMakeClick}
+                label={toTitleCase(String(make))}
+                variant="source"
               />
             )}
             {model && (
-              <YMMBadge
-                label={toTitleCase(String(model))}
+              <BadgePortal
                 dimension="model"
                 value={model}
-                onClick={onModelClick}
+                label={toTitleCase(String(model))}
+                variant="source"
               />
             )}
             {trim && (
-              <YMMBadge
-                label={toTitleCase(String(trim))}
-                dimension="trim"
+              <BadgePortal
+                dimension="model"
                 value={trim}
-                onClick={onTrimClick}
+                label={toTitleCase(String(trim))}
+                variant="source"
               />
             )}
           </>

@@ -2,10 +2,11 @@
  * CardDealScore — Deal/heat score indicator pill.
  *
  * Shows "GREAT DEAL", "GOOD DEAL", "FAIR", "OVERPRICED" etc.
+ * Each badge is a BadgePortal — click to see all vehicles with that deal score.
  * Only renders when score exists and isn't "fair" (the default/neutral state).
  */
 
-import type { CSSProperties } from 'react';
+import { BadgePortal } from '../../../components/badges/BadgePortal';
 
 export interface CardDealScoreProps {
   dealScore?: number | null;
@@ -14,8 +15,7 @@ export interface CardDealScoreProps {
   heatScoreLabel?: string | null;
 }
 
-// Colors matching DEAL_SCORE_CONFIG from constants/dealScore.ts
-const DEAL_COLORS: Record<string, { bg: string; text: string; display: string; tooltip: string }> = {
+const DEAL_CONFIG: Record<string, { bg: string; text: string; display: string; tooltip: string }> = {
   plus_3:  { bg: '#16825d', text: 'var(--surface-elevated)', display: 'STEAL', tooltip: 'Price significantly below comparable vehicles' },
   plus_2:  { bg: '#16825d', text: 'var(--surface-elevated)', display: 'GREAT DEAL', tooltip: 'Price well below market average' },
   plus_1:  { bg: '#2d9d78', text: 'var(--surface-elevated)', display: 'GOOD DEAL', tooltip: 'Price below market average' },
@@ -25,38 +25,16 @@ const DEAL_COLORS: Record<string, { bg: string; text: string; display: string; t
   minus_3: { bg: '#d13438', text: 'var(--surface-elevated)', display: 'WAY OVER', tooltip: 'Price significantly above market' },
 };
 
-const HEAT_COLORS: Record<string, { color: string; display: string; tooltip: string }> = {
-  volcanic: { color: '#d13438', display: 'VOLCANIC', tooltip: 'Extremely high interest and engagement' },
-  fire:     { color: 'var(--error)', display: 'FIRE', tooltip: 'Very high interest from buyers' },
-  hot:      { color: 'var(--warning)', display: 'HOT', tooltip: 'Above-average buyer interest' },
-  warm:     { color: '#b05a00', display: 'WARM', tooltip: 'Moderate buyer interest' },
-  cold:     { color: 'var(--text-disabled)', display: 'COLD', tooltip: 'Low buyer interest' },
-};
-
 export function CardDealScore({
   dealScoreLabel,
   heatScoreLabel,
 }: CardDealScoreProps) {
-  const dealConfig = dealScoreLabel ? DEAL_COLORS[dealScoreLabel] : null;
-  const heatConfig = heatScoreLabel ? HEAT_COLORS[heatScoreLabel] : null;
+  const dealConfig = dealScoreLabel ? DEAL_CONFIG[dealScoreLabel] : null;
 
-  // Don't render if both are neutral/missing
   const showDeal = dealConfig && dealScoreLabel !== 'fair';
-  const showHeat = heatConfig && heatScoreLabel !== 'cold';
+  const showHeat = heatScoreLabel && heatScoreLabel !== 'cold';
 
   if (!showDeal && !showHeat) return null;
-
-  const pillStyle: CSSProperties = {
-    display: 'inline-block',
-    fontSize: 'var(--feed-font-size-sm, 8px)',
-    fontWeight: 800,
-    fontFamily: 'Arial, sans-serif',
-    textTransform: 'uppercase',
-    letterSpacing: '0.3px',
-    padding: '1px 4px',
-    lineHeight: 1.4,
-    border: '1px solid var(--border)',
-  };
 
   return (
     <div
@@ -67,30 +45,31 @@ export function CardDealScore({
         flexWrap: 'wrap',
       }}
     >
-      {showDeal && (
-        <span
-          title={dealConfig.tooltip}
-          style={{
-            ...pillStyle,
-            background: dealConfig.bg,
-            color: dealConfig.text,
-            borderColor: dealConfig.bg === 'transparent' ? 'var(--border)' : dealConfig.bg,
-          }}
-        >
-          {dealConfig.display}
-        </span>
+      {showDeal && dealScoreLabel && (
+        <BadgePortal
+          dimension="deal_score"
+          value={dealScoreLabel}
+          label={dealConfig.display}
+          bg={dealConfig.bg}
+          color={dealConfig.text}
+          borderColor={dealConfig.bg === 'transparent' ? undefined : dealConfig.bg}
+          tooltip={dealConfig.tooltip}
+        />
       )}
-      {showHeat && (
-        <span
-          title={heatConfig.tooltip}
-          style={{
-            ...pillStyle,
-            color: heatConfig.color,
-            borderColor: heatConfig.color,
-          }}
-        >
-          {heatConfig.display}
-        </span>
+      {showHeat && heatScoreLabel && (
+        <BadgePortal
+          dimension="status"
+          value={heatScoreLabel}
+          label={heatScoreLabel.toUpperCase()}
+          variant="status"
+          static
+          tooltip={
+            heatScoreLabel === 'volcanic' ? 'Extremely high interest'
+            : heatScoreLabel === 'fire' ? 'Very high interest'
+            : heatScoreLabel === 'hot' ? 'Above-average interest'
+            : 'Moderate interest'
+          }
+        />
       )}
     </div>
   );
