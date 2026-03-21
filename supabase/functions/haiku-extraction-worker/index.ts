@@ -30,7 +30,7 @@ import {
   parseJsonResponse,
   QUALITY_THRESHOLDS,
   type AgentCallResult,
-} from "../_shared/agentTiers.ts";
+} from "../_shared/llmRouter.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 
 const corsHeaders = {

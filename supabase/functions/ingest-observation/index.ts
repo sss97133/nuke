@@ -51,6 +51,13 @@ interface ObservationInput {
   observer_raw?: Record<string, unknown>;
   extractor_id?: string;
   extraction_metadata?: Record<string, unknown>;
+  /** LLM provenance — which model produced this observation */
+  agent_tier?: string;
+  agent_model?: string;
+  agent_cost_cents?: number;
+  agent_duration_ms?: number;
+  extraction_method?: string;
+  raw_source_ref?: string;
 }
 
 async function hashContent(content: string): Promise<string> {
@@ -229,7 +236,14 @@ Deno.serve(async (req) => {
         confidence_factors: confidenceFactors,
         observer_raw: input.observer_raw,
         extractor_id: input.extractor_id,
-        extraction_metadata: input.extraction_metadata
+        extraction_metadata: input.extraction_metadata,
+        // LLM provenance fields
+        agent_tier: input.agent_tier || null,
+        agent_model: input.agent_model || null,
+        agent_cost_cents: input.agent_cost_cents || null,
+        agent_duration_ms: input.agent_duration_ms || null,
+        extraction_method: input.extraction_method || null,
+        raw_source_ref: input.raw_source_ref || null
       })
       .select()
       .maybeSingle();

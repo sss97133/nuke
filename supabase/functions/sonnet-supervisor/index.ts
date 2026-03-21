@@ -25,7 +25,7 @@ import {
   QUALITY_THRESHOLDS,
   estimateBatchCost,
   type AgentCallResult,
-} from "../_shared/agentTiers.ts";
+} from "../_shared/llmRouter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
