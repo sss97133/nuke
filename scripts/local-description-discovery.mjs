@@ -28,6 +28,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { buildExtractionContext, formatContextForPrompt } from './lib/build-extraction-context.mjs';
+import { buildV3Prompt, countV3Claims, avgV3Confidence } from './lib/extraction-prompt-v3.mjs';
 import pg from 'pg';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -64,7 +65,8 @@ const MAX_TOTAL = parseInt(getArg("max", "1000"), 10);
 const CONTINUE = hasFlag("continue");
 const DRY_RUN = hasFlag("dry-run");
 
-const PROMPT_VERSION = "discovery-v2";
+const USE_V3 = hasFlag("v3");
+const PROMPT_VERSION = USE_V3 ? "testimony-v3" : "discovery-v2";
 const USE_LIBRARY = !hasFlag("no-library");
 
 // ─── Library context (pg connection for reference data) ─────────────────
@@ -135,6 +137,14 @@ Group related information logically. Use snake_case for keys.
 IMPORTANT: Return ONLY valid JSON. No explanation, no markdown fences, just the JSON object.`;
 
 async function buildPrompt(description, vehicle) {
+  const libraryContext = await getLibraryContext(vehicle.year, vehicle.make, vehicle.model);
+
+  if (USE_V3) {
+    // Testimony-grade extraction: structured claims with citations and confidence
+    return buildV3Prompt(description, vehicle, libraryContext);
+  }
+
+  // Discovery mode: freeform extraction with optional library context
   let prompt = DISCOVERY_PROMPT
     .replace("{year}", String(vehicle.year || "Unknown"))
     .replace("{make}", vehicle.make || "Unknown")
@@ -142,8 +152,6 @@ async function buildPrompt(description, vehicle) {
     .replace("{sale_price}", vehicle.sale_price ? `$${Number(vehicle.sale_price).toLocaleString()}` : "Unknown")
     .replace("{description}", description.substring(0, 6000));
 
-  // Inject library reference data when available
-  const libraryContext = await getLibraryContext(vehicle.year, vehicle.make, vehicle.model);
   if (libraryContext) {
     prompt += `\n\n--- REFERENCE DATA (use to cross-reference and validate claims) ---\n${libraryContext}`;
   }
