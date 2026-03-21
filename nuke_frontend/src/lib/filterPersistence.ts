@@ -13,7 +13,7 @@ export const DEFAULT_FILTERS: FilterState = {
   is4x4: false,
   priceMin: null,
   priceMax: null,
-  hasImages: false,
+  hasImages: true,
   addedTodayOnly: false,
   forSale: false,
   hideSold: false,

@@ -4604,7 +4604,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   <img
                     src={thumbSrc}
                     alt=""
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
                   />
                 </button>
               ) : null}
