@@ -19,6 +19,7 @@ import { firecrawlScrape } from '../_shared/firecrawl.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { qualityGate } from '../_shared/extractionQualityGate.ts';
 import { archiveFetch } from '../_shared/archiveFetch.ts';
+import { normalizeListingUrl } from '../_shared/urlNormalization.ts';
 
 const VERSION = '1.1.0';
 const JAMESEDITION_SOURCE_ID = '77c149de-7866-4a7c-ad24-3423ee6c1f22';
@@ -285,16 +286,49 @@ Deno.serve(async (req: Request) => {
         primary_image_url: extracted.image_urls[0] || null,
       };
 
-      // Check for existing vehicle by URL or VIN
+      // Check for existing vehicle by normalized URL, exact URL, or VIN
       let existing: { id: string } | null = null;
-      const { data: byUrl } = await supabase
-        .from('vehicles')
-        .select('id')
-        .or(`listing_url.eq.${url},discovery_url.eq.${url}`)
-        .limit(1)
-        .maybeSingle();
-      existing = byUrl;
 
+      // 1. Normalized URL match: use canonical listing ID to catch URL variants
+      const normUrl = normalizeListingUrl(url);
+      if (normUrl?.canonicalListingId) {
+        // Extract the platform-specific numeric ID for ILIKE search
+        const listingId = normUrl.canonicalListingId.split(':')[1];
+        if (listingId) {
+          const { data: byNormUrl } = await supabase
+            .from('vehicles')
+            .select('id, listing_url')
+            .ilike('listing_url', `%${listingId}%`)
+            .not('status', 'in', '(merged,deleted)')
+            .limit(5);
+
+          if (byNormUrl?.length === 1) {
+            existing = { id: byNormUrl[0].id };
+          } else if (byNormUrl && byNormUrl.length > 1) {
+            // Multiple matches: verify via canonical listing ID comparison
+            for (const m of byNormUrl) {
+              const mNorm = normalizeListingUrl(m.listing_url);
+              if (mNorm?.canonicalListingId === normUrl.canonicalListingId) {
+                existing = { id: m.id };
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // 2. Exact URL match fallback
+      if (!existing) {
+        const { data: byUrl } = await supabase
+          .from('vehicles')
+          .select('id')
+          .or(`listing_url.eq.${url},discovery_url.eq.${url}`)
+          .limit(1)
+          .maybeSingle();
+        existing = byUrl;
+      }
+
+      // 3. VIN match
       if (!existing && extracted.vin) {
         const { data: byVin } = await supabase
           .from('vehicles')
@@ -317,6 +351,12 @@ Deno.serve(async (req: Request) => {
         }), { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       Object.assign(vehicleData, gateResult.cleaned);
+
+      // Store the normalized URL to prevent future duplicates
+      if (normUrl?.normalized) {
+        vehicleData.listing_url = normUrl.normalized;
+        vehicleData.discovery_url = normUrl.normalized;
+      }
 
       let vehicleId: string;
       if (existing) {
