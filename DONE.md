@@ -2,6 +2,21 @@
 
 ## 2026-03-21
 
+### [frontend] Bug Fix Sprint — Tier 1+2 (13 bugs, 12 files)
+- **#7** Hero image black void: added fallback query (any non-doc/non-dup image)
+- **#14** Search default: sort by feed_rank_score instead of sale_price desc
+- **#20** Auctions page: shows "Recently Ended" (30d) when no live auctions
+- **#11** Price history modal: falls back to vehicle_events prices
+- **#9** Timeline: shows "NO TIMELINE DATA" instead of empty grey boxes
+- **#1** ResilientImage: cleaner "IMAGE UNAVAILABLE" fail state
+- **#2** Grid card height: bumped from 320→340px for badge space
+- **#3** Deal badges: added tooltip explanations (STEAL, GREAT DEAL, etc.)
+- **#4** Source favicons: added platform name labels (FB MARKET, BAT, etc.)
+- **#6** Stats strip: shows "SHOWN X / Y" when filtered
+- **#8** Gallery alt text: uses photo ID instead of generic "Vehicle image"
+- **#12** "MULTI-SOURCE VERIFIED": requires 5+ multi-source fields (was 75% coverage)
+- **#13** Dossier SRC badges: collapse to "Nx" when not hovered
+
 ### [mcp] User Onboarding & Account Linking — 5 new MCP tools
 - `create_profile`: email → Supabase auth user + profile + API key (idempotent)
 - `get_profile`: lookup by email/user_id with vehicle count + linked accounts
