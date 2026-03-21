@@ -138,6 +138,50 @@ export default function FeedPage() {
           onImageFitChange={setImageFit}
         />
 
+        {/* Feed welcome strip — quick stats when no filters active */}
+        {!hasActiveFilters && !feedQuery.isLoading && stats && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '24px',
+            padding: '8px 12px',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--surface)',
+          }}>
+            {stats.vehicles_added_today > 0 && (
+              <span style={{
+                fontFamily: "'Courier New', monospace",
+                fontSize: '10px',
+                fontWeight: 700,
+                color: 'var(--success)',
+              }}>
+                +{stats.vehicles_added_today} NEW TODAY
+              </span>
+            )}
+            {stats.active_auctions > 0 && (
+              <span style={{
+                fontFamily: "'Courier New', monospace",
+                fontSize: '10px',
+                fontWeight: 700,
+                color: 'var(--error)',
+              }}>
+                {stats.active_auctions} LIVE AUCTION{stats.active_auctions !== 1 ? 'S' : ''}
+              </span>
+            )}
+            {stats.for_sale_count > 0 && (
+              <span style={{
+                fontFamily: "'Courier New', monospace",
+                fontSize: '10px',
+                fontWeight: 700,
+                color: '#16825d',
+              }}>
+                {stats.for_sale_count.toLocaleString()} FOR SALE
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Sidebar + Content */}
         <div style={{ display: 'flex', minHeight: 'calc(100vh - 72px)' }}>
           {/* Filter sidebar */}

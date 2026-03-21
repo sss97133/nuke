@@ -62,48 +62,49 @@ export default function Search() {
   const answerRequestIdRef = useRef(0);
   const [showWorkstation, setShowWorkstation] = useState(false);
 
-  // Featured vehicles for empty state
-  const [featuredVehicles, setFeaturedVehicles] = useState<Array<{
+  // Featured vehicle sections for empty state
+  type FeaturedVehicle = {
     id: string;
     year: number | null;
     make: string | null;
     model: string | null;
     primary_image_url: string | null;
     sale_price: number | null;
-  }>>([]);
+  };
+  const [featuredVehicles, setFeaturedVehicles] = useState<FeaturedVehicle[]>([]);
+  const [recentDeals, setRecentDeals] = useState<FeaturedVehicle[]>([]);
+  const [recentlyListed, setRecentlyListed] = useState<FeaturedVehicle[]>([]);
 
   useEffect(() => {
     if (searchQuery) return;
-    let q = supabase
-      .from('vehicles')
-      .select('id,year,make,model,primary_image_url,sale_price')
-      .eq('is_public', true)
-      .not('primary_image_url', 'is', null)
-      .not('year', 'is', null);
-    q = applyNonAutoFilters(q);
-    q = q.is('origin_organization_id', null);
-    q.not('feed_rank_score', 'is', null)
+    const baseSelect = 'id,year,make,model,primary_image_url,sale_price';
+    const baseFilters = (q: any) => {
+      q = q.eq('is_public', true).not('primary_image_url', 'is', null).not('year', 'is', null);
+      q = applyNonAutoFilters(q);
+      return q.is('origin_organization_id', null);
+    };
+
+    // Section 1: Trending (by feed_rank_score)
+    baseFilters(supabase.from('vehicles').select(baseSelect))
+      .not('feed_rank_score', 'is', null)
       .order('feed_rank_score', { ascending: false })
-      .limit(24)
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setFeaturedVehicles(data);
-        } else {
-          // Fallback: sort by updated_at if feed_rank_score unavailable
-          supabase
-            .from('vehicles')
-            .select('id,year,make,model,primary_image_url,sale_price')
-            .eq('is_public', true)
-            .not('primary_image_url', 'is', null)
-            .not('year', 'is', null)
-            .order('updated_at', { ascending: false })
-            .limit(24)
-            .then(({ data: fallback }) => {
-              if (fallback) setFeaturedVehicles(fallback);
-            });
-        }
-      })
-      .catch(() => {});
+      .limit(8)
+      .then(({ data }: any) => { if (data) setFeaturedVehicles(data); });
+
+    // Section 2: Recent Deals (vehicles with deal scores)
+    baseFilters(supabase.from('vehicles').select(baseSelect))
+      .in('deal_score_label', ['plus_2', 'plus_3'])
+      .not('sale_price', 'is', null)
+      .order('updated_at', { ascending: false })
+      .limit(8)
+      .then(({ data }: any) => { if (data) setRecentDeals(data); });
+
+    // Section 3: Recently Listed (newest for-sale vehicles)
+    baseFilters(supabase.from('vehicles').select(baseSelect))
+      .eq('is_for_sale', true)
+      .order('created_at', { ascending: false })
+      .limit(8)
+      .then(({ data }: any) => { if (data) setRecentlyListed(data); });
   }, [searchQuery]);
 
   // VIN search state
@@ -1102,9 +1103,22 @@ export default function Search() {
       {/* No-query empty state — featured vehicles */}
       {!searchQuery && !loading && (
         <div style={{ padding: '0 0 48px' }}>
-          {/* Quick-search suggestions */}
+          {/* Quick-search suggestions — top makes + curated terms */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '32px' }}>
-            {['Porsche 911', '1967 Mustang', 'LS swap', 'Barn find', 'Ferrari'].map(term => (
+            {(() => {
+              // Build dynamic chips from featured vehicles' top makes + curated terms
+              const makeCounts = new Map<string, number>();
+              for (const v of featuredVehicles) {
+                if (v.make) makeCounts.set(v.make, (makeCounts.get(v.make) || 0) + 1);
+              }
+              const topMakes = [...makeCounts.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map(([make]) => make.charAt(0).toUpperCase() + make.slice(1).toLowerCase());
+              const curated = ['Barn find', 'Manual transmission'];
+              const chips = [...new Set([...topMakes, ...curated])].slice(0, 6);
+              return chips;
+            })().map(term => (
               <a
                 key={term}
                 href={`/search?q=${encodeURIComponent(term)}`}
@@ -1126,39 +1140,19 @@ export default function Search() {
             ))}
           </div>
 
-          {/* Featured vehicles grid */}
+          {/* Trending vehicles */}
           {featuredVehicles.length > 0 && (
-            <div>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '12px' }}>
-                Top Vehicles by Value
-              </div>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                gap: '12px',
-              }}>
-                {featuredVehicles.map(v => (
-                  <VehicleCardDense
-                    key={v.id}
-                    vehicle={{
-                      id: v.id,
-                      year: v.year ?? undefined,
-                      make: v.make ?? undefined,
-                      model: v.model ?? undefined,
-                      primary_image_url: v.primary_image_url ?? undefined,
-                      sale_price: v.sale_price ?? undefined,
-                    }}
-                    viewMode="gallery"
-                    showSocial={false}
-                    showPriceChange={false}
-                    showPriceOverlay={true}
-                    showDetailOverlay={true}
-                    infoDense={true}
-                    thumbnailFit="contain"
-                  />
-                ))}
-              </div>
-            </div>
+            <SearchSection title="TRENDING" vehicles={featuredVehicles} />
+          )}
+
+          {/* Recent deals */}
+          {recentDeals.length > 0 && (
+            <SearchSection title="RECENT DEALS" vehicles={recentDeals} />
+          )}
+
+          {/* Recently listed */}
+          {recentlyListed.length > 0 && (
+            <SearchSection title="RECENTLY LISTED" vehicles={recentlyListed} />
           )}
         </div>
       )}
@@ -1247,3 +1241,52 @@ export default function Search() {
   );
 }
 
+/** Reusable section for the search empty state (Trending, Deals, Recently Listed) */
+function SearchSection({ title, vehicles }: {
+  title: string;
+  vehicles: Array<{ id: string; year: number | null; make: string | null; model: string | null; primary_image_url: string | null; sale_price: number | null }>;
+}) {
+  return (
+    <div style={{ marginBottom: '28px' }}>
+      <div style={{
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '9px',
+        fontWeight: 800,
+        textTransform: 'uppercase' as const,
+        letterSpacing: '1px',
+        color: 'var(--text-disabled)',
+        marginBottom: '10px',
+        borderBottom: '2px solid var(--border)',
+        paddingBottom: '4px',
+      }}>
+        {title}
+      </div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+        gap: '12px',
+      }}>
+        {vehicles.map(v => (
+          <VehicleCardDense
+            key={v.id}
+            vehicle={{
+              id: v.id,
+              year: v.year ?? undefined,
+              make: v.make ?? undefined,
+              model: v.model ?? undefined,
+              primary_image_url: v.primary_image_url ?? undefined,
+              sale_price: v.sale_price ?? undefined,
+            }}
+            viewMode="gallery"
+            showSocial={false}
+            showPriceChange={false}
+            showPriceOverlay={true}
+            showDetailOverlay={true}
+            infoDense={true}
+            thumbnailFit="contain"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
