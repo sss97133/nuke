@@ -2,6 +2,21 @@
 
 ## 2026-03-21
 
+### [search] Complete Search Rebuild — Frontend + Backend Deep Search
+- **Search page rewritten**: 1,293 lines → 75 lines. Removed duplicate search bar, VIN lookup button, "Barn find"/"Manual transmission" pills, GPT-4o answer box, inline haversine, vibe detection, workstation quick-links
+- **New files**: `useSearchPage.ts` (hook), `useSearchEmptyState.ts` (hook), `SearchFilterPanel.tsx`, `SearchStatsBar.tsx`, `SearchEmptyState.tsx`
+- **Deleted**: `IntelligentSearch.tsx` (93KB) — redundant with header search + useSearch hook
+- **Empty state**: data-driven browse facets (top 12 makes with counts, eras, body styles), search tips, notable sales grid, recently added grid, total vehicle count hero
+- **Browse stats**: when searching a make, shows total/avg price/model breakdown/source distribution/era distribution (expandable)
+- **`vehicle_search_index` table**: denormalized FTS combining vehicle fields (weight A), descriptions (B), comments (C), evidence (D) with GIN index. 556K rows populated.
+- **`search_vehicles_deep` RPC**: searches across ALL sources, returns match_source + highlighted snippets via `ts_headline`. Ranking boosted for make/model field matches (+5.0 for exact make, +4.0 for make+model prefix).
+- **`search_vehicles_fuzzy` RPC**: trigram fuzzy fallback for typo tolerance ("camero" → Camaro). Triggered when FTS returns < 3 results.
+- **universal-search edge function**: updated to call deep search + fuzzy fallback in parallel. Results enriched with `deep_match_source` and `deep_snippet` metadata.
+- **SearchResults.tsx**: vehicle cards now show match provenance snippet (COMMENT/DESCRIPTION/EVIDENCE label + highlighted text)
+- **Comment aggregation**: 28K+ vehicles have aggregated comment text indexed (still running, batch job in background)
+- **Quality audit**: 12 test queries run. Fixed: Porsche ranking noise (MG no longer appears), typo tolerance working, multi-field matching confirmed (description + comment cross-matching)
+- **Deployed**: universal-search edge function, frontend build clean
+
 ### [frontend] Browser Inspection + Fixes from Live Site
 - **OPEN PROFILE → button fix**: was missing from expanded cards (expandedContent || fallback logic bug)
 - **Auctions recently-ended**: always loads independently now (was gated on results.length === 0)
@@ -4577,3 +4592,58 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - **`analysis_widgets`** entry — comment-refinery-coverage widget registered.
 - **`analyze-comments-fast` claim_triage mode** — Zero-cost regex pre-filter. Tested: 57 comments triaged, 4 passed (7% pass rate). Correctly identifies substantive claims (condition, provenance, ownership) and filters noise (congrats, jokes, short reactions).
 - **`batch-comment-discovery` extract_claims mode** — LLM claim extraction pipeline. Gemini 2.5 Flash primary (free), Haiku fallback. Batches 10 comments per LLM call, writes Category A/B claims to field_evidence, updates comment_claims_progress. Self-chaining. **Blocked on LLM credits** — both Anthropic and Google quotas exhausted. Pipeline code is production-ready.
+
+### [refinery] Comment Refinery — First Live Extraction
+- **xAI Grok-3-Mini** wired as primary LLM ($0.30/M input, $0.50/M output — ~$0.001/vehicle)
+- Fixed JSONB double-encoding in field_evidence (supporting_signals, raw_extraction_data)
+- Fixed temporal_anchor NaN when LLM returns "null" string
+- Added Category C claim writing via ingest-observation (sightings, ownership, work records)
+- **First live run:** 4 comments → 12 claims extracted → 6 field_evidence rows written
+  - interior: "original untouched" (conf 100, skylarwilliams)
+  - rust: "no signs of rust or mishaps" (conf 100, skylarwilliams)
+  - exterior: "excellent survivor, some overspray" (conf 95, skylarwilliams)
+  - exterior_damage: "front bumper chips" (conf 80, Archer84)
+  - hitch_type: "front hitch receiver" (conf 80, Archer84)
+  - trailer_plug: "front trailer plug" (conf 80, Archer84)
+- Quote verification working: rejected 1 claim where LLM dropped quotation marks from source text
+- LLM fallback chain: xAI Grok → Gemini → Haiku (all wired, tested)
+- Estimated full corpus cost: $30-50 via Grok-3-Mini
+
+## 2026-03-21
+
+### [data-quality] Autonomous Data Quality Cleanup
+- Archived 24,993 ECR ghost records (no year, no URL, no images, source=unknown)
+- Merged 49 JamesEdition URL-variant duplicates (same listing ID, URL differed by appended title)
+- Merged 1,224 exact URL duplicate groups across all platforms (6 minor FK errors)
+- Archived ~5,000 Bonhams + source skeletons (no year/make/model, no images)
+- Generated 26 AI-verified VIN merge proposals via local Ollama (qwen2.5:7b)
+  - 17 MERGE (auto-approved >= 85%), 16 executed, 1 FK constraint error
+  - 5 SKIP (correctly rejected: fake VINs, mismatched vehicles)
+  - 4 REVIEW (held for human judgment)
+- Koenigsegg Regera: 84 → 12 active records (case study proving the approach)
+
+### [data-quality] New Scripts
+- `scripts/diagnose-duplicates.mjs` — URL normalization diagnostic for any make/model
+- `scripts/data-quality-cleanup.mjs` — Phase 1-3: ECR ghosts, JamesEdition dupes, pattern hunting
+- `scripts/data-quality-cleanup-phase4.mjs` — Phase 4a-d: exact URL dedup, VIN dedup, skeleton archival
+- `scripts/generate-merge-proposals.mjs` — AI-verified merge proposals with `merge_proposals` table
+- `merge_proposals` table created (vehicle_a_id, vehicle_b_id, ai_decision, confidence, evidence)
+
+### [architecture] Entity Resolution Rules — Canonical Definition
+- Wrote `docs/architecture/ENTITY_RESOLUTION_RULES.md` — definitive rules for all merge/dedup/resolution
+- Core principle: vehicle is the entity, URLs are testimony, observations have temporal provenance
+- Evidence hierarchy: 4 tiers from definitive (VIN match 0.99) to weak (year+make only 0.30)
+- Replaced "merge two profiles" mental model with "link observations to canonical entity"
+- Updated CLAUDE.md to reference entity resolution rules before any merge work
+- AI verification required for Tier 3+ matches (stored in merge_proposals, auto-approved >= 85%)
+
+## 2026-03-21
+
+### [backend] FB Image Persistence + ARS Tables + Auction Pipeline Cleanup
+- **FB Image Backfill**: `scripts/backfill-fb-images.mjs` — downloads expired fbcdn URLs to Supabase Storage. ~24% CDN direct success rate (URLs <2 weeks old still work). Added to package.json as `backfill:fb-images`. Running in background against 6,781 vehicles.
+- **vehicle_submissions table**: Created via migration. Completes the ARS table trio (auction_readiness 2,142 rows, photo_coverage_requirements 20 rows, vehicle_submissions 0 rows).
+- **persist_auction_readiness()**: Verified working end-to-end. Test on 1977 K5 Blazer: composite_score=45, tier=EARLY_STAGE, 83 photo score, actionable coaching gaps.
+- **MCP tools verified**: `get_auction_readiness`, `get_coaching_plan`, `prepare_listing` — all call persist_auction_readiness and return real data.
+- **Stale auction events cleaned**: 7,353 → 2,030 truly active events across 12 platforms. Batch-updated 5,323 stale events (ended_at in past or platform stopped syncing).
+- **sync-live-auctions cron fixed**: Job 109 updated from `skip_vehicle_sync: true` → `false`. Now creates/links vehicle records during discovery. Runs every 15 min.
+- **BaT pipeline confirmed live**: 177 active BaT events, latest update 18 min ago. sync-bat-listing, sync-live-auctions, score-live-auctions all running on cron.
