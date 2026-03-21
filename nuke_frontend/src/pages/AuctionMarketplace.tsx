@@ -266,8 +266,9 @@ export default function AuctionMarketplace() {
 
     setAuctions(results);
 
-    // If no live auctions, load recently ended (last 30 days)
-    if (results.length === 0) {
+    // Always load recently ended (last 30 days) — shown as fallback when no live,
+    // and useful context even when live auctions exist
+    {
       try {
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
         const { data: recentEvents } = await supabase
@@ -327,11 +328,9 @@ export default function AuctionMarketplace() {
           }
           setRecentAuctions(recent);
         }
-      } catch {
-        // fail silently
+      } catch (err) {
+        console.warn('[Auctions] recently ended query failed:', err);
       }
-    } else {
-      setRecentAuctions([]);
     }
 
     setLoading(false);
@@ -625,8 +624,8 @@ export default function AuctionMarketplace() {
           </div>
         )}
 
-        {/* Recently Ended — shown when no live auctions */}
-        {!loading && filtered.length === 0 && recentAuctions.length > 0 && (
+        {/* Recently Ended — shown when no live auctions, or below live auctions */}
+        {!loading && recentAuctions.length > 0 && (
           <div>
             <div style={{
               display: 'flex',
