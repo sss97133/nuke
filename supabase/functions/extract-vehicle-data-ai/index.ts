@@ -457,9 +457,26 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Save images to vehicle_images
+        // Save images to vehicle_images (filter junk URLs first)
+        const JUNK_IMAGE_PATTERNS = [
+          /dealer_listings_logos/i,
+          /\/logo[._\-]/i,
+          /\/favicon/i,
+          /\/placeholder/i,
+          /\/avatar/i,
+          /\/spacer/i,
+          /\/pixel\./i,
+          /1x1\./i,
+          /transparent\.(gif|png)/i,
+          /\/icon[._\-]/i,
+          /\/badge[._\-]/i,
+          /\/watermark/i,
+        ];
         if (vehicleId && normalized.image_urls && normalized.image_urls.length > 0) {
-          const imageRows = normalized.image_urls.slice(0, 50).map((imgUrl: string, idx: number) => ({
+          const cleanedUrls = normalized.image_urls.filter((u: string) =>
+            !JUNK_IMAGE_PATTERNS.some((p) => p.test(u))
+          );
+          const imageRows = cleanedUrls.slice(0, 50).map((imgUrl: string, idx: number) => ({
             vehicle_id: vehicleId,
             image_url: imgUrl,
             source: 'external_import',
