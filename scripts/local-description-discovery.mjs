@@ -27,6 +27,8 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { buildExtractionContext, formatContextForPrompt } from './lib/build-extraction-context.mjs';
+import pg from 'pg';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -62,7 +64,44 @@ const MAX_TOTAL = parseInt(getArg("max", "1000"), 10);
 const CONTINUE = hasFlag("continue");
 const DRY_RUN = hasFlag("dry-run");
 
-const PROMPT_VERSION = "discovery-v1";
+const PROMPT_VERSION = "discovery-v2";
+const USE_LIBRARY = !hasFlag("no-library");
+
+// ─── Library context (pg connection for reference data) ─────────────────
+
+let pgClient = null;
+const contextCache = new Map(); // make:year → context string
+
+async function getPgClient() {
+  if (!pgClient) {
+    pgClient = new pg.Client({
+      host: '54.177.55.191', port: 6543,
+      user: 'postgres.qkgaybvrernstplzjaam',
+      password: process.env.SUPABASE_DB_PASSWORD,
+      database: 'postgres',
+      ssl: { rejectUnauthorized: false },
+    });
+    await pgClient.connect();
+  }
+  return pgClient;
+}
+
+async function getLibraryContext(year, make, model) {
+  if (!USE_LIBRARY || !year || !make) return '';
+  const cacheKey = `${make}:${year}`;
+  if (contextCache.has(cacheKey)) return contextCache.get(cacheKey);
+  try {
+    const db = await getPgClient();
+    const ctx = await buildExtractionContext(db, year, make, model);
+    const formatted = formatContextForPrompt(ctx);
+    contextCache.set(cacheKey, formatted);
+    if (formatted) console.log(`  [lib] Loaded ${Object.keys(ctx).length} reference categories for ${year} ${make}`);
+    return formatted;
+  } catch (err) {
+    contextCache.set(cacheKey, '');
+    return '';
+  }
+}
 
 // ─── Shared prompt ──────────────────────────────────────────────────────
 
@@ -95,13 +134,21 @@ Group related information logically. Use snake_case for keys.
 
 IMPORTANT: Return ONLY valid JSON. No explanation, no markdown fences, just the JSON object.`;
 
-function buildPrompt(description, vehicle) {
-  return DISCOVERY_PROMPT
+async function buildPrompt(description, vehicle) {
+  let prompt = DISCOVERY_PROMPT
     .replace("{year}", String(vehicle.year || "Unknown"))
     .replace("{make}", vehicle.make || "Unknown")
     .replace("{model}", vehicle.model || "Unknown")
     .replace("{sale_price}", vehicle.sale_price ? `$${Number(vehicle.sale_price).toLocaleString()}` : "Unknown")
     .replace("{description}", description.substring(0, 6000));
+
+  // Inject library reference data when available
+  const libraryContext = await getLibraryContext(vehicle.year, vehicle.make, vehicle.model);
+  if (libraryContext) {
+    prompt += `\n\n--- REFERENCE DATA (use to cross-reference and validate claims) ---\n${libraryContext}`;
+  }
+
+  return prompt;
 }
 
 // ─── Provider implementations ───────────────────────────────────────────
@@ -217,7 +264,7 @@ const PROVIDERS = { ollama: callOllama, openai: callOpenAI, gemini: callGemini, 
 // ─── Extract + parse ────────────────────────────────────────────────────
 
 async function extract(description, vehicle) {
-  const prompt = buildPrompt(description, vehicle);
+  const prompt = await buildPrompt(description, vehicle);
   const startMs = Date.now();
   const callFn = PROVIDERS[PROVIDER];
   if (!callFn) throw new Error(`Unknown provider: ${PROVIDER}`);
@@ -382,4 +429,4 @@ async function main() {
   console.log(`   Provider: ${PROVIDER} | Model: ${MODEL}`);
 }
 
-main().catch((e) => { console.error("Fatal:", e.message); process.exit(1); });
+main().catch((e) => { console.error("Fatal:", e.message); process.exit(1); }).finally(() => { if (pgClient) pgClient.end().catch(() => {}); });
