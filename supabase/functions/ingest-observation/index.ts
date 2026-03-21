@@ -25,6 +25,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { normalizeListingUrl, normalizeVin } from "../_shared/urlNormalization.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -146,32 +147,84 @@ Deno.serve(async (req) => {
 
       // Try VIN match first (highest confidence)
       if (hints.vin) {
-        const { data: vinMatch } = await supabase
-          .from("vehicles")
-          .select("id")
-          .eq("vin", hints.vin)
-          .maybeSingle();
+        const cleanVin = normalizeVin(hints.vin);
+        if (cleanVin) {
+          const { data: vinMatch } = await supabase
+            .from("vehicles")
+            .select("id")
+            .eq("vin", cleanVin)
+            .maybeSingle();
 
-        if (vinMatch) {
-          vehicleId = vinMatch.id;
-          vehicleMatchConfidence = 0.99;
-          vehicleMatchSignals = { vin_match: true };
+          if (vinMatch) {
+            vehicleId = vinMatch.id;
+            vehicleMatchConfidence = 0.99;
+            vehicleMatchSignals = { vin_match: true, normalized_vin: cleanVin };
+          }
         }
       }
 
-      // Try URL match (for listings we've seen before)
+      // Try URL match — first normalized, then exact (for listings we've seen before)
       if (!vehicleId && hints.url) {
-        const { data: urlMatch } = await supabase
-          .from("vehicle_events")
-          .select("vehicle_id")
-          .eq("source_url", hints.url)
-          .not("vehicle_id", "is", null)
-          .maybeSingle();
+        const normUrl = normalizeListingUrl(hints.url);
 
-        if (urlMatch?.vehicle_id) {
-          vehicleId = urlMatch.vehicle_id;
-          vehicleMatchConfidence = 0.95;
-          vehicleMatchSignals = { url_match: true };
+        // Try canonical listing ID match against vehicles.listing_url
+        if (normUrl?.canonicalListingId) {
+          // Extract the platform-specific ID pattern to match against existing URLs
+          const { data: urlMatches } = await supabase
+            .from("vehicles")
+            .select("id, listing_url")
+            .ilike("listing_url", `%${normUrl.canonicalListingId.split(":")[1]}%`)
+            .not("status", "in", "(merged,deleted)")
+            .limit(5);
+
+          if (urlMatches?.length === 1) {
+            vehicleId = urlMatches[0].id;
+            vehicleMatchConfidence = 0.95;
+            vehicleMatchSignals = { normalized_url_match: true, canonical_id: normUrl.canonicalListingId };
+          } else if (urlMatches && urlMatches.length > 1) {
+            // Multiple matches — pick the one with exact normalized match
+            for (const m of urlMatches) {
+              const mNorm = normalizeListingUrl(m.listing_url);
+              if (mNorm?.canonicalListingId === normUrl.canonicalListingId) {
+                vehicleId = m.id;
+                vehicleMatchConfidence = 0.95;
+                vehicleMatchSignals = { normalized_url_match: true, canonical_id: normUrl.canonicalListingId };
+                break;
+              }
+            }
+          }
+        }
+
+        // Fall back to exact URL match in vehicle_events
+        if (!vehicleId) {
+          const { data: urlMatch } = await supabase
+            .from("vehicle_events")
+            .select("vehicle_id")
+            .eq("source_url", hints.url)
+            .not("vehicle_id", "is", null)
+            .maybeSingle();
+
+          if (urlMatch?.vehicle_id) {
+            vehicleId = urlMatch.vehicle_id;
+            vehicleMatchConfidence = 0.95;
+            vehicleMatchSignals = { exact_url_match: true };
+          }
+        }
+
+        // Also try normalized URL match in vehicle_events
+        if (!vehicleId && normUrl?.normalized && normUrl.normalized !== hints.url) {
+          const { data: normUrlMatch } = await supabase
+            .from("vehicle_events")
+            .select("vehicle_id")
+            .eq("source_url", normUrl.normalized)
+            .not("vehicle_id", "is", null)
+            .maybeSingle();
+
+          if (normUrlMatch?.vehicle_id) {
+            vehicleId = normUrlMatch.vehicle_id;
+            vehicleMatchConfidence = 0.90;
+            vehicleMatchSignals = { normalized_event_url_match: true };
+          }
         }
       }
 
