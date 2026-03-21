@@ -36,7 +36,7 @@ import {
   TIER_CONFIGS,
   QUALITY_THRESHOLDS,
   type AgentTier,
-} from "../_shared/agentTiers.ts";
+} from "../_shared/llmRouter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
