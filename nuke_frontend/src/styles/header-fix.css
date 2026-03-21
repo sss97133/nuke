@@ -1,160 +1,11 @@
 /**
- * COMPREHENSIVE HEADER FIX
- * Fixes sticky positioning, dropdown overlap, mobile responsive issues
+ * HEADER FIXES — Dropdown positioning and z-index hierarchy
+ * Legacy header layout classes removed (2026-03-21 header rework).
+ * Main header styles now in AppHeader.css.
  */
 
 /* ============================================================================
-   HEADER WRAPPER - Clean sticky positioning
-   ============================================================================ */
-
-.header-wrapper {
-  position: sticky;
-  top: 0;
-  z-index: 1000; /* Above content, below modals */
-  background: var(--surface);
-  /* Keep the bottom edge subtle in dark mode */
-  border-bottom: 1px solid var(--border);
-  width: 100%;
-}
-
-/* In light mode, a slightly stronger header edge matches the rest of the Win95 frame */
-:root[data-theme="light"] .header-wrapper {
-  border-bottom-width: 2px;
-}
-
-.header-content {
-  max-width: 100%;
-  margin: 0 auto;
-  padding: 0 8px;
-  display: grid;
-  align-items: center;
-  /* max-content Nuke+nav | 2% spacer | (remaining) search | 2% spacer | max-content capsule */
-  grid-template-columns: max-content 2% minmax(0, 1fr) 2% minmax(8%, max-content);
-  height: 40px;
-  box-sizing: border-box;
-}
-
-/* ============================================================================
-   3-COLUMN HEADER LAYOUT (with fixed proportional spacers)
-   Target: 8% Nuke, 2% space, 80% agent input, 2% space, 8% capsule
-   Notes:
-   - Nuke dropdown is a popup, so opening it should not affect layout.
-   - capsule can expand; when it does, it steals space from the agent input.
-   ============================================================================ */
-
-.header-slot-left {
-  min-width: 72px;
-  display: flex;
-  align-items: center;
-}
-
-.header-spacer {
-  min-width: 6px;
-}
-
-.header-slot-center {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-}
-
-.header-slot-right {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
-/* ============================================================================
-   HEADER LEFT - Logo + Nav
-   ============================================================================ */
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  overflow: visible; /* allow dropdown to render outside header */
-}
-
-.logo {
-  flex-shrink: 0;
-}
-
-.logo-text {
-  padding: 4px 8px;
-  background: var(--surface);
-  border: 2px outset var(--border);
-  font-size: 9pt;
-  font-weight: bold;
-  white-space: nowrap;
-}
-
-/* ============================================================================
-   NUKE WORDMARK — always-visible brand link
-   ============================================================================ */
-
-.nuke-wordmark {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-decoration: none;
-  color: var(--text);
-  padding: 4px 6px;
-  flex-shrink: 0;
-  user-select: none;
-  white-space: nowrap;
-}
-
-.nuke-wordmark:hover {
-  color: var(--text);
-  opacity: 0.75;
-}
-
-.main-nav {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.nav-link {
-  padding: 4px 8px;
-  font-size: 9pt;
-  white-space: nowrap;
-  border: 1px solid transparent;
-  text-decoration: none;
-  color: var(--text);
-  flex-shrink: 1;
-}
-
-.nav-link:hover {
-  background: var(--surface-hover);
-  border: 1px solid var(--border);
-}
-
-.nav-link.active {
-  background: var(--surface-hover);
-  border: 2px inset var(--border);
-  font-weight: bold;
-}
-
-/* ============================================================================
-   HEADER RIGHT - Search + Upload + Profile
-   ============================================================================ */
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: flex-end;
-  min-width: 0;
-  max-width: none;
-}
-
-/* ============================================================================
-   DROPDOWN MENU - Fixed positioning, no overlap
+   DROPDOWN MENU - Fixed positioning (used by ProfileBalancePill)
    ============================================================================ */
 
 .profile-dropdown-backdrop {
@@ -169,7 +20,6 @@
 
 .profile-dropdown-menu {
   position: fixed !important;
-  /* Will be positioned by JS */
   min-width: 180px;
   max-width: 220px;
   background: var(--surface) !important;
@@ -200,66 +50,13 @@
 }
 
 /* ============================================================================
-   MOBILE RESPONSIVE
-   ============================================================================ */
-
-/* On small screens, tighten header layout: hide spacers, shrink proportions */
-@media (max-width: 600px) {
-  .header-content {
-    /* Nuke | search (fills) | capsule */
-    grid-template-columns: max-content minmax(0, 1fr) max-content;
-    padding: 0 6px;
-    gap: 0;
-  }
-
-  /* Hide the explicit spacer columns on mobile */
-  .header-spacer {
-    display: none;
-  }
-
-  .header-slot-left {
-    min-width: 48px;
-  }
-
-  .header-slot-right {
-    min-width: 40px;
-  }
-
-  /* Ensure nav dropdown doesn't overflow the viewport on mobile */
-  [data-marque-menu] > div {
-    max-width: calc(100vw - 16px);
-  }
-
-  /* Hide Search/Market links on mobile — accessible via NukeMenu dropdown */
-  .header-main-nav {
-    display: none;
-  }
-}
-
-/* ============================================================================
    Z-INDEX HIERARCHY (from highest to lowest)
    ============================================================================ */
 
 /* 10001 - Profile dropdown menu */
 /* 10000 - Profile dropdown backdrop */
-/* 2000 - Navigation dropdown menu */
 /* 1000 - Sticky header */
+/* 999 - Vehicle tab bar (sticky in content) */
 /* 200 - Upload status bar */
 /* 100 - Page content */
 /* 1 - Base content */
-
-/* ============================================================================
-   NAVIGATION DROPDOWN FIXES
-   ============================================================================ */
-
-/* Ensure navigation dropdown links are clickable and have proper hover states */
-[data-marque-menu] .nav-link {
-  cursor: pointer !important;
-  transition: background-color 0.1s ease !important;
-}
-
-[data-marque-menu] .nav-link:hover {
-  background: var(--surface-hover) !important;
-  border-color: transparent !important;
-}
-

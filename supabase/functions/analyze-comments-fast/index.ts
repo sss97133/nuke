@@ -355,6 +355,9 @@ Deno.serve(async (req) => {
       case "batch":
         result = await batchProcess(supabase, supabaseUrl, serviceKey, body);
         break;
+      case "claim_triage":
+        result = await claimTriage(supabase, supabaseUrl, serviceKey, body);
+        break;
       default:
         return jsonResponse({ error: `Unknown mode: ${mode}` }, 400);
     }
@@ -1221,6 +1224,138 @@ async function batchProcess(supabase: any, supabaseUrl: string, serviceKey: stri
     errors: result.errors || 0,
     remaining,
     continued: remaining > 0 && (result.discovered || 0) > 0,
+  };
+}
+
+// ═══════════════════════════════════════════════════
+// MODE: CLAIM_TRIAGE — Pre-filter comments for claim extraction
+// ═══════════════════════════════════════════════════
+
+async function claimTriage(supabase: any, supabaseUrl: string, serviceKey: string, body: any) {
+  const { computeClaimDensity, passesClaimFilter } = await import("../_shared/commentRefinery.ts");
+
+  const batchSize = Math.min(body.batch_size || 1000, 2000);
+  const vehicleId = body.vehicle_id || null; // optional: triage for specific vehicle
+  const shouldContinue = body.continue ?? false;
+  const batchNum = body._batch_num || 1;
+  const startTime = Date.now();
+
+  // Find comments not yet in comment_claims_progress
+  // Two-step: get IDs already triaged, then fetch untriaged comments
+  let commentsQuery = supabase
+    .from("auction_comments")
+    .select("id, vehicle_id, comment_text, author_username, is_seller, posted_at, bid_amount, word_count")
+    .not("vehicle_id", "is", null)
+    .not("comment_text", "is", null)
+    .order("posted_at", { ascending: false })
+    .limit(batchSize);
+
+  if (vehicleId) {
+    commentsQuery = commentsQuery.eq("vehicle_id", vehicleId);
+  }
+
+  const { data: candidateComments, error: fetchErr } = await commentsQuery;
+  console.log(`[claim_triage] fetchErr=${fetchErr?.message || 'none'}, candidates=${candidateComments?.length ?? 0}`);
+  if (fetchErr) {
+    return { error: fetchErr.message, triaged: 0 };
+  }
+
+  // Filter out already-triaged comments
+  const candidateIds = (candidateComments || []).map((c: any) => c.id);
+  let alreadyTriaged = new Set<string>();
+  if (candidateIds.length > 0) {
+    const { data: existing } = await supabase
+      .from("comment_claims_progress")
+      .select("comment_id")
+      .in("comment_id", candidateIds);
+    alreadyTriaged = new Set((existing || []).map((e: any) => e.comment_id));
+  }
+
+  const comments = (candidateComments || []).filter((c: any) => !alreadyTriaged.has(c.id) && String(c.comment_text || "").length > 20);
+  if (comments.length === 0) {
+    if (candidateIds.length > 0 && alreadyTriaged.size > 0) {
+      return { triaged: 0, passed_filter: 0, remaining: -1, batch_num: batchNum, note: "All candidates in batch already triaged." };
+    }
+    return { triaged: 0, passed_filter: 0, remaining: 0, batch_num: batchNum };
+  }
+
+  if (comments.length === 0) {
+    return { triaged: 0, passed_filter: 0, remaining: 0, batch_num: batchNum };
+  }
+
+  // Score each comment
+  const rows: any[] = [];
+  let passedFilter = 0;
+
+  for (const c of comments) {
+    const wordCount = c.word_count || String(c.comment_text || "").split(/\s+/).length;
+    const { score } = computeClaimDensity(c.comment_text, wordCount, !!c.is_seller);
+    const passes = passesClaimFilter(score, wordCount, !!c.is_seller);
+    if (passes) passedFilter++;
+
+    rows.push({
+      comment_id: c.id,
+      vehicle_id: c.vehicle_id,
+      claim_density_score: Math.round(score * 100) / 100,
+      llm_processed: false,
+    });
+  }
+
+  // Batch insert to comment_claims_progress (chunks of 500)
+  let inserted = 0;
+  for (let i = 0; i < rows.length; i += 500) {
+    const chunk = rows.slice(i, i + 500);
+    const { error: insertErr } = await supabase
+      .from("comment_claims_progress")
+      .upsert(chunk, { onConflict: "comment_id", ignoreDuplicates: true });
+    if (insertErr) {
+      console.error(`[claim_triage] Insert error batch ${i}:`, insertErr.message);
+    } else {
+      inserted += chunk.length;
+    }
+  }
+
+  // Estimate remaining (use count of triaged vs total for this vehicle, or just report inserted)
+  let remaining = -1; // -1 = unknown (full count too expensive for 11M rows)
+  if (vehicleId) {
+    const { count: totalCount } = await supabase
+      .from("auction_comments")
+      .select("id", { count: "exact", head: true })
+      .eq("vehicle_id", vehicleId)
+      .not("comment_text", "is", null);
+    const { count: triagedCount } = await supabase
+      .from("comment_claims_progress")
+      .select("id", { count: "exact", head: true })
+      .eq("vehicle_id", vehicleId);
+    remaining = Math.max(0, (totalCount ?? 0) - (triagedCount ?? 0));
+  }
+
+  // Self-chain if continuing and more to process
+  if (shouldContinue && remaining > 0 && inserted > 0 && (Date.now() - startTime) < 50000) {
+    fetch(`${supabaseUrl}/functions/v1/analyze-comments-fast`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        mode: "claim_triage",
+        batch_size: batchSize,
+        vehicle_id: vehicleId,
+        continue: true,
+        _batch_num: batchNum + 1,
+      }),
+    }).catch(e => console.error("[claim_triage] Chain failed:", e));
+  }
+
+  return {
+    batch_num: batchNum,
+    triaged: inserted,
+    passed_filter: passedFilter,
+    pass_rate: comments.length > 0 ? Math.round((passedFilter / comments.length) * 100) : 0,
+    remaining,
+    continued: shouldContinue && remaining > 0 && inserted > 0,
+    elapsed_ms: Date.now() - startTime,
   };
 }
 

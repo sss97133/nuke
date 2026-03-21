@@ -5,11 +5,10 @@
  * virtualized rendering, and atomic cards.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useFeedSearchParams } from '../hooks/useFeedSearchParams';
 import { useFeedQuery } from '../hooks/useFeedQuery';
 import { useFeedScrollRestore } from '../hooks/useFeedScrollRestore';
-import { useAppLayoutContext } from '../../components/layout/AppLayoutContext';
 import { AuctionClockProvider } from './AuctionClockProvider';
 import { FeedStatsStrip } from './FeedStatsStrip';
 import { FeedToolbar } from './FeedToolbar';
@@ -89,23 +88,6 @@ export default function FeedPage() {
     [stats, vehicles.length],
   );
 
-  // Inject stats strip into the header toolbar slot
-  const { setToolbarSlot } = useAppLayoutContext();
-  useEffect(() => {
-    setToolbarSlot(
-      <FeedStatsStrip
-        stats={stats}
-        isLoading={feedQuery.isLoading}
-        searchText={searchText}
-        onSearchChange={setSearchText}
-        resultCount={vehicles.length}
-        hasActiveFilters={hasActiveFilters}
-        onResetFilters={resetAll}
-      />
-    );
-    return () => setToolbarSlot(null);
-  }, [stats, feedQuery.isLoading, searchText, setSearchText, vehicles.length, hasActiveFilters, resetAll, setToolbarSlot]);
-
   // CSS custom property for font size control
   const feedStyle = useMemo(() => ({
     '--feed-font-size': `${fontSize}px`,
@@ -120,6 +102,17 @@ export default function FeedPage() {
   return (
     <AuctionClockProvider>
       <div className="fullscreen-content" style={feedStyle}>
+        {/* Stats strip — inline in content area */}
+        <FeedStatsStrip
+          stats={stats}
+          isLoading={feedQuery.isLoading}
+          searchText={searchText}
+          onSearchChange={setSearchText}
+          resultCount={vehicles.length}
+          hasActiveFilters={hasActiveFilters}
+          onResetFilters={resetAll}
+        />
+
         {/* Toolbar — full width */}
         <FeedToolbar
           sort={sortBy}

@@ -36,6 +36,7 @@
     "extract:validate": "node scripts/validate-extractions.mjs",
     "extract:bridge": "node scripts/bridge-extractions-to-field-evidence.mjs",
     "taxonomy:normalize-case": "tsx scripts/normalize-models.ts",
+    "backfill:fb-images": "node scripts/backfill-fb-images.mjs",
     "backfill:fb-saved-observations": "node scripts/backfill-fb-saved-observations.mjs",
     "backfill:make-model": "tsx scripts/backfill-make-model-from-urls.ts",
     "backfill:make-model-firecrawl": "tsx scripts/backfill-make-model-from-firecrawl.ts",

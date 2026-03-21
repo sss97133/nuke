@@ -795,6 +795,59 @@ Deno.serve(async (req) => {
       })());
     }
 
+    // --- DEEP SEARCH (comments, descriptions, evidence via vehicle_search_index) ---
+    if (allowedTypes.includes('vehicle') && queryType === 'text') {
+      searches.push((async () => {
+        try {
+          const { data: deepResults, error: deepErr } = await supabase.rpc('search_vehicles_deep', {
+            p_query: trimmedQuery,
+            p_limit: 20,
+            p_offset: 0,
+          });
+          if (deepErr || !deepResults?.length) return;
+
+          for (const d of deepResults) {
+            if (isNonAutomobile(d)) continue;
+            // Only add if not already in results (the main vehicle search may have found it too)
+            if (results.some(r => r.id === d.vehicle_id)) {
+              // If already present, enrich with match_source info
+              const existing = results.find(r => r.id === d.vehicle_id);
+              if (existing && d.match_source && d.match_source !== 'vehicle') {
+                existing.metadata = existing.metadata || {};
+                existing.metadata.deep_match_source = d.match_source;
+                existing.metadata.deep_snippet = d.snippet;
+                // Boost score slightly for multi-source match
+                existing.relevance_score = Math.min(existing.relevance_score + 0.1, 1.5);
+              }
+              continue;
+            }
+
+            const price = d.sale_price;
+            results.push({
+              id: d.vehicle_id,
+              type: 'vehicle',
+              title: `${d.year || ''} ${d.make || ''} ${d.model || ''}`.trim() || 'Vehicle',
+              subtitle: price ? `$${Number(price).toLocaleString()}` : d.vin ? `VIN: ${d.vin.slice(-6)}` : undefined,
+              image_url: d.primary_image_url,
+              relevance_score: Math.max(d.relevance || 0.6, 0.6),
+              metadata: {
+                year: d.year,
+                make: d.make,
+                model: d.model,
+                vin: d.vin,
+                sale_price: price ? Number(price) : null,
+                primary_image_url: d.primary_image_url,
+                deep_match_source: d.match_source,
+                deep_snippet: d.snippet,
+              },
+            });
+          }
+        } catch (e) {
+          console.error('Deep search failed (non-fatal):', e);
+        }
+      })());
+    }
+
     // Wait for all searches - use allSettled so one failure doesn't kill others
     const settled = await Promise.allSettled(searches);
     for (const r of settled) {

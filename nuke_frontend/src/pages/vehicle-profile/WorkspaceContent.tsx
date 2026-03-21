@@ -15,7 +15,7 @@ const VehiclePricingValueCard = React.lazy(() => import('../../components/vehicl
 const ExternalListingCard = React.lazy(() => import('../../components/vehicle/ExternalListingCard'));
 const VehicleReferenceLibrary = React.lazy(() => import('../../components/vehicle/VehicleReferenceLibrary'));
 const VehicleDescriptionCard = React.lazy(() => import('../../components/vehicle/VehicleDescriptionCard'));
-const VehicleCommentsSection = React.lazy(() => import('./VehicleCommentsSection'));
+const VehicleCommentsCard = React.lazy(() => import('../../components/vehicle/VehicleCommentsCard').then(m => ({ default: m.VehicleCommentsCard })));
 const BundleReviewQueue = React.lazy(() => import('../../components/images/BundleReviewQueue'));
 const ImageGallery = React.lazy(() => import('../../components/images/ImageGallery'));
 const VehicleVideoSection = React.lazy(() => import('../../components/vehicle/VehicleVideoSection'));
@@ -306,7 +306,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
               badge={<span className="widget__count">{totalCommentCount}</span>}
             >
               <React.Suspense fallback={null}>
-                <VehicleCommentsSection vehicleId={vehicle.id} />
+                <VehicleCommentsCard vehicleId={vehicle.id} session={session} collapsed={false} />
               </React.Suspense>
             </CollapsibleWidget>
           )}

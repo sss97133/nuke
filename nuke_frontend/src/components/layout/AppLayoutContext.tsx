@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
-import type { ReactNode, ReactElement } from 'react';
+import type { ReactNode } from 'react';
 
 export type VehicleTab = {
   vehicleId: string;
@@ -13,9 +13,6 @@ interface AppLayoutContextValue {
   openVehicleTab: (tab: VehicleTab) => void;
   closeVehicleTab: (vehicleId: string) => void;
   setActiveVehicleTab: (vehicleId?: string) => void;
-  /** Contextual toolbar rendered inside the header-wrapper (sticky, auto-measured). */
-  toolbarSlot: ReactElement | null;
-  setToolbarSlot: (content: ReactElement | null) => void;
   /** Stack of recently closed tabs (for reopen-last-closed) */
   reopenLastClosedTab: () => VehicleTab | undefined;
 }
@@ -27,15 +24,12 @@ const AppLayoutContext = createContext<AppLayoutContextValue>({
   openVehicleTab: () => undefined,
   closeVehicleTab: () => undefined,
   setActiveVehicleTab: () => undefined,
-  toolbarSlot: null,
-  setToolbarSlot: () => {},
   reopenLastClosedTab: () => undefined,
 });
 
 export const AppLayoutProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [vehicleTabs, setVehicleTabs] = useState<VehicleTab[]>([]);
   const [activeVehicleId, setActiveVehicleId] = useState<string | undefined>(undefined);
-  const [toolbarSlot, setToolbarSlot] = useState<ReactElement | null>(null);
   const closedTabStackRef = useRef<VehicleTab[]>([]);
 
   const openVehicleTab = useCallback((tab: VehicleTab) => {
@@ -88,11 +82,9 @@ export const AppLayoutProvider: React.FC<{ children: ReactNode }> = ({ children 
       openVehicleTab,
       closeVehicleTab,
       setActiveVehicleTab,
-      toolbarSlot,
-      setToolbarSlot,
       reopenLastClosedTab,
     };
-  }, [vehicleTabs, activeVehicleId, openVehicleTab, closeVehicleTab, setActiveVehicleTab, toolbarSlot, reopenLastClosedTab]);
+  }, [vehicleTabs, activeVehicleId, openVehicleTab, closeVehicleTab, setActiveVehicleTab, reopenLastClosedTab]);
 
   return (
     <AppLayoutContext.Provider value={value}>
