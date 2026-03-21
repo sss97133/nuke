@@ -2,6 +2,17 @@
 
 ## 2026-03-21
 
+### [data-quality] Autonomous Data Quality & Pipeline Session
+- **Mecum URL normalizer fixed**: `mecum:lots/303124/slug` → `mecum:303124` (lot number only). False-positive dup groups dropped from 551 → 48.
+- **RM Sotheby's URL normalizer fixed**: Now includes auction event code. `rmsothebys:r0019-slug` → `rmsothebys:pa25:r0019-slug`. Prevents cross-event collisions.
+- **SQL `normalize_listing_url()` function updated**: Matches TS changes. Applied via migration `20260321190001`.
+- **3 edge functions deployed**: `ingest-observation`, `dedup-vehicles`, `extract-jamesedition` — all carry updated URL normalization.
+- **Hero fingerprints scaled**: Concurrency 20→50, batch 500→2000. 50K batch launched in background (PID 43633).
+- **FB Marketplace → Vehicle pipeline**: `scripts/fb-marketplace-to-vehicles.mjs` built. 192 listings linked (124 new vehicles + 68 existing matches), 299 empty stubs marked reviewed, 0 errors.
+- **Ghost record triage**: 8,084 zero-data ghosts archived (no URL/images/VIN/year). 89.6K image-bearing ghosts identified as fingerprint priority targets.
+- **Weekly dedup cron**: `scripts/scheduled/weekly-dedup-sweep.sh` created. Runs normalized URL dedup + VIN duplicate detection. Target: Sunday 3am.
+- **New npm scripts**: `fb:link-vehicles`, `dedup:weekly`
+
 ### [search] Complete Search Rebuild — Frontend + Backend Deep Search
 - **Search page rewritten**: 1,293 lines → 75 lines. Removed duplicate search bar, VIN lookup button, "Barn find"/"Manual transmission" pills, GPT-4o answer box, inline haversine, vibe detection, workstation quick-links
 - **New files**: `useSearchPage.ts` (hook), `useSearchEmptyState.ts` (hook), `SearchFilterPanel.tsx`, `SearchStatsBar.tsx`, `SearchEmptyState.tsx`
@@ -4647,3 +4658,18 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - **Stale auction events cleaned**: 7,353 → 2,030 truly active events across 12 platforms. Batch-updated 5,323 stale events (ended_at in past or platform stopped syncing).
 - **sync-live-auctions cron fixed**: Job 109 updated from `skip_vehicle_sync: true` → `false`. Now creates/links vehicle records during discovery. Runs every 15 min.
 - **BaT pipeline confirmed live**: 177 active BaT events, latest update 18 min ago. sync-bat-listing, sync-live-auctions, score-live-auctions all running on cron.
+
+### [auction-pipeline] Live Auction Sync — Full Overhaul
+- **Root cause found**: `sync-live-auctions` ran with `skip_vehicle_sync: true` → vehicles table never updated with live auction data. Only vehicle_events got bid snapshots.
+- **BaT has 931 live auctions** (scraped from `auctionsCurrentInitialData`) — we had 47 in vehicle_events. Now 5,769 truly live in vehicles table.
+- **Timeout fixed**: Rewrote `syncToDatabase()` to use upsert instead of lookup+update. BaT sync dropped from 55s+ timeout to **3.4 seconds**.
+  - Old: 5 URL-lookup queries (200 each) + 931 individual UPDATE calls → timeout
+  - New: 10 upsert batches of 100 → 3.4s total
+- **Cron split**: Single cron replaced with per-platform crons:
+  - Job 109: BaT every 15 min at :00 (vehicle sync enabled)
+  - Job 422: Collecting Cars every 30 min at :07/:37
+  - Job 423: Cars & Bids every 30 min at :22/:52
+- **Stale vehicles cleaned**: 1,559 ended BaT + 177 C&B + 153 CC vehicles marked `sale_status='ended'`
+- **Collecting Cars**: Re-synced, 148 live auctions in DB
+- **Barrett-Jackson**: extract-barrett-jackson returning 400 on every call — needs investigation
+- Function redeployed: `supabase functions deploy sync-live-auctions --no-verify-jwt`

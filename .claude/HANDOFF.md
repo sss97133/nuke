@@ -1,6 +1,30 @@
 # Session Handoff — 2026-03-21
 
-## CURRENT SESSION: Unified Multi-LLM Integration
+## LATEST: Search Rebuild (complete + running background jobs)
+
+### What was done
+- Search page rewritten (1,293 → 75 lines) — single search bar, data-driven facets, browse stats, match snippets
+- `vehicle_search_index` table: 556K rows, weighted tsvector (vehicle/description/comment/evidence), GIN indexed
+- `search_vehicles_deep` RPC: multi-source FTS with field boosting, `ts_headline` snippets, source attribution
+- `search_vehicles_fuzzy` RPC: trigram fallback for typos ("camero" → Camaro)
+- `universal-search` edge function: updated with deep + fuzzy search, deployed
+- Comment aggregation: ~28K vehicles with comments indexed, script still running in background
+- Quality audit: 12 queries tested, ranking fixed, fuzzy working
+- Full details in `DONE.md` under "2026-03-21 [search]"
+
+### Still running
+- `scripts/populate-search-comments.sh` — batching comments into vehicle_search_index. Check progress: `SELECT count(*) FILTER (WHERE comment_text != '') FROM vehicle_search_index;`
+
+### Next steps for search
+1. VACUUM vehicle_search_index (1.4 GB → ~500 MB expected)
+2. Automotive synonym thesaurus (Chevy=Chevrolet, Vette=Corvette)
+3. Index field_evidence into evidence_text column
+4. Cron job to keep index fresh
+5. Deploy frontend to Vercel (git push)
+
+---
+
+## PREVIOUS: Unified Multi-LLM Integration
 
 ### What's happening
 Building unified LLM router (`_shared/llmRouter.ts`) per approved plan at `.claude/plans/mossy-exploring-wall.md`.
@@ -1573,6 +1597,704 @@ nuke_frontend/src/components/settings/AppearanceSpecimen.tsx
 nuke_frontend/src/components/vehicle/VehicleCommentsCard.tsx
 nuke_frontend/src/feed/components/FeedPage.tsx
 nuke_frontend/src/pages/HomePage.tsx
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:04:01
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+90d5c7f9c docs: PAPER — Enrichment Rules (ground truth for making data better)
+c13e5feba feat: overnight enrichment script — tested, 43/50 vehicles enriched at $0
+2d1d80eb0 docs(library): dynamic trust model — trust earned through track record
+
+## Uncommitted Changes
+none
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:05:27
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+90d5c7f9c docs: PAPER — Enrichment Rules (ground truth for making data better)
+c13e5feba feat: overnight enrichment script — tested, 43/50 vehicles enriched at $0
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+DONE.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:05:58
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+90d5c7f9c docs: PAPER — Enrichment Rules (ground truth for making data better)
+c13e5feba feat: overnight enrichment script — tested, 43/50 vehicles enriched at $0
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+DONE.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:08:39
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+90d5c7f9c docs: PAPER — Enrichment Rules (ground truth for making data better)
+c13e5feba feat: overnight enrichment script — tested, 43/50 vehicles enriched at $0
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+DONE.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:09:16
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+90d5c7f9c docs: PAPER — Enrichment Rules (ground truth for making data better)
+c13e5feba feat: overnight enrichment script — tested, 43/50 vehicles enriched at $0
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+DONE.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Session Handoff — 2026-03-21 12:10:27
+*(Written explicitly by agent — high-quality context for next session)*
+
+## What Was Happening
+LONG SESSION — Description pipeline overhaul. Handing off to autonomous work phase.
+
+COMPLETED (this session, ~5 hours):
+1. modal_description_discovery.py — standalone Modal batch extraction (tested, committed)
+2. Fixed paginated fetch for large batches
+3. Discovered transformers.generate() is 10x too expensive vs vLLM (.70/1K vs .20/1K)
+4. promote-discoveries-to-observations.mjs — digests JSON blobs into observations (81K+ obs created)
+5. 4 library docs: GPU infrastructure ch.9, extraction quality study, GPU costs almanac, field note
+6. P00: Fixed import_queue status CHECK constraint
+7. P01: Backfilled 81K observations with audit trail columns
+8. TEMPORAL DECAY: 4 SQL functions implementing half-life paper (observation_relevance, observation_half_life_days, observation_effective_weight, observation_freshness)
+9. vehicle_current_state view — weighted composite from spec observations (16,193 vehicles)
+10. Multi-model corroboration script — 721 agreements, 483 contradictions across 594 vehicles
+11. Library injection into extraction prompts — reference data (RPO codes, paint codes, known issues) injected per make/year
+12. v3 testimony-grade extraction prompt — structured claims with quotes, confidence, reference_validation
+13. observer_trust_scores table — 63 observers (7 AI models, 56 platforms) with dynamic trust function
+14. Dynamic trust model paper in library
+15. Engineering Manual Ch.10 — Testimony Fields (concrete spec: 1 claim = 7 supporting fields)
+
+CURRENTLY RUNNING:
+- v2 extraction stream: PID running via modal vLLM, ~230 extractions/hour
+  Log: /tmp/modal-desc-v2-extraction.log
+  vLLM server: https://sss97133--nuke-vllm-serve.modal.run
+
+DB STATE:
+- 15,192 description_discoveries (14,386 promoted, 5 pending, 685 parse_failed)
+- 83,197 AI observations in vehicle_observations
+- 1,765,309 total observations
+- 16,193 vehicles with computed current state
+- 63 observer trust scores tracked
+
+NEXT STEPS (autonomous work):
+1. Run promote + corroboration periodically as extractions accumulate
+2. Populate observer trust from corroboration data (category-level accuracy)
+3. Expand reference library (mine more RPO codes, paint codes from comments)
+4. Test v3 prompt at scale (currently only 2 vehicles tested)
+5. Consider wiring vehicle profile to consume vehicle_current_state view
+
+PLAN FILE: ~/.claude/plans/snazzy-squishing-coral.md
+
+KEY USER INSIGHTS CAPTURED:
+- 'Nuke Estimate' terminology is wrong — value is a topology/surface, not a single number
+- Trust is earned through track record, not assigned — the hermit who is always right outranks the credentialed expert who gets things wrong
+- Every field requires 7 supporting fields to be epistemically valid
+- The library IS the spec — always check alignment before building
+
+## Branch
+main
+
+## Recent Commits (last 3h)
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+90d5c7f9c docs: PAPER — Enrichment Rules (ground truth for making data better)
+c13e5feba feat: overnight enrichment script — tested, 43/50 vehicles enriched at $0
+2d1d80eb0 docs(library): dynamic trust model — trust earned through track record
+fcb2de3eb feat: v3 testimony-grade extraction prompt + testimony fields documentation
+c6ee4e2f7 docs: update DONE.md with browser inspection findings
+4aa797fcc fix: auctions page — always load recently ended, log errors
+c2b1cb7c7 fix: filter junk images (dealer logos, favicons, tracking pixels)
+f54391104 feat: multi-model corroboration + library-injected extraction prompts
+9ad485974 feat: wire llmRouter into pipeline — migrate core edge functions
+
+## Uncommitted Changes (not yet committed)
+.claude/HANDOFF.md
+DONE.md
+
+## Staged
+none
+
+## Pickup Instructions
+1. Read PROJECT_STATE.md for sprint context
+2. Read above "What Was Happening" section
+3. Check git log if more detail needed: `git log --oneline -10`
+4. Register in .claude/ACTIVE_AGENTS.md before starting
+
+---
+# Auto-Checkpoint — 2026-03-21 12:11:25
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+90d5c7f9c docs: PAPER — Enrichment Rules (ground truth for making data better)
+c13e5feba feat: overnight enrichment script — tested, 43/50 vehicles enriched at $0
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:15:34
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+90d5c7f9c docs: PAPER — Enrichment Rules (ground truth for making data better)
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/overnight-enrichment.mjs
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:22:27
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+90d5c7f9c docs: PAPER — Enrichment Rules (ground truth for making data better)
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/overnight-enrichment.mjs
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:24:50
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+90d5c7f9c docs: PAPER — Enrichment Rules (ground truth for making data better)
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/overnight-enrichment.mjs
+supabase/functions/ingest-observation/index.ts
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:28:03
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+docs/architecture/ENTITY_RESOLUTION_RULES.md
+scripts/overnight-enrichment.mjs
+supabase/functions/_shared/urlNormalization.ts
+supabase/functions/dedup-vehicles/index.ts
+supabase/functions/extract-jamesedition/index.ts
+supabase/functions/ingest-observation/index.ts
+supabase/functions/universal-search/index.ts
+supabase/migrations/20260321190000_add_normalize_listing_url_function.sql
+
+## Staged
+DONE.md
+docs/architecture/ENTITY_RESOLUTION_RULES.md
+supabase/functions/_shared/urlNormalization.ts
+supabase/functions/ingest-observation/index.ts
+supabase/migrations/20260321190000_add_normalize_listing_url_function.sql
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:29:54
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+01b9cdc29 feat: entity resolution rules + URL normalization + data quality cleanup
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+scripts/overnight-enrichment.mjs
+supabase/functions/dedup-vehicles/index.ts
+supabase/functions/extract-jamesedition/index.ts
+supabase/functions/ingest-observation/index.ts
+supabase/functions/sync-live-auctions/index.ts
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Session Handoff — 2026-03-21 12:30:23
+*(Written explicitly by agent — high-quality context for next session)*
+
+## What Was Happening
+ENTITY RESOLUTION + DATA QUALITY SESSION. COMPLETED: (1) Wrote canonical ENTITY_RESOLUTION_RULES.md - vehicle is the entity, URLs are testimony, observations have temporal provenance. (2) Built URL normalization for 12 platforms (_shared/urlNormalization.ts + SQL function). (3) Wired into ingest-observation entity resolution. (4) Cleaned 31,500 records: 25K ECR ghosts archived, 1,462 URL dupes merged, 5K skeletons archived, 16 AI-verified VIN merges. (5) Built merge_proposals table + AI verification workflow. (6) Registered 5 social media observation sources. IN PROGRESS: 3 background agents (URL normalization improvements, hero fingerprint table, large-scale duplicate diagnostics across luxury makes). NEXT: check agent results, deploy ingest-observation, run hero fingerprint computation on 260K vehicles, build cross-vehicle image matching, create Facebook observation pipeline.
+
+## Branch
+main
+
+## Recent Commits (last 3h)
+01b9cdc29 feat: entity resolution rules + URL normalization + data quality cleanup
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+90d5c7f9c docs: PAPER — Enrichment Rules (ground truth for making data better)
+c13e5feba feat: overnight enrichment script — tested, 43/50 vehicles enriched at $0
+2d1d80eb0 docs(library): dynamic trust model — trust earned through track record
+fcb2de3eb feat: v3 testimony-grade extraction prompt + testimony fields documentation
+c6ee4e2f7 docs: update DONE.md with browser inspection findings
+4aa797fcc fix: auctions page — always load recently ended, log errors
+c2b1cb7c7 fix: filter junk images (dealer logos, favicons, tracking pixels)
+f54391104 feat: multi-model corroboration + library-injected extraction prompts
+9ad485974 feat: wire llmRouter into pipeline — migrate core edge functions
+
+## Uncommitted Changes (not yet committed)
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+scripts/overnight-enrichment.mjs
+supabase/functions/dedup-vehicles/index.ts
+supabase/functions/extract-jamesedition/index.ts
+supabase/functions/ingest-observation/index.ts
+supabase/functions/sync-live-auctions/index.ts
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## Pickup Instructions
+1. Read PROJECT_STATE.md for sprint context
+2. Read above "What Was Happening" section
+3. Check git log if more detail needed: `git log --oneline -10`
+4. Register in .claude/ACTIVE_AGENTS.md before starting
+
+---
+# Auto-Checkpoint — 2026-03-21 12:33:15
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+01b9cdc29 feat: entity resolution rules + URL normalization + data quality cleanup
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+package.json
+scripts/overnight-enrichment.mjs
+supabase/functions/dedup-vehicles/index.ts
+supabase/functions/extract-jamesedition/index.ts
+supabase/functions/ingest-observation/index.ts
+supabase/functions/sync-live-auctions/index.ts
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:34:43
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+01b9cdc29 feat: entity resolution rules + URL normalization + data quality cleanup
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+package.json
+scripts/overnight-enrichment.mjs
+supabase/functions/dedup-vehicles/index.ts
+supabase/functions/extract-jamesedition/index.ts
+supabase/functions/ingest-observation/index.ts
+supabase/functions/sync-live-auctions/index.ts
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:38:23
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+c83398068 feat: enrichment working at 11/min + library expansion
+01b9cdc29 feat: entity resolution rules + URL normalization + data quality cleanup
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+package.json
+supabase/functions/dedup-vehicles/index.ts
+supabase/functions/extract-jamesedition/index.ts
+supabase/functions/ingest-observation/index.ts
+supabase/functions/sync-live-auctions/index.ts
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Session Handoff — 2026-03-21 12:41:34
+*(Written explicitly by agent — high-quality context for next session)*
+
+## What Was Happening
+ENTITY RESOLUTION + DATA QUALITY — COMPLETE SESSION. Built: (1) ENTITY_RESOLUTION_RULES.md canonical doc, (2) URL normalization for 12 platforms (TS shared module + SQL function + wired into ingest-observation + extract-jamesedition + dedup-vehicles), (3) VIN normalization with fake VIN rejection, (4) merge_proposals table with AI verification workflow, (5) vehicle_hero_fingerprints table + dHash index + compute script + cross-vehicle finder script, (6) 5 new social media observation sources registered. Cleaned: 31,500+ records (25K ECR ghosts, 1,462 URL dupes, 189 normalized URL dupes, 16 VIN merges, 5K skeletons). Running: hero fingerprint computation (10K batch, PID in background). Data quality report at .claude/DATA_QUALITY_REPORT.md shows 26,755 ghost records across luxury makes need image-based resolution. Normalizer bugs found: Mecum/RM lot ID collisions need year+platform scoping. NEXT: (1) deploy ingest-observation + dedup-vehicles + extract-jamesedition, (2) scale hero fingerprints to 260K vehicles, (3) run cross-vehicle image matching at scale, (4) fix Mecum/RM normalizer false positives, (5) build Facebook observation pipeline.
+
+## Branch
+main
+
+## Recent Commits (last 3h)
+56ab6fff1 feat: cross-vehicle image fingerprinting + normalized URL dedup + data quality report
+c83398068 feat: enrichment working at 11/min + library expansion
+01b9cdc29 feat: entity resolution rules + URL normalization + data quality cleanup
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+90d5c7f9c docs: PAPER — Enrichment Rules (ground truth for making data better)
+c13e5feba feat: overnight enrichment script — tested, 43/50 vehicles enriched at $0
+2d1d80eb0 docs(library): dynamic trust model — trust earned through track record
+fcb2de3eb feat: v3 testimony-grade extraction prompt + testimony fields documentation
+c6ee4e2f7 docs: update DONE.md with browser inspection findings
+4aa797fcc fix: auctions page — always load recently ended, log errors
+c2b1cb7c7 fix: filter junk images (dealer logos, favicons, tracking pixels)
+f54391104 feat: multi-model corroboration + library-injected extraction prompts
+9ad485974 feat: wire llmRouter into pipeline — migrate core edge functions
+
+## Uncommitted Changes (not yet committed)
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+supabase/functions/sync-live-auctions/index.ts
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## Pickup Instructions
+1. Read PROJECT_STATE.md for sprint context
+2. Read above "What Was Happening" section
+3. Check git log if more detail needed: `git log --oneline -10`
+4. Register in .claude/ACTIVE_AGENTS.md before starting
+
+---
+# Auto-Checkpoint — 2026-03-21 12:42:53
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+56ab6fff1 feat: cross-vehicle image fingerprinting + normalized URL dedup + data quality report
+c83398068 feat: enrichment working at 11/min + library expansion
+01b9cdc29 feat: entity resolution rules + URL normalization + data quality cleanup
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+supabase/functions/sync-live-auctions/index.ts
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:43:26
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+56ab6fff1 feat: cross-vehicle image fingerprinting + normalized URL dedup + data quality report
+c83398068 feat: enrichment working at 11/min + library expansion
+01b9cdc29 feat: entity resolution rules + URL normalization + data quality cleanup
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+supabase/functions/sync-live-auctions/index.ts
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:44:03
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+56ab6fff1 feat: cross-vehicle image fingerprinting + normalized URL dedup + data quality report
+c83398068 feat: enrichment working at 11/min + library expansion
+01b9cdc29 feat: entity resolution rules + URL normalization + data quality cleanup
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+supabase/functions/sync-live-auctions/index.ts
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:45:21
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+56ab6fff1 feat: cross-vehicle image fingerprinting + normalized URL dedup + data quality report
+c83398068 feat: enrichment working at 11/min + library expansion
+01b9cdc29 feat: entity resolution rules + URL normalization + data quality cleanup
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+supabase/functions/sync-live-auctions/index.ts
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-21 12:47:24
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+56ab6fff1 feat: cross-vehicle image fingerprinting + normalized URL dedup + data quality report
+c83398068 feat: enrichment working at 11/min + library expansion
+01b9cdc29 feat: entity resolution rules + URL normalization + data quality cleanup
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+supabase/functions/sync-live-auctions/index.ts
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Session Handoff — 2026-03-21 12:59:28
+*(Written explicitly by agent — high-quality context for next session)*
+
+## What Was Happening
+Comment Refinery running live at $0 via local Ollama. COMPLETED THIS SESSION: (1) Wired xAI Grok-3-Mini as cheap cloud fallback ($0.001/vehicle). (2) Built local extraction script scripts/refinery-extract-claims.mjs — runs against Ollama directly, no tunnel needed. (3) Built batch triage script scripts/refinery-triage-batch.mjs — uses vehicle_events for fast candidate selection. (4) Fixed JSONB double-encoding in field_evidence writes. (5) Fixed temporal_anchor NaN. (6) Added Category C claim routing via ingest-observation. CURRENTLY RUNNING: Background process triaging+extracting top 50 vehicles (22,228 comments triaged, 1,283 passed filter, extraction in progress via qwen2.5:7b). Check task bwziesj4b. KNOWN ISSUES: (1) ingest-observation returns non-2xx for Category C claims — likely missing required field. Fix the edge function or skip C claims for now. (2) Cloudflare tunnel to Ollama gets 403 (OLLAMA_ORIGINS not set in macOS app). Not needed since local script works. NEXT: (1) Fix ingest-observation for C claims. (2) Run triage+extract on remaining vehicles (--max-vehicles 500). (3) Build corroboration sweep. (4) Build gap detection widget. (5) Consider pulling qwen3:30b model for better extraction quality.
+
+## Branch
+main
+
+## Recent Commits (last 3h)
+56ab6fff1 feat: cross-vehicle image fingerprinting + normalized URL dedup + data quality report
+c83398068 feat: enrichment working at 11/min + library expansion
+01b9cdc29 feat: entity resolution rules + URL normalization + data quality cleanup
+c75dab80d feat: observer trust scores table + library docs + session artifacts
+90d5c7f9c docs: PAPER — Enrichment Rules (ground truth for making data better)
+c13e5feba feat: overnight enrichment script — tested, 43/50 vehicles enriched at $0
+2d1d80eb0 docs(library): dynamic trust model — trust earned through track record
+fcb2de3eb feat: v3 testimony-grade extraction prompt + testimony fields documentation
+c6ee4e2f7 docs: update DONE.md with browser inspection findings
+4aa797fcc fix: auctions page — always load recently ended, log errors
+c2b1cb7c7 fix: filter junk images (dealer logos, favicons, tracking pixels)
+f54391104 feat: multi-model corroboration + library-injected extraction prompts
+
+## Uncommitted Changes (not yet committed)
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/compute-hero-fingerprints.mjs
+supabase/functions/_shared/urlNormalization.ts
+supabase/functions/sync-live-auctions/index.ts
+supabase/functions/universal-search/index.ts
+
+## Staged
+none
+
+## Pickup Instructions
+1. Read PROJECT_STATE.md for sprint context
+2. Read above "What Was Happening" section
+3. Check git log if more detail needed: `git log --oneline -10`
+4. Register in .claude/ACTIVE_AGENTS.md before starting
+
+---
+# Auto-Checkpoint — 2026-03-21 12:59:48
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+56ab6fff1 feat: cross-vehicle image fingerprinting + normalized URL dedup + data quality report
+c83398068 feat: enrichment working at 11/min + library expansion
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/compute-hero-fingerprints.mjs
+supabase/functions/_shared/urlNormalization.ts
+supabase/functions/sync-live-auctions/index.ts
+supabase/functions/universal-search/index.ts
 
 ## Staged
 none
