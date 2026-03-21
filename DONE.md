@@ -2,6 +2,21 @@
 
 ## 2026-03-21
 
+### [frontend] Browser Inspection + Fixes from Live Site
+- **OPEN PROFILE → button fix**: was missing from expanded cards (expandedContent || fallback logic bug)
+- **Auctions recently-ended**: always loads independently now (was gated on results.length === 0)
+- **Data discovery**: `feed_rank_score` and `deal_score_label` don't exist on vehicles table — only computed by feed-query edge function. Search page sections querying these columns got zero results.
+- **Deployed to production** via git push
+
+### [schema/frontend] Comment System Unification — Phases 0-2
+- **Root cause:** Vehicle profile "Comments & Bids" widget was hidden because count query checked `vehicle_comments` (26 rows) instead of `auction_comments` (11.55M rows)
+- **Created `user_comments` table:** Consolidates `vehicle_comments` (26), `vehicle_image_comments` (5), `timeline_event_comments` (1) into single polymorphic table with `target_type` + `target_id`. RLS policies mirroring old tables.
+- **Created `vehicle_comments_unified` VIEW:** UNION ALL across `auction_comments` (11.55M) + `user_comments` (30) + `vehicle_observations` where kind IN (comment, bid) (605K, deduped against auction_comments via NOT EXISTS). LEFT JOIN for null source_ids. Per-vehicle count query: 1.6ms.
+- **Added partial index:** `idx_observations_vehicle_comment_bid` on vehicle_observations(vehicle_id, observed_at DESC) WHERE kind IN (comment, bid) — dropped observation arm from 284ms to 2.7ms.
+- **Frontend:** `VehicleProfileContext.tsx` now counts from unified VIEW. `VehicleCommentsCard.tsx` reads from single VIEW query (was 3 parallel table fetches). Realtime subs reduced from 3 to 2 (auction_comments + user_comments). Write path: post/edit now targets `user_comments`.
+- **Extraction:** Removed `bat_comments` upsert from `extract-auction-comments` edge function. `auction_comments` is now sole write target.
+- **Deferred:** `CommentService.ts` (timeline event comments) — has richer per-event fields (image_id, work_order_id, context_type) needing schema consideration. `profileStatsService.ts` — queries bat_comments with JOINs to bat_listings, needs separate refactor.
+
 ### [frontend] Click-to-Expand Cards + Zero Dead Ends (Phases 3-5)
 - CardShell: single click expands card in-place instead of navigating away
 - Expanded view shows BadgePortals for every vehicle dimension (year, make, model, body, trans, deal, source)
