@@ -87,111 +87,152 @@ export function MiniDistribution({ bins, width = 80, height = 20 }: {
   );
 }
 
-const BAR_HEIGHT = 120;
+/**
+ * Market depth tiers — groups log-scale histogram bins into meaningful
+ * price segments that tell you the composition of the market at a glance.
+ *
+ * Each tier is clickable → navigates to search filtered by that price range.
+ */
 
-/** Full distribution chart — pure HTML, hover-interactive, click-through */
+interface MarketTier {
+  label: string;
+  min: number;
+  max: number;
+  count: number;
+}
+
+function aggregateTiers(bins: HistogramBin[]): MarketTier[] {
+  // Materialize all 17 buckets (0 = <$1K, 1-15 log-spaced, 16 = >$15M)
+  const filled = new Array(NUM_BUCKETS + 2).fill(0);
+  for (const { b, n } of bins) filled[Math.max(0, Math.min(b, NUM_BUCKETS + 1))] = n;
+
+  // Map each bucket to its price bounds, then sum into tiers
+  const tierDefs = [
+    { label: 'ENTRY',     min: 0,         max: 10_000 },
+    { label: 'CORE',      min: 10_000,    max: 50_000 },
+    { label: 'COLLECTOR', min: 50_000,    max: 250_000 },
+    { label: 'PREMIUM',   min: 250_000,   max: 1_000_000 },
+    { label: 'TROPHY',    min: 1_000_000, max: Infinity },
+  ];
+
+  return tierDefs.map(td => {
+    let count = 0;
+    for (let i = 0; i <= NUM_BUCKETS + 1; i++) {
+      const bounds = bucketPriceBounds(i);
+      // Bucket overlaps tier if its midpoint falls within
+      const mid = (bounds.min + Math.min(bounds.max, 20_000_000)) / 2;
+      if (mid >= td.min && mid < td.max) count += filled[i];
+    }
+    return { ...td, count };
+  });
+}
+
+const tierPriceLabel = (n: number) => {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(0)}M`;
+  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
+  return `$${n}`;
+};
+
+/** Market depth chart — horizontal tier bars with counts and percentages */
 export function PriceDistributionChart({ bins, make }: {
   bins: HistogramBin[];
   make: string;
 }) {
   const navigate = useNavigate();
-  const [hoveredBucket, setHoveredBucket] = useState<number | null>(null);
+  const [hoveredTier, setHoveredTier] = useState<number | null>(null);
 
-  const { filled, max, total } = useMemo(() => {
-    const arr = new Array(NUM_BUCKETS + 2).fill(0);
-    for (const { b, n } of bins) arr[Math.max(0, Math.min(b, NUM_BUCKETS + 1))] = n;
-    const total = arr.reduce((a: number, b: number) => a + b, 0);
-    const max = Math.max(...arr, 1);
-    return { filled: arr, max, total };
+  const { tiers, total, maxCount } = useMemo(() => {
+    const tiers = aggregateTiers(bins);
+    const total = tiers.reduce((a, t) => a + t.count, 0);
+    const maxCount = Math.max(...tiers.map(t => t.count), 1);
+    return { tiers, total, maxCount };
   }, [bins]);
-
-  // Show labels at these bucket indices
-  const labelIndices = [0, 3, 6, 9, 12, 15];
 
   return (
     <div style={{ width: '100%' }}>
-      {/* Hover readout */}
       <div style={{
-        height: 14,
-        fontSize: 9,
+        fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+        color: 'var(--text-secondary)', marginBottom: 10,
         fontFamily: 'Courier New, monospace',
-        color: hoveredBucket !== null ? 'var(--text)' : 'var(--text-secondary)',
-        marginBottom: 8,
-        letterSpacing: '0.04em',
       }}>
-        {hoveredBucket !== null
-          ? `${bucketRange(hoveredBucket)}  ·  ${filled[hoveredBucket].toLocaleString()} vehicles  ·  ${((filled[hoveredBucket] / total) * 100).toFixed(1)}%`
-          : `${total.toLocaleString()} VEHICLES WITH PRICES`
-        }
+        MARKET DEPTH — {total.toLocaleString()} WITH PRICES
       </div>
 
-      {/* Bars */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'flex-end',
-        height: BAR_HEIGHT,
-        gap: 2,
-        width: '100%',
-      }}>
-        {filled.map((n, i) => {
-          const pct = n / max;
-          const isHovered = hoveredBucket === i;
-          const handleClick = () => {
-            if (n === 0) return;
-            const { min, max: mx } = bucketPriceBounds(i);
-            const params = new URLSearchParams();
-            params.set('tab', 'feed');
-            params.set('make', make);
-            params.set('price_min', String(min));
-            params.set('price_max', String(mx));
-            navigate(`/?${params.toString()}`);
-          };
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {tiers.map((tier, i) => {
+          if (tier.count === 0) return null;
+          const pct = total > 0 ? (tier.count / total) * 100 : 0;
+          const barWidth = (tier.count / maxCount) * 100;
+          const isHovered = hoveredTier === i;
+          const rangeLabel = tier.max === Infinity
+            ? `${tierPriceLabel(tier.min)}+`
+            : `${tierPriceLabel(tier.min)}–${tierPriceLabel(tier.max)}`;
+
           return (
             <div
-              key={i}
-              onMouseEnter={() => setHoveredBucket(i)}
-              onMouseLeave={() => setHoveredBucket(null)}
-              onClick={handleClick}
+              key={tier.label}
+              onClick={() => {
+                const params = new URLSearchParams();
+                params.set('tab', 'feed');
+                params.set('make', make);
+                params.set('price_min', String(tier.min));
+                if (tier.max !== Infinity) params.set('price_max', String(tier.max));
+                navigate(`/?${params.toString()}`);
+              }}
+              onMouseEnter={() => setHoveredTier(i)}
+              onMouseLeave={() => setHoveredTier(null)}
               style={{
-                flex: 1,
-                height: '100%',
-                display: 'flex',
-                alignItems: 'flex-end',
-                cursor: n > 0 ? 'pointer' : 'default',
+                display: 'flex', alignItems: 'center', gap: 0,
+                cursor: 'pointer', height: 22,
+                opacity: isHovered ? 1 : 0.85,
+                transition: 'opacity 80ms ease-out',
               }}
             >
+              {/* Tier label */}
               <div style={{
-                width: '100%',
-                height: n > 0 ? Math.max(2, pct * BAR_HEIGHT) : 0,
-                background: isHovered ? 'var(--text)' : 'var(--text-secondary)',
-                opacity: isHovered ? 1 : n > 0 ? 0.45 : 0,
-                transition: 'opacity 80ms ease-out, background 80ms ease-out',
-              }} />
+                width: 70, flexShrink: 0,
+                fontSize: 9, fontWeight: 700, letterSpacing: '0.06em',
+                fontFamily: 'Arial, sans-serif',
+                color: isHovered ? 'var(--text)' : 'var(--text-secondary)',
+              }}>
+                {tier.label}
+              </div>
+
+              {/* Price range */}
+              <div style={{
+                width: 80, flexShrink: 0,
+                fontSize: 9,
+                fontFamily: 'Courier New, monospace',
+                color: 'var(--text-secondary)',
+              }}>
+                {rangeLabel}
+              </div>
+
+              {/* Bar */}
+              <div style={{ flex: 1, height: 14, position: 'relative' }}>
+                <div style={{
+                  width: `${barWidth}%`,
+                  height: '100%',
+                  background: isHovered ? 'var(--text)' : 'var(--text-secondary)',
+                  opacity: isHovered ? 0.7 : 0.3,
+                  transition: 'opacity 80ms ease-out, background 80ms ease-out, width 300ms ease-out',
+                }} />
+              </div>
+
+              {/* Count + percentage */}
+              <div style={{
+                width: 100, flexShrink: 0, textAlign: 'right',
+                fontSize: 10,
+                fontFamily: 'Courier New, monospace',
+                color: isHovered ? 'var(--text)' : 'var(--text-secondary)',
+                fontWeight: isHovered ? 700 : 400,
+              }}>
+                {tier.count.toLocaleString()}
+                <span style={{ opacity: 0.5, marginLeft: 6 }}>{pct.toFixed(0)}%</span>
+              </div>
             </div>
           );
         })}
-      </div>
-
-      {/* X-axis labels */}
-      <div style={{
-        display: 'flex',
-        width: '100%',
-        marginTop: 6,
-      }}>
-        {filled.map((_, i) => (
-          <div key={i} style={{
-            flex: 1,
-            textAlign: 'center',
-            fontSize: 8,
-            fontFamily: 'Courier New, monospace',
-            color: 'var(--text-secondary)',
-            opacity: labelIndices.includes(i) ? 0.6 : 0,
-            letterSpacing: '0.02em',
-            userSelect: 'none',
-          }}>
-            {bucketShortLabel(i)}
-          </div>
-        ))}
       </div>
     </div>
   );
