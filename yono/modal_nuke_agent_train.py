@@ -247,20 +247,24 @@ def train_nuke_agent(
             if state.global_step % self.notify_every != 0 or state.global_step == 0:
                 return
             elapsed = time.time() - self.start_time if self.start_time else 0
-            loss = logs.get("loss", "?")
-            lr = logs.get("learning_rate", "?")
-            epoch = logs.get("epoch", "?")
+            loss = logs.get("loss")
+            lr = logs.get("learning_rate")
+            epoch = logs.get("epoch")
+            loss_str = f"{loss:.4f}" if isinstance(loss, (int, float)) else str(loss)
+            lr_str = f"{lr:.2e}" if isinstance(lr, (int, float)) else str(lr)
+            epoch_str = f"{epoch:.1f}" if isinstance(epoch, (int, float)) else str(epoch)
             dispatch(
-                f"📈 Step {state.global_step}/{state.max_steps} "
-                f"| Epoch {epoch:.1f}/{args.num_train_epochs} "
-                f"| Loss: {loss:.4f} | LR: {lr:.2e} "
+                f"Step {state.global_step}/{state.max_steps} "
+                f"| Epoch {epoch_str}/{args.num_train_epochs} "
+                f"| Loss: {loss_str} | LR: {lr_str} "
                 f"| {elapsed/60:.0f}min elapsed"
             )
 
         def on_evaluate(self, args, state, control, metrics=None, **kwargs):
             if metrics:
-                eval_loss = metrics.get("eval_loss", "?")
-                dispatch(f"🔍 *Eval* step {state.global_step}: loss={eval_loss:.4f}")
+                eval_loss = metrics.get("eval_loss")
+                el_str = f"{eval_loss:.4f}" if isinstance(eval_loss, (int, float)) else str(eval_loss)
+                dispatch(f"Eval step {state.global_step}: loss={el_str}")
 
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = f"/data/nuke-agent-runs/{run_id}"
@@ -514,7 +518,8 @@ def main(
         print("Nuke Agent training runs:")
         for r in runs:
             loss = r.get("train_loss", 0)
-            print(f"  {r.get('run_id')}: loss={loss:.4f}, "
+            loss_str = f"{loss:.4f}" if isinstance(loss, (int, float)) else str(loss)
+            print(f"  {r.get('run_id')}: loss={loss_str}, "
                   f"model={r.get('base_model', '?')}, "
                   f"examples={r.get('train_examples', '?')}, "
                   f"epochs={r.get('epochs', '?')}")
