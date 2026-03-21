@@ -140,7 +140,12 @@ const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({ vehicleId, isOpen
           {loading ? (
             <div className="text" style={to8}>Loading history...</div>
           ) : rows.length === 0 ? (
-            <div className="text text-muted" style={to8}>No history yet</div>
+            <div style={{ padding: '12px 0', textAlign: 'center' }}>
+              <div className="text text-muted" style={{ ...to8, marginBottom: '8px' }}>No price history recorded for this vehicle.</div>
+              <div className="text text-muted" style={{ ...to8, fontSize: '10px', color: 'var(--text-disabled)' }}>
+                Price data accumulates from auction results, listing events, and owner submissions.
+              </div>
+            </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>

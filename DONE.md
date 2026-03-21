@@ -2,6 +2,14 @@
 
 ## 2026-03-21
 
+### [frontend] BadgePortal System — End-to-End Design Foundation
+- `BadgePortal` component: every badge is clickable, expands inline cluster panel, collapses back
+- `BadgeClusterPanel`: 6-item preview grid with vehicle thumbnails, prices
+- `useBadgeDepth`: lazy depth+preview fetch with 200ms debounce and cache
+- VehicleSubHeader YMM badges → BadgePortals (no more navigate-away context destruction)
+- CardDealScore pills → BadgePortals (click STEAL → see all steals inline)
+- Supports: year, make, model, source, deal_score, status, body_style, drivetrain, transmission
+
 ### [frontend] Bug Fix Sprint — Tier 1+2 (13 bugs, 12 files)
 - **#7** Hero image black void: added fallback query (any non-doc/non-dup image)
 - **#14** Search default: sort by feed_rank_score instead of sale_price desc

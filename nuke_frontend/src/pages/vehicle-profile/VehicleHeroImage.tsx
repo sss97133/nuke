@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import MobileImageGallery from '../../components/image/MobileImageGallery';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { BadgePortal } from '../../components/badges/BadgePortal';
 
 interface VehicleHeroImageProps {
   overlayNode?: React.ReactNode;
@@ -29,9 +30,12 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
     }
   };
 
+  const { vehicle } = useVehicleProfile();
+  const v = vehicle as any;
+
   const src = leadImageUrl ? String(leadImageUrl).trim() : '';
   if (!src || src === 'undefined' || src === 'null') {
-    // Show a minimal placeholder so the hero area exists
+    // No photo: show spec card with clickable badges (zero dead ends)
     return (
       <div style={{
         width: '100%',
@@ -45,15 +49,49 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '8px',
+          gap: '12px',
           color: 'var(--text-disabled)',
+          maxWidth: '400px',
         }}>
-          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="12" width="40" height="28" stroke="currentColor" strokeWidth="2" fill="none"/>
-            <circle cx="18" cy="22" r="4" stroke="currentColor" strokeWidth="2" fill="none"/>
-            <path d="M4 34 L14 24 L20 30 L30 20 L44 34" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" fill="none"/>
-          </svg>
-          <span style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const }}>No photo available</span>
+          {/* Vehicle identity */}
+          <div style={{
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '14px',
+            fontWeight: 700,
+            textTransform: 'uppercase' as const,
+            letterSpacing: '0.5px',
+            color: 'var(--surface)',
+            textAlign: 'center',
+          }}>
+            {[v?.year, v?.make, v?.model].filter(Boolean).join(' ') || 'VEHICLE'}
+          </div>
+
+          {/* Badge portals — every piece of data is explorable */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' }}>
+            {v?.year && <BadgePortal dimension="year" value={v.year} label={String(v.year)} variant="source" />}
+            {v?.make && <BadgePortal dimension="make" value={v.make} label={String(v.make).toUpperCase()} variant="source" />}
+            {v?.model && <BadgePortal dimension="model" value={v.model} label={String(v.model).toUpperCase()} variant="source" />}
+            {v?.body_style && <BadgePortal dimension="body_style" value={v.body_style} label={String(v.body_style).toUpperCase()} variant="status" />}
+            {v?.transmission && (
+              <BadgePortal
+                dimension="transmission"
+                value={v.transmission}
+                label={String(v.transmission).toLowerCase().includes('manual') ? 'MANUAL' : 'AUTO'}
+                variant="status"
+              />
+            )}
+          </div>
+
+          <span style={{
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '8px',
+            fontWeight: 600,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase' as const,
+            marginTop: '4px',
+          }}>
+            NO PHOTO · EXPLORE BY BADGE
+          </span>
         </div>
       </div>
     );
