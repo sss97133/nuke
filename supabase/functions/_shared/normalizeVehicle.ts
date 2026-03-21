@@ -489,7 +489,40 @@ export function normalizeVehicleFields(data: Record<string, any>): Record<string
     }
   }
 
+  // Image URL filtering — remove junk (dealer logos, favicons, tracking pixels)
+  for (const field of ['images', 'image_urls'] as const) {
+    if (Array.isArray(data[field])) {
+      data[field] = filterJunkImageUrls(data[field]);
+    }
+  }
+
   return data;
+}
+
+/** Filter out non-vehicle image URLs (dealer logos, favicons, tracking pixels, etc.) */
+const JUNK_IMAGE_PATTERNS = [
+  /dealer_listings_logos/i,
+  /\/logo[._\-\/]/i,
+  /\/favicon/i,
+  /\/placeholder/i,
+  /\/avatar[._\-\/]/i,
+  /\/spacer/i,
+  /\/pixel\./i,
+  /\b1x1\./i,
+  /transparent\.(gif|png)/i,
+  /\/icon[._\-\/]/i,
+  /\/watermark/i,
+  /\/spinner/i,
+  /\/loading/i,
+  /\/blank\.(gif|png|jpg)/i,
+];
+
+export function filterJunkImageUrls(urls: string[]): string[] {
+  return urls.filter((u) => {
+    if (!u || typeof u !== 'string') return false;
+    if (u.length < 20) return false; // too short to be a real image URL
+    return !JUNK_IMAGE_PATTERNS.some((p) => p.test(u));
+  });
 }
 
 /** Canonical source platform aliases. Maps raw values → canonical slugs matching source_alias_mapping table. */
