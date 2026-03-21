@@ -137,6 +137,22 @@ export async function selectBestHeroImage(
       return buildHeroResult(scored[0]);
     }
 
+    // Attempt 2.5: any non-document, non-duplicate image (no AI filtering)
+    const { data: anyImage, error: anyImageErr } = await supabase
+      .from('vehicle_images')
+      .select('image_url, medium_url, large_url, exif_data, taken_at')
+      .eq('vehicle_id', vehicleId)
+      .not('is_document', 'is', true)
+      .not('is_duplicate', 'is', true)
+      .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
+      .order('is_primary', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (!anyImageErr && anyImage && anyImage.length > 0) {
+      return buildHeroResult(anyImage[0]);
+    }
+
     // Attempt 3: fall back to primary_image_url
     if (primaryImageUrl) {
       return { url: primaryImageUrl, meta: {} };

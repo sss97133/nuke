@@ -49,7 +49,36 @@ const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({ vehicleId, isOpen
           .order('as_of', { ascending: false })
           .limit(200);
         if (error) throw error;
-        setRows((data as any) || []);
+        let historyRows = (data as any) || [];
+
+        // Fallback: if no price history rows, synthesize from vehicle_events
+        if (historyRows.length === 0) {
+          try {
+            const { data: events } = await supabase
+              .from('vehicle_events')
+              .select('id, source_platform, current_price, final_price, sold_at, ended_at, created_at, event_status')
+              .eq('vehicle_id', vehicleId)
+              .or('current_price.not.is.null,final_price.not.is.null')
+              .order('created_at', { ascending: false })
+              .limit(50);
+            if (events && events.length > 0) {
+              historyRows = events.map((ev: any) => ({
+                id: ev.id,
+                price_type: ev.final_price ? 'sale' : 'current',
+                value: ev.final_price ?? ev.current_price,
+                source: ev.source_platform || 'event',
+                as_of: ev.sold_at || ev.ended_at || ev.created_at,
+                confidence: null,
+                is_outlier: null,
+                outlier_reason: null,
+              })).filter((r: any) => r.value != null && Number(r.value) > 0);
+            }
+          } catch {
+            // ignore fallback failure
+          }
+        }
+
+        setRows(historyRows);
 
         // Load pinned baselines for 30d (optional; safe if table missing / RLS blocks)
         try {

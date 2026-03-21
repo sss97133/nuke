@@ -15,22 +15,22 @@ export interface CardDealScoreProps {
 }
 
 // Colors matching DEAL_SCORE_CONFIG from constants/dealScore.ts
-const DEAL_COLORS: Record<string, { bg: string; text: string; display: string }> = {
-  plus_3:  { bg: '#16825d', text: 'var(--surface-elevated)', display: 'STEAL' },
-  plus_2:  { bg: '#16825d', text: 'var(--surface-elevated)', display: 'GREAT DEAL' },
-  plus_1:  { bg: '#2d9d78', text: 'var(--surface-elevated)', display: 'GOOD DEAL' },
-  fair:    { bg: 'transparent', text: 'var(--text-secondary)', display: 'FAIR' },
-  minus_1: { bg: '#b05a00', text: 'var(--surface-elevated)', display: 'ABOVE MARKET' },
-  minus_2: { bg: '#d13438', text: 'var(--surface-elevated)', display: 'OVERPRICED' },
-  minus_3: { bg: '#d13438', text: 'var(--surface-elevated)', display: 'WAY OVER' },
+const DEAL_COLORS: Record<string, { bg: string; text: string; display: string; tooltip: string }> = {
+  plus_3:  { bg: '#16825d', text: 'var(--surface-elevated)', display: 'STEAL', tooltip: 'Price significantly below comparable vehicles' },
+  plus_2:  { bg: '#16825d', text: 'var(--surface-elevated)', display: 'GREAT DEAL', tooltip: 'Price well below market average' },
+  plus_1:  { bg: '#2d9d78', text: 'var(--surface-elevated)', display: 'GOOD DEAL', tooltip: 'Price below market average' },
+  fair:    { bg: 'transparent', text: 'var(--text-secondary)', display: 'FAIR', tooltip: 'Price in line with market' },
+  minus_1: { bg: '#b05a00', text: 'var(--surface-elevated)', display: 'ABOVE MARKET', tooltip: 'Price above market average' },
+  minus_2: { bg: '#d13438', text: 'var(--surface-elevated)', display: 'OVERPRICED', tooltip: 'Price well above comparable vehicles' },
+  minus_3: { bg: '#d13438', text: 'var(--surface-elevated)', display: 'WAY OVER', tooltip: 'Price significantly above market' },
 };
 
-const HEAT_COLORS: Record<string, { color: string; display: string }> = {
-  volcanic: { color: '#d13438', display: 'VOLCANIC' },
-  fire:     { color: 'var(--error)', display: 'FIRE' },
-  hot:      { color: 'var(--warning)', display: 'HOT' },
-  warm:     { color: '#b05a00', display: 'WARM' },
-  cold:     { color: 'var(--text-disabled)', display: 'COLD' },
+const HEAT_COLORS: Record<string, { color: string; display: string; tooltip: string }> = {
+  volcanic: { color: '#d13438', display: 'VOLCANIC', tooltip: 'Extremely high interest and engagement' },
+  fire:     { color: 'var(--error)', display: 'FIRE', tooltip: 'Very high interest from buyers' },
+  hot:      { color: 'var(--warning)', display: 'HOT', tooltip: 'Above-average buyer interest' },
+  warm:     { color: '#b05a00', display: 'WARM', tooltip: 'Moderate buyer interest' },
+  cold:     { color: 'var(--text-disabled)', display: 'COLD', tooltip: 'Low buyer interest' },
 };
 
 export function CardDealScore({
@@ -69,6 +69,7 @@ export function CardDealScore({
     >
       {showDeal && (
         <span
+          title={dealConfig.tooltip}
           style={{
             ...pillStyle,
             background: dealConfig.bg,
@@ -81,6 +82,7 @@ export function CardDealScore({
       )}
       {showHeat && (
         <span
+          title={heatConfig.tooltip}
           style={{
             ...pillStyle,
             color: heatConfig.color,

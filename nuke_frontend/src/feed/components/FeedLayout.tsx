@@ -34,7 +34,7 @@ export interface FeedLayoutProps {
 }
 
 const ROW_HEIGHTS: Record<string, number> = {
-  grid: 320,
+  grid: 340,
   gallery: 84,
   technical: 32,
 };

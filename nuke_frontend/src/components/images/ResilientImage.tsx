@@ -134,6 +134,41 @@ const ResilientImage: React.FC<ResilientImageProps> = ({
   const finalSrc = showPlaceholder ? placeholderSrc : current;
   const finalOpacity = showPlaceholder ? placeholderOpacity : 1;
 
+  // If all sources failed, show a cleaner placeholder instead of faint logo
+  if (failed && sourceList.length > 0) {
+    return (
+      <div ref={containerRef} className={className} style={{ ...baseContainerStyle, ...style }}>
+        <div style={{
+          ...(fill ? { position: 'absolute' as const, inset: 0 } : {}),
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column' as const,
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '4px',
+          background: 'var(--surface-hover, #f5f5f5)',
+        }}>
+          <img
+            src={placeholderSrc}
+            alt=""
+            style={{ width: '24px', height: '24px', opacity: 0.15, objectFit: 'contain' }}
+          />
+          <span style={{
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '8px',
+            fontWeight: 700,
+            textTransform: 'uppercase' as const,
+            letterSpacing: '1px',
+            color: 'var(--text-disabled)',
+          }}>
+            IMAGE UNAVAILABLE
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={containerRef} className={className} style={{ ...baseContainerStyle, ...style }}>
       <img
