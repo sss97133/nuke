@@ -27,7 +27,7 @@ function getArg(name, defaultVal) {
 }
 
 const MAX = parseInt(getArg("max", "1000"));
-const MODEL = getArg("model", "qwen3:30b-a3b");
+const MODEL = getArg("model", "qwen2.5:7b");
 const OLLAMA_URL = getArg("ollama-url", "http://127.0.0.1:11434");
 const DRY_RUN = getArg("dry-run", false);
 const BATCH_SIZE = parseInt(getArg("batch", "50"));
@@ -87,7 +87,9 @@ Engine: ${engine_type || "?"}
 Description:
 ${(description || "").slice(0, 3000)}
 
-Extract equipment, highlights, known_flaws, and modifications as JSON.`;
+Extract equipment, highlights, known_flaws, and modifications.
+
+JSON:`;
 
   const raw = await callOllama(prompt);
   const parsed = parseJSON(raw);
@@ -100,8 +102,12 @@ Extract equipment, highlights, known_flaws, and modifications as JSON.`;
     let value = parsed[field];
     if (!value) continue;
 
-    // Handle array responses — join into comma-separated string
+    // Handle various response formats
     if (Array.isArray(value)) value = value.join(", ");
+    if (typeof value === "object" && value !== null) {
+      // Flatten nested objects: {engine: "350 V8", trans: "4-speed"} → "350 V8, 4-speed"
+      value = Object.values(value).filter(v => v && typeof v === "string").join(", ");
+    }
     if (typeof value !== "string") value = String(value);
     value = value.trim();
 
