@@ -1,6 +1,10 @@
 /**
- * FeedEmptyState — Zero-results message with filter reset.
+ * FeedEmptyState — Zero-results message with actionable next steps.
+ *
+ * Zero dead ends: always offers a way forward.
  */
+
+import { Link } from 'react-router-dom';
 
 export interface FeedEmptyStateProps {
   hasFilters: boolean;
@@ -16,7 +20,7 @@ export function FeedEmptyState({ hasFilters, onResetFilters }: FeedEmptyStatePro
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '300px',
-        gap: '12px',
+        gap: '16px',
         padding: '40px 20px',
       }}
     >
@@ -30,8 +34,9 @@ export function FeedEmptyState({ hasFilters, onResetFilters }: FeedEmptyStatePro
           color: 'var(--text-secondary)',
         }}
       >
-        NO VEHICLES FOUND
+        NO VEHICLES MATCH
       </div>
+
       {hasFilters && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
           <div
@@ -54,7 +59,7 @@ export function FeedEmptyState({ hasFilters, onResetFilters }: FeedEmptyStatePro
                 textTransform: 'uppercase',
                 letterSpacing: '0.3px',
                 padding: '4px 12px',
-                border: '1px solid var(--border)',
+                border: '2px solid var(--text)',
                 background: 'transparent',
                 color: 'var(--text)',
                 cursor: 'pointer',
@@ -65,6 +70,48 @@ export function FeedEmptyState({ hasFilters, onResetFilters }: FeedEmptyStatePro
           )}
         </div>
       )}
+
+      {/* Always offer next actions — no dead ends */}
+      <div style={{
+        display: 'flex',
+        gap: '12px',
+        marginTop: '8px',
+      }}>
+        <Link
+          to="/search"
+          style={{
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '8px',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.3px',
+            padding: '3px 10px',
+            border: '1px solid var(--border)',
+            background: 'transparent',
+            color: 'var(--text-secondary)',
+            textDecoration: 'none',
+          }}
+        >
+          SEARCH
+        </Link>
+        <Link
+          to="/auctions"
+          style={{
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '8px',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.3px',
+            padding: '3px 10px',
+            border: '1px solid var(--border)',
+            background: 'transparent',
+            color: 'var(--text-secondary)',
+            textDecoration: 'none',
+          }}
+        >
+          AUCTIONS
+        </Link>
+      </div>
     </div>
   );
 }

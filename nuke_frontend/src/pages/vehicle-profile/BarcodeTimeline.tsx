@@ -421,12 +421,14 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
 
   const receiptEvent = receiptDate ? eventMap[receiptDate] : null;
 
-  // If no timeline events at all, show a minimal empty state instead of grey boxes
+  // If no timeline events at all, show empty state with vehicle context
   if (timelineEvents.length === 0) {
+    const vYear = (vehicle as any)?.year;
+    const vMake = (vehicle as any)?.make;
     return (
       <div
         className="barcode-strip barcode-strip--collapsed"
-        style={{ opacity: 0.5 }}
+        style={{ opacity: 0.6 }}
       >
         <div className="barcode-bar" style={{ cursor: 'default' }}>
           <span className="barcode-bar__label-left">TIMELINE</span>
@@ -435,6 +437,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            gap: '8px',
             fontFamily: 'Arial, sans-serif',
             fontSize: '8px',
             fontWeight: 700,
@@ -442,7 +445,12 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
             letterSpacing: '0.5px',
             color: 'var(--text-disabled)',
           }}>
-            NO TIMELINE DATA
+            NO EVENTS RECORDED
+            {(vYear || vMake) && (
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>
+                · EXPLORE {[vYear, vMake].filter(Boolean).join(' ')} VEHICLES FOR COMPARABLES
+              </span>
+            )}
           </div>
           <span className="barcode-bar__label-right" />
         </div>

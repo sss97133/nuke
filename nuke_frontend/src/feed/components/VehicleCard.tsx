@@ -20,6 +20,7 @@ import { CardAuctionTimer } from './card/CardAuctionTimer';
 import { CardActions } from './card/CardActions';
 import { CardTier } from './card/CardTier';
 import { CardRankScore } from './card/CardRankScore';
+import { BadgePortal } from '../../components/badges/BadgePortal';
 
 export interface VehicleCardProps {
   vehicle: FeedVehicle;
@@ -272,11 +273,81 @@ export function VehicleCard({
     );
   }
 
+  // Expanded content for grid cards — BadgePortals for every dimension
+  const expandedContent = useMemo(() => (
+    <div>
+      {/* Badge portal row — explore by dimension */}
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '4px',
+        marginBottom: '8px',
+      }}>
+        {vehicle.year && (
+          <BadgePortal dimension="year" value={vehicle.year} label={String(vehicle.year)} variant="source" />
+        )}
+        {vehicle.make && (
+          <BadgePortal dimension="make" value={vehicle.make} label={vehicle.make} variant="source" />
+        )}
+        {vehicle.model && (
+          <BadgePortal dimension="model" value={vehicle.model} label={vehicle.model} variant="source" />
+        )}
+        {(vehicle.canonical_body_style || vehicle.body_style) && (
+          <BadgePortal
+            dimension="body_style"
+            value={vehicle.canonical_body_style || vehicle.body_style || ''}
+            label={vehicle.canonical_body_style || vehicle.body_style || ''}
+            variant="status"
+          />
+        )}
+        {vehicle.transmission && (
+          <BadgePortal
+            dimension="transmission"
+            value={vehicle.transmission}
+            label={vehicle.transmission.toLowerCase().includes('manual') ? 'MANUAL' : 'AUTO'}
+            variant="status"
+          />
+        )}
+        {vehicle.deal_score_label && vehicle.deal_score_label !== 'fair' && (
+          <BadgePortal
+            dimension="deal_score"
+            value={vehicle.deal_score_label}
+            label={vehicle.deal_score_label.replace(/_/g, ' ').toUpperCase()}
+            variant="deal"
+          />
+        )}
+        {vehicle.discovery_source && (
+          <BadgePortal
+            dimension="source"
+            value={vehicle.discovery_source}
+            label={vehicle.discovery_source.toUpperCase().slice(0, 12)}
+            variant="source"
+          />
+        )}
+      </div>
+
+      {/* Specs row */}
+      <div style={{
+        display: 'flex',
+        gap: '12px',
+        fontFamily: "'Courier New', monospace",
+        fontSize: '9px',
+        color: 'var(--text-secondary)',
+        marginBottom: '8px',
+      }}>
+        {vehicle.mileage ? <span>{Math.floor(vehicle.mileage).toLocaleString()} MI</span> : null}
+        {vehicle.drivetrain ? <span>{vehicle.drivetrain.toUpperCase()}</span> : null}
+        {vehicle.vin ? <span>VIN: ...{vehicle.vin.slice(-6)}</span> : null}
+      </div>
+    </div>
+  ), [vehicle]);
+
   // Grid mode (default) — richer than v1
   return (
     <CardShell
       vehicleId={vehicle.id}
       viewMode="grid"
+      expandedContent={expandedContent}
       onHoverStart={onHoverStart}
       onHoverEnd={onHoverEnd}
       style={style}
