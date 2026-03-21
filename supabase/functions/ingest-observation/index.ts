@@ -167,13 +167,14 @@ Deno.serve(async (req) => {
       if (!vehicleId && hints.url) {
         const normUrl = normalizeListingUrl(hints.url);
 
-        // Try canonical listing ID match against vehicles.listing_url
+        // Try canonical listing ID match against vehicles.listing_url and discovery_url
         if (normUrl?.canonicalListingId) {
           // Extract the platform-specific ID pattern to match against existing URLs
+          const listingIdPart = normUrl.canonicalListingId.split(":")[1];
           const { data: urlMatches } = await supabase
             .from("vehicles")
-            .select("id, listing_url")
-            .ilike("listing_url", `%${normUrl.canonicalListingId.split(":")[1]}%`)
+            .select("id, listing_url, discovery_url")
+            .or(`listing_url.ilike.%${listingIdPart}%,discovery_url.ilike.%${listingIdPart}%`)
             .not("status", "in", "(merged,deleted)")
             .limit(5);
 
@@ -182,10 +183,14 @@ Deno.serve(async (req) => {
             vehicleMatchConfidence = 0.95;
             vehicleMatchSignals = { normalized_url_match: true, canonical_id: normUrl.canonicalListingId };
           } else if (urlMatches && urlMatches.length > 1) {
-            // Multiple matches — pick the one with exact normalized match
+            // Multiple matches — pick the one with exact canonical listing ID match
             for (const m of urlMatches) {
-              const mNorm = normalizeListingUrl(m.listing_url);
-              if (mNorm?.canonicalListingId === normUrl.canonicalListingId) {
+              const mNormListing = normalizeListingUrl(m.listing_url);
+              const mNormDiscovery = normalizeListingUrl(m.discovery_url);
+              if (
+                mNormListing?.canonicalListingId === normUrl.canonicalListingId ||
+                mNormDiscovery?.canonicalListingId === normUrl.canonicalListingId
+              ) {
                 vehicleId = m.id;
                 vehicleMatchConfidence = 0.95;
                 vehicleMatchSignals = { normalized_url_match: true, canonical_id: normUrl.canonicalListingId };
