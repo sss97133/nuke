@@ -4673,3 +4673,37 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - **Collecting Cars**: Re-synced, 148 live auctions in DB
 - **Barrett-Jackson**: extract-barrett-jackson returning 400 on every call — needs investigation
 - Function redeployed: `supabase functions deploy sync-live-auctions --no-verify-jwt`
+
+### [llm-infrastructure] Local LLM Setup + Enrichment Pipeline
+- Downloaded DeepSeek R1 32B, Qwen3 30B-A3B, Kimi K2.5 cloud to SSD
+- Created `nuke` Ollama model (fat system prompt with full platform knowledge)
+- Fine-tuned `nuke-agent` on market intelligence data (loss 0.084, 2.75 epochs)
+- Merged LoRA weights + exported GGUF (4.7 GB Q4_K_M)
+- Built unified LLM router (`_shared/llmRouter.ts`) — 13 models, 8 providers, task-based routing
+- Migrated haiku-extraction-worker, sonnet-supervisor, agent-tier-router to new router
+- Created `agentTiers.ts` backward-compat shim (23+ importers unbroken)
+- Added agent_tier/agent_model/agent_cost_cents provenance to vehicle_observations + ingest-observation
+- Created llm_cost_tracking table
+- Built + tested overnight-enrichment.mjs: 490/500 enriched, 0 errors, 9.1/min, $0
+- Kicked off 2000-vehicle enrichment run (PID 49234, ~3.5 hrs, $0)
+
+### [library] Papers + Atlas + Dictionary + Almanac
+- PAPERS: Entity Resolution Design (why three-pass cascade, decision record)
+- PAPERS: Trust Scoring Methodology (source hierarchy, decay model, contradiction handling)
+- PAPERS: Market Intelligence Patterns (7 empirical findings from 304K vehicles)
+- PAPERS: Enrichment Rules (ground truth for making data better)
+- ATLAS: Scraping Sources (every source with access method, trust, rate limits)
+- DICTIONARY: Enrichable Fields (13 unowned fields with rules)
+- DICTIONARY: LLM Infrastructure Terms
+- ALMANAC: Platform Metrics 2026-03-20 snapshot
+- ENGINEERING MANUAL Ch.9: Local LLM Infrastructure
+
+### [training] Modal Fine-Tuning Pipeline
+- export_nuke_market_intelligence.py — cohort comparisons, gap analyses (3,213 examples)
+- export_squarebody_intelligence.py — all 73-91 GM trucks (3,788 examples)
+- modal_nuke_agent_train.py upgraded: Telegram dispatch, GGUF export, --action full pipeline
+- Training data on Modal volume: /data/nuke-agent/ and /data/nuke-squarebody/
+
+### [phase-0] Foundation Fixes
+- Phase 0.3 DONE: agent_tier, extraction_method, raw_source_ref on vehicle_observations
+- Phase 0.4 DONE: CHECK constraint already includes pending_review/pending_strategy
