@@ -183,47 +183,50 @@ export function CardShell({
             animation: 'fadeIn180 180ms ease-out',
           }}
         >
-          {expandedContent || (
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
+          {/* Custom expanded content (badges, specs) */}
+          {expandedContent}
+
+          {/* OPEN PROFILE footer — always renders */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: expandedContent ? '8px' : 0,
+          }}>
+            <span style={{
+              fontFamily: 'Arial, sans-serif',
+              fontSize: '8px',
+              fontWeight: 700,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.5px',
+              color: 'var(--text-disabled)',
             }}>
-              <span style={{
+              CLICK BADGES TO EXPLORE
+            </span>
+            <Link
+              to={`/vehicle/${vehicleId}`}
+              state={{ fromFeed: true }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
                 fontFamily: 'Arial, sans-serif',
-                fontSize: '8px',
-                fontWeight: 700,
+                fontSize: '9px',
+                fontWeight: 800,
                 textTransform: 'uppercase' as const,
-                letterSpacing: '0.5px',
-                color: 'var(--text-disabled)',
-              }}>
-                CLICK BADGES TO EXPLORE
-              </span>
-              <Link
-                to={`/vehicle/${vehicleId}`}
-                state={{ fromFeed: true }}
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  fontFamily: 'Arial, sans-serif',
-                  fontSize: '9px',
-                  fontWeight: 800,
-                  textTransform: 'uppercase' as const,
-                  letterSpacing: '0.3px',
-                  padding: '3px 10px',
-                  border: '2px solid var(--text)',
-                  background: 'var(--text)',
-                  color: 'var(--surface)',
-                  textDecoration: 'none',
-                  cursor: 'pointer',
-                  transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
-              >
-                OPEN PROFILE →
-              </Link>
-            </div>
-          )}
+                letterSpacing: '0.3px',
+                padding: '3px 10px',
+                border: '2px solid var(--text)',
+                background: 'var(--text)',
+                color: 'var(--surface)',
+                textDecoration: 'none',
+                cursor: 'pointer',
+                transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+            >
+              OPEN PROFILE →
+            </Link>
+          </div>
         </div>
       )}
     </div>
