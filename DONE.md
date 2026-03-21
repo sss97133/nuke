@@ -2,6 +2,28 @@
 
 ## 2026-03-21
 
+### [mcp] User Onboarding & Account Linking — 5 new MCP tools
+- `create_profile`: email → Supabase auth user + profile + API key (idempotent)
+- `get_profile`: lookup by email/user_id with vehicle count + linked accounts
+- `link_account`: connect BaT/C&B/Hemmings/Hagerty/Instagram/YouTube/Facebook/eBay/Craigslist with preview of linkable data
+- `verify_account_link`: email_match, profile_url_proof, or manual_review verification pipeline
+- `list_linked_accounts`: unified view of all linked platforms + pending claims
+- DB: `mcp_create_api_key` RPC, `account_link_claims` table, `onboarded_via` on profiles, `submitted_by_user_id` on vehicle_observations
+- Fixed `create_user_rating_on_signup` trigger (missing `SET search_path TO 'public'` was blocking ALL auth user creation)
+- Extended `user_external_profiles` platform check constraint (was only 5 platforms, now 14)
+- MCP connector: 28 → 33 tools. mcp-server npm: 7 → 12 tools
+- All tools tested end-to-end: create → lookup → link → verify → list
+
+## 2026-03-20
+
+### [frontend] Vehicle card image rendering fix + AVG PRICE fix
+- [bug] Fixed grey/empty image boxes in vehicle grid: Supabase render API returns 422 "Invalid source image" for large files (5MB+ Facebook photos). Fixed by adding original URL as fallback source in `ResilientImage.normalizeSources` — render fail → retry with raw storage URL
+- [bug] Fixed "AVG PRICE $0" in feed stat card: `portfolio_stats_cache.avg_value` was 0. Fixed in DB (set to $32,646) + fallback computation in feed-query
+- Files: `nuke_frontend/src/components/images/ResilientImage.tsx`, `supabase/functions/feed-query/index.ts`
+- Deployed to prod
+
+## 2026-03-21
+
 ### [overnight] Autonomous Overnight Session (2026-03-21 00:00-08:00)
 
 **Stabilize + Commit:**
