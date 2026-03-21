@@ -859,6 +859,42 @@ Deno.serve(async (req) => {
     // Sort by relevance
     results.sort((a, b) => b.relevance_score - a.relevance_score);
 
+    // --- FUZZY FALLBACK (typo tolerance) ---
+    // If we have fewer than 3 vehicle results, try trigram fuzzy search
+    if (queryType === 'text' && results.filter(r => r.type === 'vehicle').length < 3) {
+      try {
+        const { data: fuzzyResults } = await supabase.rpc('search_vehicles_fuzzy', {
+          p_query: trimmedQuery,
+          p_limit: 10,
+        });
+        if (fuzzyResults?.length) {
+          for (const f of fuzzyResults) {
+            if (isNonAutomobile(f)) continue;
+            if (results.some(r => r.id === f.vehicle_id)) continue;
+            const price = f.sale_price;
+            results.push({
+              id: f.vehicle_id,
+              type: 'vehicle',
+              title: `${f.year || ''} ${f.make || ''} ${f.model || ''}`.trim() || 'Vehicle',
+              subtitle: price ? `$${Number(price).toLocaleString()}` : undefined,
+              image_url: f.primary_image_url,
+              relevance_score: f.relevance || 0.5,
+              metadata: {
+                year: f.year, make: f.make, model: f.model, vin: f.vin,
+                sale_price: price ? Number(price) : null,
+                primary_image_url: f.primary_image_url,
+                deep_match_source: 'fuzzy',
+              },
+            });
+          }
+          // Re-sort after adding fuzzy results
+          results.sort((a, b) => b.relevance_score - a.relevance_score);
+        }
+      } catch (e) {
+        console.error('Fuzzy search failed (non-fatal):', e);
+      }
+    }
+
     // Deduplicate (by id)
     const seen = new Set<string>();
     const dedupedResults = results.filter(r => {
