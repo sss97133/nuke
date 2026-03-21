@@ -356,16 +356,27 @@ def train_nuke_agent(
     secrets=[modal.Secret.from_name("nuke-sidecar-secrets")],
     memory=65536,
 )
-def merge_and_export(run_id: str, model_name: str = "Qwen/Qwen2.5-7B-Instruct"):
+def merge_and_export(run_id: str, model_name: str = "Qwen/Qwen2.5-7B-Instruct", checkpoint: str = ""):
     """Merge LoRA weights and export full model for serving."""
     import torch
     from transformers import AutoTokenizer, AutoModelForCausalLM
     from peft import PeftModel
 
+    # Try final/ first, then checkpoint, then latest checkpoint
     run_dir = f"/data/nuke-agent-runs/{run_id}/final"
+    if checkpoint:
+        run_dir = f"/data/nuke-agent-runs/{run_id}/{checkpoint}"
+    elif not os.path.exists(run_dir):
+        # Find latest checkpoint
+        run_base = f"/data/nuke-agent-runs/{run_id}"
+        checkpoints = sorted([d for d in os.listdir(run_base) if d.startswith("checkpoint-")])
+        if checkpoints:
+            run_dir = f"{run_base}/{checkpoints[-1]}"
+            dispatch(f"No final/ dir, using latest checkpoint: {checkpoints[-1]}")
+
     output_dir = f"/data/nuke-agent-merged/{run_id}"
 
-    dispatch(f"🔀 *Merging LoRA weights*\nRun: `{run_id}`\nBase: `{model_name}`")
+    dispatch(f"Merging LoRA weights\nRun: {run_id}\nAdapter: {run_dir}\nBase: {model_name}")
 
     base_model = AutoModelForCausalLM.from_pretrained(
         model_name,

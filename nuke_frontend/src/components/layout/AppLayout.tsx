@@ -42,7 +42,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
 
   const location = useLocation();
   const navigate = useNavigate();
-  const { openVehicleTab, activeVehicleId, vehicleTabs, toolbarSlot } = useAppLayoutContext();
+  const { openVehicleTab, activeVehicleId, vehicleTabs } = useAppLayoutContext();
 
   // Sync vehicle tabs with URL
   useEffect(() => {
@@ -168,19 +168,18 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
 
         <AppHeader
           onOpenNotifications={() => setShowNotifications(true)}
-          toolbarSlot={toolbarSlot}
-        />
-
-        <VehicleTabBar />
-
-        <PageHeader
-          title={title}
-          showBackButton={showBackButton}
-          primaryAction={primaryAction}
-          breadcrumbs={breadcrumbs}
         />
 
         <main id="main-content" className="main-content content-container">
+          <VehicleTabBar />
+
+          <PageHeader
+            title={title}
+            showBackButton={showBackButton}
+            primaryAction={primaryAction}
+            breadcrumbs={breadcrumbs}
+          />
+
           {children}
         </main>
 

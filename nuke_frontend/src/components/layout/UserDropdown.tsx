@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { useTheme, type HeaderVariant } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface UserDropdownProps {
   isOpen: boolean;
@@ -22,7 +22,7 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const { theme, toggleTheme, headerVariant, setHeaderVariant } = useTheme();
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -41,13 +41,6 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
     navigate(path);
     onClose();
   };
-
-  const VARIANTS: { id: HeaderVariant; label: string }[] = [
-    { id: 'command-line', label: 'Command Line' },
-    { id: 'segmented', label: 'Segmented' },
-    { id: 'two-row', label: 'Two Row' },
-    { id: 'minimal', label: 'Minimal' },
-  ];
 
   return (
     <>
@@ -105,20 +98,6 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
             <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
             <span style={{ fontSize: '11px' }}>{theme === 'dark' ? '\u2600' : '\u263E'}</span>
           </button>
-          <div className="user-dropdown-variant-picker">
-            <div className="user-dropdown-section-label">HEADER</div>
-            <div className="user-dropdown-variant-options">
-              {VARIANTS.map((v) => (
-                <button
-                  key={v.id}
-                  className={`user-dropdown-variant-btn ${headerVariant === v.id ? 'active' : ''}`}
-                  onClick={() => setHeaderVariant(v.id)}
-                >
-                  {v.label}
-                </button>
-              ))}
-            </div>
-          </div>
           <button
             className="user-dropdown-signout"
             onClick={async () => {

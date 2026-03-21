@@ -59,17 +59,9 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   useEffect(() => {
     loadComments();
     
-    // Subscribe to new comments (both Nuke and BaT auction comments)
+    // Subscribe to underlying tables (VIEWs can't have realtime subs)
     const channel = supabase
       .channel(`vehicle-comments-${vehicleId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'vehicle_comments',
-        filter: `vehicle_id=eq.${vehicleId}`
-      }, () => {
-        loadComments();
-      })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -81,7 +73,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'bat_comments',
+        table: 'user_comments',
         filter: `vehicle_id=eq.${vehicleId}`
       }, () => {
         loadComments();
@@ -96,273 +88,158 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   const loadComments = async () => {
     try {
       setLoading(true);
-      
-      // Load ALL comment sources: Nuke, auction_comments, AND bat_comments
-      // Use pagination to fetch all comments (Supabase default limit is 1000, so we fetch in batches)
-      const fetchAllComments = async (table: string, select: string, orderBy: string, orderDir: 'asc' | 'desc' = 'desc') => {
-        const allResults: any[] = [];
-        let offset = 0;
-        const batchSize = 1000;
-        let hasMore = true;
 
-        while (hasMore) {
-          const query = supabase
-            .from(table)
-            .select(select)
-            .eq('vehicle_id', vehicleId)
-            .order(orderBy, { ascending: orderDir === 'asc' })
-            .range(offset, offset + batchSize - 1);
+      // Single query against the unified VIEW — replaces 3 separate table fetches
+      const allRows: any[] = [];
+      let offset = 0;
+      const batchSize = 1000;
+      let hasMore = true;
 
-          const { data, error } = await query;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('vehicle_comments_unified')
+          .select('comment_id, vehicle_id, comment_text, observed_at, author_username, comment_type, bid_amount, is_seller, platform, comment_url, external_identity_id, media_urls, auction_event_id, source_category, source_slug, user_id, is_editable')
+          .eq('vehicle_id', vehicleId)
+          .order('observed_at', { ascending: false })
+          .range(offset, offset + batchSize - 1);
 
-          if (error) {
-            console.warn(`Error fetching ${table}:`, error);
-            break;
-          }
-
-          if (data && data.length > 0) {
-            allResults.push(...data);
-            offset += batchSize;
-            hasMore = data.length === batchSize; // If we got a full batch, there might be more
-          } else {
-            hasMore = false;
-          }
+        if (error) { console.warn('Error fetching comments:', error); break; }
+        if (data && data.length > 0) {
+          allRows.push(...data);
+          offset += batchSize;
+          hasMore = data.length === batchSize;
+        } else {
+          hasMore = false;
         }
-
-        return { data: allResults, error: null };
-      };
-
-      const [nzeroCommentsResult, auctionCommentsResult, batCommentsResult] = await Promise.all([
-        // Nuke vehicle comments
-        fetchAllComments('vehicle_comments', 'id, user_id, comment_text, created_at, updated_at', 'created_at', 'desc'),
-        
-        // Auction comments (from auction_comments table) - supports: BaT, Cars & Bids, PCar Market, SBX Cars, etc.
-        fetchAllComments('auction_comments', 'id, author_username, comment_text, posted_at, comment_type, bid_amount, is_seller, platform, source_url, auction_event_id, external_identity_id, vehicle_id, media_urls', 'posted_at', 'desc'),
-        
-        // BaT comments (from bat_comments table) - legacy BaT-specific table
-        fetchAllComments('bat_comments', 'id, bat_username, comment_text, comment_timestamp, bat_listing_id, vehicle_id, external_identity_id, contains_bid, is_seller_comment, likes_count', 'comment_timestamp', 'desc')
-      ]);
-
-      const allComments: Comment[] = [];
+      }
 
       const normalizeExternalPlatform = (raw: any): string | null => {
         if (!raw) return null;
         const s = String(raw);
-        if (!s) return null;
         if (s === 'bringatrailer') return 'bat';
         if (s === 'carsandbids') return 'cars_and_bids';
         return s;
       };
 
-      // Resolve auction platform per auction_event_id (auction_comments is multi-platform)
-      const auctionEventIds = [...new Set((auctionCommentsResult.data || []).map((c: any) => c.auction_event_id).filter(Boolean))];
+      const isGarbageCarsAndBidsComment = (text: string): boolean => {
+        const t = String(text || '').trim();
+        if (!t) return true;
+        const lower = t.toLowerCase();
+        return lower.includes('comments & bids') || lower.includes('most upvoted') ||
+          lower.includes('newest') || lower.includes('add a comment') ||
+          lower.includes('bid history') || lower.includes('you just commented') ||
+          lower.startsWith('comments ');
+      };
+
+      // Resolve auction_event platforms in batch
+      const auctionEventIds = [...new Set(allRows.map(c => c.auction_event_id).filter(Boolean))];
       const auctionEventPlatformMap = new Map<string, string>();
       if (auctionEventIds.length > 0) {
         try {
-          const { data: evRows } = await supabase
-            .from('auction_events')
-            .select('id, source')
-            .in('id', auctionEventIds);
+          const { data: evRows } = await supabase.from('auction_events').select('id, source').in('id', auctionEventIds);
           (evRows || []).forEach((r: any) => {
-            const src = r?.source ? String(r.source) : null;
-            const mapped = normalizeExternalPlatform(src);
+            const mapped = normalizeExternalPlatform(r?.source);
             if (r?.id && mapped) auctionEventPlatformMap.set(String(r.id), mapped);
           });
-        } catch {
-          // ignore
-        }
+        } catch { /* ignore */ }
       }
 
-      // Process Nuke comments
-      if (nzeroCommentsResult.data && nzeroCommentsResult.data.length > 0) {
-        const userIds = [...new Set(nzeroCommentsResult.data.map(c => c.user_id).filter(Boolean))];
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, full_name, username, avatar_url')
-          .in('id', userIds);
+      // Resolve external identities for auction usernames
+      const platformHandles = new Map<string, Set<string>>();
+      for (const c of allRows) {
+        if (c.source_category === 'user' || !c.author_username) continue;
+        const p = normalizeExternalPlatform(c.platform || c.source_slug) ||
+          normalizeExternalPlatform(auctionEventPlatformMap.get(String(c.auction_event_id))) || 'bat';
+        const set = platformHandles.get(p) || new Set<string>();
+        set.add(c.author_username);
+        platformHandles.set(p, set);
+      }
 
-        const profilesMap = new Map((profilesData || []).map(p => [p.id, p]));
+      const externalIdentityByKey = new Map<string, any>();
+      for (const [platform, handlesSet] of platformHandles.entries()) {
+        const handles = Array.from(handlesSet);
+        if (handles.length === 0) continue;
+        const { data: externalIds } = await supabase
+          .from('external_identities')
+          .select('id, handle, claimed_by_user_id, profile_url')
+          .eq('platform', platform)
+          .in('handle', handles);
+        (externalIds || []).forEach((e: any) => {
+          if (e?.handle) externalIdentityByKey.set(`${platform}:${e.handle}`, e);
+        });
+      }
 
-        for (const c of nzeroCommentsResult.data) {
-          const profile = profilesMap.get(c.user_id);
+      // Resolve Nuke user profiles
+      const nukeUserIds = [...new Set(allRows.filter(c => c.source_category === 'user' && c.user_id).map(c => c.user_id))];
+      const profilesMap = new Map<string, any>();
+      if (nukeUserIds.length > 0) {
+        const { data: profilesData } = await supabase.from('profiles').select('id, full_name, username, avatar_url').in('id', nukeUserIds);
+        (profilesData || []).forEach(p => profilesMap.set(p.id, p));
+      }
+
+      // Map unified rows to Comment objects
+      const allComments: Comment[] = [];
+
+      for (const c of allRows) {
+        const resolvedPlatform = normalizeExternalPlatform(c.platform || c.source_slug) ||
+          normalizeExternalPlatform(auctionEventPlatformMap.get(String(c.auction_event_id))) || null;
+
+        // Filter garbage C&B comments
+        if (resolvedPlatform === 'cars_and_bids' && isGarbageCarsAndBidsComment(c.comment_text)) continue;
+
+        if (c.source_category === 'user') {
+          // First-party Nuke user comment
+          const profile = c.user_id ? profilesMap.get(c.user_id) : null;
           allComments.push({
-            id: c.id,
+            id: c.comment_id,
             user_id: c.user_id,
             comment_text: c.comment_text,
-            created_at: c.created_at,
-            updated_at: c.updated_at,
+            created_at: c.observed_at,
+            updated_at: c.observed_at,
             user_name: profile?.full_name || profile?.username || 'User',
             user_avatar: profile?.avatar_url,
             source: 'nzero'
           });
-        }
-      }
+        } else {
+          // Auction / observation comment
+          const identity = c.author_username
+            ? (externalIdentityByKey.get(`${resolvedPlatform || 'bat'}:${c.author_username}`) || null)
+            : null;
 
-      // Process auction comments (from auction_comments table)
-      if (auctionCommentsResult.data && auctionCommentsResult.data.length > 0) {
-        const isGarbageCarsAndBidsComment = (text: string): boolean => {
-          const t = String(text || '').trim();
-          if (!t) return true;
-          const lower = t.toLowerCase();
-          if (lower.includes('comments & bids')) return true;
-          if (lower.includes('most upvoted')) return true;
-          if (lower.includes('newest')) return true;
-          if (lower.includes('add a comment')) return true;
-          if (lower.includes('bid history')) return true;
-          if (lower.includes('you just commented')) return true;
-          if (lower.startsWith('comments ')) return true;
-          return false;
-        };
-
-        // Get external identities for usernames by platform (bat, cars_and_bids, etc.)
-        const platformHandles = new Map<string, Set<string>>();
-        for (const c of auctionCommentsResult.data as any[]) {
-          const handle = c.author_username;
-          if (!handle) continue;
-          const eventPlatform =
-            normalizeExternalPlatform(c.platform ? String(c.platform) : null) ||
-            normalizeExternalPlatform(auctionEventPlatformMap.get(String(c.auction_event_id))) ||
-            null;
-          const p = (eventPlatform || 'bat').toString();
-          const set = platformHandles.get(p) || new Set<string>();
-          set.add(handle);
-          platformHandles.set(p, set);
-        }
-
-        const externalIdentityByPlatformHandle = new Map<string, any>();
-        for (const [platform, handlesSet] of platformHandles.entries()) {
-          const handles = Array.from(handlesSet);
-          if (handles.length === 0) continue;
-          const { data: externalIds } = await supabase
-            .from('external_identities')
-            .select('id, handle, claimed_by_user_id, profile_url')
-            .eq('platform', platform)
-            .in('handle', handles);
-          (externalIds || []).forEach((e: any) => {
-            if (e?.handle) externalIdentityByPlatformHandle.set(`${platform}:${e.handle}`, e);
-          });
-        }
-
-        for (const c of auctionCommentsResult.data) {
-          const auctionPlatform =
-            normalizeExternalPlatform((c as any).platform ? String((c as any).platform) : null) ||
-            normalizeExternalPlatform(auctionEventPlatformMap.get(String((c as any).auction_event_id))) ||
-            null;
-
-          if (auctionPlatform === 'cars_and_bids' && isGarbageCarsAndBidsComment(String(c.comment_text || ''))) {
-            continue;
-          }
-
-          const identity =
-            (auctionPlatform && c.author_username ? externalIdentityByPlatformHandle.get(`${auctionPlatform}:${c.author_username}`) : null) ||
-            (!auctionPlatform && c.author_username ? externalIdentityByPlatformHandle.get(`bat:${c.author_username}`) : null) ||
-            null;
-
-          // Convert bid_amount properly - handle both numeric and string types
-          let bidAmount: number | undefined = undefined;
+          let bidAmount: number | undefined;
           if (c.bid_amount != null) {
             const num = typeof c.bid_amount === 'number' ? c.bid_amount : Number(c.bid_amount);
-            if (!isNaN(num) && num > 0) {
-              bidAmount = num;
-            }
+            if (!isNaN(num) && num > 0) bidAmount = num;
           }
-          
-          // Determine source based on platform
-          let commentSource: 'auction' | 'bat' | 'facebook' | 'instagram' | 'sbx' | 'pcar' | 'cars_and_bids' = 'auction';
-          if (auctionPlatform === 'bat' || auctionPlatform === 'bringatrailer') {
-            commentSource = 'bat';
-          } else if (auctionPlatform === 'cars_and_bids' || auctionPlatform === 'carsandbids') {
-            commentSource = 'cars_and_bids';
-          } else if (auctionPlatform === 'pcarmarket' || auctionPlatform === 'pcar') {
-            commentSource = 'pcar';
-          } else if (auctionPlatform === 'sbx' || auctionPlatform === 'sbxcars') {
-            commentSource = 'sbx';
-          } else if (auctionPlatform === 'facebook') {
-            commentSource = 'facebook';
-          } else if (auctionPlatform === 'instagram') {
-            commentSource = 'instagram';
-          }
-          
+
+          let commentSource: Comment['source'] = 'auction';
+          if (resolvedPlatform === 'bat') commentSource = 'bat';
+          else if (resolvedPlatform === 'cars_and_bids') commentSource = 'cars_and_bids';
+          else if (resolvedPlatform === 'pcarmarket' || resolvedPlatform === 'pcar') commentSource = 'pcar';
+          else if (resolvedPlatform === 'sbx' || resolvedPlatform === 'sbxcars') commentSource = 'sbx';
+          else if (resolvedPlatform === 'facebook') commentSource = 'facebook';
+          else if (resolvedPlatform === 'instagram') commentSource = 'instagram';
+
           allComments.push({
-            id: `auction-${c.id}`,
+            id: c.comment_id,
             user_id: identity?.claimed_by_user_id || null,
             author_username: c.author_username,
             comment_text: c.comment_text,
-            created_at: c.posted_at,
-            posted_at: c.posted_at,
+            created_at: c.observed_at,
+            posted_at: c.observed_at,
             user_name: c.author_username,
             comment_type: c.comment_type || (bidAmount ? 'bid' : undefined),
             bid_amount: bidAmount,
             is_seller: c.is_seller,
             source: commentSource,
-            auction_platform: auctionPlatform,
+            auction_platform: resolvedPlatform,
             external_identity_id: identity?.id || c.external_identity_id,
             user_avatar: identity?.profile_url || undefined,
             media_urls: Array.isArray(c.media_urls) ? c.media_urls : undefined,
-            comment_url: c.source_url || undefined
+            comment_url: c.comment_url || undefined
           });
         }
       }
-
-      // Process BaT comments (from bat_comments table) - THIS WAS MISSING!
-      if (batCommentsResult.data && batCommentsResult.data.length > 0) {
-        // Get external_identity_id for BaT usernames to link to profiles
-        const batUsernames = [...new Set(batCommentsResult.data.map(c => c.bat_username).filter(Boolean))];
-        const { data: externalIds } = await supabase
-          .from('external_identities')
-          .select('id, handle, claimed_by_user_id, profile_url')
-          .eq('platform', 'bat')
-          .in('handle', batUsernames);
-
-        const identityMap = new Map((externalIds || []).map(e => [e.handle, e]));
-
-        for (const c of batCommentsResult.data) {
-          const identity = identityMap.get(c.bat_username) || (c.external_identity_id ? externalIds?.find(e => e.id === c.external_identity_id) : null);
-
-          const commentText = String(c.comment_text || '');
-          const soldMatch = commentText.match(/\bsold\s+for\s+\$?\s*([\d,]+)/i);
-
-          // BaT can set contains_bid=true for "Sold for $X" comments. Treat those as SOLD (not BID).
-          let commentType: 'comment' | 'bid' | 'sold' = 'comment';
-          let amount: number | undefined = undefined;
-
-          if (soldMatch) {
-            commentType = 'sold';
-            const n = Number(String(soldMatch[1] || '').replace(/,/g, ''));
-            if (!Number.isNaN(n) && n > 0) amount = n;
-          } else if (c.contains_bid) {
-            commentType = 'bid';
-            const bidMatch = commentText.match(/\$?\s*([\d,]+)/);
-            if (bidMatch) {
-              const n = Number(String(bidMatch[1] || '').replace(/,/g, ''));
-              if (!Number.isNaN(n) && n > 0) amount = n;
-            }
-          }
-
-          allComments.push({
-            id: `bat-comment-${c.id}`,
-            user_id: identity?.claimed_by_user_id || null,
-            author_username: c.bat_username,
-            comment_text: commentText,
-            created_at: c.comment_timestamp,
-            posted_at: c.comment_timestamp,
-            user_name: c.bat_username,
-            comment_type: commentType,
-            bid_amount: amount,
-            is_seller: c.is_seller_comment,
-            source: 'bat',
-            external_identity_id: identity?.id || c.external_identity_id,
-            user_avatar: identity?.profile_url || undefined
-          });
-        }
-      }
-
-      // Sort all comments by date (most recent first)
-      allComments.sort((a, b) => {
-        const dateA = new Date(a.posted_at || a.created_at).getTime();
-        const dateB = new Date(b.posted_at || b.created_at).getTime();
-        return dateB - dateA;
-      });
 
       setComments(allComments);
     } catch (err) {
@@ -379,10 +256,11 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
     setPosting(true);
     try {
       const { error } = await supabase
-        .from('vehicle_comments')
+        .from('user_comments')
         .insert({
           vehicle_id: vehicleId,
           user_id: session.user.id,
+          target_type: 'vehicle',
           comment_text: newComment.trim(),
           created_at: new Date().toISOString()
         });
@@ -415,7 +293,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
     setUpdating(true);
     try {
       const { error } = await supabase
-        .from('vehicle_comments')
+        .from('user_comments')
         .update({
           comment_text: editingText.trim(),
           updated_at: new Date().toISOString()

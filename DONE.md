@@ -4568,3 +4568,12 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - Multi-model pipeline: qwen2.5:7b grinding at ~100/hr (3,385 done), 0 API cost
 - Schema: description_discoveries now (vehicle_id, model_used) unique — multi-model provenance enabled
 - Total description_discoveries: 13,121 across 4 models
+
+### [refinery] Comment Refinery — Pipeline Foundation (Phases 1-2)
+- **`_shared/commentRefinery.ts`** — Shared utilities: claim density scoring (25 regex patterns across 5 categories), prompt builder for schema-guided per-comment claim extraction, response parser with quote verification, temporal decay computation (paint 2yr, rust 5yr, specs no decay), corroboration engine (cross-refs field_evidence, VIN decode, photos).
+- **`comment_claims_progress` table** — Processing tracker: comment_id, vehicle_id, claim_density_score, llm_processed, claims_extracted. Indexes on vehicle, pending queue, density ranking.
+- **`compute_temporal_decay()` DB function** — Immutable SQL function for condition claim half-lives.
+- **`data_source_trust_hierarchy`** entry — auction_comment_claim at trust level 45 (requires corroboration).
+- **`analysis_widgets`** entry — comment-refinery-coverage widget registered.
+- **`analyze-comments-fast` claim_triage mode** — Zero-cost regex pre-filter. Tested: 57 comments triaged, 4 passed (7% pass rate). Correctly identifies substantive claims (condition, provenance, ownership) and filters noise (congrats, jokes, short reactions).
+- **`batch-comment-discovery` extract_claims mode** — LLM claim extraction pipeline. Gemini 2.5 Flash primary (free), Haiku fallback. Batches 10 comments per LLM call, writes Category A/B claims to field_evidence, updates comment_claims_progress. Self-chaining. **Blocked on LLM credits** — both Anthropic and Google quotas exhausted. Pipeline code is production-ready.

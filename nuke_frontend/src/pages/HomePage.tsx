@@ -4,8 +4,6 @@ import { useAuth } from '../hooks/useAuth';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { supabase } from '../lib/supabase';
 import { useVehiclesDashboard } from '../hooks/useVehiclesDashboard';
-import { useAppLayoutContext } from '../components/layout/AppLayoutContext';
-import { GarageToolbar } from '../components/garage/GarageToolbar';
 import { applyNonAutoFilters } from '../lib/nonAutoExclusion';
 import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlideshow';
 import { MiniDistribution, PriceDistributionChart } from '../components/charts/PriceDistribution';
@@ -799,8 +797,6 @@ export default function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const [showFeed, setShowFeed] = useState(false);
-  const { setToolbarSlot } = useAppLayoutContext();
-
   const defaultTab = useMemo(() => {
     const fromUrl = searchParams.get('tab') as TabId | null;
     if (fromUrl && TABS.some((t) => t.id === fromUrl)) return fromUrl;
@@ -813,44 +809,6 @@ export default function HomePage() {
 
   // Garage dashboard state — lifted here so toolbar + GarageTab share it
   const garage = useVehiclesDashboard(user?.id);
-
-  // Register / unregister the garage toolbar in the AppHeader
-  useEffect(() => {
-    if (activeTab === 'garage' && user && !garage.isLoading) {
-      setToolbarSlot(
-        <GarageToolbar
-          vehicleCount={garage.vehicles.length}
-          totalValue={garage.totalEstimatedValue}
-          viewMode={garage.viewMode}
-          sortMode={garage.sortMode}
-          filterMode={garage.filterMode}
-          onViewChange={garage.setViewMode}
-          onSortChange={garage.setSortMode}
-          onFilterChange={garage.setFilterMode}
-        />
-      );
-    } else {
-      setToolbarSlot(null);
-    }
-  }, [
-    activeTab,
-    user,
-    garage.isLoading,
-    garage.vehicles.length,
-    garage.totalEstimatedValue,
-    garage.viewMode,
-    garage.sortMode,
-    garage.filterMode,
-    garage.setViewMode,
-    garage.setSortMode,
-    garage.setFilterMode,
-    setToolbarSlot,
-  ]);
-
-  // Clean up toolbar on unmount
-  useEffect(() => {
-    return () => setToolbarSlot(null);
-  }, [setToolbarSlot]);
 
   useEffect(() => {
     if (authLoading) return;

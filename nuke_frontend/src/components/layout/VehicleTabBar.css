@@ -7,6 +7,9 @@
   align-items: flex-end;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 40px; /* below the 40px header */
+  z-index: 999;
 }
 
 .vehicle-tab-bar::-webkit-scrollbar {

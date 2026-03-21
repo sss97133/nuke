@@ -21,3 +21,6 @@
 09:20 | LOCAL-LLM-SETUP | Downloading DeepSeek R1 32B + Qwen3 30B-A3B to SSD, built Modelfile + Modal fine-tuning pipeline | yono/Modelfile.nuke, yono/Modelfile.nuke-agent, yono/export_nuke_training_data.py, yono/modal_nuke_agent_train.py
 Fri Mar 20 17:31:17 PDT 2026
 17:31 | MCP-ONBOARDING | Implementing user onboarding + account linking (5 MCP tools, migration, both servers) | supabase/functions/mcp-connector/index.ts, mcp-server/src/index.ts, DB migration
+2026-03-20 18:36 | frontend-bugfix | Tier 1-2 bugs across feed, vehicle-profile, search, auctions | Files: nuke_frontend/src/
+2026-03-21 10:00 | TRIPLE-PRIORITY | (1) YONO sidecar status, (2) pHash entity resolution for rare car dedup, (3) vision enrichment sweep | yono/*, scripts/*, supabase/functions/dedup-*
+2026-03-21 11:00 | BACKEND-FOUNDATIONS | (1) FB image backfill script, (2) vehicle_submissions table, (3) stale auction cleanup | scripts/backfill-fb-images.mjs, DB migrations, vehicle_events

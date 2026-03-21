@@ -226,8 +226,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     if (!vehicleId) return;
     try {
       const { count } = await supabase
-        .from('vehicle_comments')
-        .select('id', { count: 'exact', head: true })
+        .from('vehicle_comments_unified')
+        .select('comment_id', { count: 'exact', head: true })
         .eq('vehicle_id', vehicleId);
       if (count !== null) setTotalCommentCount(count);
     } catch { /* ignore */ }

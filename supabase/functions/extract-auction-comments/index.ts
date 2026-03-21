@@ -792,28 +792,8 @@ Deno.serve(async (req) => {
       }
 
       if (batListingId) {
-        const batCommentRows = commentsWithIdentities.map((c: any) => ({
-          bat_listing_id: batListingId,
-          vehicle_id: vehicleId,
-          bat_username: String(c.author_username || 'Unknown'),
-          external_identity_id: c.external_identity_id,
-          content_hash: c.content_hash,
-          comment_text: String(c.comment_text || ''),
-          comment_html: null,
-          comment_timestamp: c.posted_at,
-          scraped_at: nowIso,
-          bat_comment_id: null,
-          comment_url: null,
-          is_seller_comment: !!c.is_seller,
-          likes_count: typeof c.comment_likes === 'number' && Number.isFinite(c.comment_likes) ? Math.max(0, Math.floor(c.comment_likes)) : 0,
-          replies_count: 0,
-          parent_comment_id: null,
-          updated_at: nowIso,
-        }))
-
-        await supabase
-          .from('bat_comments')
-          .upsert(batCommentRows, { onConflict: 'bat_listing_id,content_hash' })
+        // NOTE: bat_comments upsert removed — auction_comments is the canonical store.
+        // bat_comments is deprecated; reads go through vehicle_comments_unified VIEW.
 
         const bidRows = commentsWithIdentities
           .filter((c: any) => typeof c?.bid_amount === 'number' && Number.isFinite(c.bid_amount) && c.bid_amount > 0)
