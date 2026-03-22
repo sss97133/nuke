@@ -34,7 +34,7 @@ export interface BrowseStats {
 
 const DEFAULT_FILTERS: VehicleFilters = {
   make: '', priceMin: '', priceMax: '', yearMin: '', yearMax: '',
-  mileageMax: '', transmission: '', listingStatus: '', showFilters: true,
+  mileageMax: '', transmission: '', listingStatus: '', showFilters: false,
 };
 
 type SearchFilter = 'all' | SearchResultType;
