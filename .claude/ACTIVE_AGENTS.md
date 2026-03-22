@@ -22,5 +22,8 @@
 Fri Mar 20 17:31:17 PDT 2026
 17:31 | MCP-ONBOARDING | Implementing user onboarding + account linking (5 MCP tools, migration, both servers) | supabase/functions/mcp-connector/index.ts, mcp-server/src/index.ts, DB migration
 2026-03-20 18:36 | frontend-bugfix | Tier 1-2 bugs across feed, vehicle-profile, search, auctions | Files: nuke_frontend/src/
-2026-03-21 10:00 | TRIPLE-PRIORITY | (1) YONO sidecar status, (2) pHash entity resolution for rare car dedup, (3) vision enrichment sweep | yono/*, scripts/*, supabase/functions/dedup-*
-2026-03-21 11:00 | BACKEND-FOUNDATIONS | (1) FB image backfill script, (2) vehicle_submissions table, (3) stale auction cleanup | scripts/backfill-fb-images.mjs, DB migrations, vehicle_events
+2026-03-21 10:00 | AUTONOMOUS-SESSION | DONE — Entity resolution rules, URL normalization (12 platforms), 31.5K records cleaned, hero fingerprints table + 401 computed, merge_proposals with AI verification, data quality report across 7 luxury makes. Background: hero fingerprint computation running (5K batch).
+2026-03-21 12:00 | LLM-ENRICHMENT | 4hr autonomous: run enrichment batches, refine model prompts, fill library gaps, test all models | scripts/overnight-enrichment.mjs, yono/*, docs/library/*
+2026-03-21 | URL-NORMALIZATION | DONE — URL normalization wired into extract-jamesedition + dedup-vehicles normalized mode + ingest-observation discovery_url search
+2026-03-21 14:00 | DATA-QUALITY-SESSION | DONE — All phases complete. Hero fingerprints restarted (PID 30637) with FK fix, 8.2K computed. FB pipeline done (192 linked). Ghost cleanup done (8K archived).
+2026-03-21 14:00 | FB-SCRAPER | 4 groups running (PIDs 80053/80063/80073/80118) across 58 metros, 50 pages each | scripts/fb-marketplace-local-scraper.mjs, vehicles, vehicle_images, marketplace_listings
