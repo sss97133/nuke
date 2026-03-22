@@ -196,7 +196,16 @@ const VehicleProfileInner: React.FC = () => {
   }
   return (
       <div className="vehicle-profile-page">
-        {/* Vehicle Sub-Header — sticky badge bar (replaces old VehicleHeader) */}
+        {/* VehicleHeader — hidden visually but kept for data/context/height logic */}
+        <div ref={vehicleHeaderRef} style={{ display: 'none' }}>
+          <React.Suspense fallback={null}>
+            <VehicleHeader
+              onClaimClick={() => setShowOwnershipClaim(true)}
+            />
+          </React.Suspense>
+        </div>
+
+        {/* Vehicle Sub-Header — sticky badge bar */}
         <React.Suspense fallback={null}>
           <VehicleSubHeader />
         </React.Suspense>
