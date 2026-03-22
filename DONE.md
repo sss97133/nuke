@@ -4707,3 +4707,90 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 ### [phase-0] Foundation Fixes
 - Phase 0.3 DONE: agent_tier, extraction_method, raw_source_ref on vehicle_observations
 - Phase 0.4 DONE: CHECK constraint already includes pending_review/pending_strategy
+
+### [backend] FB Image Second Pass — Investigation Complete
+- **1,688 images recovered** in first pass (CDN direct download, 24.9% success rate)
+- **5,091 remaining** with expired CDN URLs — curl to FB listing pages works but rate-limited (~10 req/IP window)
+- Node.js fetch gets login-walled by FB TLS fingerprinting — must use curl subprocess with clean env
+- `marketplace_listings.all_images` also stores expired CDN URLs (same tokens)
+- **Best path: re-run fb-marketplace-local-scraper.mjs** which uses GraphQL doc_id at scale (residential IP, proven at 58 metros). v3.0 already persists images via downloadAndStoreImage.
+- Added curl subprocess + clean env + rate limiting to backfill script for future use
+
+### [auction-pipeline] Stale Auction Cleanup Automation
+- Created `cleanup_ended_auctions(batch_limit)` SQL function — marks auction_live vehicles as ended when auction_end_date has passed (10-min grace for soft-close)
+- Cron job 424: runs hourly at :05 (`SELECT cleanup_ended_auctions(500)`)
+- First run cleaned 42 stale auctions
+
+### [auction-pipeline] Barrett-Jackson — Not Broken
+- extract-barrett-jackson returns 400 when called without body params (expected behavior)
+- BJ cron (job 418) calls batch-extract-snapshots, not extract-barrett-jackson directly
+- Extractor v2.0.0 working: 29,614 BJ vehicles, 90.3% price coverage
+
+### [auction-pipeline] Cars & Bids Sync — Restored
+- Tested sync-live-auctions with platform=cars-and-bids: 197 live auctions synced in 10.4s
+- Cron job 423 created at :22/:52 schedule
+
+### [data-quality] Phase 1 Bug Fix — Hero Fingerprint FK Violation
+- `compute-hero-fingerprints.mjs`: Added FK violation retry (NULL image_ids on constraint error)
+- Restarted 50K batch (PID 30637), 8,262 fingerprints computed before fix applied
+- FB pipeline complete: 192 linked, 124 new vehicles, 299 stubs cleaned
+
+### [refinery] Comment Refinery — Scale Run + Frontend Wiring
+- **Batch triage:** 22,285 comments across top 50 BaT vehicles (by comment count). 6% pass rate.
+- **Local Ollama extraction:** 1,232 comments processed via qwen2.5:7b, 573 claims extracted, 69 field_evidence rows, $0 cost.
+- **Vehicles processed:** Ferrari LaFerrari, 1971 240Z ($310K sale), Mercedes 300SL Gullwing (restoration costs $200K-$600K), BMW 507, Corvette L88 (427/560hp), Ferrari F40, Porsche 959, Singer 911, Sherman M4A1 tank, BMW M3 E30, Shelby GT350, Porsche 356C — crown jewels of BaT.
+- **Frontend wiring:** Added `auction_comment_claim` to useFieldEvidence trust hierarchy (level 45). Dossier panel already renders field_evidence with provenance drawers — comment claims will show alongside listing data.
+- **Prompt fix:** field_name now constrained to exact dossier vocabulary (engine_type, mileage, transmission, etc.) — prevents piped multi-field names that don't match frontend.
+- **Scripts:** `scripts/refinery-triage-batch.mjs` (batch triage by vehicle), `scripts/refinery-extract-claims.mjs` (local Ollama extraction). Both production-ready.
+- **Known issue:** ingest-observation returns non-2xx for Category C claims (provenance/sightings). Fix needed.
+- **Re-extraction needed:** First 47 vehicles have messy field_names from pre-fix prompt. Re-run with fixed prompt.
+
+### [feed] Feed Ranking Overhaul — Auctions Now Dominate
+- **Root cause**: `vehicle_valuation_feed` MV used `v.discovery_source` which was NULL for 5,344 live auctions (sync writes to `platform_source` not `discovery_source`). All auctions scored 50, FB scored 120.
+- **Fix**: Rebuilt MV with `COALESCE(v.platform_source, v.discovery_source)` and new ranking:
+  - Live auction: +200, BaT source: +100, CC/C&B/Mecum: +80, FB: -30
+  - BaT live auctions now score 350 vs FB at 120
+- **Feed-query CDN filter**: Thumbnail resolution now skips expired fbcdn/scontent URLs — no more "IMAGE UNAVAILABLE" cards
+- **Non-auto filter**: FB vehicles with null `canonical_vehicle_type` excluded (boats/RVs/trailers)
+- **MV refresh cron**: Job 425, every 15 min
+- Deployed: `feed-query`, `sync-live-auctions`
+
+### [feed] Materialized View — Missing Refresh Cron Found
+- `vehicle_valuation_feed` had NO cron job refreshing it — last autoanalyze was March 19
+- New vehicles were invisible to the feed for 2 days
+- Created cron job 425: `REFRESH MATERIALIZED VIEW CONCURRENTLY vehicle_valuation_feed` every 15 min
+
+## 2026-03-21
+
+### [design] Header rework — one row, three zones, 40px
+- Eliminated 4-variant header system (command-line, segmented, two-row, minimal)
+- Single layout: NUKE wordmark | AIDataIngestionSearch | user capsule
+- Deleted 5 files: 4 variant layouts + useHeaderVariant hook
+- Removed toolbar slot from AppLayoutContext
+- Moved VehicleTabBar and PageHeader into content area
+- Removed variant picker from UserDropdown and AppearanceSpecimen
+
+### [design] Vehicle profile fixes
+- Empty spec rows hidden (no more "—" for null fields)
+- Vehicle dossier identity block hidden (was repeating YMM from badges)
+- Incomplete profile banner minimized to single-line indicator
+- Gallery thumbnails default to contain (stop cropping)
+- VehicleSubHeader badge bar visible via CSS swap (VehicleHeader hidden but mounted)
+
+### [library] 2,862 lines across 9 files
+- Discourse: The Header (471 lines) — naming, nesting, agentic-first, timelessness
+- Discourse: The Bridge (414 lines) — design audit, physical-digital bridge, three user modes
+- Discourse: The Audit (400+ lines) — live site problems cataloged with fixes
+- Design Book Ch. 1: Foundations (253 lines) — why Arial, why sharp corners, why 8px, Bloomberg/Win95
+- Design Book Ch. 5: The Header (259 lines) — implementation spec
+- Contemplation: The Permanent Interface (143 lines) — what survives, what dies
+- Contemplation: Click Anxiety and Digital Trust (177 lines) — psychology of interface trust
+- Contemplation: The Three Users and the Finder (285 lines) — savant janitor, archivist, browser
+- Paper: The Agentic Header (235 lines) — navigation vs intent expression
+- Dictionary: 17 new terms with intellectual-shelf-depth definitions
+
+### [mistakes] Production breakage
+- hasImages:true default emptied the feed (most vehicles lack imported images)
+- Removing VehicleHeader from render tree broke profile data flow
+- Three broken pushes to production without local testing
+- Lesson: branch, local dev, verify, then merge
