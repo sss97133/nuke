@@ -31,22 +31,7 @@ export default function Search() {
 
   return (
     <div style={{ padding: '12px', maxWidth: '1200px', margin: '0 auto' }}>
-      {/* Browse stats — total count, avg price, model/source/era breakdown */}
-      {query && browseStats && browseStats.total > 0 && (
-        <SearchStatsBar stats={browseStats} make={detectedMake} />
-      )}
-
-      {/* Filter panel — only when results contain vehicles */}
-      {query && vehicleCount > 0 && (
-        <SearchFilterPanel
-          filters={filters}
-          onChange={setFilters}
-          vehicleCount={vehicleCount}
-          displayVehicleCount={displayVehicleCount}
-        />
-      )}
-
-      {/* Results */}
+      {/* Results first — the thing you came here for */}
       {query && (
         <div ref={resultsRef}>
           <SearchResults
@@ -63,7 +48,22 @@ export default function Search() {
         </div>
       )}
 
-      {/* Empty state — browse facets + recent vehicles */}
+      {/* Filter panel — collapsed by default, below results summary */}
+      {query && vehicleCount > 0 && (
+        <SearchFilterPanel
+          filters={filters}
+          onChange={setFilters}
+          vehicleCount={vehicleCount}
+          displayVehicleCount={displayVehicleCount}
+        />
+      )}
+
+      {/* Browse stats — context about the make, below results */}
+      {query && browseStats && browseStats.total > 0 && (
+        <SearchStatsBar stats={browseStats} make={detectedMake} />
+      )}
+
+      {/* Empty state */}
       {!query && !loading && (
         <SearchEmptyState
           recentVehicles={emptyState.recentVehicles}

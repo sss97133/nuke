@@ -615,24 +615,32 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                     {/* Deep match snippet — shows WHY this result matched */}
                     {result.metadata?.deep_snippet && (
                       <div style={{
-                        padding: '4px 8px',
-                        fontSize: '9px',
-                        lineHeight: 1.4,
-                        color: 'var(--text-secondary)',
+                        padding: '6px 10px',
+                        fontSize: '10px',
+                        lineHeight: 1.5,
+                        color: 'var(--text)',
                         background: 'var(--surface)',
-                        borderTop: '1px solid var(--border)',
-                        overflow: 'hidden',
-                        maxHeight: '36px',
+                        border: '2px solid var(--border)',
+                        borderTop: 'none',
                       }}>
                         <span style={{
-                          fontWeight: 700, fontSize: '8px', textTransform: 'uppercase',
-                          letterSpacing: '0.5px', color: 'var(--text-disabled)', marginRight: '4px',
+                          display: 'inline-block',
+                          fontWeight: 800, fontSize: '8px', textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          padding: '1px 5px',
+                          marginRight: '6px',
+                          background: result.metadata.deep_match_source === 'comment' ? 'var(--text)' : 'var(--border)',
+                          color: result.metadata.deep_match_source === 'comment' ? 'var(--surface)' : 'var(--text)',
                         }}>
                           {result.metadata.deep_match_source === 'comment' ? 'COMMENT' :
-                           result.metadata.deep_match_source === 'description' ? 'DESCRIPTION' :
+                           result.metadata.deep_match_source === 'description' ? 'DESC' :
                            result.metadata.deep_match_source === 'evidence' ? 'EVIDENCE' : 'MATCH'}
                         </span>
-                        {result.metadata.deep_snippet.replace(/\*\*/g, '')}
+                        <span dangerouslySetInnerHTML={{
+                          __html: result.metadata.deep_snippet
+                            .replace(/\*\*([^*]+)\*\*/g, '<b style="color:var(--text);background:rgba(255,200,0,0.15)">$1</b>')
+                            .slice(0, 200)
+                        }} />
                       </div>
                     )}
                   </div>
