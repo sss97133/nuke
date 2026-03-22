@@ -196,16 +196,7 @@ const VehicleProfileInner: React.FC = () => {
   }
   return (
       <div className="vehicle-profile-page">
-        {/* Vehicle Sub-Header with Price — sticky, z-900 per V3 spec */}
-        <div ref={vehicleHeaderRef} className="vehicle-profile-sub-header" style={{ position: 'sticky', top: 'var(--header-height, 40px)', zIndex: 900, background: 'var(--surface)', borderBottom: '2px solid var(--border)' }}>
-          <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading header...</div>}>
-            <VehicleHeader
-              onClaimClick={() => setShowOwnershipClaim(true)}
-            />
-          </React.Suspense>
-        </div>
-
-        {/* Vehicle Sub-Header — sticky badge bar */}
+        {/* Vehicle Sub-Header — sticky badge bar (replaces old VehicleHeader) */}
         <React.Suspense fallback={null}>
           <VehicleSubHeader />
         </React.Suspense>
