@@ -856,8 +856,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Sort by relevance
-    results.sort((a, b) => b.relevance_score - a.relevance_score);
+    // Sort by relevance, with image boost (results with photos rank higher)
+    results.sort((a, b) => {
+      const aScore = a.relevance_score + (a.image_url ? 0.15 : 0);
+      const bScore = b.relevance_score + (b.image_url ? 0.15 : 0);
+      return bScore - aScore;
+    });
 
     // --- FUZZY FALLBACK (typo tolerance) ---
     // If we have fewer than 3 vehicle results, try trigram fuzzy search
