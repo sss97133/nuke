@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { useVehicleProfile } from './VehicleProfileContext';
+import { useBuildProfile } from './hooks/useBuildProfile';
 
 // Lazy-load heavy components
 const WorkMemorySection = React.lazy(() => import('./WorkMemorySection'));
@@ -20,7 +21,11 @@ const BundleReviewQueue = React.lazy(() => import('../../components/images/Bundl
 const ImageGallery = React.lazy(() => import('../../components/images/ImageGallery'));
 const VehicleVideoSection = React.lazy(() => import('../../components/vehicle/VehicleVideoSection'));
 const VehicleScoresWidget = React.lazy(() => import('./VehicleScoresWidget'));
+const AuctionReadinessPanel = React.lazy(() => import('./AuctionReadinessPanel'));
 const ColumnDivider = React.lazy(() => import('./ColumnDivider'));
+const BuildManifestPanel = React.lazy(() => import('./BuildManifestPanel'));
+const BuildTimelineChart = React.lazy(() => import('./BuildTimelineChart'));
+const BuildSpendSummary = React.lazy(() => import('./BuildSpendSummary'));
 
 export type GalleryViewMode = 'ZONES' | 'GRID' | 'FULL' | 'INFO' | 'SESSIONS' | 'CATEGORY' | 'CHRONO' | 'SOURCE';
 
@@ -110,6 +115,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   const [galleryCols, setGalleryCols] = useState(3);
   const [leftPct, setLeftPct] = useState(DEFAULT_LEFT_PCT);
   const [galleryView, setGalleryView] = useState<GalleryViewMode>('CATEGORY');
+  const { manifestByCategory, manifestStats, snapshots, spendProfile, loading: buildLoading } = useBuildProfile(vehicle?.id);
 
   const handleResize = useCallback((pct: number) => setLeftPct(pct), []);
   const handleReset = useCallback(() => setLeftPct(DEFAULT_LEFT_PCT), []);
@@ -189,6 +195,31 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           />
 
           {/* Timeline — single timeline is the barcode strip at top of profile; no second timeline section here */}
+
+          {/* Build Intelligence — owner/contributor only */}
+          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && !buildLoading && manifestStats.total > 0 && (
+            <>
+              <CollapsibleWidget variant="profile" title="Build Manifest" defaultCollapsed={true}
+                badge={<span className="widget__count">{manifestStats.purchased}/{manifestStats.total}</span>}
+              >
+                <React.Suspense fallback={null}>
+                  {spendProfile && <BuildSpendSummary spendProfile={spendProfile} manifestStats={manifestStats} />}
+                  <div style={{ marginTop: '8px' }}>
+                    <BuildManifestPanel manifestByCategory={manifestByCategory} manifestStats={manifestStats} />
+                  </div>
+                </React.Suspense>
+              </CollapsibleWidget>
+              {snapshots.length > 0 && (
+                <CollapsibleWidget variant="profile" title="Build Timeline" defaultCollapsed={true}
+                  badge={<span className="widget__count">{snapshots.length} MONTHS</span>}
+                >
+                  <React.Suspense fallback={null}>
+                    <BuildTimelineChart snapshots={snapshots} />
+                  </React.Suspense>
+                </CollapsibleWidget>
+              )}
+            </>
+          )}
 
           {/* Engine Bay Analysis */}
           {(vehicle as any)?.origin_metadata?.engine_bay_analysis?.engine_family && (
@@ -380,6 +411,11 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {/* Vehicle Scores */}
           <React.Suspense fallback={null}>
             <VehicleScoresWidget />
+          </React.Suspense>
+
+          {/* Auction Readiness */}
+          <React.Suspense fallback={null}>
+            <AuctionReadinessPanel />
           </React.Suspense>
 
           {/* Videos */}

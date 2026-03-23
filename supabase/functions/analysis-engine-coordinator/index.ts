@@ -449,6 +449,62 @@ async function upsertSignal(
   };
 }
 
+// ─── Backfill: ARS-scored vehicles with no analysis signals ──────────
+
+async function handleBackfillAuctions(
+  supabase: any,
+  batchSize: number
+): Promise<unknown> {
+  const limit = Math.min(batchSize, 100);
+
+  // Find vehicles with auction_readiness scores but zero analysis_signals rows.
+  // Use auction_readiness table directly, then filter out those already in analysis_signals.
+  const { data: arsVehicles, error: arsErr } = await supabase
+    .from("auction_readiness")
+    .select("vehicle_id")
+    .order("composite_score", { ascending: false })
+    .limit(limit * 3); // over-fetch since we filter below
+
+  if (arsErr || !arsVehicles?.length) {
+    return { error: arsErr?.message ?? "no_ars_vehicles", queued: 0 };
+  }
+
+  // Check which of these already have signals
+  const vehicleIds = arsVehicles.map((r: any) => r.vehicle_id);
+  const { data: existingSignals } = await supabase
+    .from("analysis_signals")
+    .select("vehicle_id")
+    .in("vehicle_id", vehicleIds.slice(0, 200));
+
+  const hasSignals = new Set((existingSignals ?? []).map((r: any) => r.vehicle_id));
+  const rows = vehicleIds.filter((id: string) => !hasSignals.has(id)).slice(0, limit);
+
+  let queued = 0;
+  for (const vid of rows) {
+    if (!vid) continue;
+    const { error } = await supabase.from("analysis_queue").upsert(
+      {
+        vehicle_id: vid,
+        trigger_source: "backfill_auctions",
+        trigger_reasons: ["ars_scored_no_signals"],
+        status: "pending",
+        priority: 30, // Lower than sweep (50) and observation (70)
+      },
+      { onConflict: "vehicle_id", ignoreDuplicates: true }
+    );
+    if (!error) queued++;
+  }
+
+  // Now process the queue
+  const processResult = await processQueue(supabase, batchSize);
+
+  return {
+    candidates_found: rows.length,
+    queued,
+    ...processResult,
+  };
+}
+
 // ─── Actions ─────────────────────────────────────────────────────────
 
 async function handleSweep(
@@ -1017,6 +1073,12 @@ Deno.serve(async (req: Request) => {
         return json(200, { action: "dismiss", ...result });
       }
 
+      case "backfill_auctions": {
+        const batchSize = Math.min(body.batch_size ?? 50, 100);
+        const result = await handleBackfillAuctions(supabase, batchSize);
+        return json(200, { action: "backfill_auctions", ...result });
+      }
+
       default:
         return json(400, {
           error: `Unknown action: ${action}`,
@@ -1029,6 +1091,7 @@ Deno.serve(async (req: Request) => {
             "dashboard",
             "acknowledge",
             "dismiss",
+            "backfill_auctions",
           ],
         });
     }
