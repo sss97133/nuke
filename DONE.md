@@ -1,6 +1,125 @@
 # DONE — Completed Work Log
 
+## 2026-03-23
+
+### [wiring] Overnight Sprint — Book, Data Validation, Pin Map Fix
+- **13 book chapters written** (Ch2, Ch4, Ch9-12, Ch13-15, Appendices A-D) — book now 15/15 complete
+- **GM circuits 109 → 219**: 110 new circuits from manual pages 8C-46 to 8C-51
+- **Invoices 33 → 49**: SW77005 + SW77006 line items ingested
+- **Factory circuit cross-ref**: 40 MATCH, 3 corrections (speaker L/R, washer pump colors)
+- **CRITICAL: M130+M150 pin maps REPLACED**: All 180 scaffolded pins were WRONG — replaced with MoTeC datasheet data
+- **Key discovery**: M150 Connectors C+D = M130 Connectors A+B (identical pinout = easy upgrade path)
+- Knowledge doc updated, corrections log complete (17 total corrections)
+
+## 2026-03-22
+
+### [build-intel] K5 Blazer Build Intelligence System
+- **build_activity_snapshots table**: Monthly aggregates combining QB spending + photo activity + manifest purchases
+- **compute-build-timeline edge function**: Computes 42 months of activity data for K5 ($81K, 516 photos, peak Jan 2022)
+- **enhance-qb-confidence edge function**: Enhanced 131 QB transactions with temporal/photo/vendor correlation (11 high, 81 medium, 39 low)
+- **compute_build_spend_profile() SQL function**: Comprehensive build spend analysis — by_category, by_month, by_vendor, manifest stats
+- **pipeline_registry**: 6 new entries for computed fields
+- **Frontend BUILD section**: BuildManifestPanel (categorized parts list), BuildTimelineChart (monthly spend + photo overlay), BuildSpendSummary (top-line numbers)
+- **useBuildProfile hook**: Parallel fetch of manifest, snapshots, and spend profile via RPC
+- **WorkspaceContent.tsx**: BUILD MANIFEST + BUILD TIMELINE widgets inserted after Pricing & Value, gated behind owner/contributor access
+
+### [wiring] LS Swap Template + K5 Wiring Overlay
+- **seed-ls-swap-template.mjs**: Creates "LS Swap - Motec M150 + PDM30" template (121 new circuits, 71 factory circuit actions)
+- **create-k5-wiring-overlay.mjs**: Links template to K5, calls compute-wiring-overlay (110 wires, 804 ft)
+- npm scripts: `wiring:seed-template`, `wiring:create-k5-overlay`
+
+### [materialization] Field Evidence Materialization
+- **materialize-field-evidence.mjs**: Reads pending field_evidence, applies trust hierarchy, writes to vehicles + provenance
+- Dry-run validated: 23K pending fields, 3.1K vehicles, 257 conflicts resolvable
+- npm scripts: `materialize:field-evidence`, `materialize:field-evidence:apply`
+
+### [bedrock] ARS Batch + Node.js Script
+- ARS batch: 2,142 → 323,287 scored (100% of all vehicles). COMPLETE. 186 NEEDS_WORK, 24,728 EARLY_STAGE, 298,373 DISCOVERY_ONLY. 321,145 new scores in one session across 72 batches.
+- `scripts/batch-ars-scoring.mjs` — per-vehicle commit Node.js script (no transaction rollbacks)
+- npm scripts: `ars:batch` (continuous 5K), `ars:batch:small` (1K)
+
+### [oem-reference] OEM Reference Book — Cited Sources Import
+- **EPA Fuel Economy**: 44,523 specs (1984-2026, 146 makes). Engine, trans, drivetrain, MPG. Source: `EPA_fueleconomy_gov` conf:90
+- **NHTSA Vehicle Catalog**: 13,340 specs + 1,279 model defs (1981-2000, 44 makes). Source: `NHTSA_VPIC` conf:95
+- **Normalization Rules**: 36 total (was 18). 107 variant mappings across 7 field types. Mined from 175K+747K evidence rows.
+- **auto_populate_vehicle_specs()**: Upgraded to 4-strategy fuzzy matching (exact→prefix→contains→stripped-suffix)
+- **oem_vehicle_specs**: 14 → 57,877 rows | **oem_models**: 15 → 1,294 rows
+- Scripts: `oem:epa`, `oem:nhtsa`, `oem:normalize` in package.json
+
+### [bedrock] Deep System Audit + 8 Priority Deployments
+- **Temporal decay DEPLOYED**: `observation_half_lives` table (14 kinds), `compute_decayed_confidence()` function, `vehicle_observations_decayed` view, `get_effective_observations()` function. Theory→production in 1 step.
+- **Conflict resolution DEPLOYED**: `vehicle_field_consensus` table + `detect_field_conflicts()` function. Found 4 real conflicts in top 50 vehicles (4x4 vs 4WD, mileage discrepancy).
+- **Cross-vehicle image matching DEPLOYED**: `dhash_hamming_distance()`, `find_similar_vehicles()`, `find_image_duplicate_candidates()`. Found 5,000+ exact image matches (hamming=0) across 18K fingerprints.
+- **ARS batch computed**: 10,142 vehicles scored (was 2,142). 7 NEEDS_WORK, 2,046 EARLY_STAGE, rest DISCOVERY_ONLY. Running continuously.
+- **YONO sidecar REVIVED**: `modal deploy yono/modal_serve.py` — all models healthy (276 flat classes, 41 zones, finetuned_v2 vision).
+- **Digital twin engine proof**: 1977 Blazer (CKR187F127263) fully seeded across 8 engine tables: block (400ci SBC #3951509), 2 heads (336781 76cc), crank (#3932442 externally balanced), cam (flat-tappet hydraulic), Q-Jet carb (#7047213), dual-plane intake (#346250), HEI distributor, oil system. First complete engine digital twin.
+- **Background**: RPO library enrichment + Haiku comment mining running
+
+### [pipeline] FB Saved Items → Supplier Inventory Pipeline
+- **Migration**: `20260322220000_supplier_pipeline.sql`
+  - Expanded `organization_vehicles.relationship_type` CHECK: +supplier_inventory, supplier_sold, supplier_build
+  - Added `fb_saved_items.is_supplier_listing` boolean column
+  - Expanded `fb_saved_items.processing_status` CHECK: +queued, imported
+  - Created `supplier_vehicle_readiness` view (org_vehicles × ARS scores)
+- **Phase 1**: `scripts/enrich-fb-orgs.mjs` — enriches 73 FB stub orgs (Firecrawl FB page + Google search → create-org-from-url)
+- **Phase 2**: `scripts/catalog-supplier-inventory.mjs` — 3 inventory sources:
+  - A: Website inventory via discover-organization-full
+  - B: Marketplace cross-link (fb_saved_items → import_queue)
+  - C: Reel title parsing for vehicle references → organization_behavior_signals
+- **Phase 3**: `scripts/monitor-supplier-inventory.mjs` — 3 monitoring loops:
+  - A: Weekly website re-scrape scheduling
+  - B: FB Marketplace supplier matching
+  - C: FB Saved items status dashboard
+- **Phase 4**: Wired supplier vehicles to ARS pipeline via `supplier_vehicle_readiness` view
+- **npm scripts**: supplier:enrich, supplier:catalog, supplier:monitor (+ :dry variants)
+- **Execution results:**
+  - Phase 1: 59 enriched, 50 with verified websites, 14 with phone, 5 with email, 6 with address
+  - Phase 2B: 747 marketplace items → import_queue (63 vehicles created, 8K non-vehicles skipped)
+  - Phase 2C: 18 vehicle references from 93 reels across 15 organizations → behavior signals
+  - Phase 3: 50 orgs in inventory sync queue, monitoring dashboard operational
+  - Cleaned 10 false-positive website matches (generic sites from Google search)
+
+### [infra] Presigned URL Photo Upload Architecture
+- **Migration**: `upload_batches` + `upload_batch_items` tables, `vehicle_images.upload_batch_id` column
+- **Server**: `image-intake` edge function now supports 3 actions:
+  - `prepare_upload` — dedup-check hashes, generate presigned URLs (up to 500/call)
+  - `confirm_upload` — batch-INSERT vehicle_images for completed uploads
+  - (default) — legacy flow unchanged
+- **CLI library**: `scripts/lib/presigned-upload.mjs` — hash, request URLs, parallel PUT, confirm batch
+- **Browser client**: `nuke_frontend/src/lib/uploadClient.ts` — Web Crypto hashing, concurrent PUT, progress
+- **Refactored**: `bulk-photo-upload.mjs`, `nuke-photo-drop.mjs` → use presigned upload lib
+- **Refactored**: `PhotoSyncPage.tsx` → uses `uploadClient.ts` (50 concurrent, presigned)
+- **Refactored**: `mcp-connector/index.ts` `ingest_photos` → presigned flow for base64 images
+- **Flow**: Client hashes → prepare_upload → PUT direct to storage → confirm_upload → batch INSERT
+- **Result**: 1,500/hr → 15,000-30,000/hr per user (bytes never touch our server)
+- **TOOLS.md** updated with presigned upload entries
+
 ## 2026-03-21
+
+### [social] Patient Zero — Autonomous Daily Posting System
+- **3 tables created**: `patient_zero_queue` (post state machine), `patient_zero_image_pool` (curated images), `patient_zero_config` (per-account settings)
+- **Edge function deployed**: `patient-zero` — single action-routed function handling generate/publish/preview/approve/skip/override/stats/pause/curate/seed_pool + Telegram webhook
+- **Telegram webhook registered**: `/pz`, `/pzskip`, `/pzstats`, `/pzpause`, `/pz override <text>`, inline Approve/Skip buttons
+- **2 cron jobs**: `patient-zero-generate` (daily 1pm UTC), `patient-zero-publish` (every 5 min)
+- **Image pool seeded**: 50 random pre-1990 vehicle primary images for X account (@1991skylar)
+- **Config seeded**: X account enabled (manual approval), IG account disabled (awaiting OAuth fix)
+- **Day 480 generated**: "day 480. 1988 jeep wrangler sahara 5-speed. nobody noticed yet." — Telegram preview sent, approved via API test
+- **Caption gen**: Haiku 4.5 via llmRouter, ~$0.001/caption, dry deadpan format enforced by system prompt
+- **TOOLS.md updated**: Full Social Media & Posting section added
+- Day 1 = Nov 28, 2024. Count climbs autonomously. Zero human input per day.
+- **v2 improvements (same session):**
+  - x-media-upload migrated from v1.1 → v2 endpoint (`api.x.com/2/media/upload`), v1.1 sunset June 2025
+  - Alt text auto-generated from vehicle year/make/model/color, passed via x-media-upload to X
+  - Media uploaded separately (with alt text) then attached via media_ids — avoids double-upload
+  - Telegram webhook secured with `secret_token` (401 for unauthenticated requests verified)
+  - Telegram bot commands registered via `setMyCommands` (/pz, /pzstats, /pzskip, /pzpause in menu)
+  - Bluesky publishing support added (AT Protocol: session auth → blob upload → createRecord with richtext facets)
+  - Threads publishing support added (graph.threads.net: container → publish)
+  - Instagram upgraded to Graph API v25.0, uses `graph.instagram.com` endpoint (was `graph.facebook.com`)
+  - Instagram: `?format=origin` appended to Supabase Storage URLs to prevent WebP auto-conversion
+  - Instagram: hashtags in caption (3-5 max, current best practice) instead of first comment
+  - X: 1.5s delay between main post and hashtag reply to avoid rate limit issues
+  - TOOLS.md updated with platform details and security notes
 
 ### [data-quality] Autonomous Data Quality & Pipeline Session
 - **Mecum URL normalizer fixed**: `mecum:lots/303124/slug` → `mecum:303124` (lot number only). False-positive dup groups dropped from 551 → 48.
@@ -4794,3 +4913,274 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - Removing VehicleHeader from render tree broke profile data flow
 - Three broken pushes to production without local testing
 - Lesson: branch, local dev, verify, then merge
+
+### [wiring] Squarebody Wiring Layer Overlay - Sprint 1 (partial)
+- Created 10 new tables: wire_specifications, connector_specifications, device_pin_maps, factory_harness_circuits, upgrade_templates, upgrade_circuit_actions, upgrade_new_circuits, vehicle_wiring_overlays, vehicle_circuit_measurements, vehicle_custom_circuits
+- Seeded wire_specifications: 11 types (GPT through MIL-W-22759/44 and PTFE)
+- Seeded connector_specifications: 12 families (Weatherpack through Deutsch Autosport AS)
+- Seeded device_pin_maps for M150: ALL 120 pins (Connectors A/B/C/D, 34+34+26+26)
+- Seeded device_pin_maps for PDM30: 39 pins (30 output channels + CAN + power + digital inputs)
+- Plan doc: .claude/plans/lazy-knitting-harp.md
+- Migration file: supabase/migrations/20260322200000_wiring_layer_overlay.sql
+- REMAINING: factory_harness_circuits seed (80+ squarebody circuits), pipeline_registry, TOOLS.md update
+- Seeded 71 squarebody factory harness circuits (51 standard + 20 option-dependent)
+  - 10 systems: lighting(18), accessories(13), engine(10), body(6), fuel(5), gauges(5), starting(5), ignition(4), charging(3), cooling(2)
+  - 26 circuits with documented failure modes and severity
+  - Options: AC, dual fuel tanks, power windows/locks, cruise control, TBI (1987)
+- Registered all 10 tables in pipeline_registry
+- Updated TOOLS.md with Wiring Layer Overlay section
+- SPRINT 1 COMPLETE
+
+### [wiring] Build Manifest — 77 K5 Blazer (115 devices, 347 endpoints, 60% avg)
+- Created vehicle_build_manifest table with sourcing fields (difficulty, lead_time, supplier_type, supplier_contact)
+- Populated 115 electrical devices across 12 categories for K5 vehicle e04bf9c5
+- 67 have real part numbers, 101 have endpoint/pin counts, 99 have prices
+- All data from web research agents (ACDelco, Dorman, Truck-Lite, United Pacific, Dakota Digital, AMP Research, Aeromotive, Motec, Kicker, RetroSound, Optima, Painless, AutoMeter, etc.)
+- 10 micro-suppliers registered as catalog_sources (Engineered Vintage, Delmo Speed, Davis Off Road, JL Fabrication, Far From Stock, Desert Performance, Tulay Wire Werks, Retrofit Innovations, E-Stopp, Wilwood)
+- Ingested Desert Performance invoice (Howard Barton coupe) — real Motec pricing
+- Read 4 NUKE LTD invoices (SW77002-SW77006) for K5 build — $120K+ documented spend
+- Key architectural insight: ECU model is a COMPUTED requirement from I/O count, not a fixed choice. Every build manifest change recomputes the entire harness specification.
+
+### [auction-pipeline] Auction Thumbnail Pipeline — Images on Every Card
+- **Backfilled 4,753 live auctions** with `primary_image_url` from `origin_metadata.thumbnail_url`
+  - 4,619 BaT thumbnails (bringatrailer.com WordPress static URLs)
+  - 134 CC thumbnails (images.collectingcars.com CDN)
+- **Feed-query pass 3** serves these URLs directly — no Supabase Storage download needed
+- **Approach:** Direct URL reference, not download. BaT/CC URLs are stable (WordPress/CDN), unlike FB CDN.
+- **Going forward:** `sync-live-auctions` now sets `primary_image_url` in the vehicle upsert payload. Every new auction gets a thumbnail automatically.
+- **vehicle_images insert blocked** by unknown trigger/RLS — primary_image_url works as fallback. vehicle_images backfill deferred.
+- **Result:** Feed shows Dodge Viper, De Tomaso Pantera, Porsche 911 etc. with actual images instead of "NO PHOTO"
+
+### [wiring] Factory Circuit Validation Against GM Service Manual
+- Found 3,406 service_manual_chunks already OCR'd in database (GM 1973 Light Duty Truck Service Manual)
+- Discovered GM Electrical Circuit ID Table (Section 8C, pages 46-51) — 500+ circuits with exact wire colors
+- Validated all 71 squarebody factory harness circuits against GM source data
+- CORRECTED 11 wrong wire colors: neutral safety (YEL not PPL), fuel gauge (PNK not DK BLU), horn feed (DK GRN not BLK), tachometer (WHT not BRN), radio feed (YEL not PNK), headlight hi-beam flip-flopped, window circuits, door lock circuits
+- 0 circuits remain unsourced — every row now cites a GM Service Manual section
+- ProWire connector prices updated in catalog_parts (19 rows: DTM $3-13, Superseal kits $8-20, M150 complete kit $56)
+- Publication pages (41,592) confirmed as Polo Lifestyles magazines — NOT relevant to wiring
+
+### [wiring] compute-wiring-overlay edge function — LIVE
+- Deployed and tested against K5 Blazer (e04bf9c5)
+- Computes from 115-device build manifest: 96 wires, 744 ft total, 15 PDM channels
+- ECU requirement: M150 (28 outputs, 22 inputs)
+- PDM channel auto-assignment with overload detection
+- Caught and fixed: alternator/starter/battery/brake booster/fuel pump/amplifier are NOT PDM-controlled (direct-wired with relays)
+- Deterministic wire color assignment by function group
+- Wire gauge auto-selection from amperage + length with voltage drop check
+- Alternator sizing from total continuous current draw
+- Zero warnings on clean run
+- pdm_controlled flag added to vehicle_build_manifest
+
+### [wiring] Thread completions
+- THREAD 1: Build manifest 0% devices eliminated — 115/115 have data, 67% avg (was 60%)
+  - All power_draw_amps filled, all pdm_controlled flags set
+  - PDM channel grouping: markers_clearance(8), park_tail(4), interior_courtesy(5), backup(4), turn_brake L/R
+  - Recompute: 30/30 PDM channels, 0 overflow (was 17), 1 headroom warning
+- THREAD 3: GM Circuit ID table extracted — 109 circuits in gm_circuit_identification table
+- THREAD 5: Invoice ingestion — 33 prices from Desert Performance #1190 in invoice_learned_pricing
+  - Real Motec prices: M130 $3,500, PDM30 $3,140, LTCD $844, GT101 $80, RBD-190 $300
+  - Labor: $65/hr, dyno $750 flat
+- THREAD 6: Compute engine improvements
+  - PDM channel grouping (shared channels for low-current devices)
+  - PDM headroom warning when channels near capacity
+  - pdm_channel_group column on vehicle_build_manifest
+  - 3 redeployments of compute-wiring-overlay, all clean
+
+### [wiring] Knowledge persistence — The Wiring Book
+- Created docs/wiring/ with README.md (table of contents, 15 chapters + 4 appendices)
+- Created WIRING_SYSTEM_KNOWLEDGE.md — complete reference for any agent working on wiring
+- Written: Ch1 Workshop Model (1,800 words), Ch3 Tier System (2,200 words)  
+- Added wiring system summary to MEMORY.md
+- Updated HANDOFF.md with drill-to-bedrock status on 10 threads
+- Created .claude/plans/wiring-drill-plan.md with 7 execution threads
+- Structure ensures next agent has full context without this conversation
+
+### [wiring] Client-side compute engine + sandbox UI + output generators
+- overlayCompute.ts — Pure TypeScript compute engine, runs client-side <5ms
+  - ECU OPTIONS (M130/M150/M1 with cost/headroom/bottleneck analysis)
+  - PDM OPTIONS (PDM15/PDM30/2×PDM15/PDM30+PDM15 with channel fit)
+  - Configuration matrix: all valid ECU×PDM combos sorted by cost
+  - Delta computation: what changed between two computations
+  - Wire color assignment by function group
+  - All from harnessCalculations.ts foundations
+- useOverlayCompute.ts — React hook: addDevice/removeDevice/updateDevice triggers instant recompute
+  - Quick helpers: addSensor, addLight, addMotor
+  - Delta tracking for flash-on-change UI
+- WiringOverlaySandbox.tsx — Interactive sandbox component
+  - Quick-add buttons for 19 device templates (sensors, actuators, lighting, body/accessories)
+  - Status bar with live device/wire/ECU/PDM/cost/warnings
+  - Delta flash showing what changed on each add/remove
+  - ECU options panel showing all models with fit/headroom
+  - PDM channels panel with load per channel
+  - Wire list view
+  - Device list with remove buttons
+  - Warnings panel
+- WiringSandbox.tsx — Page wrapper, loads manifest from Supabase, route at /:vehicleId/wiring/sandbox
+- generateCutList.ts — Wire-by-wire bench document with sections (engine/exterior/interior/chassis/audio)
+  - Plain text export for printing
+  - Wire purchase summary with spool size recommendations
+  - Shielded and twisted pair callouts
+- generateConnectorSchedule.ts — Pin-by-pin output for ECU connectors and PDM channels
+  - Plain text export
+  - Groups by connector (A=outputs, B=inputs, C=comms)
+  - PDM channel assignments with load and overload warnings
+- generateBOM.ts — Full bill of materials linked to catalog
+  - Motec system section with computed ECU+PDM+connector kit
+  - All device categories with part numbers and pricing
+  - Wire and consumables estimation
+  - Labor hours estimate (0.5 hr/wire × wire count)
+  - Grand total with labor
+  - Purchased vs unpurchased tracking
+  - Plain text export
+
+### 2026-03-23 — Auction System Deep Audit
+
+[auction/bids] Fixed bat_bids recording — 965 bid snapshots per sync restored
+  - Root cause: redundant 2nd query to vehicle_events failed with 500-UUID .in()
+  - Simplified to use id from first query directly
+  - Dropped bat_bids_bat_listing_id_fkey (live auctions don't have bat_listings entries)
+  - Migration: drop_bat_bids_listing_fk_for_live_sync
+
+[auction/images] Fixed vehicle_images photo pipeline trigger for BaT imports
+  - Added ai_processing_status: "pending" to extract-bat-core insert objects
+  - Photo pipeline trigger now fires for newly imported auction images
+
+[auction/cab] Fixed C&B auction end date handling
+  - Added end-time parsing from page HTML data
+  - Added cleanup step: marks expired auctions as ended after each sync cycle
+
+[auction/vehicles] Fixed listing_url unique index enforcement
+  - Soft-deleted 4,885 duplicate vehicles (keeping most complete per listing_url)
+  - Recreated idx_vehicles_listing_url_unique (was indisvalid=false)
+  - Index now valid and enforcing uniqueness
+
+[auction/predict] Restored hammer price prediction pipeline
+  - Created missing _shared/predictionEngine.ts (deleted during triage)
+  - Fixed column mapping: vehicle_event_id → external_listing_id
+  - Fixed end_date resolution (ended_at fallback)
+  - Added factors object to PredictionOutput for reporting
+  - 3 existing crons running: predict-all (30m), final-hours (10m), score (30m)
+  - Verified: 2 new predictions stored successfully
+
+[auction/ars] Audited ARS system — FULLY IMPLEMENTED (not spec-only)
+  - compute_auction_readiness() SQL function exists with all 6 dimensions
+  - 124,143 vehicles scored (avg 22.6, range 5-69)
+  - Tier distribution: 112K DISCOVERY_ONLY, 16.7K EARLY_STAGE, 153 NEEDS_WORK
+  - Photo dimension correctly wires YONO zone classification
+  - coaching_plan JSONB generated with priority-ranked gaps
+
+[auction/comments] Audited comment extraction — wiring exists
+  - sync-bat-listing triggers extract-auction-comments for auctions ending within 24h
+  - restore-bat-comments cron runs daily at 2 AM
+  - backfill-comments self-continuing batch available
+  - No changes needed — system is functional
+
+[audit/remaining] Sections 8-9 (widgets, coaching frontend, packager, submission) documented but not implemented
+  - 12 analysis widgets have near-zero coverage (3 vehicles each)
+  - Coaching data IS computed but no frontend panel exists
+  - Listing packager and submission automation are spec-only
+
+### [wiring] M130 viability proven — $2,000 saved through data correction
+- Reclassified 20 switch/digital devices into proper categories:
+  - ecu_digital_input (4): brake switch, A/C pressure switches, VSS
+  - ecu_crank_cam (2): crank + cam dedicated inputs
+  - pdm_input (9): headlight/turn/wiper/blower/ignition/door switches, reverse, tcase
+  - standalone_switch (4): window switches, lock switch, neutral safety
+  - standalone_module (1): hazard flasher
+- Fixed half-bridge counting: only ECU-driven motors counted (throttle body), not PDM-controlled motors
+- Fixed CAN bus counting: 1 bus with multiple devices, not count of CAN devices
+- Added M130 ECU to compute engine with verified specs (racespeconline.com):
+  - 8 P&H inj, 8 LS ign, 6 HB, 8 AV, 4 AT, 7 UDIG, 2 knock, 1 CAN
+  - 2 connectors (34+26 Superseal), 107×127×39mm, 290g, $3,500
+- Added M130 pin map to device_pin_maps (60 pins across 2 connectors)
+- ECU selection now per-type comparison (not total I/O count)
+- Result: M130 fits the K5 build — 8/8 inj, 4/7 dig, 1/6 hb, 1/1 CAN
+- Cost impact: M130 $3,500 vs M150 $5,500 = $2,000 saved
+
+### [wiring] Cut list edge function deployed and tested
+- generate-cut-list deployed — produces printable wire-by-wire bench document
+- K5 output: 110 wires, 805 ft, 7 sections (engine/exterior/interior/chassis/audio/power/misc)
+- Wire purchase summary: 11 gauge/type combinations, spool recommendations
+- Saved to docs/wiring/output/K5_cut_list.txt (157 lines)
+- Supports JSON and text format output
+- Text format is directly printable for the wire bench
+
+### [wiring] BOM edge function deployed
+- generate-wiring-bom deployed — full bill of materials with catalog linkage
+- K5 output: $19,966 total (parts $16,391 + labor $3,575 at $65/hr)
+- ECU: M130 ($3,500) — computed, not assumed
+- 94 items priced, 18 need quotes, 30 purchased, 85 needed
+- Saved to docs/wiring/output/K5_bom.txt
+- Deep sprint Batch 1: 2 of 3 output functions deployed (cut list + BOM)
+- Remaining: connector schedule edge function
+
+### [wiring] Book chapters written
+- Ch5: Build Manifest — signal type classification, M130 discovery, PDM channel grouping, direct-wired devices
+- Ch6: Compute Engine — I/O requirements, ECU selection, PDM assignment, wire specs, delta computation, file reference
+- Ch7: Motec Ecosystem — M130/M150/M1 specs with I/O tables, PDM configs, LTCD, C125, CAN architecture, pin map status warnings
+- Ch8: LS3 Sensors — complete ACDelco part numbers for every sensor/actuator, connector types, critical compatibility notes (D510C not D585, 6-pin not 8-pin throttle, EV6 not Multec)
+- Total book progress: 6 of 15 chapters + appendices written (Ch1, Ch3, Ch5, Ch6, Ch7, Ch8)
+
+### [wiring] All three output edge functions deployed and tested
+- generate-connector-schedule deployed — pin-by-pin for M130 (Connector A + B) and PDM30
+  - M130 Connector A: 8 injectors + 8 coils + crank/cam + grounds/power assigned. 8 unused (A19-A26 half-bridge)
+  - M130 Connector B: 2 knock sensors assigned. 23 unused. Massive input headroom.
+  - PDM30: 30 channels assigned by current draw. All with part numbers cross-referenced.
+  - Saved to docs/wiring/output/K5_connector_schedule.txt
+- 3 more factory circuit corrections: CHARGE_SENSE (BRN→DK BLU), HEATER_BLOWER (ORN→PPL), IGN_RUN (correct reference)
+- Total factory circuit corrections this session: 14
+- Standardized ORG → ORN abbreviation across all circuits
+- Cross-referenced 24 circuits against gm_circuit_identification: 19 MATCH, 2 PARTIAL, 3 MISMATCH (all fixed)
+
+### [manhunt] Service Manual Manhunt System
+- Created `manhunt_searches` table for tracking systematic documentation searches
+- Built `scripts/manhunt-service-manuals.mjs` — local script with 3 source modules:
+  - **Archive.org**: broad keyword search with scoring, year-range matching, PDF download + upload
+  - **NHTSA**: complaints + recalls API (free, no auth needed)
+  - **Ford Heritage**: browse + Archive.org mirror fallback
+- Fixed `link_document_to_specs` trigger (NULL model crash on library_documents insert)
+- 5 npm scripts: `manhunt`, `manhunt:top50`, `manhunt:dry`, `manhunt:ford`, `manhunt:tsb`
+- First run results: 14 documents created, 25 libraries now have docs (was 15), 138 MB in storage
+- Rate limiting: 1 req/sec search, 5s metadata, 10s download. Max 100 searches + 20 downloads/run
+- Handles Archive.org borrowable items (401/403), restricted items, connection timeouts
+- Search result caching per make (6 broad queries cached, reused across year-specific libraries)
+
+### 2026-03-22
+### [patient-zero] Content Engine — 7 content types on weekly rotation
+- Migration: content_type, thread_posts, source_data columns on patient_zero_queue + patient_zero_calendar + patient_zero_chart_templates tables
+- Content router: actionGenerate now dispatches by day-of-week calendar (Mon=save, Tue=chart, Wed=vehicle, Thu=shop_photo, Fri=chart, Sat=retrospective, Sun=thread)
+- Chart engine: `_shared/chartGenerator.ts` — QuickChart.io URL builder with Nuke design system (Arial, Courier New, zero radius, #f5f5f5 bg, 11-color palette)
+- 8 chart templates seeded: price-trend-by-make, disappearance-velocity, estimate-vs-actual, auction-platform-comparison, bid-count-distribution, year-tier-pricing, weekly-marketplace-flow, geographic-price-map
+- Data pipelines: `_shared/contentQueries.ts` — querySaveData (fb_saved_items × marketplace_listings), queryRetrospectiveData (auction vs marketplace delta), queryMarketObservationData, queryVehicleData, queryThreadData, queryChartData
+- Thread publishing: X gets sequential reply chain (max 8 tweets, 1.5s delays), non-X platforms get single-post fallback
+- Type-specific LLM prompts: saves=regretful, charts=clinical, retrospectives=wistful, threads=authoritative
+- New Telegram command: /pztype [type] for calendar override
+- TOOLS.md updated with content types, calendar, new tables
+- Deployed and verified: function compiles clean, responds correctly
+
+### 2026-03-23
+### [auction] Widget coverage backfill system
+- Added `backfill_auctions` action to analysis-engine-coordinator
+- Creates `analysis_queue` table + `claim_analysis_queue_batch` RPC (were missing)
+- Queries ARS-scored vehicles with no analysis_signals, processes through all enabled widgets
+- Tested: 5 vehicles × 14 widgets = 70 signals created, 0 failures
+- Cron: `analysis-widget-backfill` every 10min, batch_size=50
+
+### [auction] ARS market_score wired to analysis_signals
+- Fixed `compute_auction_readiness()` — 5 column mismatches corrected:
+  - exterior_color → color, engine → engine_type, flaws → known_flaws
+  - zone_label → vehicle_zone, library_documents → vehicle_documents
+  - condition_report → condition (enum value)
+- Added analysis_signals bonus: +5 for ≥3 signals, +5 more for ≥6
+- Verified: market_score 65→75 after backfill, tier upgraded to COMPETITIVE
+
+### [auction] Coaching panel on vehicle profile
+- New: `AuctionReadinessPanel.tsx` — composite score, tier badge, 6 dimension bars, MVPS status, coaching actions list
+- Wired into `WorkspaceContent.tsx` below VehicleScoresWidget
+- Design system compliant: Arial, ALL CAPS 8-9px, 2px borders, zero radius
+
+### [auction] Comment re-extraction for ending BaT auctions
+- `sync-live-auctions` now triggers `extract-auction-comments` for BaT auctions ending within 6 hours
+- Fire-and-forget, capped at 10 per sync cycle
+- Deployed both edge functions

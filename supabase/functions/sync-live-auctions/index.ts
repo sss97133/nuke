@@ -128,15 +128,26 @@ async function syncBaT(): Promise<{ auctions: LiveAuction[]; error: string | nul
     const auctions: LiveAuction[] = data.items
       .filter(item => item.active)
       .map(item => {
-        // Parse year from title (e.g., "1996 Porsche 911 Turbo" -> 1996)
-        const yearMatch = item.title.match(/^(\d{4})\s+/);
+        // Parse year/make/model from BaT title
+        // Titles often have prefixes: "44k-Mile 2001 Chevrolet Suburban", "No Reserve: 2006 Porsche..."
+        // Strategy: find the 4-digit year anywhere in the title, then parse make/model after it
+        const cleanTitle = item.title.replace(/&#\d+;/g, "'").replace(/&amp;/g, "&");
+        const yearMatch = cleanTitle.match(/\b(19\d{2}|20[0-2]\d)\s+/);
         const year = yearMatch ? parseInt(yearMatch[1], 10) : (item.year ? parseInt(item.year, 10) : null);
 
-        // Parse make/model from title
-        const titleWithoutYear = item.title.replace(/^\d{4}\s+/, "");
-        const parts = titleWithoutYear.split(" ");
-        const make = parts[0] || null;
-        const model = parts.slice(1).join(" ") || null;
+        // Everything after the year is "make model trim..."
+        let make: string | null = null;
+        let model: string | null = null;
+        if (yearMatch) {
+          const afterYear = cleanTitle.substring(yearMatch.index! + yearMatch[0].length).trim();
+          const parts = afterYear.split(/\s+/);
+          make = parts[0] || null;
+          model = parts.slice(1).join(" ") || null;
+        } else {
+          const parts = cleanTitle.split(/\s+/);
+          make = parts[0] || null;
+          model = parts.slice(1).join(" ") || null;
+        }
 
         return {
           url: item.url.replace(/\/$/, ""),
@@ -528,8 +539,22 @@ async function syncCarsAndBids(): Promise<{ auctions: LiveAuction[]; error: stri
 
     console.log(`[sync-live-auctions] Cars & Bids: Found ${foundUrls.size} auction URLs`);
 
+    // Try to extract end times from page data (C&B embeds auction end timestamps)
+    // Pattern: data-end-time="...", endTime, auctionEnd, or ISO timestamps near auction IDs
+    const endTimePatterns = [
+      /data-(?:end|auction-end)(?:-time)?=["']([^"']+)["']/gi,
+      /"endTime"\s*:\s*"([^"]+)"/gi,
+      /"auction_end"\s*:\s*"([^"]+)"/gi,
+    ];
+    const globalEndTimes: string[] = [];
+    for (const pattern of endTimePatterns) {
+      let etMatch;
+      while ((etMatch = pattern.exec(html)) !== null) {
+        globalEndTimes.push(etMatch[1]);
+      }
+    }
+
     // Extract auction data from card elements
-    // C&B typically has: data-auction-end, title, current bid in card structure
     const auctions: LiveAuction[] = [];
 
     for (const [url, { id, slug }] of foundUrls) {
@@ -543,11 +568,17 @@ async function syncCarsAndBids(): Promise<{ auctions: LiveAuction[]; error: stri
         .map(part => part.charAt(0).toUpperCase() + part.slice(1))
         .join(" ");
 
+      // Try to find an end time from page data for this auction
+      // C&B auctions typically last 7 days from listing; use parsed end time if found
+      const endTimeRegex = new RegExp(`${id}[^}]*?"(?:endTime|end_time|auction_end)"\\s*:\\s*"([^"]+)"`, "i");
+      const etMatch = endTimeRegex.exec(html);
+      const endDate = etMatch ? etMatch[1] : (globalEndTimes.shift() || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString());
+
       auctions.push({
         url,
         title,
         platform: "cars-and-bids",
-        auction_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Default 7 days, will be updated from actual listing
+        auction_end_date: endDate,
         current_bid: null,
         bid_count: null,
         no_reserve: false, // Would need to parse from page
@@ -587,101 +618,13 @@ async function syncToDatabase(
     return stats;
   }
 
-  // Map platform name to URL pattern for matching
-  const platformUrlPatterns: Record<string, string> = {
-    "bringatrailer": "bringatrailer",
-    "collecting-cars": "collectingcars",
-    "cars-and-bids": "carsandbids",
-    "pcarmarket": "pcarmarket",
-    "mecum": "mecum",
-    "barrett-jackson": "barrett-jackson",
-    "rm-sothebys": "rmsothebys",
-    "gooding": "goodingco",
-    "bonhams": "bonhams",
-  };
-  const urlPattern = platformUrlPatterns[platform] || platform.replace(/-/g, "");
-
-  // Look up which of the current live auction URLs already exist in the DB.
-  // Query by specific URLs (fast indexed lookup) instead of scanning all 355k+ active vehicles.
-  const currentLiveUrls = auctions.map(a => a.url);
-  const existingUrlSet = new Set<string>();
-
-  // Check in batches of 50 URLs to stay under query param limits
-  const URL_BATCH = 50;
-  for (let i = 0; i < currentLiveUrls.length; i += URL_BATCH) {
-    const urlBatch = currentLiveUrls.slice(i, i + URL_BATCH);
-    const { data: existing } = await supabase
-      .from("vehicles")
-      .select("listing_url, bat_auction_url")
-      .or(urlBatch.map(u => `listing_url.eq.${escapePostgrestValue(u)}`).join(","));
-
-    if (existing) {
-      for (const v of existing) {
-        if (v.listing_url) existingUrlSet.add(v.listing_url);
-        if (v.bat_auction_url) existingUrlSet.add(v.bat_auction_url);
-      }
-    }
-  }
-
-  // Skip ended-auction detection during regular sync cycles. The 355k+ stale "active"
-  // vehicles can't be processed in a single edge function call. Ended detection is
-  // handled separately by the extraction pipeline (vehicle_events.event_status).
-
-  // Batch upsert current live auctions
-  // Split into updates (existing URLs) and inserts (new URLs), process in batches
+  // Fast upsert: INSERT all auctions with ON CONFLICT DO UPDATE on listing_url.
+  // This eliminates the expensive URL lookup phase entirely — one DB call per batch.
   const now = new Date().toISOString();
-  const toUpdate: LiveAuction[] = [];
-  const toInsert: LiveAuction[] = [];
 
-  for (const auction of auctions) {
-    if (existingUrlSet.has(auction.url)) {
-      toUpdate.push(auction);
-    } else {
-      toInsert.push(auction);
-    }
-  }
+  console.log(`[sync-live-auctions] ${platform}: Upserting ${auctions.length} auctions to vehicles table`);
 
-  // Batch update existing vehicles in chunks of 20
-  const UPDATE_BATCH = 20;
-  for (let i = 0; i < toUpdate.length; i += UPDATE_BATCH) {
-    const batch = toUpdate.slice(i, i + UPDATE_BATCH);
-    const promises = batch.map(auction => {
-      const vehicleData = {
-        listing_url: auction.url,
-        title: auction.title,
-        year: auction.year,
-        make: auction.make,
-        model: auction.model,
-        auction_status: "active",
-        sale_status: "auction_live",
-        auction_end_date: auction.auction_end_date,
-        sale_price: auction.current_bid,
-        platform_source: platform,
-        origin_metadata: {
-          platform,
-          external_id: auction.external_id,
-          no_reserve: auction.no_reserve,
-          reserve_met: auction.reserve_met,
-          bid_count: auction.bid_count,
-          thumbnail_url: auction.thumbnail_url,
-          last_sync: now,
-          ...auction.raw_data,
-        },
-        updated_at: now,
-      };
-      return supabase
-        .from("vehicles")
-        .update(vehicleData)
-        .or(`listing_url.eq."${escapePostgrestValue(auction.url)}",bat_auction_url.eq."${escapePostgrestValue(auction.url)}"`)
-        .then(({ error }) => !error);
-    });
-    const results = await Promise.all(promises);
-    stats.updated_count += results.filter(Boolean).length;
-  }
-
-  // Batch insert new vehicles
-  if (toInsert.length > 0) {
-    const insertRows = toInsert.map(auction => ({
+  const upsertRows = auctions.map(auction => ({
       listing_url: auction.url,
       title: auction.title,
       year: auction.year,
@@ -691,6 +634,7 @@ async function syncToDatabase(
       sale_status: "auction_live",
       auction_end_date: auction.auction_end_date,
       sale_price: auction.current_bid,
+      primary_image_url: auction.thumbnail_url || undefined,
       platform_source: platform,
       origin_metadata: {
         platform,
@@ -702,31 +646,82 @@ async function syncToDatabase(
         last_sync: now,
         ...auction.raw_data,
       },
-      created_at: now,
       updated_at: now,
     }));
 
-    // Insert in chunks of 20
-    for (let i = 0; i < insertRows.length; i += UPDATE_BATCH) {
-      const chunk = insertRows.slice(i, i + UPDATE_BATCH);
+    // Upsert in chunks of 100 — ON CONFLICT updates auction-critical fields only
+    const UPSERT_BATCH = 100;
+    for (let i = 0; i < upsertRows.length; i += UPSERT_BATCH) {
+      const chunk = upsertRows.slice(i, i + UPSERT_BATCH);
       const { error, data } = await supabase
         .from("vehicles")
-        .insert(chunk)
+        .upsert(chunk, {
+          onConflict: "listing_url",
+          ignoreDuplicates: false,
+        })
         .select("id");
 
       if (!error) {
         stats.new_count += data?.length ?? chunk.length;
-      } else if (error.code === "23505") {
-        // Some duplicates — fall back to individual updates for this chunk
-        for (const row of chunk) {
-          const { error: upErr } = await supabase
-            .from("vehicles")
-            .update({ ...row, created_at: undefined })
-            .eq("listing_url", row.listing_url);
-          if (!upErr) stats.updated_count++;
+      } else {
+        // If upsert fails (e.g., no unique constraint on listing_url), fall back to insert-only
+        console.warn(`[sync-live-auctions] Upsert error: ${error.message}, trying insert with ignore`);
+        const { error: insErr, data: insData } = await supabase
+          .from("vehicles")
+          .upsert(chunk, {
+            onConflict: "listing_url",
+            ignoreDuplicates: true,
+          })
+          .select("id");
+        if (!insErr) {
+          stats.new_count += insData?.length ?? 0;
+        } else {
+          console.error(`[sync-live-auctions] Insert fallback also failed: ${insErr.message}`);
         }
       }
     }
+
+  // Ensure vehicle_events rows exist for all live auctions (needed for bid snapshots + comments)
+  // Uses upsert on (vehicle_id, source_platform, source_url) to avoid duplicates
+  try {
+    const eventRows = auctions
+      .filter(a => a.url)
+      .map(a => ({
+        source_platform: platform === "bringatrailer" ? "bat" : platform,
+        source_url: a.url,
+        event_type: "auction",
+        event_status: "active",
+        current_price: a.current_bid ? String(a.current_bid) : null,
+        bid_count: a.bid_count,
+        ended_at: a.auction_end_date,
+        updated_at: now,
+      }));
+
+    // Match against vehicles to get vehicle_ids
+    const urls = auctions.map(a => a.url).filter(Boolean);
+    const { data: vehRows } = await supabase
+      .from("vehicles")
+      .select("id, listing_url")
+      .in("listing_url", urls.slice(0, 200));
+
+    const urlToVehicle = new Map((vehRows ?? []).map(v => [v.listing_url, v.id]));
+
+    const eventsToInsert = eventRows
+      .filter(e => urlToVehicle.has(e.source_url))
+      .map(e => ({ ...e, vehicle_id: urlToVehicle.get(e.source_url) }));
+
+    if (eventsToInsert.length > 0) {
+      // Batch upsert — only insert if no existing active event for this vehicle+platform
+      for (let i = 0; i < eventsToInsert.length; i += 100) {
+        await supabase.from("vehicle_events").upsert(
+          eventsToInsert.slice(i, i + 100),
+          { onConflict: "vehicle_id,source_platform,source_url", ignoreDuplicates: true }
+        );
+      }
+    }
+    console.log(`[sync-live-auctions] Ensured ${eventsToInsert.length} vehicle_events for ${platform}`);
+  } catch (e) {
+    console.error("[sync-live-auctions] vehicle_events creation error (non-fatal):", e);
   }
 
   return stats;
@@ -747,42 +742,44 @@ async function recordBidSnapshots(
 ): Promise<number> {
   // Only record bids for BaT auctions that have a current_bid
   const biddable = auctions.filter(a => a.current_bid && a.current_bid > 0);
+  console.log(`[bid-debug] biddable: ${biddable.length}/${auctions.length} auctions have current_bid > 0`);
   if (biddable.length === 0) return 0;
 
   // Build URL-to-auction map
   const auctionByUrl = new Map<string, LiveAuction>();
   for (const a of biddable) auctionByUrl.set(a.url, a);
+  if (biddable.length > 0) {
+    console.log(`[bid-debug] sample auction URL: ${biddable[0].url} bid: ${biddable[0].current_bid}`);
+  }
 
-  // Query ALL active BaT vehicle_events (small set ~50), then match in memory
-  const { data: extListings } = await supabase
+  // Query ALL active BaT vehicle_events (including id for direct use as bat_listing_id)
+  const { data: extListings, error: veErr } = await supabase
     .from("vehicle_events")
-    .select("vehicle_id, source_url")
+    .select("id, vehicle_id, source_url")
     .eq("source_platform", "bat")
-    .eq("event_status", "active");
+    .eq("event_status", "active")
+    .limit(10000);
 
+  console.log(`[bid-debug] vehicle_events query: ${extListings?.length ?? 0} rows, error: ${veErr?.message ?? 'none'}`);
   if (!extListings || extListings.length === 0) return 0;
+
+  if (extListings.length > 0) {
+    console.log(`[bid-debug] sample vehicle_event URL: ${extListings[0].source_url}`);
+  }
 
   // Filter to only those with matching sync URLs
   const matched = extListings.filter(el => el.source_url && auctionByUrl.has(el.source_url));
-  if (matched.length === 0) return 0;
-
-  const vehicleIds = matched.map(el => el.vehicle_id);
-
-  // Get vehicle_event IDs for these vehicles (BaT events)
-  const { data: batEvents } = await supabase
-    .from("vehicle_events")
-    .select("id, vehicle_id")
-    .eq("source_platform", "bat")
-    .in("vehicle_id", vehicleIds);
-
-  if (!batEvents || batEvents.length === 0) return 0;
-
-  const vehicleToBatEvent = new Map<string, string>();
-  for (const ve of batEvents) {
-    vehicleToBatEvent.set(ve.vehicle_id, ve.id);
+  console.log(`[bid-debug] URL matched: ${matched.length} vehicle_events match scraped auction URLs`);
+  if (matched.length === 0) {
+    // Debug: check for near-misses (trailing slash differences)
+    const sampleVE = extListings.slice(0, 3).map(e => e.source_url);
+    const sampleAuction = [...auctionByUrl.keys()].slice(0, 3);
+    console.log(`[bid-debug] NO MATCH. Sample VE URLs: ${JSON.stringify(sampleVE)}`);
+    console.log(`[bid-debug] NO MATCH. Sample auction URLs: ${JSON.stringify(sampleAuction)}`);
+    return 0;
   }
 
-  // Build batch of bid rows to insert
+  // Build batch of bid rows directly from matched results (id already selected)
   const now = new Date().toISOString();
   const bidRows: Array<{
     bat_listing_id: string;
@@ -798,11 +795,8 @@ async function recordBidSnapshots(
     const auction = auctionByUrl.get(el.source_url || "");
     if (!auction || !auction.current_bid) continue;
 
-    const batEventId = vehicleToBatEvent.get(el.vehicle_id);
-    if (!batEventId) continue;
-
     bidRows.push({
-      bat_listing_id: batEventId, // points to vehicle_events.id now
+      bat_listing_id: el.id, // vehicle_events.id directly (FK dropped)
       vehicle_id: el.vehicle_id,
       bat_username: "bid_snapshot",
       bid_amount: auction.current_bid,
@@ -818,7 +812,8 @@ async function recordBidSnapshots(
   const { error } = await supabase.from("bat_bids").insert(bidRows);
 
   if (error) {
-    console.error("[sync-live-auctions] Error recording bid snapshots:", error);
+    console.error("[sync-live-auctions] Error recording bid snapshots:", JSON.stringify(error));
+    console.error(`[sync-live-auctions] Attempted to insert ${bidRows.length} rows. Sample:`, JSON.stringify(bidRows[0]));
     return 0;
   }
 
@@ -1077,10 +1072,11 @@ Deno.serve(async (req) => {
         const normalizedPlatform = platformAliases[platform] || platform;
 
         // Record bid snapshots + update vehicle_events FIRST (fast, critical for predictions)
+        let bidSnapshotCount = 0;
         if (normalizedPlatform === "bringatrailer" && !syncResult.error && syncResult.auctions.length > 0) {
           try {
-            const bidCount = await recordBidSnapshots(supabase, syncResult.auctions);
-            console.log(`[sync-live-auctions] Recorded ${bidCount} BaT bid snapshots`);
+            bidSnapshotCount = await recordBidSnapshots(supabase, syncResult.auctions);
+            console.log(`[sync-live-auctions] Recorded ${bidSnapshotCount} BaT bid snapshots`);
           } catch (e) {
             console.error("[sync-live-auctions] Bid snapshot error (non-fatal):", e);
           }
@@ -1089,6 +1085,31 @@ Deno.serve(async (req) => {
             console.log(`[sync-live-auctions] Updated ${veUpdated} vehicle_events rows`);
           } catch (e) {
             console.error("[sync-live-auctions] Vehicle events update error (non-fatal):", e);
+          }
+        }
+
+        // Trigger comment extraction for BaT auctions ending within 6 hours
+        if (normalizedPlatform === "bringatrailer" && !syncResult.error && syncResult.auctions.length > 0) {
+          try {
+            const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+            const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+            const endingSoon = syncResult.auctions.filter(a => {
+              const hoursLeft = (new Date(a.auction_end_date).getTime() - Date.now()) / (1000 * 60 * 60);
+              return hoursLeft > 0 && hoursLeft <= 6 && a.current_bid && a.current_bid > 0;
+            });
+            const toExtract = endingSoon.slice(0, 10);
+            if (toExtract.length > 0) {
+              console.log(`[sync-live-auctions] Triggering comment extraction for ${toExtract.length} auctions ending within 6h`);
+              for (const auction of toExtract) {
+                fetch(`${supabaseUrl}/functions/v1/extract-auction-comments`, {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+                  body: JSON.stringify({ auction_url: auction.url }),
+                }).catch(() => {});
+              }
+            }
+          } catch (e) {
+            console.error("[sync-live-auctions] Comment extraction trigger error (non-fatal):", e);
           }
         }
 
@@ -1108,9 +1129,27 @@ Deno.serve(async (req) => {
           new_count: dbStats.new_count,
           updated_count: dbStats.updated_count,
           ended_count: dbStats.ended_count,
+          bid_snapshots: bidSnapshotCount,
           error: syncResult.error,
           duration_ms: Date.now() - startTime,
         });
+      }
+
+      // Cleanup: mark expired auctions as ended (catches C&B 7-day defaults and any stale auctions)
+      try {
+        const { count: endedCount } = await supabase
+          .from("vehicles")
+          .update({ auction_status: "ended", sale_status: "not_sold" })
+          .eq("auction_status", "active")
+          .lt("auction_end_date", new Date().toISOString())
+          .not("auction_end_date", "is", null)
+          .select("id", { count: "exact", head: true });
+
+        if (endedCount && endedCount > 0) {
+          console.log(`[sync-live-auctions] Cleanup: marked ${endedCount} expired auctions as ended`);
+        }
+      } catch (e) {
+        console.error("[sync-live-auctions] Cleanup error (non-fatal):", e);
       }
 
       const totalLive = results.reduce((sum, r) => sum + r.live_count, 0);
