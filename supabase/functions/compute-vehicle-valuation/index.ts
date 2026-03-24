@@ -62,7 +62,71 @@ function clamp(val: number, min: number, max: number): number {
 }
 
 // ============================================================================
-// STEP 1: BASE PRICE FROM COMPARABLES
+// MODEL NORMALIZATION — Strip noise from model strings for comp matching
+// ============================================================================
+function normalizeModelForComps(model: string): string {
+  let m = model.toLowerCase();
+  // Strip chassis/registration/engine/VIN metadata (common in Bonhams, Gooding, RM)
+  m = m.replace(/\b(chassis|registration|engine|vin|see text|lot|ref)\b.*$/i, "");
+  m = m.replace(/\bno\.\s*\S+/gi, "");
+  // Strip parenthetical notes
+  m = m.replace(/\(.*?\)/g, "");
+  // Normalize accented characters
+  m = m.replace(/[éèëê]/g, "e");
+  m = m.replace(/[àáâä]/g, "a");
+  m = m.replace(/[ùúûü]/g, "u");
+  m = m.replace(/[ìíîï]/g, "i");
+  m = m.replace(/[òóôö]/g, "o");
+  m = m.replace(/[ñ]/g, "n");
+  // Strip non-alphanumeric except spaces and hyphens
+  m = m.replace(/[^a-z0-9 -]/g, " ");
+  // Collapse whitespace
+  m = m.replace(/\s+/g, " ").trim();
+  return m;
+}
+
+/**
+ * Extract the core model identifier (first 1-3 meaningful tokens).
+ * E.g., "911 carrera 4 gts coupe 6-speed" -> "911 carrera"
+ *        "f40"                             -> "f40"
+ *        "model a roadster"                -> "model a"
+ */
+function extractCoreModel(normalizedModel: string): string {
+  const tokens = normalizedModel.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return "";
+
+  // Body-style and trim words that don't help identify the model
+  const stopWords = new Set([
+    "coupe", "cabriolet", "convertible", "roadster", "sedan", "saloon",
+    "targa", "spyder", "spider", "speedster", "berlinetta", "estate",
+    "wagon", "touring", "sport", "sports", "super", "special", "custom",
+    "limousine", "landaulet", "drophead", "fixedhead", "tourer",
+    "6-speed", "7-speed", "5-speed", "4-speed", "3-speed", "automatic",
+    "manual", "lwb", "swb", "rhd", "lhd", "recreation", "replica",
+    "lightweight", "competition", "rally", "race", "racing",
+  ]);
+
+  // Take the first significant tokens (model identifiers, not body styles)
+  const coreTokens: string[] = [];
+  for (const token of tokens) {
+    if (coreTokens.length >= 3) break;
+    // Skip displacement-only tokens like "2-litre", "30-litre"
+    if (/^\d+-?litre$/.test(token) || /^\d+-?liter$/.test(token)) continue;
+    if (/^\d+hp$/.test(token)) continue;
+    if (stopWords.has(token)) {
+      // If we already have at least one token, stop at body style words
+      if (coreTokens.length > 0) break;
+      // If first token is a stop word, keep it (e.g., "Super" in "Super Bee")
+      continue;
+    }
+    coreTokens.push(token);
+  }
+
+  return coreTokens.join(" ");
+}
+
+// ============================================================================
+// STEP 1: BASE PRICE FROM COMPARABLES (multi-tier matching)
 // ============================================================================
 async function getBasePrice(supabase: any, vehicle: any): Promise<{
   basePrice: number;
@@ -73,44 +137,172 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
   const model = vehicle.model;
   const year = vehicle.year;
 
-  if (!make || !model || !year) {
+  if (!make || !year) {
     return { basePrice: 0, compCount: 0, method: "none" };
   }
 
-  // Try exact match: same make+model, year +/- 5
-  const { data: compRows } = await supabase
-    .from("clean_vehicle_prices")
-    .select("best_price, is_sold, updated_at")
-    .ilike("make", make)
-    .ilike("model", `%${model}%`)
-    .gte("year", year - 5)
-    .lte("year", year + 5)
-    .gt("best_price", 0)
-    .order("updated_at", { ascending: false })
-    .limit(300);
+  // ---- Tier 1: Canonical model aliases (best quality match) ----
+  if (model) {
+    const normalizedModel = normalizeModelForComps(model);
+    const { data: canonMatch } = await supabase
+      .from("canonical_models")
+      .select("canonical_model, aliases")
+      .ilike("make", make)
+      .or(`canonical_model.ilike.%${normalizedModel}%`)
+      .limit(5);
 
-  if (!compRows || compRows.length === 0) {
-    // Fallback: same make, any model in same era (wider window)
-    const { data: makeComps } = await supabase
+    // Also check if the model string matches any alias
+    let bestCanonical: string | null = null;
+    if (canonMatch && canonMatch.length > 0) {
+      for (const cm of canonMatch) {
+        if (cm.aliases && Array.isArray(cm.aliases)) {
+          for (const alias of cm.aliases) {
+            if (normalizedModel.includes(alias.toLowerCase()) || alias.toLowerCase().includes(normalizedModel)) {
+              bestCanonical = cm.canonical_model;
+              break;
+            }
+          }
+        }
+        if (bestCanonical) break;
+        // Direct match on canonical_model
+        if (normalizedModel.includes(cm.canonical_model.toLowerCase())) {
+          bestCanonical = cm.canonical_model;
+        }
+      }
+    }
+
+    if (!bestCanonical && model) {
+      // Try matching with core model extracted
+      const coreModel = extractCoreModel(normalizedModel);
+      if (coreModel) {
+        const { data: coreMatch } = await supabase
+          .from("canonical_models")
+          .select("canonical_model, aliases")
+          .ilike("make", make)
+          .limit(50);
+
+        if (coreMatch) {
+          for (const cm of coreMatch) {
+            const cmLower = cm.canonical_model.toLowerCase();
+            if (cmLower === coreModel || coreModel.startsWith(cmLower + " ") || cmLower.startsWith(coreModel + " ")) {
+              bestCanonical = cm.canonical_model;
+              break;
+            }
+            if (cm.aliases && Array.isArray(cm.aliases)) {
+              for (const alias of cm.aliases) {
+                const aliasLower = alias.toLowerCase();
+                if (aliasLower === coreModel || coreModel.startsWith(aliasLower) || aliasLower.startsWith(coreModel)) {
+                  bestCanonical = cm.canonical_model;
+                  break;
+                }
+              }
+            }
+            if (bestCanonical) break;
+          }
+        }
+      }
+    }
+
+    // If we found a canonical model, use it for comp lookup
+    if (bestCanonical) {
+      const { data: canonComps } = await supabase
+        .from("clean_vehicle_prices")
+        .select("best_price, is_sold, updated_at")
+        .ilike("make", make)
+        .ilike("model", `%${bestCanonical}%`)
+        .gte("year", year - 5)
+        .lte("year", year + 5)
+        .gt("best_price", 0)
+        .order("updated_at", { ascending: false })
+        .limit(300);
+
+      if (canonComps && canonComps.length >= 3) {
+        const median = recencyWeightedMedian(canonComps);
+        return { basePrice: median, compCount: canonComps.length, method: "canonical" };
+      }
+    }
+  }
+
+  // ---- Tier 2: Exact model string match (original logic) ----
+  if (model) {
+    const { data: compRows } = await supabase
       .from("clean_vehicle_prices")
       .select("best_price, is_sold, updated_at")
       .ilike("make", make)
-      .gte("year", year - 10)
-      .lte("year", year + 10)
+      .ilike("model", `%${model}%`)
+      .gte("year", year - 5)
+      .lte("year", year + 5)
       .gt("best_price", 0)
       .order("updated_at", { ascending: false })
-      .limit(200);
+      .limit(300);
 
-    if (!makeComps || makeComps.length === 0) {
-      return { basePrice: 0, compCount: 0, method: "none" };
+    if (compRows && compRows.length >= 3) {
+      const median = recencyWeightedMedian(compRows);
+      return { basePrice: median, compCount: compRows.length, method: "exact" };
     }
+  }
 
+  // ---- Tier 3: Normalized model match (strips chassis/VIN/accents) ----
+  if (model) {
+    const normalizedModel = normalizeModelForComps(model);
+    if (normalizedModel && normalizedModel !== model.toLowerCase()) {
+      const { data: normComps } = await supabase
+        .from("clean_vehicle_prices")
+        .select("best_price, is_sold, updated_at")
+        .ilike("make", make)
+        .ilike("model", `%${normalizedModel}%`)
+        .gte("year", year - 5)
+        .lte("year", year + 5)
+        .gt("best_price", 0)
+        .order("updated_at", { ascending: false })
+        .limit(300);
+
+      if (normComps && normComps.length >= 3) {
+        const median = recencyWeightedMedian(normComps);
+        return { basePrice: median, compCount: normComps.length, method: "normalized" };
+      }
+    }
+  }
+
+  // ---- Tier 4: Core model match (first 1-3 significant tokens) ----
+  if (model) {
+    const coreModel = extractCoreModel(normalizeModelForComps(model));
+    if (coreModel && coreModel.length >= 2) {
+      const { data: coreComps } = await supabase
+        .from("clean_vehicle_prices")
+        .select("best_price, is_sold, updated_at")
+        .ilike("make", make)
+        .ilike("model", `%${coreModel}%`)
+        .gte("year", year - 5)
+        .lte("year", year + 5)
+        .gt("best_price", 0)
+        .order("updated_at", { ascending: false })
+        .limit(300);
+
+      if (coreComps && coreComps.length >= 3) {
+        const median = recencyWeightedMedian(coreComps);
+        return { basePrice: median, compCount: coreComps.length, method: "core_model" };
+      }
+    }
+  }
+
+  // ---- Tier 5: Make-only fallback with wider year range ----
+  const { data: makeComps } = await supabase
+    .from("clean_vehicle_prices")
+    .select("best_price, is_sold, updated_at")
+    .ilike("make", make)
+    .gte("year", year - 10)
+    .lte("year", year + 10)
+    .gt("best_price", 0)
+    .order("updated_at", { ascending: false })
+    .limit(200);
+
+  if (makeComps && makeComps.length > 0) {
     const median = recencyWeightedMedian(makeComps);
     return { basePrice: median, compCount: makeComps.length, method: "make_fallback" };
   }
 
-  const median = recencyWeightedMedian(compRows);
-  return { basePrice: median, compCount: compRows.length, method: "exact" };
+  return { basePrice: 0, compCount: 0, method: "none" };
 }
 
 function recencyWeightedMedian(rows: any[]): number {
@@ -572,10 +764,14 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
 
   const estimatedValue = Math.round(basePrice * compositeMultiplier * 100) / 100;
 
-  // Confidence interval
+  // Confidence interval — widen for less precise comp methods
   const baseInterval = weights.confidence_interval;
   const recordWiden = recordProx.widenInterval;
-  const totalInterval = baseInterval + recordWiden;
+  const methodWiden = compMethod === "core_model" ? 0.05
+    : compMethod === "make_fallback" ? 0.10
+    : compMethod === "self_price_fallback" ? 0.15
+    : 0;
+  const totalInterval = baseInterval + recordWiden + methodWiden;
 
   const valueLow = Math.round(estimatedValue * (1 - totalInterval) * 100) / 100;
   const valueHigh = Math.round(estimatedValue * (1 + totalInterval) * 100) / 100;
@@ -583,7 +779,13 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
   // Confidence score: based on input count and comp quality
   const inputCount = Object.values(signals).reduce((s, sig) => s + (sig.sourceCount > 0 ? 1 : 0), 0);
   let confidence = 30 + inputCount * 8 + Math.min(compCount, 20) * 1.5;
+  // Comp method quality bonus: exact/canonical are best, normalized/core are good
   if (compMethod === "exact") confidence += 10;
+  else if (compMethod === "canonical") confidence += 9;
+  else if (compMethod === "normalized") confidence += 7;
+  else if (compMethod === "core_model") confidence += 5;
+  else if (compMethod === "make_fallback") confidence += 0;
+  // self_price_fallback gets no bonus (already in base 30)
   confidence = Math.min(Math.round(confidence), 100);
 
   // Step 4: Deal score
