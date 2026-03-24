@@ -325,7 +325,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
                   </div>
                 ))}
                 {transfers.length > 5 && (
-                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                     +{transfers.length - 5} more transfers
                   </div>
                 )}

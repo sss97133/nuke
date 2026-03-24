@@ -677,19 +677,21 @@ const DealerDropboxImport: React.FC = () => {
                 {autoSyncInProgress && !importing && (
                   <div style={{
                     padding: '12px',
-                    background: '#fff3cd',
-                    border: '1px solid #ffc107', marginBottom: '12px',
-                    fontSize: '12px'
+                    background: 'var(--warning-dim)',
+                    border: '2px solid var(--warning)', marginBottom: '12px',
+                    fontSize: '11px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: 'var(--warning)',
                   }}>
-                    Auto-syncing missing images for existing vehicles...
+                    AUTO-SYNCING MISSING IMAGES FOR EXISTING VEHICLES...
                   </div>
                 )}
 
                 {importing && (
                   <div style={{
                     padding: '16px',
-                    background: '#d1ecf1',
-                    border: '1px solid #bee5eb', marginBottom: '20px'
+                    background: 'var(--info-dim, var(--accent-dim))',
+                    border: '2px solid var(--info, var(--accent))', marginBottom: '20px'
                   }}>
                     <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>
                       Importing...

@@ -162,7 +162,7 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
       ))}
 
       {organizations.length === 0 && (
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           No organizations found
         </div>
       )}

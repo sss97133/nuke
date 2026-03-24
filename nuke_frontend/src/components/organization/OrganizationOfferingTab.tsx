@@ -250,7 +250,7 @@ export default function OrganizationOfferingTab({ organizationId, organizationNa
     },
     pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
     blockquote: ({ children }: { children?: React.ReactNode }) => (
-      <blockquote style={{ borderLeft: '3px solid var(--border-medium)', paddingLeft: 'var(--space-4)', margin: 'var(--space-3) 0', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '12px' }}>{children}</blockquote>
+      <blockquote style={{ borderLeft: '3px solid var(--border-medium)', paddingLeft: 'var(--space-4)', margin: 'var(--space-3) 0', color: 'var(--text-muted)', fontSize: '12px' }}>{children}</blockquote>
     ),
     hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--border-light)', margin: 'var(--space-6) 0' }} />,
     strong: ({ children }: { children?: React.ReactNode }) => <strong style={{ fontWeight: 'bold' }}>{children}</strong>,

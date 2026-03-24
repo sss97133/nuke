@@ -323,7 +323,7 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
               fontSize: '9px',
               color: 'var(--error)',
               marginTop: '8px',
-              fontStyle: 'italic'
+
             }}>
               ⚠️ If you did not sell or transfer this vehicle, you must dispute this claim immediately.
             </div>

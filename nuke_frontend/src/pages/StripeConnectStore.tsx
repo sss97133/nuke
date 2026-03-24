@@ -114,34 +114,38 @@ export default function StripeConnectStore() {
       {isSuccess && (
         <div
           style={{
-            background: '#d4edda',
-            border: '1px solid #c3e6cb', padding: '16px 20px',
+            background: 'var(--success-dim)',
+            border: '2px solid var(--success)', padding: '16px 20px',
             marginBottom: '24px',
-            color: '#155724',
-            fontWeight: 600,
-            fontSize: '15px',
+            color: 'var(--success)',
+            fontWeight: 700,
+            fontSize: '11px',
+            fontFamily: 'Arial, sans-serif',
+            textTransform: 'uppercase' as const,
+            letterSpacing: '0.08em',
           }}
         >
-          Payment successful! Thank you for your purchase.
+          PAYMENT SUCCESSFUL
         </div>
       )}
 
-      <h1 style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text)', marginBottom: '4px' }}>
-        Store
+      <h1 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '4px', textTransform: 'uppercase' as const, letterSpacing: '0.04em', fontFamily: 'Arial, sans-serif' }}>
+        STORE
       </h1>
       <p style={{ ...mutedText, marginBottom: '32px' }}>
         Browse and purchase products from this seller.
       </p>
 
-      {loading && <p style={mutedText}>Loading products…</p>}
+      {loading && <p style={mutedText}>LOADING...</p>}
 
       {error && (
         <div
           style={{
-            background: '#fdecea',
-            border: '1px solid #f5c6cb', padding: '12px 16px',
-            color: '#721c24',
-            fontSize: '13px',
+            background: 'var(--error-dim)',
+            border: '2px solid var(--error)', padding: '12px 16px',
+            color: 'var(--error)',
+            fontSize: '11px',
+            fontFamily: 'Arial, sans-serif',
           }}
         >
           {error}
@@ -149,16 +153,17 @@ export default function StripeConnectStore() {
       )}
 
       {!loading && !error && products.length === 0 && (
-        <p style={mutedText}>No products available in this store yet.</p>
+        <p style={mutedText}>NO PRODUCTS AVAILABLE IN THIS STORE YET.</p>
       )}
 
       {buyError && (
         <div
           style={{
-            background: '#fdecea',
-            border: '1px solid #f5c6cb', padding: '12px 16px',
-            color: '#721c24',
-            fontSize: '13px',
+            background: 'var(--error-dim)',
+            border: '2px solid var(--error)', padding: '12px 16px',
+            color: 'var(--error)',
+            fontSize: '11px',
+            fontFamily: 'Arial, sans-serif',
             marginBottom: '16px',
           }}
         >

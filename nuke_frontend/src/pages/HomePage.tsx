@@ -985,7 +985,7 @@ function TabSkeleton() {
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12, fontFamily: 'Arial, sans-serif' }}>
       {[1, 2, 3].map((i) => (
-        <div key={i} style={{ height: 80, background: '#ebebeb', border: '1px solid #bdbdbd', animation: 'pulse 1.5s ease-in-out infinite' }} />
+        <div key={i} style={{ height: 80, background: 'var(--surface)', border: '1px solid var(--border)', animation: 'pulse 1.5s ease-in-out infinite' }} />
       ))}
       <style>{`@keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }`}</style>
     </div>

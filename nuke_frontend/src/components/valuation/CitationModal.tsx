@@ -329,7 +329,7 @@ export default function CitationModal({
 
                     {/* Notes */}
                     {cit.notes && (
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', fontStyle: 'italic' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
                         "{cit.notes}"
                       </div>
                     )}

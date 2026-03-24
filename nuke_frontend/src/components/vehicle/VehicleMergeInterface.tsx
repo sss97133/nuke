@@ -215,7 +215,7 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
                       VIN: {proposal.primary_vehicle.vin}
                     </div>
                   ) : (
-                    <div style={{ fontStyle: 'italic', marginBottom: '4px' }}>No VIN</div>
+                    <div style={{, marginBottom: '4px' }}>No VIN</div>
                   )}
                   <div>{proposal.primary_vehicle?.image_count || 0} images</div>
                 </div>
@@ -258,7 +258,7 @@ const VehicleMergeInterface: React.FC<Props> = ({ userId }) => {
                       VIN: {proposal.duplicate_vehicle.vin}
                     </div>
                   ) : (
-                    <div style={{ fontStyle: 'italic', marginBottom: '4px' }}>No VIN</div>
+                    <div style={{, marginBottom: '4px' }}>No VIN</div>
                   )}
                   <div>{proposal.duplicate_vehicle?.image_count || 0} images</div>
                 </div>

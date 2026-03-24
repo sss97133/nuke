@@ -1489,7 +1489,7 @@ function CuratorPanel({
                         <HoverStat label="Return" value={`${c.total_return_pct >= 0 ? '+' : ''}${c.total_return_pct.toFixed(2)}%`}
                           color={c.total_return_pct >= 0 ? 'var(--success)' : 'var(--error)'} />
                       )}
-                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '6px', fontStyle: 'italic' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '6px' }}>
                         Click to view this contract
                       </div>
                     </div>

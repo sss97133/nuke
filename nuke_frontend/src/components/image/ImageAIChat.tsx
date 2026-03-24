@@ -202,7 +202,7 @@ export const ImageAIChat: React.FC<ImageAIChatProps> = ({
             padding: '4px 6px',
             fontSize: '8px',
             color: 'rgba(255,255,255,0.5)',
-            fontStyle: 'italic'
+
           }}>
             Thinking...
           </div>

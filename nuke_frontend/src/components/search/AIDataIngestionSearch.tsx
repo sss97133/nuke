@@ -1679,7 +1679,7 @@ export default function AIDataIngestionSearch() {
                   </div>
                 )}
                 {extractionPreview.result.rawData.organization.description && (
-                  <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px', fontStyle: 'italic' }}>
+                  <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                     {extractionPreview.result.rawData.organization.description}
                   </div>
                 )}
@@ -1726,7 +1726,7 @@ export default function AIDataIngestionSearch() {
           )}
 
           {extractionPreview.result.provider && (
-            <div style={{ marginTop: '8px', fontSize: '9px', color: 'var(--text-disabled)', fontStyle: 'italic' }}>
+            <div style={{ marginTop: '8px', fontSize: '9px', color: 'var(--text-disabled)' }}>
               Processed with {extractionPreview.result.provider}
               {extractionPreview.result.model && ` / ${extractionPreview.result.model}`}
             </div>

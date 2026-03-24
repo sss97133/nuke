@@ -311,7 +311,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                         <HoverStat label="Investors" value={contract.total_investors || 0} />
                         <HoverStat label="NAV/Share" value={contract.current_nav_cents ? formatCurrencyFromCents(contract.current_nav_cents) : '—'} />
                         <HoverStat label="Shares Outstanding" value={contract.total_shares_authorized?.toLocaleString() || '—'} />
-                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '6px', fontStyle: 'italic' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '6px' }}>
                           AUM = total value of all underlying assets managed by this contract.
                         </div>
                       </div>
@@ -337,7 +337,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
                         {contract.sharpe_ratio != null && <HoverStat label="Sharpe Ratio" value={contract.sharpe_ratio.toFixed(2)} />}
                         {contract.max_drawdown_pct != null && <HoverStat label="Max Drawdown" value={`${contract.max_drawdown_pct.toFixed(2)}%`} color="var(--danger, #ef4444)" />}
                         {contract.target_returns_pct && <HoverStat label="Target Return" value={`${contract.target_returns_pct}%`} />}
-                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '6px', fontStyle: 'italic' }}>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '6px' }}>
                           Past performance does not guarantee future results.
                         </div>
                       </div>

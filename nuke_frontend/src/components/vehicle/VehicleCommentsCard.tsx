@@ -635,7 +635,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                         <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                           {formatTimeAgo(displayDate)}
                           {comment.updated_at && comment.updated_at !== comment.created_at && (
-                            <span style={{ marginLeft: '4px', fontStyle: 'italic' }}>(edited)</span>
+                            <span style={{ marginLeft: '4px' }}>(edited)</span>
                           )}
                         </span>
                         {/* Edit button - only for user's own Nuke comments */}

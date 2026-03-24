@@ -96,9 +96,9 @@ const S = {
     gap: '12px',
   } as React.CSSProperties,
   section: {
-    border: '2px solid #333',
+    border: '2px solid var(--border)',
     padding: '12px',
-    background: '#222',
+    background: 'var(--surface)',
   } as React.CSSProperties,
   sectionTitle: {
     fontSize: '9px',

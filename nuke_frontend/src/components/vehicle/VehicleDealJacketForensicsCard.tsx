@@ -190,7 +190,7 @@ export default function VehicleDealJacketForensicsCard({ vehicleId }: { vehicleI
   }
 
   if (!summary) return (
-    <div style={{ padding: '8px', fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+    <div style={{ padding: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
       No deal jacket forensics available for this vehicle.
     </div>
   );
