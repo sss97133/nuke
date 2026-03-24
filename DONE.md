@@ -5247,3 +5247,20 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - `sync-live-auctions` now triggers `extract-auction-comments` for BaT auctions ending within 6 hours
 - Fire-and-forget, capped at 10 per sync cycle
 - Deployed both edge functions
+
+### 2026-03-24
+### [valuation] Bonhams valuation coverage fix — 7.1% → 35.8% high-confidence
+- Root cause: Bonhams model strings are hyper-specific (chassis nos, accented chars, registration data)
+  - Model uniqueness ratio 0.917 (vs 0.115 for Mecum) — comp matching found ~0 cross-source comps
+  - e.g., "911 2.0 racing coupe chassis no. 9110101449 engine no. 3180044" matches nothing else
+- Fix: Multi-tier comp matching in `compute-vehicle-valuation`:
+  - Tier 1: canonical_models aliases (3,454 canonical models with aliases)
+  - Tier 2: Exact model string (original logic)
+  - Tier 3: Normalized model (strip chassis/VIN/accents)
+  - Tier 4: Core model tokens (first 1-3 significant words)
+  - Tier 5: Make-only fallback with wider year range
+- Added normalizeModelForComps() and extractCoreModel() functions
+- Updated confidence scoring for new match tiers + confidence interval widening
+- Deployed compute-vehicle-valuation, batch-extracted 4,379/4,450 vehicles
+- Also added "Sold for" price fallback to batch-extract-snapshots Bonhams parser
+- Results: high_conf 323→1,628 (+5x), no_estimate 578→78, avg_confidence 55→64
