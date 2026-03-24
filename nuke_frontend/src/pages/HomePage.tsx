@@ -4,105 +4,430 @@ import { useAuth } from '../hooks/useAuth';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { supabase } from '../lib/supabase';
 import { useVehiclesDashboard } from '../hooks/useVehiclesDashboard';
-import { applyNonAutoFilters } from '../lib/nonAutoExclusion';
 import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlideshow';
-import { MiniDistribution, PriceDistributionChart } from '../components/charts/PriceDistribution';
 
-/** v3 landing page data — single RPC, all sections. */
-interface LandingDataV3 {
-  vitals: { total_vehicles: number; total_with_price: number; min_year: number; max_year: number; distinct_years: number; distinct_makes: number } | null;
-  platform: { total_observations: number; total_images: number; total_comments: number; total_sources: number; schema_tables: number; schema_columns: number; vehicle_columns: number; pipeline_entries: number } | null;
-  makes: { make: string; vehicle_count: number; avg_price: number; model_count: number }[] | null;
-  make_models: { make: string; model: string; vehicle_count: number; avg_price: number }[] | null;
-  price_histograms: Record<string, { b: number; n: number }[]> | null;
-  source_categories: { category: string; source_count: number; avg_trust: number; min_trust: number; max_trust: number }[] | null;
-  sources: { slug: string; display_name: string; category: string; base_trust_score: number }[] | null;
-  observation_kinds: { kind: string; cnt: number }[] | null;
-  pipeline_tables: { table_name: string; governed_columns: number; protected_columns: number; function_count: number }[] | null;
-  pipeline_columns: { table_name: string; column_name: string; owned_by: string; do_not_write_directly: boolean; description: string | null }[] | null;
+// ────────────────────────────────────────────────────────────
+// TYPES
+// ────────────────────────────────────────────────────────────
+
+interface TreemapNode {
+  name: string;
+  count: number;
+  value: number;
+  median_price?: number;
+  min_price?: number;
+  max_price?: number;
+  sold_count?: number;
+  auction_count?: number;
+  avg_bids?: number;
+  avg_watchers?: number;
 }
 
-function useLandingDataV3() {
-  const [data, setData] = useState<LandingDataV3 | null>(null);
+interface TreemapRect {
+  node: TreemapNode;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
+interface DrillLevel {
+  label: string;
+  make?: string;
+  model?: string;
+}
+
+// ────────────────────────────────────────────────────────────
+// SQUARIFIED TREEMAP ALGORITHM (Bruls, Huizing, van Wijk 2000)
+// ────────────────────────────────────────────────────────────
+
+function worstAspectRatio(row: number[], w: number): number {
+  // w = length of the shorter side of the remaining rectangle
+  // row = array of areas
+  const s = row.reduce((a, b) => a + b, 0);
+  const rMax = Math.max(...row);
+  const rMin = Math.min(...row);
+  // worst = max(w^2 * rMax / s^2, s^2 / (w^2 * rMin))
+  const w2 = w * w;
+  const s2 = s * s;
+  return Math.max((w2 * rMax) / s2, s2 / (w2 * rMin));
+}
+
+function squarify(
+  items: { node: TreemapNode; area: number }[],
+  x: number,
+  y: number,
+  w: number,
+  h: number
+): TreemapRect[] {
+  if (items.length === 0) return [];
+  if (w <= 0 || h <= 0) return [];
+
+  // Sort descending by area
+  const sorted = [...items].sort((a, b) => b.area - a.area);
+  const totalArea = sorted.reduce((s, i) => s + i.area, 0);
+  if (totalArea <= 0) return [];
+
+  // Scale areas to fill the rectangle
+  const scale = (w * h) / totalArea;
+  const scaled = sorted.map(i => ({ ...i, scaledArea: i.area * scale }));
+
+  const result: TreemapRect[] = [];
+  layoutRow(scaled, x, y, w, h, result);
+  return result;
+}
+
+function layoutRow(
+  items: { node: TreemapNode; area: number; scaledArea: number }[],
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  result: TreemapRect[]
+): void {
+  if (items.length === 0) return;
+  if (items.length === 1) {
+    result.push({ node: items[0].node, x, y, w, h });
+    return;
+  }
+
+  // Determine the shorter side
+  const shorter = Math.min(w, h);
+  const horizontal = w >= h; // layout row along the shorter dimension
+
+  let row: typeof items = [items[0]];
+  let remaining = items.slice(1);
+  let currentWorst = worstAspectRatio(
+    row.map(i => i.scaledArea),
+    shorter
+  );
+
+  // Greedily add items to the row while aspect ratio improves
+  for (let k = 0; k < remaining.length; k++) {
+    const candidate = [...row, remaining[k]];
+    const candidateWorst = worstAspectRatio(
+      candidate.map(i => i.scaledArea),
+      shorter
+    );
+    if (candidateWorst <= currentWorst) {
+      row = candidate;
+      currentWorst = candidateWorst;
+    } else {
+      break;
+    }
+  }
+
+  remaining = items.slice(row.length);
+
+  // Lay out the row
+  const rowArea = row.reduce((s, i) => s + i.scaledArea, 0);
+
+  if (horizontal) {
+    // Row fills along the left side (fixed width = rowArea / h)
+    const rowW = rowArea / h;
+    let yOff = y;
+    for (const item of row) {
+      const itemH = item.scaledArea / rowW;
+      result.push({ node: item.node, x, y: yOff, w: rowW, h: itemH });
+      yOff += itemH;
+    }
+    // Recurse on the remaining rectangle
+    layoutRow(remaining, x + rowW, y, w - rowW, h, result);
+  } else {
+    // Row fills along the top (fixed height = rowArea / w)
+    const rowH = rowArea / w;
+    let xOff = x;
+    for (const item of row) {
+      const itemW = item.scaledArea / rowH;
+      result.push({ node: item.node, x: xOff, y, w: itemW, h: rowH });
+      xOff += itemW;
+    }
+    // Recurse on the remaining rectangle
+    layoutRow(remaining, x, y + rowH, w, h - rowH, result);
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// DATA HOOKS
+// ────────────────────────────────────────────────────────────
+
+function useTreemapBrands() {
+  const [data, setData] = useState<TreemapNode[] | null>(null);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     let cancelled = false;
-    supabase.rpc('landing_page_v3_cached').then(({ data: result }) => {
-      if (!cancelled && result) setData(result as unknown as LandingDataV3);
+    supabase.rpc('treemap_by_brand').then(({ data: result, error }) => {
+      if (!cancelled && result && !error) {
+        setData(result as TreemapNode[]);
+      }
+      if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
   }, []);
-
-  return data;
+  return { data, loading };
 }
 
-const OBSERVATION_DESCRIPTIONS: Record<string, string> = {
-  media: 'Photographs, videos, and visual documentation. Each image is zone-classified (exterior, interior, engine bay, undercarriage, detail) and processed through multi-model vision analysis for condition assessment, component identification, and authenticity verification.',
-  comment: 'Auction comments, forum posts, and social discussions. Analyzed for sentiment, technical claims, provenance hints, ownership history, and market signals. Comments are rhizomatic — they reveal vehicle condition, commenter expertise, auction mood, and geographic patterns simultaneously.',
-  bid: 'Auction bid records with timestamps, amounts, and bidder identifiers. Used to reconstruct price discovery curves, identify bidding patterns, and calibrate market valuations across platforms and time periods.',
-  spec: 'Factory specifications, build sheet data, RPO/option codes, and technical documentation. Cross-referenced against registry databases and service manual data to verify claimed configurations.',
-  work_record: 'Service records, restoration logs, and maintenance history from shops and owners. Tied to actor records (shop/mechanic/owner) with location and timestamp for full provenance chains.',
-  listing: 'Marketplace and auction listings with full seller descriptions, asking prices, and claimed specifications. Descriptions are treated as testimony with category-specific half-lives — mechanical claims decay faster than body claims.',
-  provenance: 'Ownership chain documentation, title history, and registry records. Each transfer links to actor records with timestamps, creating a complete chain of custody from factory to present.',
-  ownership: 'Current and historical owner records tied to the actor system. Includes purchase dates, locations, and relationship to the vehicle (daily driver, show car, investment, project).',
-  sale: 'Completed transaction records with final prices, buyer/seller data, and sale conditions (reserve met, buy-it-now, negotiated). Used to build the definitive price history for each vehicle.',
-  valuation: 'Professional appraisals, insurance valuations, and algorithmic estimates. Each valuation is scored by source authority and recency. Multiple valuations create a confidence-weighted price envelope.',
-  condition: 'Structured condition assessments from inspections, vision analysis, and expert evaluations. Scored across body, mechanical, interior, and originality dimensions with photographic evidence links.',
+function useTreemapModels(make: string | null) {
+  const [data, setData] = useState<TreemapNode[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!make) { setData(null); return; }
+    let cancelled = false;
+    setLoading(true);
+    supabase.rpc('treemap_models_by_brand', { p_make: make }).then(({ data: result, error }) => {
+      if (!cancelled && result && !error) {
+        setData(result as TreemapNode[]);
+      }
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [make]);
+  return { data, loading };
+}
+
+function useTreemapYears(make: string | null, model: string | null) {
+  const [data, setData] = useState<TreemapNode[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!make || !model) { setData(null); return; }
+    let cancelled = false;
+    setLoading(true);
+    supabase.rpc('treemap_years', { p_source: null, p_make: make, p_model: model }).then(({ data: result, error }) => {
+      if (!cancelled && result && !error) {
+        setData(result as TreemapNode[]);
+      }
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [make, model]);
+  return { data, loading };
+}
+
+// ────────────────────────────────────────────────────────────
+// FORMAT HELPERS
+// ────────────────────────────────────────────────────────────
+
+const fmtNum = (n: number) => n?.toLocaleString() ?? '--';
+const fmtMoney = (n: number) => {
+  if (!n) return '--';
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${Math.round(n / 1_000).toLocaleString()}K`;
+  return `$${n.toLocaleString()}`;
 };
 
-interface ShowcaseVehicle {
-  id: string;
-  year: number | null;
-  make: string | null;
-  model: string | null;
-  primary_image_url: string | null;
-  sale_price: number | null;
-  asking_price: number | null;
+// ────────────────────────────────────────────────────────────
+// COLOR SCALE — median price maps to a green-to-amber heatmap
+// inspired by Finviz: low price = muted, high price = saturated
+// ────────────────────────────────────────────────────────────
+
+function priceToColor(medianPrice: number | undefined, count: number): string {
+  if (!medianPrice || medianPrice <= 0) {
+    // fallback: use count to create subtle variation
+    const t = Math.min(count / 500, 1);
+    const lightness = 92 - t * 12;
+    return `hsl(0, 0%, ${lightness}%)`;
+  }
+  // Map log(price) to a hue scale:
+  // $5K = cool green (140), $50K = teal (170), $200K = blue (210), $1M+ = indigo (250)
+  const logP = Math.log10(Math.max(medianPrice, 1000));
+  // logP range: ~3.0 ($1K) to ~6.7 ($5M+)
+  const t = Math.max(0, Math.min(1, (logP - 3.5) / 3.2)); // 0..1 across price range
+  // Hue: green(140) -> teal(180) -> blue(210) -> indigo(250)
+  const hue = 140 + t * 110;
+  // Saturation: higher for more data
+  const countFactor = Math.min(count / 100, 1);
+  const saturation = 20 + countFactor * 30;
+  // Lightness: bright for low price, darker for high
+  const lightness = 88 - t * 20;
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 }
 
-/** Loads 8 recent vehicles that have images for the live showcase strip. */
-function useLiveShowcase() {
-  const [vehicles, setVehicles] = useState<ShowcaseVehicle[]>([]);
-  const [error, setError] = useState(false);
+// ────────────────────────────────────────────────────────────
+// TREEMAP CELL COMPONENT
+// ────────────────────────────────────────────────────────────
 
-  const load = useCallback(async () => {
-    try {
-      let q = supabase
-        .from('vehicles')
-        .select('id, year, make, model, primary_image_url, sale_price, asking_price')
-        .not('primary_image_url', 'is', null)
-        .not('year', 'is', null)
-        .not('make', 'is', null)
-        .not('model', 'is', null)
-        .eq('is_public', true)
-        .neq('status', 'deleted')
-        .neq('status', 'pending');
-      q = applyNonAutoFilters(q);
-      q = q.is('origin_organization_id', null);
-      // Prefer vehicles with sale prices (auction results are more interesting)
-      const { data, error: err } = await q
-        .not('sale_price', 'is', null)
-        .gt('sale_price', 1000)
-        .order('created_at', { ascending: false })
-        .limit(8);
-      if (err) throw err;
-      if (data && data.length > 0) {
-        setVehicles(data);
-        setError(false);
-      }
-    } catch {
-      setError(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-    const interval = setInterval(load, 60_000);
-    return () => clearInterval(interval);
-  }, [load]);
-
-  return { vehicles, error };
+interface CellProps {
+  rect: TreemapRect;
+  onClick: () => void;
+  totalCount: number;
+  showValue?: boolean;
+  isYear?: boolean;
 }
+
+function TreemapCell({ rect, onClick, totalCount, showValue, isYear }: CellProps) {
+  const { node, x, y, w, h } = rect;
+  const [hovered, setHovered] = useState(false);
+
+  const pct = totalCount > 0 ? ((node.count / totalCount) * 100) : 0;
+  const bg = priceToColor(node.median_price, node.count);
+
+  // Decide what text fits
+  const canShowName = w > 28 && h > 16;
+  const canShowCount = w > 40 && h > 30;
+  const canShowPrice = w > 60 && h > 44;
+  const canShowPct = w > 50 && h > 56;
+  const isLarge = w > 120 && h > 80;
+
+  // Font size scales with cell area
+  const area = w * h;
+  const nameFontSize = area > 40000 ? 13 : area > 15000 ? 11 : area > 5000 ? 10 : 9;
+  const dataFontSize = area > 40000 ? 11 : area > 15000 ? 10 : 9;
+
+  return (
+    <div
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        width: w,
+        height: h,
+        boxSizing: 'border-box',
+        border: `2px solid ${hovered ? '#2a2a2a' : '#bdbdbd'}`,
+        background: hovered ? `color-mix(in srgb, ${bg} 85%, #2a2a2a 15%)` : bg,
+        cursor: 'pointer',
+        overflow: 'hidden',
+        padding: 4,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        transition: 'border-color 120ms ease-out, background 120ms ease-out',
+        userSelect: 'none',
+      }}
+    >
+      {canShowName && (
+        <div
+          style={{
+            fontSize: nameFontSize,
+            fontWeight: 700,
+            letterSpacing: isLarge ? '-0.02em' : '0.04em',
+            textTransform: 'uppercase' as const,
+            color: '#2a2a2a',
+            lineHeight: 1.15,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: isLarge ? 'normal' : 'nowrap',
+            fontFamily: 'Arial, system-ui, sans-serif',
+            wordBreak: isLarge ? 'break-word' : undefined,
+          }}
+        >
+          {node.name}
+        </div>
+      )}
+
+      <div style={{ marginTop: 'auto' }}>
+        {canShowCount && (
+          <div
+            style={{
+              fontSize: dataFontSize,
+              fontFamily: "'Courier New', monospace",
+              color: '#444',
+              lineHeight: 1.3,
+            }}
+          >
+            {fmtNum(node.count)} {isYear ? '' : 'vehicles'}
+          </div>
+        )}
+        {canShowPrice && node.median_price && (
+          <div
+            style={{
+              fontSize: dataFontSize,
+              fontFamily: "'Courier New', monospace",
+              fontWeight: 700,
+              color: '#2a2a2a',
+              lineHeight: 1.3,
+            }}
+          >
+            {fmtMoney(node.median_price)} med
+          </div>
+        )}
+        {canShowPct && pct >= 0.1 && (
+          <div
+            style={{
+              fontSize: 8,
+              fontFamily: "'Courier New', monospace",
+              color: '#666',
+              lineHeight: 1.3,
+            }}
+          >
+            {pct.toFixed(1)}%
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// TOOLTIP COMPONENT
+// ────────────────────────────────────────────────────────────
+
+interface TooltipData {
+  node: TreemapNode;
+  x: number;
+  y: number;
+  totalCount: number;
+  level: string;
+}
+
+function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
+  const pct = totalCount > 0 ? ((node.count / totalCount) * 100).toFixed(1) : '0.0';
+  const sellThrough = node.auction_count && node.auction_count > 0
+    ? Math.round(((node.sold_count || 0) / node.auction_count) * 100) + '%'
+    : null;
+
+  // Keep tooltip on screen
+  const adjustedX = typeof window !== 'undefined' && x > window.innerWidth - 240 ? x - 220 : x + 12;
+  const adjustedY = typeof window !== 'undefined' && y > window.innerHeight - 200 ? y - 160 : y + 12;
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        left: adjustedX,
+        top: adjustedY,
+        background: '#fff',
+        border: '2px solid #2a2a2a',
+        padding: '10px 14px',
+        pointerEvents: 'none',
+        zIndex: 10000,
+        minWidth: 180,
+        maxWidth: 260,
+        fontFamily: 'Arial, system-ui, sans-serif',
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#2a2a2a', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+        {node.name}
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Courier New', monospace", color: '#2a2a2a', marginBottom: 6 }}>
+        {fmtNum(node.count)} <span style={{ fontSize: 10, fontWeight: 400, color: '#666' }}>{level === 'years' ? 'listings' : 'vehicles'}</span>
+      </div>
+      <div style={{ borderTop: '1px solid #bdbdbd', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <Row label="of total" value={pct + '%'} />
+        <Row label="total value" value={fmtMoney(node.value)} />
+        {node.median_price ? <Row label="median" value={fmtMoney(node.median_price)} /> : null}
+        {node.min_price && node.max_price ? <Row label="range" value={`${fmtMoney(node.min_price)} - ${fmtMoney(node.max_price)}`} /> : null}
+        {sellThrough ? <Row label="sell-through" value={sellThrough} /> : null}
+        {node.avg_bids ? <Row label="avg bids" value={String(node.avg_bids)} /> : null}
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 10, color: '#666' }}>
+      <span style={{ fontFamily: "'Courier New', monospace", color: '#2a2a2a', fontWeight: 600 }}>{value}</span>
+      <span style={{ marginLeft: 12, textAlign: 'right', fontSize: 9 }}>{label}</span>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// SEARCH BAR (reused from original)
+// ────────────────────────────────────────────────────────────
 
 interface SearchPreviewResult {
   id: string;
@@ -113,7 +438,6 @@ interface SearchPreviewResult {
   asking_price: number | null;
 }
 
-/** Inline search preview hook — debounced 300ms. */
 function useSearchPreview(query: string) {
   const [results, setResults] = useState<SearchPreviewResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -133,19 +457,15 @@ function useSearchPreview(query: string) {
 
     timerRef.current = setTimeout(async () => {
       try {
-        // Split query into words for flexible matching
         const words = q.split(/\s+/).filter(w => w.length > 0);
         let builder = supabase
           .from('vehicles')
           .select('id, year, make, model, sale_price, asking_price');
-        builder = applyNonAutoFilters(builder);
 
-        // Apply ilike for each word across make+model concatenation
         for (const word of words) {
           builder = builder.or(`make.ilike.%${word}%,model.ilike.%${word}%,vin.ilike.%${word}%`);
         }
 
-        // If query looks like a year, also filter by year
         const yearMatch = q.match(/\b(19|20)\d{2}\b/);
         if (yearMatch) {
           builder = builder.eq('year', parseInt(yearMatch[0]));
@@ -171,63 +491,97 @@ function useSearchPreview(query: string) {
   return { results, loading, noResults };
 }
 
-const FeedPage = lazy(() => import('../feed/components/FeedPage'));
-const GarageTab = lazy(() => import('../components/garage/GarageTab'));
-const UnifiedMap = lazy(() => import('../components/map/NukeMap'));
+// ────────────────────────────────────────────────────────────
+// MAIN TREEMAP HOMEPAGE
+// ────────────────────────────────────────────────────────────
 
-type TabId = 'garage' | 'feed' | 'map';
-
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'feed', label: 'Feed' },
-  { id: 'garage', label: 'Garage' },
-  { id: 'map', label: 'Map' },
-];
-
-const LS_KEY = 'nuke_hub_tab';
-
-/** Shared label styles */
-const sectionLabel: React.CSSProperties = {
-  fontSize: 9,
-  fontWeight: 700,
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase',
-  color: 'var(--text-secondary)',
-  marginBottom: 12,
-};
-
-/** Shared clickable row styles */
-const rowButton: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  width: '100%',
-  padding: '10px 16px',
-  border: 'none',
-  background: 'transparent',
-  color: 'var(--text)',
-  cursor: 'pointer',
-  textAlign: 'left',
-  fontFamily: 'Arial, sans-serif',
-  gap: 12,
-  position: 'relative',
-};
-
-const easeOut = '180ms cubic-bezier(0.16, 1, 0.3, 1)';
-
-function LandingHero({ onBrowse }: { onBrowse: () => void }) {
+function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
   const navigate = useNavigate();
   usePageTitle('Nuke — Vehicle Intelligence');
-  const d = useLandingDataV3();
+
+  // Drill-down state
+  const [drillStack, setDrillStack] = useState<DrillLevel[]>([{ label: 'ALL MAKES' }]);
+  const currentLevel = drillStack[drillStack.length - 1];
+
+  // Data hooks
+  const { data: brandsData, loading: brandsLoading } = useTreemapBrands();
+  const { data: modelsData, loading: modelsLoading } = useTreemapModels(currentLevel.make && !currentLevel.model ? currentLevel.make : null);
+  const { data: yearsData, loading: yearsLoading } = useTreemapYears(
+    currentLevel.model ? currentLevel.make ?? null : null,
+    currentLevel.model ?? null
+  );
+
+  // Determine active data and level type
+  const activeData = useMemo(() => {
+    if (currentLevel.model && yearsData) return yearsData;
+    if (currentLevel.make && modelsData) return modelsData;
+    if (brandsData) return brandsData;
+    return null;
+  }, [currentLevel, brandsData, modelsData, yearsData]);
+
+  const levelType = currentLevel.model ? 'years' : currentLevel.make ? 'models' : 'brands';
+  const isLoading = brandsLoading || modelsLoading || yearsLoading;
+
+  // Container sizing
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dims, setDims] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setDims({ w: Math.floor(r.width), h: Math.floor(r.height) });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Compute treemap layout
+  const rects = useMemo(() => {
+    if (!activeData || dims.w < 10 || dims.h < 10) return [];
+    const PAD = 2; // border space
+    const items = activeData
+      .filter(n => n.count > 0)
+      .map(node => ({ node, area: node.count }));
+    return squarify(items, PAD, PAD, dims.w - PAD * 2, dims.h - PAD * 2);
+  }, [activeData, dims]);
+
+  const totalCount = useMemo(
+    () => (activeData || []).reduce((s, n) => s + n.count, 0),
+    [activeData]
+  );
+
+  // Tooltip
+  const [tooltip, setTooltip] = useState<TooltipData | null>(null);
+
+  // Drill down
+  const drillInto = useCallback((node: TreemapNode) => {
+    if (levelType === 'brands') {
+      setDrillStack(prev => [...prev, { label: node.name, make: node.name }]);
+    } else if (levelType === 'models') {
+      setDrillStack(prev => [...prev, { label: node.name, make: currentLevel.make, model: node.name }]);
+    } else if (levelType === 'years') {
+      // At deepest level, navigate to search results
+      const params = new URLSearchParams();
+      if (currentLevel.make) params.set('make', currentLevel.make);
+      if (currentLevel.model) params.set('model', currentLevel.model);
+      params.set('year', node.name);
+      navigate(`/search?${params.toString()}`);
+    }
+  }, [levelType, currentLevel, navigate]);
+
+  // Navigate back
+  const goBack = useCallback((toIndex: number) => {
+    setDrillStack(prev => prev.slice(0, toIndex + 1));
+  }, []);
+
+  // Search state
   const [searchInput, setSearchInput] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
-
-  const [expandedMake, setExpandedMake] = useState<string | null>(null);
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
-  const [expandedKind, setExpandedKind] = useState<string | null>(null);
-  const [expandedTable, setExpandedTable] = useState<string | null>(null);
-  const [showAllMakes, setShowAllMakes] = useState(false);
-
-  const { vehicles: showcaseVehicles } = useLiveShowcase();
   const { results: searchResults, noResults } = useSearchPreview(searchInput);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -247,6 +601,8 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const showDropdown = searchFocused && searchInput.trim().length >= 2 && (searchResults.length > 0 || noResults);
+
   const formatPrice = (v: { sale_price?: number | null; asking_price?: number | null }) => {
     const p = v.sale_price || v.asking_price;
     if (!p) return null;
@@ -255,185 +611,73 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
     return `$${p.toLocaleString()}`;
   };
 
-  const formatAvgPrice = (n: number) => {
-    if (!n) return '--';
-    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `$${Math.round(n / 1_000).toLocaleString()}K`;
-    return `$${n.toLocaleString()}`;
-  };
-
-  const fmtNum = (n: number) => n?.toLocaleString() ?? '--';
-
-  const showDropdown = searchFocused && searchInput.trim().length >= 2 && (searchResults.length > 0 || noResults);
-
-  // Treemap row slicing
-  const makes = d?.makes || [];
-  const row1 = makes.slice(0, 3);
-  const row2 = makes.slice(3, 8);
-  const row3 = makes.slice(8, 15);
-  const row4 = makes.slice(15);
-
-  // Models for expanded make
-  const modelsForMake = expandedMake ? (d?.make_models || []).filter(m => m.make === expandedMake) : [];
-
-  // Sources for expanded category
-  const sourcesForCategory = expandedCategory ? (d?.sources || []).filter(s => s.category === expandedCategory) : [];
-
-  // Pipeline columns for expanded table
-  const columnsForTable = expandedTable ? (d?.pipeline_columns || []).filter(c => c.table_name === expandedTable) : [];
-
-  // Max observation count for bar widths
-  const maxObsCount = d?.observation_kinds ? Math.max(...d.observation_kinds.map(o => o.cnt)) : 1;
-
-  const histograms = d?.price_histograms || {};
-
-  const renderTreemapCell = (m: typeof makes[0], minHeight: number) => {
-    const bins = histograms[m.make];
-    return (
-      <button
-        key={m.make}
-        onClick={() => setExpandedMake(expandedMake === m.make ? null : m.make)}
-        style={{
-          flex: m.vehicle_count,
-          minHeight,
-          padding: '8px 10px',
-          border: '2px solid var(--border)',
-          borderColor: expandedMake === m.make ? 'var(--text)' : 'var(--border)',
-          background: 'var(--surface)',
-          cursor: 'pointer',
-          textAlign: 'left',
-          fontFamily: 'Arial, sans-serif',
-          color: 'var(--text)',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          transition: `border-color ${easeOut}`,
-          overflow: 'hidden',
-          minWidth: 0,
-        }}
-      >
-        <div style={{
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}>
-          {m.make}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
-          <span style={{ fontSize: 10, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)', flexShrink: 0 }}>{fmtNum(m.vehicle_count)}</span>
-          {bins ? (
-            <MiniDistribution bins={bins} width={Math.min(80, Math.max(40, m.vehicle_count / 100))} height={minHeight > 60 ? 20 : 14} />
-          ) : (
-            <span style={{ fontSize: 10, fontFamily: 'Courier New, monospace', fontWeight: 700 }}>{formatAvgPrice(m.avg_price)}</span>
-          )}
-        </div>
-      </button>
-    );
-  };
-
-  const renderMakeAccordion = () => {
-    if (!expandedMake) return null;
-    const bins = histograms[expandedMake];
-    return (
-      <div style={{
-        width: '100%',
-        padding: '8px 0',
-        animation: 'fadeIn 180ms ease-out',
-      }}>
-        {/* Price distribution chart */}
-        {bins && (
-          <div style={{
-            border: '2px solid var(--border)',
-            background: 'var(--surface)',
-            padding: '12px 16px',
-            marginBottom: 8,
-          }}>
-            <PriceDistributionChart bins={bins} make={expandedMake} />
-          </div>
-        )}
-        {/* Model grid */}
-        {modelsForMake.length > 0 && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-            gap: 4,
-          }}>
-            {modelsForMake.map(mm => (
-              <button
-                key={`${mm.make}-${mm.model}`}
-                onClick={() => navigate(`/search?make=${encodeURIComponent(mm.make)}&model=${encodeURIComponent(mm.model)}`)}
-                style={{
-                  padding: '8px 10px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--surface)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontFamily: 'Arial, sans-serif',
-                  color: 'var(--text)',
-                  transition: `border-color ${easeOut}`,
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
-              >
-                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {mm.model}
-                </div>
-                <div style={{ display: 'flex', gap: 8, fontSize: 10, fontFamily: 'Courier New, monospace' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>{fmtNum(mm.vehicle_count)}</span>
-                  <span style={{ fontWeight: 700 }}>{formatAvgPrice(mm.avg_price)}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Which row is the expanded make in?
-  const expandedMakeRow = expandedMake
-    ? row1.some(m => m.make === expandedMake) ? 1
-    : row2.some(m => m.make === expandedMake) ? 2
-    : row3.some(m => m.make === expandedMake) ? 3
-    : row4.some(m => m.make === expandedMake) ? 4
-    : 0
-    : 0;
+  // Transition animation state
+  const [transitioning, setTransitioning] = useState(false);
+  const prevLevelRef = useRef(levelType);
+  useEffect(() => {
+    if (prevLevelRef.current !== levelType) {
+      setTransitioning(true);
+      const t = setTimeout(() => setTransitioning(false), 200);
+      prevLevelRef.current = levelType;
+      return () => clearTimeout(t);
+    }
+  }, [levelType]);
 
   return (
     <div
       style={{
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        padding: '48px 24px 40px',
-        background: 'var(--bg)',
-        color: 'var(--text)',
-        fontFamily: 'Arial, sans-serif',
+        height: '100vh',
+        background: '#f5f5f5',
+        color: '#2a2a2a',
+        fontFamily: 'Arial, system-ui, sans-serif',
+        overflow: 'hidden',
       }}
     >
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-
-      {/* ─── Hero ─── */}
-      <div style={{ textAlign: 'center', maxWidth: 680, marginBottom: 40 }}>
-        <h1 style={{ fontSize: 'clamp(36px, 7vw, 64px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0 0 8px', color: 'var(--text)' }}>
-          NUKE
-        </h1>
-        <p style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-secondary)', margin: '0 0 32px' }}>
-          Vehicle data intelligence.
-        </p>
+      {/* ─── HEADER BAR ─── */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          padding: '0 16px',
+          height: 44,
+          borderBottom: '2px solid #bdbdbd',
+          background: '#ebebeb',
+          flexShrink: 0,
+        }}
+      >
+        {/* Logo / Identity */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <div
+            style={{
+              width: 7,
+              height: 7,
+              background: '#22c55e',
+              animation: 'livePulse 2s ease-in-out infinite',
+              flexShrink: 0,
+            }}
+          />
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              cursor: 'pointer',
+            }}
+            onClick={() => setDrillStack([{ label: 'ALL MAKES' }])}
+          >
+            NUKE
+          </span>
+          <span style={{ fontSize: 9, color: '#999', letterSpacing: '0.06em', fontWeight: 600 }}>
+            PROVENANCE ENGINE
+          </span>
+        </div>
 
         {/* Search bar */}
-        <div ref={searchContainerRef} style={{ position: 'relative', maxWidth: 520, margin: '0 auto 20px' }}>
-          <form onSubmit={handleSearch} style={{ display: 'flex', gap: 0, border: '2px solid var(--border)' }}>
+        <div ref={searchContainerRef} style={{ position: 'relative', flex: 1, maxWidth: 480 }}>
+          <form onSubmit={handleSearch} style={{ display: 'flex', border: '2px solid #bdbdbd' }}>
             <input
               type="text"
               value={searchInput}
@@ -441,354 +685,309 @@ function LandingHero({ onBrowse }: { onBrowse: () => void }) {
               onFocus={() => setSearchFocused(true)}
               placeholder="Search: 1967 Porsche 911, VIN, make, model..."
               aria-label="Search vehicles"
-              style={{ flex: 1, padding: '10px 16px', fontSize: 11, fontFamily: 'Arial, sans-serif', border: 'none', background: 'var(--surface)', color: 'var(--text)', outline: 'none', minWidth: 0 }}
+              style={{
+                flex: 1,
+                padding: '6px 12px',
+                fontSize: 11,
+                fontFamily: 'Arial, system-ui, sans-serif',
+                border: 'none',
+                background: '#f5f5f5',
+                color: '#2a2a2a',
+                outline: 'none',
+                minWidth: 0,
+              }}
             />
-            <button type="submit" style={{ padding: '10px 24px', fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'Arial, sans-serif', border: 'none', borderLeft: '2px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>
-              Search
+            <button
+              type="submit"
+              style={{
+                padding: '6px 16px',
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                fontFamily: 'Arial, system-ui, sans-serif',
+                border: 'none',
+                borderLeft: '2px solid #bdbdbd',
+                background: '#ebebeb',
+                color: '#2a2a2a',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              SEARCH
             </button>
           </form>
           {showDropdown && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', zIndex: 100 }}>
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '2px solid #bdbdbd', borderTop: 'none', zIndex: 10000 }}>
               {searchResults.map((v) => (
                 <button
                   key={v.id}
                   onClick={() => { setSearchFocused(false); navigate(`/vehicle/${v.id}`); }}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '10px 16px', border: 'none', borderBottom: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontFamily: 'Arial, sans-serif' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
+                  style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    width: '100%', padding: '8px 12px', border: 'none',
+                    borderBottom: '1px solid #ebebeb', background: 'transparent',
+                    color: '#2a2a2a', cursor: 'pointer', textAlign: 'left',
+                    fontSize: 11, fontFamily: 'Arial, system-ui, sans-serif',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#f5f5f5'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
                   <span>{[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown Vehicle'}</span>
-                  {formatPrice(v) && <span style={{ fontFamily: "'Courier New', monospace", color: 'var(--text-muted)', fontSize: 12 }}>{formatPrice(v)}</span>}
+                  {formatPrice(v) && (
+                    <span style={{ fontFamily: "'Courier New', monospace", color: '#666', fontSize: 10 }}>
+                      {formatPrice(v)}
+                    </span>
+                  )}
                 </button>
               ))}
-              {noResults && <div style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: 12 }}>No vehicles found for "{searchInput.trim()}"</div>}
+              {noResults && (
+                <div style={{ padding: '8px 12px', color: '#999', fontSize: 11 }}>
+                  No vehicles found for "{searchInput.trim()}"
+                </div>
+              )}
             </div>
           )}
         </div>
-        <button onClick={onBrowse} style={{ padding: '10px 28px', fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', border: '2px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-          Browse
+
+        {/* Browse button */}
+        <button
+          onClick={onBrowse}
+          style={{
+            padding: '6px 16px',
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            border: '2px solid #bdbdbd',
+            background: 'transparent',
+            color: '#666',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          FEED
         </button>
       </div>
 
-      {/* ─── 2. Platform Vitals ─── */}
-      {d?.vitals && d?.platform && (
-        <div style={{ width: '100%', maxWidth: 900, marginBottom: 48, border: '2px solid var(--border)', padding: '16px 20px' }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
-            gap: '12px 16px',
-            textAlign: 'center',
-          }}>
-            {[
-              ['VEHICLES', d.vitals.total_vehicles],
-              ['OBSERVATIONS', d.platform.total_observations],
-              ['IMAGES', d.platform.total_images],
-              ['COMMENTS', d.platform.total_comments],
-              ['SOURCES', d.platform.total_sources],
-              ['COLUMNS', d.platform.schema_columns],
-              ['TABLES', d.platform.schema_tables],
-              ['PIPELINES', d.platform.pipeline_entries],
-            ].map(([label, val]) => (
-              <div key={label as string}>
-                <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: 4 }}>
-                  {label}
-                </div>
-                <div style={{ fontSize: 14, fontFamily: 'Courier New, monospace', fontWeight: 700, color: 'var(--text)' }}>
-                  {fmtNum(val as number)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ─── 3. Market Treemap ─── */}
-      {makes.length > 0 && (
-        <div style={{ width: '100%', maxWidth: 900, marginBottom: 48 }}>
-          <div style={sectionLabel}>MARKET</div>
-          {/* Row 1: Top 3 */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-            {row1.map(m => renderTreemapCell(m, 80))}
-          </div>
-          {expandedMakeRow === 1 && renderMakeAccordion()}
-          {/* Row 2: Next 5 */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-            {row2.map(m => renderTreemapCell(m, 64))}
-          </div>
-          {expandedMakeRow === 2 && renderMakeAccordion()}
-          {/* Row 3: Next 7 */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-            {row3.map(m => renderTreemapCell(m, 52))}
-          </div>
-          {expandedMakeRow === 3 && renderMakeAccordion()}
-          {/* Row 4: Remaining — collapsed by default */}
-          {row4.length > 0 && (
-            <>
-              {showAllMakes ? (
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
-                  {row4.map(m => renderTreemapCell(m, 44))}
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowAllMakes(true)}
-                  style={{
-                    width: '100%', padding: '8px', border: '2px solid var(--border)',
-                    background: 'var(--surface)', cursor: 'pointer', fontFamily: 'Arial, sans-serif',
-                    fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
-                    color: 'var(--text-secondary)', textAlign: 'center',
-                  }}
-                >
-                  +{row4.length} MORE MAKES
-                </button>
+      {/* ─── BREADCRUMB / NAVIGATION BAR ─── */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '0 16px',
+          height: 32,
+          borderBottom: '2px solid #bdbdbd',
+          background: '#ebebeb',
+          flexShrink: 0,
+          gap: 4,
+          overflow: 'hidden',
+        }}
+      >
+        {drillStack.map((level, i) => {
+          const isLast = i === drillStack.length - 1;
+          return (
+            <React.Fragment key={i}>
+              {i > 0 && (
+                <span style={{ fontSize: 9, color: '#999', margin: '0 2px' }}>/</span>
               )}
-              {expandedMakeRow === 4 && renderMakeAccordion()}
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ─── 4. Intelligence Network ─── */}
-      {d?.source_categories && (
-        <div style={{ width: '100%', maxWidth: 900, marginBottom: 48 }}>
-          <div style={sectionLabel}>INTELLIGENCE NETWORK</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 4 }}>
-            {d.source_categories.map(cat => (
-              <div key={cat.category}>
-                <button
-                  onClick={() => setExpandedCategory(expandedCategory === cat.category ? null : cat.category)}
-                  style={{
-                    width: '100%', padding: '12px 14px', border: '2px solid var(--border)',
-                    borderColor: expandedCategory === cat.category ? 'var(--text)' : 'var(--border)',
-                    background: 'var(--surface)', cursor: 'pointer', textAlign: 'left',
-                    fontFamily: 'Arial, sans-serif', color: 'var(--text)', transition: `border-color ${easeOut}`,
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                      {cat.category}
-                    </span>
-                    <span style={{ fontSize: 10, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)' }}>
-                      {cat.source_count}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 9, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)', minWidth: 28 }}>
-                      {cat.min_trust}
-                    </span>
-                    <div style={{ flex: 1, height: 4, background: 'var(--border)', position: 'relative' }}>
-                      <div style={{
-                        position: 'absolute', left: `${cat.min_trust * 100}%`, right: `${(1 - cat.max_trust) * 100}%`,
-                        top: 0, bottom: 0, background: 'var(--text-secondary)', opacity: 0.4,
-                      }} />
-                      <div style={{
-                        position: 'absolute', left: `${cat.avg_trust * 100}%`, top: -2,
-                        width: 3, height: 8, background: 'var(--text)',
-                      }} />
-                    </div>
-                    <span style={{ fontSize: 9, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)', minWidth: 28, textAlign: 'right' }}>
-                      {cat.max_trust}
-                    </span>
-                  </div>
-                </button>
-                {expandedCategory === cat.category && sourcesForCategory.length > 0 && (
-                  <div style={{ border: '1px solid var(--border)', borderTop: 'none', background: 'var(--surface)', animation: 'fadeIn 180ms ease-out' }}>
-                    {sourcesForCategory.map(s => (
-                      <div key={s.slug} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderBottom: '1px solid var(--border)' }}>
-                        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {s.display_name}
-                        </span>
-                        <span style={{ fontSize: 10, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)', minWidth: 32, textAlign: 'right' }}>
-                          {s.base_trust_score}
-                        </span>
-                        <div style={{ width: 80, height: 4, background: 'var(--border)', flexShrink: 0 }}>
-                          <div style={{ width: `${s.base_trust_score * 100}%`, height: '100%', background: 'var(--text-secondary)', opacity: 0.4 }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ─── 5. Observation Graph ─── */}
-      {d?.observation_kinds && (
-        <div style={{ width: '100%', maxWidth: 900, marginBottom: 48 }}>
-          <div style={sectionLabel}>OBSERVATIONS</div>
-          <div style={{ border: '2px solid var(--border)', background: 'var(--surface)' }}>
-            {d.observation_kinds.map((ok, i) => (
-              <div key={ok.kind}>
-                <button
-                  onClick={() => setExpandedKind(expandedKind === ok.kind ? null : ok.kind)}
-                  style={{
-                    ...rowButton,
-                    borderBottom: i < d.observation_kinds!.length - 1 || expandedKind === ok.kind ? '1px solid var(--border)' : 'none',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text)', minWidth: 90, flexShrink: 0 }}>
-                    {ok.kind}
-                  </span>
-                  <div style={{ flex: 1, height: 4, background: 'var(--border)', position: 'relative' }}>
-                    <div style={{
-                      width: `${(ok.cnt / maxObsCount) * 100}%`, height: '100%',
-                      background: 'var(--text-secondary)', opacity: 0.4,
-                      transition: `width ${easeOut}`,
-                    }} />
-                  </div>
-                  <span style={{ fontSize: 10, color: 'var(--text-secondary)', fontFamily: 'Courier New, monospace', whiteSpace: 'nowrap', minWidth: 64, textAlign: 'right' }}>
-                    {fmtNum(ok.cnt)}
-                  </span>
-                </button>
-                {expandedKind === ok.kind && OBSERVATION_DESCRIPTIONS[ok.kind] && (
-                  <div style={{
-                    padding: '10px 16px 12px', fontSize: 10, lineHeight: 1.5,
-                    color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)',
-                    animation: 'fadeIn 180ms ease-out',
-                  }}>
-                    {OBSERVATION_DESCRIPTIONS[ok.kind]}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ─── 6. Schema Explorer ─── */}
-      {d?.pipeline_tables && (
-        <div style={{ width: '100%', maxWidth: 900, marginBottom: 48 }}>
-          <div style={sectionLabel}>SCHEMA GOVERNANCE</div>
-          <div style={{ border: '2px solid var(--border)', background: 'var(--surface)' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', padding: '8px 16px', borderBottom: '1px solid var(--border)', fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-secondary)', gap: 12 }}>
-              <span style={{ flex: 1 }}>TABLE</span>
-              <span style={{ minWidth: 64, textAlign: 'right' }}>GOVERNED</span>
-              <span style={{ minWidth: 64, textAlign: 'right' }}>PROTECTED</span>
-              <span style={{ minWidth: 64, textAlign: 'right' }}>FUNCTIONS</span>
-            </div>
-            {d.pipeline_tables.map((pt, i) => (
-              <div key={pt.table_name}>
-                <button
-                  onClick={() => setExpandedTable(expandedTable === pt.table_name ? null : pt.table_name)}
-                  style={{
-                    ...rowButton,
-                    borderBottom: i < d.pipeline_tables!.length - 1 || expandedTable === pt.table_name ? '1px solid var(--border)' : 'none',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <span style={{ flex: 1, fontSize: 10, fontFamily: 'Courier New, monospace', fontWeight: 700 }}>
-                    {pt.table_name}
-                  </span>
-                  <span style={{ minWidth: 64, textAlign: 'right', fontSize: 10, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)' }}>
-                    {pt.governed_columns}
-                  </span>
-                  <span style={{ minWidth: 64, textAlign: 'right', fontSize: 10, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)' }}>
-                    {pt.protected_columns}
-                  </span>
-                  <span style={{ minWidth: 64, textAlign: 'right', fontSize: 10, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)' }}>
-                    {pt.function_count}
-                  </span>
-                </button>
-                {expandedTable === pt.table_name && columnsForTable.length > 0 && (
-                  <div style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', animation: 'fadeIn 180ms ease-out' }}>
-                    {columnsForTable.map(col => (
-                      <div key={col.column_name} style={{ display: 'flex', alignItems: 'center', padding: '5px 16px 5px 32px', gap: 12, borderBottom: '1px solid var(--border)', fontSize: 10 }}>
-                        <span style={{ fontFamily: 'Courier New, monospace', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {col.column_name}
-                        </span>
-                        <span style={{ fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)', fontSize: 9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>
-                          {col.owned_by}
-                        </span>
-                        {col.do_not_write_directly && (
-                          <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-secondary)', flexShrink: 0 }} title="Protected — writes only via owning function">
-                            PROTECTED
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ─── 7. Recent Sales ─── */}
-      {showcaseVehicles.length > 0 && (
-        <div style={{ width: '100%', maxWidth: 900, marginBottom: 48 }}>
-          <div style={sectionLabel}>RECENT SALES</div>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, scrollbarWidth: 'thin' }}>
-            {showcaseVehicles.map((v) => (
-              <Link
-                key={v.id}
-                to={`/vehicle/${v.id}`}
+              <button
+                onClick={() => !isLast && goBack(i)}
                 style={{
-                  flexShrink: 0, width: 180, background: 'var(--surface)', border: '2px solid var(--border)',
-                  textDecoration: 'none', color: 'var(--text)', display: 'flex', flexDirection: 'column',
-                  overflow: 'hidden', transition: `border-color ${easeOut}`,
+                  fontSize: 9,
+                  fontWeight: isLast ? 700 : 600,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: isLast ? '#2a2a2a' : '#666',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: isLast ? 'default' : 'pointer',
+                  padding: '4px 6px',
+                  fontFamily: 'Arial, system-ui, sans-serif',
+                  textDecoration: 'none',
+                  whiteSpace: 'nowrap',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+                onMouseEnter={(e) => {
+                  if (!isLast) e.currentTarget.style.color = '#2a2a2a';
+                }}
+                onMouseLeave={(e) => {
+                  if (!isLast) e.currentTarget.style.color = '#666';
+                }}
               >
-                <div style={{ width: '100%', height: 120, overflow: 'hidden', background: 'var(--bg)' }}>
-                  <img src={v.primary_image_url || ''} alt={`${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim()} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-                <div style={{ padding: '8px 10px' }}>
-                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' as const, lineHeight: 1.3, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Vehicle'}
-                  </div>
-                  {formatPrice(v) && (
-                    <div style={{ fontSize: 11, fontFamily: 'Courier New, monospace', fontWeight: 700, color: 'var(--text)' }}>{formatPrice(v)}</div>
-                  )}
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
+                {level.label}
+              </button>
+            </React.Fragment>
+          );
+        })}
 
-      {/* ─── 8. Footer ─── */}
-      <a href="https://nuke.ag" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-secondary)', textDecoration: 'none' }}>
-        nuke.ag
-      </a>
+        {/* Level indicator */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          {activeData && (
+            <span style={{ fontSize: 9, fontFamily: "'Courier New', monospace", color: '#666' }}>
+              {fmtNum(totalCount)} vehicles / {fmtMoney((activeData || []).reduce((s, n) => s + n.value, 0))} total value
+            </span>
+          )}
+          <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#999' }}>
+            {levelType === 'brands' ? 'MAKES' : levelType === 'models' ? 'MODELS' : 'YEARS'}
+          </span>
+        </div>
+      </div>
+
+      {/* ─── TREEMAP VIEWPORT ─── */}
+      <div
+        ref={containerRef}
+        style={{
+          flex: 1,
+          position: 'relative',
+          overflow: 'hidden',
+          background: '#f5f5f5',
+          minHeight: 0,
+        }}
+        onMouseLeave={() => setTooltip(null)}
+      >
+        {isLoading && !activeData && (
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, color: '#999', fontFamily: "'Courier New', monospace",
+            letterSpacing: '0.08em',
+          }}>
+            LOADING...
+          </div>
+        )}
+
+        {/* Loading overlay for transitions */}
+        {isLoading && activeData && (
+          <div style={{
+            position: 'absolute', inset: 0, background: 'rgba(245,245,245,0.6)',
+            zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, color: '#999', fontFamily: "'Courier New', monospace",
+          }}>
+            LOADING...
+          </div>
+        )}
+
+        <div
+          style={{
+            opacity: transitioning ? 0.3 : 1,
+            transition: 'opacity 150ms ease-out',
+            width: '100%',
+            height: '100%',
+            position: 'relative',
+          }}
+        >
+          {rects.map((rect, i) => (
+            <div
+              key={rect.node.name + '-' + i}
+              onMouseMove={(e) => {
+                setTooltip({
+                  node: rect.node,
+                  x: e.clientX,
+                  y: e.clientY,
+                  totalCount,
+                  level: levelType,
+                });
+              }}
+              onMouseLeave={() => setTooltip(null)}
+            >
+              <TreemapCell
+                rect={rect}
+                onClick={() => drillInto(rect.node)}
+                totalCount={totalCount}
+                isYear={levelType === 'years'}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Empty state */}
+        {!isLoading && activeData && activeData.length === 0 && (
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            flexDirection: 'column', gap: 8,
+          }}>
+            <div style={{ fontSize: 11, color: '#999', fontFamily: "'Courier New', monospace" }}>
+              NO DATA
+            </div>
+            <button
+              onClick={() => goBack(drillStack.length - 2)}
+              style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+                textTransform: 'uppercase', border: '2px solid #bdbdbd',
+                background: 'transparent', color: '#666', cursor: 'pointer',
+                padding: '6px 16px', fontFamily: 'Arial, system-ui, sans-serif',
+              }}
+            >
+              GO BACK
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ─── TOOLTIP ─── */}
+      {tooltip && <TreemapTooltip {...tooltip} />}
+
+      {/* ─── FOOTER ─── */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 16px',
+          height: 24,
+          borderTop: '2px solid #bdbdbd',
+          background: '#ebebeb',
+          flexShrink: 0,
+        }}
+      >
+        <span style={{ fontSize: 8, fontFamily: "'Courier New', monospace", color: '#999' }}>
+          AREA = VEHICLE COUNT / COLOR = MEDIAN PRICE
+        </span>
+        <a
+          href="https://nuke.ag"
+          style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', color: '#999', textDecoration: 'none' }}
+        >
+          nuke.ag
+        </a>
+      </div>
+
+      {/* ─── GLOBAL STYLES ─── */}
+      <style>{`
+        @keyframes livePulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
     </div>
   );
 }
 
-// Minimal skeleton for tab content while lazy loading
+// ────────────────────────────────────────────────────────────
+// TABS (garage, feed, map) — kept from original
+// ────────────────────────────────────────────────────────────
+
+const FeedPage = lazy(() => import('../feed/components/FeedPage'));
+const GarageTab = lazy(() => import('../components/garage/GarageTab'));
+const UnifiedMap = lazy(() => import('../components/map/NukeMap'));
+
+type TabId = 'garage' | 'feed' | 'map';
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'feed', label: 'Feed' },
+  { id: 'garage', label: 'Garage' },
+  { id: 'map', label: 'Map' },
+];
+
+const LS_KEY = 'nuke_hub_tab';
+
 function TabSkeleton() {
   return (
-    <div
-      style={{
-        padding: 24,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        fontFamily: 'Arial, sans-serif',
-      }}
-    >
+    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12, fontFamily: 'Arial, sans-serif' }}>
       {[1, 2, 3].map((i) => (
-        <div
-          key={i}
-          style={{
-            height: 80,
-            background: 'var(--surface)',
-            border: '1px solid var(--border)', animation: 'pulse 1.5s ease-in-out infinite',
-          }}
-        />
+        <div key={i} style={{ height: 80, background: '#ebebeb', border: '1px solid #bdbdbd', animation: 'pulse 1.5s ease-in-out infinite' }} />
       ))}
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 1; }
-        }
-      `}</style>
+      <style>{`@keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }`}</style>
     </div>
   );
 }
@@ -807,7 +1006,6 @@ export default function HomePage() {
 
   const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
 
-  // Garage dashboard state — lifted here so toolbar + GarageTab share it
   const garage = useVehiclesDashboard(user?.id);
 
   useEffect(() => {
@@ -828,7 +1026,6 @@ export default function HomePage() {
     setSearchParams(tab === 'garage' && user ? {} : { tab }, { replace: true });
   };
 
-  // Onboarding for first-time authenticated users
   const [showOnboarding, setShowOnboarding] = useState(false);
   useEffect(() => {
     if (!authLoading && user && !localStorage.getItem('nuke_onboarding_seen')) {
@@ -841,9 +1038,9 @@ export default function HomePage() {
     localStorage.setItem('nuke_onboarding_seen', '1');
   };
 
-  // Logged-out users with no explicit tab request see the landing page
+  // Logged-out users see the treemap landing page
   if (!authLoading && !user && !showFeed) {
-    return <LandingHero onBrowse={() => setShowFeed(true)} />;
+    return <TreemapHomePage onBrowse={() => setShowFeed(true)} />;
   }
 
   return (
@@ -851,15 +1048,14 @@ export default function HomePage() {
       {showOnboarding && (
         <OnboardingSlideshow isOpen={showOnboarding} onClose={handleOnboardingClose} />
       )}
-      {/* Tab bar — only show for non-feed tabs (feed uses its own chrome) */}
       {activeTab !== 'feed' && (
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            background: 'var(--surface)',
+            background: '#ebebeb',
             flexShrink: 0,
-            borderBottom: '2px solid var(--border)',
+            borderBottom: '2px solid #bdbdbd',
             height: 30,
           }}
         >
@@ -874,18 +1070,19 @@ export default function HomePage() {
                   padding: '0 16px',
                   height: 30,
                   fontSize: 9,
-                  fontFamily: 'Arial, sans-serif',
+                  fontFamily: 'Arial, system-ui, sans-serif',
                   fontWeight: 700,
                   letterSpacing: '0.12em',
                   textTransform: 'uppercase',
                   border: 'none',
-                  borderBottom: active ? '2px solid var(--text)' : '2px solid transparent',
-                  background: active ? 'var(--bg)' : 'transparent',
-                  color: active ? 'var(--text)' : 'var(--text-disabled)',
+                  borderBottom: active ? '2px solid #2a2a2a' : '2px solid transparent',
+                  background: active ? '#f5f5f5' : 'transparent',
+                  color: active ? '#2a2a2a' : '#999',
                   cursor: 'pointer',
-                  transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1), background 180ms cubic-bezier(0.16, 1, 0.3, 1)', }}
-                onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)'; }}
-                onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-disabled)'; }}
+                  transition: 'color 180ms ease-out, background 180ms ease-out',
+                }}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = '#666'; }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = '#999'; }}
               >
                 {tab.label}
               </button>
@@ -894,7 +1091,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Tab content — feed scrolls with window, map needs fixed height */}
       {activeTab === 'map' ? (
         <div style={{ height: 'calc(100vh - var(--header-height, 40px) - 30px)', overflow: 'hidden', position: 'relative' }}>
           <Suspense fallback={<TabSkeleton />}>
