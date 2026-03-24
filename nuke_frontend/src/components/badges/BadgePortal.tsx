@@ -188,8 +188,11 @@ export function BadgePortal({
       {isOpen && data && (
         <BadgeClusterPanel
           label={label}
+          dimension={dimension}
+          value={value}
           count={data.count}
           preview={data.preview}
+          stats={data.stats}
           loading={loading}
           onClose={handleClose}
         />
