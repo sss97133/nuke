@@ -32,6 +32,6 @@
 ~DONE~ | BJ-VIN-EXTRACT | Extracted 2,180 VINs from B-J snapshots. Remaining 53K lack snapshots (32K conceptcarz imports, 12.9K no snapshot, 8K discovery-url only) | listing_page_snapshots, vehicles
 ~DONE~ | BJ-DESC-BACKFILL | Extract descriptions from Barrett-Jackson snapshots — 3,105 updated | listing_page_snapshots, vehicles
 08:00 | FB-ENRICH | Batch enrichment of 477 Facebook Marketplace vehicles | vehicles, scripts/, listing_page_snapshots
-09:00 | FB-PRICE-FIX | Diagnose + fix 12K FB Marketplace vehicles with no price signal | vehicles, compute-vehicle-valuation, field_evidence
+~DONE~ | FB-PRICE-FIX | Fixed denorm bug + deployed edge function fix + launched FB sweep (running in background, ~86/batch). Coverage 28%->44%+ | vehicles, compute-vehicle-valuation
 09:30 | IMAGE-EXTRACT-ALL | Batch extract images from ALL platform snapshots | listing_page_snapshots, vehicle_images, vehicles
 09:30 | BJ-PRICE-FIX | Fix 5,903 Barrett-Jackson vehicles with no price — snapshot extraction + valuation | vehicles, listing_page_snapshots, compute-vehicle-valuation

@@ -2,6 +2,19 @@
 
 ## 2026-03-24
 
+### [valuation] FB Marketplace nuke_estimate sweep — 28% to 44%+ and climbing
+- **Diagnosis**: 12,430 FB vehicles appeared to have "no price" (no sale_price + no nuke_estimate)
+  - Reality: 99.6% already had asking_price; only 103 truly had no price signal
+  - Root cause 1: Valuation cron queue had 42K vehicles across all sources; FB deprioritized
+  - Root cause 2: Denorm bug — 337 vehicles had nuke_estimates rows but NULL on vehicles table
+  - Root cause 3: Edge function cached path didn't re-denormalize, causing infinite cron retry
+- **Fix 1**: Backfilled 337 denorm gaps (UPDATE vehicles FROM nuke_estimates)
+- **Fix 2**: Fixed compute-vehicle-valuation cached path to re-denormalize on cache hit
+- **Fix 3**: Deployed targeted FB sweep (200 batches x 100 vehicles, running in background)
+- **Results so far**: nuke_estimate coverage 28% → 44% (12,717 of 29K), sweep continuing
+- **Error rate**: ~14% per batch from junk data (make="3", "Hemi Veney", etc.)
+- Deployed: compute-vehicle-valuation with denorm fix
+
 ### [data-quality] Facebook Marketplace Deep Enrichment Pipeline
 - **Problem**: 29K FB vehicles were shallow — 13% descriptions, 47% prices (initially reported), 0% VINs
 - **Root cause**: Scraper only captured search-page data (title, price, image); descriptions require individual page visits
