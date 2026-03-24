@@ -494,6 +494,21 @@ const TOOLS: ToolDef[] = [
 
   // ── Vehicle Deep Graph ────────────────────────────────────────────────
   {
+    name: "vehicle",
+    description:
+      "Get all populated fields for a vehicle by ID. Returns every non-null field on the record: " +
+      "year, make, model, VIN, mileage, colors, engine, transmission, drivetrain, price, " +
+      "location, description, images, scores, and metadata. Null fields are stripped. " +
+      "Use this as the primary way to fetch a full vehicle profile after searching.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vehicle_id: { type: "string", description: "Vehicle UUID (from search results)" },
+      },
+      required: ["vehicle_id"],
+    },
+  },
+  {
     name: "get_vehicle",
     description:
       "Get a vehicle profile by ID. Returns identity (year/make/model/VIN), pricing, location, images, and summary counts for observations, events, and images.",
@@ -1066,18 +1081,59 @@ async function handleSearchVehicles(args: Record<string, unknown>): Promise<Tool
 }
 
 async function handleSearchVehiclesAdvanced(args: Record<string, unknown>): Promise<ToolResult> {
-  const params = new URLSearchParams();
-  params.set("q", String(args.q));
-  if (args.make) params.set("make", String(args.make));
-  if (args.model) params.set("model", String(args.model));
-  if (args.year_from) params.set("year_from", String(args.year_from));
-  if (args.year_to) params.set("year_to", String(args.year_to));
-  if (args.sort) params.set("sort", String(args.sort));
-  if (args.limit) params.set("limit", String(args.limit));
-  if (args.page) params.set("page", String(args.page));
+  const supabase = sb();
+  const limit = Math.min(Math.max(Number(args.limit) || 50, 1), 200);
+  const page = Math.max(Number(args.page) || 1, 1);
+  const offset = (page - 1) * limit;
 
-  const data = await callEdgeApi("search", `?${params}`);
-  return toolOk(data);
+  let query = supabase
+    .from("vehicles")
+    .select(
+      "id, vin, year, make, model, trim, color, interior_color, sale_price, asking_price, " +
+      "mileage, transmission, engine_type, body_style, status, primary_image_url, " +
+      "listing_url, nuke_estimate, nuke_estimate_confidence, deal_score, location, " +
+      "city, state, country, created_at",
+      { count: "estimated" }
+    );
+
+  // Full-text search (only when q is provided — avoid searching for "undefined")
+  if (args.q) {
+    const tokens = String(args.q).trim().split(/\s+/).filter(Boolean);
+    const tsq = tokens.map((t) => t.replace(/[^a-zA-Z0-9]/g, "")).filter(Boolean).join(" & ");
+    if (tsq) query = query.textSearch("search_vector", tsq, { type: "plain", config: "english" });
+  }
+
+  // Structured filters — applied as SQL WHERE clauses
+  if (args.make) query = (query as any).ilike("make", String(args.make));
+  if (args.model) query = (query as any).ilike("model", `%${args.model}%`);
+  if (args.year_from) query = (query as any).gte("year", Number(args.year_from));
+  if (args.year_to) query = (query as any).lte("year", Number(args.year_to));
+
+  // Sort
+  switch (String(args.sort)) {
+    case "price_desc": query = (query as any).order("sale_price", { ascending: false, nullsFirst: false }); break;
+    case "price_asc": query = (query as any).order("sale_price", { ascending: true, nullsFirst: false }); break;
+    case "year_desc": query = (query as any).order("year", { ascending: false, nullsFirst: false }); break;
+    case "year_asc": query = (query as any).order("year", { ascending: true, nullsFirst: false }); break;
+    default: query = (query as any).order("updated_at", { ascending: false, nullsFirst: false }); break;
+  }
+
+  query = (query as any).range(offset, offset + limit - 1);
+
+  const { data, count, error } = await query;
+  if (error) return toolErr(error.message);
+
+  const results = (data || []).map((v: Record<string, unknown>) =>
+    Object.fromEntries(Object.entries(v).filter(([, val]) => val !== null && val !== undefined && val !== ""))
+  );
+
+  return toolOk({
+    results,
+    total_count: count ?? results.length,
+    page,
+    limit,
+    has_more: (count ?? 0) > offset + limit,
+  });
 }
 
 async function handleDecodeVin(args: Record<string, unknown>): Promise<ToolResult> {
@@ -1240,6 +1296,29 @@ async function handleBrowseInventory(args: Record<string, unknown>): Promise<Too
 }
 
 // ── Vehicle Deep Graph ──────────────────────────────────────────────────────
+
+async function handleVehicle(args: Record<string, unknown>): Promise<ToolResult> {
+  const supabase = sb();
+  const vid = String(args.vehicle_id);
+
+  const { data: vehicle, error } = await supabase
+    .from("vehicles")
+    .select("*")
+    .eq("id", vid)
+    .single();
+
+  if (error) return toolErr(error.message);
+  if (!vehicle) return toolErr("Vehicle not found");
+
+  // Return only populated fields
+  const populated = Object.fromEntries(
+    Object.entries(vehicle as Record<string, unknown>).filter(
+      ([, v]) => v !== null && v !== undefined && v !== "" && v !== "{}",
+    ),
+  );
+
+  return toolOk(populated);
+}
 
 async function handleGetVehicle(args: Record<string, unknown>): Promise<ToolResult> {
   const supabase = sb();
@@ -2796,6 +2875,7 @@ const TOOL_HANDLERS: Record<string, (args: Record<string, unknown>) => Promise<T
   search_vehicles_advanced: handleSearchVehiclesAdvanced,
   decode_vin: handleDecodeVin,
   browse_inventory: handleBrowseInventory,
+  vehicle: handleVehicle,
   get_vehicle: handleGetVehicle,
   query_vehicle_deep: handleQueryVehicleDeep,
   query_field_evidence: handleQueryFieldEvidence,

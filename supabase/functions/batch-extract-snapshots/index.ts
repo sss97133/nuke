@@ -456,7 +456,7 @@ Deno.serve(async (req) => {
         if (useQueue) {
           await supabase.from("snapshot_extraction_queue")
             .update({ status: "failed", completed_at: new Date().toISOString() })
-            .eq("vehicle_id", vehicle.id).catch(() => {});
+            .eq("vehicle_id", vehicle.id);
         }
       }
     }
@@ -1405,6 +1405,40 @@ function parseBonhamsHtml(html: string): Record<string, any> {
   if (!result.vin) {
     const engineNoMatch = html.match(/\bEngine\s+(?:No\.?\s*)?[:;]?\s*([A-Z0-9\-]{5,15})\b/i);
     // Don't use engine number as VIN
+  }
+
+  // ── Sale price fallback: "Sold for" text (common in Bonhams SSR pages) ──
+  if (!result.sale_price) {
+    // Pattern 1: "Sold for US$35,000 inc. premium" or "Sold for £12,000"
+    const soldForMatch = html.match(/Sold\s+for\s+(?:US)?\s*([£€$CHF]*)\s*([\d,]+)/i);
+    if (soldForMatch?.[2]) {
+      const price = parseInt(soldForMatch[2].replace(/,/g, ""));
+      if (price > 0) result.sale_price = price;
+    }
+  }
+  if (!result.sale_price) {
+    // Pattern 2: hammerPrice in JSON (some pages have this in inline scripts)
+    const hammerMatch = html.match(/"hammerPrice"\s*:\s*"?(\d+)"?/);
+    if (hammerMatch?.[1]) {
+      const price = parseInt(hammerMatch[1]);
+      if (price > 0) result.sale_price = price;
+    }
+  }
+  if (!result.sale_price) {
+    // Pattern 3: "hammer_price" variant
+    const hp2 = html.match(/"hammer_price"\s*:\s*"?(\d+)"?/);
+    if (hp2?.[1]) {
+      const price = parseInt(hp2[1]);
+      if (price > 0) result.sale_price = price;
+    }
+  }
+  if (!result.sale_price) {
+    // Pattern 4: Bonhams auction result JSON: "salePrice" or "soldPrice"
+    const spMatch = html.match(/"(?:salePrice|soldPrice)"\s*:\s*"?(\d+)"?/);
+    if (spMatch?.[1]) {
+      const price = parseInt(spMatch[1]);
+      if (price > 0) result.sale_price = price;
+    }
   }
 
   // Engine from description
