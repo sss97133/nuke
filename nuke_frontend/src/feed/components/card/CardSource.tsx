@@ -1,100 +1,127 @@
 /**
- * CardSource — Source favicon stamp.
+ * CardSource — Platform source badge on feed cards.
  *
- * Shows a small favicon for the vehicle's discovery source.
- * Positioned in bottom-left of image area.
+ * Shows WHERE the vehicle is from (BaT, FB, MECUM, etc.)
+ * as a pill/label in the top-left of the image area.
+ *
+ * Design system: Courier New, 8px UPPERCASE, 2px borders, zero radius.
  */
-
-import { FaviconIcon } from '../../../components/common/FaviconIcon';
 
 export interface CardSourceProps {
   discoveryUrl?: string | null;
   discoverySource?: string | null;
+  profileOrigin?: string | null;
 }
 
-/** Map source patterns to short platform labels */
-const SOURCE_LABELS: Record<string, string> = {
-  craigslist: 'CL',
-  bat: 'BAT',
-  'bring a trailer': 'BAT',
+/** Canonical source slug -> display abbreviation */
+const SOURCE_DISPLAY: Record<string, string> = {
+  // Slug-based matches (from discovery_source / profile_origin)
+  bat: 'BaT',
+  'bring a trailer': 'BaT',
+  bringatrailer: 'BaT',
+  facebook_marketplace: 'FB',
+  facebook: 'FB',
+  fb_marketplace: 'FB',
+  fb: 'FB',
+  mecum: 'MECUM',
+  cars_and_bids: 'C&B',
+  carsandbids: 'C&B',
   'cars and bids': 'C&B',
   'c&b': 'C&B',
-  ksl: 'KSL',
-  facebook: 'FB MARKET',
-  fb: 'FB MARKET',
-  classic: 'CLASSIC',
+  'barrett-jackson': 'B-J',
+  barrett_jackson: 'B-J',
+  barrettjackson: 'B-J',
+  bonhams: 'BONHAMS',
+  craigslist: 'CL',
+  gooding: 'GOODING',
+  pcarmarket: 'PCAR',
   hemmings: 'HEMMINGS',
-  mecum: 'MECUM',
+  classic: 'CLASSIC',
+  ksl: 'KSL',
+  ebay: 'EBAY',
+  rm_sothebys: 'RM',
+  rmsothebys: 'RM',
+  conceptcarz: 'CCARZ',
+  autotrader: 'AT',
+  hagerty: 'HAGERTY',
 };
 
-function resolvePlatformLabel(url: string | null, source: string | null): string | null {
-  const s = (source || '').toLowerCase();
-  for (const [key, label] of Object.entries(SOURCE_LABELS)) {
-    if (s.includes(key)) return label;
+/** URL domain -> display abbreviation */
+const DOMAIN_DISPLAY: [RegExp, string][] = [
+  [/bringatrailer\.com/, 'BaT'],
+  [/facebook\.com|fb\.com|fbmarketplace/, 'FB'],
+  [/mecum\.com/, 'MECUM'],
+  [/carsandbids\.com/, 'C&B'],
+  [/barrett-jackson\.com/, 'B-J'],
+  [/bonhams\.com/, 'BONHAMS'],
+  [/craigslist\.org/, 'CL'],
+  [/goodingco\.com/, 'GOODING'],
+  [/pcarmarket\.com/, 'PCAR'],
+  [/hemmings\.com/, 'HEMMINGS'],
+  [/classic\.com/, 'CLASSIC'],
+  [/ksl\.com/, 'KSL'],
+  [/ebay\.com/, 'EBAY'],
+  [/rmsothebys\.com/, 'RM'],
+  [/conceptcarz\.com/, 'CCARZ'],
+  [/autotrader\.com/, 'AT'],
+  [/hagerty\.com/, 'HAGERTY'],
+];
+
+function resolveSourceLabel(
+  url: string | null | undefined,
+  source: string | null | undefined,
+  origin: string | null | undefined,
+): string | null {
+  // Try profile_origin first (most reliable), then discovery_source
+  for (const raw of [origin, source]) {
+    if (!raw) continue;
+    const key = raw.toLowerCase().trim();
+    if (SOURCE_DISPLAY[key]) return SOURCE_DISPLAY[key];
+    // Partial match
+    for (const [slug, label] of Object.entries(SOURCE_DISPLAY)) {
+      if (key.includes(slug)) return label;
+    }
   }
+
+  // Fall back to URL domain matching
   if (url) {
-    const u = url.toLowerCase();
-    if (u.includes('facebook.com') || u.includes('fb.com')) return 'FB MARKET';
-    if (u.includes('bringatrailer.com')) return 'BAT';
-    if (u.includes('carsandbids.com')) return 'C&B';
-    if (u.includes('craigslist.org')) return 'CL';
-    if (u.includes('mecum.com')) return 'MECUM';
-    if (u.includes('hemmings.com')) return 'HEMMINGS';
+    const lower = url.toLowerCase();
+    for (const [pattern, label] of DOMAIN_DISPLAY) {
+      if (pattern.test(lower)) return label;
+    }
   }
+
   return null;
 }
 
-export function CardSource({ discoveryUrl, discoverySource }: CardSourceProps) {
-  // Build a URL for the favicon
-  let faviconTarget: string | null = null;
+export function CardSource({ discoveryUrl, discoverySource, profileOrigin }: CardSourceProps) {
+  const label = resolveSourceLabel(discoveryUrl, discoverySource, profileOrigin);
 
-  if (discoveryUrl) {
-    faviconTarget = discoveryUrl;
-  } else if (discoverySource) {
-    const source = discoverySource.toLowerCase();
-    if (source.includes('craigslist')) faviconTarget = 'https://craigslist.org';
-    else if (source.includes('bat') || source.includes('bring a trailer')) faviconTarget = 'https://bringatrailer.com';
-    else if (source.includes('cars and bids') || source.includes('c&b')) faviconTarget = 'https://carsandbids.com';
-    else if (source.includes('ksl')) faviconTarget = 'https://ksl.com';
-    else if (source.includes('facebook') || source.includes('fb')) faviconTarget = 'https://facebook.com';
-    else if (source.includes('classic')) faviconTarget = 'https://classic.com';
-    else if (source.includes('hemmings')) faviconTarget = 'https://hemmings.com';
-    else if (source.includes('mecum')) faviconTarget = 'https://mecum.com';
-  }
-
-  if (!faviconTarget) return null;
-
-  const platformLabel = resolvePlatformLabel(discoveryUrl ?? null, discoverySource ?? null);
+  if (!label) return null;
 
   return (
     <div
       style={{
-        position: 'absolute',
-        bottom: '6px',
-        left: '6px',
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '3px',
-        zIndex: 10,
-        pointerEvents: 'none',
-        background: 'rgba(0,0,0,0.55)',
-        padding: '2px 5px 2px 3px',
+        background: 'var(--surface)',
+        padding: '2px 5px',
+        border: '2px solid var(--text-tertiary, var(--border))',
       }}
     >
-      <FaviconIcon url={faviconTarget} size={14} preserveAspectRatio />
-      {platformLabel && (
-        <span style={{
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '7px',
-          fontWeight: 800,
+      <span
+        style={{
+          fontFamily: "'Courier New', monospace",
+          fontSize: '8px',
+          fontWeight: 700,
           textTransform: 'uppercase' as const,
-          letterSpacing: '0.3px',
-          color: '#fff',
+          letterSpacing: '0.5px',
+          color: 'var(--text-tertiary, var(--text-secondary))',
           lineHeight: 1,
-        }}>
-          {platformLabel}
-        </span>
-      )}
+        }}
+      >
+        {label}
+      </span>
     </div>
   );
 }

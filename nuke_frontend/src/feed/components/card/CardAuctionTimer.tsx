@@ -46,9 +46,6 @@ export function CardAuctionTimer({ endDate, isLive }: CardAuctionTimerProps) {
   return (
     <div
       style={{
-        position: 'absolute',
-        top: '6px',
-        left: '6px',
         background: 'rgba(0, 0, 0, 0.75)',
         backdropFilter: 'blur(6px)',
         color: 'white',
@@ -59,9 +56,8 @@ export function CardAuctionTimer({ endDate, isLive }: CardAuctionTimerProps) {
         display: 'inline-flex',
         alignItems: 'center',
         gap: '4px',
-        border: '1px solid rgba(255,255,255,0.18)',
-        zIndex: 10,
-        pointerEvents: 'none',
+        border: '2px solid rgba(255,255,255,0.18)',
+        alignSelf: 'flex-start',
       }}
     >
       {timerText}
