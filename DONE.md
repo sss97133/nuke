@@ -2,6 +2,47 @@
 
 ## 2026-03-23
 
+### [data-quality] Data Enrichment Sprint — VERIFIED
+- **Platform source**: 5K → 201K (+196K). 25 platforms tagged from listing_url patterns
+- **Color family**: 142K → 207K (+65K). 14 families. Two-tone fix (9.5K reclassified)
+- **Displacement**: 67K → 104K (+37K) from vin_decoded_data backfill
+- **Seller name**: 0 → 64K from bat_seller propagation
+- **Transmission**: 62K normalized (case, format, junk removal)
+- **VIN decode total**: +65K cells (displacement 37K, fuel 9.4K, trim 8.8K, doors 7.8K, engine 1.4K)
+- **Mileage from descriptions**: +3.1K regex-extracted. Cleaned 93 outliers >500K
+- **Make normalization**: 686 fixed (lowercase, abbreviations)
+- **Location/price/date**: +2.3K from bat_ field propagation
+- **Cron scaling**: BaT extraction 3x (5→15), VIN decode 4x (50→100, 30→15min)
+- **Validation**: 9 tests, all pass. 0.005% platform mismatch. VIN 15/15 spot checks correct
+- Scripts: enrich-vehicles, normalize-transmission, normalize-makes, tag-platform-source, backfill-vin-decode
+
+### [infra] Presigned URL Photo Upload Architecture (5 phases)
+- Migration: upload_batches + upload_batch_items tables
+- Server: image-intake prepare_upload/confirm_upload actions. E2E tested + deployed
+- CLI: scripts/lib/presigned-upload.mjs. Refactored bulk-photo-upload + nuke-photo-drop
+- Browser: nuke_frontend/src/lib/uploadClient.ts. Refactored PhotoSyncPage
+- MCP: mcp-connector ingest_photos → presigned for base64 images
+
+### [auction-pipeline] Live Auction Fixes
+- 5K vehicle_images backfilled from thumbnails + auto-create on sync
+- Comment extraction: 6h→24h, 10→25 batch, soonest-first sort
+- Bid snapshots, new auctions, comments, images — all 4 verified working
+
+### [infra] .claude/ Full Restructure (27GB → 12MB)
+- [cleanup] Deleted 18 stale worktrees (~27GB), archived 40+ stale files
+- [rules] 7 path-scoped rules: db-safety, extraction, edge-functions, frontend, library, agent-coordination, platform-hygiene
+- [commands] 7 slash commands: /status, /extract, /deploy, /health, /library, /qa, /debug-all
+- [settings] Project settings.json created. MEMORY.md trimmed 239→100 lines.
+
+### [extraction] BaT Auth Redirect Bug Fixed + Deployed
+- [fix] extract-auction-comments + extract-bat-core patched and deployed (v137, v107)
+- [audit] 36/40 extractors vulnerable to same redirect bug — EXTRACTOR_REDIRECT_AUDIT.md
+
+### [audit] 5 Platform Audit Reports
+- FRONTEND_AUDIT.md, EXTRACTOR_REDIRECT_AUDIT.md, DESIGN_VIOLATIONS.md (1,641 violations), LIBRARY_GAP_ANALYSIS.md, ISSUES.md updated
+
+### [qa] QA Closed Loop — /qa and /debug-all commands, ISSUES.md tracker, sentinel updated
+
 ### [wiring] Overnight Sprint — Book, Data Validation, Pin Map Fix
 - **13 book chapters written** (Ch2, Ch4, Ch9-12, Ch13-15, Appendices A-D) — book now 15/15 complete
 - **GM circuits 109 → 219**: 110 new circuits from manual pages 8C-46 to 8C-51

@@ -137,11 +137,12 @@ Return this EXACT structure. Use null for fields not mentioned. Empty arrays for
 }
 
 RULES:
-- Every "quote" must be copied EXACTLY from the description (max 60 chars)
+- Every "quote" must be copied EXACTLY from the description text above (max 60 chars). If you cannot point to the exact words in the DESCRIPTION, do not include the claim.
 - "confidence" is YOUR confidence the extraction is correct (0.0 = guessing, 1.0 = certain)
-- For option_codes, cross-reference against REFERENCE DATA if provided
+- CRITICAL — option_codes: ONLY include codes that appear LITERALLY in the DESCRIPTION text. The REFERENCE DATA is for VALIDATION ONLY — use it to identify what a code means, NOT to generate codes. If a code appears in reference but NOT in the description, it does NOT go in option_codes.
+- CRITICAL — Do NOT copy items from REFERENCE DATA into option_codes, equipment, work_history, or any extraction field. REFERENCE DATA exists so you can RECOGNIZE and VALIDATE what you find in the description — like a decoder ring, not a shopping list.
 - For red_flags, include anything suspicious: odometer discrepancies, missing documentation, vague provenance, non-matching claims
-- reference_validation: compare what you found against the REFERENCE DATA sections above
+- reference_validation: compare what you EXTRACTED from the description against the REFERENCE DATA. "codes_matched" = codes you found in the description that ALSO appear in reference. "codes_unrecognized" = codes in the description NOT found in reference.
 - Return ONLY valid JSON. No explanation outside the JSON.`;
 
   return prompt;
