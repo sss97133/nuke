@@ -445,7 +445,7 @@ Components:
               </div>
             </div>
             
-            <p style={{ fontSize: '13px', lineHeight: '1.7', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+            <p style={{ fontSize: '11px', lineHeight: '1.7', color: 'var(--text-secondary)' }}>
               NUK Points will convert to NUK governance tokens at platform launch, ensuring early contributors have a meaningful voice in platform governance and share in its success.
             </p>
           </section>

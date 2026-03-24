@@ -42,6 +42,7 @@ interface FeedRequest {
   hide_sold?: boolean;
   has_images?: boolean;
   excluded_sources?: string[];
+  added_today?: boolean;
   sort?: string;
   direction?: "asc" | "desc";
   cursor?: string;
@@ -292,6 +293,12 @@ Deno.serve(async (req) => {
     // Pass has_images=false explicitly to include vehicles without photos (e.g. search results)
     if (body.has_images !== false) {
       query = query.eq("has_photos", true);
+    }
+
+    // Added today — filter to vehicles created in the last 24 hours
+    if (body.added_today === true) {
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      query = query.gte("created_at", yesterday);
     }
 
     // Excluded sources

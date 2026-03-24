@@ -19,6 +19,7 @@ import { FeedEmptyState } from './FeedEmptyState';
 import { VehicleCard } from './VehicleCard';
 import { BrandHeartbeat } from './heartbeat/BrandHeartbeat';
 import { FeedStatCard } from './FeedStatCard';
+import { DEFAULT_FILTERS } from '../../lib/filterPersistence';
 import type { FeedVehicle } from '../types/feed';
 
 export default function FeedPage() {
@@ -48,6 +49,51 @@ export default function FeedPage() {
   const [fontSize, setFontSize] = useState(10);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const [showScores, setShowScores] = useState(false);
+  const [activeMetric, setActiveMetric] = useState<string | null>(null);
+
+  // Metric click handler — applies filter presets per Design Bible Law #1
+  const handleMetricClick = useCallback(
+    (metric: 'vehicles' | 'value' | 'today' | 'for_sale' | 'live') => {
+      // If same metric clicked again, reset to defaults
+      if (activeMetric === metric) {
+        setActiveMetric(null);
+        setFilters(DEFAULT_FILTERS);
+        setSortBy('popular');
+        return;
+      }
+
+      setActiveMetric(metric);
+
+      switch (metric) {
+        case 'vehicles':
+          // Reset all filters — show everything
+          setFilters(DEFAULT_FILTERS);
+          setSortBy('popular');
+          break;
+        case 'value':
+          // Sort by price high
+          setFilters(DEFAULT_FILTERS);
+          setSortBy('price_high');
+          break;
+        case 'today':
+          // Filter to today only
+          setFilters({ ...DEFAULT_FILTERS, addedTodayOnly: true });
+          setSortBy('newest');
+          break;
+        case 'for_sale':
+          // Filter to for-sale only
+          setFilters({ ...DEFAULT_FILTERS, forSale: true });
+          setSortBy('newest');
+          break;
+        case 'live':
+          // Filter to for-sale + sort by feed rank (live auctions get +200 rank boost)
+          setFilters({ ...DEFAULT_FILTERS, forSale: true });
+          setSortBy('popular');
+          break;
+      }
+    },
+    [activeMetric, setFilters, setSortBy],
+  );
 
   // Resolve 'auto' fit: contain for dense grids (>= 8 cols), cover otherwise
   const resolvedFit: 'cover' | 'contain' =
@@ -102,7 +148,7 @@ export default function FeedPage() {
   return (
     <AuctionClockProvider>
       <div className="fullscreen-content" style={feedStyle}>
-        {/* Stats strip — inline in content area */}
+        {/* Stats strip — inline in content area. Every metric is clickable (Law #1). */}
         <FeedStatsStrip
           stats={stats}
           isLoading={feedQuery.isLoading}
@@ -111,6 +157,8 @@ export default function FeedPage() {
           resultCount={vehicles.length}
           hasActiveFilters={hasActiveFilters}
           onResetFilters={resetAll}
+          onMetricClick={handleMetricClick}
+          activeMetric={activeMetric}
         />
 
         {/* Toolbar — full width */}
@@ -130,50 +178,6 @@ export default function FeedPage() {
           onToggleScores={() => setShowScores(!showScores)}
           onImageFitChange={setImageFit}
         />
-
-        {/* Feed welcome strip — quick stats when no filters active */}
-        {!hasActiveFilters && !feedQuery.isLoading && stats && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '24px',
-            padding: '8px 12px',
-            borderBottom: '1px solid var(--border)',
-            background: 'var(--surface)',
-          }}>
-            {stats.vehicles_added_today > 0 && (
-              <span style={{
-                fontFamily: "'Courier New', monospace",
-                fontSize: '10px',
-                fontWeight: 700,
-                color: 'var(--success)',
-              }}>
-                +{stats.vehicles_added_today} NEW TODAY
-              </span>
-            )}
-            {stats.active_auctions > 0 && (
-              <span style={{
-                fontFamily: "'Courier New', monospace",
-                fontSize: '10px',
-                fontWeight: 700,
-                color: 'var(--error)',
-              }}>
-                {stats.active_auctions} LIVE AUCTION{stats.active_auctions !== 1 ? 'S' : ''}
-              </span>
-            )}
-            {stats.for_sale_count > 0 && (
-              <span style={{
-                fontFamily: "'Courier New', monospace",
-                fontSize: '10px',
-                fontWeight: 700,
-                color: '#16825d',
-              }}>
-                {stats.for_sale_count.toLocaleString()} FOR SALE
-              </span>
-            )}
-          </div>
-        )}
 
         {/* Sidebar + Content */}
         <div style={{ display: 'flex', minHeight: 'calc(100vh - 72px)' }}>

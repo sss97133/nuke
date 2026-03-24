@@ -654,7 +654,7 @@ export default function SystemStatus() {
             )}
 
             {!selectedImage.ai_scan_metadata?.tier_1_analysis && (
-              <div style={{ fontSize: '11px', color: 'var(--text-disabled)', fontStyle: 'italic' }}>No analysis data yet</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>NO ANALYSIS DATA YET</div>
             )}
           </div>
         </div>

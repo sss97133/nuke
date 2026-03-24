@@ -167,7 +167,7 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ endDate, size = 'small'
         padding, display: 'inline-block',
         opacity: pulseOpacity,
         transform: pulseScale,
-        border: style.border || 'none', transition: 'opacity 0.15s, transform 0.15s, box-shadow 0.15s',
+        border: style.border || 'none', transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {formatTime(timeRemaining)}

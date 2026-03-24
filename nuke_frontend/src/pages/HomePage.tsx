@@ -285,8 +285,8 @@ function TreemapCell({ rect, onClick, totalCount, showValue, isYear }: CellProps
         width: w,
         height: h,
         boxSizing: 'border-box',
-        border: `2px solid ${hovered ? '#2a2a2a' : '#bdbdbd'}`,
-        background: hovered ? `color-mix(in srgb, ${bg} 85%, #2a2a2a 15%)` : bg,
+        border: `2px solid ${hovered ? 'var(--text)' : 'var(--border)'}`,
+        background: hovered ? `color-mix(in srgb, ${bg} 85%, var(--text) 15%)` : bg,
         cursor: 'pointer',
         overflow: 'hidden',
         padding: 4,
@@ -304,12 +304,12 @@ function TreemapCell({ rect, onClick, totalCount, showValue, isYear }: CellProps
             fontWeight: 700,
             letterSpacing: isLarge ? '-0.02em' : '0.04em',
             textTransform: 'uppercase' as const,
-            color: '#2a2a2a',
+            color: 'var(--text)',
             lineHeight: 1.15,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: isLarge ? 'normal' : 'nowrap',
-            fontFamily: 'Arial, system-ui, sans-serif',
+            fontFamily: 'Arial, sans-serif',
             wordBreak: isLarge ? 'break-word' : undefined,
           }}
         >
@@ -323,7 +323,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, isYear }: CellProps
             style={{
               fontSize: dataFontSize,
               fontFamily: "'Courier New', monospace",
-              color: '#444',
+              color: 'var(--text-secondary)',
               lineHeight: 1.3,
             }}
           >
@@ -336,7 +336,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, isYear }: CellProps
               fontSize: dataFontSize,
               fontFamily: "'Courier New', monospace",
               fontWeight: 700,
-              color: '#2a2a2a',
+              color: 'var(--text)',
               lineHeight: 1.3,
             }}
           >
@@ -348,7 +348,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, isYear }: CellProps
             style={{
               fontSize: 8,
               fontFamily: "'Courier New', monospace",
-              color: '#666',
+              color: 'var(--text-secondary)',
               lineHeight: 1.3,
             }}
           >
@@ -388,23 +388,23 @@ function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
         position: 'fixed',
         left: adjustedX,
         top: adjustedY,
-        background: '#fff',
-        border: '2px solid #2a2a2a',
+        background: 'var(--surface-elevated, #fff)',
+        border: '2px solid var(--text)',
         padding: '10px 14px',
         pointerEvents: 'none',
         zIndex: 10000,
         minWidth: 180,
         maxWidth: 260,
-        fontFamily: 'Arial, system-ui, sans-serif',
+        fontFamily: 'Arial, sans-serif',
       }}
     >
-      <div style={{ fontSize: 12, fontWeight: 700, color: '#2a2a2a', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
         {node.name}
       </div>
-      <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Courier New', monospace", color: '#2a2a2a', marginBottom: 6 }}>
-        {fmtNum(node.count)} <span style={{ fontSize: 10, fontWeight: 400, color: '#666' }}>{level === 'years' ? 'listings' : 'vehicles'}</span>
+      <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Courier New', monospace", color: 'var(--text)', marginBottom: 6 }}>
+        {fmtNum(node.count)} <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-secondary)' }}>{level === 'years' ? 'listings' : 'vehicles'}</span>
       </div>
-      <div style={{ borderTop: '1px solid #bdbdbd', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <Row label="of total" value={pct + '%'} />
         <Row label="total value" value={fmtMoney(node.value)} />
         {node.median_price ? <Row label="median" value={fmtMoney(node.median_price)} /> : null}
@@ -418,8 +418,8 @@ function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 10, color: '#666' }}>
-      <span style={{ fontFamily: "'Courier New', monospace", color: '#2a2a2a', fontWeight: 600 }}>{value}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 10, color: 'var(--text-secondary)' }}>
+      <span style={{ fontFamily: "'Courier New', monospace", color: 'var(--text)', fontWeight: 600 }}>{value}</span>
       <span style={{ marginLeft: 12, textAlign: 'right', fontSize: 9 }}>{label}</span>
     </div>
   );
@@ -629,9 +629,9 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
-        background: '#f5f5f5',
-        color: '#2a2a2a',
-        fontFamily: 'Arial, system-ui, sans-serif',
+        background: 'var(--bg)',
+        color: 'var(--text)',
+        fontFamily: 'Arial, sans-serif',
         overflow: 'hidden',
       }}
     >
@@ -643,8 +643,8 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
           gap: 12,
           padding: '0 16px',
           height: 44,
-          borderBottom: '2px solid #bdbdbd',
-          background: '#ebebeb',
+          borderBottom: '2px solid var(--border)',
+          background: 'var(--surface)',
           flexShrink: 0,
         }}
       >
@@ -654,7 +654,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
             style={{
               width: 7,
               height: 7,
-              background: '#22c55e',
+              background: 'var(--success)',
               animation: 'livePulse 2s ease-in-out infinite',
               flexShrink: 0,
             }}
@@ -670,14 +670,14 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
           >
             NUKE
           </span>
-          <span style={{ fontSize: 9, color: '#999', letterSpacing: '0.06em', fontWeight: 600 }}>
+          <span style={{ fontSize: 9, color: 'var(--text-disabled)', letterSpacing: '0.06em', fontWeight: 600 }}>
             PROVENANCE ENGINE
           </span>
         </div>
 
         {/* Search bar */}
         <div ref={searchContainerRef} style={{ position: 'relative', flex: 1, maxWidth: 480 }}>
-          <form onSubmit={handleSearch} style={{ display: 'flex', border: '2px solid #bdbdbd' }}>
+          <form onSubmit={handleSearch} style={{ display: 'flex', border: '2px solid var(--border)' }}>
             <input
               type="text"
               value={searchInput}
@@ -689,10 +689,10 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
                 flex: 1,
                 padding: '6px 12px',
                 fontSize: 11,
-                fontFamily: 'Arial, system-ui, sans-serif',
+                fontFamily: 'Arial, sans-serif',
                 border: 'none',
-                background: '#f5f5f5',
-                color: '#2a2a2a',
+                background: 'var(--bg)',
+                color: 'var(--text)',
                 outline: 'none',
                 minWidth: 0,
               }}
@@ -705,11 +705,11 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
                 fontWeight: 700,
                 letterSpacing: '0.12em',
                 textTransform: 'uppercase',
-                fontFamily: 'Arial, system-ui, sans-serif',
+                fontFamily: 'Arial, sans-serif',
                 border: 'none',
-                borderLeft: '2px solid #bdbdbd',
-                background: '#ebebeb',
-                color: '#2a2a2a',
+                borderLeft: '2px solid var(--border)',
+                background: 'var(--surface)',
+                color: 'var(--text)',
                 cursor: 'pointer',
                 flexShrink: 0,
               }}
@@ -718,7 +718,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
             </button>
           </form>
           {showDropdown && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '2px solid #bdbdbd', borderTop: 'none', zIndex: 10000 }}>
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface-elevated, #fff)', border: '2px solid var(--border)', borderTop: 'none', zIndex: 10000 }}>
               {searchResults.map((v) => (
                 <button
                   key={v.id}
@@ -726,23 +726,23 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
                   style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     width: '100%', padding: '8px 12px', border: 'none',
-                    borderBottom: '1px solid #ebebeb', background: 'transparent',
-                    color: '#2a2a2a', cursor: 'pointer', textAlign: 'left',
-                    fontSize: 11, fontFamily: 'Arial, system-ui, sans-serif',
+                    borderBottom: '1px solid var(--surface)', background: 'transparent',
+                    color: 'var(--text)', cursor: 'pointer', textAlign: 'left',
+                    fontSize: 11, fontFamily: 'Arial, sans-serif',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#f5f5f5'; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
                   <span>{[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Unknown Vehicle'}</span>
                   {formatPrice(v) && (
-                    <span style={{ fontFamily: "'Courier New', monospace", color: '#666', fontSize: 10 }}>
+                    <span style={{ fontFamily: "'Courier New', monospace", color: 'var(--text-secondary)', fontSize: 10 }}>
                       {formatPrice(v)}
                     </span>
                   )}
                 </button>
               ))}
               {noResults && (
-                <div style={{ padding: '8px 12px', color: '#999', fontSize: 11 }}>
+                <div style={{ padding: '8px 12px', color: 'var(--text-disabled)', fontSize: 11 }}>
                   No vehicles found for "{searchInput.trim()}"
                 </div>
               )}
@@ -759,9 +759,9 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
             fontWeight: 700,
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
-            border: '2px solid #bdbdbd',
+            border: '2px solid var(--border)',
             background: 'transparent',
-            color: '#666',
+            color: 'var(--text-secondary)',
             cursor: 'pointer',
             flexShrink: 0,
           }}
@@ -777,8 +777,8 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
           alignItems: 'center',
           padding: '0 16px',
           height: 32,
-          borderBottom: '2px solid #bdbdbd',
-          background: '#ebebeb',
+          borderBottom: '2px solid var(--border)',
+          background: 'var(--surface)',
           flexShrink: 0,
           gap: 4,
           overflow: 'hidden',
@@ -789,7 +789,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
           return (
             <React.Fragment key={i}>
               {i > 0 && (
-                <span style={{ fontSize: 9, color: '#999', margin: '0 2px' }}>/</span>
+                <span style={{ fontSize: 9, color: 'var(--text-disabled)', margin: '0 2px' }}>/</span>
               )}
               <button
                 onClick={() => !isLast && goBack(i)}
@@ -798,20 +798,20 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
                   fontWeight: isLast ? 700 : 600,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
-                  color: isLast ? '#2a2a2a' : '#666',
+                  color: isLast ? 'var(--text)' : 'var(--text-secondary)',
                   background: 'transparent',
                   border: 'none',
                   cursor: isLast ? 'default' : 'pointer',
                   padding: '4px 6px',
-                  fontFamily: 'Arial, system-ui, sans-serif',
+                  fontFamily: 'Arial, sans-serif',
                   textDecoration: 'none',
                   whiteSpace: 'nowrap',
                 }}
                 onMouseEnter={(e) => {
-                  if (!isLast) e.currentTarget.style.color = '#2a2a2a';
+                  if (!isLast) e.currentTarget.style.color = 'var(--text)';
                 }}
                 onMouseLeave={(e) => {
-                  if (!isLast) e.currentTarget.style.color = '#666';
+                  if (!isLast) e.currentTarget.style.color = 'var(--text-secondary)';
                 }}
               >
                 {level.label}
@@ -823,11 +823,11 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
         {/* Level indicator */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           {activeData && (
-            <span style={{ fontSize: 9, fontFamily: "'Courier New', monospace", color: '#666' }}>
+            <span style={{ fontSize: 9, fontFamily: "'Courier New', monospace", color: 'var(--text-secondary)' }}>
               {fmtNum(totalCount)} vehicles / {fmtMoney((activeData || []).reduce((s, n) => s + n.value, 0))} total value
             </span>
           )}
-          <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#999' }}>
+          <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-disabled)' }}>
             {levelType === 'brands' ? 'MAKES' : levelType === 'models' ? 'MODELS' : 'YEARS'}
           </span>
         </div>
@@ -840,7 +840,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
           flex: 1,
           position: 'relative',
           overflow: 'hidden',
-          background: '#f5f5f5',
+          background: 'var(--bg)',
           minHeight: 0,
         }}
         onMouseLeave={() => setTooltip(null)}
@@ -849,7 +849,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
           <div style={{
             position: 'absolute', inset: 0, display: 'flex',
             alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, color: '#999', fontFamily: "'Courier New', monospace",
+            fontSize: 11, color: 'var(--text-disabled)', fontFamily: "'Courier New', monospace",
             letterSpacing: '0.08em',
           }}>
             LOADING...
@@ -859,9 +859,9 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
         {/* Loading overlay for transitions */}
         {isLoading && activeData && (
           <div style={{
-            position: 'absolute', inset: 0, background: 'rgba(245,245,245,0.6)',
+            position: 'absolute', inset: 0, background: 'color-mix(in srgb, var(--bg) 60%, transparent)',
             zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, color: '#999', fontFamily: "'Courier New', monospace",
+            fontSize: 11, color: 'var(--text-disabled)', fontFamily: "'Courier New', monospace",
           }}>
             LOADING...
           </div>
@@ -907,16 +907,16 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
             alignItems: 'center', justifyContent: 'center',
             flexDirection: 'column', gap: 8,
           }}>
-            <div style={{ fontSize: 11, color: '#999', fontFamily: "'Courier New', monospace" }}>
+            <div style={{ fontSize: 11, color: 'var(--text-disabled)', fontFamily: "'Courier New', monospace" }}>
               NO DATA
             </div>
             <button
               onClick={() => goBack(drillStack.length - 2)}
               style={{
                 fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
-                textTransform: 'uppercase', border: '2px solid #bdbdbd',
-                background: 'transparent', color: '#666', cursor: 'pointer',
-                padding: '6px 16px', fontFamily: 'Arial, system-ui, sans-serif',
+                textTransform: 'uppercase', border: '2px solid var(--border)',
+                background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
+                padding: '6px 16px', fontFamily: 'Arial, sans-serif',
               }}
             >
               GO BACK
@@ -936,17 +936,17 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
           justifyContent: 'space-between',
           padding: '0 16px',
           height: 24,
-          borderTop: '2px solid #bdbdbd',
-          background: '#ebebeb',
+          borderTop: '2px solid var(--border)',
+          background: 'var(--surface)',
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 8, fontFamily: "'Courier New', monospace", color: '#999' }}>
+        <span style={{ fontSize: 8, fontFamily: "'Courier New', monospace", color: 'var(--text-disabled)' }}>
           AREA = VEHICLE COUNT / COLOR = MEDIAN PRICE
         </span>
         <a
           href="https://nuke.ag"
-          style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', color: '#999', textDecoration: 'none' }}
+          style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-disabled)', textDecoration: 'none' }}
         >
           nuke.ag
         </a>
@@ -1053,9 +1053,9 @@ export default function HomePage() {
           style={{
             display: 'flex',
             alignItems: 'center',
-            background: '#ebebeb',
+            background: 'var(--surface)',
             flexShrink: 0,
-            borderBottom: '2px solid #bdbdbd',
+            borderBottom: '2px solid var(--border)',
             height: 30,
           }}
         >
@@ -1070,19 +1070,19 @@ export default function HomePage() {
                   padding: '0 16px',
                   height: 30,
                   fontSize: 9,
-                  fontFamily: 'Arial, system-ui, sans-serif',
+                  fontFamily: 'Arial, sans-serif',
                   fontWeight: 700,
                   letterSpacing: '0.12em',
                   textTransform: 'uppercase',
                   border: 'none',
-                  borderBottom: active ? '2px solid #2a2a2a' : '2px solid transparent',
-                  background: active ? '#f5f5f5' : 'transparent',
-                  color: active ? '#2a2a2a' : '#999',
+                  borderBottom: active ? '2px solid var(--text)' : '2px solid transparent',
+                  background: active ? 'var(--bg)' : 'transparent',
+                  color: active ? 'var(--text)' : 'var(--text-disabled)',
                   cursor: 'pointer',
-                  transition: 'color 180ms ease-out, background 180ms ease-out',
+                  transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1), background 180ms cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
-                onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = '#666'; }}
-                onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = '#999'; }}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-disabled)'; }}
               >
                 {tab.label}
               </button>

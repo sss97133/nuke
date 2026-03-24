@@ -937,7 +937,7 @@ export default function RestorationIntake() {
               {selectedSubmission.message_text && (
                 <div style={{ marginTop: 'var(--space-3)' }}>
                   <div style={{ color: 'var(--text-muted)', marginBottom: '2px', fontSize: '11px' }}>Tech's Note</div>
-                  <div style={{ fontSize: '11px', fontStyle: 'italic' }}>"{selectedSubmission.message_text}"</div>
+                  <div style={{ fontSize: '11px', fontFamily: "'Courier New', monospace" }}>"{selectedSubmission.message_text}"</div>
                 </div>
               )}
             </div>

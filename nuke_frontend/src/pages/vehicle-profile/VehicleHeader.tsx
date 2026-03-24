@@ -1771,7 +1771,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   </div>
                 )}
                 {!popoverData.avg_price && (
-                  <div style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '9px', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
                     No aggregated market data available yet for {vehicle?.year} vehicles.
                   </div>
                 )}
@@ -1832,7 +1832,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   </div>
                 )}
                 {!popoverData.avg_price && (
-                  <div style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '9px', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
                     No aggregated market data available yet for {vehicle?.make}.
                   </div>
                 )}
@@ -1929,7 +1929,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   </div>
                 )}
                 {!popoverData.avg_price && (
-                  <div style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '9px', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
                     No aggregated market data available yet for this model.
                   </div>
                 )}
@@ -2669,13 +2669,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       <div style={{ fontWeight: 700, marginBottom: '4px', color: 'var(--text-muted)', fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
                         AREA VEHICLE DEMOGRAPHICS
                       </div>
-                      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
                         {(vehicle as any)?.zip_code ? (
-                          <span style={{ fontStyle: 'italic' }}>
-                            Area data not yet available for {(vehicle as any).zip_code}
+                          <span>
+                            AREA DATA NOT YET AVAILABLE FOR {(vehicle as any).zip_code}
                           </span>
                         ) : (
-                          <span style={{ fontStyle: 'italic' }}>Add ZIP code to enable area data</span>
+                          <span>ADD ZIP CODE TO ENABLE AREA DATA</span>
                         )}
                       </div>
                     </div>

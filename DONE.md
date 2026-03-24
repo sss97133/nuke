@@ -2,6 +2,19 @@
 
 ## 2026-03-24
 
+### [feed] MV refresh fix + clickable header metrics
+- Fixed `vehicle_valuation_feed` MV that was NEVER refreshing (all 16 cron runs failed with 120s timeout)
+- Root cause: postgres role had 120s statement_timeout, but 830MB MV refresh needs ~3-5 minutes
+- Fix: re-created cron.schedule with `SET statement_timeout = '600s'` prefix
+- Forced manual refresh: 344,607 rows now live (2,637 today, 8,805 for sale, 607 live auctions)
+- Clickable feed header metrics already wired by prior session — improved:
+  - Fixed "LIVE" handler to sort by feed_rank (live auctions get +200 rank boost) instead of duplicating for_sale
+  - Added `added_today` filter to feed-query edge function (was in FilterState but never sent to backend)
+  - Fixed hover style: 2px borders per design system, removed layout-shifting "FILTER" label
+  - Removed redundant welcome strip (stats strip is now the single clickable data bar)
+- Deployed feed-query edge function with added_today support
+- All TypeScript compiles clean (frontend + Deno)
+
 ### [valuation] Barrett-Jackson price gap: 5,903 → 98 vehicles without price signal
 - Started with 5,903 BJ vehicles having no sale_price AND no nuke_estimate
 - Investigated snapshots: all 1,408 show "Register to View Price" (BJ paywalls prices behind login)

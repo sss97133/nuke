@@ -1,6 +1,11 @@
 # DESIGN BOOK — Chapter 1: Foundations
 
-The philosophy behind every visual decision. Not what the tokens are — that's the CSS file. This chapter explains why.
+The philosophy behind every visual decision. Not what the tokens are — that's the CSS file (`nuke_frontend/src/styles/unified-design-system.css`). This chapter explains **why**.
+
+**Cross-references:**
+- Token values: [TOKENS.md](./TOKENS.md)
+- Violation patterns: [VIOLATIONS.md](./VIOLATIONS.md)
+- ESLint enforcement: `nuke_frontend/eslint-plugin-design-system.js`
 
 ---
 
@@ -24,6 +29,10 @@ Arial is none of these things. It's proportional. It's universal. It has no era.
 
 **The rule:** Arial for everything human. Courier New for everything machine. Two fonts. No exceptions.
 
+> **CSS token:** `--font-family: Arial, sans-serif`
+> **ESLint rule:** `design-system/no-banned-fonts` — catches any `fontFamily` not in the allowed list
+> **Violation:** [V-04](./VIOLATIONS.md#violation-v-04-wrong-font-family)
+
 ---
 
 ## Why Courier New
@@ -37,6 +46,10 @@ Courier New draws a visual boundary between human content and machine content. W
 This separation matters because Nuke is a platform where human claims and machine measurements coexist. A seller's description ("beautiful original paint") is a claim — subjective, temporal, potentially inaccurate. The price ($24,500) is a measurement — objective, timestamped, sourced. Rendering them in different typefaces signals this distinction visually.
 
 **Why Courier New specifically?** Because it's on every computer ever made. Like Arial, it's universal. A fancier monospace (Fira Code, JetBrains Mono, Berkeley Mono) would introduce an aesthetic opinion where none is needed. Courier New has no opinion. It's just monospace.
+
+> **CSS token:** `--font-mono: 'Courier New', monospace`
+> **ESLint rule:** `design-system/no-banned-fonts`
+> **Violation:** [V-04](./VIOLATIONS.md#violation-v-04-wrong-font-family)
 
 ---
 
@@ -61,6 +74,9 @@ The `--font-scale` CSS variable allows proportional scaling (0.9x to 1.2x) for a
 
 **Why not 12px body text?** Because 12px is the web default, and the web default is designed for general-purpose reading. Nuke is not general-purpose. Every pixel of vertical space saved by smaller text is a pixel returned to the content — another row in a table, another card in the grid, another data point visible without scrolling.
 
+> **CSS tokens:** `--fs-8` (8px), `--fs-9` (9px), `--fs-10` (10px), `--fs-11` (11px), `--fs-12` (12px rare)
+> **Violation:** [V-05](./VIOLATIONS.md#violation-v-05-font-size-too-large), [V-15](./VIOLATIONS.md#violation-v-15-12px-font-size-on-data-labels-and-column-headers)
+
 ---
 
 ## Why Zero Border-Radius
@@ -83,6 +99,11 @@ Sharp corners say: this is a screen. These are boxes. Here is the edge. The hone
 
 **Information density.** Rounded corners waste pixels. A 12px border-radius on a card means 12 pixels of unusable corner in each direction — a total of ~452 square pixels lost per corner, ~1,808 per card. Multiply by a grid of 24 cards and you've wasted ~43,000 pixels on corner rounding. At small card sizes (as in Nuke's dense grid views), this waste is visible — content is pushed away from the corners for no functional reason.
 
+> **CSS enforcement:** `*, *::before, *::after { border-radius: 0 !important; }`
+> **CSS token:** `--radius: 0px`
+> **ESLint rule:** `design-system/no-border-radius`
+> **Violation:** [V-01](./VIOLATIONS.md#violation-v-01-border-radius-on-any-element)
+
 ---
 
 ## Why Zero Shadow
@@ -102,6 +123,10 @@ Same enforcement level as border-radius.
 **Shadows fight borders.** In a system with 2px solid borders, shadows create visual noise. The border says "here is the edge." The shadow says "here is an edge too, but blurrier and slightly offset." Two edge signals for one element is redundant. The border is sufficient.
 
 **The exception that proves the rule:** The search overlay and user dropdown use `box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2)`. This is the only shadow in the system. It's used on floating elements that truly do overlap content — and even this is debatable. It exists because without it, the overlay's edge merges with the content below in certain color configurations. This is a pragmatic exception, documented and contained.
+
+> **CSS enforcement:** `*, *::before, *::after { box-shadow: none !important; }`
+> **ESLint rule:** `design-system/no-box-shadow`
+> **Violation:** [V-02](./VIOLATIONS.md#violation-v-02-box-shadow-for-depth-or-emphasis)
 
 ---
 
@@ -123,6 +148,9 @@ The 4px base unit creates a grid that allows precise alignment at small scales.
 **Why not px values directly?** CSS variables ensure consistency. When `--space-2` means 8px everywhere, changing it to 10px changes the entire interface proportionally. The variables are the source of truth; the values are implementations.
 
 **The alignment benefit:** At 4px increments, every element aligns to a 4px grid. This creates visual order even in complex layouts — columns of data, grids of cards, stacked badges all share the same underlying rhythm. The eye perceives this order even if the user can't articulate it. It feels "right" because everything is proportionally related.
+
+> **CSS tokens:** `--space-1: 4px` through `--space-6: 24px`
+> **Violation:** [V-17](./VIOLATIONS.md#violation-v-17-padding-or-margin-not-on-the-4px-grid), [V-19](./VIOLATIONS.md#violation-v-19-flexgrid-gaps-not-on-the-4px-grid)
 
 ---
 
@@ -146,6 +174,10 @@ Text:    #2a2a2a / #cccccc
 
 **Not desaturated — never saturated.** The greyscale palette isn't a "desaturated version of a colorful palette." It's the primary palette. Color is added where needed, not subtracted where unnecessary. The mental model should be: grey is the default, color is the exception.
 
+> **CSS tokens:** `--bg: #f5f5f5`, `--surface: #ebebeb`, `--text: #2a2a2a`, `--border: #bdbdbd`, `--text-secondary: #666666` (light mode). See TOKENS.md for dark mode values.
+> **ESLint rule:** `design-system/no-hardcoded-colors`
+> **Violation:** [V-03](./VIOLATIONS.md#violation-v-03-hardcoded-hex-colors)
+
 ---
 
 ## Why Racing Accents as Easter Eggs
@@ -159,6 +191,9 @@ Gulf Blue. Martini Red. JPS Gold. British Racing Green. Papaya Orange. These are
 **Never primary.** The accents modify `--accent` (the color used for active nav states, focus borders, and interactive highlights). They don't modify the core greyscale palette. The interface remains grey with colored accents — not a "Gulf Blue themed interface." The accent is a tint, not a takeover.
 
 **The emotional layer.** Most software is emotionally neutral. The racing accents inject personality without compromising professionalism. It's the difference between a tool and a *tool you enjoy using*. The mechanic who puts racing stickers on their toolbox isn't less professional — they're more invested.
+
+> **CSS tokens:** `data-accent="gulf"`, `data-accent="martini"`, `data-accent="jps"`, `data-accent="brg"`, `data-accent="papaya"`, and 15 more colorways. See TOKENS.md Racing Accent Colorways section.
+> **Violation:** [V-07](./VIOLATIONS.md#violation-v-07-colored-borders-for-emphasis) (misusing accents as functional UI colors)
 
 ---
 
@@ -224,6 +259,9 @@ The Win95 reference is about values, not visuals. We value: density, honesty, fu
 **The easing curve:** `cubic-bezier(0.16, 1, 0.3, 1)` is a custom ease-out with a fast start and gradual deceleration. The element moves most of its distance in the first 60ms and settles into position over the remaining 120ms. This creates the illusion of responsiveness — the visual change begins immediately, then eases to rest.
 
 **The rule:** No animation exceeds 180ms. This is enforced by convention, not by CSS — but the convention is strict. If an animation needs more than 180ms to communicate its effect, the animation should be redesigned or eliminated. The user doesn't wait for the interface. The interface keeps pace with the user.
+
+> **CSS token:** `--transition: 0.12s ease` (default), `180ms cubic-bezier(0.16, 1, 0.3, 1)` (interaction standard)
+> **CSS animation:** `@keyframes fadeIn180 { from { opacity: 0 } to { opacity: 1 } }` — used for panel open animations
 
 ---
 
