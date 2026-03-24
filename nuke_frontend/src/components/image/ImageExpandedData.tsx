@@ -490,7 +490,7 @@ export const ImageExpandedData: React.FC<ImageExpandedDataProps> = ({
             {tags.length > 8 && ` · +${tags.length - 8}`}
           </div>
         ) : (
-          <div style={{ ...FIELD_VALUE_STYLE, color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>No tags</div>
+          <div style={{ ...FIELD_VALUE_STYLE, color: 'rgba(255,255,255,0.4)' }}>No tags</div>
         )}
       </Section>
     </div>

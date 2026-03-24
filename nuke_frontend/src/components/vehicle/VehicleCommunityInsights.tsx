@@ -642,7 +642,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
                       padding: '8px 12px',
                       fontSize: '11px',
                       color: 'var(--text-secondary)',
-                      fontStyle: 'italic'
+
                     }}>
                       "{quote}"
                     </div>

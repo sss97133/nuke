@@ -366,7 +366,7 @@ export default function DrillDown({ concept, value, children, inline = true }: D
               </div>
             )}
             {def.context && (
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', borderTop: '1px solid var(--border)', paddingTop: '6px', marginTop: '6px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: '6px', marginTop: '6px' }}>
                 {def.context}
               </div>
             )}

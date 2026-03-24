@@ -366,7 +366,7 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
                     <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-secondary)' }}>
                       {dateLabel}{imageCount ? ` · ${imageCount} photos` : ''}
                       {suggestion && !form?.saved && (
-                        <span style={{ marginLeft: '8px', color: 'var(--warning)', fontStyle: 'italic' }}>
+                        <span style={{ marginLeft: '8px', color: 'var(--warning)' }}>
                           {suggestion.event_type}
                         </span>
                       )}

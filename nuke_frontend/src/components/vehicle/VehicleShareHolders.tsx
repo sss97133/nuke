@@ -258,7 +258,7 @@ export default function VehicleShareHolders({ vehicleId, vehicleValue = 0, compa
                         fontSize: '11px',
                         color: 'var(--text-secondary)',
                         marginTop: '4px',
-                        fontStyle: 'italic'
+
                       }}>
                         "{supporter.message}"
                       </div>

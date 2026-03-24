@@ -386,7 +386,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
                   color: 'var(--text)',
                   marginBottom: '12px',
                   padding: '8px',
-                  backgroundColor: 'var(--bg)', fontStyle: 'italic'
+                  backgroundColor: 'var(--bg)'
                 }}>
                   "{comparable.notes}"
                 </div>

@@ -107,16 +107,16 @@ const S = {
     letterSpacing: '0.04em',
     textTransform: 'uppercase' as const,
     padding: '1px 4px',
-    border: '1px solid #c00',
-    background: '#fee',
-    color: '#900',
+    border: '1px solid var(--error)',
+    background: 'var(--error-dim)',
+    color: 'var(--error)',
   } as React.CSSProperties,
 
   body: {
     padding: '6px 8px 8px',
-    borderTop: '1px dashed #ccc',
-    borderBottom: '1px dashed #ccc',
-    background: '#fafaf0',
+    borderTop: '1px dashed var(--border)',
+    borderBottom: '1px dashed var(--border)',
+    background: 'var(--surface)',
   } as React.CSSProperties,
 
   row: {
@@ -125,13 +125,13 @@ const S = {
     alignItems: 'center',
     gap: '6px',
     padding: '3px 0',
-    borderBottom: '1px solid #eee',
+    borderBottom: '1px solid var(--border)',
   } as React.CSSProperties,
 
   value: {
-    fontFamily: 'Arial, Helvetica, sans-serif',
+    fontFamily: 'Arial, sans-serif',
     fontSize: '10px',
-    color: '#222',
+    color: 'var(--text)',
     minWidth: 0,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -265,10 +265,10 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
           return (
             <div key={row.id} className="dossier-evidence-row" style={{
               ...S.row,
-              borderBottom: idx === sources.length - 1 ? 'none' : '1px solid #eee',
-              borderLeft: isPrimary ? '2px solid #000' : '2px solid transparent',
+              borderBottom: idx === sources.length - 1 ? 'none' : '1px solid var(--border)',
+              borderLeft: isPrimary ? '2px solid var(--text)' : '2px solid transparent',
               paddingLeft: isPrimary ? '4px' : '0',
-              ...(isConflict ? { border: '1px solid #e8c0c0', background: '#fef8f8' } : {}),
+              ...(isConflict ? { border: '1px solid var(--error)', background: 'var(--error-dim)' } : {}),
             }}>
               {/* Source badge */}
               <span style={{

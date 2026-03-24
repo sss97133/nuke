@@ -453,7 +453,7 @@ Components:
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-light)', paddingTop: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
             <strong>Acknowledgment:</strong> Nuke recognizes that the value of vehicle history data comes from the community that creates and validates it. Every contribution, from correcting a single field to uploading complete restoration documentation, advances our collective mission of preserving automotive heritage.
             <br /><br />
-            <em>Contributors who help build this platform will have their contribution recognized.</em>
+            <span style={{ fontWeight: 700 }}>Contributors who help build this platform will have their contribution recognized.</span>
           </div>
 
         </div>

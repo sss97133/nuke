@@ -1265,7 +1265,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                         Confidence: {e.source_confidence}%
                       </div>
                       {e.extraction_context && (
-                        <div style={{ marginTop: '4px', fontStyle: 'italic' }}>
+                        <div style={{ marginTop: '4px' }}>
                           "{e.extraction_context}"
                         </div>
                       )}
@@ -1390,7 +1390,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                 textAlign: 'center', 
                 color: 'var(--text-muted)', 
                 fontSize: '11px',
-                fontStyle: 'italic'
+
               }}>
                 Insufficient market data<br/>for comparable vehicles
               </div>

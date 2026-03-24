@@ -849,7 +849,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
 
           {/* Notes */}
           {imageMetadata.components.notes && (
-            <div style={{ marginTop: '4px', fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>
+            <div style={{ marginTop: '4px', fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>
               {imageMetadata.components.notes}
             </div>
           )}
