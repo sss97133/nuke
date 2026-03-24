@@ -2,6 +2,17 @@
 
 ## 2026-03-24
 
+### [data-quality] FB Saved Vehicles deep enrichment — 483 vehicles, 6,594 evidence rows
+- **Before**: 483 title+price skeletons from Mar 16 FB Saved Items import. Only 7 had descriptions, 0 AI-enriched.
+- **Phase 1**: Propagated 38 marketplace_listing descriptions + images to vehicle records
+- **Phase 2**: Regex-parsed 45 descriptions for VIN, engine, transmission, drivetrain, body_style (31 new fields extracted)
+- **Phase 3a**: Rule-based enrichment for ALL 483 vehicles (329 fields: body_style +157, drivetrain +164)
+- **Phase 3b**: Ollama qwen2.5:7b AI extraction for ALL 483 vehicles (2,207 evidence rows: trim, engine, condition, features)
+- **Cleanup**: Fixed 4 non-vehicles (parts), corrected 5 missing models, 6 missing years
+- **After**: body_style 119→366, drivetrain 101→342, engine 114→155, transmission 138→145, trim 183, vehicle_type 483/483
+- Scripts: `enrich-fb-batch.mjs` (3-phase pipeline), `enrich-fb-rules.mjs` (deterministic rules)
+- FB listings confirmed unfetchable (bingbot returns login page now)
+
 ### [images] Snapshot image extraction — 90K+ images for 16K vehicles
 - Created `scripts/extract-images-from-snapshots.mjs` + SQL function `find_imageless_with_snapshots()`
 - Phase 1: Promoted 12,306 `primary_image_url` values to `vehicle_images` rows
