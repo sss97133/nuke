@@ -2,6 +2,11 @@
 
 How every interactive element behaves. The click anxiety elimination model.
 
+**Cross-references:**
+- Component specs: [02-components.md](./02-components.md)
+- Design tokens: [TOKENS.md](./TOKENS.md)
+- Violation patterns: [VIOLATIONS.md](./VIOLATIONS.md)
+
 ---
 
 ## The Rule
@@ -116,3 +121,178 @@ Every empty state must offer at least one next action. The interface never says 
 - An empty view with no outbound connections
 - A badge that behaves differently in different locations
 - An animation longer than 180ms
+
+---
+
+## Animation Specifications
+
+Every transition and animation in the design system, with exact values.
+
+### Badge Portal Open
+
+**Trigger:** Click on a BadgePortal element
+**Element:** BadgeClusterPanel (positioned absolute below badge)
+**Property:** `opacity`
+**Duration:** 180ms
+**Easing:** `ease-out`
+**From:** `opacity: 0`
+**To:** `opacity: 1`
+**Implementation:** `animation: fadeIn180 180ms ease-out` on BadgeClusterPanel
+**Notes:** Panel border is `2px solid var(--text)`. Badge border transitions to `var(--text)` simultaneously.
+
+### Badge Hover
+
+**Trigger:** Mouse enter on BadgePortal
+**Element:** Badge border
+**Property:** `border-color`
+**Duration:** 180ms
+**Easing:** `cubic-bezier(0.16, 1, 0.3, 1)`
+**From:** `var(--border)` (idle) or variant border color
+**To:** `var(--text-secondary)`
+**Notes:** 200ms debounce on depth data fetch. Depth count appears inline after data loads.
+
+### Feed Card Hover
+
+**Trigger:** Mouse enter on CardShell
+**Element:** Card border
+**Property:** `border-color`
+**Duration:** 180ms
+**Easing:** `cubic-bezier(0.16, 1, 0.3, 1)`
+**From:** `var(--border)`
+**To:** `var(--border-focus)` (which resolves to `var(--text)`)
+**Notes:** Applied via JavaScript (`e.currentTarget.style.borderColor`). Resets on mouse leave unless card is expanded.
+
+### Feed Card Expand
+
+**Trigger:** Click on CardShell in grid mode
+**Element:** Expanded content area
+**Property:** `opacity`
+**Duration:** 180ms
+**Easing:** `ease-out`
+**From:** `opacity: 0`
+**To:** `opacity: 1`
+**Implementation:** `animation: fadeIn180 180ms ease-out` on expanded content div
+**Notes:** Card border simultaneously changes to `var(--text)`. Card `overflow` changes from `hidden` to `visible`. Card `z-index` changes to `10`.
+
+### Route Change
+
+**Trigger:** Navigation via `<Link>` or router
+**Element:** Page content
+**Property:** None — no page transition animation
+**Notes:** Route changes are instant. No fade, no slide, no transition. The interface replaces content immediately. React Suspense fallback is a pixel-perfect skeleton, not a transition.
+
+### Data Loading (Skeleton to Content)
+
+**Trigger:** TanStack Query resolves data
+**Element:** Skeleton placeholder to actual content
+**Property:** No animation — skeleton is replaced by content in a single render
+**Notes:** Skeletons have ZERO animation. No pulse, no shimmer. They are static `var(--surface)` fills. Content appears instantly when data arrives.
+
+### Dropdown Open/Close
+
+**Trigger:** Click on dropdown trigger
+**Element:** Dropdown menu
+**Property:** `opacity`
+**Duration:** 180ms
+**Easing:** `ease-out`
+**From:** `opacity: 0`
+**To:** `opacity: 1`
+**Notes:** Close is immediate (no exit animation). Dropdown background: `var(--surface)`. Border: `2px solid var(--border)`.
+
+### Command Input Focus
+
+**Trigger:** Click on header search input or `Cmd+K`
+**Element:** Search input border
+**Property:** `border-color`
+**Duration:** 180ms
+**Easing:** `cubic-bezier(0.16, 1, 0.3, 1)`
+**From:** `var(--border)`
+**To:** `var(--accent)`
+**Notes:** Search overlay appears below with `fadeIn180` animation.
+
+### Toast Notification
+
+**Trigger:** Action completion (save, error, etc.)
+**Element:** Toast container
+**Property:** `opacity`, `transform`
+**Duration:** Controlled by react-hot-toast (override to <=180ms)
+**Notes:** Toast must use design system tokens for background, border, text. See Chapter 06.
+
+### Table Row Hover
+
+**Trigger:** Mouse enter on table row
+**Element:** Row background
+**Property:** `background-color`
+**Duration:** 180ms
+**Easing:** `cubic-bezier(0.16, 1, 0.3, 1)`
+**From:** transparent or `var(--surface)`
+**To:** `var(--surface-hover)`
+
+### Tab Switch
+
+**Trigger:** Click on tab
+**Element:** Active tab indicator
+**Property:** `border-bottom-color`
+**Duration:** Instant (no animation on tab indicator change)
+**Notes:** Tab content transitions are handled by content replacement, not animation.
+
+### Form Field Focus
+
+**Trigger:** Focus on input/textarea/select
+**Element:** Input border
+**Property:** `border-color`
+**Duration:** Defined by `--transition: 0.12s ease`
+**From:** `var(--border)`
+**To:** `var(--border-focus)`
+
+---
+
+## The "No Surprise" Rule
+
+Every interaction must have a predictable outcome. The user should never be surprised by what a click, hover, or keyboard action does.
+
+- Hover states ALWAYS precede click states visually (the user sees the hover change before they decide to click)
+- Every clickable element shows `cursor: pointer` on hover
+- Every destructive action requires explicit confirmation (modal or inline confirm)
+- Every navigation action updates the URL (deep-linkable state)
+- No auto-playing animations or transitions (the user initiates all motion)
+
+---
+
+## Keyboard Navigation
+
+### Global
+
+| Key | Action |
+|-----|--------|
+| `Cmd+K` / `Ctrl+K` | Focus command input in header |
+| `Escape` | Close any open panel, modal, dropdown, or expanded card |
+
+### Badge Portals
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Move focus to next badge |
+| `Enter` / `Space` | Toggle badge panel open/close |
+| `Escape` | Close open panel |
+
+### Feed Cards (Grid Mode)
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Move to next card |
+| `Enter` | Expand/collapse card (equivalent to click) |
+| `Escape` | Collapse expanded card |
+
+### Dropdowns and Menus
+
+| Key | Action |
+|-----|--------|
+| `Arrow Down` | Move to next item |
+| `Arrow Up` | Move to previous item |
+| `Enter` | Select current item |
+| `Escape` | Close dropdown |
+
+### Tab Order
+
+Visual left-to-right, top-to-bottom. Interactive elements within a card are reachable via Tab. Badge portals within an expanded card are in the tab order after the card's main content.

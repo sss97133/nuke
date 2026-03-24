@@ -2,6 +2,12 @@
 
 Every reusable frontend component. What it does, what props it takes, how it composes with other components.
 
+**Cross-references:**
+- Design tokens: [TOKENS.md](./TOKENS.md)
+- Violation patterns: [VIOLATIONS.md](./VIOLATIONS.md)
+- Dark mode: [08-dark-mode.md](./08-dark-mode.md)
+- Third-party overrides: [06-third-party.md](./06-third-party.md)
+
 ---
 
 ## BadgePortal
@@ -230,3 +236,127 @@ Not a BadgePortal (lives inside `overflow: hidden` image container — dropdown 
 Shows: VEHICLES (or SHOWN X / Y when filtered), VALUE, TODAY (+N), FOR SALE, LIVE auctions. Inline search field right-aligned. CLEAR button when filters active.
 
 Injected into the `AppHeader` toolbar slot via `useAppLayoutContext`.
+
+### Props
+
+```typescript
+interface FeedStatsStripProps {
+  stats: FeedStats | null | undefined;
+  isLoading?: boolean;
+  searchText?: string;
+  onSearchChange?: (text: string) => void;
+  resultCount?: number;
+  hasActiveFilters?: boolean;
+  onResetFilters?: () => void;
+}
+```
+
+### CSS Tokens Used
+
+- `var(--surface)` — strip background
+- `var(--border)` — bottom border
+- `var(--text)` — primary stat values (Courier New)
+- `var(--text-disabled)` — stat labels (Arial, 8px, ALL CAPS)
+- `var(--success)` — today's additions count
+- `var(--error)` — live auction count and CLEAR button
+
+### Loading State
+
+32px height skeleton with `var(--surface)` background and `1px solid var(--border)` bottom border. No animation.
+
+---
+
+## FeedEmptyState
+
+**File:** `nuke_frontend/src/feed/components/FeedEmptyState.tsx`
+**Purpose:** Zero-results message with actionable next steps. Zero dead ends.
+
+### Props
+
+```typescript
+interface FeedEmptyStateProps {
+  hasFilters: boolean;
+  onResetFilters?: () => void;
+}
+```
+
+### Behavior
+
+1. Shows "NO VEHICLES MATCH" header (12px, 700 weight, ALL CAPS, `var(--text-secondary)`)
+2. If filters active: "Try adjusting your filters or search terms" + RESET ALL FILTERS button
+3. Always shows SEARCH and AUCTIONS links as next actions
+
+### Common Violations
+
+- Adding decorative icons or emoji ([V-16](./VIOLATIONS.md))
+- Using "Oops!" or exclamation marks in empty state text
+- Not providing a next action ([V-09](./VIOLATIONS.md))
+
+---
+
+## Loading Skeletons (Pattern)
+
+The canonical skeleton pattern across all components:
+
+```tsx
+<div style={{
+  background: 'var(--surface)',
+  width: '100%',
+  height: '200px',  // Match the loaded content height
+}} />
+```
+
+**Rules:**
+- `background: var(--surface)` for all skeleton fills
+- Same dimensions as loaded content
+- NO animation (no shimmer, no pulse, no fade) — see [V-10](./VIOLATIONS.md)
+- Use React Suspense with pixel-perfect fallbacks
+
+---
+
+## Empty States (Pattern)
+
+### Text Hierarchy
+
+| Level | Font Size | Weight | Case | Color | Purpose |
+|-------|-----------|--------|------|-------|---------|
+| Primary message | `var(--fs-12)` | 700 | ALL CAPS | `var(--text-secondary)` | What is empty |
+| Secondary message | `var(--fs-10)` | 400 | Sentence | `var(--text-disabled)` | Why or what to do |
+| Action | `var(--fs-8)` to `var(--fs-9)` | 700 | ALL CAPS | `var(--text)` or `var(--text-secondary)` | Link or button |
+
+### Rules
+
+- No icons, no illustrations, no emoji
+- No exclamation marks, no apologetic language
+- The action must be a real affordance (link, button, search suggestion)
+- Always provide at least one next action — see [V-09](./VIOLATIONS.md)
+
+---
+
+## Component-to-File Mapping
+
+| Component | File Path | Pattern | Primary Tokens |
+|-----------|-----------|---------|----------------|
+| BadgePortal | `src/components/badges/BadgePortal.tsx` | Badge Portal | `--border`, `--text`, `--text-secondary` |
+| BadgeClusterPanel | `src/components/badges/BadgeClusterPanel.tsx` | Badge Cluster | `--surface`, `--text`, `--border`, `--font-mono` |
+| useBadgeDepth | `src/components/badges/useBadgeDepth.ts` | Hook | (data fetch) |
+| CardShell | `src/feed/components/card/CardShell.tsx` | Feed Card | `--surface`, `--border`, `--text`, `--bg` |
+| CardImage | `src/feed/components/card/CardImage.tsx` | Feed Card | `--surface-hover`, `--border`, `--text-disabled` |
+| CardIdentity | `src/feed/components/card/CardIdentity.tsx` | Feed Card | `--text`, `--font-family` |
+| CardMeta | `src/feed/components/card/CardMeta.tsx` | Feed Card | `--text-secondary` |
+| CardDealScore | `src/feed/components/card/CardDealScore.tsx` | Badge Portal | `--success`, `--warning`, `--error` |
+| CardSource | `src/feed/components/card/CardSource.tsx` | Feed Card | (favicon overlay) |
+| CardPrice | `src/feed/components/card/CardPrice.tsx` | Feed Card | `--font-mono` |
+| CardAuctionTimer | `src/feed/components/card/CardAuctionTimer.tsx` | Feed Card | `--font-mono`, `--error` |
+| FeedStatsStrip | `src/feed/components/FeedStatsStrip.tsx` | Stats Bar | `--surface`, `--border`, `--text`, `--font-mono` |
+| FeedEmptyState | `src/feed/components/FeedEmptyState.tsx` | Empty State | `--text-secondary`, `--text-disabled` |
+| FeedSkeleton | `src/feed/components/FeedSkeleton.tsx` | Skeleton | `--surface` |
+| FeedToolbar | `src/feed/components/FeedToolbar.tsx` | Toolbar | `--surface`, `--border`, `--text` |
+| VehicleCard | `src/feed/components/VehicleCard.tsx` | Feed Card | (composes sub-components) |
+| ResilientImage | `src/components/images/ResilientImage.tsx` | Image | `--text-disabled` |
+| PageHeader | `src/components/layout/PageHeader.tsx` | Layout | `--text`, `--border` |
+| Button (ui) | `src/components/ui/button.tsx` | Primitive | Button system classes |
+| Card (ui) | `src/components/ui/card.tsx` | Primitive | `--surface`, `--border` |
+| Label (ui) | `src/components/ui/label.tsx` | Primitive | `--text` |
+
+All file paths relative to `nuke_frontend/`.
