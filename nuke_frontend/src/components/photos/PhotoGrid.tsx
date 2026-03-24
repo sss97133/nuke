@@ -242,6 +242,22 @@ export function PhotoGrid({
     return () => el.removeEventListener('scroll', onScroll);
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  // Auto-fetch when content doesn't fill the viewport (high column counts).
+  // After each data change, if the scroll container has no overflow, fetch more.
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage) return;
+    const el = scrollRef.current;
+    if (!el) return;
+
+    // Use rAF to wait for React to render the new rows before measuring
+    const raf = requestAnimationFrame(() => {
+      if (el.scrollHeight <= el.clientHeight + 100) {
+        fetchNextPage();
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, photos.length]);
+
   // Track current date header for sticky overlay
   useEffect(() => {
     if (!onDateChange) return;
