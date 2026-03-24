@@ -17,6 +17,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/api/functions/v1/:path*",
+      "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/:path*"
+    },
+    {
       "source": "/api/:path+",
       "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path+"
     },
