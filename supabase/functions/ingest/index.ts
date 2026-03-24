@@ -236,6 +236,8 @@ function parseLocation(text: string): { city: string | null; state: string | nul
 interface MatchResult {
   vehicleId: string;
   isNew: boolean;
+  matchTier?: number;       // 1=VIN, 2=URL, 3=YMM+context
+  matchConfidence?: number; // 0-1
 }
 
 interface VehicleEnrichment {
@@ -259,7 +261,8 @@ async function matchOrCreateVehicle(
   parsed: ParsedVehicle & VehicleEnrichment,
   platform?: string | null,
 ): Promise<MatchResult> {
-  // 1. VIN match
+  // ── Tier 1: VIN match (confidence 0.99) ───────────────────────
+  // VIN is definitive identity for post-1981 vehicles.
   if (parsed.vin) {
     const { data: vinMatch } = await supabaseAdmin
       .from("vehicles")
@@ -269,13 +272,12 @@ async function matchOrCreateVehicle(
       .single();
 
     if (vinMatch) {
-      // Enrich existing vehicle with any new data
       await enrichVehicle(vinMatch.id, parsed);
-      return { vehicleId: vinMatch.id, isNew: false };
+      return { vehicleId: vinMatch.id, isNew: false, matchTier: 1, matchConfidence: 0.99 };
     }
   }
 
-  // 2. URL match in marketplace_listings
+  // ── Tier 2a: URL match in marketplace_listings ────────────────
   if (parsed.url) {
     const { data: urlMatch } = await supabaseAdmin
       .from("marketplace_listings")
@@ -287,11 +289,133 @@ async function matchOrCreateVehicle(
 
     if (urlMatch?.vehicle_id) {
       await enrichVehicle(urlMatch.vehicle_id, parsed);
-      return { vehicleId: urlMatch.vehicle_id, isNew: false };
+      return { vehicleId: urlMatch.vehicle_id, isNew: false, matchTier: 2, matchConfidence: 0.99 };
     }
   }
 
-  // 3. Create new vehicle with ALL available data
+  // ── Tier 2b: URL match in vehicle_events.source_url ───────────
+  if (parsed.url) {
+    const { data: eventUrlMatch } = await supabaseAdmin
+      .from("vehicle_events")
+      .select("vehicle_id")
+      .eq("source_url", parsed.url)
+      .not("vehicle_id", "is", null)
+      .limit(1)
+      .single();
+
+    if (eventUrlMatch?.vehicle_id) {
+      await enrichVehicle(eventUrlMatch.vehicle_id, parsed);
+      return { vehicleId: eventUrlMatch.vehicle_id, isNew: false, matchTier: 2, matchConfidence: 0.99 };
+    }
+  }
+
+  // ── Tier 2c: URL match in vehicles.listing_url ────────────────
+  if (parsed.url) {
+    const { data: listingUrlMatch } = await supabaseAdmin
+      .from("vehicles")
+      .select("id")
+      .eq("listing_url", parsed.url)
+      .limit(1)
+      .single();
+
+    if (listingUrlMatch) {
+      await enrichVehicle(listingUrlMatch.id, parsed);
+      return { vehicleId: listingUrlMatch.id, isNew: false, matchTier: 2, matchConfidence: 0.95 };
+    }
+  }
+
+  // ── Tier 3: Year+Make+Model fuzzy match ───────────────────────
+  // Only attempt if we have all three identity fields.
+  // Does NOT auto-link — collects candidates for merge_proposals after vehicle creation.
+  // Per Entity Resolution Rules: "False splits are acceptable. False merges are catastrophic."
+  interface MergeCandidate {
+    existingVehicleId: string;
+    confidence: number;
+    reasons: string[];
+    evidence: Record<string, unknown>;
+  }
+  const mergeCandidates: MergeCandidate[] = [];
+
+  if (parsed.year && parsed.make && parsed.model) {
+    const { data: ymmCandidates } = await supabaseAdmin
+      .from("vehicles")
+      .select("id, vin, location, mileage, sale_price, asking_price, listing_url")
+      .eq("year", parsed.year)
+      .eq("make", parsed.make)
+      .eq("model", parsed.model)
+      .limit(5);
+
+    if (ymmCandidates && ymmCandidates.length > 0) {
+      for (const candidate of ymmCandidates) {
+        let confidence = 0.50; // Base: year+make+model match
+        const reasons: string[] = ["year+make+model match"];
+
+        // Location overlap boosts confidence
+        if (parsed.location && candidate.location) {
+          const parsedLoc = parsed.location.toLowerCase().trim();
+          const candLoc = candidate.location.toLowerCase().trim();
+          if (parsedLoc === candLoc) {
+            confidence += 0.15;
+            reasons.push("exact location match");
+          } else if (parsedLoc.split(",")[0]?.trim() === candLoc.split(",")[0]?.trim()) {
+            confidence += 0.08;
+            reasons.push("city match");
+          }
+        }
+
+        // Mileage within 5% boosts confidence (mileage decays over time)
+        if (parsed.mileage && candidate.mileage) {
+          const diff = Math.abs(parsed.mileage - candidate.mileage);
+          const pct = diff / Math.max(parsed.mileage, candidate.mileage);
+          if (pct <= 0.01) {
+            confidence += 0.12;
+            reasons.push("mileage within 1%");
+          } else if (pct <= 0.05) {
+            confidence += 0.06;
+            reasons.push("mileage within 5%");
+          }
+        }
+
+        // Price within 10% is a signal (same car re-listed at similar price)
+        const candPrice = candidate.sale_price || candidate.asking_price;
+        if (parsed.price && candPrice) {
+          const priceDiff = Math.abs(parsed.price - candPrice);
+          const pricePct = priceDiff / Math.max(parsed.price, candPrice);
+          if (pricePct <= 0.05) {
+            confidence += 0.08;
+            reasons.push("price within 5%");
+          } else if (pricePct <= 0.10) {
+            confidence += 0.04;
+            reasons.push("price within 10%");
+          }
+        }
+
+        // Only propose if confidence reaches threshold
+        if (confidence >= 0.60) {
+          mergeCandidates.push({
+            existingVehicleId: candidate.id,
+            confidence: Math.min(confidence, 0.99),
+            reasons,
+            evidence: {
+              ingest_url: parsed.url,
+              ingest_year: parsed.year,
+              ingest_make: parsed.make,
+              ingest_model: parsed.model,
+              ingest_location: parsed.location,
+              ingest_price: parsed.price,
+              ingest_mileage: parsed.mileage,
+              candidate_id: candidate.id,
+              candidate_location: candidate.location,
+              candidate_mileage: candidate.mileage,
+              candidate_price: candPrice,
+            },
+          });
+        }
+      }
+    }
+  }
+
+  // ── No definitive match: Create new vehicle ───────────────────
   const vehicleData: Record<string, any> = {
     year: parsed.year,
     make: parsed.make,
@@ -332,6 +456,35 @@ async function matchOrCreateVehicle(
       source: "ingest",
     }));
     await supabaseAdmin.from("vehicle_images").insert(imageRows);
+  }
+
+  // ── Create merge proposals for Tier 3 candidates ──────────────
+  // Now that the new vehicle exists, we can properly reference it.
+  // Per Entity Resolution Rules: Tier 3 does NOT auto-link.
+  // Human/AI reviews the proposal and decides whether to merge.
+  for (const candidate of mergeCandidates) {
+    try {
+      await supabaseAdmin
+        .from("merge_proposals")
+        .upsert({
+          vehicle_a_id: candidate.existingVehicleId,
+          vehicle_b_id: newVehicle.id,
+          detection_source: "ingest-entity-resolution",
+          ai_decision: "REVIEW",
+          ai_confidence: candidate.confidence,
+          ai_reasoning: candidate.reasons.join("; "),
+          match_tier: 3,
+          match_reason: candidate.reasons.join("; "),
+          confidence: candidate.confidence,
+          proposed_by: "ingest",
+          proposed_at: new Date().toISOString(),
+          status: "pending",
+          evidence: candidate.evidence,
+        }, { onConflict: "vehicle_a_id,vehicle_b_id", ignoreDuplicates: true });
+    } catch (propErr: any) {
+      // Non-fatal: merge proposal creation failure shouldn't block ingestion
+      console.error("Merge proposal creation error:", propErr.message);
+    }
   }
 
   return { vehicleId: newVehicle.id, isNew: true };
