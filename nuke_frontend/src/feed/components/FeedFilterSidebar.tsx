@@ -5,7 +5,7 @@
  * ALL CAPS 8px headers, chip toggles, range sliders. Brutalist design.
  */
 
-import { useCallback, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import type { FilterState } from '../../types/feedTypes';
 
 export interface FeedFilterSidebarProps {
@@ -146,6 +146,29 @@ export function FeedFilterSidebar({
     [filters.bodyStyles, update],
   );
 
+  // Local state for year inputs — committed on blur/Enter to avoid
+  // the URL deserializer rejecting partial values (e.g. "19" < 1880).
+  const [localYearMin, setLocalYearMin] = useState<string>(filters.yearMin != null ? String(filters.yearMin) : '');
+  const [localYearMax, setLocalYearMax] = useState<string>(filters.yearMax != null ? String(filters.yearMax) : '');
+
+  // Sync local state when filters change externally (e.g. reset)
+  useEffect(() => {
+    setLocalYearMin(filters.yearMin != null ? String(filters.yearMin) : '');
+  }, [filters.yearMin]);
+  useEffect(() => {
+    setLocalYearMax(filters.yearMax != null ? String(filters.yearMax) : '');
+  }, [filters.yearMax]);
+
+  const commitYearMin = useCallback(() => {
+    const num = localYearMin ? Number(localYearMin) : null;
+    update({ yearMin: num });
+  }, [localYearMin, update]);
+
+  const commitYearMax = useCallback(() => {
+    const num = localYearMax ? Number(localYearMax) : null;
+    update({ yearMax: num });
+  }, [localYearMax, update]);
+
   // Active filter count
   const filterCount = useMemo(() => {
     let count = 0;
@@ -262,8 +285,10 @@ export function FeedFilterSidebar({
           <input
             type="number"
             placeholder="From"
-            value={filters.yearMin ?? ''}
-            onChange={(e) => update({ yearMin: e.target.value ? Number(e.target.value) : null })}
+            value={localYearMin}
+            onChange={(e) => setLocalYearMin(e.target.value)}
+            onBlur={commitYearMin}
+            onKeyDown={(e) => { if (e.key === 'Enter') commitYearMin(); }}
             style={{ ...inputStyle, width: '50%' }}
             min={1886}
             max={2030}
@@ -272,8 +297,10 @@ export function FeedFilterSidebar({
           <input
             type="number"
             placeholder="To"
-            value={filters.yearMax ?? ''}
-            onChange={(e) => update({ yearMax: e.target.value ? Number(e.target.value) : null })}
+            value={localYearMax}
+            onChange={(e) => setLocalYearMax(e.target.value)}
+            onBlur={commitYearMax}
+            onKeyDown={(e) => { if (e.key === 'Enter') commitYearMax(); }}
             style={{ ...inputStyle, width: '50%' }}
             min={1886}
             max={2030}

@@ -10,7 +10,7 @@ import { useFeedSearchParams } from '../hooks/useFeedSearchParams';
 import { useFeedQuery } from '../hooks/useFeedQuery';
 import { useFeedScrollRestore } from '../hooks/useFeedScrollRestore';
 import { AuctionClockProvider } from './AuctionClockProvider';
-import { FeedStatsStrip } from './FeedStatsStrip';
+import { FeedStatsStrip, type FilteredStats } from './FeedStatsStrip';
 import { FeedToolbar } from './FeedToolbar';
 import { FeedFilterSidebar } from './FeedFilterSidebar';
 import { FeedLayout } from './FeedLayout';
@@ -108,6 +108,30 @@ export default function FeedPage() {
 
   const stats = feedQuery.data?.pages[0]?.stats ?? null;
 
+  // Compute stats from the loaded (filtered) vehicle set
+  const filteredStats = useMemo((): FilteredStats | null => {
+    if (vehicles.length === 0) return null;
+    let totalValue = 0;
+    let pricedCount = 0;
+    let forSaleCount = 0;
+    let liveCount = 0;
+    for (const v of vehicles) {
+      if (v.display_price != null && v.display_price > 0) {
+        totalValue += v.display_price;
+        pricedCount++;
+      }
+      if (v.is_for_sale) forSaleCount++;
+      if (v.listing_status === 'active' || v.listing_status === 'live') liveCount++;
+    }
+    return {
+      count: vehicles.length,
+      totalValue,
+      avgPrice: pricedCount > 0 ? Math.round(totalValue / pricedCount) : 0,
+      forSaleCount,
+      liveCount,
+    };
+  }, [vehicles]);
+
   const renderCard = useCallback(
     (vehicle: FeedVehicle) => (
       <VehicleCard
@@ -129,9 +153,9 @@ export default function FeedPage() {
   // Stat card renderer for FeedLayout
   const renderStatCard = useCallback(
     (index: number) => (
-      <FeedStatCard index={index} stats={stats} vehicleCount={vehicles.length} />
+      <FeedStatCard index={index} stats={stats} filteredStats={filteredStats} />
     ),
-    [stats, vehicles.length],
+    [stats, filteredStats],
   );
 
   // CSS custom property for font size control
@@ -151,10 +175,10 @@ export default function FeedPage() {
         {/* Stats strip — inline in content area. Every metric is clickable (Law #1). */}
         <FeedStatsStrip
           stats={stats}
+          filteredStats={filteredStats}
           isLoading={feedQuery.isLoading}
           searchText={searchText}
           onSearchChange={setSearchText}
-          resultCount={vehicles.length}
           hasActiveFilters={hasActiveFilters}
           onResetFilters={resetAll}
           onMetricClick={handleMetricClick}

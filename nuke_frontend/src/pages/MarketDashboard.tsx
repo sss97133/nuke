@@ -332,7 +332,6 @@ export default function MarketDashboard() {
           isLoading={feedQuery.isLoading}
           searchText={searchText}
           onSearchChange={setSearchText}
-          resultCount={vehicles.length}
           hasActiveFilters={hasActiveFilters}
           onResetFilters={resetAll}
         />
