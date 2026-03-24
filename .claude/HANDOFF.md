@@ -729,3 +729,31 @@ none
 2. `tail -40 DONE.md` — what exists
 3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
 4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-24 12:30:03
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+44ff3d022 Reactivate 89 stale sources: 8,919 new vehicles queued, 6 new discovery crons
+3f6b5e515 Badge drill-down panels: make/source/model stats, richer card expand-in-place
+e64d5df98 Badge drill-down panels + richer card expand-in-place
+73f045dbe Feed cards: source badges (BaT/FB/MECUM/etc) + status indicators on all view modes
+cce87d53c Wire treemap drill-down to filtered feed: model click → feed, BROWSE ALL button
+fa37025b7 Feed cards: source platform badge + status indicators (SOLD/LIVE/FOR SALE)
+da9b357fe Treemap drill-through navigates to feed instead of search
+7495fa3e5 Fix feed UI: year filter typing, stats format ($17.3B), filtered stats reflect active set
+7cfea0871 Fix feed UI: year filter typing, stats strip shows filtered set
+
+## Uncommitted Changes
+nuke_frontend/src/components/vehicle/VehicleDescriptionCard.tsx
+nuke_frontend/src/pages/vehicle-profile/WorkspaceContent.tsx
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
