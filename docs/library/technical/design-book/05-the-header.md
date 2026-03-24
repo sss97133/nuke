@@ -256,4 +256,100 @@ src/components/layout/
 
 ---
 
+---
+
+## Exact CSS Token Reference
+
+### Wordmark (NUKE)
+
+| Property | Value |
+|----------|-------|
+| Font family | `Arial, sans-serif` / `var(--font-family)` |
+| Font size | 13px / `var(--fs-13)` |
+| Font weight | 700 |
+| Text transform | `uppercase` |
+| Letter spacing | `0.10em` to `0.12em` |
+| Color | `var(--text)` |
+| Hover | `opacity: 0.75` |
+| Link target | `/` |
+
+### Command Input
+
+| Property | Value |
+|----------|-------|
+| Height | 28px |
+| Border | `2px solid var(--border)` |
+| Background | `var(--bg)` |
+| Font family | `var(--font-family)` |
+| Font size | `var(--fs-10)` (10px) |
+| Color | `var(--text)` |
+| Placeholder color | `var(--text-disabled)` |
+| Focus border | `var(--accent)` |
+| Focus outline | none |
+| Padding | `0 8px` |
+
+### User Capsule
+
+| Property | Value |
+|----------|-------|
+| Avatar size | 28px x 28px |
+| Border | `2px solid var(--border)` |
+| Border radius | 0 (enforced globally) |
+| Fallback | Initials in `var(--text)` on `var(--surface)` background |
+| Notification dot | 6px x 6px, `#E4002B` (Rosso red), positioned top-right |
+
+---
+
+## Dark Mode Behavior
+
+In dark mode, the header tokens swap automatically:
+
+| Token | Light | Dark |
+|-------|-------|------|
+| Background (`var(--surface)`) | `#ebebeb` | `#252526` |
+| Border (`var(--border)`) | `#bdbdbd` | `#3e3e42` |
+| Text (`var(--text)`) | `#2a2a2a` | `#cccccc` |
+| Input background (`var(--bg)`) | `#f5f5f5` | `#1e1e1e` |
+| Accent (`var(--accent)`) | `#2a2a2a` | `#cccccc` |
+
+No conditional rendering or `dark:` Tailwind classes needed. All dark mode behavior comes from the CSS variable system.
+
+---
+
+## Responsive Behavior
+
+| Breakpoint | Layout |
+|-----------|--------|
+| Desktop (768px+) | Full three-zone layout: `[NUKE] [command input] [avatar]` |
+| Mobile (< 768px) | `[NUKE] [trigger icon] [avatar]` — command input becomes tap-to-expand |
+
+### Mobile (< 768px)
+
+- Command input collapses to a trigger button showing magnifying glass icon
+- Tapping the trigger opens a full-viewport command sheet overlay
+- The header stays at 40px height
+- NUKE wordmark remains visible
+- Avatar/session zone remains visible
+
+### Key Rules
+
+- Header height is ALWAYS 40px. No expanding, collapsing, or auto-hide.
+- The header is `position: sticky; top: 0; z-index: 1000`.
+- The header is the same on every page. No page-specific modifications.
+
+---
+
+## The Header as Navigation Anchor
+
+The header is the one constant in the entire design. Every screen has it. It communicates: you are always in the same system, regardless of what data you are looking at. Design decisions for the header must never compromise this consistency.
+
+**Rules:**
+- Never add a fourth zone
+- Never stack bars below the header (sub-context goes in the content area)
+- Never add variant switching (one header, one design)
+- Never make the height conditional
+- Never put page-specific controls in the header
+
+---
+
 *The header is the fulcrum. Get it right and 136px of chrome becomes 40px. Every pixel recovered goes to the content — the vehicles, the images, the data. The header exists to serve what's below it. The moment it serves itself, it's broken.*
