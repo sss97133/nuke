@@ -155,6 +155,71 @@ const DRIVETRAIN_MAP: Record<string, string> = {
   '2wd': 'RWD',
 };
 
+// ── HTML Entity Decoding ────────────────────────────────────────────
+// Prevents HTML entities (&#215;, &amp;, &#8217;, etc.) from reaching the database.
+// Applied to all text fields during normalizeVehicleFields().
+
+const HTML_ENTITY_MAP: Record<string, string> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&apos;': "'",
+  '&nbsp;': ' ',
+  '&ndash;': '\u2013',
+  '&mdash;': '\u2014',
+  '&lsquo;': '\u2018',
+  '&rsquo;': '\u2019',
+  '&ldquo;': '\u201C',
+  '&rdquo;': '\u201D',
+  '&bull;': '\u2022',
+  '&hellip;': '\u2026',
+  '&copy;': '\u00A9',
+  '&reg;': '\u00AE',
+  '&trade;': '\u2122',
+  '&frac12;': '\u00BD',
+  '&frac14;': '\u00BC',
+  '&frac34;': '\u00BE',
+  '&deg;': '\u00B0',
+  '&times;': '\u00D7',
+};
+
+/**
+ * Decode HTML entities in a string.
+ * Handles both named entities (&amp;) and numeric entities (&#215;, &#x27;).
+ */
+export function decodeHtmlEntities(s: string | null | undefined): string | null {
+  if (!s || typeof s !== 'string') return s as null;
+  if (!s.includes('&')) return s;
+
+  let result = s;
+
+  // Named entities
+  result = result.replace(/&[a-zA-Z]+;/g, (match) => {
+    return HTML_ENTITY_MAP[match.toLowerCase()] ?? match;
+  });
+
+  // Numeric decimal entities: &#215; &#8217; etc.
+  result = result.replace(/&#(\d+);/g, (_match, digits) => {
+    const code = parseInt(digits, 10);
+    if (code > 0 && code <= 0x10FFFF) {
+      return String.fromCodePoint(code);
+    }
+    return _match;
+  });
+
+  // Numeric hex entities: &#x27; &#xA9; etc.
+  result = result.replace(/&#x([0-9a-fA-F]+);/g, (_match, hex) => {
+    const code = parseInt(hex, 16);
+    if (code > 0 && code <= 0x10FFFF) {
+      return String.fromCodePoint(code);
+    }
+    return _match;
+  });
+
+  return result;
+}
+
 /**
  * Normalize a vehicle make to its canonical form.
  * Returns title-cased make if no alias match is found.
@@ -454,6 +519,15 @@ export function normalizeColor(color: string | null | undefined): string | null 
  * Call this before writing to the vehicles table from any extractor.
  */
 export function normalizeVehicleFields(data: Record<string, any>): Record<string, any> {
+  // Decode HTML entities in all text fields before any other normalization
+  for (const field of ['make', 'model', 'title', 'trim', 'description', 'series',
+                        'engine', 'transmission', 'drivetrain', 'body_style',
+                        'exterior_color', 'interior_color', 'seller_username'] as const) {
+    if (typeof data[field] === 'string') {
+      data[field] = decodeHtmlEntities(data[field]);
+    }
+  }
+
   if (data.make) data.make = normalizeMake(data.make);
   if (data.model !== undefined) data.model = normalizeModel(data.model);
   if (data.vin) data.vin = normalizeVin(data.vin);
