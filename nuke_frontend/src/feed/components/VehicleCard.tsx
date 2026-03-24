@@ -355,10 +355,26 @@ export function VehicleCard({
       <CardImage thumbnailUrl={vehicle.thumbnail_url} alt={alt} viewMode="grid" fit={imageFit} noImageData={noImageData}>
         {showScores && <CardRankScore vehicle={vehicle} compact={compact} />}
         <CardPrice price={price} compact={compact} />
-        {price.isLive && vehicle.auction_end_date && (
-          <CardAuctionTimer endDate={vehicle.auction_end_date} isLive />
-        )}
-        <CardSource discoveryUrl={vehicle.discovery_url} discoverySource={vehicle.discovery_source} />
+        {/* Top-left: source badge + live timer stacked */}
+        <div style={{
+          position: 'absolute',
+          top: '6px',
+          left: '6px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '3px',
+          zIndex: 10,
+          pointerEvents: 'none',
+        }}>
+          <CardSource
+            discoveryUrl={vehicle.discovery_url}
+            discoverySource={vehicle.discovery_source}
+            profileOrigin={vehicle.profile_origin}
+          />
+          {price.isLive && vehicle.auction_end_date && (
+            <CardAuctionTimer endDate={vehicle.auction_end_date} isLive />
+          )}
+        </div>
         {showActions && onToggleFollow && (
           <CardActions
             isFollowing={isFollowing}

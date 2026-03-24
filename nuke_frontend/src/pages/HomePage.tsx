@@ -5,6 +5,7 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { supabase } from '../lib/supabase';
 import { useVehiclesDashboard } from '../hooks/useVehiclesDashboard';
 import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlideshow';
+import { useInterests } from '../hooks/useInterests';
 
 // ────────────────────────────────────────────────────────────
 // TYPES
@@ -498,6 +499,7 @@ function useSearchPreview(query: string) {
 function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
   const navigate = useNavigate();
   usePageTitle('Nuke — Vehicle Intelligence');
+  const { recordInterest } = useInterests();
 
   // Drill-down state
   const [drillStack, setDrillStack] = useState<DrillLevel[]>([{ label: 'ALL MAKES' }]);
@@ -560,8 +562,10 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
   // Drill down
   const drillInto = useCallback((node: TreemapNode) => {
     if (levelType === 'brands') {
+      recordInterest('make', node.name);
       setDrillStack(prev => [...prev, { label: node.name, make: node.name }]);
     } else if (levelType === 'models') {
+      recordInterest('model', node.name);
       setDrillStack(prev => [...prev, { label: node.name, make: currentLevel.make, model: node.name }]);
     } else if (levelType === 'years') {
       // At deepest level, navigate to search results
@@ -571,7 +575,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
       params.set('year', node.name);
       navigate(`/search?${params.toString()}`);
     }
-  }, [levelType, currentLevel, navigate]);
+  }, [levelType, currentLevel, navigate, recordInterest]);
 
   // Navigate back
   const goBack = useCallback((toIndex: number) => {
