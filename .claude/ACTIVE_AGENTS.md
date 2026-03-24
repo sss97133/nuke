@@ -11,9 +11,12 @@
 23:01 | AGENT-1 | Apply 9 pending DB migrations | supabase/migrations/
 23:01 | AGENT-2 | Deploy 9 new edge functions | supabase/functions/
 23:01 | AGENT-3 | Commit all uncommitted work in logical groups | git, all untracked files
-23:01 | AGENT-4 | Homepage treemap — real squarified algorithm + drill-down | nuke_frontend/src/pages/HomePage.tsx
+~DONE~ | AGENT-4 | Homepage treemap v8 COMPLETE — squarified algorithm + drill-down | nuke_frontend/src/pages/HomePage.tsx
 23:01 | AGENT-5 | API perf — fix api-v1-comps 6s + db-stats 7s | supabase/functions/
 23:01 | AGENT-6 | Drop unused vehicle_images indexes — recover 17GB | DB indexes
+23:15 | P88-AGENT | Batch-complete 34K stale in_progress import_queue records | import_queue table
+03:24 | P85-IMAGE-EXTRACT | Extract images from Mecum/BJ archived snapshots | listing_page_snapshots, vehicle_images
+07:20 | VALUATION-FIX | Fix nuke_estimate throughput — cron bug fixed, burndown running (PID 51893) | cron.job, nuke_estimates, vehicles
 
 ---
 
@@ -24,3 +27,6 @@
 - Garbage audit: 289K flagged, zero deleted
 - VIN extraction: 11,855 promoted from conceptcarz chassis numbers
 - Batch extraction: 86 vehicles enriched
+03:30 | BJ-VIN-EXTRACT | Extract VINs from Barrett-Jackson snapshots for ~8K vehicles | listing_page_snapshots, vehicles
+~DONE~ | BJ-DESC-BACKFILL | Extract descriptions from Barrett-Jackson snapshots — 3,105 updated | listing_page_snapshots, vehicles
+05:00 | BONHAMS-VALUATION | Investigate & fix Bonhams 7.4% valuation coverage gap | vehicles, listing_page_snapshots, nuke_estimate

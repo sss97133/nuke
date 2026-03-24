@@ -1,5 +1,17 @@
 # DONE — Completed Work Log
 
+## 2026-03-24
+
+### [data-quality] Barrett-Jackson Description Backfill
+- Extracted descriptions from 39K archived markdown snapshots in listing_page_snapshots
+- Matched snapshots to vehicles via listing_url (direct) and vehicle_events.source_url (fallback), with www normalization
+- BJ markdown structure: Description > ## Summary (short) > ## Details (full prose)
+- **3,105 vehicles** updated with prose descriptions (avg ~1,100 chars)
+- **105 vehicles** had snapshots but only structured fields, no prose
+- Gap reduced from 47,035 to 43,930 (remaining 43.9K are conceptcarz imports without BJ URLs)
+- Script: `scripts/backfill-bj-descriptions.mjs` with 1000-row batches, pg_sleep, lock checking
+- npm scripts: `backfill:bj-descriptions`, `backfill:bj-descriptions:dry-run`
+
 ## 2026-03-23
 
 ### [data-quality] Data Enrichment Sprint — VERIFIED
