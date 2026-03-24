@@ -12,8 +12,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
-const BINGBOT_UA =
-  "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)";
+// Googlebot works for FB Marketplace individual listings (bingbot blocked as of 2026-03)
+const GOOGLEBOT_UA =
+  "Mozilla/5.0 (compatible; Googlebot/2.0; +http://www.google.com/bot.html)";
+const BINGBOT_UA = GOOGLEBOT_UA; // keep old name for backward compat
 
 interface RefinedData {
   title: string | null;
@@ -426,6 +428,143 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { facebook_id, url, batch_size, debug, action } = body;
 
+    // ---- Fetch descriptions for listings that have none ----
+    // This is the key enrichment action: picks listings with URLs but no
+    // description, fetches each page via bingbot, extracts description +
+    // structured fields, writes to marketplace_listings AND vehicles.
+    if (action === "fetch_descriptions") {
+      const limit = Math.min(batch_size || 10, 25); // conservative: bingbot fetches are slow
+
+      // Get listings that have a URL, are linked to a vehicle, have no description
+      const { data: candidates, error: findErr } = await supabase
+        .from("marketplace_listings")
+        .select("facebook_id, url, title, vehicle_id, price, mileage, transmission, exterior_color")
+        .is("description", null)
+        .eq("status", "active")
+        .not("vehicle_id", "is", null)
+        .not("facebook_id", "is", null)
+        .order("first_seen_at", { ascending: false })
+        .limit(limit);
+
+      if (findErr) throw findErr;
+      if (!candidates || candidates.length === 0) {
+        return new Response(
+          JSON.stringify({ action: "fetch_descriptions", message: "No listings need description fetch", count: 0 }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const results: { facebook_id: string; success: boolean; got_description: boolean; fields_extracted: number; error?: string }[] = [];
+      let totalDescriptions = 0;
+      let totalFields = 0;
+
+      for (const listing of candidates) {
+        try {
+          const listingUrl = listing.url || `https://www.facebook.com/marketplace/item/${listing.facebook_id}/`;
+
+          // Fetch via bingbot
+          const refined = await extractFullListing(listingUrl, false);
+
+          // Update marketplace_listings with whatever we got
+          const listingUpdates: Record<string, unknown> = {
+            refined_at: new Date().toISOString(),
+          };
+          if (refined.description) listingUpdates.description = refined.description;
+          if (refined.title && !listing.title) listingUpdates.title = refined.title;
+          if (refined.mileage && !listing.mileage) listingUpdates.mileage = refined.mileage;
+          if (refined.transmission && !listing.transmission) listingUpdates.transmission = refined.transmission;
+          if (refined.all_images.length > 0) listingUpdates.all_images = refined.all_images;
+          if (refined.contact_phones.length > 0 || refined.contact_emails.length > 0) {
+            listingUpdates.contact_info = { phones: refined.contact_phones, emails: refined.contact_emails };
+          }
+
+          await supabase
+            .from("marketplace_listings")
+            .update(listingUpdates)
+            .eq("facebook_id", listing.facebook_id);
+
+          // Propagate to vehicle record
+          let fieldsExtracted = 0;
+          if (listing.vehicle_id) {
+            const vehicleUpdates: Record<string, unknown> = {};
+
+            if (refined.description) {
+              vehicleUpdates.description = refined.description;
+              fieldsExtracted++;
+              totalDescriptions++;
+
+              // Parse structured data from the description
+              const parsed = parseDescription(refined.description);
+              if (parsed.vin) { vehicleUpdates.vin = parsed.vin; fieldsExtracted++; }
+              if (parsed.trim) { vehicleUpdates.trim = parsed.trim; fieldsExtracted++; }
+              if (parsed.drivetrain) { vehicleUpdates.drivetrain = parsed.drivetrain; fieldsExtracted++; }
+              if (parsed.mileage) { vehicleUpdates.mileage = parsed.mileage; fieldsExtracted++; }
+              if (parsed.transmission) { vehicleUpdates.transmission = parsed.transmission; fieldsExtracted++; }
+              if (parsed.exterior_color) { vehicleUpdates.color = parsed.exterior_color; fieldsExtracted++; }
+              if (parsed.engine) { vehicleUpdates.engine_type = parsed.engine; fieldsExtracted++; }
+              if (parsed.body_style) { vehicleUpdates.body_style = parsed.body_style; fieldsExtracted++; }
+            }
+
+            if (refined.mileage && !vehicleUpdates.mileage) { vehicleUpdates.mileage = refined.mileage; fieldsExtracted++; }
+            if (refined.transmission && !vehicleUpdates.transmission) { vehicleUpdates.transmission = refined.transmission; fieldsExtracted++; }
+
+            // Enrich origin_metadata
+            const { data: existing } = await supabase
+              .from("vehicles")
+              .select("origin_metadata")
+              .eq("id", listing.vehicle_id)
+              .maybeSingle();
+            const meta = (existing?.origin_metadata as Record<string, unknown>) || {};
+            const parsed = refined.description ? parseDescription(refined.description) : null;
+            if (parsed?.engine) meta.engine = parsed.engine;
+            if (parsed?.body_style) meta.body_style = parsed.body_style;
+            if (parsed?.title_status) meta.title_status = parsed.title_status;
+            if (refined.contact_phones.length > 0) meta.contact_phones = refined.contact_phones;
+            if (refined.contact_emails.length > 0) meta.contact_emails = refined.contact_emails;
+            meta.fetched_via_bingbot_at = new Date().toISOString();
+            vehicleUpdates.origin_metadata = meta;
+
+            if (Object.keys(vehicleUpdates).length > 0) {
+              await supabase
+                .from("vehicles")
+                .update(vehicleUpdates)
+                .eq("id", listing.vehicle_id);
+            }
+          }
+
+          totalFields += fieldsExtracted;
+          results.push({
+            facebook_id: listing.facebook_id,
+            success: true,
+            got_description: !!refined.description,
+            fields_extracted: fieldsExtracted,
+          });
+        } catch (e: any) {
+          results.push({
+            facebook_id: listing.facebook_id,
+            success: false,
+            got_description: false,
+            fields_extracted: 0,
+            error: e.message,
+          });
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          action: "fetch_descriptions",
+          candidates_found: candidates.length,
+          processed: results.length,
+          descriptions_fetched: totalDescriptions,
+          total_fields_extracted: totalFields,
+          success_rate: `${results.filter(r => r.success).length}/${results.length}`,
+          description_rate: `${totalDescriptions}/${results.length}`,
+          results,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // ---- Backfill images from raw_scrape_data ----
     if (action === "backfill_images") {
       const limit = Math.min(batch_size || 500, 500);
@@ -602,8 +741,112 @@ Deno.serve(async (req) => {
 
     if (fetchError) throw fetchError;
     if (!listings || listings.length === 0) {
+      // Phase 1 complete — all listings with descriptions are refined.
+      // Phase 2: parse titles and raw_scrape_data for listings WITHOUT descriptions.
+      // NOTE: Fetching individual FB listing pages from cloud IPs doesn't work
+      // (Facebook redirects to login). Description fetching must happen from
+      // residential IPs via the local fb-enrich-all.ts / enrich-fb-ollama.mjs scripts.
+      // Here we extract what we CAN from the title + raw_scrape_data we already have.
+      const fetchLimit = Math.min(limit, 100);
+
+      const { data: noDescListings, error: noDescErr } = await supabase
+        .from("marketplace_listings")
+        .select("facebook_id, title, vehicle_id, price, raw_scrape_data")
+        .is("description", null)
+        .is("refined_at", null)
+        .eq("status", "active")
+        .not("vehicle_id", "is", null)
+        .not("title", "is", null)
+        .order("first_seen_at", { ascending: false })
+        .limit(fetchLimit);
+
+      if (noDescErr) throw noDescErr;
+      if (!noDescListings || noDescListings.length === 0) {
+        return new Response(
+          JSON.stringify({ message: "No listings need refinement or title parsing", count: 0 }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Parse titles and raw_scrape_data for year/make/model/price/location
+      const titleResults: { facebook_id: string; success: boolean; fields_extracted: number }[] = [];
+      let totalFieldsFromTitles = 0;
+
+      for (const listing of noDescListings) {
+        try {
+          const parsed = listing.title ? parseTitle(listing.title) : { year: null, make: null, model: null, cleanPrice: null };
+          const raw = listing.raw_scrape_data as Record<string, unknown> | null;
+          let fields = 0;
+
+          // Mark listing as refined (title-only)
+          const listingPatch: Record<string, unknown> = { refined_at: new Date().toISOString() };
+          await supabase.from("marketplace_listings").update(listingPatch).eq("facebook_id", listing.facebook_id);
+
+          // Build vehicle updates from title + raw data
+          if (listing.vehicle_id) {
+            const vehicleUpdates: Record<string, unknown> = {};
+
+            // Year/Make/Model from title (only if vehicle is missing them)
+            const { data: vehicle } = await supabase
+              .from("vehicles")
+              .select("year, make, model, listing_location, asking_price")
+              .eq("id", listing.vehicle_id)
+              .maybeSingle();
+
+            if (vehicle) {
+              if (!vehicle.year && parsed.year) { vehicleUpdates.year = parsed.year; fields++; }
+              if (!vehicle.make && parsed.make) { vehicleUpdates.make = parsed.make; fields++; }
+              if (!vehicle.model && parsed.model) { vehicleUpdates.model = parsed.model; fields++; }
+
+              // Location from raw_scrape_data
+              if (!vehicle.listing_location && raw) {
+                const loc = raw.location as Record<string, unknown> | null;
+                const geo = loc?.reverse_geocode as Record<string, unknown> | null;
+                if (geo?.city && geo?.state) {
+                  vehicleUpdates.listing_location = `${geo.city}, ${geo.state}`;
+                  fields++;
+                }
+              }
+
+              // Price from raw_scrape_data
+              if (!vehicle.asking_price && raw) {
+                const price = raw.price as Record<string, unknown> | null;
+                const amount = price?.amount ? parseFloat(price.amount as string) : null;
+                if (amount && amount > 0) {
+                  vehicleUpdates.asking_price = amount;
+                  fields++;
+                }
+              }
+
+              // Price from title
+              if (!vehicle.asking_price && !vehicleUpdates.asking_price && parsed.cleanPrice) {
+                vehicleUpdates.asking_price = parsed.cleanPrice;
+                fields++;
+              }
+
+              if (Object.keys(vehicleUpdates).length > 0) {
+                await supabase.from("vehicles").update(vehicleUpdates).eq("id", listing.vehicle_id);
+              }
+            }
+          }
+
+          totalFieldsFromTitles += fields;
+          titleResults.push({ facebook_id: listing.facebook_id, success: true, fields_extracted: fields });
+        } catch (e: any) {
+          await supabase.from("marketplace_listings").update({ refined_at: new Date().toISOString() }).eq("facebook_id", listing.facebook_id);
+          titleResults.push({ facebook_id: listing.facebook_id, success: false, fields_extracted: 0 });
+        }
+      }
+
       return new Response(
-        JSON.stringify({ message: "No listings need refinement", count: 0 }),
+        JSON.stringify({
+          phase: "title_parse",
+          message: "Phase 1 (parse descriptions) complete. Phase 2: extracting from titles + raw data.",
+          processed: titleResults.length,
+          total_fields: totalFieldsFromTitles,
+          note: "Description fetching requires residential IP. Run fb-enrich-all.ts or enrich-fb-ollama.mjs locally.",
+          results: titleResults,
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

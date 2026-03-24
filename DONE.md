@@ -2,6 +2,23 @@
 
 ## 2026-03-24
 
+### [data-quality] Facebook Marketplace Deep Enrichment Pipeline
+- **Problem**: 29K FB vehicles were shallow — 13% descriptions, 47% prices (initially reported), 0% VINs
+- **Root cause**: Scraper only captured search-page data (title, price, image); descriptions require individual page visits
+- **Quick wins applied immediately**:
+  - Propagated 73 descriptions from marketplace_listings to vehicles
+  - Propagated 662 locations from raw_scrape_data to vehicles (72.1% coverage now)
+  - Filled 6 missing prices from raw_scrape_data (prices were actually 99.4% already)
+- **Fixed bingbot->Googlebot UA** in refine-fb-listing (Facebook blocked bingbot as of 2026-03)
+- **Discovered**: Cloud-based scraping (Supabase Edge Functions) blocked by FB — redirects to login from non-residential IPs
+- **Added Phase 2 title-parse fallthrough** to refine-fb-listing for listings without descriptions
+- **Upgraded refine cron**: 2x/hr batch_size=15 -> every 5 min batch_size=50
+- **Added tier 0 (all years)** to enrich-fb-ollama.mjs
+- **Fixed listing_url unique constraint error** in fb-enrich-all.ts
+- **Started Playwright enricher** (PID 98827): ~450 vehicles/hr, getting descriptions + structured fields from residential IP
+- **Started Ollama enricher** (PID 98175): ~720 vehicles/hr, AI title extraction for vehicle_type/trim/engine/transmission
+- **Projected**: 25K descriptions via Playwright (~56 hrs), 19K AI title enrichments via Ollama (~27 hrs)
+
 ### [data-quality] Barrett-Jackson VIN Extraction from Snapshots
 - Extracted 2,180 VINs from B-J `listing_page_snapshots` markdown using pattern `([A-Za-z0-9]+) Vin`
 - Script: `scripts/backfill-bj-vins.mjs` (npm: `backfill:bj-vins`)

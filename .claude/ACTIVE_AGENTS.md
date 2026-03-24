@@ -17,6 +17,8 @@
 23:15 | P88-AGENT | Batch-complete 34K stale in_progress import_queue records | import_queue table
 03:24 | P85-IMAGE-EXTRACT | Extract images from Mecum/BJ archived snapshots | listing_page_snapshots, vehicle_images
 07:20 | VALUATION-FIX | Fix nuke_estimate throughput — cron bug fixed, burndown running (PID 51893) | cron.job, nuke_estimates, vehicles
+09:00 | SNAPSHOT-BURNDOWN | Fast snapshot extraction: 25K mecum + 31K BJ at ~35K/hr via local script | scripts/snapshot-burndown.mjs, vehicles, vehicle_images, snapshot_extraction_queue
+08:36 | FB-DEEP-ENRICH | Deep FB enrichment: Playwright (PID 98827) + Ollama (PID 98175) running. Refine cron upgraded. | supabase/functions/refine-fb-listing/, scripts/enrich-fb-ollama.mjs, scripts/fb-enrich-all.ts, vehicles, marketplace_listings
 
 ---
 
@@ -29,3 +31,7 @@
 - Batch extraction: 86 vehicles enriched
 ~DONE~ | BJ-VIN-EXTRACT | Extracted 2,180 VINs from B-J snapshots. Remaining 53K lack snapshots (32K conceptcarz imports, 12.9K no snapshot, 8K discovery-url only) | listing_page_snapshots, vehicles
 ~DONE~ | BJ-DESC-BACKFILL | Extract descriptions from Barrett-Jackson snapshots — 3,105 updated | listing_page_snapshots, vehicles
+08:00 | FB-ENRICH | Batch enrichment of 477 Facebook Marketplace vehicles | vehicles, scripts/, listing_page_snapshots
+09:00 | FB-PRICE-FIX | Diagnose + fix 12K FB Marketplace vehicles with no price signal | vehicles, compute-vehicle-valuation, field_evidence
+09:30 | IMAGE-EXTRACT-ALL | Batch extract images from ALL platform snapshots | listing_page_snapshots, vehicle_images, vehicles
+09:30 | BJ-PRICE-FIX | Fix 5,903 Barrett-Jackson vehicles with no price — snapshot extraction + valuation | vehicles, listing_page_snapshots, compute-vehicle-valuation

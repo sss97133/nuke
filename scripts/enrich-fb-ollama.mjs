@@ -41,6 +41,8 @@ const TIER_RANGES = {
   1: [1960, 1989],
   2: [1990, 1999],
   3: [2000, 2009],
+  4: [2010, 2030],
+  0: [1900, 2030], // all years
 };
 
 const [yearMin, yearMax] = TIER_RANGES[tier] || TIER_RANGES[1];

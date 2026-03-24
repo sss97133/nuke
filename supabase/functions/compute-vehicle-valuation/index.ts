@@ -942,6 +942,23 @@ Deno.serve(async (req) => {
         cachedResults = existing;
         const existingIds = new Set(existing.map((e: any) => e.vehicle_id));
         vehicleIds = vehicleIds.filter((id) => !existingIds.has(id));
+
+        // Re-denormalize cached results to vehicles table in case previous
+        // denormalization failed (prevents infinite cron retry loop where
+        // vehicles.nuke_estimate stays NULL while nuke_estimates has a row)
+        for (const cached of existing) {
+          await supabase
+            .from("vehicles")
+            .update({
+              nuke_estimate: cached.estimated_value,
+              nuke_estimate_confidence: cached.confidence_score,
+              deal_score: cached.deal_score,
+              heat_score: cached.heat_score,
+              valuation_calculated_at: cached.calculated_at,
+            })
+            .eq("id", cached.vehicle_id)
+            .is("nuke_estimate", null);
+        }
       }
     }
 
