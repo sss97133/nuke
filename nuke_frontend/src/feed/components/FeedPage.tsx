@@ -5,7 +5,7 @@
  * virtualized rendering, and atomic cards.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFeedSearchParams } from '../hooks/useFeedSearchParams';
 import { useFeedQuery } from '../hooks/useFeedQuery';
 import { useFeedScrollRestore } from '../hooks/useFeedScrollRestore';
@@ -19,7 +19,9 @@ import { FeedEmptyState } from './FeedEmptyState';
 import { VehicleCard } from './VehicleCard';
 import { BrandHeartbeat } from './heartbeat/BrandHeartbeat';
 import { FeedStatCard } from './FeedStatCard';
+import { InterestsBar } from './InterestsBar';
 import { DEFAULT_FILTERS } from '../../lib/filterPersistence';
+import { useInterests } from '../../hooks/useInterests';
 import type { FeedVehicle } from '../types/feed';
 
 export default function FeedPage() {
@@ -44,6 +46,62 @@ export default function FeedPage() {
 
   // Restore scroll position when returning via back navigation
   useFeedScrollRestore();
+
+  // Interest memory — tracks makes/models the user engages with
+  const {
+    topMakes,
+    topModels,
+    hasInterests,
+    previousVisit,
+    recordInterest,
+    touchLastVisit,
+    clearInterests,
+  } = useInterests();
+
+  // Update lastVisit on mount so we can count "new since last visit"
+  useEffect(() => {
+    touchLastVisit();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Wrap setFilters to also record interest when makes/models change
+  const handleFiltersChange = useCallback(
+    (newFilters: typeof filters) => {
+      // Record new makes
+      for (const make of newFilters.makes) {
+        if (!filters.makes.includes(make)) {
+          recordInterest('make', make);
+        }
+      }
+      // Record new models
+      for (const model of newFilters.models) {
+        if (!filters.models.includes(model)) {
+          recordInterest('model', model);
+        }
+      }
+      setFilters(newFilters);
+    },
+    [filters.makes, filters.models, recordInterest, setFilters],
+  );
+
+  // Interest chip click handlers — apply make or model as filter
+  const handleInterestMakeClick = useCallback(
+    (make: string) => {
+      recordInterest('make', make);
+      setFilters({ ...DEFAULT_FILTERS, makes: [make] });
+      setSortBy('popular');
+    },
+    [recordInterest, setFilters, setSortBy],
+  );
+
+  const handleInterestModelClick = useCallback(
+    (model: string) => {
+      recordInterest('model', model);
+      // Try to infer the make from the model's top association
+      setFilters({ ...DEFAULT_FILTERS, models: [model] });
+      setSortBy('popular');
+    },
+    [recordInterest, setFilters, setSortBy],
+  );
 
   // Local display settings (not URL-persisted)
   const [fontSize, setFontSize] = useState(10);
@@ -185,7 +243,7 @@ export default function FeedPage() {
           activeMetric={activeMetric}
         />
 
-        {/* Toolbar — full width */}
+        {/* Toolbar — full width, with FOR YOU sort when interests exist */}
         <FeedToolbar
           sort={sortBy}
           direction={sortDirection}
@@ -194,6 +252,7 @@ export default function FeedPage() {
           fontSize={fontSize}
           showScores={showScores}
           imageFit={imageFit}
+          hasInterests={hasInterests}
           onSortChange={setSortBy}
           onDirectionChange={setSortDirection}
           onViewModeChange={setViewMode}
@@ -203,12 +262,25 @@ export default function FeedPage() {
           onImageFitChange={setImageFit}
         />
 
+        {/* Interest chips — shown when user has interests and no active filters */}
+        <InterestsBar
+          topMakes={topMakes}
+          topModels={topModels}
+          hasInterests={hasInterests}
+          hasActiveFilters={hasActiveFilters}
+          vehicles={vehicles}
+          previousVisit={previousVisit}
+          onMakeClick={handleInterestMakeClick}
+          onModelClick={handleInterestModelClick}
+          onClearInterests={clearInterests}
+        />
+
         {/* Sidebar + Content */}
         <div style={{ display: 'flex', minHeight: 'calc(100vh - 72px)' }}>
-          {/* Filter sidebar */}
+          {/* Filter sidebar — make/model toggles also record interests */}
           <FeedFilterSidebar
             filters={filters}
-            onFiltersChange={setFilters}
+            onFiltersChange={handleFiltersChange}
             onResetAll={resetAll}
             hasActiveFilters={hasActiveFilters}
             collapsed={filtersCollapsed}
