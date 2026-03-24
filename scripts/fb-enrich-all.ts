@@ -296,10 +296,9 @@ async function main() {
     if (data.fuelType) updates.fuel_type = data.fuelType;
     if (data.videoUrl) updates.walk_around_video_url = data.videoUrl;
     if (!v.asking_price && data.price) updates.asking_price = data.price;
-    updates.listing_url = url;
     updates.updated_at = new Date().toISOString();
 
-    const fieldCount = Object.keys(updates).length - 2; // minus listing_url and updated_at
+    const fieldCount = Object.keys(updates).length - 1; // minus updated_at
 
     if (fieldCount === 0 && data.images.length === 0) {
       console.log(`  — Already complete, skipping`);
