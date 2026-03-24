@@ -207,20 +207,34 @@ Deno.serve(async (req) => {
           for (let url of rawUrls) {
             url = url.replace(/\/(contact|error\.[^/]+|feed|amp|embed|comments|trackback|page\/\d+)\/?.*$/i, "");
             const u = url.replace(/\/$/, "");
-            const uSlash = u + "/";
-            const https = u.replace(/^http:/, "https:");
-            const http = u.replace(/^https:/, "http:");
-            normalizedUrls.add(u);
-            normalizedUrls.add(uSlash);
-            normalizedUrls.add(https);
-            normalizedUrls.add(https + "/");
-            normalizedUrls.add(http);
-            normalizedUrls.add(http + "/");
-            if (platform === "carsandbids") {
-              normalizedUrls.add(u.toLowerCase());
-              normalizedUrls.add(uSlash.toLowerCase());
-              normalizedUrls.add(https.toLowerCase());
-              normalizedUrls.add((https + "/").toLowerCase());
+
+            // Generate www / non-www variants
+            // e.g. "https://mecum.com/..." <-> "https://www.mecum.com/..."
+            const bases = [u];
+            if (u.match(/^https?:\/\/www\./)) {
+              // Has www — add variant without www
+              bases.push(u.replace(/^(https?:\/\/)www\./, "$1"));
+            } else {
+              // No www — add variant with www
+              bases.push(u.replace(/^(https?:\/\/)/, "$1www."));
+            }
+
+            for (const base of bases) {
+              const baseSlash = base + "/";
+              const https = base.replace(/^http:/, "https:");
+              const http = base.replace(/^https:/, "http:");
+              normalizedUrls.add(base);
+              normalizedUrls.add(baseSlash);
+              normalizedUrls.add(https);
+              normalizedUrls.add(https + "/");
+              normalizedUrls.add(http);
+              normalizedUrls.add(http + "/");
+              if (platform === "carsandbids") {
+                normalizedUrls.add(base.toLowerCase());
+                normalizedUrls.add(baseSlash.toLowerCase());
+                normalizedUrls.add(https.toLowerCase());
+                normalizedUrls.add((https + "/").toLowerCase());
+              }
             }
           }
 
