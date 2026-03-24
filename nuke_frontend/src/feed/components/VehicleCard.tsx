@@ -304,15 +304,175 @@ export function VehicleCard({
     );
   }
 
-  // Expanded content for grid cards — BadgePortals for every dimension
+  // Build spec entries for the expanded key-specs grid
+  const specEntries = useMemo(() => {
+    const entries: { label: string; value: string }[] = [];
+    if (vehicle.mileage) entries.push({ label: 'MILEAGE', value: `${Math.floor(vehicle.mileage).toLocaleString()} mi` });
+    if (vehicle.transmission) {
+      const t = vehicle.transmission.toLowerCase();
+      entries.push({
+        label: 'TRANS',
+        value: t.includes('manual') ? 'Manual' : t.includes('auto') ? 'Automatic' : vehicle.transmission,
+      });
+    }
+    if (vehicle.drivetrain) entries.push({ label: 'DRIVE', value: vehicle.drivetrain.toUpperCase() });
+    if (vehicle.engine_size) entries.push({ label: 'ENGINE', value: vehicle.engine_size });
+    if (vehicle.fuel_type) entries.push({ label: 'FUEL', value: vehicle.fuel_type });
+    if (vehicle.canonical_body_style || vehicle.body_style)
+      entries.push({ label: 'BODY', value: (vehicle.canonical_body_style || vehicle.body_style)! });
+    if (vehicle.vin) entries.push({ label: 'VIN', value: `...${vehicle.vin.slice(-8)}` });
+    if (vehicle.location) entries.push({ label: 'LOCATION', value: vehicle.location });
+    return entries;
+  }, [vehicle]);
+
+  // Expanded content for grid cards — hero image, key specs, BadgePortals
   const expandedContent = useMemo(() => (
     <div>
+      {/* Hero image — larger view of the thumbnail */}
+      {vehicle.thumbnail_url && (
+        <div style={{
+          width: '100%',
+          paddingTop: '50%',
+          position: 'relative',
+          background: 'var(--surface-hover)',
+          marginBottom: '8px',
+          overflow: 'hidden',
+        }}>
+          <img
+            src={vehicle.thumbnail_url}
+            alt={alt}
+            loading="lazy"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+          {/* Image count overlay */}
+          {vehicle.image_count != null && vehicle.image_count > 1 && (
+            <span style={{
+              position: 'absolute',
+              bottom: '4px',
+              right: '6px',
+              fontFamily: "'Courier New', monospace",
+              fontSize: '8px',
+              fontWeight: 700,
+              color: 'white',
+              background: 'rgba(0,0,0,0.65)',
+              padding: '2px 5px',
+              letterSpacing: '0.3px',
+            }}>
+              {vehicle.image_count} PHOTOS
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Key specs grid — 2-column layout */}
+      {specEntries.length > 0 && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: '1px',
+          background: 'var(--border)',
+          border: '1px solid var(--border)',
+          marginBottom: '8px',
+        }}>
+          {specEntries.map((spec) => (
+            <div key={spec.label} style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1px',
+              padding: '4px 6px',
+              background: 'var(--surface)',
+            }}>
+              <span style={{
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '7px',
+                fontWeight: 800,
+                textTransform: 'uppercase' as const,
+                letterSpacing: '0.5px',
+                color: 'var(--text-disabled)',
+                lineHeight: 1,
+              }}>
+                {spec.label}
+              </span>
+              <span style={{
+                fontFamily: "'Courier New', monospace",
+                fontSize: '9px',
+                fontWeight: 700,
+                color: 'var(--text)',
+                lineHeight: 1.2,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}>
+                {spec.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Price context — estimate + deal score */}
+      {(vehicle.nuke_estimate || vehicle.deal_score_label) && (
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center',
+          marginBottom: '8px',
+          padding: '4px 6px',
+          border: '1px solid var(--border)',
+          background: 'var(--surface)',
+        }}>
+          {vehicle.nuke_estimate != null && vehicle.nuke_estimate > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              <span style={{
+                fontFamily: 'Arial, sans-serif', fontSize: '7px', fontWeight: 800,
+                textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-disabled)',
+                lineHeight: 1,
+              }}>
+                ESTIMATE
+              </span>
+              <span style={{
+                fontFamily: "'Courier New', monospace", fontSize: '10px', fontWeight: 700,
+                color: 'var(--text)', lineHeight: 1.2,
+              }}>
+                ${vehicle.nuke_estimate.toLocaleString()}
+              </span>
+            </div>
+          )}
+          {vehicle.nuke_estimate_confidence != null && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              <span style={{
+                fontFamily: 'Arial, sans-serif', fontSize: '7px', fontWeight: 800,
+                textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-disabled)',
+                lineHeight: 1,
+              }}>
+                CONF
+              </span>
+              <span style={{
+                fontFamily: "'Courier New', monospace", fontSize: '10px', fontWeight: 700,
+                color: vehicle.nuke_estimate_confidence >= 0.7 ? '#16825d'
+                  : vehicle.nuke_estimate_confidence >= 0.4 ? '#b05a00'
+                  : 'var(--text-secondary)',
+                lineHeight: 1.2,
+              }}>
+                {Math.round(vehicle.nuke_estimate_confidence * 100)}%
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Badge portal row — explore by dimension */}
       <div style={{
         display: 'flex',
         flexWrap: 'wrap',
         gap: '4px',
-        marginBottom: '8px',
+        marginBottom: '4px',
       }}>
         {vehicle.year && (
           <BadgePortal dimension="year" value={vehicle.year} label={String(vehicle.year)} variant="source" />
@@ -356,22 +516,8 @@ export function VehicleCard({
           />
         )}
       </div>
-
-      {/* Specs row */}
-      <div style={{
-        display: 'flex',
-        gap: '12px',
-        fontFamily: "'Courier New', monospace",
-        fontSize: '9px',
-        color: 'var(--text-secondary)',
-        marginBottom: '8px',
-      }}>
-        {vehicle.mileage ? <span>{Math.floor(vehicle.mileage).toLocaleString()} MI</span> : null}
-        {vehicle.drivetrain ? <span>{vehicle.drivetrain.toUpperCase()}</span> : null}
-        {vehicle.vin ? <span>VIN: ...{vehicle.vin.slice(-6)}</span> : null}
-      </div>
     </div>
-  ), [vehicle]);
+  ), [vehicle, specEntries, alt, sourceLabel]);
 
   // Grid mode (default) — richer than v1
   return (

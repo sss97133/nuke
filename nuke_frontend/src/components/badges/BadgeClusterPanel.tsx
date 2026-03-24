@@ -1,22 +1,30 @@
 /**
  * BadgeClusterPanel — Inline expand panel for BadgePortal.
  *
- * Shows a preview grid of vehicles matching the badge's filter.
- * Appears below/beside the badge. Click-outside or Escape closes it.
+ * Shows dimension-specific stats + preview grid of matching vehicles.
+ * Appears below the badge. Click-outside or Escape closes it.
+ *
+ * Stats shown per dimension:
+ *   make   → avg price, year range, top models
+ *   source → avg price, fill rates, top makes
+ *   model  → avg price, year range, top body styles
+ *   price  → price bracket distribution (TODO)
+ *   other  → avg price, year range
  */
 
 import React, { useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import type { BadgePreviewItem } from './useBadgeDepth';
+import { Link, useNavigate } from 'react-router-dom';
+import type { BadgePreviewItem, BadgeDimensionStats, BadgeDimension } from './useBadgeDepth';
 
 export interface BadgeClusterPanelProps {
   label: string;
+  dimension: BadgeDimension;
+  value: string | number | null;
   count: number;
   preview: BadgePreviewItem[];
+  stats: BadgeDimensionStats | null;
   loading?: boolean;
   onClose: () => void;
-  /** Position relative to badge — defaults to 'below' */
-  position?: 'below' | 'right';
 }
 
 function formatCompact(n: number): string {
@@ -30,14 +38,278 @@ function formatPrice(n: number | null): string {
   return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
+/** Build a search URL that filters the feed by this badge's dimension */
+function buildFilterUrl(dimension: BadgeDimension, value: string | number | null): string {
+  if (value == null) return '/';
+  const params = new URLSearchParams();
+  switch (dimension) {
+    case 'make':
+      params.set('makes', String(value));
+      break;
+    case 'model':
+      params.set('models', String(value));
+      break;
+    case 'year':
+      params.set('year_min', String(value));
+      params.set('year_max', String(value));
+      break;
+    case 'source':
+      params.set('q', String(value));
+      break;
+    case 'body_style':
+      params.set('body_styles', String(value));
+      break;
+    case 'transmission':
+      params.set('q', String(value));
+      break;
+    case 'drivetrain':
+      params.set('q', String(value));
+      break;
+    case 'deal_score':
+      params.set('q', String(value).replace(/_/g, ' '));
+      break;
+    default:
+      params.set('q', String(value));
+  }
+  return `/?${params.toString()}`;
+}
+
+/** Stats row for MAKE dimension: avg price, year range, top models */
+function MakeStats({ stats }: { stats: BadgeDimensionStats }) {
+  return (
+    <div style={{ padding: '6px 10px 4px', borderBottom: '1px solid var(--border)' }}>
+      {/* Aggregates row */}
+      <div style={{
+        display: 'flex', gap: '12px', marginBottom: '4px',
+      }}>
+        {stats.avg_price != null && (
+          <StatCell label="AVG PRICE" value={formatPrice(stats.avg_price)} />
+        )}
+        {stats.min_year != null && stats.max_year != null && (
+          <StatCell
+            label="YEARS"
+            value={stats.min_year === stats.max_year
+              ? String(stats.min_year)
+              : `${stats.min_year}–${stats.max_year}`}
+          />
+        )}
+      </div>
+      {/* Top models */}
+      {stats.top_facets.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '2px' }}>
+          <span style={{
+            fontFamily: 'Arial, sans-serif', fontSize: '7px', fontWeight: 800,
+            textTransform: 'uppercase', letterSpacing: '0.5px',
+            color: 'var(--text-disabled)', marginRight: '2px', lineHeight: '16px',
+          }}>
+            TOP MODELS
+          </span>
+          {stats.top_facets.map((f) => (
+            <FacetChip key={f.label} label={f.label} count={f.count} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Stats row for SOURCE dimension: avg price, fill rates, top makes */
+function SourceStats({ stats }: { stats: BadgeDimensionStats }) {
+  return (
+    <div style={{ padding: '6px 10px 4px', borderBottom: '1px solid var(--border)' }}>
+      {/* Aggregates */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '4px' }}>
+        {stats.avg_price != null && (
+          <StatCell label="AVG PRICE" value={formatPrice(stats.avg_price)} />
+        )}
+      </div>
+      {/* Fill rates */}
+      {stats.fill_rates && stats.fill_rates.length > 0 && (
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
+          <span style={{
+            fontFamily: 'Arial, sans-serif', fontSize: '7px', fontWeight: 800,
+            textTransform: 'uppercase', letterSpacing: '0.5px',
+            color: 'var(--text-disabled)', marginRight: '2px', lineHeight: '14px',
+          }}>
+            FILL RATE
+          </span>
+          {stats.fill_rates.map((r) => (
+            <FillRateChip key={r.field} label={r.field} pct={r.pct} />
+          ))}
+        </div>
+      )}
+      {/* Top makes */}
+      {stats.top_facets.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '2px' }}>
+          <span style={{
+            fontFamily: 'Arial, sans-serif', fontSize: '7px', fontWeight: 800,
+            textTransform: 'uppercase', letterSpacing: '0.5px',
+            color: 'var(--text-disabled)', marginRight: '2px', lineHeight: '16px',
+          }}>
+            TOP MAKES
+          </span>
+          {stats.top_facets.map((f) => (
+            <FacetChip key={f.label} label={f.label} count={f.count} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Stats row for MODEL dimension: avg price, year range, top body styles */
+function ModelStats({ stats }: { stats: BadgeDimensionStats }) {
+  return (
+    <div style={{ padding: '6px 10px 4px', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '4px' }}>
+        {stats.avg_price != null && (
+          <StatCell label="AVG PRICE" value={formatPrice(stats.avg_price)} />
+        )}
+        {stats.min_year != null && stats.max_year != null && (
+          <StatCell
+            label="YEARS"
+            value={stats.min_year === stats.max_year
+              ? String(stats.min_year)
+              : `${stats.min_year}–${stats.max_year}`}
+          />
+        )}
+      </div>
+      {stats.top_facets.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '2px' }}>
+          <span style={{
+            fontFamily: 'Arial, sans-serif', fontSize: '7px', fontWeight: 800,
+            textTransform: 'uppercase', letterSpacing: '0.5px',
+            color: 'var(--text-disabled)', marginRight: '2px', lineHeight: '16px',
+          }}>
+            BODY STYLES
+          </span>
+          {stats.top_facets.map((f) => (
+            <FacetChip key={f.label} label={f.label} count={f.count} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Generic stats row for dimensions without specialized layout */
+function GenericStats({ stats }: { stats: BadgeDimensionStats }) {
+  const hasAgg = stats.avg_price != null || (stats.min_year != null && stats.max_year != null);
+  if (!hasAgg && stats.top_facets.length === 0) return null;
+
+  return (
+    <div style={{ padding: '6px 10px 4px', borderBottom: '1px solid var(--border)' }}>
+      {hasAgg && (
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '2px' }}>
+          {stats.avg_price != null && (
+            <StatCell label="AVG PRICE" value={formatPrice(stats.avg_price)} />
+          )}
+          {stats.min_year != null && stats.max_year != null && (
+            <StatCell
+              label="YEARS"
+              value={stats.min_year === stats.max_year
+                ? String(stats.min_year)
+                : `${stats.min_year}–${stats.max_year}`}
+            />
+          )}
+        </div>
+      )}
+      {stats.top_facets.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '2px' }}>
+          {stats.top_facets.map((f) => (
+            <FacetChip key={f.label} label={f.label} count={f.count} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Small stat cell: label over value */
+function StatCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+      <span style={{
+        fontFamily: 'Arial, sans-serif', fontSize: '7px', fontWeight: 800,
+        textTransform: 'uppercase', letterSpacing: '0.5px',
+        color: 'var(--text-disabled)', lineHeight: 1,
+      }}>
+        {label}
+      </span>
+      <span style={{
+        fontFamily: "'Courier New', monospace", fontSize: '10px', fontWeight: 700,
+        color: 'var(--text)', lineHeight: 1.2,
+      }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/** A facet chip: "C10 (42)" */
+function FacetChip({ label, count }: { label: string; count: number }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '2px',
+      fontFamily: 'Arial, sans-serif', fontSize: '8px', fontWeight: 700,
+      textTransform: 'uppercase', letterSpacing: '0.10em',
+      padding: '1px 5px', border: '1px solid var(--border)',
+      color: 'var(--text-secondary)', lineHeight: 1, whiteSpace: 'nowrap',
+    }}>
+      {label}
+      <span style={{
+        fontFamily: "'Courier New', monospace", fontSize: '7px', fontWeight: 400,
+        opacity: 0.6,
+      }}>
+        {count}
+      </span>
+    </span>
+  );
+}
+
+/** Fill rate chip: "PRICE 92%" with visual bar */
+function FillRateChip({ label, pct }: { label: string; pct: number }) {
+  const barColor = pct >= 80 ? '#16825d' : pct >= 50 ? '#b05a00' : 'var(--text-disabled)';
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '3px',
+      fontFamily: 'Arial, sans-serif', fontSize: '7px', fontWeight: 700,
+      textTransform: 'uppercase', letterSpacing: '0.10em',
+      color: 'var(--text-secondary)', lineHeight: 1, whiteSpace: 'nowrap',
+    }}>
+      {label}
+      {/* Mini bar */}
+      <span style={{
+        display: 'inline-block', width: '20px', height: '3px',
+        background: 'var(--border)', position: 'relative',
+      }}>
+        <span style={{
+          position: 'absolute', left: 0, top: 0, height: '100%',
+          width: `${Math.min(pct, 100)}%`, background: barColor,
+        }} />
+      </span>
+      <span style={{
+        fontFamily: "'Courier New', monospace", fontSize: '7px',
+        fontWeight: 700, color: barColor,
+      }}>
+        {pct}%
+      </span>
+    </span>
+  );
+}
+
 export function BadgeClusterPanel({
   label,
+  dimension,
+  value,
   count,
   preview,
+  stats,
   loading = false,
   onClose,
 }: BadgeClusterPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // Close on Escape
   useEffect(() => {
@@ -75,6 +347,26 @@ export function BadgeClusterPanel({
     return () => window.removeEventListener('scroll', handler, true);
   }, [onClose]);
 
+  const filterUrl = buildFilterUrl(dimension, value);
+
+  const handleViewAll = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+    navigate(filterUrl);
+  };
+
+  // Render dimension-specific stats section
+  const renderStats = () => {
+    if (!stats) return null;
+    switch (dimension) {
+      case 'make': return <MakeStats stats={stats} />;
+      case 'source': return <SourceStats stats={stats} />;
+      case 'model': return <ModelStats stats={stats} />;
+      default: return <GenericStats stats={stats} />;
+    }
+  };
+
   return (
     <div
       ref={panelRef}
@@ -88,7 +380,7 @@ export function BadgeClusterPanel({
         background: 'var(--surface, #fff)',
         border: '2px solid var(--text, #1a1a1a)',
         padding: 0,
-        animation: 'fadeIn180 180ms ease-out',
+        animation: 'fadeIn180 180ms cubic-bezier(0.16, 1, 0.3, 1)',
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -119,6 +411,9 @@ export function BadgeClusterPanel({
           {formatCompact(count)} VEHICLES
         </span>
       </div>
+
+      {/* Dimension-specific stats */}
+      {!loading && renderStats()}
 
       {/* Preview grid */}
       {loading ? (
@@ -235,24 +530,35 @@ export function BadgeClusterPanel({
         </div>
       )}
 
-      {/* Footer — view all */}
+      {/* Footer — view all (navigates to filtered feed) */}
       {count > preview.length && (
         <div style={{
           padding: '4px 10px 6px',
           borderTop: '1px solid var(--border)',
           textAlign: 'right',
         }}>
-          <span style={{
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '8px',
-            fontWeight: 700,
-            textTransform: 'uppercase' as const,
-            letterSpacing: '0.3px',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-          }}>
+          <a
+            href={filterUrl}
+            onClick={handleViewAll}
+            style={{
+              fontFamily: 'Arial, sans-serif',
+              fontSize: '8px',
+              fontWeight: 700,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.3px',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              textDecoration: 'none',
+              border: 'none',
+              background: 'none',
+              padding: 0,
+              transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
+          >
             VIEW ALL {formatCompact(count)} →
-          </span>
+          </a>
         </div>
       )}
     </div>
