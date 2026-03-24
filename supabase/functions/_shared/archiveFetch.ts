@@ -61,6 +61,53 @@ function getSupabase() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
+/** Normalize URL for consistent cache keys — lowercase host, strip fragment, remove trailing slash */
+function normalizeUrl(raw: string): string {
+  try {
+    const u = new URL(raw);
+    u.hash = "";
+    // Sort query params for consistent ordering
+    const params = new URLSearchParams(u.searchParams);
+    const sorted = new URLSearchParams([...params.entries()].sort());
+    u.search = sorted.toString() ? `?${sorted.toString()}` : "";
+    // Remove trailing slash (except root)
+    let path = u.pathname;
+    if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+    return `${u.protocol}//${u.hostname.toLowerCase()}${path}${u.search}`;
+  } catch {
+    return raw;
+  }
+}
+
+/** Generate URL variants for backward-compatible cache lookup against old snapshots */
+function cacheKeyVariants(normalized: string): string[] {
+  const variants = [normalized];
+  // Also check with trailing slash (old snapshots may have it)
+  if (!normalized.endsWith("/")) variants.push(normalized + "/");
+  return variants;
+}
+
+/** Smart TTL: completed auctions are permanent, active listings 24h, everything else 7d */
+function smartMaxAge(url: string, platform: string): number {
+  // Completed auction pages are static forever
+  const completedPatterns: Record<string, RegExp[]> = {
+    bat: [/bringatrailer\.com\/listing\//],
+    mecum: [/mecum\.com\/lots\//],
+    bonhams: [/bonhams\.com\/lot\//],
+    rmsothebys: [/rmsothebys\.com\/.*\/lot\//],
+    gooding: [/goodingco\.com\/lot\//],
+    barrettjackson: [/barrett-jackson\.com\/Events\/.*\/Lots\//i],
+  };
+  const patterns = completedPatterns[platform];
+  if (patterns?.some(p => p.test(url))) {
+    return 315360000; // 10 years — effectively permanent
+  }
+  // Active marketplace listings: refresh after 24h
+  if (["facebook", "craigslist", "ebay"].includes(platform)) return 86400;
+  // Default: 7 days
+  return 604800;
+}
+
 function detectPlatform(url: string): string {
   if (url.includes("bringatrailer.com")) return "bat";
   if (url.includes("carsandbids.com")) return "carsandbids";
@@ -140,7 +187,8 @@ export async function archiveFetch(
   options?: ArchiveFetchOptions,
 ): Promise<ArchiveFetchResult> {
   const platform = options?.platform ?? detectPlatform(url);
-  const maxAgeSec = options?.maxAgeSec ?? 86400; // 24h default
+  const normalized = normalizeUrl(url);
+  const maxAgeSec = options?.maxAgeSec ?? smartMaxAge(normalized, platform);
   const supabase = getSupabase();
 
   const result: ArchiveFetchResult = {
@@ -162,31 +210,21 @@ export async function archiveFetch(
       const cutoff = new Date(Date.now() - maxAgeSec * 1000).toISOString();
       const useFirecrawl = options?.useFirecrawl ?? needsFirecrawl(url);
 
-      // Prefer snapshots matching the requested fetch method (direct vs firecrawl).
-      // This prevents firecrawl markdown-only snapshots from masking direct HTML
-      // snapshots that contain structured data (e.g. __NEXT_DATA__).
+      // Single query with URL variants (handles trailing slash / normalization mismatches)
+      // Fetches up to 5 rows, then picks preferred fetch_method client-side
+      const variants = cacheKeyVariants(normalized);
       const preferredMethod = useFirecrawl ? "firecrawl" : "direct";
-      let query = supabase
+      const { data: rows } = await supabase
         .from("listing_page_snapshots")
-        .select("id, html, markdown, fetched_at, html_storage_path, markdown_storage_path")
-        .eq("listing_url", url)
+        .select("id, html, markdown, fetched_at, html_storage_path, markdown_storage_path, fetch_method")
+        .in("listing_url", variants)
         .eq("success", true)
         .gte("fetched_at", cutoff)
         .order("fetched_at", { ascending: false })
-        .limit(1);
+        .limit(5);
 
-      // Try preferred method first
-      const { data: preferred } = await query.eq("fetch_method", preferredMethod).maybeSingle();
-      // Fall back to any method if preferred not found
-      const cached = preferred ?? (await supabase
-        .from("listing_page_snapshots")
-        .select("id, html, markdown, fetched_at, html_storage_path, markdown_storage_path")
-        .eq("listing_url", url)
-        .eq("success", true)
-        .gte("fetched_at", cutoff)
-        .order("fetched_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()).data;
+      // Prefer matching fetch_method, fall back to any
+      const cached = rows?.find(r => r.fetch_method === preferredMethod) ?? rows?.[0] ?? null;
 
       if (cached && (cached.html || cached.html_storage_path)) {
         let cachedHtml = cached.html ?? null;
@@ -284,7 +322,7 @@ export async function archiveFetch(
 
     const payload: Record<string, unknown> = {
       platform,
-      listing_url: url,
+      listing_url: normalized,
       fetched_at: new Date().toISOString(),
       fetch_method: result.source,
       http_status: result.statusCode,
