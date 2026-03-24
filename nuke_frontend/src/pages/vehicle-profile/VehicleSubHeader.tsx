@@ -402,8 +402,8 @@ const YMMBadge: React.FC<YMMBadgeProps> = ({ label, dimension, value, onClick })
                   <span style={STATS_VALUE}>{formatPrice(data.priceRange.min)} — {formatPrice(data.priceRange.max)}</span>
                 </div>
               )}
-              <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>
-                Click to view {dimensionLabels[dimension]}
+              <div style={{ marginTop: 4, fontSize: 7, color: 'rgba(255,255,255,0.35)', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
+                CLICK TO VIEW {dimensionLabels[dimension]?.toUpperCase()}
               </div>
             </>
           )}

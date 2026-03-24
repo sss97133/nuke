@@ -644,8 +644,8 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                 <>
                   {vehicle.vin || vinFromImages}
                   {vinFromImages && !vehicle.vin && (
-                    <span style={{ fontSize: '8px', color: 'var(--text-muted)', marginLeft: '4px', fontStyle: 'italic' }}>
-                      (from image analysis*)
+                    <span style={{ fontSize: '8px', color: 'var(--text-muted)', marginLeft: '4px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
+                      FROM IMAGE ANALYSIS
                     </span>
                   )}
                 </>

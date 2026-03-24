@@ -724,13 +724,15 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
         ) : (
           <div style={{
             paddingTop: '8px',
-            borderTop: '1px solid var(--border-light, #eee)',
+            borderTop: '1px solid var(--border)',
             textAlign: 'center',
-            fontSize: '9px',
+            fontSize: '8px',
+            fontWeight: 700,
+            textTransform: 'uppercase' as const,
+            letterSpacing: '0.08em',
             color: 'var(--text-muted)',
-            fontStyle: 'italic',
           }}>
-            Pending data ingestion
+            PENDING DATA INGESTION
           </div>
         )}
 

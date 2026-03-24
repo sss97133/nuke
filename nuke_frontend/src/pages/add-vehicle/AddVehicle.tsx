@@ -1906,12 +1906,14 @@ Redirecting to vehicle profile...`);
                       
                       {extractedImages.length > 20 && (
                         <div style={{
-                          fontSize: '11px',
+                          fontSize: '9px',
                           textAlign: 'center',
                           color: 'var(--text-muted)',
-                          fontStyle: 'italic'
+                          fontWeight: 700,
+                          textTransform: 'uppercase' as const,
+                          letterSpacing: '0.08em',
                         }}>
-                          + {extractedImages.length - 20} more image{extractedImages.length - 20 !== 1 ? 's' : ''} (not shown for performance)
+                          + {extractedImages.length - 20} MORE IMAGE{extractedImages.length - 20 !== 1 ? 'S' : ''} (NOT SHOWN)
                         </div>
                       )}
                     </>
@@ -2081,13 +2083,15 @@ Redirecting to vehicle profile...`);
                     </div>
                     {extractedImages.length > 12 && (
                       <div style={{
-                        fontSize: '11px',
+                        fontSize: '9px',
                         textAlign: 'center',
                         color: 'var(--text-muted)',
                         marginTop: 'var(--space-2)',
-                        fontStyle: 'italic'
+                        fontWeight: 700,
+                        textTransform: 'uppercase' as const,
+                        letterSpacing: '0.08em',
                       }}>
-                        + {extractedImages.length - 12} more image{extractedImages.length - 12 !== 1 ? 's' : ''} ready to upload
+                        + {extractedImages.length - 12} MORE IMAGE{extractedImages.length - 12 !== 1 ? 'S' : ''} READY TO UPLOAD
                       </div>
                     )}
                   </div>

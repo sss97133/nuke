@@ -1406,7 +1406,7 @@ export default function TeamInbox() {
         }
         .inbox-mobile-tabbar { display: none; }
         .inbox-email-row:hover { background: var(--surface-hover) !important; }
-        .email-body img { max-width: 100%; height: auto; border-radius: 4px; margin: 8px 0; display: block; }
+        .email-body img { max-width: 100%; height: auto; border-radius: 0; margin: 8px 0; display: block; }
         .email-body a { color: var(--primary, var(--accent)); text-decoration: underline; }
         .email-body p { margin: 0 0 12px; }
         .email-body table { max-width: 100%; border-collapse: collapse; }

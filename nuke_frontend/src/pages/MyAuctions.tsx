@@ -623,8 +623,8 @@ const SoldVehicleCard: React.FC<{
             )}
           </div>
         ) : (
-          <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-disabled)', fontStyle: 'italic' }}>
-            Expense data not available. Log purchase price and expenses to see margin and ROI.
+          <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-disabled)' }}>
+            NO EXPENSE DATA. LOG PURCHASE PRICE AND EXPENSES TO SEE MARGIN AND ROI.
           </div>
         )}
 

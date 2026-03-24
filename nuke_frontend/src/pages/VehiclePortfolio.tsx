@@ -684,7 +684,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--surface)',
     border: '1px solid var(--border)', textDecoration: 'none',
     color: 'inherit',
-    transition: 'border-color 0.15s, box-shadow 0.15s',
+    transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
   },
   docCardHover: {
     borderColor: 'var(--text-disabled)', },
