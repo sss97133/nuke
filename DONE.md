@@ -2,6 +2,15 @@
 
 ## 2026-03-24
 
+### [valuation] Barrett-Jackson price gap: 5,903 → 98 vehicles without price signal
+- Started with 5,903 BJ vehicles having no sale_price AND no nuke_estimate
+- Investigated snapshots: all 1,408 show "Register to View Price" (BJ paywalls prices behind login)
+- No hammerPrice in archived HTML — BJ Next.js RSC only sends price data to authenticated users
+- Ran comp-based valuation via compute-vehicle-valuation for 4,965 eligible vehicles
+- 4,875 successfully computed (98.2% success rate), 90 too obscure for comps
+- Remaining 98 are un-valueable oddities: buggies, covered wagons, paddle boats, fire trucks, boat trailers
+- BJ coverage: 99.74% of 38,244 vehicles now have a price signal (sale_price or nuke_estimate)
+
 ### [data-quality] FB Saved Vehicles deep enrichment — 483 vehicles, 6,594 evidence rows
 - **Before**: 483 title+price skeletons from Mar 16 FB Saved Items import. Only 7 had descriptions, 0 AI-enriched.
 - **Phase 1**: Propagated 38 marketplace_listing descriptions + images to vehicle records

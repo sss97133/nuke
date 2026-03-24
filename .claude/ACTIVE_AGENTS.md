@@ -33,4 +33,4 @@
 ~DONE~ | BJ-DESC-BACKFILL | Extract descriptions from Barrett-Jackson snapshots — 3,105 updated | listing_page_snapshots, vehicles
 ~DONE~ | FB-PRICE-FIX | Fixed denorm bug + deployed edge function fix + launched FB sweep (running in background, ~86/batch). Coverage 28%->44%+ | vehicles, compute-vehicle-valuation
 ~DONE~ | IMAGE-EXTRACT-ALL | 90K+ images extracted from snapshots for 16K vehicles across 5 platforms. Coverage: 81% -> 84.6%. | listing_page_snapshots, vehicle_images, vehicles
-09:30 | BJ-PRICE-FIX | Fix 5,903 Barrett-Jackson vehicles with no price — snapshot extraction + valuation | vehicles, listing_page_snapshots, compute-vehicle-valuation
+~DONE~ | BJ-PRICE-FIX | Computed nuke_estimate for 4,875 of 5,903 BJ vehicles. 98 remain (un-valueable oddities). Coverage 99.74%. | vehicles, nuke_estimates, compute-vehicle-valuation
