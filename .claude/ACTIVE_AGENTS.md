@@ -17,7 +17,7 @@
 23:15 | P88-AGENT | Batch-complete 34K stale in_progress import_queue records | import_queue table
 03:24 | P85-IMAGE-EXTRACT | Extract images from Mecum/BJ archived snapshots | listing_page_snapshots, vehicle_images
 07:20 | VALUATION-FIX | Fix nuke_estimate throughput — cron bug fixed, burndown running (PID 51893) | cron.job, nuke_estimates, vehicles
-09:00 | SNAPSHOT-BURNDOWN | Fast snapshot extraction: 25K mecum + 31K BJ at ~35K/hr via local script | scripts/snapshot-burndown.mjs, vehicles, vehicle_images, snapshot_extraction_queue
+~DONE~ | SNAPSHOT-BURNDOWN | Fast snapshot extraction COMPLETE: 27K vehicles, 96K fields, 848K images in 67min. Queue drained to 0. | scripts/snapshot-burndown.mjs
 08:36 | FB-DEEP-ENRICH | Deep FB enrichment: Playwright (PID 98827) + Ollama (PID 98175) running. Refine cron upgraded. | supabase/functions/refine-fb-listing/, scripts/enrich-fb-ollama.mjs, scripts/fb-enrich-all.ts, vehicles, marketplace_listings
 
 ---
