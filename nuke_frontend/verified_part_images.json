@@ -1,0 +1,346 @@
+{
+  "_metadata": {
+    "generated": "2026-03-23",
+    "total_parts": 65,
+    "verified_with_http_200": 60,
+    "unresolved": 5,
+    "notes": "All URLs verified with HTTP 200 via curl. AMD URLs require User-Agent header. Some UP-specific part numbers (110709, 110711, 110706) use representative product images from same product line."
+  },
+
+  "ACDelco_217-2425": {
+    "description": "LS3 Fuel Injector",
+    "image_url": "https://partshawk.com/media/catalog/product/2/1/217-2425_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "ACDelco_D510C": {
+    "description": "Ignition Coil",
+    "image_url": "https://partshawk.com/media/catalog/product/d/5/d510c_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "ACDelco_213-3826": {
+    "description": "Cam Position Sensor",
+    "image_url": "https://partshawk.com/media/catalog/product/2/1/213-3826_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "ACDelco_213-4514": {
+    "description": "Coolant Temp Sensor",
+    "image_url": "https://partshawk.com/media/catalog/product/2/1/213-4514_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "ACDelco_213-4573": {
+    "description": "Crank Position Sensor",
+    "image_url": "https://partshawk.com/media/catalog/product/2/1/213-4573_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "ACDelco_213-1576": {
+    "description": "Knock Sensor",
+    "image_url": "https://partshawk.com/media/catalog/product/2/1/213-1576_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "ACDelco_25036751": {
+    "description": "Intake Air Temp Sensor (IAT)",
+    "image_url": "https://stmtuned.com/cdn/shop/products/25036751-gm-ait-iat-air-intake-temp-sensor-1.jpg?v=1626972949",
+    "source": "STM Tuned (Shopify)"
+  },
+  "ACDelco_55573248": {
+    "description": "MAP Sensor",
+    "image_url": "https://cdn11.bigcommerce.com/s-jf84aish/images/stencil/1280x1280/products/5371/20595/28-73248__28260.1657305403.jpg?c=2",
+    "source": "LSXceleration (BigCommerce)"
+  },
+  "ACDelco_D1846A": {
+    "description": "Oil Pressure Sensor",
+    "image_url": "https://partshawk.com/media/catalog/product/d/1/d1846a_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "GM_12605109": {
+    "description": "Electronic Throttle Body (LS3)",
+    "image_url": "https://www.ictbillet.com/cdn/shop/files/19420707_Primary.avif?v=1753384802",
+    "source": "ICT Billet (Shopify)"
+  },
+  "ACDelco_E1903E": {
+    "description": "Horn",
+    "image_url": "https://partshawk.com/media/catalog/product/e/1/e1903e_primary.jpg",
+    "source": "PartsHawk"
+  },
+
+  "Dorman_746-014": {
+    "description": "Power Lock Actuator",
+    "image_url": "https://static.dormanproducts.com/images/product/medium/746-014-007.jpg",
+    "source": "Dorman Products CDN"
+  },
+  "Dorman_742-143": {
+    "description": "Power Window Motor",
+    "image_url": "https://static.dormanproducts.com/images/product/medium/742-143-007.jpg",
+    "source": "Dorman Products CDN"
+  },
+  "Dorman_599-5401": {
+    "description": "Master Window Switch",
+    "image_url": "https://partshawk.com/media/catalog/product/5/9/599-5401-007.jpg",
+    "source": "PartsHawk"
+  },
+  "Dorman_901-048": {
+    "description": "Passenger Window Switch",
+    "image_url": "https://static.dormanproducts.com/images/product/medium/901-048-001.jpg",
+    "source": "Dorman Products CDN"
+  },
+  "Dorman_901-001": {
+    "description": "Lock Switch",
+    "image_url": "https://static.dormanproducts.com/images/product/medium/901-001-007.jpg",
+    "source": "Dorman Products CDN"
+  },
+  "Dorman_923-236": {
+    "description": "Third Brake Light",
+    "image_url": "https://static.dormanproducts.com/images/product/medium/923-236-007.jpg",
+    "source": "Dorman Products CDN"
+  },
+
+  "SMP_DS-177": {
+    "description": "Headlight Switch",
+    "image_url": "https://partshawk.com/media/catalog/product/d/s/ds-177_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "SMP_US-14": {
+    "description": "Ignition Switch",
+    "image_url": "https://partshawk.com/media/catalog/product/u/s/us-14_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "SMP_TW-20": {
+    "description": "Turn Signal Switch",
+    "image_url": "https://partshawk.com/media/catalog/product/t/w/tw-20_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "SMP_DS-807": {
+    "description": "Wiper Switch",
+    "image_url": "https://partshawk.com/media/catalog/product/d/s/ds-807_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "SMP_SLS-147": {
+    "description": "Brake Light Switch",
+    "image_url": "https://partshawk.com/media/catalog/product/s/l/sls-147_primary.jpg",
+    "source": "PartsHawk"
+  },
+
+  "Optima_8004-003": {
+    "description": "RedTop 34/78 Battery",
+    "image_url": "https://batteryworldonline.com/cdn/shop/products/optima-red-top-agm-starting-battery-3478-8004-003-375026.jpg?v=1703094837",
+    "source": "Battery World Online (Shopify)"
+  },
+  "Speedway_403210": {
+    "description": "AD244 220A Alternator",
+    "image_url": "https://i.ebayimg.com/images/g/gN0AAOSwL4Nd7zqP/s-l1600.jpg",
+    "source": "eBay (Speedway Motors listing)"
+  },
+  "SPAL_30102049": {
+    "description": "Electric Fan",
+    "image_url": "https://www.mckenzies.com/cdn/shop/products/30102049_1.jpg?v=1502220479",
+    "source": "McKenzies (Shopify)"
+  },
+  "Davies_Craig_8030": {
+    "description": "EWP115 Electric Water Pump",
+    "image_url": "https://www.partsforspeed.com/pub/media/catalog/product/cache/926507dc7f93631a094422215b778fe0/d/v/dvc8030.jpg",
+    "source": "Parts For Speed"
+  },
+  "Aeromotive_11101": {
+    "description": "A1000 Fuel Pump",
+    "image_url": "https://aeromotiveinc.com/cdn/shop/files/f0651643a7f44886f2c866e5b7d603d3.jpg?v=1722873335",
+    "source": "Aeromotive Inc (Shopify)"
+  },
+  "Aeromotive_15633": {
+    "description": "Fuel Pressure Sensor",
+    "image_url": "https://jnaperformance.com/cdn/shop/products/15633.jpg?v=1561482841",
+    "source": "JNA Performance (Shopify)"
+  },
+  "AMP_Research_P300-K5": {
+    "description": "Controller",
+    "image_url": null,
+    "source": null,
+    "note": "Part number not found in any retailer catalog. May be an internal/custom part number."
+  },
+  "AMP_Research_75138-01A": {
+    "description": "PowerStep",
+    "image_url": "https://ampstep.com/cdn/shop/files/ee0320a1509c8d7bf4fef1d6114350ed_3334aa88-10fe-40f3-a569-5998ad4136e8.webp?v=1713536198",
+    "source": "AMP Step (Shopify)"
+  },
+  "Sanden_9176": {
+    "description": "SD508 A/C Compressor Clutch",
+    "image_url": "https://cdn11.bigcommerce.com/s-td8cmtfdhr/images/stencil/1280x1280/products/1128/3733/P2413-04__96439.1761841045.jpg?c=1",
+    "source": "March Performance (BigCommerce)"
+  },
+  "United_Pacific_CTL7387LED": {
+    "description": "Tail Light",
+    "image_url": "https://goodspeedusa.com/wp-content/uploads/2017/10/products-CTL7387LED_Main.jpg",
+    "source": "Goodspeed USA"
+  },
+  "United_Pacific_36469": {
+    "description": "LED 1156 Backup",
+    "image_url": "https://www.vehiclesafetysupply.com/site/mfr/united_pacific_1/36469.jpg",
+    "source": "Vehicle Safety Supply"
+  },
+  "United_Pacific_110709": {
+    "description": "LED Cab Light",
+    "image_url": "https://berubes.com/cdn/shop/files/W53140aa.jpg?v=1734363877",
+    "source": "Berubes Truck Accessories (Shopify) - United Pacific 36 LED Square Cab Light",
+    "note": "Generic UP LED cab light image. Exact 110709 product page not found in any retailer."
+  },
+  "United_Pacific_110711": {
+    "description": "LED License Plate",
+    "image_url": null,
+    "source": null,
+    "note": "Part number 110711 not found in any retailer catalog. May be a discontinued or internal SKU."
+  },
+  "United_Pacific_110706": {
+    "description": "LED Park/Turn",
+    "image_url": null,
+    "source": null,
+    "note": "Part number 110706 not found in any retailer catalog. May be a discontinued or internal SKU."
+  },
+  "United_Pacific_36480A": {
+    "description": "LED 1157 Amber",
+    "image_url": "https://berubes.com/cdn/shop/products/7838.jpg?v=1649768774",
+    "source": "Berubes Truck Accessories (Shopify) - United Pacific High Power LED 1157 Amber"
+  },
+  "United_Pacific_90652": {
+    "description": "LED Flasher",
+    "image_url": "https://www.vehiclesafetysupply.com/site/mfr/united_pacific_1/90652.jpg",
+    "source": "Vehicle Safety Supply"
+  },
+  "Truck-Lite_27270C": {
+    "description": "LED 7\" Headlight",
+    "image_url": "https://a1truckparts.net/cdn/shop/products/27270C_1024x.jpg?v=1743703146",
+    "source": "A1 Truck Parts (Shopify)"
+  },
+  "E-Stopp_ESK001": {
+    "description": "Electric Parking Brake",
+    "image_url": "https://static.wixstatic.com/media/f55561_0013b24d6e9a421da13a699d11bcc110~mv2.jpeg/v1/fit/w_500,h_500,q_90/file.jpg",
+    "source": "E-Stopp Official (Wix)"
+  },
+  "Painless_80175": {
+    "description": "Neutral/Reverse Switch",
+    "image_url": "https://painlessperformance.com/wp-content/uploads/2023/11/80175-600x400.jpg",
+    "source": "Painless Performance"
+  },
+  "Painless_80111": {
+    "description": "Blower Resistor",
+    "image_url": "https://painlessperformance.com/wp-content/uploads/2023/11/80111-600x600.jpg",
+    "source": "Painless Performance",
+    "note": "This is actually a Diode Assembly/Race Car part per Painless catalog. Verify part number if blower resistor is intended."
+  },
+  "Cardone_40-160": {
+    "description": "Wiper Motor",
+    "image_url": "https://partshawk.com/media/catalog/product/4/0/40-160_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "Four_Seasons_35342": {
+    "description": "Blower Motor",
+    "image_url": "https://partshawk.com/media/catalog/product/3/5/35342_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "Four_Seasons_36680": {
+    "description": "A/C Pressure Switch",
+    "image_url": "https://partshawk.com/media/catalog/product/3/6/36680_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "Trico_11-515": {
+    "description": "Washer Pump",
+    "image_url": "https://partshawk.com/media/catalog/product/1/1/11-515_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "Spectra_FG12C": {
+    "description": "Fuel Level Sender",
+    "image_url": "https://partshawk.com/media/catalog/product/f/g/fg12c_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "AutoMeter_5291": {
+    "description": "Vehicle Speed Sensor",
+    "image_url": "https://partshawk.com/media/catalog/product/5/2/5291.jpg",
+    "source": "PartsHawk"
+  },
+  "Dakota_Digital_VHX-73C-PU-K-B": {
+    "description": "VHX Gauge Cluster",
+    "image_url": "https://azproperformance.com/cdn/shop/products/prd_ssh_3648_5579.jpg?v=1633448678",
+    "source": "AZ Pro Performance (Shopify)"
+  },
+  "Delmo_Speed_DFSR-8715": {
+    "description": "Starter Motor",
+    "image_url": null,
+    "source": null,
+    "note": "Part number DFSR-8715 not found in any retailer catalog or manufacturer website. May be a custom/private-label part."
+  },
+  "Torque_King_QU30048": {
+    "description": "Transfer Case Switch",
+    "image_url": "https://torqueking.com/cdn/shop/files/qu30048__08146_8788__76476.1707875361.1280.1280.jpg?v=1742520915",
+    "source": "Torque King 4x4 (Shopify)"
+  },
+  "Kicker_46CXA3604T": {
+    "description": "CXA360.4 Amplifier",
+    "image_url": "https://bigjeffaudio.com/cdn/shop/products/a03a1a905d9fe5f0936ef6731e1860722f4540c5b8827b54f117dc261e0c4086_grande.jpg?v=1757968457",
+    "source": "Big Jeff Audio (Shopify)"
+  },
+  "Kicker_46CSC354": {
+    "description": "3.5\" Speakers",
+    "image_url": "https://freemanscarstereo.com/cdn/shop/products/1_ae8efd8a-4d88-464f-8ed1-53d874625a5c.jpg?v=1579692540",
+    "source": "Freemans Car Stereo (Shopify)"
+  },
+  "Kicker_46CSC674": {
+    "description": "6x7\" Speakers",
+    "image_url": "https://proaudiocenter.com/cdn/shop/files/46csc674-kicker-cs-series-6-75-6-34-coaxial-2-way-speakers-100w-rms-300w-peak-4-ohm-car-audio-pair-pro-audio-center-1.jpg?v=1702666908",
+    "source": "Pro Audio Center (Shopify)"
+  },
+  "Kicker_50TCWC104": {
+    "description": "CompC 10\" Subwoofer",
+    "image_url": "https://proaudiocenter.com/cdn/shop/files/71a2dupzLzL._AC_SL1500_a3c011f2-494c-4542-9a08-129d3b36f6db.jpg?v=1702669528",
+    "source": "Pro Audio Center (Shopify)"
+  },
+  "RetroSound_LB-M4-116-03-73": {
+    "description": "Hermosa M4 Head Unit",
+    "image_url": "https://www.retromanufacturing.com/cdn/shop/products/B-116-03-73_a3f66b26-a268-4a22-b316-45189a60fd9e.jpg?v=1741101152",
+    "source": "Retro Manufacturing (Shopify)"
+  },
+  "Blue_Sea_1011200": {
+    "description": "12V Outlet",
+    "image_url": "https://petersonmarineinc.com/cdn/shop/files/54605XL.jpg?v=1710933717",
+    "source": "Peterson Marine Inc (Shopify)"
+  },
+  "Blue_Sea_1045": {
+    "description": "Dual USB 4.8A",
+    "image_url": "https://drewcraftmarine.com/cdn/shop/files/blue-sea-1045-12-24v-dual-usb-charger-1-1-8-socket-mount-1045-496.jpg?v=1739306026",
+    "source": "Drewcraft Marine (Shopify)"
+  },
+  "Bosch_17025": {
+    "description": "LSU 4.9 Wideband O2",
+    "image_url": "https://partshawk.com/media/catalog/product/1/7/17025_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "Bosch_0332019150": {
+    "description": "Mini Relay",
+    "image_url": "https://partshawk.com/media/catalog/product/0/3/0332019150_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "Hella_007794301": {
+    "description": "Mini ISO Relay",
+    "image_url": "https://partshawk.com/media/catalog/product/0/0/007794301_primary.jpg",
+    "source": "PartsHawk"
+  },
+  "SuperBrightLEDs_LP-WW12SMD": {
+    "description": "LED Panel",
+    "image_url": "https://www.superbrightleds.com/media/catalog/product/cache/b47ccd0ace51e94e2b80df3b7e1b1c4e/l/p/lp-ww12smd-front-on-500.jpg",
+    "source": "SuperBrightLEDs"
+  },
+  "SuperBrightLEDs_NFLS-WW3-CL": {
+    "description": "LED Strip",
+    "image_url": "https://www.superbrightleds.com/media/catalog/product/cache/b47ccd0ace51e94e2b80df3b7e1b1c4e/n/f/nfls-ww3-cl-front-on-500.jpg",
+    "source": "SuperBrightLEDs"
+  },
+  "AMD_X240-4073-1D": {
+    "description": "Side Marker Front",
+    "image_url": "https://www.autometaldirect.com/storage/product/32848/X240-4073-1D_800.webp",
+    "source": "Auto Metal Direct",
+    "note": "Requires User-Agent header to return 200. May return 406 without it."
+  },
+  "AMD_X240-4073-2D": {
+    "description": "Side Marker Rear",
+    "image_url": "https://www.autometaldirect.com/storage/product/32849/X240-4073-2D_800.webp",
+    "source": "Auto Metal Direct",
+    "note": "Requires User-Agent header to return 200. May return 406 without it."
+  }
+}
