@@ -5,7 +5,7 @@
  * Now includes font size and badge toggles for user control.
  */
 
-import type { CSSProperties } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import type { SortBy, SortDirection, ViewMode } from '../../types/feedTypes';
 import type { ImageFit } from '../utils/feedUrlCodec';
 
@@ -17,6 +17,8 @@ export interface FeedToolbarProps {
   fontSize: number;
   showScores: boolean;
   imageFit: ImageFit;
+  /** Whether user has recorded interests (enables FOR YOU sort) */
+  hasInterests?: boolean;
   onSortChange: (sort: SortBy) => void;
   onDirectionChange: (dir: SortDirection) => void;
   onViewModeChange: (mode: ViewMode) => void;
@@ -81,6 +83,7 @@ export function FeedToolbar({
   fontSize,
   showScores,
   imageFit,
+  hasInterests,
   onSortChange,
   onDirectionChange,
   onViewModeChange,
@@ -90,6 +93,16 @@ export function FeedToolbar({
   onImageFitChange,
 }: FeedToolbarProps) {
   const isTableView = viewMode === 'technical';
+
+  // Build sort options — replace FINDS with FOR YOU when user has interests
+  const sortOptions = useMemo(() => {
+    if (hasInterests) {
+      return SORT_OPTIONS.map((opt) =>
+        opt.value === 'finds' ? { value: 'finds' as SortBy, label: 'FOR YOU' } : opt,
+      );
+    }
+    return SORT_OPTIONS;
+  }, [hasInterests]);
 
   return (
     <div
@@ -111,7 +124,7 @@ export function FeedToolbar({
           }}>
             SORT
           </span>
-          {SORT_OPTIONS.map((opt) => (
+          {sortOptions.map((opt) => (
             <button
               key={opt.value}
               type="button"
