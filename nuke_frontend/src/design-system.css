@@ -3607,7 +3607,10 @@ body {
     z-index: 10000 !important;
   }
 
-  /* Fix button sizing on mobile - prevent explosion */
+  /* Fix button sizing on mobile - prevent explosion
+     MUST stay inside @media — was top-level before, broke every button on desktop
+     (header avatar, search actions, badge portals all got 6px 8px padding + 32px min-height) */
+@media (max-width: 767px) {
   .button,
   button {
     width: auto !important;
@@ -3617,6 +3620,7 @@ body {
     min-width: auto !important;
     min-height: 32px !important;
   }
+}
   
   /* Specific fixes for inline buttons that shouldn't expand */
   .card-header button,

@@ -33,6 +33,7 @@
   padding: 0 8px;
   max-width: 100%;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* ============================================================================
@@ -53,6 +54,14 @@
 
 .header-wordmark:hover {
   opacity: 0.75;
+}
+
+/* Protect header session buttons from global !important overrides (design-system.css) */
+.header-session button,
+.header-wordmark {
+  padding: 0 !important;
+  min-height: 0 !important;
+  font-size: inherit !important;
 }
 
 /* ============================================================================
@@ -83,7 +92,11 @@
 .user-area {
   border: none;
   background: transparent;
-  padding: 0;
+  padding: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  width: auto !important;
+  font-size: inherit !important;
   cursor: pointer;
   position: relative;
   flex-shrink: 0;
