@@ -559,21 +559,31 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
   // Tooltip
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
 
-  // Drill down
+  // Drill down — makes drill into models, models + years navigate to feed
   const drillInto = useCallback((node: TreemapNode) => {
     if (levelType === 'brands') {
       recordInterest('make', node.name);
       setDrillStack(prev => [...prev, { label: node.name, make: node.name }]);
     } else if (levelType === 'models') {
       recordInterest('model', node.name);
-      setDrillStack(prev => [...prev, { label: node.name, make: currentLevel.make, model: node.name }]);
-    } else if (levelType === 'years') {
-      // At deepest level, navigate to search results
+      // Navigate to feed filtered by make + model
       const params = new URLSearchParams();
+      params.set('tab', 'feed');
+      if (currentLevel.make) params.set('make', currentLevel.make);
+      params.set('model', node.name);
+      navigate(`/?${params.toString()}`);
+    } else if (levelType === 'years') {
+      // Navigate to feed filtered by make + model + year
+      const params = new URLSearchParams();
+      params.set('tab', 'feed');
       if (currentLevel.make) params.set('make', currentLevel.make);
       if (currentLevel.model) params.set('model', currentLevel.model);
-      params.set('year', node.name);
-      navigate(`/search?${params.toString()}`);
+      const year = parseInt(node.name, 10);
+      if (Number.isFinite(year)) {
+        params.set('year_min', String(year));
+        params.set('year_max', String(year));
+      }
+      navigate(`/?${params.toString()}`);
     }
   }, [levelType, currentLevel, navigate, recordInterest]);
 
@@ -824,12 +834,38 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
           );
         })}
 
-        {/* Level indicator */}
+        {/* Level indicator + feed shortcut */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           {activeData && (
             <span style={{ fontSize: 9, fontFamily: "'Courier New', monospace", color: 'var(--text-secondary)' }}>
               {fmtNum(totalCount)} vehicles / {fmtMoney((activeData || []).reduce((s, n) => s + n.value, 0))} total value
             </span>
+          )}
+          {currentLevel.make && (
+            <button
+              onClick={() => {
+                const params = new URLSearchParams();
+                params.set('tab', 'feed');
+                params.set('make', currentLevel.make!);
+                if (currentLevel.model) params.set('model', currentLevel.model);
+                navigate(`/?${params.toString()}`);
+              }}
+              style={{
+                fontSize: 8,
+                fontWeight: 700,
+                letterSpacing: '0.10em',
+                textTransform: 'uppercase',
+                fontFamily: 'Arial, sans-serif',
+                border: '2px solid var(--border)',
+                background: 'transparent',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                padding: '2px 10px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              ENTER FEED
+            </button>
           )}
           <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-disabled)' }}>
             {levelType === 'brands' ? 'MAKES' : levelType === 'models' ? 'MODELS' : 'YEARS'}
@@ -939,21 +975,41 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 16px',
-          height: 24,
+          height: 28,
           borderTop: '2px solid var(--border)',
           background: 'var(--surface)',
           flexShrink: 0,
+          gap: 12,
         }}
       >
         <span style={{ fontSize: 8, fontFamily: "'Courier New', monospace", color: 'var(--text-disabled)' }}>
           AREA = VEHICLE COUNT / COLOR = MEDIAN PRICE
         </span>
-        <a
-          href="https://nuke.ag"
-          style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-disabled)', textDecoration: 'none' }}
-        >
-          nuke.ag
-        </a>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            onClick={onBrowse}
+            style={{
+              padding: '4px 20px',
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              fontFamily: 'Arial, sans-serif',
+              border: '2px solid var(--text)',
+              background: 'var(--text)',
+              color: 'var(--bg)',
+              cursor: 'pointer',
+            }}
+          >
+            BROWSE ALL
+          </button>
+          <a
+            href="https://nuke.ag"
+            style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-disabled)', textDecoration: 'none' }}
+          >
+            nuke.ag
+          </a>
+        </div>
       </div>
 
       {/* ─── GLOBAL STYLES ─── */}
@@ -1019,10 +1075,12 @@ export default function HomePage() {
     if (!fromUrl && !fromStorage) {
       setActiveTab('feed');
     }
+    // Show feed for logged-out users when tab=feed is in URL
+    // (includes treemap drill-through navigation with filters)
     if (!user && fromUrl) {
       setShowFeed(true);
     }
-  }, [authLoading, user]);
+  }, [authLoading, user, searchParams]);
 
   const switchTab = (tab: TabId) => {
     setActiveTab(tab);
