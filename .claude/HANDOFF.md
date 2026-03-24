@@ -480,3 +480,252 @@ none
 2. `tail -40 DONE.md` — what exists
 3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
 4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-24 12:15:48
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+73f045dbe Feed cards: source badges (BaT/FB/MECUM/etc) + status indicators on all view modes
+cce87d53c Wire treemap drill-down to filtered feed: model click → feed, BROWSE ALL button
+fa37025b7 Feed cards: source platform badge + status indicators (SOLD/LIVE/FOR SALE)
+da9b357fe Treemap drill-through navigates to feed instead of search
+7495fa3e5 Fix feed UI: year filter typing, stats format ($17.3B), filtered stats reflect active set
+7cfea0871 Fix feed UI: year filter typing, stats strip shows filtered set
+
+## Uncommitted Changes
+none
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-24 12:16:24
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+73f045dbe Feed cards: source badges (BaT/FB/MECUM/etc) + status indicators on all view modes
+cce87d53c Wire treemap drill-down to filtered feed: model click → feed, BROWSE ALL button
+fa37025b7 Feed cards: source platform badge + status indicators (SOLD/LIVE/FOR SALE)
+da9b357fe Treemap drill-through navigates to feed instead of search
+7495fa3e5 Fix feed UI: year filter typing, stats format ($17.3B), filtered stats reflect active set
+7cfea0871 Fix feed UI: year filter typing, stats strip shows filtered set
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-24 12:16:58
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+73f045dbe Feed cards: source badges (BaT/FB/MECUM/etc) + status indicators on all view modes
+cce87d53c Wire treemap drill-down to filtered feed: model click → feed, BROWSE ALL button
+fa37025b7 Feed cards: source platform badge + status indicators (SOLD/LIVE/FOR SALE)
+da9b357fe Treemap drill-through navigates to feed instead of search
+7495fa3e5 Fix feed UI: year filter typing, stats format ($17.3B), filtered stats reflect active set
+7cfea0871 Fix feed UI: year filter typing, stats strip shows filtered set
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-24 12:17:42
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+73f045dbe Feed cards: source badges (BaT/FB/MECUM/etc) + status indicators on all view modes
+cce87d53c Wire treemap drill-down to filtered feed: model click → feed, BROWSE ALL button
+fa37025b7 Feed cards: source platform badge + status indicators (SOLD/LIVE/FOR SALE)
+da9b357fe Treemap drill-through navigates to feed instead of search
+7495fa3e5 Fix feed UI: year filter typing, stats format ($17.3B), filtered stats reflect active set
+7cfea0871 Fix feed UI: year filter typing, stats strip shows filtered set
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-24 12:19:20
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+73f045dbe Feed cards: source badges (BaT/FB/MECUM/etc) + status indicators on all view modes
+cce87d53c Wire treemap drill-down to filtered feed: model click → feed, BROWSE ALL button
+fa37025b7 Feed cards: source platform badge + status indicators (SOLD/LIVE/FOR SALE)
+da9b357fe Treemap drill-through navigates to feed instead of search
+7495fa3e5 Fix feed UI: year filter typing, stats format ($17.3B), filtered stats reflect active set
+7cfea0871 Fix feed UI: year filter typing, stats strip shows filtered set
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-24 12:21:04
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+73f045dbe Feed cards: source badges (BaT/FB/MECUM/etc) + status indicators on all view modes
+cce87d53c Wire treemap drill-down to filtered feed: model click → feed, BROWSE ALL button
+fa37025b7 Feed cards: source platform badge + status indicators (SOLD/LIVE/FOR SALE)
+da9b357fe Treemap drill-through navigates to feed instead of search
+7495fa3e5 Fix feed UI: year filter typing, stats format ($17.3B), filtered stats reflect active set
+7cfea0871 Fix feed UI: year filter typing, stats strip shows filtered set
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-24 12:21:49
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+73f045dbe Feed cards: source badges (BaT/FB/MECUM/etc) + status indicators on all view modes
+cce87d53c Wire treemap drill-down to filtered feed: model click → feed, BROWSE ALL button
+fa37025b7 Feed cards: source platform badge + status indicators (SOLD/LIVE/FOR SALE)
+da9b357fe Treemap drill-through navigates to feed instead of search
+7495fa3e5 Fix feed UI: year filter typing, stats format ($17.3B), filtered stats reflect active set
+7cfea0871 Fix feed UI: year filter typing, stats strip shows filtered set
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-24 12:22:43
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+73f045dbe Feed cards: source badges (BaT/FB/MECUM/etc) + status indicators on all view modes
+cce87d53c Wire treemap drill-down to filtered feed: model click → feed, BROWSE ALL button
+fa37025b7 Feed cards: source platform badge + status indicators (SOLD/LIVE/FOR SALE)
+da9b357fe Treemap drill-through navigates to feed instead of search
+7495fa3e5 Fix feed UI: year filter typing, stats format ($17.3B), filtered stats reflect active set
+7cfea0871 Fix feed UI: year filter typing, stats strip shows filtered set
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-24 12:23:10
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+73f045dbe Feed cards: source badges (BaT/FB/MECUM/etc) + status indicators on all view modes
+cce87d53c Wire treemap drill-down to filtered feed: model click → feed, BROWSE ALL button
+fa37025b7 Feed cards: source platform badge + status indicators (SOLD/LIVE/FOR SALE)
+da9b357fe Treemap drill-through navigates to feed instead of search
+7495fa3e5 Fix feed UI: year filter typing, stats format ($17.3B), filtered stats reflect active set
+7cfea0871 Fix feed UI: year filter typing, stats strip shows filtered set
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-24 12:26:09
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+73f045dbe Feed cards: source badges (BaT/FB/MECUM/etc) + status indicators on all view modes
+cce87d53c Wire treemap drill-down to filtered feed: model click → feed, BROWSE ALL button
+fa37025b7 Feed cards: source platform badge + status indicators (SOLD/LIVE/FOR SALE)
+da9b357fe Treemap drill-through navigates to feed instead of search
+7495fa3e5 Fix feed UI: year filter typing, stats format ($17.3B), filtered stats reflect active set
+7cfea0871 Fix feed UI: year filter typing, stats strip shows filtered set
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+nuke_frontend/src/components/badges/BadgeClusterPanel.tsx
+nuke_frontend/src/components/badges/BadgePortal.tsx
+nuke_frontend/src/components/badges/useBadgeDepth.ts
+nuke_frontend/src/components/search/AIDataIngestionSearch.tsx
+nuke_frontend/src/feed/components/VehicleCard.tsx
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
