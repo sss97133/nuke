@@ -2,6 +2,19 @@
 
 ## 2026-03-24
 
+### [images] Snapshot image extraction — 90K+ images for 16K vehicles
+- Created `scripts/extract-images-from-snapshots.mjs` + SQL function `find_imageless_with_snapshots()`
+- Phase 1: Promoted 12,306 `primary_image_url` values to `vehicle_images` rows
+- Phase 2: Extracted 77,942 images from archived HTML snapshots across 5 platforms
+  - Barrett-Jackson: 1,610 vehicles, 16,766 images (91.4% coverage, up from 64.7%)
+  - Craigslist: 819 vehicles, 18,852 images
+  - Bonhams: 716 vehicles, 716 images (82.4% coverage, up from 39.5%)
+  - RM Sotheby's: 489 vehicles, 23,956 images
+  - BaT: 356 vehicles, 17,457 images
+- Overall vehicle image coverage: 84.6% (298K/353K), up from ~81%
+- Remaining gap: 54.5K vehicles, mostly pcarmarket (5.5K, 0 snapshots), mecum (4.5K, "Gallery not available"), KSL (3K, no snapshots)
+- Mecum + Gooding snapshots have JS-rendered galleries — images not in HTML
+
 ### [valuation] FB Marketplace nuke_estimate sweep — 28% to 44%+ and climbing
 - **Diagnosis**: 12,430 FB vehicles appeared to have "no price" (no sale_price + no nuke_estimate)
   - Reality: 99.6% already had asking_price; only 103 truly had no price signal
