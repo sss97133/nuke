@@ -1,0 +1,160 @@
+CUT LIST — 1977 chevrolet blazer
+Generated: 3/23/2026 | TXL tier
+113 wires | 830 ft total | 4 shielded | 1 twisted pair
+==========================================================================================
+
+>> ENGINE LOOM (28 wires, 142.6 ft)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#4   Electronic Throttle Body        ECU           18 AWG TXL            ORG         4.6ft   
+#5   Ignition Coil 3                 M130:A03      20 AWG TXL            WHT         4.6ft   
+#7   Ignition Coil 5                 M130:A04      20 AWG TXL            WHT/WHT     4.6ft   
+#8   Ignition Coil 7                 M130:A05      20 AWG TXL            WHT/BLK     4.6ft   
+#9   Ignition Coil 2                 M130:A06      20 AWG TXL            WHT/RED     4.6ft   
+#10  Ignition Coil 4                 M130:A07      20 AWG TXL            WHT/BLU     4.6ft   
+#11  Ignition Coil 6                 M130:A08      20 AWG TXL            WHT/YEL     4.6ft   
+#12  Ignition Coil 8                 M130:A12      20 AWG TXL            WHT/VIO     4.6ft   
+#13  Fuel Injector 1                 M130:A19      18 AWG TXL            GRN         4.6ft   
+#14  Fuel Injector 2                 M130:A20      18 AWG TXL            GRN/WHT     4.6ft   
+#15  Fuel Injector 3                 M130:A21      18 AWG TXL            GRN/BLK     4.6ft   
+#16  Fuel Injector 4                 M130:A22      18 AWG TXL            GRN/RED     4.6ft   
+#17  Fuel Injector 5                 M130:A27      18 AWG TXL            GRN/BLU     4.6ft   
+#18  Fuel Injector 6                 M130:A28      18 AWG TXL            GRN/YEL     4.6ft   
+#19  Fuel Injector 7                 M130:A29      18 AWG TXL            GRN/VIO     4.6ft   
+#20  Fuel Injector 8                 M130:A30      18 AWG TXL            GRN/ORG     4.6ft   
+#24  Ignition Coil 1                 M130:A13      20 AWG TXL            WHT/ORG     4.6ft   
+#97  Rear Backup Camera              PDM30:OUT15   20 AWG TXL            BLU/WHT     18.4ft  
+#99  Crank Position Sensor           M130:B01      22 AWG SHIELDED 2C    BLU/WHT/WHT 4.6ft   2-conductor shielded cable
+#101 Cam Position Sensor             M130:B02      22 AWG SHIELDED 2C    BLU/WHT/BLK 4.6ft   2-conductor shielded cable
+#102 Oil Pressure Sensor (ECU)       M130:A14      22 AWG TXL            VIO         4.6ft   
+#103 Knock Sensor Bank 1             M130:B07      22 AWG SHIELDED 2C    GRY         4.6ft   2-conductor shielded cable
+#104 Knock Sensor Bank 2             M130:B13      22 AWG SHIELDED 2C    GRY/WHT     4.6ft   2-conductor shielded cable
+#108 MAP Sensor                      M130:A15      22 AWG TXL            VIO/WHT     4.6ft   
+#109 Intake Air Temp Sensor          M130:B03      22 AWG TXL            TAN         4.6ft   
+#110 Coolant Temp Sensor (ECU)       M130:B04      22 AWG TXL            TAN/WHT     4.6ft   
+#112 Fuel Pressure Sensor            M130:A16      22 AWG TXL            VIO/BLK     4.6ft   
+#113 Oil Temperature Sensor          M130:B05      22 AWG TXL            TAN/BLK     4.6ft   
+
+>> EXTERIOR / BODY (27 wires, 240.7 ft)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#33  Turn Signal Switch              ECU           18 AWG TXL            ORN/BLU     3.5ft   
+#39  Headlight Switch                ECU           14 AWG TXL            ORN/ORG     3.5ft   
+#46  Wiper/Washer Switch             ECU           18 AWG TXL            ORN/VIO     3.5ft   
+#48  Horn                            PDM30:OUT14   14 AWG TXL            ORN/ORG     4.6ft   
+#49  Windshield Wiper Motor          PDM30:OUT12   14 AWG TXL            PPL         4.6ft   
+#50  Washer Pump                     PDM30:OUT26   18 AWG TXL            ORN/BLK/RED 4.6ft   
+#53  Brake Light Switch              ECU           22 AWG TXL            ORN/WHT     3.5ft   
+#54  Electric Parking Brake          PDM30:OUT7    14 AWG TXL            ORN/BLK/YEL 18.4ft  
+#75  Tail Light Right                PDM30:OUT13   18 AWG TXL            BRN/YEL     18.4ft  
+#76  Backup Light Right              PDM30:OUT15   18 AWG TXL            BRN/VIO     18.4ft  
+#77  Side Marker Rear Left           PDM30:OUT19   18 AWG TXL            BRN/ORG     18.4ft  
+#78  Side Marker Rear Right          PDM30:OUT19   18 AWG TXL            BRN         18.4ft  
+#79  Cab Clearance Light Left        PDM30:OUT19   18 AWG TXL            BRN/WHT     3.5ft   
+#80  Turn Signal Left Front          PDM30:OUT27   18 AWG TXL            LT BLU      4.6ft   
+#81  Tail Light Left                 PDM30:OUT13   18 AWG TXL            BRN/BLK     18.4ft  
+#82  Turn Signal Right Front         PDM30:OUT28   18 AWG TXL            DK BLU      4.6ft   
+#83  Parking Light Left Front        PDM30:OUT13   18 AWG TXL            BRN/RED     4.6ft   
+#84  Parking Light Right Front       PDM30:OUT13   18 AWG TXL            BRN/BLU     4.6ft   
+#85  LED Headlight Left              PDM30:OUT17   16 AWG TXL            LT GRN      4.6ft   
+#86  LED Headlight Right             PDM30:OUT18   16 AWG TXL            LT GRN/WHT  4.6ft   
+#87  Side Marker Front Left          PDM30:OUT19   18 AWG TXL            BRN/YEL     4.6ft   
+#88  Side Marker Front Right         PDM30:OUT19   18 AWG TXL            BRN/VIO     4.6ft   
+#89  Backup Light Left               PDM30:OUT15   18 AWG TXL            BRN/ORG     18.4ft  
+#90  Cab Clearance Light Center      PDM30:OUT19   18 AWG TXL            BRN         3.5ft   
+#91  Cab Clearance Light Right       PDM30:OUT19   18 AWG TXL            BRN/WHT     3.5ft   
+#92  License Plate Light             PDM30:OUT19   18 AWG TXL            BRN/BLK     18.4ft  
+#93  Third Brake Light               PDM30:OUT15   18 AWG TXL            BRN/RED     18.4ft  
+
+>> INTERIOR / DASH (18 wires, 94.7 ft)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#34  Power Window Motor Left         PDM30:OUT3    12 AWG TXL            DK BLU      6.9ft   
+#35  Power Window Motor Right        PDM30:OUT4    12 AWG TXL            DK BLU/WHT  6.9ft   
+#36  Window Switch Master (Driver)   ECU           14 AWG TXL            ORN/YEL     6.9ft   
+#37  Window Switch Passenger         ECU           14 AWG TXL            ORN/VIO     6.9ft   
+#38  Power Lock Actuator Left        PDM30:OUT21   18 AWG TXL            BLK         6.9ft   
+#42  Door Switch Left                ECU           18 AWG TXL            ORN/BLK     6.9ft   
+#43  Door Switch Right               ECU           18 AWG TXL            ORN/RED     6.9ft   
+#44  Lock Switch                     ECU           18 AWG TXL            ORN/BLU     6.9ft   
+#45  Blower Speed Switch/Control     ECU           14 AWG TXL            ORN/YEL     3.5ft   
+#47  Power Lock Actuator Right       PDM30:OUT22   18 AWG TXL            BLK/WHT     6.9ft   
+#51  Heater Blower Motor             PDM30:OUT6    12 AWG TXL            ORN/BLK/BLU 4.6ft   
+#65  Display/Dash                    PDM30:OUT29   22 AWG TXL            ORN/RED     3.5ft   
+#67  Dome Light                      PDM30:OUT25   20 AWG TXL            BRN         3.5ft   
+#68  Under-Dash LED Lights           PDM30:OUT25   20 AWG TXL            BRN/WHT     3.5ft   
+#69  Footwell Lights                 PDM30:OUT25   20 AWG TXL            BRN/BLK     3.5ft   
+#70  USB Charging Port               PDM30:OUT30   18 AWG TXL            ORN/YEL     3.5ft   
+#71  Dakota Digital Gauge Cluster    PDM30         18 AWG TXL            ORN/VIO     3.5ft   
+#72  Cigarette Lighter / 12V Outlet  PDM30:OUT8    14 AWG TXL            ORN/ORG     3.5ft   
+
+>> CHASSIS / UNDERBODY (12 wires, 110.4 ft)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#1   AMP Research Step Left          PDM30:OUT9    14 AWG TXL            ORN/BLK     11.5ft  
+#2   AMP Research Step Right         PDM30:OUT10   14 AWG TXL            ORN/BLK/WHT 11.5ft  
+#3   AMP Research Controller         PDM30:OUT11   14 AWG TXL            ORN/BLK/BLK 11.5ft  
+#21  Radiator Fan 1                  PDM30:OUT1    12 AWG TXL            ORN/WHT     4.6ft   
+#22  Radiator Fan 2                  PDM30:OUT2    12 AWG TXL            ORN/BLK     4.6ft   
+#25  Electric Water Pump             PDM30:OUT5    14 AWG TXL            ORN/BLU     4.6ft   
+#64  Wideband Lambda Controller      PDM30:OUT24   20 AWG TXL            ORN/BLK     4.6ft   
+#66  Fuel Pump                       ECU           10 AWG TXL            ORN/BLU     18.4ft  
+#94  Fuel Pump Relay                 PDM30         22 AWG TXL            ORN         4.6ft   
+#100 Vehicle Speed Sensor            ECU           22 AWG TXL            ORN/BLU     11.5ft  
+#106 Wideband O2 Sensor 1            ECU           22 AWG TXL            VIO/BLU     11.5ft  
+#107 Wideband O2 Sensor 2            ECU           22 AWG TXL            VIO/BLU/WHT 11.5ft  
+
+>> AUDIO (8 wires, 109.3 ft)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#26  Speaker Front Left              ECU           18 AWG TXL            ORN/YEL     6.9ft   
+#27  Speaker Front Right             ECU           18 AWG TXL            ORN/VIO     6.9ft   
+#28  Speaker Rear Left               ECU           18 AWG TXL            ORN/ORG     18.4ft  
+#29  Speaker Rear Right              ECU           18 AWG TXL            ORN         18.4ft  
+#30  Subwoofer                       ECU           14 AWG TXL            ORN/WHT     18.4ft  
+#31  Radio/Head Unit                 PDM30:OUT20   18 AWG TXL            ORN/BLK     3.5ft   
+#32  Amplifier                       ECU           8 AWG TXL             ORN/RED     18.4ft  
+#96  Amplifier Relay                 ECU           22 AWG TXL            ORN/BLK     18.4ft  
+
+>> POWER / COMM (4 wires, 17.3 ft)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#6   Starter Motor                   ECU           4 AWG TXL             ORN         4.6ft   
+#59  Alternator                      ECU           8 AWG TXL             ORN/VIO     4.6ft   
+#62  CAN Bus Network                 ECU           22 AWG TWISTED PAIR   WHT/GRN     3.5ft   120Ω termination each end
+#63  Battery Disconnect              ECU           4 AWG TXL             ORN/WHT     4.6ft   
+
+>> MISC (16 wires, 115.2 ft)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#23  A/C Compressor Clutch           PDM30:OUT16   18 AWG TXL            ORN/RED     4.6ft   
+#40  Ignition Switch                 ECU           14 AWG TXL            ORN         3.5ft   
+#41  Hazard Flasher                  ECU           18 AWG TXL            ORN/WHT     3.5ft   
+#52  Bosch V4 Electric Brake Booste  ECU           10 AWG TXL            ORN         4.6ft   
+#55  Transfer Case Indicator         PDM30         16 AWG TXL            ORN/BLK     11.5ft  
+#56  Neutral Safety Switch           PDM30         14 AWG TXL            ORN/RED     11.5ft  
+#57  Reverse Light Switch            PDM30         18 AWG TXL            ORN/BLU     11.5ft  
+#58  Transmission Controller         PDM30:OUT23   20 AWG TXL            ORN/YEL     3.5ft   
+#60  ECU                             ECU           20 AWG TXL            ORN/ORG     4.6ft   
+#61  Power Distribution Module       ECU           22 AWG TXL            ORN         3.5ft   
+#73  Underhood Light                 PDM30:OUT25   20 AWG TXL            BRN/RED     4.6ft   
+#74  Cargo/Bed Light                 PDM30:OUT25   20 AWG TXL            BRN/BLU     18.4ft  
+#95  Bosch iBooster Relay            PDM30         22 AWG TXL            ORN/WHT     2.3ft   
+#98  Fuel Level Sender               ECU           20 AWG TXL            ORN/RED     18.4ft  
+#105 A/C Pressure Switch Low         ECU           22 AWG TXL            ORN/YEL     4.6ft   
+#111 A/C Pressure Switch High        ECU           22 AWG TXL            ORN/VIO     4.6ft   
+
+==========================================================================================
+WIRE PURCHASE SUMMARY
+------------------------------------------------------------------------------------------
+4 AWG TXL: 9ft needed -> order 10ft (2 colors)
+8 AWG TXL: 23ft needed -> order 25ft (2 colors)
+10 AWG TXL: 23ft needed -> order 25ft (2 colors)
+12 AWG TXL: 28ft needed -> order 50ft (5 colors)
+14 AWG TXL: 124ft needed -> order 200ft (12 colors)
+16 AWG TXL: 21ft needed -> order 25ft (3 colors)
+18 AWG TXL: 354ft needed -> order 400ft (30 colors)
+20 AWG TXL: 120ft needed -> order 200ft (18 colors)
+22 AWG TXL: 107ft needed -> order 200ft (15 colors)
+22 AWG TWISTED PAIR: 4ft needed -> order 10ft (1 colors)
+22 AWG SHIELDED: 18ft needed -> order 25ft (4 colors)

@@ -1,0 +1,107 @@
+CONNECTOR SCHEDULE — 1977 chevrolet blazer
+Generated: 3/23/2026 | ECU: M130
+==========================================================================================
+
+>> M130 Connector_A (Superseal 34-pin)
+------------------------------------------------------------------------------------------
+PIN   FUNCTION                    ASSIGNED TO                 GAUGE NOTES
+A02   SEN_5V0_A                   —                           22ga  
+A03   IGN_LS1                     Ignition Coil 1             20ga  12611424 D510C 4-pin
+A04   IGN_LS2                     Ignition Coil 2             20ga  12611424 D510C 4-pin
+A05   IGN_LS3                     Ignition Coil 3             20ga  12611424 D510C 4-pin
+A06   IGN_LS4                     Ignition Coil 4             20ga  12611424 D510C 4-pin
+A07   IGN_LS5                     Ignition Coil 5             20ga  12611424 D510C 4-pin
+A08   IGN_LS6                     Ignition Coil 6             20ga  12611424 D510C 4-pin
+A09   SEN_5V0_B                   —                           22ga  
+A10   BAT_NEG1                    —                           16ga  Star ground point
+A11   BAT_NEG2                    —                           16ga  Star ground point
+A12   IGN_LS7                     Ignition Coil 7             20ga  12611424 D510C 4-pin
+A13   IGN_LS8                     Ignition Coil 8             20ga  12611424 D510C 4-pin
+A19   INJ_PH1                     Fuel Injector 1             18ga  12576341 EV6/USCAR connector
+A20   INJ_PH2                     Fuel Injector 2             18ga  12576341 EV6/USCAR connector
+A21   INJ_PH3                     Fuel Injector 3             18ga  12576341 EV6/USCAR connector
+A22   INJ_PH4                     Fuel Injector 4             18ga  12576341 EV6/USCAR connector
+A23   INJ_LS1                     Fuel Injector 1             18ga  12576341 EV6/USCAR connector
+A24   INJ_LS2                     Fuel Injector 2             18ga  12576341 EV6/USCAR connector
+A26   BAT_POS                     —                           16ga  
+A27   INJ_PH5                     Fuel Injector 5             18ga  12576341 EV6/USCAR connector
+A28   INJ_PH6                     Fuel Injector 6             18ga  12576341 EV6/USCAR connector
+A29   INJ_PH7                     Fuel Injector 7             18ga  12576341 EV6/USCAR connector
+A30   INJ_PH8                     Fuel Injector 8             18ga  12576341 EV6/USCAR connector
+  UNUSED (11): A01, A14, A15, A16, A17, A18, A25, A31, A32, A33, A34
+
+>> M130 Connector_B (Superseal 26-pin)
+------------------------------------------------------------------------------------------
+PIN   FUNCTION                    ASSIGNED TO                 GAUGE NOTES
+B01   UDIG1                       Crank Position Sensor       22ga  SHIELDED SHIELDED. 12615626 Firmware-locked to crank position.
+B02   UDIG2                       Cam Position Sensor         22ga  SHIELDED SHIELDED. 12591720
+B07   KNOCK1                      Knock Sensor Bank 1         22ga  SHIELDED SHIELDED. Drain to sensor ground.
+B12   BAT_BAK                     —                           22ga  
+B13   KNOCK2                      Knock Sensor Bank 2         22ga  SHIELDED SHIELDED. Drain to sensor ground.
+B15   SEN_0V_A                    —                           22ga  Star ground point
+B16   SEN_0V_B                    —                           22ga  Star ground point
+B17   CAN_HI                      —                           22ga  120 ohm termination required
+B18   CAN_LO                      —                           22ga  120 ohm termination required
+B19   SEN_6V3                     —                           22ga  
+B23   ETH_TX+                     —                           24ga  
+B24   ETH_TX-                     —                           24ga  
+B25   ETH_RX+                     —                           24ga  
+B26   ETH_RX-                     —                           24ga  
+  UNUSED (12): B03, B04, B05, B06, B08, B09, B10, B11, B14, B20, B21, B22
+
+>> PDM30 (Superseal 34+26+M6 (61 pins))
+------------------------------------------------------------------------------------------
+PIN   FUNCTION                    ASSIGNED TO                 GAUGE NOTES
+A01   OUT1 (20A)                  Radiator Fan 1              16ga  18A load. Dual-pin output.
+A03   OUT2 (20A)                  Radiator Fan 2              16ga  18A load. Dual-pin output.
+A05   OUT3 (20A)                  Power Window Motor Left     16ga  15A load. Dual-pin output.
+A07   OUT4 (20A)                  Power Window Motor Right    16ga  15A load. Dual-pin output.
+A09   OUT5 (20A)                  Heater Blower Motor         16ga  12A load. Dual-pin output.
+B03   OUT6 (20A)                  Electric Water Pump         16ga  12A load. Dual-pin output.
+B05   OUT7 (20A)                  Electric Parking Brake      16ga  10A load. Dual-pin output.
+B07   OUT8 (20A)                  Cigarette Lighter / 12V Ou  16ga  10A load. Dual-pin output.
+A02   OUT9 (8A)                   AMP Research Step Left      20ga  8A load
+A04   OUT10 (8A)                  AMP Research Step Right     20ga  8A load
+A06   OUT11 (8A)                  AMP Research Controller     20ga  8A load
+A08   OUT12 (8A)                  Windshield Wiper Motor      20ga  8A load
+A11   OUT13 (8A)                  Horn                        20ga  5A load
+A13   OUT14 (8A)                  A/C Compressor Clutch       20ga  4A load
+A15   OUT15 (8A)                  LED Headlight Left          20ga  3.6A load
+A18   OUT16 (8A)                  LED Headlight Right         20ga  3.6A load
+A20   OUT17 (8A)                  Power Lock Actuator Left    20ga  3A load
+A22   OUT18 (8A)                  Radio/Head Unit             20ga  3A load
+A24   OUT19 (8A)                  Power Lock Actuator Right   20ga  3A load
+A25   OUT20 (8A)                  Transmission Controller     20ga  3A load
+B01   OUT21 (8A)                  Wideband Lambda Controller  20ga  3A load
+B02   OUT22 (8A)                  Tail Light Right            20ga  2A load
+B04   OUT23 (8A)                  Tail Light Left             20ga  2A load
+B06   OUT24 (8A)                  Turn Signal Left Front      20ga  2A load
+B08   OUT25 (8A)                  Turn Signal Right Front     20ga  2A load
+B10   OUT26 (8A)                  Washer Pump                 20ga  2A load
+B12   OUT27 (8A)                  Backup Light Right          20ga  1.5A load
+B14   OUT28 (8A)                  Backup Light Left           20ga  1.5A load
+B16   OUT29 (8A)                  USB Charging Port           20ga  1A load
+B19   OUT30 (8A)                  Parking Light Left Front    20ga  1A load
+A19   DIG2                        —                           22ga  Switch Input 2. 10k pullup to VBATT. Trigger 3.5V/4.2V.
+A21   DIG4                        —                           22ga  Switch Input 4
+A23   DIG7                        —                           22ga  Switch Input 7
+A26   VBATT_NEG_A                 —                           16ga  Battery Negative A. Must connect both A26 and B18. Carries >
+A27   DIG1                        —                           22ga  Switch Input 1
+A28   GND_0V_A                    —                           20ga  0V reference A. For switch returns and OUT9 wiper ground. NO
+A29   DIG3                        —                           22ga  Switch Input 3
+A30   DIG5                        —                           22ga  Switch Input 5
+A31   DIG6                        —                           22ga  Switch Input 6
+A32   DIG8                        —                           22ga  Switch Input 8
+A33   DIG9                        —                           22ga  Switch Input 9
+A34   DIG10                       —                           22ga  Switch Input 10
+B15   DIG13                       —                           22ga  Switch Input 13. 10k pullup to VBATT.
+B17   DIG15                       —                           22ga  Switch Input 15
+B18   VBATT_NEG_B                 —                           16ga  Battery Negative B. Must connect both A26 and B18.
+B20   DIG11                       —                           22ga  Switch Input 11
+B21   DIG12                       —                           22ga  Switch Input 12
+B22   GND_0V_B                    —                           20ga  0V reference B. Internally connected to A28.
+B23   DIG14                       —                           22ga  Switch Input 14
+B24   DIG16                       —                           22ga  Switch Input 16
+B25   CAN_LO                      —                           22ga  CAN Bus Low. 100 ohm termination required.
+B26   CAN_HI                      —                           22ga  CAN Bus High. 100 ohm termination required.
+C01   VBATT_POS                   —                           6ga   Battery Positive M6 stud. 6 AWG main feed. 80A aggregate cap

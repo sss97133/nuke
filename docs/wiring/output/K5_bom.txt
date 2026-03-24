@@ -1,0 +1,174 @@
+BILL OF MATERIALS — 1977 chevrolet blazer
+Generated: 3/23/2026 | ECU: M130 | PDM: PDM30
+==========================================================================================
+
+>> MOTEC SYSTEM (3 items)
+------------------------------------------------------------------------------------------
+  1x M130 ECU — $3,500 PURCHASED
+  1x PDM30 — $3,140 PURCHASED
+  1x M130 Connector Kit [M130-CONN-KIT] — $35
+  SUBTOTAL: $6,675
+
+>> SENSORS (18 items)
+------------------------------------------------------------------------------------------
+  1x Fuel Level Sender [FG12C] — $75
+  1x Crank Position Sensor [12615626] — $20
+  1x Vehicle Speed Sensor [5291] — $130
+  1x Cam Position Sensor [12591720] — $28
+  1x Throttle Position Sensor 1 [integrated_in_12605109] — QUOTE
+  1x Throttle Position Sensor 2 [integrated_in_12605109] — QUOTE
+  1x Oil Pressure Sensor (ECU) [12673134] — $55
+  1x Knock Sensor Bank 1 [12623730] — $20
+  1x Knock Sensor Bank 2 [12623730] — $20
+  1x A/C Pressure Switch Low — QUOTE
+  1x Wideband O2 Sensor 1 [17025] — $120
+  1x Wideband O2 Sensor 2 [17025] — $120
+  1x MAP Sensor [55573248] — $35
+  1x Intake Air Temp Sensor [25036751] — $15
+  1x Coolant Temp Sensor (ECU) [19236568] — $13
+  1x A/C Pressure Switch High — QUOTE
+  1x Fuel Pressure Sensor — QUOTE
+  1x Oil Temperature Sensor — QUOTE
+  SUBTOTAL: $651
+
+>> ACTUATORS (22 items)
+------------------------------------------------------------------------------------------
+  1x Electronic Throttle Body [12605109] — $164 PURCHASED (add_to_cart)
+  1x Ignition Coil 3 [12611424] — $35
+  1x Starter Motor — $662 PURCHASED
+  1x Ignition Coil 5 [12611424] — $35
+  1x Ignition Coil 7 [12611424] — $35
+  1x Ignition Coil 2 [12611424] — $35
+  1x Ignition Coil 4 [12611424] — $35
+  1x Ignition Coil 6 [12611424] — $35
+  1x Ignition Coil 8 [12611424] — $35
+  1x Fuel Injector 1 [12576341] — $40
+  1x Fuel Injector 2 [12576341] — $40
+  1x Fuel Injector 3 [12576341] — $40
+  1x Fuel Injector 4 [12576341] — $40
+  1x Fuel Injector 5 [12576341] — $40
+  1x Fuel Injector 6 [12576341] — $40
+  1x Fuel Injector 7 [12576341] — $40
+  1x Fuel Injector 8 [12576341] — $40
+  1x Radiator Fan 1 — QUOTE
+  1x Radiator Fan 2 — QUOTE
+  1x A/C Compressor Clutch — QUOTE
+  1x Ignition Coil 1 [12611424] — $35
+  1x Electric Water Pump — QUOTE
+  SUBTOTAL: $1,426
+
+>> LIGHTING (19 items)
+------------------------------------------------------------------------------------------
+  1x Tail Light Right [CTL7387LED-R] — $100 PURCHASED
+  1x Backup Light Right — QUOTE PURCHASED
+  1x Side Marker Rear Left — $35 PURCHASED
+  1x Side Marker Rear Right — $35 PURCHASED
+  1x Cab Clearance Light Left — $15
+  1x Turn Signal Left Front — $15 PURCHASED
+  1x Tail Light Left [CTL7387LED-L] — $100 PURCHASED
+  1x Turn Signal Right Front — $15 PURCHASED
+  1x Parking Light Left Front — $15 PURCHASED
+  1x Parking Light Right Front — $15 PURCHASED
+  1x LED Headlight Left [27270C] — $110 PURCHASED
+  1x LED Headlight Right [27270C] — $110 PURCHASED
+  1x Side Marker Front Left [X240-4073-1D] — $35 PURCHASED
+  1x Side Marker Front Right [X240-4073-1D] — $35 PURCHASED
+  1x Backup Light Left — QUOTE PURCHASED
+  1x Cab Clearance Light Center — $15
+  1x Cab Clearance Light Right — $15
+  1x License Plate Light — $15
+  1x Third Brake Light — $25
+  SUBTOTAL: $705
+
+>> BODY (19 items)
+------------------------------------------------------------------------------------------
+  1x Turn Signal Switch [TW-20] — $45
+  1x Power Window Motor Left [742-143] — $40 PURCHASED
+  1x Power Window Motor Right [742-143] — $40 PURCHASED
+  1x Window Switch Master (Driver) — QUOTE PURCHASED
+  1x Window Switch Passenger — QUOTE PURCHASED
+  1x Power Lock Actuator Left [746-014] — $16
+  1x Headlight Switch [DS-177] — $28
+  1x Ignition Switch [US-14] — $20
+  1x Hazard Flasher [90652] — $12
+  1x Door Switch Left — $15 PURCHASED
+  1x Door Switch Right — $15 PURCHASED
+  1x Lock Switch — $25
+  1x Blower Speed Switch/Control — $20
+  1x Wiper/Washer Switch [DS-807] — $28
+  1x Power Lock Actuator Right [746-014] — $16
+  1x Horn [E1903E] — $22
+  1x Windshield Wiper Motor [40-160] — $55
+  1x Washer Pump [11-515] — $14
+  1x Heater Blower Motor [35342] — $40
+  SUBTOTAL: $451
+
+>> BRAKES (3 items)
+------------------------------------------------------------------------------------------
+  1x Bosch V4 Electric Brake Booster — $440 PURCHASED (quote_request)
+  1x Brake Light Switch — QUOTE
+  1x Electric Parking Brake [ESK001] — $580
+  SUBTOTAL: $1,020
+
+>> FUEL (1 items)
+------------------------------------------------------------------------------------------
+  1x Fuel Pump [11101] — $520 PURCHASED
+  SUBTOTAL: $520
+
+>> DRIVETRAIN (4 items)
+------------------------------------------------------------------------------------------
+  1x Transfer Case Indicator [QU30048] — $57
+  1x Neutral Safety Switch [80175] — $50
+  1x Reverse Light Switch [80175] — $50
+  1x Transmission Controller — QUOTE
+  SUBTOTAL: $157
+
+>> INTERIOR (8 items)
+------------------------------------------------------------------------------------------
+  1x Dome Light — $25
+  1x Under-Dash LED Lights — $25
+  1x Footwell Lights — $25
+  1x USB Charging Port — $15
+  1x Dakota Digital Gauge Cluster [VHX-73C-PU-K-B] — $850 PURCHASED
+  1x Cigarette Lighter / 12V Outlet — $10
+  1x Underhood Light — $25
+  1x Cargo/Bed Light — $25
+  SUBTOTAL: $1,000
+
+>> AUDIO (7 items)
+------------------------------------------------------------------------------------------
+  1x Speaker Front Left [46CSC354] — $30
+  1x Speaker Front Right [46CSC354] — $30
+  1x Speaker Rear Left [46CSC674] — $50
+  1x Speaker Rear Right [46CSC674] — $50
+  1x Subwoofer [50TCWC104] — $220
+  1x Radio/Head Unit [LB-M4-116-03-73] — $417
+  1x Amplifier [46CXA3604T] — $230
+  SUBTOTAL: $1,027
+
+>> ACCESSORIES (3 items)
+------------------------------------------------------------------------------------------
+  1x AMP Research Step Left — QUOTE PURCHASED
+  1x AMP Research Step Right — QUOTE PURCHASED
+  1x AMP Research Controller [P300-K5] — $2,264 PURCHASED (dm_instagram)
+  SUBTOTAL: $2,264
+
+>> SAFETY (1 items)
+------------------------------------------------------------------------------------------
+  1x Rear Backup Camera — $100
+  SUBTOTAL: $100
+
+>> WIRE AND CONSUMABLES (4 items)
+------------------------------------------------------------------------------------------
+  1x TXL Wire assorted (825 ft est) — $124
+  15x DTM Connector Kits (assorted) — $105
+  1x DR-25 Heat Shrink assorted — $70
+  1x Terminals, boots, consumables — $100
+  SUBTOTAL: $399
+
+==========================================================================================
+PARTS:  $16,395
+LABOR:  57 hrs @ $65/hr = $3,705
+TOTAL:  $20,100
+
+Priced: 94 | Unpriced: 18 | Purchased: 30 | Needed: 88
