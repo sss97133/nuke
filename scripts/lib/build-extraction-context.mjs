@@ -126,14 +126,14 @@ export function formatContextForPrompt(context) {
     const codeList = context.option_codes
       .map(c => `  ${c.code || c.c}: ${c.description || c.d || ''} (${c.category || c.cat || ''})`)
       .join('\n');
-    sections.push(`REFERENCE — Known option codes for this make/year:\n${codeList}\nCross-reference any codes in the description against these. Flag unrecognized codes.`);
+    sections.push(`REFERENCE — Known option codes for this make/year (DECODER RING — do NOT copy these into your extraction, only use to identify codes you find in the description):\n${codeList}`);
   }
 
   if (context.known_engines?.length) {
     const engineList = context.known_engines
       .map(e => `  ${e.name || e.type || ''}: ${e.displacement_ci || ''}ci / ${e.displacement_liters || ''}L, ${e.horsepower || '?'}hp`)
       .join('\n');
-    sections.push(`REFERENCE — Known engines for this make/year:\n${engineList}\nIdentify which engine this vehicle has based on the description.`);
+    sections.push(`REFERENCE — Known engines for this make/year (use to validate engine claims found in description):\n${engineList}`);
   }
 
   if (context.known_transmissions?.length) {
@@ -147,21 +147,21 @@ export function formatContextForPrompt(context) {
     const paintList = context.paint_codes
       .map(p => `  ${p.code}: ${p.name} (${p.color_family})`)
       .join('\n');
-    sections.push(`REFERENCE — Known paint codes for this make/year:\n${paintList}\nIf a color is mentioned, identify the likely paint code.`);
+    sections.push(`REFERENCE — Known paint codes for this make/year (match against colors mentioned in description):\n${paintList}`);
   }
 
   if (context.known_issues?.length) {
     const issueList = context.known_issues
       .map(i => `  - ${i.issue || i.description || JSON.stringify(i).slice(0, 100)}`)
       .join('\n');
-    sections.push(`REFERENCE — Known issues for this make/model:\n${issueList}\nCheck if the description mentions or addresses any of these.`);
+    sections.push(`REFERENCE — Known issues for this make/model (check if description mentions or addresses any — report in reference_validation, not as extracted claims):\n${issueList}`);
   }
 
   if (context.trim_packages?.length) {
     const trimList = context.trim_packages
       .map(t => `  ${t.trim_name}${t.trim_code ? ` (${t.trim_code})` : ''}: ${(t.standard_features || []).join(', ')}`)
       .join('\n');
-    sections.push(`REFERENCE — Known trim packages:\n${trimList}\nIdentify which trim level this vehicle is.`);
+    sections.push(`REFERENCE — Known trim packages (use to validate trim claims found in description):\n${trimList}`);
   }
 
   if (context.production_facts?.length) {
