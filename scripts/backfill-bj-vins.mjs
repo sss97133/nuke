@@ -120,18 +120,28 @@ async function extractVins() {
     vehicleClient.release();
   }
 
-  // 1c: Get existing (vin, make) combos to avoid constraint violations
-  console.log('\nPhase 1c: Loading existing VIN+make combos for conflict check...');
+  // 1c: Get existing VINs to avoid constraint violations
+  // Two unique indexes exist:
+  //   vehicles_vin_unique_17char: UNIQUE(vin) WHERE length(vin)=17
+  //   vehicles_vin_unique_short:  UNIQUE(vin, make) WHERE length(vin)<17
+  console.log('\nPhase 1c: Loading existing VINs for conflict check...');
   const existingClient = await pool.connect();
-  let existingVinMakes; // Set of "VIN|make"
+  let existingVin17; // Set of 17-char VINs (unique on vin alone)
+  let existingVinMakeShort; // Set of "VIN|make" for short VINs
   try {
-    const { rows } = await existingClient.query(`
-      SELECT vin, make FROM vehicles
-      WHERE source = 'barrett-jackson'
-        AND vin IS NOT NULL AND length(vin) >= 5
+    const { rows: rows17 } = await existingClient.query(`
+      SELECT DISTINCT vin FROM vehicles
+      WHERE vin IS NOT NULL AND length(vin) = 17
     `);
-    existingVinMakes = new Set(rows.map(r => `${r.vin}|${r.make}`));
-    console.log(`  Loaded ${existingVinMakes.size} existing VIN+make combos`);
+    existingVin17 = new Set(rows17.map(r => r.vin));
+    console.log(`  Loaded ${existingVin17.size} existing 17-char VINs`);
+
+    const { rows: rowsShort } = await existingClient.query(`
+      SELECT vin, make FROM vehicles
+      WHERE vin IS NOT NULL AND length(vin) BETWEEN 5 AND 16
+    `);
+    existingVinMakeShort = new Set(rowsShort.map(r => `${r.vin}|${r.make}`));
+    console.log(`  Loaded ${existingVinMakeShort.size} existing short VIN+make combos`);
   } finally {
     existingClient.release();
   }
@@ -173,14 +183,33 @@ async function extractVins() {
     }
 
     if (matched) {
-      // Check for unique constraint conflict
-      const key = `${matched.vin}|${v.make}`;
-      if (existingVinMakes.has(key)) {
+      // Check for unique constraint conflict based on VIN length
+      let isConflict = false;
+      if (matched.len === 17) {
+        // 17-char VINs: unique on vin alone
+        if (existingVin17.has(matched.vin)) {
+          isConflict = true;
+        }
+      } else {
+        // Short VINs: unique on (vin, make)
+        const key = `${matched.vin}|${v.make}`;
+        if (existingVinMakeShort.has(key)) {
+          isConflict = true;
+        }
+      }
+
+      if (isConflict) {
         conflictsSkipped++;
         continue;
       }
-      // Also mark this vin+make as taken so we don't create a conflict within our own batch
-      existingVinMakes.add(key);
+
+      // Mark as taken to prevent intra-batch conflicts
+      if (matched.len === 17) {
+        existingVin17.add(matched.vin);
+      } else {
+        existingVinMakeShort.add(`${matched.vin}|${v.make}`);
+      }
+
       updates.push({
         vehicle_id: v.id,
         vin: matched.vin,
@@ -217,79 +246,105 @@ async function extractVins() {
   }
 
   // ---- PHASE 2: Batch UPDATE ----
-  console.log(`\nPhase 2: Applying ${updates.length} updates in batches of ${BATCH_SIZE}...`);
+  // Disable the auto-merge trigger that fires on VIN updates and tries to delete duplicates
+  // (it fails due to FK constraints and we don't want merges during bulk VIN backfill)
+  console.log('\nDisabling trigger_auto_detect_duplicates for batch update...');
+  const trigClient = await pool.connect();
+  try {
+    await trigClient.query(`ALTER TABLE vehicles DISABLE TRIGGER trigger_auto_detect_duplicates`);
+    // Also disable VIN decode trigger to avoid hammering external APIs
+    await trigClient.query(`ALTER TABLE vehicles DISABLE TRIGGER auto_vin_decode_trigger`);
+    console.log('  Triggers disabled.');
+  } finally {
+    trigClient.release();
+  }
+
+  console.log(`\nApplying ${updates.length} updates in batches of ${BATCH_SIZE}...`);
 
   let totalUpdated = 0;
   let totalSkipped = 0;
   const batchCount = Math.ceil(updates.length / BATCH_SIZE);
 
-  for (let batch = 0; batch < batchCount; batch++) {
-    const batchNum = batch + 1;
-    const batchUpdates = updates.slice(batch * BATCH_SIZE, (batch + 1) * BATCH_SIZE);
+  try {
+    for (let batch = 0; batch < batchCount; batch++) {
+      const batchNum = batch + 1;
+      const batchUpdates = updates.slice(batch * BATCH_SIZE, (batch + 1) * BATCH_SIZE);
 
-    const updateClient = await pool.connect();
-    try {
-      // Build a VALUES list for batch update
-      const values = [];
-      const params = [];
-      for (let i = 0; i < batchUpdates.length; i++) {
-        const u = batchUpdates[i];
-        const base = i * 3;
-        values.push(`($${base + 1}::uuid, $${base + 2}::text, $${base + 3}::int)`);
-        params.push(u.vehicle_id, u.vin, u.vin_length);
-      }
-
-      const result = await updateClient.query(`
-        UPDATE vehicles v
-        SET
-          vin = t.vin,
-          vin_source = 'barrett_jackson_snapshot_extraction',
-          vin_confidence = CASE WHEN t.vin_length = 17 THEN 90 ELSE 80 END,
-          updated_at = now()
-        FROM (VALUES ${values.join(',')}) AS t(vehicle_id, vin, vin_length)
-        WHERE v.id = t.vehicle_id
-          AND (v.vin IS NULL OR length(v.vin) < 5)
-      `, params);
-
-      totalUpdated += result.rowCount;
-      const skipped = batchUpdates.length - result.rowCount;
-      totalSkipped += skipped;
-
-      if (VERBOSE || batchNum % 3 === 0 || batchNum === batchCount) {
-        console.log(`  Batch ${batchNum}/${batchCount}: updated ${result.rowCount}${skipped > 0 ? `, skipped ${skipped}` : ''} (total: ${totalUpdated})`);
-      }
-    } catch (err) {
-      if (err.code === '23505') {
-        // Rare: conflict we missed. Do row-by-row for this batch.
-        console.log(`  Batch ${batchNum}: unexpected conflict, row-by-row fallback...`);
-        let batchOk = 0;
-        for (const u of batchUpdates) {
-          try {
-            const r = await updateClient.query(`
-              UPDATE vehicles SET vin = $1, vin_source = 'barrett_jackson_snapshot_extraction',
-                vin_confidence = $2, updated_at = now()
-              WHERE id = $3 AND (vin IS NULL OR length(vin) < 5)
-            `, [u.vin, u.vin_length === 17 ? 90 : 80, u.vehicle_id]);
-            batchOk += r.rowCount;
-          } catch (e) {
-            if (e.code === '23505') { totalSkipped++; } else throw e;
-          }
+      const updateClient = await pool.connect();
+      try {
+        // Build a VALUES list for batch update
+        const values = [];
+        const params = [];
+        for (let i = 0; i < batchUpdates.length; i++) {
+          const u = batchUpdates[i];
+          const base = i * 3;
+          values.push(`($${base + 1}::uuid, $${base + 2}::text, $${base + 3}::int)`);
+          params.push(u.vehicle_id, u.vin, u.vin_length);
         }
-        totalUpdated += batchOk;
-        console.log(`    Row-by-row: ${batchOk} updated (total: ${totalUpdated})`);
-      } else {
-        throw err;
+
+        const result = await updateClient.query(`
+          UPDATE vehicles v
+          SET
+            vin = t.vin,
+            vin_source = 'barrett_jackson_snapshot_extraction',
+            vin_confidence = CASE WHEN t.vin_length = 17 THEN 90 ELSE 80 END,
+            updated_at = now()
+          FROM (VALUES ${values.join(',')}) AS t(vehicle_id, vin, vin_length)
+          WHERE v.id = t.vehicle_id
+            AND (v.vin IS NULL OR length(v.vin) < 5)
+        `, params);
+
+        totalUpdated += result.rowCount;
+        const skipped = batchUpdates.length - result.rowCount;
+        totalSkipped += skipped;
+
+        if (VERBOSE || batchNum % 3 === 0 || batchNum === batchCount) {
+          console.log(`  Batch ${batchNum}/${batchCount}: updated ${result.rowCount}${skipped > 0 ? `, skipped ${skipped}` : ''} (total: ${totalUpdated})`);
+        }
+      } catch (err) {
+        if (err.code === '23505') {
+          // Rare: conflict we missed. Do row-by-row for this batch.
+          console.log(`  Batch ${batchNum}: unexpected conflict, row-by-row fallback...`);
+          let batchOk = 0;
+          for (const u of batchUpdates) {
+            try {
+              const r = await updateClient.query(`
+                UPDATE vehicles SET vin = $1, vin_source = 'barrett_jackson_snapshot_extraction',
+                  vin_confidence = $2, updated_at = now()
+                WHERE id = $3 AND (vin IS NULL OR length(vin) < 5)
+              `, [u.vin, u.vin_length === 17 ? 90 : 80, u.vehicle_id]);
+              batchOk += r.rowCount;
+            } catch (e) {
+              if (e.code === '23505') { totalSkipped++; } else throw e;
+            }
+          }
+          totalUpdated += batchOk;
+          console.log(`    Row-by-row: ${batchOk} updated (total: ${totalUpdated})`);
+        } else {
+          throw err;
+        }
+      } finally {
+        updateClient.release();
       }
-    } finally {
-      updateClient.release();
+
+      // Check locks
+      await checkLocks();
+
+      // Sleep between batches
+      if (batchNum < batchCount) {
+        await new Promise(r => setTimeout(r, 200));
+      }
     }
-
-    // Check locks
-    await checkLocks();
-
-    // Sleep between batches
-    if (batchNum < batchCount) {
-      await new Promise(r => setTimeout(r, 200));
+  } finally {
+    // ALWAYS re-enable triggers, even if script crashes
+    console.log('\nRe-enabling triggers...');
+    const trigClient2 = await pool.connect();
+    try {
+      await trigClient2.query(`ALTER TABLE vehicles ENABLE TRIGGER trigger_auto_detect_duplicates`);
+      await trigClient2.query(`ALTER TABLE vehicles ENABLE TRIGGER auto_vin_decode_trigger`);
+      console.log('  Triggers re-enabled.');
+    } finally {
+      trigClient2.release();
     }
   }
 

@@ -2,6 +2,16 @@
 
 ## 2026-03-24
 
+### [data-quality] Barrett-Jackson VIN Extraction from Snapshots
+- Extracted 2,180 VINs from B-J `listing_page_snapshots` markdown using pattern `([A-Za-z0-9]+) Vin`
+- Script: `scripts/backfill-bj-vins.mjs` (npm: `backfill:bj-vins`)
+- VIN confidence: 90 for 17-char modern VINs, 80 for shorter chassis numbers
+- B-J VIN coverage improved from 19.2% to 27.2% (19,849 of 72,849 vehicles now have VINs)
+- 11,564 vehicles had matching snapshots but VINs already existed on other vehicle records (B-J duplicates)
+- Remaining 53K VIN-less: 32K conceptcarz imports (no B-J URL), 12.9K have B-J URL but no snapshot, 8K discovery_url only
+- Handles two unique constraints: `vehicles_vin_unique_17char` (vin alone) and `vehicles_vin_unique_short` (vin+make)
+- Safely disables `trigger_auto_detect_duplicates` and `auto_vin_decode_trigger` during batch updates, re-enables in finally block
+
 ### [data-quality] Barrett-Jackson Description Backfill
 - Extracted descriptions from 39K archived markdown snapshots in listing_page_snapshots
 - Matched snapshots to vehicles via listing_url (direct) and vehicle_events.source_url (fallback), with www normalization

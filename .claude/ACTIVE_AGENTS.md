@@ -27,6 +27,6 @@
 - Garbage audit: 289K flagged, zero deleted
 - VIN extraction: 11,855 promoted from conceptcarz chassis numbers
 - Batch extraction: 86 vehicles enriched
-03:30 | BJ-VIN-EXTRACT | Extract VINs from Barrett-Jackson snapshots for ~8K vehicles | listing_page_snapshots, vehicles
+~DONE~ | BJ-VIN-EXTRACT | Extracted 2,180 VINs from B-J snapshots. Remaining 53K lack snapshots (32K conceptcarz imports, 12.9K no snapshot, 8K discovery-url only) | listing_page_snapshots, vehicles
 ~DONE~ | BJ-DESC-BACKFILL | Extract descriptions from Barrett-Jackson snapshots — 3,105 updated | listing_page_snapshots, vehicles
 05:00 | BONHAMS-VALUATION | Investigate & fix Bonhams 7.4% valuation coverage gap | vehicles, listing_page_snapshots, nuke_estimate

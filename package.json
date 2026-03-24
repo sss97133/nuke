@@ -13,6 +13,8 @@
     "backfill-mailboxes": "tsx scripts/backfill-vehicle-mailboxes.ts",
     "backfill:bj-descriptions": "node scripts/backfill-bj-descriptions.mjs",
     "backfill:bj-descriptions:dry-run": "node scripts/backfill-bj-descriptions.mjs --dry-run",
+    "backfill:bj-vins": "node scripts/backfill-bj-vins.mjs",
+    "backfill:bj-vins:dry-run": "node scripts/backfill-bj-vins.mjs --dry-run",
     "backfill:fb-images": "node scripts/backfill-fb-images.mjs",
     "backfill:fb-saved-observations": "node scripts/backfill-fb-saved-observations.mjs",
     "backfill:make-model": "tsx scripts/backfill-make-model-from-urls.ts",
