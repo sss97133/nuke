@@ -26,6 +26,8 @@ const ColumnDivider = React.lazy(() => import('./ColumnDivider'));
 const BuildManifestPanel = React.lazy(() => import('./BuildManifestPanel'));
 const BuildTimelineChart = React.lazy(() => import('./BuildTimelineChart'));
 const BuildSpendSummary = React.lazy(() => import('./BuildSpendSummary'));
+const VehicleListingDetailsCard = React.lazy(() => import('../../components/vehicle/VehicleListingDetailsCard'));
+const SimilarSalesSection = React.lazy(() => import('../../components/vehicle/SimilarSalesSection').then(m => ({ default: m.SimilarSalesSection })));
 
 export type GalleryViewMode = 'ZONES' | 'GRID' | 'FULL' | 'INFO' | 'SESSIONS' | 'CATEGORY' | 'CHRONO' | 'SOURCE';
 
@@ -185,6 +187,25 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             isEditable={canEdit}
             onUpdate={() => {}}
           />
+
+          {/* Listing Details — highlights, equipment, modifications, flaws, service history */}
+          <React.Suspense fallback={null}>
+            <VehicleListingDetailsCard vehicle={vehicle} />
+          </React.Suspense>
+
+          {/* Comparable Sales */}
+          {vehicle.year && vehicle.make && vehicle.model && (
+            <CollapsibleWidget variant="profile" title="Comparable Sales" defaultCollapsed={true}>
+              <React.Suspense fallback={<div className="widget__label" style={{ padding: '10px 16px' }}>Loading comps...</div>}>
+                <SimilarSalesSection
+                  vehicleId={vehicle.id}
+                  vehicleYear={vehicle.year}
+                  vehicleMake={vehicle.make}
+                  vehicleModel={vehicle.model}
+                />
+              </React.Suspense>
+            </CollapsibleWidget>
+          )}
 
           {/* Pricing & Value */}
           <VehiclePricingValueCard

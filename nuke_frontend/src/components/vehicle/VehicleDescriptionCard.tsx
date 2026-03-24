@@ -349,7 +349,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
               </div>
             ) : (
               <div>
-                <div style={{ fontSize: '12px', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                <div style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '11px', lineHeight: 1.7, whiteSpace: 'pre-wrap', color: 'var(--text)' }}>
                   {description}
                 </div>
                 {/* Source attribution */}

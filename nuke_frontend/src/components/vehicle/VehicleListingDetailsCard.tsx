@@ -29,7 +29,7 @@ function parseList(val: string[] | string | null | undefined): string[] {
   if (typeof val === 'string') {
     const trimmed = val.trim();
     if (!trimmed) return [];
-    // Try JSON parse
+    // Try JSON parse (e.g. '["item1","item2"]')
     if (trimmed.startsWith('[')) {
       try {
         const parsed = JSON.parse(trimmed);
@@ -38,8 +38,39 @@ function parseList(val: string[] | string | null | undefined): string[] {
         // not JSON
       }
     }
-    // Comma-separated fallback
-    return trimmed.split(',').map(s => s.trim()).filter(Boolean);
+    // Try Postgres array literal (e.g. '{"item1","item2"}')
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        // Convert Postgres array literal to JSON array and parse
+        const jsonStr = '[' + trimmed.slice(1, -1) + ']';
+        const parsed = JSON.parse(jsonStr);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      } catch {
+        // Try splitting on comma with quote-aware parsing
+        const inner = trimmed.slice(1, -1);
+        const items: string[] = [];
+        let current = '';
+        let inQuote = false;
+        for (let i = 0; i < inner.length; i++) {
+          const ch = inner[i];
+          if (ch === '"' && (i === 0 || inner[i - 1] !== '\\')) {
+            inQuote = !inQuote;
+          } else if (ch === ',' && !inQuote) {
+            items.push(current.trim());
+            current = '';
+          } else {
+            current += ch;
+          }
+        }
+        if (current.trim()) items.push(current.trim());
+        return items.filter(Boolean);
+      }
+    }
+    // Single value or comma-separated fallback (only if no commas in natural text)
+    if (trimmed.length < 200 && trimmed.includes(',')) {
+      return trimmed.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return [trimmed];
   }
   return [];
 }
