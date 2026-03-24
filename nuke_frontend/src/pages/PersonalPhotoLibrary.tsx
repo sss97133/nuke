@@ -203,7 +203,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
     try {
       const [statsResult, vehiclesData, suggestionsData, albumsData] = await Promise.all([
         PersonalPhotoLibraryService.getLibraryStats(),
-        supabase.from('vehicles').select('id, year, make, model, trim').in('status', ['active', 'pending', 'sold', 'discovered', 'inactive', 'pending_backfill']).order('year', { ascending: false }).limit(500).then(r => {
+        supabase.from('vehicles').select('id, year, make, model, trim').order('year', { ascending: false }).limit(500).then(r => {
           if (r.error) console.error('[PhotoLibrary] Vehicle query error:', r.error);
           return r.data || [];
         }),
