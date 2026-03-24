@@ -1,5 +1,7 @@
 # NUKE DESIGN BIBLE
 
+> **SUPERSEDED:** This file is now superseded by the [Design Interface Encyclopedia](./library/technical/design-book/README.md) as the canonical implementation reference. This Design Bible remains as the philosophical foundation and source of the three laws. For token values, component specs, violation patterns, and implementation details, refer to the Design Book.
+
 **The interface IS the data topology. Design is end to end.**
 
 ---
