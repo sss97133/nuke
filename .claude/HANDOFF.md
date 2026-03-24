@@ -376,3 +376,87 @@ none
 2. `tail -40 DONE.md` — what exists
 3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
 4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Session Handoff — 2026-03-23 23:15:00
+*(Written explicitly by agent — high-quality context for next session)*
+
+## What Was Happening
+MASSIVE SESSION COMPLETE. Committed 16 files, 4,973 lines. 
+
+DEPLOYED TO DB: temporal decay (14 half-lives), conflict resolution, cross-vehicle image matching (5K+ dupes), ARS 323K scored (100%). Engine digital twin (Blazer 9 components). Supplier pipeline (59 orgs, 747 marketplace items). 1,034 FB saved items.
+
+COMMITTED: 11 new scripts (enrich/catalog/monitor/sweep/ars/twin/vision/labels/resolve/classify/rpo). 2 library papers (vision-gap-analysis, vision-training-strategy). Migration file.
+
+VISION DIAGNOSIS (critical reading for next agent): The YONO architecture is COMPLETE but UNWIRED. condition_spectrometer.py has 5 passes, only 1-2 run. Zone classifier trained on 2K images (needs 5K+). BaT photo ordering gives 236K FREE zone labels. session_detector.py and auto_label_images.py exist but abandoned. Path through chicken-and-egg costs $7.50. READ docs/library/intellectual/papers/vision-gap-analysis.md BEFORE doing any vision work.
+
+RUNNING OVERNIGHT: Ollama description extraction (50K, free), xAI/Grok extraction (50K), poll-feeds daemon, mail-app daemon.
+
+NEXT SESSION PRIORITIES:
+1. Generate zone labels from BaT photo positions (Step 1 of vision paper, 2hrs, $0)
+2. Retrain zone classifier on position-derived labels (Step 2, $6 Modal)
+3. Wire condition spectrometer passes 2-3 into modal_serve.py (Step 3, $0)
+4. Run full 5-pass pipeline on user K10 + Blazer (Step 4, $1.50)
+5. Quadrant grid prompting for simple material/condition per grid cell (Step 6, $0)
+
+## Branch
+main
+
+## Recent Commits (last 3h)
+5c4ff42ca feat: bedrock audit session — 11 scripts, 8 DB systems, 323K ARS, vision papers
+455ea62ec fix: extraction prompt — reference library is decoder ring, not shopping list
+cdd775e32 fix: badge popup stuck + header layout broken by global !important
+
+## Uncommitted Changes (not yet committed)
+supabase/functions/_shared/llmRouter.ts
+
+## Staged
+none
+
+## Pickup Instructions
+1. Read PROJECT_STATE.md for sprint context
+2. Read above "What Was Happening" section
+3. Check git log if more detail needed: `git log --oneline -10`
+4. Register in .claude/ACTIVE_AGENTS.md before starting
+
+---
+# Auto-Checkpoint — 2026-03-23 23:15:27
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+5c4ff42ca feat: bedrock audit session — 11 scripts, 8 DB systems, 323K ARS, vision papers
+455ea62ec fix: extraction prompt — reference library is decoder ring, not shopping list
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+supabase/functions/_shared/llmRouter.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-23 23:25:38
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+5c4ff42ca feat: bedrock audit session — 11 scripts, 8 DB systems, 323K ARS, vision papers
+455ea62ec fix: extraction prompt — reference library is decoder ring, not shopping list
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+supabase/functions/_shared/llmRouter.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
