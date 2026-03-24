@@ -67,7 +67,7 @@ const DOMAIN_DISPLAY: [RegExp, string][] = [
   [/hagerty\.com/, 'HAGERTY'],
 ];
 
-function resolveSourceLabel(
+export function resolveSourceLabel(
   url: string | null | undefined,
   source: string | null | undefined,
   origin: string | null | undefined,

@@ -15,7 +15,7 @@ import { CardIdentity } from './card/CardIdentity';
 import { CardPrice } from './card/CardPrice';
 import { CardMeta } from './card/CardMeta';
 import { CardDealScore } from './card/CardDealScore';
-import { CardSource } from './card/CardSource';
+import { CardSource, resolveSourceLabel } from './card/CardSource';
 import { CardAuctionTimer } from './card/CardAuctionTimer';
 import { CardActions } from './card/CardActions';
 import { CardTier } from './card/CardTier';
@@ -53,6 +53,11 @@ export function VehicleCard({
 }: VehicleCardProps) {
   const price = useMemo(() => resolveVehiclePrice(vehicle), [vehicle]);
   const timeLabel = useMemo(() => vehicleTimeLabel(vehicle), [vehicle]);
+
+  const sourceLabel = useMemo(
+    () => resolveSourceLabel(vehicle.discovery_url, vehicle.discovery_source, vehicle.profile_origin),
+    [vehicle.discovery_url, vehicle.discovery_source, vehicle.profile_origin],
+  );
 
   const alt = [vehicle.year, vehicle.make, vehicle.model]
     .filter(Boolean)
@@ -213,8 +218,34 @@ export function VehicleCard({
               </span>
             </span>
           </div>
-          {/* Row 2: meta + chips + deal + time */}
+          {/* Row 2: source + meta + chips + deal + time */}
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', paddingLeft: '4px', flexWrap: 'wrap' }}>
+            {sourceLabel && (
+              <span style={{
+                fontFamily: "'Courier New', monospace",
+                fontSize: 'var(--feed-font-size-xs, 7px)',
+                fontWeight: 700,
+                textTransform: 'uppercase' as const,
+                letterSpacing: '0.5px',
+                padding: '1px 4px',
+                border: '2px solid var(--text-tertiary, var(--border))',
+                color: 'var(--text-tertiary, var(--text-secondary))',
+              }}>
+                {sourceLabel}
+              </span>
+            )}
+            {price.isSold && price.showSoldBadge && (
+              <span style={{
+                fontFamily: 'Arial, sans-serif',
+                fontSize: 'var(--feed-font-size-xs, 7px)',
+                fontWeight: 800,
+                textTransform: 'uppercase' as const,
+                letterSpacing: '0.3px',
+                color: 'var(--success)',
+              }}>
+                SOLD
+              </span>
+            )}
             <span style={{
               fontFamily: "'Courier New', monospace", fontSize: 'var(--feed-font-size-sm, 9px)',
               color: 'var(--text-secondary)', whiteSpace: 'nowrap',
@@ -320,7 +351,7 @@ export function VehicleCard({
           <BadgePortal
             dimension="source"
             value={vehicle.discovery_source}
-            label={vehicle.discovery_source.toUpperCase().slice(0, 12)}
+            label={sourceLabel || vehicle.discovery_source.toUpperCase().slice(0, 12)}
             variant="source"
           />
         )}
@@ -392,6 +423,79 @@ export function VehicleCard({
         trim={vehicle.trim}
         compact={compact}
       />
+
+      {/* Source + Status line */}
+      {(sourceLabel || price.isSold || price.isLive || vehicle.is_for_sale) && (
+        <div style={{
+          padding: compact ? '0 4px 2px' : '0 8px 2px',
+          display: 'flex',
+          gap: '6px',
+          alignItems: 'center',
+        }}>
+          {sourceLabel && (
+            <span style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: '8px',
+              fontWeight: 700,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.5px',
+              color: 'var(--text-tertiary, var(--text-secondary))',
+              lineHeight: 1,
+            }}>
+              {sourceLabel}
+            </span>
+          )}
+          {sourceLabel && (price.isSold || price.isLive || vehicle.is_for_sale) && (
+            <span style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: '8px',
+              color: 'var(--text-disabled)',
+              lineHeight: 1,
+            }}>
+              /
+            </span>
+          )}
+          {price.isLive && (
+            <span style={{
+              fontFamily: 'Arial, sans-serif',
+              fontSize: '8px',
+              fontWeight: 800,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.3px',
+              color: 'var(--info)',
+              lineHeight: 1,
+            }}>
+              LIVE
+            </span>
+          )}
+          {price.isSold && price.showSoldBadge && !price.isLive && (
+            <span style={{
+              fontFamily: 'Arial, sans-serif',
+              fontSize: '8px',
+              fontWeight: 800,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.3px',
+              color: 'var(--success)',
+              lineHeight: 1,
+            }}>
+              SOLD
+            </span>
+          )}
+          {vehicle.is_for_sale && !price.isSold && !price.isLive && (
+            <span style={{
+              fontFamily: 'Arial, sans-serif',
+              fontSize: '8px',
+              fontWeight: 800,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.3px',
+              color: 'var(--info)',
+              lineHeight: 1,
+            }}>
+              FOR SALE
+            </span>
+          )}
+        </div>
+      )}
 
       <CardMeta
         mileage={vehicle.mileage}
