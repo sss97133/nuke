@@ -68,6 +68,13 @@ export function BadgeClusterPanel({
     };
   }, [onClose]);
 
+  // Close on scroll (any ancestor scrolling)
+  useEffect(() => {
+    const handler = () => onClose();
+    window.addEventListener('scroll', handler, true);
+    return () => window.removeEventListener('scroll', handler, true);
+  }, [onClose]);
+
   return (
     <div
       ref={panelRef}
