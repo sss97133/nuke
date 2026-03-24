@@ -4,10 +4,103 @@ import { supabase, getCurrentUserId } from '../../lib/supabase';
 import { aiDataIngestion, type ExtractionResult, ingestVehicle } from '../../services/aiDataIngestion';
 import { dataRouter, type DatabaseOperationPlan } from '../../services/dataRouter';
 import { universalSearchService, type UniversalSearchResult } from '../../services/universalSearchService';
+import { classifyIntent, type SearchIntent } from '../../lib/search/intentRouter';
+import { KNOWN_MAKES, MAKE_ALIASES } from '../../lib/search/dictionaries';
 import { useToast } from '../../hooks/useToast';
 import VehicleCritiqueMode from './VehicleCritiqueMode';
 import { SmartInvoiceUploader } from '../SmartInvoiceUploader';
 import '../../styles/unified-design-system.css';
+
+/* ─── Platform detection for URL intent ─── */
+const PLATFORM_PATTERNS: Array<{ pattern: RegExp; label: string; short: string }> = [
+  { pattern: /bringatrailer\.com/i, label: 'Bring a Trailer', short: 'BAT' },
+  { pattern: /carsandbids\.com/i, label: 'Cars & Bids', short: 'C&B' },
+  { pattern: /mecum\.com/i, label: 'Mecum Auctions', short: 'MECUM' },
+  { pattern: /barrett-jackson\.com/i, label: 'Barrett-Jackson', short: 'BJ' },
+  { pattern: /rmsothebys\.com/i, label: "RM Sotheby's", short: 'RM' },
+  { pattern: /bonhams\.com/i, label: 'Bonhams', short: 'BONHAMS' },
+  { pattern: /pcarmarket\.com/i, label: 'PCarMarket', short: 'PCAR' },
+  { pattern: /hagerty\.com/i, label: 'Hagerty', short: 'HAGERTY' },
+  { pattern: /hemmings\.com/i, label: 'Hemmings', short: 'HEMMINGS' },
+  { pattern: /collectingcars\.com/i, label: 'Collecting Cars', short: 'CC' },
+  { pattern: /ebay\.com/i, label: 'eBay', short: 'EBAY' },
+  { pattern: /facebook\.com\/marketplace/i, label: 'Facebook Marketplace', short: 'FBMP' },
+  { pattern: /craigslist\.org/i, label: 'Craigslist', short: 'CL' },
+  { pattern: /classiccars\.com/i, label: 'ClassicCars.com', short: 'CC' },
+  { pattern: /autotrader\.com/i, label: 'AutoTrader', short: 'AT' },
+];
+
+function detectPlatform(url: string): { label: string; short: string } | null {
+  for (const p of PLATFORM_PATTERNS) {
+    if (p.pattern.test(url)) return { label: p.label, short: p.short };
+  }
+  return null;
+}
+
+/* ─── Make stats for browse intent ─── */
+interface MakeStats {
+  make: string;
+  total: number;
+  topModels: Array<{ model: string; count: number }>;
+  avgPrice: number | null;
+  yearRange: { min: number; max: number } | null;
+}
+
+async function fetchMakeStats(make: string): Promise<MakeStats | null> {
+  try {
+    const resolved = MAKE_ALIASES[make.toLowerCase()] || make;
+    const normalizedMake = KNOWN_MAKES.find(m => m.toLowerCase() === resolved.toLowerCase()) || resolved;
+
+    const [countRes, modelsRes, priceRes] = await Promise.all([
+      supabase
+        .from('vehicles')
+        .select('id', { count: 'exact', head: true })
+        .ilike('make', normalizedMake),
+      supabase
+        .from('vehicles')
+        .select('model')
+        .ilike('make', normalizedMake)
+        .not('model', 'is', null)
+        .limit(500),
+      supabase
+        .from('vehicles')
+        .select('sale_price, year')
+        .ilike('make', normalizedMake)
+        .not('sale_price', 'is', null)
+        .gt('sale_price', 0)
+        .limit(200),
+    ]);
+
+    const total = countRes.count || 0;
+    if (total === 0) return null;
+
+    // Aggregate top models
+    const modelCounts: Record<string, number> = {};
+    for (const v of modelsRes.data || []) {
+      if (v.model) {
+        modelCounts[v.model] = (modelCounts[v.model] || 0) + 1;
+      }
+    }
+    const topModels = Object.entries(modelCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([model, count]) => ({ model, count }));
+
+    // Price stats
+    const prices = (priceRes.data || []).map(v => v.sale_price).filter(Boolean) as number[];
+    const avgPrice = prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null;
+
+    // Year range
+    const years = (priceRes.data || []).map(v => v.year).filter(Boolean) as number[];
+    const yearRange = years.length > 0
+      ? { min: Math.min(...years), max: Math.max(...years) }
+      : null;
+
+    return { make: normalizedMake, total, topModels, avgPrice, yearRange };
+  } catch {
+    return null;
+  }
+}
 
 function normalizeUrlInput(value: string): string | null {
   const raw = String(value || '').trim();
@@ -149,6 +242,15 @@ export default function AIDataIngestionSearch() {
   const [selectedAutocompleteIndex, setSelectedAutocompleteIndex] = useState(-1);
   const autocompleteDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Magic Box intent state
+  const [currentIntent, setCurrentIntent] = useState<SearchIntent | null>(null);
+  const [detectedPlatform, setDetectedPlatform] = useState<{ label: string; short: string } | null>(null);
+  const [makeStats, setMakeStats] = useState<MakeStats | null>(null);
+  const [makeStatsLoading, setMakeStatsLoading] = useState(false);
+  const makeStatsDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [vinCheckResult, setVinCheckResult] = useState<{ exists: boolean; vehicleId?: string; title?: string } | null>(null);
+  const [vinCheckLoading, setVinCheckLoading] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -265,7 +367,7 @@ export default function AIDataIngestionSearch() {
         setAutocompleteTotalCount(null);
         setShowAutocomplete(false);
       }
-    }, 200); // 200ms debounce for snappier feel
+    }, 300); // 300ms debounce
 
     return () => {
       if (autocompleteDebounceRef.current) {
@@ -273,6 +375,79 @@ export default function AIDataIngestionSearch() {
       }
     };
   }, [input, isProcessing, attachedImage, showPreview]);
+
+  // ── Magic Box: Intent classification on every keystroke ──
+  useEffect(() => {
+    const trimmed = input.trim();
+    if (!trimmed) {
+      setCurrentIntent(null);
+      setDetectedPlatform(null);
+      setMakeStats(null);
+      setVinCheckResult(null);
+      return;
+    }
+
+    const result = classifyIntent(trimmed);
+    setCurrentIntent(result.intent);
+
+    // URL intent: detect platform
+    if (result.intent === 'EXACT_URL') {
+      const normalized = normalizeUrlInput(trimmed);
+      setDetectedPlatform(detectPlatform(normalized || trimmed));
+      setMakeStats(null);
+      setVinCheckResult(null);
+    }
+    // VIN intent: check if vehicle exists
+    else if (result.intent === 'EXACT_VIN') {
+      setDetectedPlatform(null);
+      setMakeStats(null);
+      setVinCheckLoading(true);
+      const cleanedVin = trimmed.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      Promise.resolve(
+        supabase
+          .from('vehicles')
+          .select('id, year, make, model')
+          .ilike('vin', cleanedVin)
+          .limit(1)
+      ).then(({ data }) => {
+          if (data && data.length > 0) {
+            const v = data[0];
+            setVinCheckResult({
+              exists: true,
+              vehicleId: v.id,
+              title: [v.year, v.make, v.model].filter(Boolean).join(' '),
+            });
+          } else {
+            setVinCheckResult({ exists: false });
+          }
+          setVinCheckLoading(false);
+        })
+        .catch(() => {
+          setVinCheckResult({ exists: false });
+          setVinCheckLoading(false);
+        });
+    }
+    // Browse intent (make): fetch make stats
+    else if (result.intent === 'BROWSE') {
+      setDetectedPlatform(null);
+      setVinCheckResult(null);
+      if (makeStatsDebounceRef.current) clearTimeout(makeStatsDebounceRef.current);
+      setMakeStatsLoading(true);
+      makeStatsDebounceRef.current = setTimeout(async () => {
+        const stats = await fetchMakeStats(trimmed.split(/\s+/)[0]);
+        setMakeStats(stats);
+        setMakeStatsLoading(false);
+      }, 300);
+    } else {
+      setDetectedPlatform(null);
+      setMakeStats(null);
+      setVinCheckResult(null);
+    }
+
+    return () => {
+      if (makeStatsDebounceRef.current) clearTimeout(makeStatsDebounceRef.current);
+    };
+  }, [input]);
 
   const isWiringIntent = (text: string) => {
     const t = (text || '').toLowerCase();
@@ -1172,10 +1347,68 @@ export default function AIDataIngestionSearch() {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
+        {/* Intent badge — shows what the Magic Box thinks the input is */}
+        {currentIntent && currentIntent !== 'QUERY' && input.trim() && (
+          <span style={{
+            flexShrink: 0,
+            fontSize: '8px',
+            fontFamily: 'Arial, sans-serif',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+            padding: '1px 4px',
+            border: '1px solid',
+            lineHeight: '14px',
+            whiteSpace: 'nowrap',
+            ...(currentIntent === 'EXACT_URL' ? {
+              color: '#D35400',
+              borderColor: '#D35400',
+              background: '#FDF2E9',
+            } : currentIntent === 'EXACT_VIN' ? {
+              color: '#8E44AD',
+              borderColor: '#8E44AD',
+              background: '#F5EEF8',
+            } : currentIntent === 'BROWSE' ? {
+              color: '#27AE60',
+              borderColor: '#27AE60',
+              background: '#EAFAF1',
+            } : currentIntent === 'NAVIGATE' ? {
+              color: '#2980B9',
+              borderColor: '#2980B9',
+              background: '#EBF5FB',
+            } : currentIntent === 'MARKET' ? {
+              color: '#E74C3C',
+              borderColor: '#E74C3C',
+              background: '#FDEDEC',
+            } : {
+              color: 'var(--text-secondary)',
+              borderColor: 'var(--border)',
+              background: 'var(--bg)',
+            }),
+          }}>
+            {currentIntent === 'EXACT_URL' && detectedPlatform
+              ? detectedPlatform.short
+              : currentIntent === 'EXACT_URL'
+              ? 'URL'
+              : currentIntent === 'EXACT_VIN'
+              ? 'VIN'
+              : currentIntent === 'BROWSE'
+              ? 'BROWSE'
+              : currentIntent === 'NAVIGATE'
+              ? 'NAV'
+              : currentIntent === 'MARKET'
+              ? 'MARKET'
+              : currentIntent === 'MY_VEHICLES'
+              ? 'GARAGE'
+              : currentIntent === 'QUESTION'
+              ? 'Q&A'
+              : currentIntent.replace('_', ' ')}
+          </span>
+        )}
         <input
           type="text"
-          placeholder="VIN, URL, SEARCH QUERY, OR IMAGE..."
-          aria-label="AI input"
+          placeholder="SEARCH, PASTE URL, VIN, OR DROP IMAGE..."
+          aria-label="Magic Box — search, URL, VIN, or image"
           value={input}
           onChange={(e) => {
             setInput(e.target.value);
@@ -1280,20 +1513,289 @@ export default function AIDataIngestionSearch() {
         </button>
       </div>
 
-      {/* Autocomplete Dropdown */}
-      {showAutocomplete && autocompleteResults.length > 0 && (
+      {/* ── Magic Box Dropdown ── */}
+      {/* Intent: EXACT_URL — extracting banner */}
+      {currentIntent === 'EXACT_URL' && isProcessing && input.trim() && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '2px',
+          background: 'var(--white)', border: '2px solid var(--border)', zIndex: 1203,
+          fontSize: '11px', fontFamily: 'Arial, sans-serif',
+        }}>
+          <div style={{
+            padding: '12px',
+            display: 'flex', alignItems: 'center', gap: '10px',
+          }}>
+            <div style={{
+              width: '8px', height: '8px',
+              background: '#D35400',
+              animation: 'magicbox-pulse 1s ease-in-out infinite',
+            }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '11px', letterSpacing: '0.04em' }}>
+                EXTRACTING{detectedPlatform ? ` FROM ${detectedPlatform.label.toUpperCase()}` : ''}...
+              </div>
+              <div style={{
+                fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px',
+                fontFamily: '"Courier New", monospace',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '400px',
+              }}>
+                {input.trim()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Intent: EXACT_URL — pre-extraction hint (not yet processing) */}
+      {currentIntent === 'EXACT_URL' && !isProcessing && input.trim() && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '2px',
+          background: 'var(--white)', border: '2px solid var(--border)', zIndex: 1203,
+          fontSize: '11px', fontFamily: 'Arial, sans-serif',
+        }}>
+          <div style={{
+            padding: '10px 12px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#D35400' }}>
+                {detectedPlatform ? detectedPlatform.label : 'VEHICLE LISTING'} DETECTED
+              </div>
+              <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                Press ENTER to extract vehicle data
+              </div>
+            </div>
+            <div style={{
+              fontSize: '8px', fontWeight: 700, textTransform: 'uppercase',
+              padding: '2px 6px', border: '1px solid var(--border)',
+              color: 'var(--text-secondary)', fontFamily: '"Courier New", monospace',
+            }}>
+              ENTER
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Intent: EXACT_VIN — VIN status panel */}
+      {currentIntent === 'EXACT_VIN' && input.trim() && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '2px',
+          background: 'var(--white)', border: '2px solid var(--border)', zIndex: 1203,
+          fontSize: '11px', fontFamily: 'Arial, sans-serif',
+        }}>
+          {vinCheckLoading ? (
+            <div style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '8px', height: '8px', background: '#8E44AD',
+                animation: 'magicbox-pulse 1s ease-in-out infinite',
+              }} />
+              <div style={{ fontWeight: 700, fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                CHECKING VIN...
+              </div>
+            </div>
+          ) : vinCheckResult?.exists ? (
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                if (vinCheckResult.vehicleId) {
+                  navigate(`/vehicle/${vinCheckResult.vehicleId}`);
+                  setInput('');
+                }
+              }}
+              style={{
+                width: '100%', textAlign: 'left', padding: '10px 12px',
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                fontFamily: 'Arial, sans-serif', fontSize: '11px',
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '9px', textTransform: 'uppercase', color: '#27AE60', letterSpacing: '0.04em' }}>
+                  VIN FOUND
+                </div>
+                <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '2px' }}>
+                  {vinCheckResult.title || 'Vehicle'}
+                </div>
+                <div style={{
+                  fontSize: '9px', fontFamily: '"Courier New", monospace',
+                  color: 'var(--text-secondary)', marginTop: '1px',
+                }}>
+                  {input.trim().toUpperCase()}
+                </div>
+              </div>
+              <div style={{
+                fontSize: '8px', fontWeight: 700, textTransform: 'uppercase',
+                padding: '2px 6px', border: '1px solid #27AE60', color: '#27AE60',
+              }}>
+                VIEW
+              </div>
+            </button>
+          ) : (
+            <div style={{ padding: '10px 12px' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '9px', textTransform: 'uppercase', color: '#8E44AD', letterSpacing: '0.04em' }}>
+                    NEW VIN
+                  </div>
+                  <div style={{
+                    fontSize: '11px', fontFamily: '"Courier New", monospace',
+                    marginTop: '2px',
+                  }}>
+                    {input.trim().toUpperCase()}
+                  </div>
+                </div>
+                <div style={{
+                  fontSize: '8px', fontWeight: 700, textTransform: 'uppercase',
+                  padding: '2px 6px', border: '1px solid #8E44AD', color: '#8E44AD',
+                  cursor: 'pointer',
+                }}
+                  onClick={() => processInput()}
+                >
+                  DECODE
+                </div>
+              </div>
+              <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                Not in database. Press ENTER or click DECODE to create vehicle from VIN.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Intent: BROWSE — make stats panel (shown even if autocomplete is active) */}
+      {currentIntent === 'BROWSE' && input.trim() && !isProcessing && (makeStats || makeStatsLoading) && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '2px',
+          background: 'var(--white)', border: '2px solid var(--border)', zIndex: 1203,
+          fontSize: '11px', fontFamily: 'Arial, sans-serif',
+        }}>
+          {makeStatsLoading ? (
+            <div style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '8px', height: '8px', background: '#27AE60',
+                animation: 'magicbox-pulse 1s ease-in-out infinite',
+              }} />
+              <span style={{ fontWeight: 700, fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                LOADING STATS...
+              </span>
+            </div>
+          ) : makeStats ? (
+            <div style={{ padding: '10px 12px' }}>
+              {/* Make header row */}
+              <div style={{
+                display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                marginBottom: '8px',
+              }}>
+                <div style={{ fontWeight: 700, fontSize: '13px', textTransform: 'uppercase' }}>
+                  {makeStats.make}
+                </div>
+                <div style={{
+                  fontFamily: '"Courier New", monospace', fontSize: '11px',
+                  color: 'var(--text-secondary)',
+                }}>
+                  {makeStats.total.toLocaleString()} VEHICLES
+                </div>
+              </div>
+
+              {/* Stats row */}
+              <div style={{
+                display: 'flex', gap: '16px', fontSize: '9px', marginBottom: '8px',
+                fontFamily: '"Courier New", monospace', color: 'var(--text-secondary)',
+              }}>
+                {makeStats.avgPrice && (
+                  <span>AVG ${Math.round(makeStats.avgPrice / 1000)}K</span>
+                )}
+                {makeStats.yearRange && (
+                  <span>{makeStats.yearRange.min}--{makeStats.yearRange.max}</span>
+                )}
+              </div>
+
+              {/* Top models */}
+              {makeStats.topModels.length > 0 && (
+                <div>
+                  <div style={{
+                    fontSize: '8px', fontWeight: 700, textTransform: 'uppercase',
+                    letterSpacing: '0.06em', color: 'var(--text-disabled)',
+                    marginBottom: '4px',
+                  }}>
+                    TOP MODELS
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {makeStats.topModels.map((m) => (
+                      <button
+                        key={m.model}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setInput(`${makeStats.make} ${m.model}`);
+                          navigate(`/search?q=${encodeURIComponent(`${makeStats.make} ${m.model}`)}`);
+                          setInput('');
+                        }}
+                        style={{
+                          padding: '3px 8px',
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg)',
+                          cursor: 'pointer',
+                          fontSize: '10px',
+                          fontFamily: 'Arial, sans-serif',
+                          display: 'flex', alignItems: 'center', gap: '4px',
+                          transition: 'background 0.12s',
+                        }}
+                      >
+                        <span style={{ fontWeight: 600 }}>{m.model}</span>
+                        <span style={{
+                          fontFamily: '"Courier New", monospace',
+                          fontSize: '9px', color: 'var(--text-secondary)',
+                        }}>
+                          {m.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Browse all */}
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  navigate(`/search?q=${encodeURIComponent(input.trim())}`);
+                  setInput('');
+                }}
+                style={{
+                  width: '100%', textAlign: 'left', marginTop: '8px',
+                  padding: '6px 0', border: 'none', borderTop: '1px solid var(--border)',
+                  background: 'transparent', cursor: 'pointer',
+                  fontSize: '10px', fontWeight: 600, color: 'var(--accent)',
+                  fontFamily: 'Arial, sans-serif',
+                }}
+              >
+                BROWSE ALL {makeStats.make.toUpperCase()} ({makeStats.total.toLocaleString()})
+              </button>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* Standard autocomplete dropdown — for QUERY and other text intents */}
+      {showAutocomplete && autocompleteResults.length > 0 && currentIntent !== 'EXACT_URL' && currentIntent !== 'EXACT_VIN' && !(currentIntent === 'BROWSE' && (makeStats || makeStatsLoading)) && (
         <div
           style={{
             position: 'absolute',
             top: '100%',
             left: 0,
             right: 0,
-            marginTop: '4px',
+            marginTop: '2px',
             background: 'var(--white)',
             border: '2px solid var(--border)', zIndex: 1203,
             maxHeight: '420px',
             overflowY: 'auto',
-            fontSize: '11px'
+            fontSize: '11px',
+            fontFamily: 'Arial, sans-serif',
           }}
         >
           {/* AI Suggestion banner */}
@@ -1320,14 +1822,6 @@ export default function AIDataIngestionSearch() {
               external_identity: '#00bcd4',
               vin_match: 'var(--error)'
             };
-            const typeIcons: Record<string, string> = {
-              vehicle: '🚗',
-              organization: '🏢',
-              user: '👤',
-              tag: '🏷️',
-              external_identity: '🔗',
-              vin_match: '🔑'
-            };
 
             return (
               <div
@@ -1335,39 +1829,49 @@ export default function AIDataIngestionSearch() {
                 onClick={() => handleAutocompleteSelect(result as any)}
                 onMouseEnter={() => setSelectedAutocompleteIndex(index)}
                 style={{
-                  padding: '8px 10px',
+                  padding: '6px 10px',
                   cursor: 'pointer',
                   background: selectedAutocompleteIndex === index ? 'var(--accent-dim, #e3f2fd)' : 'transparent',
                   borderBottom: '1px solid var(--border-light)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '10px',
-                  transition: 'background 0.1s'
+                  gap: '8px',
+                  transition: 'background 0.1s',
                 }}
               >
                 {/* Thumbnail */}
                 <div style={{
-                  width: '40px',
-                  height: '40px', background: result.image_url ? `url(${result.image_url}) center/cover` : 'var(--border)',
+                  width: '36px',
+                  height: '36px',
+                  background: result.image_url ? `url(${result.image_url}) center/cover` : 'var(--border)',
                   flexShrink: 0,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '16px',
-                  border: '1px solid var(--border-light)'
+                  fontSize: '11px',
+                  border: '1px solid var(--border-light)',
+                  color: 'var(--text-disabled)',
+                  fontWeight: 700,
+                  fontFamily: 'Arial, sans-serif',
                 }}>
-                  {!result.image_url && (typeIcons[result.type] || '📄')}
+                  {!result.image_url && (
+                    result.type === 'vehicle' ? 'V' :
+                    result.type === 'organization' ? 'O' :
+                    result.type === 'user' ? 'U' :
+                    result.type === 'vin_match' ? '#' :
+                    result.type === 'tag' ? 'T' : '?'
+                  )}
                 </div>
 
                 {/* Content */}
                 <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                   <div style={{
                     fontWeight: 600,
-                    color: typeColors[result.type] || 'var(--text)',
-                    fontSize: '12px',
+                    color: 'var(--text)',
+                    fontSize: '11px',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
-                    textOverflow: 'ellipsis'
+                    textOverflow: 'ellipsis',
                   }}>
                     {result.title}
                   </div>
@@ -1377,21 +1881,41 @@ export default function AIDataIngestionSearch() {
                       color: 'var(--text-secondary)',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
-                      textOverflow: 'ellipsis'
+                      textOverflow: 'ellipsis',
+                      fontFamily: '"Courier New", monospace',
                     }}>
                       {result.subtitle}
                     </div>
                   )}
                 </div>
 
+                {/* Price if vehicle */}
+                {result.metadata?.price && (
+                  <div style={{
+                    fontSize: '10px',
+                    fontFamily: '"Courier New", monospace',
+                    fontWeight: 600,
+                    color: 'var(--text)',
+                    flexShrink: 0,
+                  }}>
+                    ${typeof result.metadata.price === 'number'
+                      ? (result.metadata.price >= 1000
+                        ? `${Math.round(result.metadata.price / 1000)}K`
+                        : result.metadata.price.toLocaleString())
+                      : result.metadata.price}
+                  </div>
+                )}
+
                 {/* Type badge */}
                 <div style={{
-                  fontSize: '8px',
-                  color: 'var(--bg)',
-                  background: typeColors[result.type] || 'var(--text-disabled)',
-                  padding: '2px 6px', textTransform: 'uppercase',
-                  fontWeight: 600,
-                  flexShrink: 0
+                  fontSize: '7px',
+                  color: typeColors[result.type] || 'var(--text-disabled)',
+                  border: `1px solid ${typeColors[result.type] || 'var(--border)'}`,
+                  padding: '1px 4px',
+                  textTransform: 'uppercase',
+                  fontWeight: 700,
+                  flexShrink: 0,
+                  letterSpacing: '0.02em',
                 }}>
                   {result.type.replace('_', ' ')}
                 </div>
@@ -1402,13 +1926,14 @@ export default function AIDataIngestionSearch() {
           {/* AI suggestion at bottom when we have results but few */}
           {autocompleteAISuggestion && autocompleteResults.length > 0 && autocompleteResults.length < 3 && (
             <div style={{
-              padding: '8px 12px',
+              padding: '6px 12px',
               background: 'var(--bg)',
               color: 'var(--text-secondary)',
               fontSize: '9px',
-              borderTop: '1px solid var(--border-light)'
+              borderTop: '1px solid var(--border-light)',
+              fontFamily: 'Arial, sans-serif',
             }}>
-              💡 {autocompleteAISuggestion}
+              {autocompleteAISuggestion}
             </div>
           )}
 
@@ -1420,6 +1945,7 @@ export default function AIDataIngestionSearch() {
                 const queryText = input.trim();
                 if (!queryText) return;
                 navigate(`/search?q=${encodeURIComponent(queryText)}`);
+                setInput('');
               }}
               style={{
                 width: '100%',
@@ -1427,14 +1953,17 @@ export default function AIDataIngestionSearch() {
                 padding: '8px 12px',
                 background: 'var(--bg)',
                 border: 'none',
-                borderTop: '1px solid var(--border-light)',
-                fontSize: '11px',
-                cursor: 'pointer'
+                borderTop: '1px solid var(--border)',
+                fontSize: '10px',
+                cursor: 'pointer',
+                fontFamily: 'Arial, sans-serif',
+                fontWeight: 600,
+                color: 'var(--accent)',
               }}
             >
               {autocompleteTotalCount && autocompleteTotalCount > autocompleteResults.length
-                ? `View all ${autocompleteTotalCount} results for "${input.trim()}"`
-                : `View full search results for "${input.trim()}"`}
+                ? `VIEW ALL ${autocompleteTotalCount.toLocaleString()} RESULTS`
+                : `VIEW ALL RESULTS FOR "${input.trim().toUpperCase()}"`}
             </button>
           )}
         </div>
@@ -1872,6 +2401,14 @@ export default function AIDataIngestionSearch() {
 
       {/* Click outside to close */}
       {/* Outside-click handling is done via window mousedown listener so the page stays usable */}
+
+      {/* Animation keyframes for Magic Box indicators */}
+      <style>{`
+        @keyframes magicbox-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
     </div>
   );
 }
