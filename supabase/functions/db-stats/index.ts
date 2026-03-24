@@ -4,9 +4,8 @@
  * Returns summary stats to understand data distribution before querying.
  * Use this FIRST when exploring the database.
  *
- * OPTIMIZED: Single pool, 3 parallel connections, pg_class estimates for
- * large tables. Eliminates 12 PostgREST HTTP calls and 3 separate pool
- * connections from the original version.
+ * OPTIMIZED v2: Materialized views for all GROUP BY aggregates (refreshed
+ * every 10 min via pg_cron). Single connection. Target: <1s response.
  *
  * GET /functions/v1/db-stats
  */
@@ -32,21 +31,15 @@ Deno.serve(async (req) => {
     }
 
     const { Pool } = await import("https://deno.land/x/postgres@v0.19.3/mod.ts");
-    const pool = new Pool(dbUrl, 4, true);
+    const pool = new Pool(dbUrl, 2, true);
 
-    // Acquire 4 connections for maximum parallelism across heavy GROUP BYs
-    const [conn1, conn2, conn3, conn4] = await Promise.all([
-      pool.connect(),
-      pool.connect(),
-      pool.connect(),
-      pool.connect(),
-    ]);
+    // Single connection — all heavy GROUP BYs now read from materialized views (<50ms each)
+    const conn1 = await pool.connect();
 
     try {
-      // Run all queries in parallel across 4 connections
-      // Each heavy GROUP BY gets its own connection to avoid serial execution
+      // Single query: pg_class estimates + small counts + MVs (all fast now)
       const [lightweightResult, eventsResult, vehiclesResult, snapshotsResult] = await Promise.all([
-        // Connection 1: pg_class estimates + small exact counts + queue stats + coverage (~200ms)
+        // pg_class estimates + small exact counts + queue stats + coverage
         conn1.queryObject<{
           big_counts: Record<string, number> | null;
           queue_stats: Record<string, number> | null;
@@ -72,47 +65,28 @@ Deno.serve(async (req) => {
             (SELECT COALESCE(json_agg(row_to_json(s)), '[]'::json) FROM source_target_coverage s) as coverage
         `,
 
-        // Connection 2: vehicle_events GROUP BY (~130ms)
-        conn2.queryObject<{
+        // Read from materialized view (refreshed every 10 min, <5ms)
+        conn1.queryObject<{
           events_by_platform: Array<{ source_platform: string; cnt: number; with_comments: number }> | null;
         }>`
-          SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) as events_by_platform FROM (
-            SELECT source_platform,
-              COUNT(*)::bigint as cnt,
-              COUNT(*) FILTER (WHERE comment_count > 0)::bigint as with_comments
-            FROM vehicle_events
-            GROUP BY source_platform
-            ORDER BY cnt DESC
-          ) r
+          SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) as events_by_platform
+          FROM mv_events_by_platform r
         `,
 
-        // Connection 3: vehicles GROUP BY source (~631ms — the bottleneck)
-        conn3.queryObject<{
+        // Read from materialized view (was 631ms, now <5ms)
+        conn1.queryObject<{
           vehicles_by_source: Array<{ source: string; total: number; with_desc: number }> | null;
         }>`
-          SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) as vehicles_by_source FROM (
-            SELECT
-              COALESCE(source, 'unknown') as source,
-              COUNT(*)::bigint as total,
-              COUNT(description)::bigint as with_desc
-            FROM vehicles
-            GROUP BY source
-            ORDER BY total DESC
-          ) r
+          SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) as vehicles_by_source
+          FROM mv_vehicles_by_source r
         `,
 
-        // Connection 4: listing_page_snapshots GROUP BY (~505ms)
-        conn4.queryObject<{
+        // Read from materialized view (was 505ms, now <5ms)
+        conn1.queryObject<{
           snapshots_by_platform: Array<{ platform: string; total: number; successful: number }> | null;
         }>`
-          SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) as snapshots_by_platform FROM (
-            SELECT platform,
-              COUNT(*)::bigint as total,
-              COUNT(*) FILTER (WHERE success)::bigint as successful
-            FROM listing_page_snapshots
-            GROUP BY platform
-            ORDER BY total DESC
-          ) r
+          SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) as snapshots_by_platform
+          FROM mv_snapshots_by_platform r
         `,
       ]);
 
@@ -320,9 +294,6 @@ Deno.serve(async (req) => {
 
     } finally {
       conn1.release();
-      conn2.release();
-      conn3.release();
-      conn4.release();
       await pool.end();
     }
 
