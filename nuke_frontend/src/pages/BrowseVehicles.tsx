@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useViewHistory } from '../hooks/useViewHistory';
 import { useSearch, type BrowseParams, type BrowseResult, type BrowseStatsData } from '../components/layout/hooks/useSearch';
 
 // ────────────────────────────────────────────────────────────
@@ -523,10 +524,12 @@ const ModelsGrid: React.FC<{ make: string }> = ({ make }) => {
 const PAGE_SIZE = 50;
 
 const VehicleResultCard: React.FC<{ v: BrowseResult }> = ({ v }) => {
+  const { recordView } = useViewHistory();
   const title = [v.year, v.make, v.model].filter(Boolean).join(' ');
   return (
     <Link
       to={`/vehicle/${v.id}`}
+      onClick={() => recordView(v.id, 'browse')}
       style={{
         border: '2px solid #ebebeb',
         background: '#f5f5f5',

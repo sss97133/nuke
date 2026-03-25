@@ -397,13 +397,14 @@ async function main() {
       consecutiveErrors++;
       console.error(`  Page ${page} error: ${err.message}`);
 
-      if (consecutiveErrors >= 20) {
-        console.log('\n20 consecutive errors. Stopping.');
+      if (consecutiveErrors >= 50) {
+        console.log('\n50 consecutive errors. Stopping.');
         break;
       }
 
-      // Back off on errors
-      await sleep(5000);
+      // Exponential backoff on errors
+      const backoff = Math.min(30000, 3000 * Math.pow(1.5, Math.min(consecutiveErrors, 8)));
+      await sleep(backoff);
     }
 
     // Respect rate limit

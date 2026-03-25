@@ -30,6 +30,8 @@ export interface VehicleCardProps {
   onToggleFollow?: () => void;
   onHoverStart?: (rect: DOMRect) => void;
   onHoverEnd?: () => void;
+  /** Whether user has previously viewed this vehicle */
+  viewed?: boolean;
   style?: CSSProperties;
 }
 
@@ -45,6 +47,7 @@ export function VehicleCard({
   onToggleFollow,
   onHoverStart,
   onHoverEnd,
+  viewed = false,
   style,
 }: VehicleCardProps) {
   const { openPopup } = usePopup();
@@ -553,6 +556,14 @@ export function VehicleCard({
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
         }}>
+          {viewed && (
+            <span>
+              <span style={{ color: 'var(--text-disabled)', fontSize: compact ? '6px' : '7px' }}>VIEWED</span>
+              {infoLineParts.length > 0 && (
+                <span style={{ color: 'var(--text-disabled)', margin: '0 4px' }}>{'\u00B7'}</span>
+              )}
+            </span>
+          )}
           {infoLineParts.map((part, i) => (
             <span key={i}>
               {i > 0 && (

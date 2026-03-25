@@ -50,6 +50,7 @@ export function CardShell({
 }: CardShellProps) {
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [popupOpen, setPopupOpen] = useState(false);
+  const { recordView } = useViewHistory();
 
   // Close popup on Escape
   useEffect(() => {
@@ -119,6 +120,7 @@ export function CardShell({
         return;
       }
 
+      recordView(vehicleId, 'feed');
       setPopupOpen(true);
     },
     [vehicleId],

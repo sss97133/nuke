@@ -20,9 +20,11 @@ import { VehicleCard } from './VehicleCard';
 import { BrandHeartbeat } from './heartbeat/BrandHeartbeat';
 import { FeedStatCard } from './FeedStatCard';
 import { InterestsBar } from './InterestsBar';
+import { RecentlyViewed } from './RecentlyViewed';
 import { HeroPanel, type HeroDimension, type HeroFilter } from './HeroPanel';
 import { DEFAULT_FILTERS } from '../../lib/filterPersistence';
 import { useInterests } from '../../hooks/useInterests';
+import { useViewHistory } from '../../hooks/useViewHistory';
 import type { FeedVehicle } from '../types/feed';
 
 export default function FeedPage() {
@@ -58,6 +60,9 @@ export default function FeedPage() {
     touchLastVisit,
     clearInterests,
   } = useInterests();
+
+  // View history — tracks which vehicles user has seen
+  const { viewedIds } = useViewHistory();
 
   // Update lastVisit on mount so we can count "new since last visit"
   useEffect(() => {
@@ -236,9 +241,10 @@ export default function FeedPage() {
         compact={viewMode === 'grid' && cardsPerRow > 8}
         showScores={showScores}
         imageFit={resolvedFit}
+        viewed={viewedIds.has(vehicle.id)}
       />
     ),
-    [viewMode, cardsPerRow, showScores, resolvedFit],
+    [viewMode, cardsPerRow, showScores, resolvedFit, viewedIds],
   );
 
   // Brand heartbeat: show when exactly one make is selected
@@ -321,6 +327,9 @@ export default function FeedPage() {
           onModelClick={handleInterestModelClick}
           onClearInterests={clearInterests}
         />
+
+        {/* Recently viewed strip */}
+        <RecentlyViewed limit={20} />
 
         {/* Sidebar + Content */}
         <div style={{ display: 'flex', minHeight: 'calc(100vh - 72px)' }}>

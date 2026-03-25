@@ -706,7 +706,7 @@ async function fetchHagertyPage(url: string): Promise<{ html: string; source: st
 // MAIN EXTRACTION FUNCTION
 // ============================================================================
 
-async function extractHagertyListing(url: string): Promise<{ extracted: HagertyExtracted; fetchSource: string }> {
+async function extractHagertyListing(url: string): Promise<{ extracted: HagertyExtracted; fetchSource: string; html: string; nextData: any }> {
   // Validate URL
   if (!url.includes('hagerty.com/marketplace')) {
     throw new Error('Invalid Hagerty Marketplace URL');
@@ -724,10 +724,126 @@ async function extractHagertyListing(url: string): Promise<{ extracted: HagertyE
   // Parse auction data
   const extracted = extractFromNextData(nextData, url);
 
-  // Store raw data for debugging (optional, can be disabled)
-  // extracted.raw_auction_data = nextData?.props?.pageProps?.auction;
+  return { extracted, fetchSource: source, html, nextData };
+}
 
-  return { extracted, fetchSource: source };
+// ============================================================================
+// COMMENT EXTRACTION FROM __NEXT_DATA__
+// ============================================================================
+
+interface HagertyComment {
+  id: string;
+  body: string;
+  author: string;
+  author_id: string | null;
+  is_seller: boolean;
+  posted_at: string | null;
+  parent_id: string | null;
+}
+
+function extractCommentsFromNextData(nextData: any): HagertyComment[] {
+  let auction = nextData?.props?.pageProps?.pageProps?.auction;
+  if (!auction) auction = nextData?.props?.pageProps?.auction;
+  if (!auction) return [];
+
+  const sellerUsername = auction?.profile?.displayName?.toLowerCase() || null;
+  const comments: HagertyComment[] = [];
+  const seenIds = new Set<string>();
+
+  // Try all known comment paths in Hagerty's Next.js data
+  const commentArrayCandidates: any[] = [];
+
+  // Path 1: auction.comments (array of comment objects)
+  if (Array.isArray(auction.comments)) {
+    commentArrayCandidates.push(...auction.comments);
+  }
+  // Path 2: auction.commentThread.comments
+  if (Array.isArray(auction.commentThread?.comments)) {
+    commentArrayCandidates.push(...auction.commentThread.comments);
+  }
+  // Path 3: auction.commentThread.items
+  if (Array.isArray(auction.commentThread?.items)) {
+    commentArrayCandidates.push(...auction.commentThread.items);
+  }
+  // Path 4: auction.commentary (some listings use this)
+  if (Array.isArray(auction.commentary)) {
+    commentArrayCandidates.push(...auction.commentary);
+  }
+  // Path 5: auction.commentThread.nodes (GraphQL-style)
+  if (Array.isArray(auction.commentThread?.nodes)) {
+    commentArrayCandidates.push(...auction.commentThread.nodes);
+  }
+  // Path 6: auction.commentThread.edges (GraphQL-style)
+  if (Array.isArray(auction.commentThread?.edges)) {
+    commentArrayCandidates.push(...auction.commentThread.edges.map((e: any) => e.node).filter(Boolean));
+  }
+
+  function processComment(raw: any, parentId: string | null = null) {
+    if (!raw || typeof raw !== 'object') return;
+
+    // Extract comment body — try multiple field names
+    const body = raw.body || raw.text || raw.content || raw.message || raw.comment || '';
+    const bodyText = typeof body === 'string' ? body.trim() : (typeof body === 'object' ? extractPlainText(body) : String(body)).trim();
+    if (!bodyText) return;
+
+    // Extract comment ID
+    const commentId = raw.id || raw._id || raw.commentId || `anon-${comments.length}`;
+    const idStr = String(commentId);
+    if (seenIds.has(idStr)) return;
+    seenIds.add(idStr);
+
+    // Extract author
+    const authorName = raw.author?.displayName || raw.author?.name || raw.author?.username
+      || raw.user?.displayName || raw.user?.name || raw.username || raw.authorName || 'Anonymous';
+
+    const authorId = raw.author?.id || raw.author?.userId || raw.user?.id || raw.userId || null;
+
+    // Determine if this is the seller
+    const isSeller = raw.isSeller === true
+      || raw.author?.isSeller === true
+      || raw.role === 'seller'
+      || raw.author?.role === 'seller'
+      || (sellerUsername && authorName.toLowerCase() === sellerUsername);
+
+    // Posted time
+    const postedAt = raw.createdAt || raw.created_at || raw.postedAt || raw.posted_at
+      || raw.timestamp || raw.date || null;
+
+    comments.push({
+      id: idStr,
+      body: bodyText,
+      author: authorName,
+      author_id: authorId ? String(authorId) : null,
+      is_seller: !!isSeller,
+      posted_at: postedAt,
+      parent_id: parentId,
+    });
+
+    // Flatten nested replies
+    const replies = raw.replies || raw.children || raw.responses || raw.thread || [];
+    if (Array.isArray(replies)) {
+      for (const reply of replies) {
+        processComment(reply, idStr);
+      }
+    }
+  }
+
+  for (const raw of commentArrayCandidates) {
+    processComment(raw);
+  }
+
+  console.log(`[hagerty] Extracted ${comments.length} comments from __NEXT_DATA__`);
+  return comments;
+}
+
+// ============================================================================
+// SHA-256 UTILITY
+// ============================================================================
+
+async function sha256Hex(text: string): Promise<string> {
+  const data = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 // ============================================================================
@@ -740,7 +856,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { url, save_to_db, vehicle_id, include_raw } = await req.json();
+    const { url, save_to_db, vehicle_id, include_raw, extract_comments } = await req.json();
 
     if (!url) {
       return new Response(
@@ -750,7 +866,7 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[hagerty] Extracting: ${url}`);
-    const { extracted, fetchSource } = await extractHagertyListing(url);
+    const { extracted, fetchSource, html, nextData } = await extractHagertyListing(url);
 
     // Normalize make/model/transmission/drivetrain
     const norm = normalizeVehicleFields(extracted);
@@ -1051,6 +1167,122 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ================================================================
+    // COMMENT EXTRACTION (when extract_comments=true AND save_to_db)
+    // ================================================================
+    let commentsExtracted = 0;
+    let commentErrors: string[] = [];
+
+    if (extract_comments && (save_to_db || vehicle_id)) {
+      const targetVehicleId = extracted.vehicle_id;
+      try {
+        const hagertyComments = extractCommentsFromNextData(nextData);
+
+        if (hagertyComments.length > 0 && targetVehicleId) {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+          const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+          // Ingest each comment as an observation
+          for (const comment of hagertyComments) {
+            try {
+              const obsPayload = {
+                source_slug: 'hagerty-marketplace',
+                kind: 'comment',
+                observed_at: comment.posted_at || new Date().toISOString(),
+                source_url: url,
+                source_identifier: `hagerty-comment-${comment.id}`,
+                content_text: comment.body,
+                structured_data: {
+                  author: comment.author,
+                  author_id: comment.author_id,
+                  is_seller: comment.is_seller,
+                  posted_at: comment.posted_at,
+                  parent_id: comment.parent_id,
+                  platform_comment_id: comment.id,
+                },
+                vehicle_id: targetVehicleId,
+                extraction_method: 'hagerty_nextdata_comments_v1',
+              };
+
+              const resp = await fetch(`${supabaseUrl}/functions/v1/ingest-observation`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${serviceKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(obsPayload),
+              });
+
+              if (resp.ok) {
+                commentsExtracted++;
+              } else {
+                const errText = await resp.text();
+                console.error(`[hagerty] Comment ingest failed for ${comment.id}: ${errText}`);
+                commentErrors.push(`comment-${comment.id}: ${resp.status}`);
+              }
+            } catch (commentErr: any) {
+              console.error(`[hagerty] Comment ingest error for ${comment.id}:`, commentErr);
+              commentErrors.push(`comment-${comment.id}: ${commentErr.message || String(commentErr)}`);
+            }
+          }
+
+          console.log(`[hagerty] Ingested ${commentsExtracted}/${hagertyComments.length} comments as observations`);
+        } else if (hagertyComments.length === 0) {
+          console.log(`[hagerty] No comments found in __NEXT_DATA__ (they may be lazy-loaded via separate API)`);
+        }
+      } catch (err: any) {
+        console.error(`[hagerty] Comment extraction failed:`, err);
+        commentErrors.push(`extraction: ${err.message || String(err)}`);
+      }
+    }
+
+    // ================================================================
+    // ARCHIVE HTML TO listing_page_snapshots
+    // ================================================================
+    let snapshotSaved = false;
+
+    if (save_to_db || vehicle_id) {
+      try {
+        const supabase = createClient(
+          Deno.env.get('SUPABASE_URL')!,
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        );
+
+        const htmlHash = await sha256Hex(html);
+
+        const { error: snapError } = await supabase
+          .from('listing_page_snapshots')
+          .upsert({
+            platform: 'hagerty',
+            listing_url: url,
+            fetched_at: new Date().toISOString(),
+            fetch_method: fetchSource,
+            http_status: 200,
+            success: true,
+            html: html,
+            html_sha256: htmlHash,
+            content_length: html.length,
+            metadata: {
+              vehicle_id: extracted.vehicle_id,
+              comment_count: extracted.comment_count,
+              comments_extracted: commentsExtracted,
+              extraction_version: 'hagerty_v2_comments',
+            },
+          }, { onConflict: 'platform,listing_url,html_sha256' });
+
+        if (snapError) {
+          console.error('[hagerty] Snapshot save error:', snapError.message);
+          dbErrors.push(`snapshot: ${snapError.message}`);
+        } else {
+          snapshotSaved = true;
+          console.log(`[hagerty] Archived HTML snapshot (${html.length} bytes, sha256=${htmlHash.slice(0, 12)}...)`);
+        }
+      } catch (snapErr: any) {
+        console.error('[hagerty] Snapshot archive error:', snapErr);
+        dbErrors.push(`snapshot: ${snapErr.message || String(snapErr)}`);
+      }
+    }
+
     // Build response
     const response: any = {
       success: true,
@@ -1061,6 +1293,9 @@ Deno.serve(async (req) => {
         images_saved: imagesSaved,
         vehicle_event_saved: externalListingSaved,
         identities_saved: identitiesSaved || [],
+        snapshot_saved: snapshotSaved,
+        comments_extracted: commentsExtracted,
+        comment_errors: commentErrors.length > 0 ? commentErrors : undefined,
         errors: dbErrors,
       } : null,
     };
