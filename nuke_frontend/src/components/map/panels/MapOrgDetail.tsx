@@ -96,7 +96,7 @@ export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
   const soldCount = org.vehicles.filter(v => v.status === 'sold').length;
   const activeCount = org.vehicles.filter(v => v.status === 'active' || v.status === 'pending').length;
   const prices = org.vehicles.filter(v => v.sale_price).map(v => v.sale_price!);
-  const avgPrice = prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null;
+  const medianPrice = prices.length > 0 ? prices.sort((a, b) => a - b)[Math.floor(prices.length / 2)] : null;
 
   // Build monthly activity sparkline
   const monthlyData = (() => {
@@ -189,10 +189,10 @@ export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
           </div>
         </div>
 
-        {/* Average Price */}
-        {avgPrice && (
+        {/* Median Price */}
+        {medianPrice && (
           <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: 12 }}>
-            AVG PRICE: <span style={{ fontFamily: 'Courier New, monospace', fontWeight: 700, color: 'var(--success, #16825d)' }}>{fmtPrice(avgPrice)}</span>
+            MEDIAN: <span style={{ fontFamily: 'Courier New, monospace', fontWeight: 700, color: 'var(--success, #16825d)' }}>{fmtPrice(medianPrice)}</span>
           </div>
         )}
 

@@ -77,25 +77,7 @@ export default function SourcePortal({
                 <span style={{ fontWeight: 600 }}>{data.platform_sell_through_pct}%</span>
               </div>
             )}
-            {data.platform_avg_price != null && data.platform_avg_price > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Platform Avg</span>
-                <span style={{ fontWeight: 600 }}>{formatCurrencyAmount(data.platform_avg_price)}</span>
-              </div>
-            )}
-
-            {/* Cross-platform insight */}
-            {vehiclePrice && data.platform_avg_price && data.platform_avg_price > 0 && (
-              <div style={{
-                marginTop: '6px', padding: '4px 6px',
-                background: 'var(--bg-secondary)', fontSize: '9px', color: 'var(--text-muted)',
-              }}>
-                {vehiclePrice > data.platform_avg_price
-                  ? `${Math.round(((vehiclePrice - data.platform_avg_price) / data.platform_avg_price) * 100)}% above ${platformDisplayName} average`
-                  : `${Math.round(((data.platform_avg_price - vehiclePrice) / data.platform_avg_price) * 100)}% below ${platformDisplayName} average`
-                }
-              </div>
-            )}
+            {/* Platform avg price removed — no averages in UI */}
           </div>
         )}
       />

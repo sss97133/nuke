@@ -13,6 +13,9 @@ import type { FeedVehicle } from '../../feed/types/feed';
 import { resolveVehiclePrice } from '../../feed/utils/feedPriceResolution';
 import { supabase } from '../../lib/supabase';
 import { usePopup } from './usePopup';
+import { MakePopup } from './MakePopup';
+import { ModelPopup } from './ModelPopup';
+import { SourcePopup } from './SourcePopup';
 
 interface Props {
   vehicle: FeedVehicle;
@@ -104,14 +107,12 @@ export function VehiclePopup({ vehicle }: Props) {
 
   const handleMakeClick = () => {
     if (vehicle.make) {
-      const { MakePopup } = require('./MakePopup');
       openPopup(<MakePopup make={vehicle.make} />, vehicle.make, 360);
     }
   };
 
   const handleModelClick = () => {
     if (vehicle.make && vehicle.model) {
-      const { ModelPopup } = require('./ModelPopup');
       openPopup(<ModelPopup make={vehicle.make} model={vehicle.model} />, vehicle.model, 360);
     }
   };
@@ -119,7 +120,6 @@ export function VehiclePopup({ vehicle }: Props) {
   const handleSourceClick = () => {
     if (vehicle.discovery_source || vehicle.profile_origin) {
       const source = vehicle.discovery_source || vehicle.profile_origin || 'unknown';
-      const { SourcePopup } = require('./SourcePopup');
       openPopup(<SourcePopup source={source} />, source.toUpperCase(), 360);
     }
   };

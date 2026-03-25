@@ -1,29 +1,35 @@
 /**
  * CardShell — Outer wrapper for feed vehicle cards.
  *
- * Zero click anxiety: single click expands the card in-place.
+ * Zero click anxiety: single click opens a centered popup overlay.
  * Navigation to the vehicle profile requires an explicit action
- * (the "OPEN" link or Cmd/Ctrl+click).
+ * (the "OPEN PROFILE" button or Cmd/Ctrl+click).
  *
- * Grid mode: click expands/collapses inline detail view.
- * Gallery/Technical: click navigates (these are compact modes where
- * inline expansion doesn't make sense).
+ * Grid mode: click opens popup with vehicle details.
+ * Gallery/Technical: click navigates (these are compact modes).
+ *
+ * The grid does NOT reflow on click. Popup renders via portal.
  */
 
 import { useCallback, useRef, useState, useEffect, type ReactNode, type CSSProperties } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 
 export interface CardShellProps {
   vehicleId: string;
   viewMode: 'grid' | 'gallery' | 'technical';
   children: ReactNode;
-  /** Content shown when card is expanded (grid mode only) */
+  /** Content shown inside the popup (grid mode only) */
   expandedContent?: ReactNode;
+  /** Card thumbnail URL for popup hero image */
+  popupImageUrl?: string | null;
+  /** Card title for popup header */
+  popupTitle?: string;
+  /** Card price text for popup */
+  popupPrice?: string;
   style?: CSSProperties;
   onHoverStart?: (rect: DOMRect) => void;
   onHoverEnd?: () => void;
-  /** If provided, called on click instead of default expand behavior (popup rhizome) */
-  onCardClick?: () => void;
 }
 
 export function CardShell({
@@ -31,43 +37,35 @@ export function CardShell({
   viewMode,
   children,
   expandedContent,
+  popupImageUrl,
+  popupTitle,
+  popupPrice,
   style,
   onHoverStart,
   onHoverEnd,
 }: CardShellProps) {
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [expanded, setExpanded] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
+  const [popupOpen, setPopupOpen] = useState(false);
 
-  // Collapse on Escape
+  // Close popup on Escape
   useEffect(() => {
-    if (!expanded) return;
+    if (!popupOpen) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setExpanded(false);
+        setPopupOpen(false);
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [expanded]);
+  }, [popupOpen]);
 
-  // Collapse on click outside
+  // Lock body scroll when popup open
   useEffect(() => {
-    if (!expanded) return;
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setExpanded(false);
-      }
-    };
-    const raf = requestAnimationFrame(() => {
-      document.addEventListener('mousedown', handler);
-    });
-    return () => {
-      cancelAnimationFrame(raf);
-      document.removeEventListener('mousedown', handler);
-    };
-  }, [expanded]);
+    if (!popupOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [popupOpen]);
 
   const handleMouseEnter = useCallback(
     (e: React.MouseEvent<HTMLElement>) => {
@@ -84,19 +82,17 @@ export function CardShell({
 
   const handleMouseLeave = useCallback(
     (e: React.MouseEvent<HTMLElement>) => {
-      if (!expanded) {
-        e.currentTarget.style.borderColor = 'var(--border)';
-      }
+      e.currentTarget.style.borderColor = 'var(--border)';
       if (hoverTimerRef.current) {
         clearTimeout(hoverTimerRef.current);
         hoverTimerRef.current = null;
       }
       onHoverEnd?.();
     },
-    [onHoverEnd, expanded],
+    [onHoverEnd],
   );
 
-  // Grid mode: click toggles expand. Cmd/Ctrl+click navigates.
+  // Grid mode: click opens popup. Cmd/Ctrl+click navigates.
   const handleGridClick = useCallback(
     (e: React.MouseEvent) => {
       // Don't intercept clicks on links, buttons, or badge portals inside the card
@@ -105,19 +101,19 @@ export function CardShell({
         return;
       }
 
-      // Cmd/Ctrl+click → navigate in new tab behavior (let browser handle)
+      // Cmd/Ctrl+click -> navigate in new tab
       if (e.metaKey || e.ctrlKey) {
         window.open(`/vehicle/${vehicleId}`, '_blank');
         return;
       }
 
       e.preventDefault();
-      setExpanded((prev) => !prev);
+      setPopupOpen(true);
     },
     [vehicleId],
   );
 
-  // Gallery / Technical modes: use Link (these are compact, expansion doesn't fit)
+  // Gallery / Technical modes: use Link
   if (viewMode !== 'grid') {
     const baseStyle: CSSProperties =
       viewMode === 'gallery'
@@ -153,84 +149,199 @@ export function CardShell({
     );
   }
 
-  // Grid mode: div with click-to-expand.
-  // Expanded content is absolutely positioned so it overlays subsequent rows
-  // instead of pushing them down. The card stays in its grid cell at fixed height.
+  // Grid mode: card stays in place, popup overlays screen center
+  return (
+    <>
+      <div
+        role="article"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'var(--surface)',
+          border: '2px solid var(--border)',
+          overflow: 'hidden',
+          height: '100%',
+          position: 'relative',
+          cursor: 'pointer',
+          transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+          ...style,
+        }}
+        onClick={handleGridClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {children}
+      </div>
+
+      {/* Popup portal — rendered at document root so it's above everything */}
+      {popupOpen && createPortal(
+        <VehiclePopupOverlay
+          vehicleId={vehicleId}
+          imageUrl={popupImageUrl}
+          title={popupTitle}
+          price={popupPrice}
+          expandedContent={expandedContent}
+          onClose={() => setPopupOpen(false)}
+        />,
+        document.body,
+      )}
+    </>
+  );
+}
+
+/* ─── Vehicle Popup Overlay ─── */
+
+function VehiclePopupOverlay({
+  vehicleId,
+  imageUrl,
+  title,
+  price,
+  expandedContent,
+  onClose,
+}: {
+  vehicleId: string;
+  imageUrl?: string | null;
+  title?: string;
+  price?: string;
+  expandedContent?: ReactNode;
+  onClose: () => void;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Close on click outside the popup panel
+  const handleOverlayClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    },
+    [onClose],
+  );
+
   return (
     <div
-      ref={containerRef}
-      role="article"
       style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
         display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--surface)',
-        border: `2px solid ${expanded ? 'var(--text)' : 'var(--border)'}`,
-        overflow: expanded ? 'visible' : 'hidden',
-        height: '100%',
-        position: 'relative',
-        zIndex: expanded ? 10 : undefined,
-        cursor: 'pointer',
-        transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-        ...style,
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(0,0,0,0.3)',
+        animation: 'fadeIn180 180ms ease-out',
       }}
-      onClick={handleGridClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onClick={handleOverlayClick}
     >
-      {children}
-
-      {/* Expanded detail view — absolutely positioned, overlays below the card */}
-      {expanded && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: '-2px',
-            right: '-2px',
-            border: '2px solid var(--text)',
-            borderTop: '2px solid var(--border)',
-            background: 'var(--bg)',
-            padding: '8px',
-            animation: 'fadeIn180 180ms ease-out',
-            zIndex: 10,
-          }}
-        >
-          {/* Custom expanded content (badges, specs) */}
-          {expandedContent}
-
-          {/* OPEN PROFILE footer — always renders */}
+      <div
+        ref={panelRef}
+        style={{
+          width: '460px',
+          maxWidth: 'calc(100vw - 32px)',
+          maxHeight: 'calc(100vh - 48px)',
+          overflowY: 'auto',
+          background: '#fff',
+          border: '2px solid var(--text, #1a1a1a)',
+          borderRadius: 0,
+          boxShadow: 'none',
+          animation: 'fadeIn180 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Hero image */}
+        {imageUrl && (
           <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            alignItems: 'center',
-            marginTop: expandedContent ? '8px' : 0,
+            width: '100%',
+            paddingTop: '66.67%',
+            position: 'relative',
+            background: 'var(--surface-hover, #f5f5f5)',
+            borderBottom: '2px solid var(--border, #e0e0e0)',
           }}>
-            <Link
-              to={`/vehicle/${vehicleId}`}
-              state={{ fromFeed: true }}
-              onClick={(e) => e.stopPropagation()}
+            <img
+              src={imageUrl}
+              alt={title || 'Vehicle'}
               style={{
-                fontFamily: 'Arial, sans-serif',
-                fontSize: '9px',
-                fontWeight: 800,
-                textTransform: 'uppercase' as const,
-                letterSpacing: '0.3px',
-                padding: '3px 10px',
-                border: '2px solid var(--text)',
-                background: 'var(--text)',
-                color: 'var(--surface)',
-                textDecoration: 'none',
-                cursor: 'pointer',
-                transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
-            >
-              OPEN PROFILE →
-            </Link>
+            />
           </div>
+        )}
+
+        {/* Header: title + price */}
+        <div style={{
+          padding: '10px 12px 8px',
+          borderBottom: '1px solid var(--border, #e0e0e0)',
+        }}>
+          {title && (
+            <div style={{
+              fontFamily: 'Arial, sans-serif',
+              fontSize: '13px',
+              fontWeight: 700,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.02em',
+              lineHeight: 1.3,
+              color: 'var(--text, #1a1a1a)',
+              marginBottom: price ? '4px' : 0,
+            }}>
+              {title}
+            </div>
+          )}
+          {price && (
+            <div style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: '14px',
+              fontWeight: 700,
+              color: 'var(--text, #1a1a1a)',
+              lineHeight: 1,
+            }}>
+              {price}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Expanded detail content */}
+        {expandedContent && (
+          <div style={{ padding: '8px 12px' }}>
+            {expandedContent}
+          </div>
+        )}
+
+        {/* Footer: OPEN PROFILE button */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          padding: '8px 12px 10px',
+          borderTop: '1px solid var(--border, #e0e0e0)',
+        }}>
+          <Link
+            to={`/vehicle/${vehicleId}`}
+            state={{ fromFeed: true }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              fontFamily: 'Arial, sans-serif',
+              fontSize: '9px',
+              fontWeight: 800,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.3px',
+              padding: '4px 14px',
+              border: '2px solid var(--text, #1a1a1a)',
+              background: 'var(--text, #1a1a1a)',
+              color: '#fff',
+              textDecoration: 'none',
+              cursor: 'pointer',
+              transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+          >
+            OPEN PROFILE
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

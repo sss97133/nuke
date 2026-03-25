@@ -451,7 +451,7 @@ export default function AuctionTrendsDashboard() {
               </div>
               <PriceTrendChart />
               <div style={{ marginTop: 'var(--space-2)', fontSize: '9px', color: 'var(--text-muted)' }}>
-                Current avg: {formatPrice(data.market_sentiment.weekly_price_trend[0]?.avg_price || 0)}
+                Latest week: {formatPrice(data.market_sentiment.weekly_price_trend[0]?.avg_price || 0)}
                 <span style={{ marginLeft: '8px' }}>
                   ({data.market_sentiment.weekly_price_trend[0]?.sales_count || 0} sales)
                 </span>

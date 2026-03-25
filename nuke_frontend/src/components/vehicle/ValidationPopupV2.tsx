@@ -175,7 +175,7 @@ const IntelligenceSection: React.FC<{
   fieldName: string;
   fieldValue: string;
 }> = ({ intel, fieldName, fieldValue }) => {
-  const hasPriceData = intel.avg_price_with != null && intel.price_sample_count != null && intel.price_sample_count > 2;
+  const hasPriceData = intel.median_price_with != null && intel.price_sample_count != null && intel.price_sample_count > 2;
   const hasTemporalData = intel.min_year != null && intel.max_year != null;
 
   return (
@@ -217,12 +217,8 @@ const IntelligenceSection: React.FC<{
           <div style={{ ...S.sectionLabel, marginBottom: '2px' }}>PRICE IMPACT</div>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <div style={S.statBox}>
-              <span style={S.statValue}>{fmtPrice(intel.avg_price_with)}</span>
-              <span style={S.statUnit}>AVG</span>
-            </div>
-            <div style={S.statBox}>
               <span style={S.statValue}>{fmtPrice(intel.median_price_with)}</span>
-              <span style={S.statUnit}>MED</span>
+              <span style={S.statUnit}>MEDIAN</span>
             </div>
             {intel.price_premium_pct != null && (
               <div style={S.statBox}>

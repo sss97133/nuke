@@ -632,9 +632,9 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                     </div>
                     <div>
                       <div style={{ fontSize: '16px', fontWeight: 700, fontFamily: "'Courier New', monospace" }}>
-                        ${(currentSlotStats.avgPrice / 1000).toFixed(0)}K
+                        {currentSlotStats.total}
                       </div>
-                      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Avg price</div>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Total lots</div>
                     </div>
                   </div>
                 </div>

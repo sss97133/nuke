@@ -677,8 +677,7 @@ export default function UserMetrics() {
               fontFamily: "'Courier New', monospace",
             }}
           >
-            {fb_stats.with_active_listings} active listings &middot;{' '}
-            avg price: {fb_stats.avg_listing_price ? `$${fmt(fb_stats.avg_listing_price)}` : '--'}
+            {fb_stats.with_active_listings} active listings
           </div>
         </div>
       </div>

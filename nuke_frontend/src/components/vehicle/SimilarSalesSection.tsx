@@ -227,7 +227,7 @@ export function SimilarSalesSection({
           paddingBottom: '8px',
           borderBottom: '1px solid var(--border)',
         }}>
-          <StatPill label="AVG" value={formatPrice(summary.avg_price)} accent />
+          <StatPill label="MEDIAN" value={formatPrice(summary.median_price)} accent />
           <StatPill label="MEDIAN" value={formatPrice(summary.median_price)} />
           <StatPill label="RANGE" value={`${formatPrice(summary.min_price)} \u2014 ${formatPrice(summary.max_price)}`} />
           <span style={{
