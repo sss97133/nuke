@@ -82,6 +82,7 @@ const FIT_LABELS: Record<ImageFit, string> = {
 
 // Map sort values to hero dimensions
 const SORT_HERO_MAP: Partial<Record<SortBy, HeroDimension>> = {
+  newest: 'newest',
   deal_score: 'deal_score',
   heat_score: 'heat_score',
   year: 'year',

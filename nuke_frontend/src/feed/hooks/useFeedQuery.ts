@@ -41,7 +41,7 @@ function toQueryParams(input: UseFeedQueryInput): FeedQueryParams {
     year: 'year',
     make: 'make',
     mileage: 'mileage',
-    finds: 'deal_score',
+    finds: 'find_score',
     popular: 'feed_rank',
     volume: 'feed_rank',
     images: 'feed_rank',

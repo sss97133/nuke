@@ -2,6 +2,22 @@
 
 ## 2026-03-25
 
+### [data] BaT 42K URL bulk ingest — 3-phase pipeline
+- **STEP 1 COMPLETE**: Created 28,068 new vehicle records from URL slug parsing (Y/M/M extraction)
+  - Filtered 12,019 non-vehicles (motorcycles, boats, trailers, memorabilia)
+  - Used existing `bat-url-parse-bulk-insert.mjs` — triggers disabled during insert, 1000/batch
+  - Also queued 29,998 URLs into import_queue for future deep extraction
+- **STEP 2 COMPLETE**: Enriched 1,103 vehicles from existing BaT snapshots via `bat-storage-extract.mjs`
+  - Downloaded HTML from Supabase Storage, extracted price/description/VIN/images
+- **STEP 3 RUNNING** (PID 56860): `bat-extract-direct.mjs` — direct fetch + extract at 26K/hr
+  - 7,000+ done, ~34K remaining, zero rate limiting from BaT
+  - Fetches page HTML, extracts all fields (JSON-LD, title, meta tags), updates vehicle, inserts images
+  - 25 concurrent fetches, 300ms delay between waves, 200 URLs per DB round-trip
+  - ETA: ~85 min remaining (should complete by ~5:30 PM)
+  - New scripts: `scripts/bat-extract-direct.mjs`, `scripts/bat-fast-fetch.mjs`, `scripts/bat-fetch-and-extract.mjs`
+  - Fixed `vehicle_images` column name (was `url`, actually `image_url`)
+- BaT totals: 162,835 vehicles, 79% with descriptions, 80% with prices, 82% with images
+
 ### [discovery] BaT /models/ Full Discovery — 10,942 new listing URLs found
 - Discovered BaT's undocumented REST API: `/wp-json/bringatrailer/1.0/data/listings-filter` (277-page limit without session)
 - Scraped all 2,439 make/model pages from `/models/` index (401 makes + 2,044 models)

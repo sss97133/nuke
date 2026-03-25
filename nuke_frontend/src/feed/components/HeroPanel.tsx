@@ -13,6 +13,7 @@ import { useMemo, useState, useRef, useEffect } from 'react';
 import type { FeedVehicle } from '../types/feed';
 import type { SortBy } from '../../types/feedTypes';
 import { DealsHeroPanel } from './hero/DealsHeroPanel';
+import { FindsHeroPanel } from './hero/FindsHeroPanel';
 import { HeroNewestPanel } from './hero/HeroNewestPanel';
 
 // ---------------------------------------------------------------------------
@@ -508,9 +509,9 @@ export function sortToDimension(sort: SortBy): HeroDimension | null {
 }
 
 // Dimensions that use treemap layout vs bar chart vs custom server-powered panels
-const TREEMAP_DIMS = new Set<HeroDimension>(['heat_score', 'finds']);
+const TREEMAP_DIMS = new Set<HeroDimension>(['heat_score']);
 const BAR_DIMS = new Set<HeroDimension>(['year', 'price_high', 'price_low', 'mileage']);
-const SERVER_DIMS = new Set<HeroDimension>(['newest', 'deal_score']);
+const SERVER_DIMS = new Set<HeroDimension>(['newest', 'deal_score', 'finds']);
 
 // ---------------------------------------------------------------------------
 // Main component
