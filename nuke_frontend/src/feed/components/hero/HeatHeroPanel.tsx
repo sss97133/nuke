@@ -430,15 +430,6 @@ export function HeatHeroPanel({ onFilter }: HeatHeroPanelProps) {
             }}>
               {hottestVehicle.heat_score.toFixed(0)} HEAT
             </span>
-            {hottestVehicle.comment_count > 0 && (
-              <span style={{
-                fontFamily: "'Courier New', monospace",
-                fontSize: 8, fontWeight: 700,
-                color: 'var(--text-secondary)',
-              }}>
-                {fmtNum(hottestVehicle.comment_count)} COMMENTS
-              </span>
-            )}
           </div>
         )}
       </div>
@@ -463,9 +454,7 @@ export function HeatHeroPanel({ onFilter }: HeatHeroPanelProps) {
                 rank={i + 1}
                 maxHeat={maxHeat}
                 onClick={() => {
-                  if (vehicle.listing_url) {
-                    window.open(vehicle.listing_url, '_blank');
-                  }
+                  window.location.href = `/vehicle/${vehicle.id}`;
                 }}
               />
             ))}
@@ -523,9 +512,7 @@ export function HeatHeroPanel({ onFilter }: HeatHeroPanelProps) {
                 item={item}
                 rank={i + 1}
                 onClick={() => {
-                  if (item.listing_url) {
-                    window.open(item.listing_url, '_blank');
-                  }
+                  window.location.href = `/vehicle/${item.id}`;
                 }}
               />
             ))}
