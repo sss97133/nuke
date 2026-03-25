@@ -308,97 +308,136 @@ function StatPill({ label, value, accent }: { label: string; value: string; acce
 
 function SaleCard({ sale }: { sale: SimilarSale }) {
   const [imgError, setImgError] = useState(false);
-  const platformColor = sale.platform ? (PLATFORM_COLORS[sale.platform] ?? 'var(--text-secondary)') : 'var(--text-secondary)';
+  const platformAbbrev = sale.platform ? (PLATFORM_ABBREV[sale.platform] ?? sale.platform.toUpperCase()) : null;
 
   const cardContent = (
     <div style={{
       display: 'flex',
-      gap: '12px',
-      padding: '12px', border: '1px solid var(--border-light)',
+      gap: '8px',
+      padding: '8px',
+      border: '2px solid var(--border)',
       backgroundColor: 'var(--surface)',
-      transition: 'border-color 0.12s ease',
+      transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
       cursor: sale.listing_url ? 'pointer' : 'default',
       textDecoration: 'none',
       color: 'inherit',
     }}
     onMouseEnter={(e) => {
       if (sale.listing_url) {
-        (e.currentTarget as HTMLElement).style.borderColor = 'var(--primary)';
+        (e.currentTarget as HTMLElement).style.borderColor = 'var(--text)';
       }
     }}
     onMouseLeave={(e) => {
-      (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-light)';
+      (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
     }}
     >
       {/* Thumbnail */}
       <div style={{
         flexShrink: 0,
-        width: '100px',
-        height: '70px', overflow: 'hidden',
-        backgroundColor: 'var(--bg)',
+        width: '80px',
+        height: '60px',
+        overflow: 'hidden',
+        backgroundColor: '#7a7a7a',
       }}>
-        <img
-          src={imgError || !sale.image_url ? PLACEHOLDER_IMAGE : sale.image_url}
-          alt={`${sale.year} ${sale.make} ${sale.model}`}
-          onError={() => setImgError(true)}
-          style={{
+        {imgError || !sale.image_url ? (
+          <div style={{
             width: '100%',
             height: '100%',
-            objectFit: 'cover',
-            display: 'block',
-          }}
-        />
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: 'Arial, Helvetica, sans-serif',
+            fontSize: '8px',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            color: '#bbb',
+          }}>
+            {sale.make || 'N/A'}
+          </div>
+        ) : (
+          <img
+            src={sale.image_url}
+            alt={`${sale.year} ${sale.make} ${sale.model}`}
+            onError={() => setImgError(true)}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: 'block',
+            }}
+          />
+        )}
       </div>
 
       {/* Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
         {/* Title */}
         <div style={{
-          fontSize: '14px',
-          fontWeight: 600,
+          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontSize: '9px',
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
           color: 'var(--text)',
-          marginBottom: '2px',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
+          marginBottom: '2px',
         }}>
           {sale.year} {sale.make} {sale.model}
           {sale.trim && (
-            <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}> {sale.trim}</span>
+            <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}> {sale.trim}</span>
           )}
         </div>
 
         {/* Price */}
         <div style={{
-          fontSize: '16px',
+          fontFamily: "'Courier New', Courier, monospace",
+          fontSize: '10px',
           fontWeight: 700,
-          color: 'var(--text)',
-          marginBottom: '6px',
-          lineHeight: 1.2,
+          color: '#16825d',
+          marginBottom: '4px',
+          lineHeight: 1,
         }}>
           {formatPrice(sale.sale_price)}
         </div>
 
         {/* Meta row */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {sale.platform && (
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {platformAbbrev && (
             <span style={{
-              fontSize: '11px',
-              fontWeight: 600,
-              color: platformColor,
-              backgroundColor: `${platformColor}15`,
-              padding: '2px 6px', whiteSpace: 'nowrap',
+              fontFamily: 'Arial, Helvetica, sans-serif',
+              fontSize: '7px',
+              fontWeight: 700,
+              letterSpacing: '0.10em',
+              textTransform: 'uppercase',
+              padding: '1px 4px',
+              border: '1px solid var(--border)',
+              color: 'var(--text)',
+              whiteSpace: 'nowrap',
             }}>
-              {sale.platform}
+              {platformAbbrev}
             </span>
           )}
           {sale.sold_date && (
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+            <span style={{
+              fontFamily: 'Arial, Helvetica, sans-serif',
+              fontSize: '7px',
+              color: 'var(--text-disabled)',
+              whiteSpace: 'nowrap',
+            }}>
               {formatDate(sale.sold_date)}
             </span>
           )}
           {sale.mileage && (
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+            <span style={{
+              fontFamily: "'Courier New', Courier, monospace",
+              fontSize: '7px',
+              color: 'var(--text-disabled)',
+              whiteSpace: 'nowrap',
+              letterSpacing: '0.06em',
+            }}>
               {formatMileage(sale.mileage)}
             </span>
           )}

@@ -28,6 +28,7 @@ const BuildTimelineChart = React.lazy(() => import('./BuildTimelineChart'));
 const BuildSpendSummary = React.lazy(() => import('./BuildSpendSummary'));
 const VehicleListingDetailsCard = React.lazy(() => import('../../components/vehicle/VehicleListingDetailsCard'));
 const SimilarSalesSection = React.lazy(() => import('../../components/vehicle/SimilarSalesSection').then(m => ({ default: m.SimilarSalesSection })));
+const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
 
 export type GalleryViewMode = 'ZONES' | 'GRID' | 'FULL' | 'INFO' | 'SESSIONS' | 'CATEGORY' | 'CHRONO' | 'SOURCE';
 
@@ -206,6 +207,13 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
               </React.Suspense>
             </CollapsibleWidget>
           )}
+
+          {/* Observation History — all observations for this vehicle, chronological */}
+          <CollapsibleWidget variant="profile" title="Observation History" defaultCollapsed={true}>
+            <React.Suspense fallback={<div className="widget__label" style={{ padding: '10px 16px' }}>Loading observations...</div>}>
+              <ObservationTimeline />
+            </React.Suspense>
+          </CollapsibleWidget>
 
           {/* Pricing & Value */}
           <VehiclePricingValueCard
