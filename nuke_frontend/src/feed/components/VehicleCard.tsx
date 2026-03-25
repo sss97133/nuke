@@ -497,12 +497,15 @@ export function VehicleCard({
     : 'var(--text)';
 
   // Grid mode (default) — clean image, all info below
-  // Click opens popup rhizome instead of inline expand
+  // Click opens centered popup overlay (no grid reflow)
   return (
     <CardShell
       vehicleId={vehicle.id}
       viewMode="grid"
       expandedContent={expandedContent}
+      popupImageUrl={vehicle.thumbnail_url}
+      popupTitle={alt}
+      popupPrice={infoPriceText || undefined}
       onHoverStart={onHoverStart}
       onHoverEnd={onHoverEnd}
       onCardClick={handleCardClick}

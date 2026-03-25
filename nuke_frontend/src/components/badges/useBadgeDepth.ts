@@ -113,7 +113,7 @@ async function fetchFacets(
 }
 
 /**
- * Fetch average price and year range for a filtered set.
+ * Fetch price aggregates and year range for a filtered set.
  */
 async function fetchAggregates(
   filterCol: string,

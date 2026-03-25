@@ -30,6 +30,8 @@ export interface CardShellProps {
   style?: CSSProperties;
   onHoverStart?: (rect: DOMRect) => void;
   onHoverEnd?: () => void;
+  /** If provided, called on click instead of internal popup (popup rhizome) */
+  onCardClick?: () => void;
 }
 
 export function CardShell({
@@ -43,6 +45,7 @@ export function CardShell({
   style,
   onHoverStart,
   onHoverEnd,
+  onCardClick,
 }: CardShellProps) {
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [popupOpen, setPopupOpen] = useState(false);
@@ -108,6 +111,13 @@ export function CardShell({
       }
 
       e.preventDefault();
+
+      // Popup rhizome: if onCardClick is provided, use it instead of internal popup
+      if (onCardClick) {
+        onCardClick();
+        return;
+      }
+
       setPopupOpen(true);
     },
     [vehicleId],
