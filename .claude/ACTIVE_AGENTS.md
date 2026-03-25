@@ -35,5 +35,6 @@
 ~DONE~ | IMAGE-EXTRACT-ALL | 90K+ images extracted from snapshots for 16K vehicles across 5 platforms. Coverage: 81% -> 84.6%. | listing_page_snapshots, vehicle_images, vehicles
 ~DONE~ | BJ-PRICE-FIX | Computed nuke_estimate for 4,875 of 5,903 BJ vehicles. 98 remain (un-valueable oddities). Coverage 99.74%. | vehicles, nuke_estimates, compute-vehicle-valuation
 ~DONE~ | FEED-FIX | MV refresh fixed (cron timeout 120s->600s), clickable header metrics wired, feed-query deployed with added_today filter
-09:XX | QUEUE-DRAIN | Fast-drain 4,858 pending import_queue items in tight loop | import_queue, process-import-queue-batch
-10:00 | ROUTE-AUDIT | Route audit — fix dead routes, broken pages, blank screens | nuke_frontend/src/
+~DONE~ | ROUTE-AUDIT | Route audit complete — all routes verified, no issues found at HEAD | nuke_frontend/src/
+09:25 | BAT-DISCOVERY | BaT gap discovery — sitemap crawl to find missing ~100K listings | import_queue, listing_page_snapshots, vehicles
+09:00 | BAT-SHALLOW-FIX | Fix 2,011 shallow BaT vehicles + comment extraction gap audit | vehicles, listing_page_snapshots, auction_comments, extract-auction-comments
