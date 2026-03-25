@@ -2,6 +2,17 @@
 
 ## 2026-03-25
 
+### [discovery] BaT /models/ Full Discovery — 10,942 new listing URLs found
+- Discovered BaT's undocumented REST API: `/wp-json/bringatrailer/1.0/data/listings-filter` (277-page limit without session)
+- Scraped all 2,439 make/model pages from `/models/` index (401 makes + 2,044 models)
+- Extracted embedded JSON items data (24 items per page initial load)
+- Found 50,742 total listing URLs, 10,942 not in any DB table
+- Queued 10,672 new URLs to `bat_extraction_queue` (pending extraction)
+- Gap reduced from ~32,824 to ~16,187 (51% reduction)
+- Remaining 16K gap requires Playwright deep crawl on high-count makes (>24 listings)
+- Scripts: `bat-models-discovery.mjs` (API crawler), `bat-make-pages-discovery.mjs` (HTML scraper)
+- Zero errors, 93.7 minutes runtime
+
 ### [condition] Condition Observation Extraction at Scale — 3 data gaps wired
 - Migration: Added 'condition' to 6 auction sources + registered 'nuke-vision' source
 - Gap 1 (Descriptions): `discover-description-data` now runs condition extraction pass + `condition_backfill` mode

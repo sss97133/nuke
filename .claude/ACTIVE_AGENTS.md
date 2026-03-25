@@ -24,7 +24,7 @@
 
 ## Completed This Session (2026-03-23)
 
-~DONE~ | BAT-DISCOVERY | BaT gap analysis: 69.6K gap found, 96K queue entries reconciled, 39K comment URLs cleared, scripts built | bat_extraction_queue, scripts/
+~DONE~ | BAT-DISCOVERY | BaT /models/ full discovery COMPLETE: scraped 2,439 make/model pages via REST API. Found 50,742 listing URLs, 10,942 new, 10,672 queued. Gap reduced from ~32K to ~16K. Remaining gap needs Playwright deep crawl. | bat_extraction_queue, scripts/bat-models-discovery.mjs, scripts/bat-make-pages-discovery.mjs
 **PERPLEXITY-TASKS** — 6-task package from claude-code-nuke-package. All done.
 - 4 RPCs: schema_stats(), source_vehicles(), make_stats(), mv_source_quality
 - Garbage audit: 289K flagged, zero deleted
