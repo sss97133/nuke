@@ -134,6 +134,24 @@ function parseBonhamsName(name: string): ParsedTitle {
     cleanTitle = cleanTitle.slice(0, cleanTitle.indexOf(engineInName[0])).trim();
   }
 
+  // Strip "Coachwork by ..." (common in Bonhams titles for coachbuilt cars)
+  const coachworkInName = cleanTitle.match(/\s+coachwork\s+by\s+.*/i);
+  if (coachworkInName) {
+    cleanTitle = cleanTitle.slice(0, cleanTitle.indexOf(coachworkInName[0])).trim();
+  }
+
+  // Strip "Registration no. ..."
+  const regInName = cleanTitle.match(/\s+registration\s+no\.?\s*.*/i);
+  if (regInName) {
+    cleanTitle = cleanTitle.slice(0, cleanTitle.indexOf(regInName[0])).trim();
+  }
+
+  // Strip "Serial no. ..." or "Body no. ..."
+  const serialInName = cleanTitle.match(/\s+(?:serial|body)\s+no\.?\s*.*/i);
+  if (serialInName) {
+    cleanTitle = cleanTitle.slice(0, cleanTitle.indexOf(serialInName[0])).trim();
+  }
+
   // Extract year (4 digits 1880-2030)
   const yearMatch = cleanTitle.match(/\b(1[89]\d{2}|20[0-3]\d)\b/);
   const year = yearMatch ? parseInt(yearMatch[0], 10) : null;

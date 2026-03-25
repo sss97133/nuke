@@ -1484,7 +1484,7 @@ function parseBonhamsHtml(html: string): Record<string, any> {
       if (engMatch) result.engine_displacement = `${engMatch[1]}L`;
     }
     if (!result.engine_displacement) {
-      const ccMatch = result.description.match(/(\d{3,5})\s*,?\s*cc/i);
+      const ccMatch = result.description.match(/([\d,]{3,6})\s*cc/i);
       if (ccMatch) result.engine_displacement = `${ccMatch[1].replace(/,/g, "")}cc`;
     }
     if (!result.horsepower) {

@@ -61,13 +61,14 @@ async function fetchPage(page, retries = 3) {
           await sleep(3000);
           continue;
         }
-        return { items: [], total: data.items_total || 0, pages: data.pages_total || 0 };
+        return { items: [], total: data.items_total || 0, pages: data.pages_total || 0, rateLimited: false };
       }
 
       return {
         items: data.items,
         total: data.items_total || 0,
         pages: data.pages_total || 0,
+        rateLimited: false,
       };
     } catch (err) {
       if (attempt < retries) {
@@ -78,7 +79,8 @@ async function fetchPage(page, retries = 3) {
     }
   }
 
-  return { items: [], total: 0, pages: 0 };
+  // If all retries were rate-limited, signal that
+  return { items: [], total: 0, pages: 0, rateLimited: true };
 }
 
 async function loadKnownUrls() {
@@ -220,24 +222,50 @@ function isValidListingUrl(url) {
 async function flushBatch(urls, dryRun) {
   if (!urls.length || dryRun) return 0;
 
-  // Insert into bat_extraction_queue (upsert to skip duplicates)
-  const records = urls.map(url => ({
-    bat_url: url.replace(/\/$/, ''),
-    status: 'pending',
-    priority: 5,
-    created_at: new Date().toISOString(),
-  }));
+  // First, check which URLs already exist in bat_extraction_queue
+  const urlsToCheck = urls.map(u => u.replace(/\/$/, ''));
+  const existingUrls = new Set();
 
+  for (let i = 0; i < urlsToCheck.length; i += 50) {
+    const chunk = urlsToCheck.slice(i, i + 50);
+    const { data } = await supabase
+      .from('bat_extraction_queue')
+      .select('bat_url')
+      .in('bat_url', chunk);
+    if (data) {
+      for (const r of data) existingUrls.add(r.bat_url);
+    }
+  }
+
+  // Only insert URLs that don't exist yet
+  const newUrls = urlsToCheck.filter(u => !existingUrls.has(u));
+  if (!newUrls.length) return 0;
+
+  const now = new Date().toISOString();
   let queued = 0;
-  for (let i = 0; i < records.length; i += 50) {
-    const chunk = records.slice(i, i + 50);
+  for (let i = 0; i < newUrls.length; i += 50) {
+    const chunk = newUrls.slice(i, i + 50).map(url => ({
+      bat_url: url,
+      status: 'pending',
+      priority: 5,
+      created_at: now,
+      updated_at: now,
+      attempts: 0,
+    }));
     const { error } = await supabase
       .from('bat_extraction_queue')
-      .upsert(chunk, { onConflict: 'bat_url', ignoreDuplicates: true });
+      .insert(chunk);
     if (!error) {
       queued += chunk.length;
     } else {
-      console.error(`  Queue error: ${error.message}`);
+      console.error(`  Queue insert error: ${error.message}`);
+      // Try one by one for the failing batch
+      for (const record of chunk) {
+        const { error: singleError } = await supabase
+          .from('bat_extraction_queue')
+          .insert([record]);
+        if (!singleError) queued++;
+      }
     }
   }
   return queued;
@@ -296,13 +324,21 @@ async function main() {
 
   for (let page = resumePage; page <= endPage; page++) {
     try {
-      const { items } = await fetchPage(page);
+      const { items, rateLimited } = await fetchPage(page);
 
       if (!items || items.length === 0) {
+        if (rateLimited) {
+          // Rate limited even after retries — back off significantly but don't count as empty
+          console.log(`  Page ${page}: still rate limited after all retries, backing off 30s`);
+          await sleep(30000);
+          errors++;
+          // Don't increment consecutiveErrors for rate limits
+          continue;
+        }
         errors++;
         consecutiveErrors++;
-        if (consecutiveErrors >= 10) {
-          console.log(`\n10 consecutive empty pages at page ${page}. May have reached end.`);
+        if (consecutiveErrors >= 20) {
+          console.log(`\n20 consecutive empty pages at page ${page}. End of results.`);
           break;
         }
         continue;
@@ -361,13 +397,13 @@ async function main() {
       consecutiveErrors++;
       console.error(`  Page ${page} error: ${err.message}`);
 
-      if (consecutiveErrors >= 10) {
-        console.log('\n10 consecutive errors. Stopping.');
+      if (consecutiveErrors >= 20) {
+        console.log('\n20 consecutive errors. Stopping.');
         break;
       }
 
       // Back off on errors
-      await sleep(3000);
+      await sleep(5000);
     }
 
     // Respect rate limit
