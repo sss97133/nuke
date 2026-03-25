@@ -12,14 +12,9 @@ import { vehicleTimeLabel } from '../utils/timeAgo';
 import { CardShell } from './card/CardShell';
 import { CardImage } from './card/CardImage';
 import { CardIdentity } from './card/CardIdentity';
-import { CardPrice } from './card/CardPrice';
-import { CardMeta } from './card/CardMeta';
 import { CardDealScore } from './card/CardDealScore';
-import { CardSource, resolveSourceLabel } from './card/CardSource';
-import { CardAuctionTimer } from './card/CardAuctionTimer';
+import { resolveSourceLabel } from './card/CardSource';
 import { CardActions } from './card/CardActions';
-import { CardTier } from './card/CardTier';
-import { CardRankScore } from './card/CardRankScore';
 import { BadgePortal } from '../../components/badges/BadgePortal';
 
 export interface VehicleCardProps {
@@ -519,7 +514,34 @@ export function VehicleCard({
     </div>
   ), [vehicle, specEntries, alt, sourceLabel]);
 
-  // Grid mode (default) — richer than v1
+  // --- Build the info line parts for grid mode ---
+  const infoLineParts = useMemo(() => {
+    const parts: string[] = [];
+    if (sourceLabel) parts.push(sourceLabel);
+    if (price.isLive) parts.push('LIVE');
+    else if (price.isSold && price.showSoldBadge) parts.push('SOLD');
+    else if (vehicle.is_for_sale) parts.push('FOR SALE');
+    else if (price.isResult) parts.push('ENDED');
+    if (timeLabel) parts.push(timeLabel.toUpperCase());
+    return parts;
+  }, [sourceLabel, price, vehicle.is_for_sale, timeLabel]);
+
+  // --- Build the price text for the info line ---
+  const infoPriceText = useMemo(() => {
+    if (price.isLive) return `BID ${price.formatted}`;
+    if (price.isSold && price.showSoldBadge) return `SOLD ${price.formatted}`;
+    if (vehicle.is_for_sale && !price.isSold && !price.isLive) return `ASKING ${price.formatted}`;
+    if (price.isResult) return `RESULT ${price.formatted}`;
+    if (price.amount) return price.formatted;
+    return null;
+  }, [price, vehicle.is_for_sale]);
+
+  const infoPriceColor = price.isSold ? 'var(--success)'
+    : price.isLive ? 'var(--text)'
+    : price.isResult ? 'var(--warning)'
+    : 'var(--text)';
+
+  // Grid mode (default) — clean image, all info below
   return (
     <CardShell
       vehicleId={vehicle.id}
@@ -530,28 +552,7 @@ export function VehicleCard({
       style={style}
     >
       <CardImage thumbnailUrl={vehicle.thumbnail_url} alt={alt} viewMode="grid" fit={imageFit} noImageData={noImageData}>
-        {showScores && <CardRankScore vehicle={vehicle} compact={compact} />}
-        <CardPrice price={price} compact={compact} />
-        {/* Top-left: source badge + live timer stacked */}
-        <div style={{
-          position: 'absolute',
-          top: '6px',
-          left: '6px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '3px',
-          zIndex: 10,
-          pointerEvents: 'none',
-        }}>
-          <CardSource
-            discoveryUrl={vehicle.discovery_url}
-            discoverySource={vehicle.discovery_source}
-            profileOrigin={vehicle.profile_origin}
-          />
-          {price.isLive && vehicle.auction_end_date && (
-            <CardAuctionTimer endDate={vehicle.auction_end_date} isLive />
-          )}
-        </div>
+        {/* Only interactive elements on image — follow button */}
         {showActions && onToggleFollow && (
           <CardActions
             isFollowing={isFollowing}
@@ -570,100 +571,64 @@ export function VehicleCard({
         compact={compact}
       />
 
-      {/* Source + Status line */}
-      {(sourceLabel || price.isSold || price.isLive || vehicle.is_for_sale) && (
-        <div style={{
-          padding: compact ? '0 4px 2px' : '0 8px 2px',
-          display: 'flex',
-          gap: '6px',
-          alignItems: 'center',
+      {/* Single info line: SOURCE · STATUS · TIME        PRICE */}
+      <div style={{
+        padding: compact ? '0 4px 4px' : '0 8px 6px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '6px',
+        minHeight: compact ? '14px' : '16px',
+      }}>
+        {/* Left: source · status · time */}
+        <span style={{
+          fontFamily: "'Courier New', monospace",
+          fontSize: compact ? '7px' : '8px',
+          fontWeight: 700,
+          textTransform: 'uppercase' as const,
+          letterSpacing: '0.5px',
+          color: 'var(--text-secondary)',
+          lineHeight: 1,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
         }}>
-          {sourceLabel && (
-            <span style={{
-              fontFamily: "'Courier New', monospace",
-              fontSize: '8px',
-              fontWeight: 700,
-              textTransform: 'uppercase' as const,
-              letterSpacing: '0.5px',
-              color: 'var(--text-tertiary, var(--text-secondary))',
-              lineHeight: 1,
-            }}>
-              {sourceLabel}
+          {infoLineParts.map((part, i) => (
+            <span key={i}>
+              {i > 0 && (
+                <span style={{ color: 'var(--text-disabled)', margin: '0 4px' }}>{'\u00B7'}</span>
+              )}
+              <span style={{
+                color: part === 'LIVE' ? 'var(--info)'
+                  : part === 'SOLD' ? 'var(--success)'
+                  : part === 'FOR SALE' ? 'var(--info)'
+                  : part === 'ENDED' ? 'var(--warning)'
+                  : part.startsWith('ENDS') ? 'var(--error)'
+                  : part.startsWith('SOLD') ? 'var(--success)'
+                  : part.startsWith('LISTED') ? 'var(--info)'
+                  : 'var(--text-secondary)',
+              }}>
+                {part}
+              </span>
             </span>
-          )}
-          {sourceLabel && (price.isSold || price.isLive || vehicle.is_for_sale) && (
-            <span style={{
-              fontFamily: "'Courier New', monospace",
-              fontSize: '8px',
-              color: 'var(--text-disabled)',
-              lineHeight: 1,
-            }}>
-              /
-            </span>
-          )}
-          {price.isLive && (
-            <span style={{
-              fontFamily: 'Arial, sans-serif',
-              fontSize: '8px',
-              fontWeight: 800,
-              textTransform: 'uppercase' as const,
-              letterSpacing: '0.3px',
-              color: 'var(--info)',
-              lineHeight: 1,
-            }}>
-              LIVE
-            </span>
-          )}
-          {price.isSold && price.showSoldBadge && !price.isLive && (
-            <span style={{
-              fontFamily: 'Arial, sans-serif',
-              fontSize: '8px',
-              fontWeight: 800,
-              textTransform: 'uppercase' as const,
-              letterSpacing: '0.3px',
-              color: 'var(--success)',
-              lineHeight: 1,
-            }}>
-              SOLD
-            </span>
-          )}
-          {vehicle.is_for_sale && !price.isSold && !price.isLive && (
-            <span style={{
-              fontFamily: 'Arial, sans-serif',
-              fontSize: '8px',
-              fontWeight: 800,
-              textTransform: 'uppercase' as const,
-              letterSpacing: '0.3px',
-              color: 'var(--info)',
-              lineHeight: 1,
-            }}>
-              FOR SALE
-            </span>
-          )}
-        </div>
-      )}
+          ))}
+        </span>
 
-      <CardMeta
-        mileage={vehicle.mileage}
-        transmission={vehicle.transmission}
-        drivetrain={vehicle.drivetrain}
-        bodyStyle={compact ? undefined : (vehicle.canonical_body_style || vehicle.body_style)}
-        timeLabel={timeLabel}
-        compact={compact}
-      />
-
-      {!compact && vehicle.deal_score_label && (
-        <CardDealScore
-          dealScoreLabel={vehicle.deal_score_label}
-          heatScoreLabel={vehicle.heat_score_label}
-        />
-      )}
-
-      {!compact && vehicle.data_completeness_tier && (
-        <div style={{ padding: '0 8px 4px' }}>
-          <CardTier tier={vehicle.data_completeness_tier} />
-        </div>
-      )}
+        {/* Right: price */}
+        {infoPriceText && (
+          <span style={{
+            fontFamily: "'Courier New', monospace",
+            fontSize: compact ? '9px' : '11px',
+            fontWeight: 700,
+            color: infoPriceColor,
+            lineHeight: 1,
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
+          }}>
+            {infoPriceText}
+          </span>
+        )}
+      </div>
     </CardShell>
   );
 }
