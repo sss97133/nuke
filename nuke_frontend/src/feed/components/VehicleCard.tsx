@@ -298,7 +298,9 @@ export function VehicleCard({
     );
   }
 
-  // Expanded content for grid cards — rhizome data (new info, not duplicates)
+  // Expanded content for grid cards — compact vertical stack within single column width.
+  // Shows: price context, extra specs (stacked), source provenance.
+  // No side-by-side grids — everything stacks vertically to fit card column.
   const expandedContent = useMemo(() => {
     // Build price context line
     const priceContextParts: string[] = [];
@@ -346,21 +348,21 @@ export function VehicleCard({
     const sans = 'Arial, sans-serif';
 
     return (
-      <div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {/* Price context — estimate comparison */}
         {priceContextParts.length > 0 && (
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
-            padding: '5px 6px',
+            gap: '6px',
+            padding: '4px 6px',
             border: '2px solid var(--border)',
             background: 'var(--surface)',
-            marginBottom: '6px',
           }}>
             <span style={{
               fontFamily: mono, fontSize: '9px', fontWeight: 700,
               color: 'var(--text)', lineHeight: 1.3,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {priceContextParts[0]}
             </span>
@@ -371,17 +373,16 @@ export function VehicleCard({
                 marginLeft: 'auto',
                 flexShrink: 0,
               }}>
-                {confDisplay}% CONF
+                {confDisplay}%
               </span>
             )}
           </div>
         )}
 
-        {/* Deal score callout — only if notable */}
+        {/* Deal score — inline, only if notable */}
         {vehicle.deal_score_label && vehicle.deal_score_label !== 'fair' && (
           <div style={{
-            padding: '4px 6px',
-            marginBottom: '6px',
+            padding: '3px 6px',
             border: '2px solid var(--border)',
             background: 'var(--surface)',
             display: 'flex',
@@ -398,29 +399,28 @@ export function VehicleCard({
                   ? 'var(--error)' : vehicle.heat_score_label === 'hot' || vehicle.heat_score_label === 'warm'
                   ? 'var(--warning)' : 'var(--text-secondary)',
               }}>
-                {vehicle.heat_score_label.toUpperCase()} DEMAND
+                {vehicle.heat_score_label.toUpperCase()}
               </span>
             )}
           </div>
         )}
 
-        {/* Extra specs — only fields NOT already visible in collapsed card */}
+        {/* Extra specs — vertically stacked, one per line */}
         {extraSpecs.length > 0 && (
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '1px',
-            background: 'var(--border)',
+            display: 'flex',
+            flexDirection: 'column',
             border: '2px solid var(--border)',
-            marginBottom: '6px',
           }}>
-            {extraSpecs.map((spec) => (
+            {extraSpecs.map((spec, i) => (
               <div key={spec.label} style={{
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '1px',
-                padding: '4px 6px',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '3px 6px',
                 background: 'var(--surface)',
+                borderTop: i > 0 ? '1px solid var(--border)' : undefined,
               }}>
                 <span style={{
                   fontFamily: sans, fontSize: '7px', fontWeight: 800,
@@ -428,6 +428,7 @@ export function VehicleCard({
                   letterSpacing: '0.5px',
                   color: 'var(--text-disabled)',
                   lineHeight: 1,
+                  flexShrink: 0,
                 }}>
                   {spec.label}
                 </span>
@@ -435,6 +436,7 @@ export function VehicleCard({
                   fontFamily: mono, fontSize: '9px', fontWeight: 700,
                   color: 'var(--text)', lineHeight: 1.2,
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  textAlign: 'right',
                 }}>
                   {spec.value}
                 </span>
@@ -451,7 +453,6 @@ export function VehicleCard({
             textTransform: 'uppercase' as const,
             letterSpacing: '0.3px',
             lineHeight: 1,
-            marginBottom: '4px',
           }}>
             {sourceParts.join(' \u00B7 ')}
           </div>

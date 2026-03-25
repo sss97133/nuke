@@ -338,7 +338,6 @@ export function FeedLayout({
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                gridAutoRows: '1fr',
                 gap: '4px',
               }}>
                 {Array.from({ length: cols }, (_, colIdx) => {
