@@ -447,7 +447,7 @@ export default function AuctionTrendsDashboard() {
             {/* Price Trend */}
             <div>
               <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
-                Weekly Average Sale Price
+                Weekly Sale Price Trend
               </div>
               <PriceTrendChart />
               <div style={{ marginTop: 'var(--space-2)', fontSize: '9px', color: 'var(--text-muted)' }}>
