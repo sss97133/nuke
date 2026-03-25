@@ -59,7 +59,7 @@ export interface PriceTrend {
 
 export class MarketStatsService {
   /**
-   * Get market pulse statistics (total vehicles, avg price, for sale count, new today)
+   * Get market pulse statistics (total vehicles, for sale count, new today)
    * Replaces 4 parallel queries in MarketPulse.tsx
    */
   static async getMarketPulseStats(): Promise<MarketPulseStats> {

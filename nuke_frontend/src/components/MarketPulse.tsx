@@ -10,7 +10,6 @@ interface PulseMetric {
 const MarketPulse: React.FC = () => {
   const [metrics, setMetrics] = useState<PulseMetric[]>([
     { label: 'Active Listings', value: 0 },
-    { label: 'Avg Price', value: 0, unit: 'k' },
     { label: 'For Sale', value: 0 },
     { label: 'New Today', value: 0 }
   ]);

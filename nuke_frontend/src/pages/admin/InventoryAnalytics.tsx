@@ -251,7 +251,7 @@ export default function InventoryAnalytics() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="By Decade (with Avg Price)">
+        <ChartCard title="By Decade">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={data.byDecade}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
