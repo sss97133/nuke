@@ -14,6 +14,7 @@ import type { FeedVehicle } from '../types/feed';
 import type { SortBy } from '../../types/feedTypes';
 import { DealsHeroPanel } from './hero/DealsHeroPanel';
 import { FindsHeroPanel } from './hero/FindsHeroPanel';
+import { HeatHeroPanel } from './hero/HeatHeroPanel';
 import { HeroNewestPanel } from './hero/HeroNewestPanel';
 
 // ---------------------------------------------------------------------------
@@ -48,40 +49,6 @@ interface Bucket {
   label: string;
   count: number;
   filter: HeroFilter;
-}
-
-function buildDealBuckets(vehicles: FeedVehicle[]): Bucket[] {
-  const counts = new Map<string, number>();
-  for (const v of vehicles) {
-    if ((v.deal_score ?? 0) > 70 && v.make) {
-      counts.set(v.make, (counts.get(v.make) ?? 0) + 1);
-    }
-  }
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 30)
-    .map(([make, count]) => ({
-      label: make,
-      count,
-      filter: { makes: [make], sort: 'deal_score' as SortBy },
-    }));
-}
-
-function buildHeatBuckets(vehicles: FeedVehicle[]): Bucket[] {
-  const sums = new Map<string, number>();
-  for (const v of vehicles) {
-    if (v.make && (v.heat_score ?? 0) > 0) {
-      sums.set(v.make, (sums.get(v.make) ?? 0) + (v.heat_score ?? 0));
-    }
-  }
-  return [...sums.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 30)
-    .map(([make, total]) => ({
-      label: make,
-      count: total,
-      filter: { makes: [make], sort: 'heat_score' as SortBy },
-    }));
 }
 
 function buildYearBuckets(vehicles: FeedVehicle[]): Bucket[] {
@@ -160,26 +127,6 @@ function buildMileageBuckets(vehicles: FeedVehicle[]): Bucket[] {
     count: counts[i],
     filter: { mileageLabel: b.label, sort: 'mileage' as SortBy },
   }));
-}
-
-function buildFindsBuckets(vehicles: FeedVehicle[]): Bucket[] {
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const counts = new Map<string, number>();
-  for (const v of vehicles) {
-    if (!v.created_at) continue;
-    const t = new Date(v.created_at).getTime();
-    if (t < sevenDaysAgo) continue;
-    const src = v.discovery_source ?? v.profile_origin ?? 'Unknown';
-    counts.set(src, (counts.get(src) ?? 0) + 1);
-  }
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 20)
-    .map(([source, count]) => ({
-      label: source,
-      count,
-      filter: { sources: [source], sort: 'newest' as SortBy },
-    }));
 }
 
 // ---------------------------------------------------------------------------
@@ -509,9 +456,9 @@ export function sortToDimension(sort: SortBy): HeroDimension | null {
 }
 
 // Dimensions that use treemap layout vs bar chart vs custom server-powered panels
-const TREEMAP_DIMS = new Set<HeroDimension>(['heat_score']);
+const TREEMAP_DIMS = new Set<HeroDimension>([]);
 const BAR_DIMS = new Set<HeroDimension>(['year', 'price_high', 'price_low', 'mileage']);
-const SERVER_DIMS = new Set<HeroDimension>(['newest', 'deal_score', 'finds']);
+const SERVER_DIMS = new Set<HeroDimension>(['newest', 'deal_score', 'heat_score', 'finds']);
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -550,8 +497,6 @@ export function HeroPanel({ dimension, vehicles, onFilter, onClose }: HeroPanelP
   const buckets = useMemo(() => {
     if (!dimension || SERVER_DIMS.has(dimension)) return [];
     switch (dimension) {
-      case 'heat_score':
-        return buildHeatBuckets(vehicles);
       case 'year':
         return buildYearBuckets(vehicles);
       case 'price_high':
@@ -617,6 +562,11 @@ export function HeroPanel({ dimension, vehicles, onFilter, onClose }: HeroPanelP
           <DealsHeroPanel onFilter={handleCellClick} />
         )}
 
+        {/* Server-powered panel: HEAT */}
+        {dimension === 'heat_score' && (
+          <HeatHeroPanel onFilter={handleCellClick} />
+        )}
+
         {/* Server-powered panel: FINDS — story cards, not treemap */}
         {dimension === 'finds' && (
           <FindsHeroPanel onFilter={handleCellClick} />
@@ -641,7 +591,7 @@ export function HeroPanel({ dimension, vehicles, onFilter, onClose }: HeroPanelP
                 pointerEvents: 'none',
               }}
             >
-              {dimension === 'heat_score' && 'HEAT BY MAKE'}
+              {/* Treemap labels -- currently no treemap dimensions */}
             </div>
             {treeRects.map((rect) => (
               <TreemapCell
