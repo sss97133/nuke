@@ -1,299 +1,567 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import { useSearch, type BrowseParams, type BrowseResult, type BrowseStatsData } from '../components/layout/hooks/useSearch';
 
-const PAGE_SIZE = 50;
+// ────────────────────────────────────────────────────────────
+// TYPES
+// ────────────────────────────────────────────────────────────
 
-const fmt = (n: number | null | undefined) => n != null ? n.toLocaleString() : '—';
+interface TreemapNode {
+  name: string;
+  count: number;
+  value: number;
+  median_price?: number;
+  min_price?: number;
+  max_price?: number;
+  sold_count?: number;
+  auction_count?: number;
+  avg_bids?: number;
+  avg_watchers?: number;
+}
+
+// ────────────────────────────────────────────────────────────
+// FORMATTERS
+// ────────────────────────────────────────────────────────────
+
+const fmt = (n: number | null | undefined) => n != null ? n.toLocaleString() : '--';
+
 const fmtPrice = (n: number | null | undefined) => {
-  if (!n) return '—';
+  if (!n) return '--';
+  if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return '$' + Math.round(n / 1_000) + 'K';
   return '$' + n.toLocaleString();
 };
 
-const ERA_LABELS: Record<string, string> = {
-  'pre-war': 'PRE-WAR', 'post-war': 'POST-WAR', 'classic': 'CLASSIC',
-  'malaise': 'MALAISE', 'modern-classic': 'MODERN CLASSIC',
-  'modern': 'MODERN', 'contemporary': 'CONTEMPORARY',
+const fmtPriceFull = (n: number | null | undefined) => {
+  if (!n) return '--';
+  return '$' + n.toLocaleString();
 };
 
-/* ═══════════════════════════════════════════
-   STATS BAR — black, pipe-separated
-   ═══════════════════════════════════════════ */
-const StatsBar: React.FC<{ make: string; stats: BrowseStatsData | null }> = ({ make, stats }) => (
-  <div style={{
-    display: 'flex',
-    alignItems: 'center',
-    gap: 16,
-    padding: '10px 16px',
-    background: 'var(--text)',
-    color: 'var(--surface-elevated)',
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase',
-    flexWrap: 'wrap',
-  }}>
-    <span>{make || 'ALL VEHICLES'}</span>
-    {stats && (
-      <>
-        <span style={{ color: '#444' }}>|</span>
-        <span>{fmt(stats.total)} VEHICLES</span>
-        <span style={{ color: '#444' }}>|</span>
-        <span>{fmt(stats.with_images)} WITH IMAGES</span>
-        <span style={{ color: '#444' }}>|</span>
-        <span>{fmt(stats.with_price)} WITH PRICE</span>
-        {stats.avg_price && (
-          <>
-            <span style={{ color: '#444' }}>|</span>
-            <span style={{ fontFamily: "'Courier New', monospace" }}>
-              AVG {fmtPrice(Math.round(stats.avg_price))}
-            </span>
-          </>
-        )}
-      </>
-    )}
-  </div>
-);
+// ────────────────────────────────────────────────────────────
+// DATA HOOKS
+// ────────────────────────────────────────────────────────────
 
-/* ═══════════════════════════════════════════
-   VIEW TOGGLES — connected buttons
-   ═══════════════════════════════════════════ */
-type ViewMode = 'grid' | 'list';
+function useBrands() {
+  const [data, setData] = useState<TreemapNode[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    supabase.rpc('treemap_by_brand').then(({ data: result, error }) => {
+      if (!cancelled && result && !error) {
+        setData(result as TreemapNode[]);
+      }
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
+  return { data, loading };
+}
 
-const ViewToggles: React.FC<{ active: ViewMode; onChange: (m: ViewMode) => void }> = ({ active, onChange }) => {
-  const modes: { id: ViewMode; label: string }[] = [
-    { id: 'grid', label: 'GRID' },
-    { id: 'list', label: 'LIST' },
+function useModels(make: string | null) {
+  const [data, setData] = useState<TreemapNode[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!make) { setData(null); return; }
+    let cancelled = false;
+    setLoading(true);
+    supabase.rpc('treemap_models_by_brand', { p_make: make }).then(({ data: result, error }) => {
+      if (!cancelled && result && !error) {
+        setData(result as TreemapNode[]);
+      }
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [make]);
+  return { data, loading };
+}
+
+// ────────────────────────────────────────────────────────────
+// BREADCRUMB
+// ────────────────────────────────────────────────────────────
+
+const Breadcrumb: React.FC<{ make: string; model: string }> = ({ make, model }) => {
+  const crumbs: { label: string; to: string }[] = [
+    { label: 'ALL MAKES', to: '/browse' },
   ];
+  if (make) {
+    crumbs.push({ label: make.toUpperCase(), to: `/browse?make=${encodeURIComponent(make)}` });
+  }
+  if (model) {
+    crumbs.push({ label: model.toUpperCase(), to: `/browse?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}` });
+  }
+
   return (
-    <div style={{ display: 'flex', gap: 0 }}>
-      {modes.map((m) => (
-        <button
-          key={m.id}
-          onClick={() => onChange(m.id)}
-          style={{
-            fontFamily: 'Arial, sans-serif',
-            fontSize: 9,
-            fontWeight: 700,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            padding: '6px 12px',
-            border: '2px solid',
-            borderColor: active === m.id ? 'var(--text)' : 'var(--border, #bdbdbd)',
-            background: active === m.id ? 'var(--text)' : 'var(--surface, #fff)',
-            color: active === m.id ? 'var(--surface-elevated)' : 'var(--text, #000)',
-            cursor: 'pointer',
-            marginRight: -2,
-            position: 'relative',
-            zIndex: active === m.id ? 1 : 0,
-          }}
-        >
-          {m.label}
-        </button>
-      ))}
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+      padding: '10px 16px',
+      background: '#000',
+      color: '#fff',
+      fontSize: 10,
+      fontWeight: 700,
+      letterSpacing: '0.12em',
+      fontFamily: 'Arial, sans-serif',
+      textTransform: 'uppercase',
+    }}>
+      {crumbs.map((c, i) => {
+        const isLast = i === crumbs.length - 1;
+        return (
+          <React.Fragment key={c.to}>
+            {i > 0 && <span style={{ color: '#555', margin: '0 2px' }}>/</span>}
+            {isLast ? (
+              <span>{c.label}</span>
+            ) : (
+              <Link to={c.to} style={{ color: '#888', textDecoration: 'none' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#888')}
+              >{c.label}</Link>
+            )}
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 };
 
-/* ═══════════════════════════════════════════
-   TOOLBAR — view toggles + sort
-   ═══════════════════════════════════════════ */
-const Toolbar: React.FC<{
-  viewMode: ViewMode;
-  onViewChange: (m: ViewMode) => void;
-  sortBy: string;
-  sortDir: string;
-  onSortChange: (sb: string, sd: string) => void;
-  imagesOnly: boolean;
-  onImagesToggle: () => void;
-  total: number;
-  loaded: number;
-}> = ({ viewMode, onViewChange, sortBy, sortDir, onSortChange, imagesOnly, onImagesToggle, total, loaded }) => (
-  <div style={{
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '8px 16px',
-    borderBottom: '2px solid var(--border, #bdbdbd)',
-    flexWrap: 'wrap',
-    gap: 8,
-  }}>
-    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-      <ViewToggles active={viewMode} onChange={onViewChange} />
-      <span style={{
-        fontFamily: "'Courier New', monospace",
-        fontSize: 9,
-        color: 'var(--text-secondary, #666)',
-        letterSpacing: '0.04em',
-      }}>
-        {loaded > 0 ? `${fmt(loaded)} OF ${fmt(total)}` : ''}
-      </span>
-    </div>
+// ────────────────────────────────────────────────────────────
+// SEARCH INPUT
+// ────────────────────────────────────────────────────────────
 
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-      <span style={{
-        fontSize: 9,
+const SearchInput: React.FC<{ value: string; onChange: (v: string) => void; placeholder: string }> = ({ value, onChange, placeholder }) => (
+  <div style={{ padding: '12px 16px', borderBottom: '2px solid #ebebeb' }}>
+    <input
+      type="text"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      style={{
+        width: '100%',
+        padding: '8px 12px',
+        border: '2px solid #ebebeb',
+        borderRadius: 0,
+        background: '#f5f5f5',
+        fontFamily: 'Arial, sans-serif',
+        fontSize: 12,
         fontWeight: 700,
-        letterSpacing: '0.1em',
+        letterSpacing: '0.06em',
         textTransform: 'uppercase',
-        color: 'var(--text-secondary, #777)',
-      }}>SORT:</span>
-      <select
-        value={`${sortBy}-${sortDir}`}
-        onChange={(e) => {
-          const [sb, sd] = e.target.value.split('-');
-          onSortChange(sb, sd);
-        }}
-        style={{
-          padding: '3px 8px',
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          border: '2px solid var(--border, #bdbdbd)',
-          background: 'var(--surface, #fff)',
-          color: 'var(--text, #000)',
-          fontFamily: 'Arial, sans-serif',
-          cursor: 'pointer',
-        }}
-      >
-        <option value="sold_price-desc">PRICE HIGH</option>
-        <option value="sold_price-asc">PRICE LOW</option>
-        <option value="year-desc">YEAR NEW</option>
-        <option value="year-asc">YEAR OLD</option>
-        <option value="created_at-desc">RECENT</option>
-      </select>
-
-      <button
-        onClick={onImagesToggle}
-        style={{
-          padding: '3px 10px',
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          fontFamily: 'Arial, sans-serif',
-          border: '2px solid',
-          borderColor: imagesOnly ? 'var(--text)' : 'var(--border, #bdbdbd)',
-          background: imagesOnly ? 'var(--text)' : 'var(--surface, #fff)',
-          color: imagesOnly ? 'var(--surface-elevated)' : 'var(--text, #000)',
-          cursor: 'pointer',
-        }}
-      >
-        {imagesOnly ? 'IMAGES ONLY' : 'SHOW ALL'}
-      </button>
-    </div>
+        outline: 'none',
+        color: '#000',
+        boxSizing: 'border-box',
+      }}
+      onFocus={e => (e.currentTarget.style.borderColor = '#000')}
+      onBlur={e => (e.currentTarget.style.borderColor = '#ebebeb')}
+    />
   </div>
 );
 
-/* ═══════════════════════════════════════════
-   FILTER ROW — label + pills
-   ═══════════════════════════════════════════ */
-const FilterRow: React.FC<{
-  label: string;
-  items: Array<{ key: string; display: string; count?: number }>;
-  activeKey: string;
-  onToggle: (key: string) => void;
-  maxVisible?: number;
-}> = ({ label, items, activeKey, onToggle, maxVisible = 10 }) => {
-  if (items.length === 0) return null;
-  const visible = items.slice(0, maxVisible);
-  const overflow = items.length - maxVisible;
+// ────────────────────────────────────────────────────────────
+// MAKE CELL — shows make name, count, avg price, top 3 models
+// ────────────────────────────────────────────────────────────
+
+const MakeCell: React.FC<{ node: TreemapNode; topModels: TreemapNode[] | null }> = ({ node, topModels }) => {
+  const avgPrice = node.count > 0 ? Math.round(node.value / node.count) : null;
   return (
-    <div style={{
-      display: 'flex',
-      gap: 8,
-      padding: '10px 16px',
-      borderBottom: '2px solid var(--surface-alt, #ebebeb)',
-      flexWrap: 'wrap',
-      alignItems: 'center',
-    }}>
-      <span style={{
-        fontSize: 9,
+    <Link
+      to={`/browse?make=${encodeURIComponent(node.name)}`}
+      style={{
+        border: '2px solid #ebebeb',
+        background: '#f5f5f5',
+        display: 'flex',
+        flexDirection: 'column',
+        textDecoration: 'none',
+        color: '#000',
+        padding: 14,
+        transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+        cursor: 'pointer',
+        minHeight: 100,
+      }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = '#000')}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = '#ebebeb')}
+    >
+      {/* Make initial / logo placeholder */}
+      <div style={{
+        width: 32,
+        height: 32,
+        background: '#000',
+        color: '#fff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: 'Arial, sans-serif',
+        fontSize: 14,
         fontWeight: 700,
-        letterSpacing: '0.1em',
+        letterSpacing: '0.04em',
+        marginBottom: 10,
+        flexShrink: 0,
+      }}>
+        {node.name.charAt(0).toUpperCase()}
+      </div>
+
+      {/* Make name */}
+      <div style={{
+        fontFamily: 'Arial, sans-serif',
+        fontSize: 14,
+        fontWeight: 700,
+        letterSpacing: '0.04em',
         textTransform: 'uppercase',
-        color: 'var(--text-secondary, #777)',
-        marginRight: 4,
-        whiteSpace: 'nowrap',
-      }}>{label}</span>
-      {visible.map((item) => {
-        const isActive = activeKey.toLowerCase() === item.key.toLowerCase();
-        return (
-          <button
-            key={item.key}
-            onClick={() => onToggle(item.key)}
-            style={{
+        lineHeight: 1.2,
+        marginBottom: 6,
+      }}>
+        {node.name}
+      </div>
+
+      {/* Count + avg price */}
+      <div style={{
+        fontFamily: "'Courier New', monospace",
+        fontSize: 11,
+        color: '#666',
+        lineHeight: 1.5,
+      }}>
+        <span>{fmt(node.count)} vehicles</span>
+        {avgPrice && (
+          <>
+            <span style={{ margin: '0 6px', color: '#bbb' }}>|</span>
+            <span>avg {fmtPrice(avgPrice)}</span>
+          </>
+        )}
+      </div>
+
+      {/* Median price */}
+      {node.median_price && (
+        <div style={{
+          fontFamily: "'Courier New', monospace",
+          fontSize: 10,
+          color: '#999',
+          marginTop: 2,
+        }}>
+          median {fmtPrice(node.median_price)}
+        </div>
+      )}
+
+      {/* Top 3 models */}
+      {topModels && topModels.length > 0 && (
+        <div style={{ marginTop: 10, borderTop: '1px solid #e0e0e0', paddingTop: 8 }}>
+          {topModels.slice(0, 3).map(m => (
+            <div key={m.name} style={{
               fontFamily: 'Arial, sans-serif',
               fontSize: 9,
               fontWeight: 700,
               letterSpacing: '0.06em',
               textTransform: 'uppercase',
-              padding: '3px 8px',
-              border: '2px solid',
-              borderColor: isActive ? 'var(--accent, #ff5f00)' : 'var(--border, #ccc)',
-              background: 'var(--surface, #fff)',
-              color: isActive ? 'var(--accent, #ff5f00)' : 'var(--text-secondary, #444)',
-              cursor: 'pointer',
-              transition: 'border-color 0.12s, color 0.12s',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {item.display}
-            {item.count != null && (
+              color: '#888',
+              lineHeight: 1.8,
+              display: 'flex',
+              justifyContent: 'space-between',
+            }}>
               <span style={{
-                marginLeft: 4,
-                fontFamily: "'Courier New', monospace",
-                opacity: 0.5,
-              }}>{fmt(item.count)}</span>
-            )}
-          </button>
-        );
-      })}
-      {overflow > 0 && (
-        <span style={{
-          fontSize: 9,
-          color: 'var(--text-secondary, #777)',
-          letterSpacing: '0.04em',
-        }}>+{overflow}</span>
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flex: 1,
+                marginRight: 8,
+              }}>{m.name}</span>
+              <span style={{ fontFamily: "'Courier New', monospace", color: '#aaa', flexShrink: 0 }}>{fmt(m.count)}</span>
+            </div>
+          ))}
+        </div>
       )}
-    </div>
+    </Link>
   );
 };
 
-/* ═══════════════════════════════════════════
-   RESULT CARD — grid mode
-   ═══════════════════════════════════════════ */
-const ResultCard: React.FC<{ v: BrowseResult; hideMake?: boolean }> = ({ v, hideMake }) => {
-  const title = hideMake
-    ? [v.year, v.model].filter(Boolean).join(' ')
-    : [v.year, v.make, v.model].filter(Boolean).join(' ');
+// ────────────────────────────────────────────────────────────
+// MODEL CELL — shows model name, count, median price
+// ────────────────────────────────────────────────────────────
+
+const ModelCell: React.FC<{ node: TreemapNode; make: string }> = ({ node, make }) => {
+  const avgPrice = node.count > 0 ? Math.round(node.value / node.count) : null;
+  return (
+    <Link
+      to={`/browse?make=${encodeURIComponent(make)}&model=${encodeURIComponent(node.name)}`}
+      style={{
+        border: '2px solid #ebebeb',
+        background: '#f5f5f5',
+        display: 'flex',
+        flexDirection: 'column',
+        textDecoration: 'none',
+        color: '#000',
+        padding: 14,
+        transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+        cursor: 'pointer',
+        minHeight: 80,
+      }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = '#000')}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = '#ebebeb')}
+    >
+      {/* Model name */}
+      <div style={{
+        fontFamily: 'Arial, sans-serif',
+        fontSize: 14,
+        fontWeight: 700,
+        letterSpacing: '0.04em',
+        textTransform: 'uppercase',
+        lineHeight: 1.2,
+        marginBottom: 6,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      }}>
+        {node.name}
+      </div>
+
+      {/* Count */}
+      <div style={{
+        fontFamily: "'Courier New', monospace",
+        fontSize: 11,
+        color: '#666',
+        lineHeight: 1.5,
+      }}>
+        {fmt(node.count)} vehicles
+      </div>
+
+      {/* Prices */}
+      <div style={{
+        fontFamily: "'Courier New', monospace",
+        fontSize: 10,
+        color: '#999',
+        marginTop: 4,
+        lineHeight: 1.5,
+      }}>
+        {avgPrice && <div>avg {fmtPrice(avgPrice)}</div>}
+        {node.median_price && <div>median {fmtPrice(node.median_price)}</div>}
+      </div>
+
+      {/* Sold ratio */}
+      {node.sold_count != null && node.auction_count != null && node.auction_count > 0 && (
+        <div style={{
+          fontFamily: "'Courier New', monospace",
+          fontSize: 9,
+          color: '#aaa',
+          marginTop: 4,
+        }}>
+          {Math.round((node.sold_count / node.auction_count) * 100)}% sold ({fmt(node.sold_count)}/{fmt(node.auction_count)})
+        </div>
+      )}
+    </Link>
+  );
+};
+
+// ────────────────────────────────────────────────────────────
+// LEVEL 0 — ALL MAKES GRID
+// ────────────────────────────────────────────────────────────
+
+const MakesGrid: React.FC = () => {
+  const { data: brands, loading } = useBrands();
+  const [filter, setFilter] = useState('');
+  const [topModelsMap, setTopModelsMap] = useState<Record<string, TreemapNode[]>>({});
+
+  // Fetch top models for each visible make (batched, top 20 makes)
+  useEffect(() => {
+    if (!brands) return;
+    let cancelled = false;
+    const topMakes = brands.slice(0, 20);
+    Promise.all(
+      topMakes.map(b =>
+        supabase.rpc('treemap_models_by_brand', { p_make: b.name })
+          .then(({ data }) => ({ make: b.name, models: (data as TreemapNode[] || []).slice(0, 3) }))
+      )
+    ).then(results => {
+      if (cancelled) return;
+      const map: Record<string, TreemapNode[]> = {};
+      results.forEach(r => { map[r.make] = r.models; });
+      setTopModelsMap(map);
+    });
+    return () => { cancelled = true; };
+  }, [brands]);
+
+  const filtered = useMemo(() => {
+    if (!brands) return [];
+    if (!filter) return brands;
+    const q = filter.toLowerCase();
+    return brands.filter(b => b.name.toLowerCase().includes(q));
+  }, [brands, filter]);
+
+  if (loading) {
+    return (
+      <div style={{ padding: 60, textAlign: 'center' }}>
+        <div style={{
+          fontFamily: "'Courier New', monospace",
+          fontSize: 11,
+          letterSpacing: '0.08em',
+          color: '#666',
+        }}>LOADING MAKES...</div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <SearchInput value={filter} onChange={setFilter} placeholder="FILTER MAKES..." />
+
+      {/* Summary */}
+      <div style={{
+        padding: '8px 16px',
+        fontFamily: "'Courier New', monospace",
+        fontSize: 10,
+        color: '#999',
+        letterSpacing: '0.04em',
+        borderBottom: '1px solid #ebebeb',
+      }}>
+        {filtered.length} MAKES
+        {filter && ` MATCHING "${filter.toUpperCase()}"`}
+      </div>
+
+      {/* Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+        gap: 2,
+        padding: 2,
+      }}>
+        {filtered.map(node => (
+          <MakeCell key={node.name} node={node} topModels={topModelsMap[node.name] || null} />
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
+        <div style={{ padding: 60, textAlign: 'center' }}>
+          <div style={{
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            marginBottom: 8,
+          }}>NO MAKES FOUND</div>
+          <div style={{ fontSize: 10, color: '#666' }}>
+            Try a different search term.
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+// ────────────────────────────────────────────────────────────
+// LEVEL 1 — MODELS GRID FOR A MAKE
+// ────────────────────────────────────────────────────────────
+
+const ModelsGrid: React.FC<{ make: string }> = ({ make }) => {
+  const { data: models, loading } = useModels(make);
+  const [filter, setFilter] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!models) return [];
+    if (!filter) return models;
+    const q = filter.toLowerCase();
+    return models.filter(m => m.name.toLowerCase().includes(q));
+  }, [models, filter]);
+
+  const totalVehicles = models?.reduce((s, m) => s + m.count, 0) || 0;
+  const totalValue = models?.reduce((s, m) => s + m.value, 0) || 0;
+  const avgPrice = totalVehicles > 0 ? Math.round(totalValue / totalVehicles) : null;
+
+  if (loading) {
+    return (
+      <div style={{ padding: 60, textAlign: 'center' }}>
+        <div style={{
+          fontFamily: "'Courier New', monospace",
+          fontSize: 11,
+          letterSpacing: '0.08em',
+          color: '#666',
+        }}>LOADING MODELS...</div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <SearchInput value={filter} onChange={setFilter} placeholder={`FILTER ${make.toUpperCase()} MODELS...`} />
+
+      {/* Summary */}
+      <div style={{
+        padding: '8px 16px',
+        fontFamily: "'Courier New', monospace",
+        fontSize: 10,
+        color: '#999',
+        letterSpacing: '0.04em',
+        borderBottom: '1px solid #ebebeb',
+        display: 'flex',
+        gap: 12,
+        flexWrap: 'wrap',
+      }}>
+        <span>{filtered.length} MODELS</span>
+        <span>{fmt(totalVehicles)} VEHICLES</span>
+        {avgPrice && <span>AVG {fmtPrice(avgPrice)}</span>}
+        {filter && <span>MATCHING "{filter.toUpperCase()}"</span>}
+      </div>
+
+      {/* Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+        gap: 2,
+        padding: 2,
+      }}>
+        {filtered.map(node => (
+          <ModelCell key={node.name} node={node} make={make} />
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
+        <div style={{ padding: 60, textAlign: 'center' }}>
+          <div style={{
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            marginBottom: 8,
+          }}>NO MODELS FOUND</div>
+          <div style={{ fontSize: 10, color: '#666' }}>
+            Try a different search term.
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+// ────────────────────────────────────────────────────────────
+// LEVEL 2 — VEHICLE LIST FOR MAKE + MODEL
+// ────────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 50;
+
+const VehicleResultCard: React.FC<{ v: BrowseResult }> = ({ v }) => {
+  const title = [v.year, v.make, v.model].filter(Boolean).join(' ');
   return (
     <Link
       to={`/vehicle/${v.id}`}
       style={{
-        border: '2px solid var(--surface-alt, #ebebeb)',
-        background: 'var(--surface, #fff)',
+        border: '2px solid #ebebeb',
+        background: '#f5f5f5',
         display: 'flex',
         flexDirection: 'column',
         textDecoration: 'none',
-        color: 'var(--text, #000)',
-        transition: 'border-color 0.12s',
+        color: '#000',
+        transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
         overflow: 'hidden',
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--accent, #ff5f00)')}
-      onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--surface-alt, #ebebeb)')}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = '#000')}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = '#ebebeb')}
     >
       <div style={{
         width: '100%',
-        height: 110,
+        height: 120,
         background: v.primary_image_url
           ? `url(${v.primary_image_url}) center/cover`
-          : 'var(--surface-alt, #ebebeb)',
+          : '#ebebeb',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        borderBottom: '2px solid var(--surface-alt, #ebebeb)',
+        borderBottom: '2px solid #ebebeb',
       }}>
         {!v.primary_image_url && (
           <span style={{
@@ -301,15 +569,16 @@ const ResultCard: React.FC<{ v: BrowseResult; hideMake?: boolean }> = ({ v, hide
             fontWeight: 700,
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
-            color: 'var(--text-secondary, #999)',
+            color: '#999',
           }}>NO IMAGE</span>
         )}
       </div>
       <div style={{ padding: 10 }}>
         <div style={{
-          fontSize: 10,
+          fontFamily: 'Arial, sans-serif',
+          fontSize: 11,
           fontWeight: 700,
-          letterSpacing: '0.06em',
+          letterSpacing: '0.04em',
           textTransform: 'uppercase',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -319,118 +588,38 @@ const ResultCard: React.FC<{ v: BrowseResult; hideMake?: boolean }> = ({ v, hide
         </div>
         <div style={{
           fontFamily: "'Courier New', monospace",
-          fontSize: 9,
-          color: 'var(--text-secondary, #777)',
-          lineHeight: 1.4,
+          fontSize: 10,
+          color: '#666',
+          lineHeight: 1.5,
           marginTop: 4,
         }}>
-          {fmtPrice(v.sold_price)}
-          {v.status ? ` · ${v.status.toUpperCase()}` : ''}
-          {v.source ? ` · ${v.source.toUpperCase()}` : ''}
+          {fmtPriceFull(v.sold_price)}
+          {v.source ? ` \u00b7 ${v.source.toUpperCase()}` : ''}
         </div>
       </div>
     </Link>
   );
 };
 
-/* ═══════════════════════════════════════════
-   RESULT ROW — list mode
-   ═══════════════════════════════════════════ */
-const ResultRow: React.FC<{ v: BrowseResult; hideMake?: boolean }> = ({ v, hideMake }) => {
-  const title = hideMake
-    ? [v.year, v.model].filter(Boolean).join(' ')
-    : [v.year, v.make, v.model].filter(Boolean).join(' ');
-  return (
-    <Link
-      to={`/vehicle/${v.id}`}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        padding: '6px 16px',
-        borderBottom: '1px solid var(--surface-alt, #ebebeb)',
-        textDecoration: 'none',
-        color: 'var(--text, #000)',
-        transition: 'background 0.12s',
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-alt, #f0f0f0)')}
-      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-    >
-      <div style={{
-        width: 64,
-        height: 40,
-        flexShrink: 0,
-        background: v.primary_image_url
-          ? `url(${v.primary_image_url}) center/cover`
-          : 'var(--surface-alt, #ebebeb)',
-        border: '1px solid var(--surface-alt, #ebebeb)',
-      }} />
-      <div style={{
-        flex: 1,
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: '0.04em',
-        textTransform: 'uppercase',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-      }}>
-        {title || 'UNKNOWN'}
-      </div>
-      <div style={{
-        fontFamily: "'Courier New', monospace",
-        fontSize: 10,
-        fontWeight: 700,
-        whiteSpace: 'nowrap',
-      }}>
-        {fmtPrice(v.sold_price)}
-      </div>
-      <div style={{
-        fontSize: 9,
-        letterSpacing: '0.06em',
-        textTransform: 'uppercase',
-        color: 'var(--text-secondary, #777)',
-        whiteSpace: 'nowrap',
-        minWidth: 60,
-        textAlign: 'right',
-      }}>
-        {v.source || ''}
-      </div>
-    </Link>
-  );
-};
-
-/* ═══════════════════════════════════════════
-   MAIN BROWSE PAGE
-   ═══════════════════════════════════════════ */
-const BrowseVehicles: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+const VehicleList: React.FC<{ make: string; model: string }> = ({ make, model }) => {
   const search = useSearch();
-
-  const make = searchParams.get('make') || '';
-  const model = searchParams.get('model') || '';
-  const era = searchParams.get('era') || '';
-  const bodyStyle = searchParams.get('bodyStyle') || '';
-
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState('sold_price');
   const [sortDir, setSortDir] = useState('desc');
-  const [imagesOnly, setImagesOnly] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [allResults, setAllResults] = useState<BrowseResult[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const isInitialLoad = useRef(true);
 
-  const buildParams = useCallback((p: number): BrowseParams => {
-    const params: BrowseParams = { page: p, pageSize: PAGE_SIZE, sortBy, sortDir };
-    if (make) params.make = make;
-    if (model) params.model = model;
-    if (era) params.era = era;
-    if (bodyStyle) params.bodyStyle = bodyStyle;
-    if (imagesOnly) params.hasImage = true;
-    return params;
-  }, [make, model, era, bodyStyle, sortBy, sortDir, imagesOnly]);
+  const buildParams = useCallback((p: number): BrowseParams => ({
+    page: p,
+    pageSize: PAGE_SIZE,
+    sortBy,
+    sortDir,
+    make,
+    model,
+    hasImage: false,
+  }), [make, model, sortBy, sortDir]);
 
   // Reset on filter change
   useEffect(() => {
@@ -438,7 +627,7 @@ const BrowseVehicles: React.FC = () => {
     setAllResults([]);
     isInitialLoad.current = true;
     search.executeBrowse(buildParams(1));
-  }, [make, model, era, bodyStyle, sortBy, sortDir, imagesOnly]);
+  }, [make, model, sortBy, sortDir]);
 
   // Append results
   useEffect(() => {
@@ -473,60 +662,67 @@ const BrowseVehicles: React.FC = () => {
     return () => obs.disconnect();
   }, [allResults.length, search.totalCount, search.browseLoading, loadingMore, page, buildParams]);
 
-  const stats = search.browseStats;
   const total = search.totalCount;
   const loading = search.browseLoading && allResults.length === 0;
 
-  const toggleParam = (key: string, value: string) => {
-    const next = new URLSearchParams(searchParams);
-    if (next.get(key)?.toLowerCase() === value.toLowerCase()) {
-      next.delete(key);
-    } else {
-      next.set(key, value);
-    }
-    setSearchParams(next);
-  };
-
-  // Build filter items from stats
-  const modelItems = (stats?.by_model || []).map(m => ({
-    key: m.model, display: m.model.length > 22 ? m.model.slice(0, 22) + '…' : m.model, count: m.count,
-  }));
-  const eraItems = (stats?.by_era || []).map(e => ({
-    key: e.era, display: ERA_LABELS[e.era] || e.era.toUpperCase(), count: e.count,
-  }));
-
   return (
-    <div style={{ minHeight: '100vh', border: '2px solid var(--border, #bdbdbd)', background: 'var(--surface, #fff)' }}>
-      {/* Stats bar */}
-      <StatsBar make={make} stats={stats} />
+    <>
+      {/* Sort bar */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '8px 16px',
+        borderBottom: '2px solid #ebebeb',
+        flexWrap: 'wrap',
+        gap: 8,
+      }}>
+        <span style={{
+          fontFamily: "'Courier New', monospace",
+          fontSize: 10,
+          color: '#999',
+          letterSpacing: '0.04em',
+        }}>
+          {total > 0 ? `${fmt(allResults.length)} OF ${fmt(total)} VEHICLES` : ''}
+        </span>
 
-      {/* Toolbar */}
-      <Toolbar
-        viewMode={viewMode}
-        onViewChange={setViewMode}
-        sortBy={sortBy}
-        sortDir={sortDir}
-        onSortChange={(sb, sd) => { setSortBy(sb); setSortDir(sd); }}
-        imagesOnly={imagesOnly}
-        onImagesToggle={() => setImagesOnly(!imagesOnly)}
-        total={total}
-        loaded={allResults.length}
-      />
-
-      {/* Filters */}
-      <FilterRow
-        label="MODEL"
-        items={modelItems}
-        activeKey={model}
-        onToggle={(m) => toggleParam('model', m)}
-        maxVisible={8}
-      />
-      <FilterRow
-        label="ERA"
-        items={eraItems}
-        activeKey={era}
-        onToggle={(e) => toggleParam('era', e)}
-      />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: '#777',
+          }}>SORT:</span>
+          <select
+            value={`${sortBy}-${sortDir}`}
+            onChange={e => {
+              const [sb, sd] = e.target.value.split('-');
+              setSortBy(sb);
+              setSortDir(sd);
+            }}
+            style={{
+              padding: '3px 8px',
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              border: '2px solid #ebebeb',
+              borderRadius: 0,
+              background: '#f5f5f5',
+              color: '#000',
+              fontFamily: 'Arial, sans-serif',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="sold_price-desc">PRICE HIGH</option>
+            <option value="sold_price-asc">PRICE LOW</option>
+            <option value="year-desc">YEAR NEW</option>
+            <option value="year-asc">YEAR OLD</option>
+            <option value="created_at-desc">RECENT</option>
+          </select>
+        </div>
+      </div>
 
       {/* Results */}
       {loading ? (
@@ -535,8 +731,8 @@ const BrowseVehicles: React.FC = () => {
             fontFamily: "'Courier New', monospace",
             fontSize: 11,
             letterSpacing: '0.08em',
-            color: 'var(--text-secondary, #666)',
-          }}>SEARCHING...</div>
+            color: '#666',
+          }}>LOADING VEHICLES...</div>
         </div>
       ) : allResults.length === 0 && !search.browseLoading ? (
         <div style={{ padding: 60, textAlign: 'center' }}>
@@ -546,27 +742,20 @@ const BrowseVehicles: React.FC = () => {
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
             marginBottom: 8,
-          }}>NO RESULTS</div>
-          <div style={{
-            fontSize: 10,
-            color: 'var(--text-secondary, #666)',
-          }}>Try adjusting filters or search for a different make.</div>
+          }}>NO VEHICLES FOUND</div>
+          <div style={{ fontSize: 10, color: '#666' }}>
+            No {make} {model} vehicles in the database yet.
+          </div>
         </div>
-      ) : viewMode === 'grid' ? (
+      ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
           gap: 2,
           padding: 2,
         }}>
-          {allResults.map((v) => (
-            <ResultCard key={v.id} v={v} hideMake={!!make} />
-          ))}
-        </div>
-      ) : (
-        <div>
-          {allResults.map((v) => (
-            <ResultRow key={v.id} v={v} hideMake={!!make} />
+          {allResults.map(v => (
+            <VehicleResultCard key={v.id} v={v} />
           ))}
         </div>
       )}
@@ -582,11 +771,11 @@ const BrowseVehicles: React.FC = () => {
           fontFamily: "'Courier New', monospace",
           fontSize: 9,
           letterSpacing: '0.08em',
-          color: 'var(--text-secondary, #666)',
+          color: '#666',
         }}>LOADING MORE...</div>
       )}
 
-      {/* End */}
+      {/* End marker */}
       {allResults.length >= total && total > 0 && !search.browseLoading && (
         <div style={{
           padding: '20px 0 40px',
@@ -594,9 +783,38 @@ const BrowseVehicles: React.FC = () => {
           fontFamily: "'Courier New', monospace",
           fontSize: 9,
           letterSpacing: '0.08em',
-          color: 'var(--text-disabled, #999)',
-        }}>{fmt(total)} VEHICLES · END</div>
+          color: '#999',
+        }}>{fmt(total)} VEHICLES -- END</div>
       )}
+    </>
+  );
+};
+
+// ════════════════════════════════════════════════════════════
+// MAIN BROWSE PAGE — TOPOLOGY EXPLORER
+// ════════════════════════════════════════════════════════════
+
+const BrowseVehicles: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const make = searchParams.get('make') || '';
+  const model = searchParams.get('model') || '';
+
+  // Determine depth: 0 = all makes, 1 = models for a make, 2 = vehicles for make+model
+  const depth = model ? 2 : make ? 1 : 0;
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: '#f5f5f5',
+      fontFamily: 'Arial, sans-serif',
+    }}>
+      {/* Breadcrumb nav */}
+      <Breadcrumb make={make} model={model} />
+
+      {/* Content by depth */}
+      {depth === 0 && <MakesGrid />}
+      {depth === 1 && <ModelsGrid make={make} />}
+      {depth === 2 && <VehicleList make={make} model={model} />}
     </div>
   );
 };
