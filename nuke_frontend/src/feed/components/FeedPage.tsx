@@ -20,6 +20,7 @@ import { VehicleCard } from './VehicleCard';
 import { BrandHeartbeat } from './heartbeat/BrandHeartbeat';
 import { FeedStatCard } from './FeedStatCard';
 import { InterestsBar } from './InterestsBar';
+import { HeroPanel, type HeroDimension, type HeroFilter } from './HeroPanel';
 import { DEFAULT_FILTERS } from '../../lib/filterPersistence';
 import { useInterests } from '../../hooks/useInterests';
 import type { FeedVehicle } from '../types/feed';
@@ -108,6 +109,43 @@ export default function FeedPage() {
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const [showScores, setShowScores] = useState(false);
   const [activeMetric, setActiveMetric] = useState<string | null>(null);
+  const [activeHeroPanel, setActiveHeroPanel] = useState<HeroDimension | null>(null);
+
+  // Hero panel filter handler -- applies the filter from a hero cell click
+  const handleHeroFilter = useCallback(
+    (filter: HeroFilter) => {
+      const newFilters = { ...DEFAULT_FILTERS };
+      if (filter.makes && filter.makes.length > 0) {
+        newFilters.makes = filter.makes;
+      }
+      if (filter.yearMin != null) {
+        newFilters.yearMin = filter.yearMin;
+      }
+      if (filter.yearMax != null) {
+        newFilters.yearMax = filter.yearMax;
+      }
+      if (filter.priceMin != null) {
+        newFilters.priceMin = filter.priceMin;
+      }
+      if (filter.priceMax != null) {
+        newFilters.priceMax = filter.priceMax;
+      }
+      setFilters(newFilters);
+      if (filter.sort) {
+        setSortBy(filter.sort);
+      }
+      // Close the panel after filtering
+      setActiveHeroPanel(null);
+    },
+    [setFilters, setSortBy],
+  );
+
+  const handleHeroPanelToggle = useCallback(
+    (dimension: HeroDimension | null) => {
+      setActiveHeroPanel(dimension);
+    },
+    [],
+  );
 
   // Metric click handler — applies filter presets per Design Bible Law #1
   const handleMetricClick = useCallback(
@@ -252,6 +290,7 @@ export default function FeedPage() {
           showScores={showScores}
           imageFit={imageFit}
           hasInterests={hasInterests}
+          activeHeroPanel={activeHeroPanel}
           onSortChange={setSortBy}
           onDirectionChange={setSortDirection}
           onViewModeChange={setViewMode}
@@ -259,6 +298,15 @@ export default function FeedPage() {
           onFontSizeChange={setFontSize}
           onToggleScores={() => setShowScores(!showScores)}
           onImageFitChange={setImageFit}
+          onHeroPanelToggle={handleHeroPanelToggle}
+        />
+
+        {/* Hero panel — dimension visualization between toolbar and feed */}
+        <HeroPanel
+          dimension={activeHeroPanel}
+          vehicles={vehicles}
+          onFilter={handleHeroFilter}
+          onClose={() => setActiveHeroPanel(null)}
         />
 
         {/* Interest chips — shown when user has interests and no active filters */}

@@ -8,6 +8,7 @@
 import { useMemo, type CSSProperties } from 'react';
 import type { SortBy, SortDirection, ViewMode } from '../../types/feedTypes';
 import type { ImageFit } from '../utils/feedUrlCodec';
+import type { HeroDimension } from './HeroPanel';
 
 export interface FeedToolbarProps {
   sort: SortBy;
@@ -19,6 +20,8 @@ export interface FeedToolbarProps {
   imageFit: ImageFit;
   /** Whether user has recorded interests (enables FOR YOU sort) */
   hasInterests?: boolean;
+  /** Currently open hero panel dimension (for highlight state) */
+  activeHeroPanel?: HeroDimension | null;
   onSortChange: (sort: SortBy) => void;
   onDirectionChange: (dir: SortDirection) => void;
   onViewModeChange: (mode: ViewMode) => void;
@@ -26,6 +29,8 @@ export interface FeedToolbarProps {
   onFontSizeChange: (n: number) => void;
   onToggleScores: () => void;
   onImageFitChange: (fit: ImageFit) => void;
+  /** Called when a sort button is clicked that has a hero panel dimension */
+  onHeroPanelToggle?: (dimension: HeroDimension | null) => void;
 }
 
 const SORT_OPTIONS: { value: SortBy; label: string }[] = [
@@ -75,6 +80,17 @@ const FIT_LABELS: Record<ImageFit, string> = {
   contain: 'FIT: FULL',
 };
 
+// Map sort values to hero dimensions
+const SORT_HERO_MAP: Partial<Record<SortBy, HeroDimension>> = {
+  deal_score: 'deal_score',
+  heat_score: 'heat_score',
+  year: 'year',
+  price_high: 'price_high',
+  price_low: 'price_low',
+  mileage: 'mileage',
+  finds: 'finds',
+};
+
 export function FeedToolbar({
   sort,
   direction,
@@ -84,6 +100,7 @@ export function FeedToolbar({
   showScores,
   imageFit,
   hasInterests,
+  activeHeroPanel,
   onSortChange,
   onDirectionChange,
   onViewModeChange,
@@ -91,6 +108,7 @@ export function FeedToolbar({
   onFontSizeChange,
   onToggleScores,
   onImageFitChange,
+  onHeroPanelToggle,
 }: FeedToolbarProps) {
   const isTableView = viewMode === 'technical';
 
@@ -124,23 +142,50 @@ export function FeedToolbar({
           }}>
             SORT
           </span>
-          {sortOptions.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => {
-                if (sort === opt.value) {
-                  onDirectionChange(direction === 'asc' ? 'desc' : 'asc');
-                } else {
-                  onSortChange(opt.value);
-                }
-              }}
-              style={sort === opt.value ? chipActive : chipBase}
-            >
-              {opt.label}
-              {sort === opt.value && (direction === 'asc' ? ' \u2191' : ' \u2193')}
-            </button>
-          ))}
+          {sortOptions.map((opt) => {
+            const heroDim = SORT_HERO_MAP[opt.value];
+            const isHeroActive = activeHeroPanel != null && heroDim === activeHeroPanel;
+            const isActive = sort === opt.value;
+
+            // Hero panel indicator bar
+            const heroIndicator: CSSProperties = isHeroActive
+              ? { borderBottom: '2px solid var(--text)', paddingBottom: '3px' }
+              : {};
+
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  if (isActive && heroDim && onHeroPanelToggle) {
+                    // Already on this sort -- toggle hero panel
+                    if (isHeroActive) {
+                      onHeroPanelToggle(null);
+                    } else {
+                      onHeroPanelToggle(heroDim);
+                    }
+                  } else if (isActive) {
+                    onDirectionChange(direction === 'asc' ? 'desc' : 'asc');
+                  } else {
+                    onSortChange(opt.value);
+                    // Open hero panel for the new sort
+                    if (heroDim && onHeroPanelToggle) {
+                      onHeroPanelToggle(heroDim);
+                    } else if (onHeroPanelToggle) {
+                      onHeroPanelToggle(null);
+                    }
+                  }
+                }}
+                style={{
+                  ...(isActive ? chipActive : chipBase),
+                  ...heroIndicator,
+                }}
+              >
+                {opt.label}
+                {isActive && (direction === 'asc' ? ' \u2191' : ' \u2193')}
+              </button>
+            );
+          })}
         </div>
       )}
 

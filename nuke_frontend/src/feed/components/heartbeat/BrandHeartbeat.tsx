@@ -138,7 +138,6 @@ export function BrandHeartbeat({ make, model }: BrandHeartbeatProps) {
         marginBottom: '10px',
       }}>
         <HeartbeatStatCell label="LISTINGS" value={d.total_listings.toLocaleString()} />
-        <HeartbeatStatCell label="AVG PRICE" value={formatPrice(d.avg_price)} />
         <HeartbeatStatCell label="MEDIAN" value={formatPrice(d.median_price)} />
         <HeartbeatStatCell
           label="SELL-THROUGH"
