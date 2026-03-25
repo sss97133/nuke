@@ -12,8 +12,192 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useBadgeDepth, type BadgeDimension } from './useBadgeDepth';
+import { useBadgeDepth, type BadgeDimension, type BadgeDepthData } from './useBadgeDepth';
 import { BadgeClusterPanel } from './BadgeClusterPanel';
+
+/* ─── Rich Tooltip ─── */
+
+function formatTooltipPrice(n: number | null): string {
+  if (n == null || n <= 0) return '';
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
+  return `$${n.toLocaleString()}`;
+}
+
+function formatTooltipCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return n.toLocaleString();
+  return String(n);
+}
+
+/** Build 2-3 line tooltip content based on dimension + stats */
+function buildTooltipLines(
+  dimension: BadgeDimension,
+  label: string,
+  data: BadgeDepthData,
+): string[][] {
+  const { count, stats } = data;
+  const lines: string[][] = [];
+
+  // Line 1: always count
+  lines.push([`${formatTooltipCount(count)} vehicles`]);
+
+  if (!stats) return lines;
+
+  switch (dimension) {
+    case 'source': {
+      // "Avg $42K · 98% photos · 93% VIN"
+      const parts: string[] = [];
+      if (stats.avg_price) parts.push(`Avg ${formatTooltipPrice(stats.avg_price)}`);
+      if (stats.fill_rates && stats.fill_rates.length > 0) {
+        // Pick top 2 fill rates
+        const top = stats.fill_rates.slice(0, 2);
+        for (const r of top) {
+          parts.push(`${r.pct}% ${r.field.toLowerCase()}`);
+        }
+      }
+      if (parts.length > 0) lines.push(parts);
+      // Top makes
+      if (stats.top_facets.length > 0) {
+        const names = stats.top_facets.slice(0, 3).map((f) => f.label);
+        lines.push([`Top: ${names.join(', ')}`]);
+      }
+      break;
+    }
+    case 'make': {
+      // "Avg $38K · 1955-2026"
+      const parts: string[] = [];
+      if (stats.avg_price) parts.push(`Avg ${formatTooltipPrice(stats.avg_price)}`);
+      if (stats.min_year != null && stats.max_year != null) {
+        parts.push(stats.min_year === stats.max_year
+          ? String(stats.min_year)
+          : `${stats.min_year}\u2013${stats.max_year}`);
+      }
+      if (parts.length > 0) lines.push(parts);
+      // "Top: Corvette, C10, Camaro"
+      if (stats.top_facets.length > 0) {
+        const names = stats.top_facets.slice(0, 3).map((f) => f.label);
+        lines.push([`Top: ${names.join(', ')}`]);
+      }
+      break;
+    }
+    case 'model': {
+      // "Avg $52K · 1965-2024"
+      const parts: string[] = [];
+      if (stats.avg_price) parts.push(`Avg ${formatTooltipPrice(stats.avg_price)}`);
+      if (stats.min_year != null && stats.max_year != null) {
+        parts.push(stats.min_year === stats.max_year
+          ? String(stats.min_year)
+          : `${stats.min_year}\u2013${stats.max_year}`);
+      }
+      if (parts.length > 0) lines.push(parts);
+      // Top body styles
+      if (stats.top_facets.length > 0) {
+        const names = stats.top_facets.slice(0, 3).map((f) => f.label);
+        lines.push([names.join(', ')]);
+      }
+      break;
+    }
+    case 'body_style': {
+      // "Avg $31K"
+      const parts: string[] = [];
+      if (stats.avg_price) parts.push(`Avg ${formatTooltipPrice(stats.avg_price)}`);
+      if (stats.min_year != null && stats.max_year != null) {
+        parts.push(`${stats.min_year}\u2013${stats.max_year}`);
+      }
+      if (parts.length > 0) lines.push(parts);
+      if (stats.top_facets.length > 0) {
+        const names = stats.top_facets.slice(0, 3).map((f) => f.label);
+        lines.push([`Top: ${names.join(', ')}`]);
+      }
+      break;
+    }
+    case 'year': {
+      const parts: string[] = [];
+      if (stats.avg_price) parts.push(`Avg ${formatTooltipPrice(stats.avg_price)}`);
+      if (parts.length > 0) lines.push(parts);
+      if (stats.top_facets.length > 0) {
+        const names = stats.top_facets.slice(0, 3).map((f) => f.label);
+        lines.push([`Top: ${names.join(', ')}`]);
+      }
+      break;
+    }
+    default: {
+      // deal_score, status, drivetrain, transmission
+      const parts: string[] = [];
+      if (stats.avg_price) parts.push(`Avg ${formatTooltipPrice(stats.avg_price)}`);
+      if (stats.min_year != null && stats.max_year != null) {
+        parts.push(`${stats.min_year}\u2013${stats.max_year}`);
+      }
+      if (parts.length > 0) lines.push(parts);
+      break;
+    }
+  }
+
+  return lines;
+}
+
+/** Custom rich tooltip positioned above the badge */
+function BadgeRichTooltip({
+  dimension,
+  label,
+  data,
+}: {
+  dimension: BadgeDimension;
+  label: string;
+  data: BadgeDepthData;
+}) {
+  const lines = buildTooltipLines(dimension, label, data);
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        bottom: 'calc(100% + 6px)',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 600,
+        background: '#2a2a2a',
+        border: '2px solid #2a2a2a',
+        padding: '5px 8px',
+        pointerEvents: 'none',
+        whiteSpace: 'nowrap',
+        animation: 'fadeIn180 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+      }}
+    >
+      {lines.map((segments, i) => (
+        <div
+          key={i}
+          style={{
+            fontFamily: "'Courier New', monospace",
+            fontSize: i === 0 ? '9px' : '8px',
+            fontWeight: i === 0 ? 700 : 400,
+            color: i === 0 ? '#fff' : 'rgba(255,255,255,0.7)',
+            lineHeight: 1.4,
+            letterSpacing: '0.02em',
+            textTransform: i === 0 ? 'uppercase' as const : 'none' as const,
+          }}
+        >
+          {segments.join(' \u00B7 ')}
+        </div>
+      ))}
+      {/* Arrow */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: -5,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 0,
+          height: 0,
+          borderLeft: '5px solid transparent',
+          borderRight: '5px solid transparent',
+          borderTop: '5px solid #2a2a2a',
+        }}
+      />
+    </div>
+  );
+}
 
 export interface BadgePortalProps {
   /** The dimension this badge filters on */
@@ -118,17 +302,22 @@ export function BadgePortal({
     setIsOpen(false);
   }, []);
 
-  // Depth count for hover tooltip
-  const depthLabel = data && data.count > 0
-    ? `${label} · ${data.count.toLocaleString()}`
-    : tooltip || label;
+  // Show rich tooltip when hovered with data loaded, but panel not open
+  const showRichTooltip = hovered && !isOpen && data && data.count > 0 && data.stats;
+
+  // Fallback native title: only when no rich tooltip (data not loaded yet)
+  const fallbackTitle = !showRichTooltip && !isOpen
+    ? (data && data.count > 0
+      ? `${label} \u00B7 ${data.count.toLocaleString()}`
+      : tooltip || label)
+    : undefined;
 
   return (
     <span
       ref={containerRef}
       role={isStatic ? undefined : 'button'}
       tabIndex={isStatic ? undefined : 0}
-      title={!isOpen ? depthLabel : undefined}
+      title={fallbackTitle}
       style={{
         position: 'relative',
         display: 'inline-flex',
@@ -182,6 +371,11 @@ export function BadgePortal({
         }}>
           ·{data.count > 999 ? `${(data.count / 1000).toFixed(0)}K` : data.count}
         </span>
+      )}
+
+      {/* Rich tooltip on hover (replaces native title) */}
+      {showRichTooltip && (
+        <BadgeRichTooltip dimension={dimension} label={label} data={data!} />
       )}
 
       {/* Cluster panel */}
