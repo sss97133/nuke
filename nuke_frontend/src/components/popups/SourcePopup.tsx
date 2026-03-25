@@ -11,6 +11,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { usePopup } from './usePopup';
+import { MakePopup } from './MakePopup';
 
 interface Props {
   source: string;
@@ -131,7 +132,6 @@ export function SourcePopup({ source }: Props) {
   }
 
   const handleMakeClick = (make: string) => {
-    const { MakePopup } = require('./MakePopup');
     openPopup(<MakePopup make={make} />, make, 360);
   };
 

@@ -168,12 +168,6 @@ export default function ZipSidebarPanel({ zip, onClose, onNavigate }: Props) {
                     {stats.median_price ? fmtPrice(stats.median_price) : '—'}
                   </div>
                 </div>
-                <div>
-                  <div style={{ fontSize: 8, color: 'var(--text-disabled)', textTransform: 'uppercase', marginBottom: 2 }}>AVERAGE</div>
-                  <div style={{ fontFamily: 'Courier New, monospace', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                    {stats.avg_price ? fmtPrice(stats.avg_price) : '—'}
-                  </div>
-                </div>
               </div>
               {stats.first_listed && (
                 <div style={{ fontSize: 9, color: 'var(--text-disabled)', marginTop: 8 }}>

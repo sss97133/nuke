@@ -231,10 +231,6 @@ function MarketAnswer({ comps }: { comps: CompsData }) {
       </div>
       <div style={{ padding: 'var(--space-2) var(--space-3)', fontFamily: '"Courier New", monospace', fontSize: '11px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-          <span style={{ color: 'var(--text-muted)' }}>avg</span>
-          <span>{formatPrice(summary.avg_price)}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
           <span style={{ color: 'var(--text-muted)' }}>median</span>
           <span>{formatPrice(summary.median_price)}</span>
         </div>

@@ -47,7 +47,7 @@ export default function ModelPortal({ make, model, vehiclePrice, activePortal, o
 
             {/* Stats grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px', marginBottom: '8px' }}>
-              <MiniStat label="Avg" value={data.avg_price > 0 ? formatCurrencyAmount(data.avg_price) : '—'} />
+              <MiniStat label="Median" value={data.median_price > 0 ? formatCurrencyAmount(data.median_price) : '—'} />
               <MiniStat label="Volume" value={String(data.total_listings)} />
               <MiniStat label="Days Avg" value={data.avg_days_on_market > 0 ? String(Math.round(data.avg_days_on_market)) : '—'} />
             </div>

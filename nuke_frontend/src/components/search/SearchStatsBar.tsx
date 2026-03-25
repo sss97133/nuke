@@ -32,9 +32,6 @@ export const SearchStatsBar: React.FC<Props> = ({ stats, make }) => {
       >
         <StatCell label="TOTAL" value={stats.total.toLocaleString()} />
         <StatCell label="WITH PHOTOS" value={stats.with_images.toLocaleString()} />
-        {stats.avg_price > 0 && (
-          <StatCell label="AVG PRICE" value={fmtPrice(stats.avg_price)} mono />
-        )}
         {stats.with_price > 0 && (
           <StatCell label="WITH PRICE" value={stats.with_price.toLocaleString()} />
         )}
@@ -69,14 +66,6 @@ export const SearchStatsBar: React.FC<Props> = ({ stats, make }) => {
                     <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
                       {m.count}
                     </span>
-                    {m.avg_price > 0 && (
-                      <span style={{
-                        fontSize: '9px', fontFamily: "'Courier New', monospace",
-                        color: 'var(--text-secondary)',
-                      }}>
-                        {fmtPrice(m.avg_price)}
-                      </span>
-                    )}
                   </div>
                 </div>
               ))}

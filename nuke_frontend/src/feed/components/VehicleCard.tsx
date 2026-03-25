@@ -5,7 +5,7 @@
  * Supports grid / gallery / technical view modes.
  */
 
-import { useMemo, type CSSProperties } from 'react';
+import { useCallback, useMemo, type CSSProperties } from 'react';
 import type { FeedVehicle, FeedViewConfig } from '../types/feed';
 import { resolveVehiclePrice } from '../utils/feedPriceResolution';
 import { vehicleTimeLabel } from '../utils/timeAgo';
@@ -15,6 +15,8 @@ import { CardIdentity } from './card/CardIdentity';
 import { CardDealScore } from './card/CardDealScore';
 import { resolveSourceLabel } from './card/CardSource';
 import { CardActions } from './card/CardActions';
+import { usePopup } from '../../components/popups/usePopup';
+import { VehiclePopup } from '../../components/popups/VehiclePopup';
 
 export interface VehicleCardProps {
   vehicle: FeedVehicle;
@@ -45,6 +47,7 @@ export function VehicleCard({
   onHoverEnd,
   style,
 }: VehicleCardProps) {
+  const { openPopup } = usePopup();
   const price = useMemo(() => resolveVehiclePrice(vehicle), [vehicle]);
   const timeLabel = useMemo(() => vehicleTimeLabel(vehicle), [vehicle]);
 
@@ -52,6 +55,11 @@ export function VehicleCard({
     () => resolveSourceLabel(vehicle.discovery_url, vehicle.discovery_source, vehicle.profile_origin),
     [vehicle.discovery_url, vehicle.discovery_source, vehicle.profile_origin],
   );
+
+  const handleCardClick = useCallback(() => {
+    const title = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'Vehicle';
+    openPopup(<VehiclePopup vehicle={vehicle} />, title, 420);
+  }, [vehicle, openPopup]);
 
   const alt = [vehicle.year, vehicle.make, vehicle.model]
     .filter(Boolean)
@@ -489,6 +497,7 @@ export function VehicleCard({
     : 'var(--text)';
 
   // Grid mode (default) — clean image, all info below
+  // Click opens popup rhizome instead of inline expand
   return (
     <CardShell
       vehicleId={vehicle.id}
@@ -496,6 +505,7 @@ export function VehicleCard({
       expandedContent={expandedContent}
       onHoverStart={onHoverStart}
       onHoverEnd={onHoverEnd}
+      onCardClick={handleCardClick}
       style={style}
     >
       <CardImage thumbnailUrl={vehicle.thumbnail_url} alt={alt} viewMode="grid" fit={imageFit} noImageData={noImageData}>

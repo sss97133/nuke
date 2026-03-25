@@ -35,14 +35,14 @@ export default function YearPortal({ year, activePortal, onOpen }: YearPortalPro
         sparseContent={data && (
           <div style={{ fontSize: '11px' }}>
             <StatRow label="Listings" value={data.total_listings} />
-            {data.avg_price > 0 && <StatRow label="Avg Price" value={formatCurrencyAmount(data.avg_price)} />}
+            {data.median_price > 0 && <StatRow label="Median" value={formatCurrencyAmount(data.median_price)} />}
           </div>
         )}
         richContent={data && (
           <div style={{ fontSize: '11px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '8px' }}>
               <StatBox label="Listings" value={String(data.total_listings)} />
-              <StatBox label="Avg Price" value={data.avg_price > 0 ? formatCurrencyAmount(data.avg_price) : '—'} />
+              <StatBox label="Median" value={data.median_price > 0 ? formatCurrencyAmount(data.median_price) : '—'} />
               <StatBox label="Median" value={data.median_price > 0 ? formatCurrencyAmount(data.median_price) : '—'} />
               <StatBox label="Sell-Through" value={`${Math.round(data.sell_through_pct)}%`} />
             </div>

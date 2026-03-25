@@ -36,5 +36,5 @@
 ~DONE~ | BJ-PRICE-FIX | Computed nuke_estimate for 4,875 of 5,903 BJ vehicles. 98 remain (un-valueable oddities). Coverage 99.74%. | vehicles, nuke_estimates, compute-vehicle-valuation
 ~DONE~ | FEED-FIX | MV refresh fixed (cron timeout 120s->600s), clickable header metrics wired, feed-query deployed with added_today filter
 ~DONE~ | ROUTE-AUDIT | Route audit complete — all routes verified, no issues found at HEAD | nuke_frontend/src/
-09:25 | BAT-DISCOVERY | BaT gap discovery — sitemap crawl to find missing ~100K listings | import_queue, listing_page_snapshots, vehicles
+09:25 | BAT-DISCOVERY | BaT REST API full crawl running — 234K listings across 6527 pages, ~32K gap. Script: bat-models-discovery.mjs. ETA ~4hrs. | bat_extraction_queue, scripts/bat-models-discovery.mjs
 09:00 | BAT-SHALLOW-FIX | Fix 2,011 shallow BaT vehicles + comment extraction gap audit | vehicles, listing_page_snapshots, auction_comments, extract-auction-comments

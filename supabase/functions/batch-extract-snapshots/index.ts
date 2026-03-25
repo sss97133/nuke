@@ -1385,7 +1385,29 @@ function parseBonhamsHtml(html: string): Record<string, any> {
     }
   }
 
-  // VIN
+  // ── Clean model: strip Bonhams title suffixes ──
+  // Bonhams titles include: "Corniche Convertible Coachwork by Mulliner Park Ward
+  //   Registration no. HUC 92W Chassis no. DRH0050454 Engine no. 0050454"
+  // We only want: "Corniche Convertible"
+  if (result.model) {
+    result.model = result.model
+      .replace(/\s+coachwork\s+by\s+.*/i, "")
+      .replace(/\s+chassis\s+no\.?\s*.*/i, "")
+      .replace(/\s+engine\s+no\.?\s*.*/i, "")
+      .replace(/\s+registration\s+no\.?\s*.*/i, "")
+      .replace(/\s+frame\s+no\.?\s*.*/i, "")
+      .replace(/\s+serial\s+no\.?\s*.*/i, "")
+      .replace(/\s+body\s+no\.?\s*.*/i, "")
+      .trim();
+  }
+
+  // ── Body style from model name (higher priority than description) ──
+  if (result.model) {
+    const modelBs = normalizeBodyStyle(result.model);
+    if (modelBs) result.body_style = modelBs;
+  }
+
+  // VIN (standard 17-char)
   const vinMatch = html.match(/\bVIN\s*[:;]?\s*([A-HJ-NPR-Z0-9]{11,17})\b/i);
   if (vinMatch?.[1]) {
     const v = cleanVin(vinMatch[1]);
@@ -1393,21 +1415,20 @@ function parseBonhamsHtml(html: string): Record<string, any> {
   }
 
   // Chassis number (very common for Bonhams — older/European cars)
+  // Use tighter regex: no spaces allowed, stop at whitespace/punctuation
   if (!result.vin) {
-    const chassisMatch = html.match(/\bChassis\s+(?:No\.?\s*)?[:;]?\s*([A-HJ-NPR-Z0-9*\-\s]{5,20})\b/i);
+    const chassisMatch = html.match(/\bChassis\s+(?:[Nn]o\.?\s*)?[:;]?\s*([A-HJ-NPR-Z0-9*\-]{5,20})\b/i);
     if (chassisMatch?.[1]) {
       const v = cleanVin(chassisMatch[1]);
       if (v) result.vin = v;
     }
   }
 
-  // Engine number as supplementary (not VIN, but useful)
-  if (!result.vin) {
-    const engineNoMatch = html.match(/\bEngine\s+(?:No\.?\s*)?[:;]?\s*([A-Z0-9\-]{5,15})\b/i);
-    // Don't use engine number as VIN
-  }
+  // Engine number — store as supplementary info, NOT as VIN
+  const engineNoMatch = html.match(/\bEngine\s+(?:[Nn]o\.?\s*)?[:;]?\s*([A-Z0-9\-]{4,15})\b/i);
+  // (engine number is useful metadata but should not be used as VIN)
 
-  // ── Sale price fallback: "Sold for" text (common in Bonhams SSR pages) ──
+  // ── Sale price: "Sold for" text (common in Bonhams SSR pages) ──
   if (!result.sale_price) {
     // Pattern 1: "Sold for US$35,000 inc. premium" or "Sold for £12,000"
     const soldForMatch = html.match(/Sold\s+for\s+(?:US)?\s*([£€$CHF]*)\s*([\d,]+)/i);
@@ -1441,6 +1462,21 @@ function parseBonhamsHtml(html: string): Record<string, any> {
     }
   }
 
+  // ── Estimate extraction (when no sale price — common for older Bonhams lots) ──
+  if (!result.sale_price) {
+    // "Estimate:£23,000 - £28,000" or "Estimate: US$50,000 - US$70,000"
+    const estMatch = html.match(/Estimate\s*:?\s*(?:US)?\s*[£€$]?\s*([\d,]+)\s*[-–]\s*(?:US)?\s*[£€$]?\s*([\d,]+)/i);
+    if (estMatch?.[1] && estMatch?.[2]) {
+      const low = parseInt(estMatch[1].replace(/,/g, ""));
+      const high = parseInt(estMatch[2].replace(/,/g, ""));
+      if (low > 0 && high > 0) {
+        // Store estimate midpoint as a reference, but NOT as sale_price
+        // (we don't know if it sold or at what price)
+        // Store in metadata via description notes instead
+      }
+    }
+  }
+
   // Engine from description
   if (result.description) {
     if (!result.engine_displacement) {
@@ -1448,8 +1484,8 @@ function parseBonhamsHtml(html: string): Record<string, any> {
       if (engMatch) result.engine_displacement = `${engMatch[1]}L`;
     }
     if (!result.engine_displacement) {
-      const ccMatch = result.description.match(/(\d{3,5})\s*cc/i);
-      if (ccMatch) result.engine_displacement = `${ccMatch[1]}cc`;
+      const ccMatch = result.description.match(/(\d{3,5})\s*,?\s*cc/i);
+      if (ccMatch) result.engine_displacement = `${ccMatch[1].replace(/,/g, "")}cc`;
     }
     if (!result.horsepower) {
       const hpMatch = result.description.match(/(\d{2,4})\s*(?:hp|bhp|horsepower)/i);
@@ -1475,9 +1511,48 @@ function parseBonhamsHtml(html: string): Record<string, any> {
       const dt = normalizeDrivetrain(result.description);
       if (dt) result.drivetrain = dt;
     }
+    // Body style from description only if not already found from model
     if (!result.body_style) {
       const bs = normalizeBodyStyle(result.description);
       if (bs) result.body_style = bs;
+    }
+
+    // ── Engine type from description (V8, V12, inline-6, etc.) ──
+    if (!result.engine_type) {
+      const etMatch = result.description.match(/\b(V-?8|V-?6|V-?12|V-?10|V-?16|inline[\s-]?[46]|straight[\s-]?[468]|flat[\s-]?[46]|boxer[\s-]?[46])\b/i);
+      if (etMatch) {
+        result.engine_type = etMatch[1].replace(/-/g, "").replace(/\s+/g, "");
+      }
+    }
+
+    // ── Color from description (Bonhams uses "presented in X livery" or "finished in X") ──
+    if (!result.color) {
+      const colorPatterns = [
+        /(?:presented|finished|repainted|painted|sprayed)\s+in\s+(\w+(?:\s+\w+)?)\s+(?:livery|with|over|and)/i,
+        /(?:livery|color|colour)\s+(?:is\s+)?(\w+)/i,
+      ];
+      for (const pat of colorPatterns) {
+        const cm = result.description.match(pat);
+        if (cm?.[1] && cm[1].length > 2 && cm[1].length < 30) {
+          result.color = titleCase(cm[1]);
+          break;
+        }
+      }
+    }
+
+    // ── Interior color from description ──
+    if (!result.interior_color) {
+      const intPatterns = [
+        /(\w+)\s+leather\s+(?:upholstery|interior|seats|trim)/i,
+        /(?:upholstered|trimmed|interior)\s+in\s+(\w+(?:\s+\w+)?)\s+(?:leather|hide|cloth)/i,
+      ];
+      for (const pat of intPatterns) {
+        const im = result.description.match(pat);
+        if (im?.[1] && im[1].length > 2 && im[1].length < 30) {
+          result.interior_color = titleCase(im[1]);
+          break;
+        }
+      }
     }
   }
 
@@ -1512,8 +1587,20 @@ function extractPrimaryImage(html: string, platform: string): string | null {
     const mecumImg = html.match(/https:\/\/(?:www\.)?mecum\.com\/[^"'\s]*\/(?:images?|photos?|gallery)\/[^"'\s]+\.(?:jpg|jpeg|png|webp)/i);
     if (mecumImg?.[0]) return mecumImg[0];
   } else if (platform === 'bonhams') {
+    // Bonhams uses Next.js image wrapper: _next/image.jpg?url=<encoded_url>
+    // Direct img1.bonhams.com URLs are in the encoded URL param
+    const bonDirectImg = html.match(/https:\/\/img1\.bonhams\.com\/image\?src=Images\/live\/[^"'\s&]+\.jpg/i);
+    if (bonDirectImg?.[0]) return bonDirectImg[0];
+    // Encoded variant in _next/image wrapper
+    const bonEncodedImg = html.match(/img1\.bonhams\.com%2Fimage%3Fsrc%3DImages%2Flive%2F[^"'\s&]+\.jpg/i);
+    if (bonEncodedImg?.[0]) {
+      try {
+        return 'https://' + decodeURIComponent(bonEncodedImg[0]);
+      } catch { /* fallback below */ }
+    }
+    // Fallback: any bonhams image URL
     const bonImg = html.match(/https:\/\/[^"'\s]*bonhams[^"'\s]*\.(?:jpg|jpeg|png|webp)/i);
-    if (bonImg?.[0] && !bonImg[0].includes('logo')) return bonImg[0];
+    if (bonImg?.[0] && !bonImg[0].includes('logo') && !bonImg[0].includes('flag')) return bonImg[0];
   } else if (platform === 'barrett-jackson') {
     const bjImg = html.match(/https:\/\/(?:www\.)?barrett-jackson\.com\/[^"'\s]+\.(?:jpg|jpeg|png|webp)/i);
     if (bjImg?.[0] && !bjImg[0].includes('logo')) return bjImg[0];

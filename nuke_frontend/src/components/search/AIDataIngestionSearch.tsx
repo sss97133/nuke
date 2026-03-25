@@ -1705,9 +1705,6 @@ export default function AIDataIngestionSearch() {
                 display: 'flex', gap: '16px', fontSize: '9px', marginBottom: '8px',
                 fontFamily: '"Courier New", monospace', color: 'var(--text-secondary)',
               }}>
-                {makeStats.avgPrice && (
-                  <span>AVG ${Math.round(makeStats.avgPrice / 1000)}K</span>
-                )}
                 {makeStats.yearRange && (
                   <span>{makeStats.yearRange.min}--{makeStats.yearRange.max}</span>
                 )}

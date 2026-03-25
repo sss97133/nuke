@@ -224,7 +224,7 @@ export default function InventoryAnalytics() {
         <StatCard label="Total Vehicles" value={o.total_vehicles} color="blue" />
         <StatCard label="Active" value={o.active} sub={`${((o.active / o.total_vehicles) * 100).toFixed(0)}% of total`} color="green" />
         <StatCard label="With Price" value={o.with_price} sub={`${((o.with_price / o.total_vehicles) * 100).toFixed(0)}%`} color="amber" />
-        <StatCard label="Avg Price" value={fmtPrice(o.avg_price)} sub={`Median: ${fmtPrice(o.median_price)}`} color="purple" />
+        <StatCard label="Median Price" value={fmtPrice(o.median_price)} color="purple" />
         <StatCard label="With Image" value={o.with_image} sub={`${((o.with_image / o.total_vehicles) * 100).toFixed(0)}%`} color="cyan" />
         <StatCard label="With VIN" value={o.with_vin} sub={`${((o.with_vin / o.total_vehicles) * 100).toFixed(0)}%`} color="red" />
       </div>
@@ -261,7 +261,7 @@ export default function InventoryAnalytics() {
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: 11, color: '#a1a1aa' }} />
               <Bar yAxisId="left" dataKey="value" name="Count" fill="var(--info)" radius={[4, 4, 0, 0]} />
-              <Bar yAxisId="right" dataKey="avg_price" name="Avg $" fill="var(--warning)" radius={[4, 4, 0, 0]} opacity={0.7} />
+              {/* avg_price chart bar removed — never show average prices */}
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>

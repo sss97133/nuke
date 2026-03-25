@@ -37,7 +37,7 @@ export default function MakePortal({ make, activePortal, onOpen }: MakePortalPro
             {/* Stat grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '8px' }}>
               <StatBox label="Volume" value={String(data.total_listings)} />
-              <StatBox label="Avg Price" value={data.avg_price > 0 ? formatCurrencyAmount(data.avg_price) : '—'} />
+              <StatBox label="Median" value={data.median_price > 0 ? formatCurrencyAmount(data.median_price) : '—'} />
               <StatBox label="Sell-Through" value={`${Math.round(data.sell_through_pct)}%`} />
               <StatBox
                 label="Demand"

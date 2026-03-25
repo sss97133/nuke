@@ -255,7 +255,6 @@ const UserDiscoveries: React.FC<UserDiscoveriesProps> = ({ userId, isOwnProfile 
           <StatCell label="Watching" value={stats.watching} />
           <StatCell label="Contacted" value={stats.contacted} />
           <StatCell label="Purchased" value={stats.purchased} />
-          {stats.avg_price && <StatCell label="Avg Price" value={formatPrice(stats.avg_price) || '—'} />}
           <StatCell label="Sources" value={stats.sources_used} />
         </div>
       )}

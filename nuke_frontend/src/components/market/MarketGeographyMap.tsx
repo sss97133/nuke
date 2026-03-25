@@ -154,9 +154,9 @@ export default function MarketGeographyMap() {
             </div>
           </div>
           <div className="bg-gray-800 p-4">
-            <div className="text-gray-400 text-sm">Average Price</div>
+            <div className="text-gray-400 text-sm">Median Price</div>
             <div className="text-2xl font-bold text-blue-400">
-              {formatCurrency(marketOverview.avg_price)}
+              {formatCurrency(marketOverview.median_price)}
             </div>
           </div>
           <div className="bg-gray-800 p-4">

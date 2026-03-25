@@ -39,10 +39,6 @@ function MarketCard({ comps }: { comps: CompsData }) {
         </div>
         <div style={{ fontFamily: '"Courier New", monospace', fontSize: '11px', lineHeight: '18px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ opacity: 0.5 }}>avg</span>
-            <span>{formatPrice(summary.avg_price)}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ opacity: 0.5 }}>median</span>
             <span>{formatPrice(summary.median_price)}</span>
           </div>

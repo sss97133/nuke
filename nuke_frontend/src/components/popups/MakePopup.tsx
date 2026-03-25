@@ -14,6 +14,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { usePopup } from './usePopup';
+import { ModelPopup } from './ModelPopup';
+import { SourcePopup } from './SourcePopup';
 
 interface Props {
   make: string;
@@ -146,12 +148,10 @@ export function MakePopup({ make }: Props) {
   }
 
   const handleModelClick = (model: string) => {
-    const { ModelPopup } = require('./ModelPopup');
     openPopup(<ModelPopup make={make} model={model} />, model, 360);
   };
 
   const handleSourceClick = (source: string) => {
-    const { SourcePopup } = require('./SourcePopup');
     openPopup(<SourcePopup source={source} />, source.toUpperCase(), 360);
   };
 

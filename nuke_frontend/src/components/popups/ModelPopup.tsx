@@ -12,6 +12,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { usePopup } from './usePopup';
+import { VehiclePopup } from './VehiclePopup';
 import type { FeedVehicle } from '../../feed/types/feed';
 
 interface Props {
@@ -136,7 +137,6 @@ export function ModelPopup({ make, model }: Props) {
       .single()
       .then(({ data: fullVehicle }) => {
         if (fullVehicle) {
-          const { VehiclePopup } = require('./VehiclePopup');
           openPopup(
             <VehiclePopup vehicle={fullVehicle as unknown as FeedVehicle} />,
             [sale.year, sale.make, sale.model].filter(Boolean).join(' '),

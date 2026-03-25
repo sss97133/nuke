@@ -32,13 +32,8 @@ const MarketPulse: React.FC = () => {
       // Single RPC call replaces 4 parallel queries
       const stats = await MarketStatsService.getMarketPulseStats();
 
-      const averagePrice = stats.avg_price > 0
-        ? Math.round(stats.avg_price / 1000)
-        : 0;
-
       setMetrics([
         { label: 'Active Listings', value: stats.total_vehicles },
-        { label: 'Avg Price', value: averagePrice, unit: 'k' },
         { label: 'For Sale', value: stats.for_sale_count },
         { label: 'New Today', value: stats.new_today }
       ]);

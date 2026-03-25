@@ -11,9 +11,13 @@
  *   <BadgePortal dimension="deal_score" value="plus_3" label="STEAL" variant="deal" />
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useContext } from 'react';
 import { useBadgeDepth, type BadgeDimension, type BadgeDepthData } from './useBadgeDepth';
 import { BadgeClusterPanel } from './BadgeClusterPanel';
+import { PopupStackContext } from '../popups/PopupStack';
+import { MakePopup } from '../popups/MakePopup';
+import { ModelPopup } from '../popups/ModelPopup';
+import { SourcePopup } from '../popups/SourcePopup';
 
 /* ─── Rich Tooltip ─── */
 
@@ -258,6 +262,7 @@ export function BadgePortal({
   const { data, loading, load } = useBadgeDepth(dimension, value);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLSpanElement>(null);
+  const popupCtx = useContext(PopupStackContext);
 
   const variantStyle = VARIANT_STYLES[variant] || VARIANT_STYLES.default;
 
@@ -281,11 +286,30 @@ export function BadgePortal({
     if (isStatic) return;
     e.preventDefault();
     e.stopPropagation();
+
+    // Popup rhizome: for make/model/source dimensions, open a stacking popup
+    if (popupCtx && value != null) {
+      const strVal = String(value);
+      if (dimension === 'make') {
+        popupCtx.push(<MakePopup make={strVal} />, strVal, 360);
+        return;
+      }
+      if (dimension === 'model') {
+        popupCtx.push(<ModelPopup make="" model={strVal} />, strVal, 360);
+        return;
+      }
+      if (dimension === 'source') {
+        popupCtx.push(<SourcePopup source={strVal} />, strVal.toUpperCase(), 360);
+        return;
+      }
+    }
+
+    // Fallback: inline cluster panel for other dimensions
     if (!isOpen) {
       load(); // Ensure data is loaded
     }
     setIsOpen((prev) => !prev);
-  }, [isStatic, isOpen, load]);
+  }, [isStatic, isOpen, load, popupCtx, dimension, value]);
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
