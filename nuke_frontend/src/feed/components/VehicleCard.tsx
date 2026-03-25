@@ -15,7 +15,6 @@ import { CardIdentity } from './card/CardIdentity';
 import { CardDealScore } from './card/CardDealScore';
 import { resolveSourceLabel } from './card/CardSource';
 import { CardActions } from './card/CardActions';
-import { BadgePortal } from '../../components/badges/BadgePortal';
 
 export interface VehicleCardProps {
   vehicle: FeedVehicle;
@@ -299,220 +298,167 @@ export function VehicleCard({
     );
   }
 
-  // Build spec entries for the expanded key-specs grid
-  const specEntries = useMemo(() => {
-    const entries: { label: string; value: string }[] = [];
-    if (vehicle.mileage) entries.push({ label: 'MILEAGE', value: `${Math.floor(vehicle.mileage).toLocaleString()} mi` });
-    if (vehicle.transmission) {
-      const t = vehicle.transmission.toLowerCase();
-      entries.push({
-        label: 'TRANS',
-        value: t.includes('manual') ? 'Manual' : t.includes('auto') ? 'Automatic' : vehicle.transmission,
-      });
+  // Expanded content for grid cards — rhizome data (new info, not duplicates)
+  const expandedContent = useMemo(() => {
+    // Build price context line
+    const priceContextParts: string[] = [];
+    if (vehicle.nuke_estimate != null && vehicle.nuke_estimate > 0 && price.amount) {
+      const diff = price.amount - vehicle.nuke_estimate;
+      const pct = Math.round((diff / vehicle.nuke_estimate) * 100);
+      const dir = pct > 0 ? 'above' : pct < 0 ? 'below' : 'at';
+      const absPct = Math.abs(pct);
+      if (absPct > 2) {
+        priceContextParts.push(
+          `${price.isSold ? 'Sold' : 'Priced'} ${absPct}% ${dir} estimate ($${vehicle.nuke_estimate.toLocaleString()})`
+        );
+      } else {
+        priceContextParts.push(`At estimate ($${vehicle.nuke_estimate.toLocaleString()})`);
+      }
+    } else if (vehicle.nuke_estimate != null && vehicle.nuke_estimate > 0) {
+      priceContextParts.push(`Estimate: $${vehicle.nuke_estimate.toLocaleString()}`);
     }
-    if (vehicle.drivetrain) entries.push({ label: 'DRIVE', value: vehicle.drivetrain.toUpperCase() });
-    if (vehicle.engine_size) entries.push({ label: 'ENGINE', value: vehicle.engine_size });
-    if (vehicle.fuel_type) entries.push({ label: 'FUEL', value: vehicle.fuel_type });
-    if (vehicle.canonical_body_style || vehicle.body_style)
-      entries.push({ label: 'BODY', value: (vehicle.canonical_body_style || vehicle.body_style)! });
-    if (vehicle.vin) entries.push({ label: 'VIN', value: `...${vehicle.vin.slice(-8)}` });
-    if (vehicle.location) entries.push({ label: 'LOCATION', value: vehicle.location });
-    return entries;
-  }, [vehicle]);
 
-  // Expanded content for grid cards — hero image, key specs, BadgePortals
-  const expandedContent = useMemo(() => (
-    <div>
-      {/* Hero image — larger view of the thumbnail */}
-      {vehicle.thumbnail_url && (
-        <div style={{
-          width: '100%',
-          paddingTop: '50%',
-          position: 'relative',
-          background: 'var(--surface-hover)',
-          marginBottom: '8px',
-          overflow: 'hidden',
-        }}>
-          <img
-            src={vehicle.thumbnail_url}
-            alt={alt}
-            loading="lazy"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-            }}
-          />
-          {/* Image count overlay */}
-          {vehicle.image_count != null && vehicle.image_count > 1 && (
+    // Confidence — stored as 0-100 integer
+    const conf = vehicle.nuke_estimate_confidence;
+    const confDisplay = conf != null ? (conf > 1 ? Math.round(conf) : Math.round(conf * 100)) : null;
+    const confColor = confDisplay != null
+      ? (confDisplay >= 70 ? '#16825d' : confDisplay >= 40 ? '#b05a00' : 'var(--text-secondary)')
+      : null;
+
+    // Build extra specs not visible in collapsed card (VIN, engine, location, fuel)
+    const extraSpecs: { label: string; value: string }[] = [];
+    if (vehicle.engine_size) extraSpecs.push({ label: 'ENGINE', value: vehicle.engine_size });
+    if (vehicle.vin) extraSpecs.push({ label: 'VIN', value: `...${vehicle.vin.slice(-8)}` });
+    if (vehicle.location) extraSpecs.push({ label: 'LOC', value: vehicle.location });
+    if (vehicle.fuel_type) extraSpecs.push({ label: 'FUEL', value: vehicle.fuel_type });
+
+    // Source + provenance line
+    const sourceParts: string[] = [];
+    if (sourceLabel) sourceParts.push(sourceLabel);
+    if (vehicle.image_count != null && vehicle.image_count > 1) {
+      sourceParts.push(`${vehicle.image_count} photos`);
+    }
+    if (vehicle.bid_count != null && vehicle.bid_count > 0) {
+      sourceParts.push(`${vehicle.bid_count} bids`);
+    }
+
+    const mono = "'Courier New', monospace";
+    const sans = 'Arial, sans-serif';
+
+    return (
+      <div>
+        {/* Price context — estimate comparison */}
+        {priceContextParts.length > 0 && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '5px 6px',
+            border: '2px solid var(--border)',
+            background: 'var(--surface)',
+            marginBottom: '6px',
+          }}>
             <span style={{
-              position: 'absolute',
-              bottom: '4px',
-              right: '6px',
-              fontFamily: "'Courier New', monospace",
-              fontSize: '8px',
-              fontWeight: 700,
-              color: 'white',
-              background: 'rgba(0,0,0,0.65)',
-              padding: '2px 5px',
-              letterSpacing: '0.3px',
+              fontFamily: mono, fontSize: '9px', fontWeight: 700,
+              color: 'var(--text)', lineHeight: 1.3,
             }}>
-              {vehicle.image_count} PHOTOS
+              {priceContextParts[0]}
             </span>
-          )}
-        </div>
-      )}
+            {confDisplay != null && (
+              <span style={{
+                fontFamily: mono, fontSize: '8px', fontWeight: 700,
+                color: confColor!,
+                marginLeft: 'auto',
+                flexShrink: 0,
+              }}>
+                {confDisplay}% CONF
+              </span>
+            )}
+          </div>
+        )}
 
-      {/* Key specs grid — 2-column layout */}
-      {specEntries.length > 0 && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: '1px',
-          background: 'var(--border)',
-          border: '1px solid var(--border)',
-          marginBottom: '8px',
-        }}>
-          {specEntries.map((spec) => (
-            <div key={spec.label} style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1px',
-              padding: '4px 6px',
-              background: 'var(--surface)',
-            }}>
-              <span style={{
-                fontFamily: 'Arial, sans-serif',
-                fontSize: '7px',
-                fontWeight: 800,
-                textTransform: 'uppercase' as const,
-                letterSpacing: '0.5px',
-                color: 'var(--text-disabled)',
-                lineHeight: 1,
-              }}>
-                {spec.label}
-              </span>
-              <span style={{
-                fontFamily: "'Courier New', monospace",
-                fontSize: '9px',
-                fontWeight: 700,
-                color: 'var(--text)',
-                lineHeight: 1.2,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}>
-                {spec.value}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Price context — estimate + deal score */}
-      {(vehicle.nuke_estimate || vehicle.deal_score_label) && (
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          alignItems: 'center',
-          marginBottom: '8px',
-          padding: '4px 6px',
-          border: '1px solid var(--border)',
-          background: 'var(--surface)',
-        }}>
-          {vehicle.nuke_estimate != null && vehicle.nuke_estimate > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-              <span style={{
-                fontFamily: 'Arial, sans-serif', fontSize: '7px', fontWeight: 800,
-                textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-disabled)',
-                lineHeight: 1,
-              }}>
-                ESTIMATE
-              </span>
-              <span style={{
-                fontFamily: "'Courier New', monospace", fontSize: '10px', fontWeight: 700,
-                color: 'var(--text)', lineHeight: 1.2,
-              }}>
-                ${vehicle.nuke_estimate.toLocaleString()}
-              </span>
-            </div>
-          )}
-          {vehicle.nuke_estimate_confidence != null && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-              <span style={{
-                fontFamily: 'Arial, sans-serif', fontSize: '7px', fontWeight: 800,
-                textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-disabled)',
-                lineHeight: 1,
-              }}>
-                CONF
-              </span>
-              <span style={{
-                fontFamily: "'Courier New', monospace", fontSize: '10px', fontWeight: 700,
-                color: vehicle.nuke_estimate_confidence >= 0.7 ? '#16825d'
-                  : vehicle.nuke_estimate_confidence >= 0.4 ? '#b05a00'
-                  : 'var(--text-secondary)',
-                lineHeight: 1.2,
-              }}>
-                {Math.round(vehicle.nuke_estimate_confidence * 100)}%
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Badge portal row — explore by dimension */}
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '4px',
-        marginBottom: '4px',
-      }}>
-        {vehicle.year && (
-          <BadgePortal dimension="year" value={vehicle.year} label={String(vehicle.year)} variant="source" />
-        )}
-        {vehicle.make && (
-          <BadgePortal dimension="make" value={vehicle.make} label={vehicle.make} variant="source" />
-        )}
-        {vehicle.model && (
-          <BadgePortal dimension="model" value={vehicle.model} label={vehicle.model} variant="source" />
-        )}
-        {(vehicle.canonical_body_style || vehicle.body_style) && (
-          <BadgePortal
-            dimension="body_style"
-            value={vehicle.canonical_body_style || vehicle.body_style || ''}
-            label={vehicle.canonical_body_style || vehicle.body_style || ''}
-            variant="status"
-          />
-        )}
-        {vehicle.transmission && (
-          <BadgePortal
-            dimension="transmission"
-            value={vehicle.transmission}
-            label={vehicle.transmission.toLowerCase().includes('manual') ? 'MANUAL' : 'AUTO'}
-            variant="status"
-          />
-        )}
+        {/* Deal score callout — only if notable */}
         {vehicle.deal_score_label && vehicle.deal_score_label !== 'fair' && (
-          <BadgePortal
-            dimension="deal_score"
-            value={vehicle.deal_score_label}
-            label={vehicle.deal_score_label.replace(/_/g, ' ').toUpperCase()}
-            variant="deal"
-          />
+          <div style={{
+            padding: '4px 6px',
+            marginBottom: '6px',
+            border: '2px solid var(--border)',
+            background: 'var(--surface)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}>
+            <CardDealScore dealScoreLabel={vehicle.deal_score_label} heatScoreLabel={vehicle.heat_score_label} />
+            {vehicle.heat_score_label && (
+              <span style={{
+                fontFamily: sans, fontSize: '8px', fontWeight: 700,
+                textTransform: 'uppercase' as const,
+                letterSpacing: '0.3px',
+                color: vehicle.heat_score_label === 'volcanic' || vehicle.heat_score_label === 'fire'
+                  ? 'var(--error)' : vehicle.heat_score_label === 'hot' || vehicle.heat_score_label === 'warm'
+                  ? 'var(--warning)' : 'var(--text-secondary)',
+              }}>
+                {vehicle.heat_score_label.toUpperCase()} DEMAND
+              </span>
+            )}
+          </div>
         )}
-        {vehicle.discovery_source && (
-          <BadgePortal
-            dimension="source"
-            value={vehicle.discovery_source}
-            label={sourceLabel || vehicle.discovery_source.toUpperCase().slice(0, 12)}
-            variant="source"
-          />
+
+        {/* Extra specs — only fields NOT already visible in collapsed card */}
+        {extraSpecs.length > 0 && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: '1px',
+            background: 'var(--border)',
+            border: '2px solid var(--border)',
+            marginBottom: '6px',
+          }}>
+            {extraSpecs.map((spec) => (
+              <div key={spec.label} style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1px',
+                padding: '4px 6px',
+                background: 'var(--surface)',
+              }}>
+                <span style={{
+                  fontFamily: sans, fontSize: '7px', fontWeight: 800,
+                  textTransform: 'uppercase' as const,
+                  letterSpacing: '0.5px',
+                  color: 'var(--text-disabled)',
+                  lineHeight: 1,
+                }}>
+                  {spec.label}
+                </span>
+                <span style={{
+                  fontFamily: mono, fontSize: '9px', fontWeight: 700,
+                  color: 'var(--text)', lineHeight: 1.2,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {spec.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Source + provenance line */}
+        {sourceParts.length > 0 && (
+          <div style={{
+            fontFamily: mono, fontSize: '8px', fontWeight: 700,
+            color: 'var(--text-disabled)',
+            textTransform: 'uppercase' as const,
+            letterSpacing: '0.3px',
+            lineHeight: 1,
+            marginBottom: '4px',
+          }}>
+            {sourceParts.join(' \u00B7 ')}
+          </div>
         )}
       </div>
-    </div>
-  ), [vehicle, specEntries, alt, sourceLabel]);
+    );
+  }, [vehicle, price, sourceLabel]);
 
   // --- Build the info line parts for grid mode ---
   const infoLineParts = useMemo(() => {
