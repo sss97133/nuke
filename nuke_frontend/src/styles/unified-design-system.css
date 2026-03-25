@@ -1083,3 +1083,9 @@ select:focus {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* Popup rhizome slide-in animation */
+@keyframes popupSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

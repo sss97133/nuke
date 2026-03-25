@@ -5,11 +5,11 @@
  * Appears below the badge. Click-outside or Escape closes it.
  *
  * Stats shown per dimension:
- *   make   → avg price, year range, top models
- *   source → avg price, fill rates, top makes
- *   model  → avg price, year range, top body styles
+ *   make   → year range, top models
+ *   source → fill rates, top makes
+ *   model  → year range, top body styles
  *   price  → price bracket distribution (TODO)
- *   other  → avg price, year range
+ *   other  → year range
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -74,7 +74,7 @@ function buildFilterUrl(dimension: BadgeDimension, value: string | number | null
   return `/?${params.toString()}`;
 }
 
-/** Stats row for MAKE dimension: avg price, year range, top models */
+/** Stats row for MAKE dimension: year range, top models */
 function MakeStats({ stats }: { stats: BadgeDimensionStats }) {
   return (
     <div style={{ padding: '6px 10px 4px', borderBottom: '1px solid var(--border)' }}>
@@ -82,9 +82,6 @@ function MakeStats({ stats }: { stats: BadgeDimensionStats }) {
       <div style={{
         display: 'flex', gap: '12px', marginBottom: '4px',
       }}>
-        {stats.avg_price != null && (
-          <StatCell label="AVG PRICE" value={formatPrice(stats.avg_price)} />
-        )}
         {stats.min_year != null && stats.max_year != null && (
           <StatCell
             label="YEARS"
@@ -113,16 +110,10 @@ function MakeStats({ stats }: { stats: BadgeDimensionStats }) {
   );
 }
 
-/** Stats row for SOURCE dimension: avg price, fill rates, top makes */
+/** Stats row for SOURCE dimension: fill rates, top makes */
 function SourceStats({ stats }: { stats: BadgeDimensionStats }) {
   return (
     <div style={{ padding: '6px 10px 4px', borderBottom: '1px solid var(--border)' }}>
-      {/* Aggregates */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '4px' }}>
-        {stats.avg_price != null && (
-          <StatCell label="AVG PRICE" value={formatPrice(stats.avg_price)} />
-        )}
-      </div>
       {/* Fill rates */}
       {stats.fill_rates && stats.fill_rates.length > 0 && (
         <div style={{ display: 'flex', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
@@ -157,14 +148,11 @@ function SourceStats({ stats }: { stats: BadgeDimensionStats }) {
   );
 }
 
-/** Stats row for MODEL dimension: avg price, year range, top body styles */
+/** Stats row for MODEL dimension: year range, top body styles */
 function ModelStats({ stats }: { stats: BadgeDimensionStats }) {
   return (
     <div style={{ padding: '6px 10px 4px', borderBottom: '1px solid var(--border)' }}>
       <div style={{ display: 'flex', gap: '12px', marginBottom: '4px' }}>
-        {stats.avg_price != null && (
-          <StatCell label="AVG PRICE" value={formatPrice(stats.avg_price)} />
-        )}
         {stats.min_year != null && stats.max_year != null && (
           <StatCell
             label="YEARS"
@@ -194,16 +182,13 @@ function ModelStats({ stats }: { stats: BadgeDimensionStats }) {
 
 /** Generic stats row for dimensions without specialized layout */
 function GenericStats({ stats }: { stats: BadgeDimensionStats }) {
-  const hasAgg = stats.avg_price != null || (stats.min_year != null && stats.max_year != null);
+  const hasAgg = stats.min_year != null && stats.max_year != null;
   if (!hasAgg && stats.top_facets.length === 0) return null;
 
   return (
     <div style={{ padding: '6px 10px 4px', borderBottom: '1px solid var(--border)' }}>
       {hasAgg && (
         <div style={{ display: 'flex', gap: '12px', marginBottom: '2px' }}>
-          {stats.avg_price != null && (
-            <StatCell label="AVG PRICE" value={formatPrice(stats.avg_price)} />
-          )}
           {stats.min_year != null && stats.max_year != null && (
             <StatCell
               label="YEARS"

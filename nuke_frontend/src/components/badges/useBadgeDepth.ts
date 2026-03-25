@@ -5,10 +5,10 @@
  * Only fires on hover (after 200ms debounce) so idle badges cost zero queries.
  *
  * Dimension-specific stats:
- *   make   → avg_price, top models, year range
- *   source → avg_price, top makes, fill rate
+ *   make   → top models, year range
+ *   source → top makes, fill rate
  *   price  → price bracket distribution (not fetched here — synthetic)
- *   model  → avg_price, year range, top body styles
+ *   model  → year range, top body styles
  */
 
 import { useState, useCallback, useRef } from 'react';

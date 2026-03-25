@@ -47,7 +47,7 @@ function TreemapCell(props: any) {
           fill={textColor}
           style={{ fontFamily: "'Courier New', monospace", fontSize: 8, opacity: 0.8 }}
         >
-          {count.toLocaleString()} — {formatPrice(avg_price)}
+          {count.toLocaleString()} listings
         </text>
       )}
     </g>
@@ -108,7 +108,7 @@ export function HeartbeatModelBar({ models, onModelClick }: {
                     background: 'var(--surface)',
                     color: 'var(--text)',
                   }}>
-                    <strong>{d.model}</strong> — {d.count.toLocaleString()} listings — {formatPrice(d.avg_price)} avg
+                    <strong>{d.model}</strong> — {d.count.toLocaleString()} listings
                   </div>
                 );
               }}

@@ -158,11 +158,10 @@ const SearchInput: React.FC<{ value: string; onChange: (v: string) => void; plac
 );
 
 // ────────────────────────────────────────────────────────────
-// MAKE CELL — shows make name, count, avg price, top 3 models
+// MAKE CELL — shows make name, count, top 3 models
 // ────────────────────────────────────────────────────────────
 
 const MakeCell: React.FC<{ node: TreemapNode; topModels: TreemapNode[] | null }> = ({ node, topModels }) => {
-  const avgPrice = node.count > 0 ? Math.round(node.value / node.count) : null;
   return (
     <Link
       to={`/browse?make=${encodeURIComponent(node.name)}`}
@@ -213,7 +212,7 @@ const MakeCell: React.FC<{ node: TreemapNode; topModels: TreemapNode[] | null }>
         {node.name}
       </div>
 
-      {/* Count + avg price */}
+      {/* Count */}
       <div style={{
         fontFamily: "'Courier New', monospace",
         fontSize: 11,
@@ -221,12 +220,6 @@ const MakeCell: React.FC<{ node: TreemapNode; topModels: TreemapNode[] | null }>
         lineHeight: 1.5,
       }}>
         <span>{fmt(node.count)} vehicles</span>
-        {avgPrice && (
-          <>
-            <span style={{ margin: '0 6px', color: '#bbb' }}>|</span>
-            <span>avg {fmtPrice(avgPrice)}</span>
-          </>
-        )}
       </div>
 
       {/* Median price */}
@@ -277,7 +270,6 @@ const MakeCell: React.FC<{ node: TreemapNode; topModels: TreemapNode[] | null }>
 // ────────────────────────────────────────────────────────────
 
 const ModelCell: React.FC<{ node: TreemapNode; make: string }> = ({ node, make }) => {
-  const avgPrice = node.count > 0 ? Math.round(node.value / node.count) : null;
   return (
     <Link
       to={`/browse?make=${encodeURIComponent(make)}&model=${encodeURIComponent(node.name)}`}
@@ -330,7 +322,6 @@ const ModelCell: React.FC<{ node: TreemapNode; make: string }> = ({ node, make }
         marginTop: 4,
         lineHeight: 1.5,
       }}>
-        {avgPrice && <div>avg {fmtPrice(avgPrice)}</div>}
         {node.median_price && <div>median {fmtPrice(node.median_price)}</div>}
       </div>
 
@@ -460,8 +451,6 @@ const ModelsGrid: React.FC<{ make: string }> = ({ make }) => {
   }, [models, filter]);
 
   const totalVehicles = models?.reduce((s, m) => s + m.count, 0) || 0;
-  const totalValue = models?.reduce((s, m) => s + m.value, 0) || 0;
-  const avgPrice = totalVehicles > 0 ? Math.round(totalValue / totalVehicles) : null;
 
   if (loading) {
     return (
@@ -494,7 +483,6 @@ const ModelsGrid: React.FC<{ make: string }> = ({ make }) => {
       }}>
         <span>{filtered.length} MODELS</span>
         <span>{fmt(totalVehicles)} VEHICLES</span>
-        {avgPrice && <span>AVG {fmtPrice(avgPrice)}</span>}
         {filter && <span>MATCHING "{filter.toUpperCase()}"</span>}
       </div>
 
