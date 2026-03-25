@@ -110,7 +110,26 @@ async function doFetchFinds(): Promise<ScoredFindItem[]> {
     return payload as ScoredFindItem[];
   }
 
-  // Fallback: if the RPC returned a single jsonb object (legacy format)
+  // hero_finds() returns jsonb object {multi_signal, multi_platform, rare_finds}
+  // Map multi_signal items to ScoredFindItem shape
+  if (payload.multi_signal && Array.isArray(payload.multi_signal)) {
+    return payload.multi_signal.map((row: any): ScoredFindItem => ({
+      vehicle_id: String(row.id ?? ''),
+      year: row.year, make: row.make, model: row.model,
+      display_price: row.price, primary_image_url: row.thumbnail,
+      listing_url: null, discovery_source: null, is_for_sale: true,
+      find_score: Math.round((row.deal_score ?? 0) + (row.heat_score ?? 0) * 2),
+      deal_score: row.deal_score, heat_score: row.heat_score,
+      model_total: null, red_flag_count: (row.recent_comments ?? 0) > 10 ? 1 : 0,
+      mod_count: 0, cross_platform_count: 0, condition_grade: null,
+      signal_breakdown: {
+        deal_score: row.deal_score ?? 0, heat_score: row.heat_score ?? 0,
+        rare: false, model_count: 0, condition: null, red_flags: 0,
+        mods: 0, cross_platform: 0, old_discovery: false,
+      },
+    }));
+  }
+
   return [];
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
