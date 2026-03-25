@@ -10,7 +10,7 @@
  * Design: 2px borders, zero radius, Courier New for scores, story cards.
  */
 
-import { useRef, useState, type CSSProperties } from 'react';
+import { useRef, useState } from 'react';
 import { useHeroFinds, buildFindExplanation, type FindItem } from '../../hooks/useHeroFinds';
 import { optimizeImageUrl } from '../../../lib/imageOptimizer';
 import type { HeroFilter } from '../HeroPanel';
