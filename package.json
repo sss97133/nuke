@@ -14,6 +14,7 @@
     "backfill:bj-descriptions": "node scripts/backfill-bj-descriptions.mjs",
     "backfill:bj-descriptions:dry-run": "node scripts/backfill-bj-descriptions.mjs --dry-run",
     "backfill:bj-vins": "node scripts/backfill-bj-vins.mjs",
+    "backfill:condition": "dotenvx run -- node scripts/backfill-condition-observations.mjs",
     "backfill:bj-vins:dry-run": "node scripts/backfill-bj-vins.mjs --dry-run",
     "backfill:fb-images": "node scripts/backfill-fb-images.mjs",
     "backfill:fb-saved-observations": "node scripts/backfill-fb-saved-observations.mjs",
