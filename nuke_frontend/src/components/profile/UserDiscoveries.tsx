@@ -512,7 +512,6 @@ const DiscoveryCard: React.FC<{
             fontSize: '10px',
             color: 'var(--text-muted)',
             marginTop: '3px',
-,
             fontFamily: '"Courier New", Courier, monospace',
           }}>
             {d.notes}
