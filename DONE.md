@@ -2,6 +2,14 @@
 
 ## 2026-03-25
 
+### [feed] HEAT hero lens — server-powered attention visualization
+- Created `hero_heat()` PostgreSQL RPC function: returns top 30 hottest vehicles by heat_score, 30-day comment velocity (top 10), and avg heat by make (min 20 vehicles, top 20 makes)
+- Built `HeatHeroPanel` component: scrollable horizontal strip of hot vehicle cards with thermometer bars (blue-to-red gradient), make heat sidebar bars, "Most Discussed (30D)" mini-list
+- Built `useHeroHeat` React Query hook with 5-min cache
+- Wired heat_score dimension from client-side treemap to server-powered panel in HeroPanel.tsx
+- Cleaned up dead client-side bucket functions (buildDealBuckets, buildHeatBuckets, buildFindsBuckets) — all now server RPCs
+- Data: 228,985 vehicles with heat scores (range 5-55, p90=15), 13,869 recent comments across 560 vehicles
+
 ### [data] BaT 42K URL bulk ingest — 3-phase pipeline
 - **STEP 1 COMPLETE**: Created 28,068 new vehicle records from URL slug parsing (Y/M/M extraction)
   - Filtered 12,019 non-vehicles (motorcycles, boats, trailers, memorabilia)
