@@ -57,19 +57,60 @@ Deno.serve(async (req) => {
 
     console.log(`=== BATCH ${batchNumber} ===`);
 
-    // Get vehicle_events (BaT auctions) with comments that haven't been extracted yet
-    // Use pagination to work through all events, not just top 200
-    const pageSize = 500;
-    const offset = ((batchNumber - 1) % 10) * pageSize; // Cycle through pages
+    // Strategy: Use SQL RPC to find unextracted events directly in DB
+    // This avoids the old approach of fetching 500 events and filtering client-side,
+    // which could only scan 5,000 events total (10 pages × 500) out of 130K+.
+    //
+    // The RPC returns events WHERE metadata->>'comments_extracted_at' IS NULL,
+    // ordered by comment_count DESC, limited to batchSize.
+    // If the RPC doesn't exist, fall back to the PostgREST approach with a random offset.
 
-    const { data: vehicleEvents } = await supabase
-      .from("vehicle_events")
-      .select("id, vehicle_id, source_url, metadata, comment_count, final_price")
-      .eq("source_platform", "bat")
-      .gt("comment_count", 10)
-      .not("vehicle_id", "is", null)
-      .order("comment_count", { ascending: false })
-      .range(offset, offset + pageSize - 1);
+    let vehicleEvents: any[] = [];
+    let alreadyDone = 0;
+    let eventsToProcess: any[] = [];
+    let queryMethod = "rpc";
+
+    try {
+      const { data: rpcResult, error: rpcErr } = await supabase.rpc(
+        "get_unextracted_comment_events",
+        { p_batch_size: batchSize }
+      );
+      if (rpcErr) throw rpcErr;
+      vehicleEvents = rpcResult || [];
+      eventsToProcess = vehicleEvents;
+      console.log(`[Batch ${batchNumber}] RPC returned ${eventsToProcess.length} unextracted events`);
+    } catch (rpcError: any) {
+      // RPC doesn't exist yet — fall back to PostgREST with random page
+      queryMethod = "postgrest_random";
+      console.log(`[Batch ${batchNumber}] RPC unavailable (${rpcError?.message || "unknown"}), using random-page fallback`);
+
+      // Use a random offset to spread coverage across the full 130K+ events
+      // instead of cycling through only the first 5,000
+      const maxOffset = 130000; // approximate total events
+      const randomOffset = Math.floor(Math.random() * maxOffset);
+      const pageSize = Math.max(batchSize * 5, 200); // Fetch more than needed to find unextracted ones
+
+      const { data: events } = await supabase
+        .from("vehicle_events")
+        .select("id, vehicle_id, source_url, metadata, comment_count, final_price")
+        .eq("source_platform", "bat")
+        .gt("comment_count", 10)
+        .not("vehicle_id", "is", null)
+        .order("comment_count", { ascending: false })
+        .range(randomOffset, randomOffset + pageSize - 1);
+
+      vehicleEvents = events || [];
+
+      eventsToProcess = vehicleEvents
+        .filter((ve: any) => {
+          const meta = ve.metadata || {};
+          return !meta.comments_extracted_at;
+        })
+        .slice(0, batchSize);
+
+      alreadyDone = vehicleEvents.length - eventsToProcess.length;
+      console.log(`[Batch ${batchNumber}] Random offset ${randomOffset}: ${vehicleEvents.length} checked, ${eventsToProcess.length} to process, ${alreadyDone} already done`);
+    }
 
     if (!vehicleEvents || vehicleEvents.length === 0) {
       return new Response(JSON.stringify({
@@ -78,17 +119,6 @@ Deno.serve(async (req) => {
         processed: 0,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-
-    // Filter to events that haven't been processed (no comments_extracted_at in metadata)
-    const eventsToProcess = vehicleEvents
-      .filter((ve: any) => {
-        const meta = ve.metadata || {};
-        return !meta.comments_extracted_at;
-      })
-      .slice(0, batchSize);
-
-    const alreadyDone = vehicleEvents.length - eventsToProcess.length;
-    console.log(`[Batch ${batchNumber}] Page ${Math.floor(offset/pageSize)+1}: ${vehicleEvents.length} events checked, ${eventsToProcess.length} to process, ${alreadyDone} already done`);
 
     // Convert to vehicle format for processing, keeping event_id for marking as done
     const vehiclesToProcess = eventsToProcess.map((ve: any) => ({
@@ -103,49 +133,16 @@ Deno.serve(async (req) => {
     }));
 
     if (vehiclesToProcess.length === 0) {
-      // Check if there are more pages to scan
-      const currentPage = Math.floor(offset / pageSize);
-      if (currentPage < 9 && vehicleEvents.length === pageSize) {
-        // More pages exist, continue to next page
-        console.log(`Page ${currentPage + 1} fully extracted, moving to next page...`);
-
-        const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-        fetch(`${supabaseUrl}/functions/v1/backfill-comments`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${serviceKey}`,
-          },
-          body: JSON.stringify({
-            batch_size: batchSize,
-            delay_ms: delayMs,
-            max_batches: maxBatches,
-            batch_number: batchNumber + 1,
-          }),
-          signal: AbortSignal.timeout(15000),
-        }).catch(e => console.error("Failed to trigger next batch:", e.message));
-
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        return new Response(JSON.stringify({
-          success: true,
-          message: `Page ${currentPage + 1} complete, continuing to next page`,
-          processed: 0,
-          batch_number: batchNumber,
-          page: currentPage + 1,
-          continuing: true,
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
       return new Response(JSON.stringify({
         success: true,
-        message: "BACKFILL COMPLETE - All events have comments extracted",
+        message: queryMethod === "rpc"
+          ? "BACKFILL COMPLETE - No unextracted events found by RPC"
+          : "No unextracted events found on this random page (will retry on next cron)",
         processed: 0,
         batch_number: batchNumber,
         events_checked: vehicleEvents.length,
         already_extracted: alreadyDone,
+        query_method: queryMethod,
         continuing: false,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -226,15 +223,20 @@ Deno.serve(async (req) => {
     }
 
     // Calculate remaining work
-    const totalRemaining = vehicleEvents.filter((ve: any) => {
-      const meta = ve.metadata || {};
-      return !meta.comments_extracted_at;
-    }).length - results.processed;
+    // With RPC mode, we know there are more if we got a full batch
+    // With random mode, there are always more until RPC says otherwise
+    const totalRemaining = queryMethod === "rpc"
+      ? (eventsToProcess.length >= batchSize ? batchSize : 0) // More if we got a full batch
+      : vehicleEvents.filter((ve: any) => {
+          const meta = ve.metadata || {};
+          return !meta.comments_extracted_at;
+        }).length - results.processed;
 
-    const hasMoreWork = totalRemaining > 0;
+    const hasMoreWork = totalRemaining > 0 || results.processed > 0;
 
     // Self-invoke for next batch if there's more work
-    if (hasMoreWork && results.success > 0) {
+    // Continue even with some errors, as long as we processed something
+    if (hasMoreWork && (results.success > 0 || results.errors < results.processed)) {
       console.log(`Triggering batch ${batchNumber + 1}, ~${totalRemaining} remaining...`);
 
       // Fire-and-forget: trigger next batch without waiting
@@ -264,7 +266,8 @@ Deno.serve(async (req) => {
       events_checked: vehicleEvents.length,
       already_extracted: alreadyDone,
       remaining_estimate: totalRemaining,
-      continuing: hasMoreWork && results.success > 0,
+      query_method: queryMethod,
+      continuing: hasMoreWork && (results.success > 0 || results.errors < results.processed),
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (e: any) {
