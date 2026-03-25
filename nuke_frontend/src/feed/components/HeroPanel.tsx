@@ -559,8 +559,6 @@ export function HeroPanel({ dimension, vehicles, onFilter, onClose }: HeroPanelP
         return buildPriceBuckets(vehicles);
       case 'mileage':
         return buildMileageBuckets(vehicles);
-      case 'finds':
-        return buildFindsBuckets(vehicles);
       default:
         return [];
     }
@@ -619,6 +617,11 @@ export function HeroPanel({ dimension, vehicles, onFilter, onClose }: HeroPanelP
           <DealsHeroPanel onFilter={handleCellClick} />
         )}
 
+        {/* Server-powered panel: FINDS — story cards, not treemap */}
+        {dimension === 'finds' && (
+          <FindsHeroPanel onFilter={handleCellClick} />
+        )}
+
         {/* Treemap layout */}
         {isTreemap && containerWidth > 0 && (
           <div style={{ position: 'relative', width: '100%', height: '170px', margin: '0' }}>
@@ -639,7 +642,6 @@ export function HeroPanel({ dimension, vehicles, onFilter, onClose }: HeroPanelP
               }}
             >
               {dimension === 'heat_score' && 'HEAT BY MAKE'}
-              {dimension === 'finds' && 'FINDS BY SOURCE (7D)'}
             </div>
             {treeRects.map((rect) => (
               <TreemapCell

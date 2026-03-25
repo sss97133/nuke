@@ -123,6 +123,10 @@ export default function FeedPage() {
       if (filter.makes && filter.makes.length > 0) {
         newFilters.makes = filter.makes;
       }
+      if (filter.sources && filter.sources.length > 0) {
+        // Source filter from NEWEST panel — show today's intake, sorted newest
+        newFilters.addedTodayOnly = true;
+      }
       if (filter.yearMin != null) {
         newFilters.yearMin = filter.yearMin;
       }
