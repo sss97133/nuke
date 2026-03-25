@@ -36,17 +36,18 @@ interface SimilarSalesSectionProps {
   vehicleModel: string;
 }
 
-const PLATFORM_COLORS: Record<string, string> = {
-  'Bring a Trailer': '#e85d04',
-  'Cars & Bids': 'var(--info)',
-  'Mecum': '#7c3aed',
-  'Barrett-Jackson': 'var(--error-dark, var(--error))',
-  "RM Sotheby's": '#1e40af',
-  'Bonhams': '#065f46',
-  'Gooding & Company': '#92400e',
-  'PCarMarket': '#0e7490',
-  'Hagerty Marketplace': '#0369a1',
-  'eBay Motors': '#0064d2',
+// Platform abbreviations — no decorative colors per design system
+const PLATFORM_ABBREV: Record<string, string> = {
+  'Bring a Trailer': 'BAT',
+  'Cars & Bids': 'C&B',
+  'Mecum': 'MECUM',
+  'Barrett-Jackson': 'B-J',
+  "RM Sotheby's": 'RM',
+  'Bonhams': 'BONHAMS',
+  'Gooding & Company': 'GOODING',
+  'PCarMarket': 'PCM',
+  'Hagerty Marketplace': 'HAGERTY',
+  'eBay Motors': 'EBAY',
 };
 
 function formatPrice(price: number): string {
@@ -155,16 +156,15 @@ export function SimilarSalesSection({
 
   if (loading) {
     return (
-      <div style={{ padding: '20px 20px 16px' }}>
-        <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '16px', color: 'var(--text)' }}>
-          Similar Sales
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
+      <div style={{ padding: '10px' }}>
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '4px',
+        }}>
           {[1, 2, 3].map((i) => (
             <div key={i} style={{
-              height: '100px', backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border-light)',
-              opacity: 0.6,
+              height: '80px', backgroundColor: 'var(--surface)',
+              border: '2px solid var(--border)',
+              opacity: 0.5,
             }} />
           ))}
         </div>
@@ -174,7 +174,14 @@ export function SimilarSalesSection({
 
   if (error) {
     return (
-      <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '14px' }}>
+      <div style={{
+        padding: '10px',
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '9px',
+        color: 'var(--text-disabled)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+      }}>
         {error}
       </div>
     );
@@ -182,13 +189,25 @@ export function SimilarSalesSection({
 
   if (sales.length === 0) {
     return (
-      <div style={{ padding: '32px 24px', textAlign: 'center' }}>
-        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '6px' }}>
-          No comparable sales found
+      <div style={{ padding: '16px 10px', textAlign: 'center' }}>
+        <div style={{
+          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontSize: '9px',
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          color: 'var(--text-disabled)',
+          marginBottom: '4px',
+        }}>
+          NO COMPARABLE SALES FOUND
         </div>
-        <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-          No sold {vehicleYear ?? ''} {vehicleMake ?? ''} {vehicleModel ?? ''} (±2 years) in our database yet.
-          <br />
+        <div style={{
+          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontSize: '9px',
+          color: 'var(--text-secondary)',
+          lineHeight: '1.5',
+        }}>
+          No sold {vehicleYear ?? ''} {vehicleMake ?? ''} {vehicleModel ?? ''} (+/-2 years) in our database yet.
           More comps are added daily as auctions close.
         </div>
       </div>
@@ -196,41 +215,38 @@ export function SimilarSalesSection({
   }
 
   return (
-    <div style={{ padding: '20px 20px 16px' }}>
-      {/* Header + Stats */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: '16px',
-        flexWrap: 'wrap',
-        gap: '12px',
-      }}>
-        <div>
-          <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '3px' }}>
-            Similar Sales
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-            {vehicleYear != null ? `${vehicleYear - 2}–${vehicleYear + 2} ` : ''}{vehicleMake} {vehicleModel}
-            {' '}&middot; {sales.length} sold
-          </div>
+    <div style={{ padding: '10px' }}>
+      {/* Summary stats */}
+      {summary && (
+        <div style={{
+          display: 'flex',
+          gap: '16px',
+          flexWrap: 'wrap',
+          alignItems: 'baseline',
+          marginBottom: '8px',
+          paddingBottom: '8px',
+          borderBottom: '1px solid var(--border)',
+        }}>
+          <StatPill label="AVG" value={formatPrice(summary.avg_price)} accent />
+          <StatPill label="MEDIAN" value={formatPrice(summary.median_price)} />
+          <StatPill label="RANGE" value={`${formatPrice(summary.min_price)} \u2014 ${formatPrice(summary.max_price)}`} />
+          <span style={{
+            fontFamily: "'Courier New', Courier, monospace",
+            fontSize: '8px',
+            color: 'var(--text-disabled)',
+            letterSpacing: '0.06em',
+          }}>
+            {vehicleYear != null ? `${vehicleYear - 2}\u2013${vehicleYear + 2}` : ''} {vehicleMake} {vehicleModel} &middot; {sales.length} SOLD
+          </span>
         </div>
-
-        {summary && (
-          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <StatPill label="Avg" value={formatPrice(summary.avg_price)} accent />
-            <StatPill label="Median" value={formatPrice(summary.median_price)} />
-            <StatPill label="Range" value={`${formatPrice(summary.min_price)} – ${formatPrice(summary.max_price)}`} />
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Sales Grid */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-        gap: '10px',
-        marginBottom: '12px',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+        gap: '4px',
+        marginBottom: '8px',
       }}>
         {displayedSales.map((sale, i) => (
           <SaleCard key={`${sale.vehicle_id ?? i}-${i}`} sale={sale} />
@@ -239,19 +255,23 @@ export function SimilarSalesSection({
 
       {/* Show more / less */}
       {sales.length > 6 && (
-        <div style={{ textAlign: 'center', paddingTop: '8px' }}>
+        <div style={{ textAlign: 'center', paddingTop: '4px' }}>
           <button
             onClick={() => setShowAll(!showAll)}
             style={{
               background: 'none',
-              border: '1px solid var(--border-light)', padding: '5px 16px',
-              fontSize: '12px',
-              color: 'var(--text-muted)',
+              border: '1px solid var(--border)',
+              padding: '3px 10px',
+              fontFamily: 'Arial, Helvetica, sans-serif',
+              fontSize: '8px',
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase' as const,
+              color: 'var(--text)',
               cursor: 'pointer',
-              letterSpacing: '0.02em',
             }}
           >
-            {showAll ? 'Show fewer' : `Show all ${sales.length} sales`}
+            {showAll ? 'SHOW FEWER' : `SHOW ALL ${sales.length} SALES`}
           </button>
         </div>
       )}
@@ -261,18 +281,27 @@ export function SimilarSalesSection({
 
 function StatPill({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div style={{ textAlign: 'right' }}>
-      <div style={{
-        fontSize: '15px',
+    <div>
+      <span style={{
+        fontFamily: "'Courier New', Courier, monospace",
+        fontSize: '10px',
         fontWeight: 700,
-        color: accent ? 'var(--primary)' : 'var(--text)',
-        lineHeight: 1.2,
+        color: accent ? '#16825d' : 'var(--text)',
+        letterSpacing: '0.04em',
       }}>
         {value}
-      </div>
-      <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+      </span>
+      <span style={{
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '8px',
+        fontWeight: 700,
+        color: 'var(--text-disabled)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+        marginLeft: '4px',
+      }}>
         {label}
-      </div>
+      </span>
     </div>
   );
 }
