@@ -1,15 +1,16 @@
 /**
- * useHeroDeals — React Query hook for the hero_deals() RPC.
+ * useHeroDeals -- React Query hook for hero_deals() RPC.
  *
- * Fetches deal data from the server: top deals, deals by make, and
- * price vs estimate distribution. Caches for 2 minutes.
+ * Returns: top 30 deals (highest deal_score, is_for_sale=true),
+ * deal distribution by make, price-vs-estimate stats.
+ * Cached for 5 minutes.
  */
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 
 // ---------------------------------------------------------------------------
-// Types
+// Types (match hero_deals() jsonb output)
 // ---------------------------------------------------------------------------
 
 export interface DealItem {
@@ -17,46 +18,46 @@ export interface DealItem {
   year: number | null;
   make: string | null;
   model: string | null;
-  asking_price: number | null;
-  sale_price: number | null;
-  nuke_estimate: number;
   deal_score: number;
-  discount_pct: number;
-  listing_url: string | null;
-  source: string | null;
+  price: number | null;
+  nuke_estimate: number | null;
   thumbnail: string | null;
 }
 
 export interface DealByMake {
   make: string;
-  deal_count: number;
-  avg_deal_score: number;
+  count: number;
+  best_score: number;
 }
 
-export interface PriceVsEstimate {
-  underpriced: number;
-  fair: number;
-  overpriced: number;
+export interface PriceVsEstimateItem {
+  id: string;
+  price: number;
+  estimate: number;
+  discount_pct: number;
 }
 
 export interface HeroDealsData {
-  top_deals: DealItem[] | null;
-  deal_by_make: DealByMake[] | null;
-  price_vs_estimate: PriceVsEstimate | null;
+  total_deals: number;
+  top_deals: DealItem[];
+  deal_by_make: DealByMake[];
+  price_vs_estimate: PriceVsEstimateItem[];
 }
 
 // ---------------------------------------------------------------------------
 // Fetcher
 // ---------------------------------------------------------------------------
 
-async function fetchHeroDeals(limit: number = 30): Promise<HeroDealsData> {
-  const { data, error } = await supabase.rpc('hero_deals', { p_limit: limit });
-
-  if (error) {
-    throw new Error(`hero_deals RPC error: ${error.message}`);
-  }
-
-  return data as HeroDealsData;
+async function fetchHeroDeals(): Promise<HeroDealsData> {
+  const { data, error } = await supabase.rpc('hero_deals');
+  if (error) throw new Error(`hero_deals RPC error: ${error.message}`);
+  const d = data as any;
+  return {
+    total_deals: d.total_deals ?? 0,
+    top_deals: d.top_deals ?? [],
+    deal_by_make: d.deal_by_make ?? [],
+    price_vs_estimate: d.price_vs_estimate ?? [],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -66,10 +67,10 @@ async function fetchHeroDeals(limit: number = 30): Promise<HeroDealsData> {
 export function useHeroDeals(enabled: boolean = true) {
   return useQuery<HeroDealsData>({
     queryKey: ['hero_deals'],
-    queryFn: () => fetchHeroDeals(30),
+    queryFn: fetchHeroDeals,
     enabled,
-    staleTime: 2 * 60_000,       // 2 minutes
-    gcTime: 5 * 60_000,          // 5 minutes
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
     refetchOnWindowFocus: false,
     retry: 1,
   });

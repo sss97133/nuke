@@ -1,5 +1,5 @@
 /**
- * useHeroFinds — React Query hook for the hero_finds() RPC.
+ * useHeroFinds -- React Query hook for the hero_finds() RPC.
  *
  * Fetches top FINDS from mv_finds: vehicles where multiple interesting
  * signals align (deal score, rarity, condition, cross-platform, etc.).
@@ -8,11 +8,22 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
-import type { FindSignalBreakdown } from '../types/feed';
 
 // ---------------------------------------------------------------------------
-// Types
+// Types (match hero_finds() RETURNS TABLE output)
 // ---------------------------------------------------------------------------
+
+export interface FindSignalBreakdown {
+  deal_score: number;
+  heat_score: number;
+  rare: boolean;
+  model_count: number;
+  condition: string | null;
+  red_flags: number;
+  mods: number;
+  cross_platform: number;
+  old_discovery: boolean;
+}
 
 export interface FindItem {
   vehicle_id: string;
@@ -105,8 +116,8 @@ export function useHeroFinds(enabled: boolean = true) {
     queryKey: ['hero_finds'],
     queryFn: () => fetchHeroFinds(20),
     enabled,
-    staleTime: 2 * 60_000,       // 2 minutes
-    gcTime: 5 * 60_000,          // 5 minutes
+    staleTime: 2 * 60_000,
+    gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     retry: 1,
   });
