@@ -14,7 +14,7 @@ import type { FeedVehicle } from '../types/feed';
 import type { SortBy } from '../../types/feedTypes';
 import { DealsHeroPanel } from './hero/DealsHeroPanel';
 import { FindsHeroPanel } from './hero/FindsHeroPanel';
-import { HeatHeroPanel } from './hero/HeatHeroPanel';
+import { HeroHeatPanel } from './hero/HeroHeatPanel';
 import { HeroNewestPanel } from './hero/HeroNewestPanel';
 
 // ---------------------------------------------------------------------------
@@ -564,7 +564,7 @@ export function HeroPanel({ dimension, vehicles, onFilter, onClose }: HeroPanelP
 
         {/* Server-powered panel: HEAT */}
         {dimension === 'heat_score' && (
-          <HeatHeroPanel onFilter={handleCellClick} />
+          <HeroHeatPanel onFilter={handleCellClick} />
         )}
 
         {/* Server-powered panel: FINDS — story cards, not treemap */}

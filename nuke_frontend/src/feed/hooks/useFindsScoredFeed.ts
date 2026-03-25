@@ -96,23 +96,55 @@ export function buildFindExplanation(item: ScoredFindItem): string {
 // Fetcher
 // ---------------------------------------------------------------------------
 
-async function fetchScoredFinds(limit: number): Promise<ScoredFindItem[]> {
-  const { data, error } = await supabase.rpc('hero_finds', { lim: limit });
+async function fetchScoredFinds(): Promise<ScoredFindItem[]> {
+  // hero_finds() now returns jsonb with {multi_signal, multi_platform, rare_finds}
+  const { data, error } = await supabase.rpc('hero_finds');
   if (error) throw new Error(`hero_finds RPC error: ${error.message}`);
-  return (data ?? []) as ScoredFindItem[];
+  const d = data as Record<string, any>;
+  const items: any[] = d?.multi_signal ?? [];
+  return items.map((item: any): ScoredFindItem => ({
+    vehicle_id: item.id,
+    year: item.year,
+    make: item.make,
+    model: item.model,
+    display_price: item.price,
+    primary_image_url: item.thumbnail,
+    listing_url: null,
+    discovery_source: null,
+    is_for_sale: true,
+    find_score: Math.round((item.deal_score ?? 0) + (item.heat_score ?? 0) * 2),
+    deal_score: item.deal_score,
+    heat_score: item.heat_score,
+    model_total: null,
+    red_flag_count: item.recent_comments > 10 ? 1 : 0,
+    mod_count: 0,
+    cross_platform_count: 0,
+    condition_grade: null,
+    signal_breakdown: {
+      deal_score: item.deal_score ?? 0,
+      heat_score: item.heat_score ?? 0,
+      rare: false,
+      model_count: 0,
+      condition: null,
+      red_flags: 0,
+      mods: 0,
+      cross_platform: 0,
+      old_discovery: false,
+    },
+  }));
 }
 
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
-export function useFindsScoredFeed(enabled: boolean = true, limit: number = 20) {
+export function useFindsScoredFeed(enabled: boolean = true, _limit: number = 20) {
   return useQuery<ScoredFindItem[]>({
-    queryKey: ['finds_scored_feed', limit],
-    queryFn: () => fetchScoredFinds(limit),
+    queryKey: ['finds_scored_feed'],
+    queryFn: fetchScoredFinds,
     enabled,
-    staleTime: 2 * 60_000,
-    gcTime: 5 * 60_000,
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
     refetchOnWindowFocus: false,
     retry: 1,
   });
