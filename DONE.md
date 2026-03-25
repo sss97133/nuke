@@ -1,5 +1,18 @@
 # DONE — Completed Work Log
 
+## 2026-03-25
+
+### [discovery] Auction Platform Gap Analysis — coverage audit + 3 new feeds live
+- Audited all 111 distinct vehicle sources (356K vehicles) and cross-referenced against source_registry (96 entries), observation_sources (144 entries), and listing_feeds (10 source slugs)
+- Researched 22 missing/underserved platforms across 5 tiers: major missing, European auctions, wholesale/salvage, niche/regional, Japanese market
+- Probed sitemaps and RSS feeds for 15+ platforms to assess integration difficulty
+- **Registered 3 new RSS feeds** in listing_feeds, all tested and confirmed working:
+  - AllCollectorCars (active auctions) — 10 items found
+  - Motorious (vehicle marketplace) — 15 items queued
+  - GuysWithRides (classic car listings) — 10 items queued
+- Key findings: biggest gaps are Classic Driver (EU marketplace, 31-page sitemap ready), ClassicCars.com (40K+ listings, only 23 in our DB), The Market by Bonhams (EU BaT equivalent), and AutoHunter (Barrett-Jackson online arm)
+- Gap analysis document: `specs_ralph/auction-platform-gap-analysis.md`
+
 ## 2026-03-24
 
 ### [feed] MV refresh fix + clickable header metrics

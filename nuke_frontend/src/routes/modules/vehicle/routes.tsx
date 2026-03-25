@@ -17,7 +17,7 @@ const VehicleListFromPhotos = React.lazy(() => import('../../../pages/VehicleLis
 
 const VehicleModuleRoutes = () => {
   return (
-    <Suspense fallback={<div style={{ padding: '20px' }}>Loading...</div>}>
+    <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'var(--text-disabled)', fontSize: '12px' }}>loading...</div>}>
       <Routes>
         {/* Public: browse vehicle list + individual profiles */}
         <Route path="/" element={<VehiclesDashboard />} />
