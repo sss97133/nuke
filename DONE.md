@@ -17,14 +17,15 @@
   - Also queued 29,998 URLs into import_queue for future deep extraction
 - **STEP 2 COMPLETE**: Enriched 1,103 vehicles from existing BaT snapshots via `bat-storage-extract.mjs`
   - Downloaded HTML from Supabase Storage, extracted price/description/VIN/images
-- **STEP 3 RUNNING** (PID 56860): `bat-extract-direct.mjs` — direct fetch + extract at 26K/hr
-  - 7,000+ done, ~34K remaining, zero rate limiting from BaT
-  - Fetches page HTML, extracts all fields (JSON-LD, title, meta tags), updates vehicle, inserts images
-  - 25 concurrent fetches, 300ms delay between waves, 200 URLs per DB round-trip
-  - ETA: ~85 min remaining (should complete by ~5:30 PM)
-  - New scripts: `scripts/bat-extract-direct.mjs`, `scripts/bat-fast-fetch.mjs`, `scripts/bat-fetch-and-extract.mjs`
+- **STEP 3 RUNNING** (PID 69798): `bat-drain-queue.mjs` — single-connection fetch+extract
+  - Draining at ~10K/hr, 38.7K remaining, zero rate limiting from BaT
+  - Fetches page HTML, extracts JSON-LD/title/meta, updates vehicle (price, desc, VIN, trans)
+  - 20 concurrent fetches, 300ms delay, 100 URLs/claim, single persistent DB connection
+  - Iterated: bat-extract-direct.mjs (25K/hr fetch but queue not draining), fixed with persistent conn
+  - ETA: ~3.9 hours remaining (should complete by ~8 PM)
+  - New scripts: `scripts/bat-drain-queue.mjs`, `scripts/bat-extract-direct.mjs`, `scripts/bat-fast-fetch.mjs`, `scripts/bat-fetch-and-extract.mjs`
   - Fixed `vehicle_images` column name (was `url`, actually `image_url`)
-- BaT totals: 162,835 vehicles, 79% with descriptions, 80% with prices, 82% with images
+- BaT totals: 162,839 vehicles, 79.8% with desc, 81.4% with price, 83.0% with image, 73.8% with VIN
 
 ### [discovery] BaT /models/ Full Discovery — 10,942 new listing URLs found
 - Discovered BaT's undocumented REST API: `/wp-json/bringatrailer/1.0/data/listings-filter` (277-page limit without session)

@@ -7,6 +7,6 @@
 
 ## Currently Active (2026-03-25)
 
-15:58 | BAT-42K-INGEST | Step 3 running in background (PID 56860) — bat-extract-direct.mjs fetching+extracting ~34K remaining BaT URLs at 26K/hr. ETA ~5:30 PM. | bat_extraction_queue, vehicles, vehicle_images
+16:30 | BAT-42K-INGEST | Step 3 running in background (PID 69798) — bat-drain-queue.mjs draining ~38.7K remaining BaT URLs at ~10K/hr. Steps 1+2 COMPLETE (28K vehicles + 1.1K enriched). ETA ~8 PM. | bat_extraction_queue, vehicles, vehicle_images
 
 ---
