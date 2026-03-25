@@ -151,7 +151,9 @@ export function CardShell({
     );
   }
 
-  // Grid mode: div with click-to-expand
+  // Grid mode: div with click-to-expand.
+  // Expanded content is absolutely positioned so it overlays subsequent rows
+  // instead of pushing them down. The card stays in its grid cell at fixed height.
   return (
     <div
       ref={containerRef}
@@ -162,8 +164,8 @@ export function CardShell({
         background: 'var(--surface)',
         border: `2px solid ${expanded ? 'var(--text)' : 'var(--border)'}`,
         overflow: expanded ? 'visible' : 'hidden',
-        height: expanded ? 'auto' : '100%',
-        position: expanded ? 'relative' : undefined,
+        height: '100%',
+        position: 'relative',
         zIndex: expanded ? 10 : undefined,
         cursor: 'pointer',
         transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
@@ -175,14 +177,20 @@ export function CardShell({
     >
       {children}
 
-      {/* Expanded detail view */}
+      {/* Expanded detail view — absolutely positioned, overlays below the card */}
       {expanded && (
         <div
           style={{
+            position: 'absolute',
+            top: '100%',
+            left: '-2px',
+            right: '-2px',
+            border: '2px solid var(--text)',
             borderTop: '2px solid var(--border)',
             background: 'var(--bg)',
             padding: '8px',
             animation: 'fadeIn180 180ms ease-out',
+            zIndex: 10,
           }}
         >
           {/* Custom expanded content (badges, specs) */}
