@@ -57,7 +57,7 @@ const VehicleBadgeBar: React.FC = () => {
       {/* WATCHERS */}
       {watcherCount != null && watcherCount > 0 && (
         <span className="badge badge--watchers">
-          &#x1F441; {watcherCount}
+          WATCHERS {watcherCount}
           <span className="badge__tooltip">
             {watcherCount} watchers<br />
             {v.bat_views && <>{Number(v.bat_views).toLocaleString()} page views<br /></>}
