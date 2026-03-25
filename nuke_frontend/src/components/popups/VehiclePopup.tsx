@@ -13,6 +13,7 @@ import type { FeedVehicle } from '../../feed/types/feed';
 import { resolveVehiclePrice } from '../../feed/utils/feedPriceResolution';
 import { supabase } from '../../lib/supabase';
 import { usePopup } from './usePopup';
+import { useViewHistory } from '../../hooks/useViewHistory';
 import { MakePopup } from './MakePopup';
 import { ModelPopup } from './ModelPopup';
 import { SourcePopup } from './SourcePopup';
@@ -42,10 +43,17 @@ function formatPrice(n: number | null): string {
 
 export function VehiclePopup({ vehicle }: Props) {
   const { openPopup } = usePopup();
+  const { recordView, endView } = useViewHistory();
   const price = resolveVehiclePrice(vehicle);
   const [comparables, setComparables] = useState<Comparable[]>([]);
   const [medianData, setMedianData] = useState<MedianData | null>(null);
   const [obsCount, setObsCount] = useState<number | null>(null);
+
+  // Track view on popup open, end on unmount
+  useEffect(() => {
+    recordView(vehicle.id, 'popup');
+    return () => { endView(vehicle.id); };
+  }, [vehicle.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch comparables + median
   useEffect(() => {

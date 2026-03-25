@@ -14,6 +14,7 @@
 import { useCallback, useRef, useState, useEffect, type ReactNode, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
+import { useViewHistory } from '../../../hooks/useViewHistory';
 
 export interface CardShellProps {
   vehicleId: string;
