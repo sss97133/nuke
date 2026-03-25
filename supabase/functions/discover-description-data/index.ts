@@ -111,11 +111,97 @@ Return a JSON array of condition items. Each item:
 Be thorough — extract every condition-relevant statement. Include both positive and negative observations.
 Return ONLY a valid JSON array. If no conditions found, return [].`;
 
+// Multi-LLM fallback: Gemini (free, fast) → Grok → Haiku
+async function callLLM(prompt: string): Promise<{ content: string; model: string }> {
+  const errors: string[] = [];
+
+  // 1. Gemini 2.5 Flash Lite (free tier, fastest)
+  const googleKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY") || "";
+  if (googleKey) {
+    try {
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${googleKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+          }),
+        }
+      );
+      if (resp.ok) {
+        const data = await resp.json();
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        if (content) return { content, model: "gemini-2.5-flash-lite" };
+      } else {
+        const errBody = await resp.text().catch(() => "");
+        errors.push(`Gemini ${resp.status}: ${errBody.slice(0, 100)}`);
+      }
+    } catch (e: any) { errors.push(`Gemini: ${e.message}`); }
+  }
+
+  // 2. xAI Grok-3-Mini (cheap but uses reasoning tokens = slow)
+  const xaiKey = Deno.env.get("XAI_API_KEY") || "";
+  if (xaiKey) {
+    try {
+      const resp = await fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${xaiKey}` },
+        body: JSON.stringify({
+          model: "grok-3-mini",
+          temperature: 0.1,
+          max_tokens: 2048,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const content = data.choices?.[0]?.message?.content || "";
+        if (content) return { content, model: "grok-3-mini" };
+      } else {
+        const errBody = await resp.text().catch(() => "");
+        errors.push(`Grok ${resp.status}: ${errBody.slice(0, 100)}`);
+      }
+    } catch (e: any) { errors.push(`Grok: ${e.message}`); }
+  }
+
+  // 3. Anthropic Haiku (fallback)
+  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY") || "";
+  if (anthropicKey) {
+    try {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-3-5-haiku-latest",
+          max_tokens: 2048,
+          temperature: 0.1,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const content = data.content?.[0]?.text || "";
+        if (content) return { content, model: "claude-3-5-haiku-latest" };
+      } else {
+        const errBody = await resp.text().catch(() => "");
+        errors.push(`Anthropic ${resp.status}: ${errBody.slice(0, 100)}`);
+      }
+    } catch (e: any) { errors.push(`Anthropic: ${e.message}`); }
+  }
+
+  throw new Error(`All LLMs failed: ${errors.join("; ")}`);
+}
+
 async function discoverWithLLM(
   description: string,
   vehicle: { year: number; make: string; model: string; sale_price: number },
-  anthropicKey: string
-): Promise<any> {
+): Promise<{ data: any; model: string }> {
   const prompt = DISCOVERY_PROMPT
     .replace("{year}", String(vehicle.year || "Unknown"))
     .replace("{make}", vehicle.make || "Unknown")
@@ -123,87 +209,43 @@ async function discoverWithLLM(
     .replace("{sale_price}", vehicle.sale_price ? `$${vehicle.sale_price.toLocaleString()}` : "Unknown")
     .replace("{description}", description.substring(0, 8000));
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": anthropicKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-3-5-haiku-latest",
-      max_tokens: 2048,
-      temperature: 0.1,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
+  const { content, model } = await callLLM(prompt);
 
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    throw new Error(`Anthropic ${response.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const result = await response.json();
-  const content = result.content?.[0]?.text || "";
-
-  // Parse JSON from response
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
-    return JSON.parse(jsonMatch[0]);
+    return { data: JSON.parse(jsonMatch[0]), model };
   }
 
-  return { raw_response: content, parse_failed: true };
+  return { data: { raw_response: content, parse_failed: true }, model };
 }
 
 async function extractConditionsWithLLM(
   description: string,
   vehicle: { year: number; make: string; model: string },
-  anthropicKey: string
-): Promise<any[]> {
+): Promise<{ conditions: any[]; model: string }> {
   const prompt = CONDITION_EXTRACTION_PROMPT
     .replace("{year}", String(vehicle.year || "Unknown"))
     .replace("{make}", vehicle.make || "Unknown")
     .replace("{model}", vehicle.model || "Unknown")
     .replace("{description}", description.substring(0, 8000));
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": anthropicKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-3-5-haiku-latest",
-      max_tokens: 2048,
-      temperature: 0.1,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
+  const { content, model } = await callLLM(prompt);
 
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    throw new Error(`Condition LLM ${response.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const result = await response.json();
-  const content = result.content?.[0]?.text || "";
-
-  // Parse JSON array from response
   const arrayMatch = content.match(/\[[\s\S]*\]/);
   if (arrayMatch) {
     const parsed = JSON.parse(arrayMatch[0]);
-    return Array.isArray(parsed) ? parsed : [];
+    return { conditions: Array.isArray(parsed) ? parsed : [], model };
   }
 
-  return [];
+  return { conditions: [], model };
 }
 
 async function ingestConditionObservations(
   vehicleId: string,
   conditions: any[],
   supabaseUrl: string,
-  serviceKey: string
+  serviceKey: string,
+  modelUsed = "unknown"
 ): Promise<{ ingested: number; errors: number }> {
   let ingested = 0;
   let errors = 0;
@@ -230,7 +272,7 @@ async function ingestConditionObservations(
           },
           vehicle_id: vehicleId,
           extraction_method: "description_condition_v1",
-          agent_model: "claude-3-5-haiku-latest",
+          agent_model: modelUsed,
         }),
       });
 
@@ -261,8 +303,10 @@ Deno.serve(async (req) => {
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    if (!anthropicKey) {
-      throw new Error("ANTHROPIC_API_KEY not configured");
+    // At least one LLM key is required
+    const hasAnyKey = Deno.env.get("XAI_API_KEY") || Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY") || Deno.env.get("ANTHROPIC_API_KEY");
+    if (!hasAnyKey) {
+      throw new Error("No LLM API key configured (need XAI_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY)");
     }
 
     const body = await req.json().catch(() => ({}));
@@ -309,9 +353,9 @@ Deno.serve(async (req) => {
       for (const vehicle of backfillVehicles) {
         if (Date.now() - startTime > 50000) break;
         try {
-          const conditions = await extractConditionsWithLLM(vehicle.description, vehicle, anthropicKey);
+          const { conditions, model: condModel } = await extractConditionsWithLLM(vehicle.description, vehicle);
           const { ingested, errors: errs } = await ingestConditionObservations(
-            vehicle.id, conditions, supabaseUrl, serviceKey
+            vehicle.id, conditions, supabaseUrl, serviceKey, condModel
           );
           totalIngested += ingested;
           totalErrors += errs;
@@ -426,7 +470,7 @@ Deno.serve(async (req) => {
         }
 
         // --- Pass 1: Open-ended discovery (existing) ---
-        const discovered = await discoverWithLLM(vehicle.description, vehicle, anthropicKey);
+        const { data: discovered, model: discModel } = await discoverWithLLM(vehicle.description, vehicle);
         const keysFound = Object.keys(discovered).length;
         const totalFields = countFields(discovered);
 
@@ -447,9 +491,9 @@ Deno.serve(async (req) => {
         // --- Pass 2: Condition extraction (new) ---
         let conditionResult = { ingested: 0, errors: 0 };
         try {
-          const conditions = await extractConditionsWithLLM(vehicle.description, vehicle, anthropicKey);
+          const { conditions, model: condModel2 } = await extractConditionsWithLLM(vehicle.description, vehicle);
           conditionResult = await ingestConditionObservations(
-            vehicle.id, conditions, supabaseUrl, serviceKey
+            vehicle.id, conditions, supabaseUrl, serviceKey, condModel2
           );
           console.log(`[discover-desc] ${vehicle.year} ${vehicle.make} ${vehicle.model}: ${conditionResult.ingested} conditions extracted`);
         } catch (condErr: any) {

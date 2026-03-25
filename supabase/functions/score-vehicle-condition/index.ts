@@ -84,22 +84,125 @@ function aggregate(results: ImageResult[]) {
   };
 }
 
-async function scoreImage(url: string, id: string, key: string): Promise<ImageResult> {
+// Multi-LLM vision scoring: Gemini → Grok → Haiku
+async function scoreImage(url: string, id: string, _key: string): Promise<ImageResult> {
   const fail = (e: string): ImageResult => ({ image_id: id, image_url: url, scores: {}, concerns: [], image_summary: "", error: e });
-  try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: "claude-3-5-haiku-latest", max_tokens: 1500,
-        messages: [{ role: "user", content: [{ type: "image", source: { type: "url", url } }, { type: "text", text: PROMPT }] }] }),
-    });
-    if (!resp.ok) { const t = await resp.text(); console.error(`[score] ${id} API ${resp.status}:`, t.slice(0, 200)); return fail(`API ${resp.status}`); }
-    const text = (await resp.json()).content?.[0]?.text || "";
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) return fail("No JSON");
-    const p = JSON.parse(m[0]);
-    return { image_id: id, image_url: url, scores: p.visible_categories || {}, concerns: p.concerns || [], image_summary: p.image_summary || "" };
-  } catch (e) { return fail(e instanceof Error ? e.message : String(e)); }
+  const errors: string[] = [];
+
+  // 1. Gemini 2.5 Flash vision (free tier — fetch image, base64-encode, send inline)
+  const googleKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY") || "";
+  if (googleKey) {
+    try {
+      // Fetch image and base64-encode (chunked to avoid stack overflow)
+      const imgResp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (imgResp.ok) {
+        const imgBuf = await imgResp.arrayBuffer();
+        const bytes = new Uint8Array(imgBuf);
+        let b64 = "";
+        const chunk = 8192;
+        for (let ci = 0; ci < bytes.length; ci += chunk) {
+          b64 += String.fromCharCode(...bytes.subarray(ci, ci + chunk));
+        }
+        b64 = btoa(b64);
+        const mimeType = imgResp.headers.get("content-type") || "image/jpeg";
+
+        const resp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${googleKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { inline_data: { mime_type: mimeType, data: b64 } },
+                  { text: PROMPT },
+                ],
+              }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 1500 },
+            }),
+          }
+        );
+        if (resp.ok) {
+          const data = await resp.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          const m = text.match(/\{[\s\S]*\}/);
+          if (m) {
+            const p = JSON.parse(m[0]);
+            return { image_id: id, image_url: url, scores: p.visible_categories || {}, concerns: p.concerns || [], image_summary: p.image_summary || "" };
+          }
+          errors.push("Gemini: no JSON in response");
+        } else {
+          const errBody = await resp.text().catch(() => "");
+          errors.push(`Gemini ${resp.status}: ${errBody.slice(0, 100)}`);
+        }
+      } else {
+        errors.push(`Image fetch ${imgResp.status} for Gemini`);
+      }
+    } catch (e: any) { errors.push(`Gemini: ${e.message}`); }
+  }
+
+  // 2. xAI Grok vision
+  const xaiKey = Deno.env.get("XAI_API_KEY") || "";
+  if (xaiKey) {
+    try {
+      const resp = await fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${xaiKey}` },
+        body: JSON.stringify({
+          model: "grok-2-vision",
+          temperature: 0.1,
+          max_tokens: 1500,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image_url", image_url: { url } },
+              { type: "text", text: PROMPT },
+            ],
+          }],
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const text = data.choices?.[0]?.message?.content || "";
+        const m = text.match(/\{[\s\S]*\}/);
+        if (m) {
+          const p = JSON.parse(m[0]);
+          return { image_id: id, image_url: url, scores: p.visible_categories || {}, concerns: p.concerns || [], image_summary: p.image_summary || "" };
+        }
+        errors.push("Grok: no JSON in response");
+      } else {
+        const errBody = await resp.text().catch(() => "");
+        errors.push(`Grok ${resp.status}: ${errBody.slice(0, 100)}`);
+      }
+    } catch (e: any) { errors.push(`Grok: ${e.message}`); }
+  }
+
+  // 3. Anthropic Haiku vision (fallback)
+  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY") || "";
+  if (anthropicKey) {
+    try {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({ model: "claude-3-5-haiku-latest", max_tokens: 1500,
+          messages: [{ role: "user", content: [{ type: "image", source: { type: "url", url } }, { type: "text", text: PROMPT }] }] }),
+      });
+      if (resp.ok) {
+        const text = (await resp.json()).content?.[0]?.text || "";
+        const m = text.match(/\{[\s\S]*\}/);
+        if (m) {
+          const p = JSON.parse(m[0]);
+          return { image_id: id, image_url: url, scores: p.visible_categories || {}, concerns: p.concerns || [], image_summary: p.image_summary || "" };
+        }
+        errors.push("Haiku: no JSON in response");
+      } else {
+        const errBody = await resp.text().catch(() => "");
+        errors.push(`Haiku ${resp.status}: ${errBody.slice(0, 100)}`);
+      }
+    } catch (e: any) { errors.push(`Haiku: ${e.message}`); }
+  }
+
+  return fail(errors.join("; ") || "No vision API key configured");
 }
 
 async function scoreVehicle(vehicleId: string, sb: any, key: string) {
@@ -254,8 +357,9 @@ Deno.serve(async (req) => {
   try {
     const sb = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false, detectSessionInUrl: false } });
-    const key = Deno.env.get("ANTHROPIC_API_KEY") ?? Deno.env.get("NUKE_CLAUDE_API") ?? "";
-    if (!key) return json({ error: "No ANTHROPIC_API_KEY configured" }, 500);
+    // At least one vision-capable LLM key required
+    const key = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY") || Deno.env.get("XAI_API_KEY") || Deno.env.get("ANTHROPIC_API_KEY") || "";
+    if (!key) return json({ error: "No vision API key configured (need GEMINI_API_KEY, XAI_API_KEY, or ANTHROPIC_API_KEY)" }, 500);
 
     const body = await req.json();
 
