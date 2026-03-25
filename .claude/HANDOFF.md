@@ -86,3 +86,29 @@ none
 2. `tail -40 DONE.md` — what exists
 3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
 4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-25 09:33:41
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+f8e795a81 Add condition observation backfill orchestrator script
+8d8f04313 Bonhams extraction fix: 1,079 model names, 960 VINs, 38 body styles cleaned
+8cc974944 View history tracking + recently viewed strip, BaT comment backfill rewrite
+e92993232 Popup rhizome system: stacking popups, infinite drill-down, every badge clickable
+fe733cd5c Remove all average price displays from UI, replace with median/range
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+DONE.md
+scripts/bat-gap-discovery.mjs
+scripts/bat-models-discovery.mjs
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`

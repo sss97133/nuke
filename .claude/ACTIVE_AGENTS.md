@@ -24,6 +24,7 @@
 
 ## Completed This Session (2026-03-23)
 
+~DONE~ | BAT-DISCOVERY | BaT gap analysis: 69.6K gap found, 96K queue entries reconciled, 39K comment URLs cleared, scripts built | bat_extraction_queue, scripts/
 **PERPLEXITY-TASKS** — 6-task package from claude-code-nuke-package. All done.
 - 4 RPCs: schema_stats(), source_vehicles(), make_stats(), mv_source_quality
 - Garbage audit: 289K flagged, zero deleted
@@ -36,6 +37,5 @@
 ~DONE~ | BJ-PRICE-FIX | Computed nuke_estimate for 4,875 of 5,903 BJ vehicles. 98 remain (un-valueable oddities). Coverage 99.74%. | vehicles, nuke_estimates, compute-vehicle-valuation
 ~DONE~ | FEED-FIX | MV refresh fixed (cron timeout 120s->600s), clickable header metrics wired, feed-query deployed with added_today filter
 ~DONE~ | ROUTE-AUDIT | Route audit complete — all routes verified, no issues found at HEAD | nuke_frontend/src/
-09:25 | BAT-DISCOVERY | BaT REST API full crawl running — 234K listings across 6527 pages, ~32K gap. Script: bat-models-discovery.mjs. ETA ~4hrs. | bat_extraction_queue, scripts/bat-models-discovery.mjs
 ~DONE~ | BAT-SHALLOW-FIX | Fixed: 156+ shallow vehicles extracted, K10 fully populated, comment backfill cron re-enabled, RPC+index created, backfill script running in background (~1,842 remaining). Comment gap: 809 vehicles, cron+RPC now draining. | vehicles, listing_page_snapshots, auction_comments, backfill-comments
-10:00 | CONDITION-OBS | Condition observation extraction at scale — 6 steps: migration, description→condition, hagerty comments, comment→condition, photo→condition, backfill orchestrator | supabase/functions/discover-description-data, extract-hagerty-listing, batch-comment-discovery, score-vehicle-condition, scripts/backfill-condition-observations.mjs
+~DONE~ | CONDITION-OBS | Condition observation extraction COMPLETE — 4 edge functions modified+deployed, migration applied, backfill script created. Blocked on Anthropic credits for actual extraction.

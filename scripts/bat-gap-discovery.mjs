@@ -4,9 +4,9 @@
  *
  * Status as of 2026-03-25:
  *   - BaT API reports: 234,943 total listings
- *   - We have: 204,718 unique URLs across all tables
- *   - Gap: ~30,225 undiscovered listings
- *   - bat_extraction_queue has 166K pending (68K without vehicles, 96K need enrichment)
+ *   - We have: 165,339 unique clean URLs across all tables (204K was inflated by comment fragments)
+ *   - TRUE gap: ~69,600 undiscovered listings
+ *   - bat_extraction_queue: 30.5K genuinely pending (after reconciling 96K + clearing 39K comment URLs)
  *
  * Strategy:
  *   Phase 1: Crawl BaT listings-filter API with proper rate limiting (3-5s delays)
@@ -29,10 +29,13 @@
 
 import pg from 'pg';
 
-const client = new pg.Client({
-  connectionString: 'postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres',
-  statement_timeout: 55000,
-});
+const DB_URL = 'postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres';
+
+function makeClient() {
+  return new pg.Client({ connectionString: DB_URL, statement_timeout: 55000 });
+}
+
+let client = makeClient();
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
@@ -460,8 +463,15 @@ async function main() {
     return;
   }
 
+  // Close DB during long API crawl (prevents stale connection errors)
+  await client.end();
+
   // Phase 1: Crawl API
   const { allListings, totalItems } = await crawlApi();
+
+  // Reconnect to DB for Phases 2-5
+  client = makeClient();
+  await client.connect();
 
   if (API_ONLY) {
     console.log(`\n  API returned ${allListings.size.toLocaleString()} / ${totalItems.toLocaleString()} total`);

@@ -25,7 +25,21 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:122.0) Gecko/20100101 Firefox/122.0",
+  "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:122.0) Gecko/20100101 Firefox/122.0",
+];
+
+function getUA() {
+  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
 const API_BASE = "https://bringatrailer.com/wp-json/bringatrailer/1.0/data/listings-filter";
 const PER_PAGE = 36;
 
@@ -39,7 +53,7 @@ async function fetchPage(page, retries = 3) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const resp = await fetch(url, {
-        headers: { "User-Agent": UA },
+        headers: { "User-Agent": getUA(), "Accept": "application/json" },
         signal: AbortSignal.timeout(20000),
       });
 
@@ -55,6 +69,14 @@ async function fetchPage(page, retries = 3) {
       }
 
       const data = await resp.json();
+
+      // Detect "silent rate limit" — returns 200 but items_total=0
+      if (data.items_total === 0 && page > 1) {
+        const waitSec = attempt * 15;
+        console.log(`  Silent rate limit on page ${page} (items_total=0), waiting ${waitSec}s (attempt ${attempt}/${retries})`);
+        await sleep(waitSec * 1000);
+        continue;
+      }
 
       if (!data.items || !Array.isArray(data.items)) {
         if (attempt < retries) {

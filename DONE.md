@@ -2,6 +2,16 @@
 
 ## 2026-03-25
 
+### [condition] Condition Observation Extraction at Scale — 3 data gaps wired
+- Migration: Added 'condition' to 6 auction sources + registered 'nuke-vision' source
+- Gap 1 (Descriptions): `discover-description-data` now runs condition extraction pass + `condition_backfill` mode
+- Gap 2a (Hagerty Comments): `extract-hagerty-listing` extracts comments from __NEXT_DATA__ via ingest-observation
+- Gap 2b (Comment Conditions): `batch-comment-discovery` adds Hagerty platform + emits Category B claims as condition obs
+- Gap 3 (Vision): `score-vehicle-condition` creates vision_summary + per-concern condition observations via nuke-vision source
+- All 4 edge functions deployed, backfill orchestrator: `npm run backfill:condition`
+- Content-hash dedup verified (re-run same vehicle = no duplicates)
+- Blocked by: Anthropic API credits exhausted — condition extraction works but can't run at scale until credits replenished
+
 ### [extraction] Shallow BaT Vehicle Backfill + Comment Gap Fix
 - Identified 1,998 BaT vehicles with listing_url but no description/VIN/specs
 - 629 had archived snapshots, 1,369 did not (262 were URL normalization mismatches with double slashes)
@@ -5368,3 +5378,19 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - Deployed compute-vehicle-valuation, batch-extracted 4,379/4,450 vehicles
 - Also added "Sold for" price fallback to batch-extract-snapshots Bonhams parser
 - Results: high_conf 323→1,628 (+5x), no_estimate 578→78, avg_confidence 55→64
+
+### 2026-03-25
+### [data] BaT gap discovery analysis + queue health fix
+- BaT total catalog confirmed: 234,943 listings via API (234,943 items_total from listings-filter endpoint)
+- Our actual unique clean URLs: 165,339 (previous 204K count was inflated by 39K comment fragment URLs in queue)
+- TRUE discovery gap: ~69,600 listings (mostly pre-2024, older than what API can paginate to)
+- API limitation found: BaT's listings-filter API has a hard 275-page limit (~9,900 items max per unfiltered query)
+  - Filter params (era, make, keyword_pages) are silently ignored by the API
+  - HTML results pages return identical content regardless of ?page= param (Knockout.js dynamic loading only)
+  - Only way to reach deeper results: Playwright "Show More" clicking through all 6,500+ pages
+- Queue reconciliation: marked 96,418 bat_extraction_queue entries as 'complete' (vehicles already existed)
+- Queue cleanup: marked 39,213 comment fragment URLs (#comment-XXXXX) as 'failed' (not actual listing URLs)
+- Queue status after cleanup: 30,528 genuinely pending (8,251 with snapshots, 22,277 need fetching)
+- Created scripts/bat-gap-discovery.mjs — API-based discovery + DB comparison + reconciliation
+- Created scripts/bat-deep-discovery.mjs — Playwright-based deep discovery to find the remaining ~69K
+- Queue processor bottleneck: process-bat-extraction-queue forces batchSize=1 despite cron sending 15. At 1/5min = 288/day, 30K queue would take 104 days.
