@@ -1,8 +1,8 @@
 /**
  * useFindsScoredFeed -- Fetches top scored finds from hero_finds() RPC.
  *
- * The hero_finds(lim) RPC returns rows from mv_finds materialized view,
- * each with a composite find_score and signal_breakdown JSON.
+ * hero_finds() returns jsonb with {multi_signal, multi_platform, rare_finds}.
+ * We map multi_signal items to the ScoredFindItem shape for backward compat.
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -93,36 +93,38 @@ export function buildFindExplanation(item: ScoredFindItem): string {
 }
 
 // ---------------------------------------------------------------------------
-// Fetcher
+// Fetcher -- calls parameterless hero_finds() RPC
 // ---------------------------------------------------------------------------
 
-async function fetchScoredFinds(): Promise<ScoredFindItem[]> {
-  // hero_finds() now returns jsonb with {multi_signal, multi_platform, rare_finds}
-  const { data, error } = await supabase.rpc('hero_finds');
-  if (error) throw new Error(`hero_finds RPC error: ${error.message}`);
-  const d = data as Record<string, any>;
-  const items: any[] = d?.multi_signal ?? [];
-  return items.map((item: any): ScoredFindItem => ({
-    vehicle_id: item.id,
-    year: item.year,
-    make: item.make,
-    model: item.model,
-    display_price: item.price,
-    primary_image_url: item.thumbnail,
+/* eslint-disable @typescript-eslint/no-explicit-any */
+async function doFetchFinds(): Promise<ScoredFindItem[]> {
+  // hero_finds() returns jsonb: {multi_signal, multi_platform, rare_finds}
+  const rpcResult = await supabase.rpc('hero_finds');
+  if (rpcResult.error) throw new Error(`hero_finds RPC error: ${rpcResult.error.message}`);
+  const payload = rpcResult.data as any;
+  if (!payload) return [];
+  const signalItems: any[] = payload.multi_signal ?? [];
+  return signalItems.map((row: any): ScoredFindItem => ({
+    vehicle_id: String(row.id ?? ''),
+    year: row.year,
+    make: row.make,
+    model: row.model,
+    display_price: row.price,
+    primary_image_url: row.thumbnail,
     listing_url: null,
     discovery_source: null,
     is_for_sale: true,
-    find_score: Math.round((item.deal_score ?? 0) + (item.heat_score ?? 0) * 2),
-    deal_score: item.deal_score,
-    heat_score: item.heat_score,
+    find_score: Math.round((row.deal_score ?? 0) + (row.heat_score ?? 0) * 2),
+    deal_score: row.deal_score,
+    heat_score: row.heat_score,
     model_total: null,
-    red_flag_count: item.recent_comments > 10 ? 1 : 0,
+    red_flag_count: (row.recent_comments ?? 0) > 10 ? 1 : 0,
     mod_count: 0,
     cross_platform_count: 0,
     condition_grade: null,
     signal_breakdown: {
-      deal_score: item.deal_score ?? 0,
-      heat_score: item.heat_score ?? 0,
+      deal_score: row.deal_score ?? 0,
+      heat_score: row.heat_score ?? 0,
       rare: false,
       model_count: 0,
       condition: null,
@@ -133,6 +135,7 @@ async function fetchScoredFinds(): Promise<ScoredFindItem[]> {
     },
   }));
 }
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -141,7 +144,7 @@ async function fetchScoredFinds(): Promise<ScoredFindItem[]> {
 export function useFindsScoredFeed(enabled: boolean = true, _limit: number = 20) {
   return useQuery<ScoredFindItem[]>({
     queryKey: ['finds_scored_feed'],
-    queryFn: fetchScoredFinds,
+    queryFn: doFetchFinds,
     enabled,
     staleTime: 5 * 60_000,
     gcTime: 10 * 60_000,
