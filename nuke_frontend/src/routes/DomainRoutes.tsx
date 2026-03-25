@@ -88,7 +88,7 @@ const StripeConnectStore = React.lazy(() => import('../pages/StripeConnectStore'
 
 export const DomainRoutes = () => {
   return (
-    <Suspense fallback={<div className="p-4 text-center">Loading module...</div>}>
+    <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'var(--text-disabled)', fontSize: '12px' }}>loading...</div>}>
       <Routes>
 
         {/* ── Auth ──────────────────────────────────────────────────────── */}
