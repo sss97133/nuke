@@ -191,20 +191,10 @@ export function CardShell({
           {/* OPEN PROFILE footer — always renders */}
           <div style={{
             display: 'flex',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-end',
             alignItems: 'center',
             marginTop: expandedContent ? '8px' : 0,
           }}>
-            <span style={{
-              fontFamily: 'Arial, sans-serif',
-              fontSize: '8px',
-              fontWeight: 700,
-              textTransform: 'uppercase' as const,
-              letterSpacing: '0.5px',
-              color: 'var(--text-disabled)',
-            }}>
-              CLICK BADGES TO EXPLORE
-            </span>
             <Link
               to={`/vehicle/${vehicleId}`}
               state={{ fromFeed: true }}
