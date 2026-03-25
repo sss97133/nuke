@@ -36,6 +36,7 @@ export function CardIdentity({
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    textTransform: 'uppercase',
   };
 
   const secondaryStyle: CSSProperties = {
