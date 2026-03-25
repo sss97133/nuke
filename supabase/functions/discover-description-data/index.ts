@@ -5,8 +5,10 @@
  * Captures EVERYTHING the LLM finds, not limited to predefined schema.
  * Used to discover what data exists before committing to final schema.
  *
+ * Also extracts discrete CONDITION observations and ingests them via ingest-observation.
+ *
  * POST /functions/v1/discover-description-data
- * Body: { "vehicle_id": "uuid" } or { "batch_size": 10 }
+ * Body: { "vehicle_id": "uuid" } or { "batch_size": 10 } or { "mode": "condition_backfill" }
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -69,6 +71,46 @@ Example structure (adapt as needed):
 
 Be exhaustive. Capture everything. Return ONLY valid JSON.`;
 
+// Condition-specific extraction prompt
+const CONDITION_EXTRACTION_PROMPT = `You are a vehicle condition assessor analyzing an auction listing description. Extract EVERY discrete condition observation.
+
+VEHICLE: {year} {make} {model}
+
+LISTING DESCRIPTION:
+---
+{description}
+---
+
+Extract individual condition observations. Look for:
+- Known imperfections (dents, scratches, chips, cracks, wear marks)
+- Modifications from factory spec (aftermarket parts, swaps, upgrades, deletions)
+- Paint condition (repainted, original, patina, touch-ups, color changes)
+- Rust or corrosion (surface rust, bubbling, rust-free claims, undercoating)
+- Mechanical state (running condition, known issues, recent repairs, noises)
+- Interior condition (tears, wear, re-upholstery, cracks, stains, originality)
+- Missing or replaced parts (original parts absent, reproduction parts used)
+- Documentation state (service records, ownership history docs, build sheet, window sticker)
+
+For each observation, determine:
+- category: one of "imperfection", "modification", "paint", "rust", "mechanical", "interior", "missing_part", "documentation", "structural", "electrical", "glass", "trim", "wheels_tires", "general"
+- severity: "info" (neutral fact), "minor" (cosmetic/small), "moderate" (notable but not critical), "major" (significant concern), "positive" (explicitly good condition)
+- component: the specific part or area (e.g., "driver door", "engine", "dashboard", "frame rails")
+- is_positive: true if this is a GOOD condition note (e.g., "rust-free", "original paint in excellent condition")
+- quote: the EXACT text from the description that supports this observation (copy verbatim)
+
+Return a JSON array of condition items. Each item:
+{
+  "category": "...",
+  "severity": "...",
+  "component": "...",
+  "is_positive": true/false,
+  "summary": "one-sentence plain English summary",
+  "quote": "exact quote from description"
+}
+
+Be thorough — extract every condition-relevant statement. Include both positive and negative observations.
+Return ONLY a valid JSON array. If no conditions found, return [].`;
+
 async function discoverWithLLM(
   description: string,
   vehicle: { year: number; make: string; model: string; sale_price: number },
@@ -113,6 +155,101 @@ async function discoverWithLLM(
   return { raw_response: content, parse_failed: true };
 }
 
+async function extractConditionsWithLLM(
+  description: string,
+  vehicle: { year: number; make: string; model: string },
+  anthropicKey: string
+): Promise<any[]> {
+  const prompt = CONDITION_EXTRACTION_PROMPT
+    .replace("{year}", String(vehicle.year || "Unknown"))
+    .replace("{make}", vehicle.make || "Unknown")
+    .replace("{model}", vehicle.model || "Unknown")
+    .replace("{description}", description.substring(0, 8000));
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": anthropicKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-3-5-haiku-latest",
+      max_tokens: 2048,
+      temperature: 0.1,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    throw new Error(`Condition LLM ${response.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const result = await response.json();
+  const content = result.content?.[0]?.text || "";
+
+  // Parse JSON array from response
+  const arrayMatch = content.match(/\[[\s\S]*\]/);
+  if (arrayMatch) {
+    const parsed = JSON.parse(arrayMatch[0]);
+    return Array.isArray(parsed) ? parsed : [];
+  }
+
+  return [];
+}
+
+async function ingestConditionObservations(
+  vehicleId: string,
+  conditions: any[],
+  supabaseUrl: string,
+  serviceKey: string
+): Promise<{ ingested: number; errors: number }> {
+  let ingested = 0;
+  let errors = 0;
+
+  for (const condition of conditions) {
+    try {
+      const resp = await fetch(`${supabaseUrl}/functions/v1/ingest-observation`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${serviceKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          source_slug: "ai-description-extraction",
+          kind: "condition",
+          observed_at: new Date().toISOString(),
+          content_text: condition.summary || condition.quote || "Unknown condition",
+          structured_data: {
+            category: condition.category,
+            severity: condition.severity,
+            component: condition.component,
+            is_positive: condition.is_positive ?? false,
+            quote: condition.quote,
+          },
+          vehicle_id: vehicleId,
+          extraction_method: "description_condition_v1",
+          agent_model: "claude-3-5-haiku-latest",
+        }),
+      });
+
+      if (resp.ok) {
+        ingested++;
+      } else {
+        errors++;
+        const errText = await resp.text().catch(() => "");
+        console.error(`[discover-desc] Ingest failed for ${vehicleId}: ${errText.slice(0, 100)}`);
+      }
+    } catch (e: any) {
+      errors++;
+      console.error(`[discover-desc] Ingest error for ${vehicleId}: ${e.message}`);
+    }
+  }
+
+  return { ingested, errors };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -132,7 +269,97 @@ Deno.serve(async (req) => {
     const vehicleId = body.vehicle_id;
     const batchSize = Math.max(1, Math.min(body.batch_size || 10, 50));
     const minPrice = body.min_price ?? 0;
+    const mode = body.mode as string | undefined;
 
+    // --- CONDITION BACKFILL MODE ---
+    if (mode === "condition_backfill") {
+      const backfillBatch = Math.max(1, Math.min(body.batch_size || 20, 50));
+      const { data: rows, error } = await supabase.rpc("execute_sql", {
+        query: `SELECT v.id, v.year, v.make, v.model, v.description
+                FROM vehicles v
+                WHERE v.description IS NOT NULL
+                  AND length(v.description) >= 100
+                  AND v.deleted_at IS NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM vehicle_observations vo
+                    WHERE vo.vehicle_id = v.id AND vo.kind = 'condition'
+                  )
+                LIMIT ${backfillBatch}`
+      });
+
+      if (error) throw new Error(`Backfill query failed: ${JSON.stringify(error)}`);
+      const backfillVehicles = Array.isArray(rows) ? rows : [];
+
+      if (backfillVehicles.length === 0) {
+        return new Response(JSON.stringify({
+          success: true,
+          mode: "condition_backfill",
+          message: "No vehicles need condition backfill",
+          processed: 0,
+          remaining: 0,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      console.log(`[discover-desc] Condition backfill: ${backfillVehicles.length} vehicles`);
+
+      let totalIngested = 0;
+      let totalErrors = 0;
+      const startTime = Date.now();
+
+      for (const vehicle of backfillVehicles) {
+        if (Date.now() - startTime > 50000) break;
+        try {
+          const conditions = await extractConditionsWithLLM(vehicle.description, vehicle, anthropicKey);
+          const { ingested, errors: errs } = await ingestConditionObservations(
+            vehicle.id, conditions, supabaseUrl, serviceKey
+          );
+          totalIngested += ingested;
+          totalErrors += errs;
+          console.log(`[discover-desc] Backfill ${vehicle.year} ${vehicle.make} ${vehicle.model}: ${ingested} conditions`);
+        } catch (e: any) {
+          totalErrors++;
+          console.error(`[discover-desc] Backfill error ${vehicle.id}: ${e.message}`);
+        }
+      }
+
+      // Check remaining
+      const { data: remData } = await supabase.rpc("execute_sql", {
+        query: `SELECT count(*) AS remaining FROM vehicles v
+                WHERE v.description IS NOT NULL AND length(v.description) >= 100
+                AND v.deleted_at IS NULL
+                AND NOT EXISTS (
+                  SELECT 1 FROM vehicle_observations vo
+                  WHERE vo.vehicle_id = v.id AND vo.kind = 'condition'
+                )`
+      });
+      const remaining = Array.isArray(remData) ? Number(remData[0]?.remaining || 0) : 0;
+
+      // Self-chain if requested
+      const shouldContinue = body.continue ?? false;
+      if (shouldContinue && remaining > 0 && totalIngested > 0) {
+        fetch(`${supabaseUrl}/functions/v1/discover-description-data`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ mode: "condition_backfill", batch_size: backfillBatch, continue: true }),
+        }).catch(e => console.error("[discover-desc] Backfill chain failed:", e));
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        mode: "condition_backfill",
+        processed: backfillVehicles.length,
+        conditions_ingested: totalIngested,
+        condition_errors: totalErrors,
+        remaining,
+        continued: shouldContinue && remaining > 0,
+        elapsed_ms: Date.now() - startTime,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // --- NORMAL DISCOVERY MODE ---
     let vehicles: any[] = [];
 
     if (vehicleId) {
@@ -181,6 +408,8 @@ Deno.serve(async (req) => {
       errors: 0,
       error_details: [] as string[],
       samples: [] as any[],
+      conditions_ingested: 0,
+      condition_errors: 0,
     };
 
     for (let i = 0; i < vehicles.length; i += PARALLEL) {
@@ -196,6 +425,7 @@ Deno.serve(async (req) => {
           return { success: false, error: "Description too short" };
         }
 
+        // --- Pass 1: Open-ended discovery (existing) ---
         const discovered = await discoverWithLLM(vehicle.description, vehicle, anthropicKey);
         const keysFound = Object.keys(discovered).length;
         const totalFields = countFields(discovered);
@@ -214,13 +444,29 @@ Deno.serve(async (req) => {
 
         if (insertError) throw new Error(`Insert: ${insertError.message}`);
 
+        // --- Pass 2: Condition extraction (new) ---
+        let conditionResult = { ingested: 0, errors: 0 };
+        try {
+          const conditions = await extractConditionsWithLLM(vehicle.description, vehicle, anthropicKey);
+          conditionResult = await ingestConditionObservations(
+            vehicle.id, conditions, supabaseUrl, serviceKey
+          );
+          console.log(`[discover-desc] ${vehicle.year} ${vehicle.make} ${vehicle.model}: ${conditionResult.ingested} conditions extracted`);
+        } catch (condErr: any) {
+          // Condition extraction failure should not fail the whole vehicle
+          console.error(`[discover-desc] Condition extraction failed for ${vehicle.id}: ${condErr.message}`);
+          conditionResult.errors = 1;
+        }
+
         return {
           success: true,
+          conditionResult,
           sample: {
             vehicle: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
             price: vehicle.sale_price,
             keys_found: keysFound,
             total_fields: totalFields,
+            conditions_ingested: conditionResult.ingested,
           },
         };
       });
@@ -230,6 +476,8 @@ Deno.serve(async (req) => {
         const r = settled[j];
         if (r.status === "fulfilled" && r.value.success) {
           results.discovered++;
+          results.conditions_ingested += r.value.conditionResult?.ingested || 0;
+          results.condition_errors += r.value.conditionResult?.errors || 0;
           if (results.samples.length < 3) results.samples.push(r.value.sample);
         } else {
           results.errors++;

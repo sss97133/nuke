@@ -4,6 +4,7 @@ import type { FeedItem } from '../feed/types';
 import ContentCard from '../feed/ContentCard';
 import VehicleCardDense from '../vehicles/VehicleCardDense';
 import { highlightSearchTerm } from '../../utils/searchHighlight';
+import { useViewHistory } from '../../hooks/useViewHistory';
 import type { SearchResult } from '../../types/search';
 import '../../styles/unified-design-system.css';
 
@@ -36,6 +37,7 @@ interface SearchResultsProps {
 const SearchResults = ({ results, searchSummary, loading = false, activeFilter, onFilterChange, totalCount, hasMore, onLoadMore, loadingMore }: SearchResultsProps) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { recordView } = useViewHistory();
   const searchQuery = searchParams.get('q') || '';
   const [viewMode, setViewMode] = useState<'cards' | 'list' | 'map'>('cards');
   const [sortBy, setSortBy] = useState<'relevance' | 'date' | 'location' | 'price_asc' | 'price_desc' | 'year_desc' | 'year_asc'>('relevance');
@@ -691,6 +693,10 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
                   onClick={() => {
                     const href = getResultHref(result);
                     if (!href) return;
+                    // Track vehicle views from search
+                    if (result.type === 'vehicle' && result.id) {
+                      recordView(result.id, 'search');
+                    }
                     if (href.startsWith('http://') || href.startsWith('https://')) {
                       window.open(href, '_blank', 'noopener,noreferrer');
                     } else {

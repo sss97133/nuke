@@ -14,6 +14,7 @@ import { resolveVehiclePrice } from '../../feed/utils/feedPriceResolution';
 import { supabase } from '../../lib/supabase';
 import { usePopup } from './usePopup';
 import { useViewHistory } from '../../hooks/useViewHistory';
+import { useInterests } from '../../hooks/useInterests';
 import { MakePopup } from './MakePopup';
 import { ModelPopup } from './ModelPopup';
 import { SourcePopup } from './SourcePopup';
@@ -44,14 +45,18 @@ function formatPrice(n: number | null): string {
 export function VehiclePopup({ vehicle }: Props) {
   const { openPopup } = usePopup();
   const { recordView, endView } = useViewHistory();
+  const { recordInterest } = useInterests();
   const price = resolveVehiclePrice(vehicle);
   const [comparables, setComparables] = useState<Comparable[]>([]);
   const [medianData, setMedianData] = useState<MedianData | null>(null);
   const [obsCount, setObsCount] = useState<number | null>(null);
 
-  // Track view on popup open, end on unmount
+  // Track view on popup open, end on unmount.
+  // Also boost interest memory — viewing a vehicle is a stronger signal.
   useEffect(() => {
     recordView(vehicle.id, 'popup');
+    if (vehicle.make) recordInterest('make', vehicle.make);
+    if (vehicle.model) recordInterest('model', vehicle.model);
     return () => { endView(vehicle.id); };
   }, [vehicle.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

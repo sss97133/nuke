@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
     // Phase 1: Use vehicle_events (pre-aggregated comment counts, fast)
     // Phase 2: Fall back to auction_comments direct scan for non-BaT vehicles
     const { data: candidates, error: cErr } = await supabase.rpc("execute_sql", {
-      query: `SELECT ve.vehicle_id, ve.comment_count, v.year, v.make, v.model, COALESCE(v.sale_price, v.winning_bid, v.high_bid, v.bat_sold_price) AS sale_price FROM vehicle_events ve JOIN vehicles v ON v.id = ve.vehicle_id AND v.deleted_at IS NULL WHERE ve.source_platform = 'bat' AND ve.vehicle_id IS NOT NULL AND ve.comment_count >= ${minComments} AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = ve.vehicle_id) ORDER BY ve.comment_count DESC LIMIT ${batchSize}`
+      query: `SELECT ve.vehicle_id, ve.comment_count, ve.source_platform, v.year, v.make, v.model, COALESCE(v.sale_price, v.winning_bid, v.high_bid, v.bat_sold_price) AS sale_price FROM vehicle_events ve JOIN vehicles v ON v.id = ve.vehicle_id AND v.deleted_at IS NULL WHERE ve.source_platform IN ('bat', 'hagerty') AND ve.vehicle_id IS NOT NULL AND ve.comment_count >= ${minComments} AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = ve.vehicle_id) ORDER BY ve.comment_count DESC LIMIT ${batchSize}`
     });
 
     if (cErr) throw new Error(`Candidate query failed: ${JSON.stringify(cErr)}`);
@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
 
     // Get remaining count (fast — vehicle_events is indexed)
     const { data: remainingData } = await supabase.rpc("execute_sql", {
-      query: `SELECT count(*) AS remaining FROM vehicle_events ve WHERE ve.source_platform = 'bat' AND ve.vehicle_id IS NOT NULL AND ve.comment_count >= ${minComments} AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = ve.vehicle_id)`
+      query: `SELECT count(*) AS remaining FROM vehicle_events ve WHERE ve.source_platform IN ('bat', 'hagerty') AND ve.vehicle_id IS NOT NULL AND ve.comment_count >= ${minComments} AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = ve.vehicle_id)`
     });
     const remaining = Array.isArray(remainingData) ? Number(remainingData[0]?.remaining || 0) : 0;
 
@@ -212,15 +212,39 @@ async function processVehicle(
   maxChars: number,
 ): Promise<{ success: boolean; sample?: any; error?: string }> {
   try {
-    // Get comments for this vehicle
-    const { data: comments, error: cErr } = await supabase
+    // Get comments for this vehicle — try auction_comments first (BaT), then vehicle_observations (Hagerty)
+    let comments: any[] | null = null;
+    const { data: auctionComments, error: cErr } = await supabase
       .from("auction_comments")
       .select("comment_text, author_username, is_seller, posted_at, bid_amount")
       .eq("vehicle_id", vehicle.vehicle_id)
       .order("posted_at", { ascending: true })
       .limit(200);
 
-    if (cErr || !comments || comments.length < 3) {
+    if (!cErr && auctionComments && auctionComments.length >= 3) {
+      comments = auctionComments;
+    } else {
+      // Fallback: Hagerty comments stored as vehicle_observations (kind='comment')
+      const { data: obsComments } = await supabase
+        .from("vehicle_observations")
+        .select("id, content_text, structured_data, observed_at")
+        .eq("vehicle_id", vehicle.vehicle_id)
+        .eq("kind", "comment")
+        .order("observed_at", { ascending: true })
+        .limit(200);
+
+      if (obsComments && obsComments.length >= 3) {
+        comments = obsComments.map((o: any) => ({
+          comment_text: o.content_text || "",
+          author_username: o.structured_data?.author || o.structured_data?.author_username || "anon",
+          is_seller: o.structured_data?.is_seller || false,
+          posted_at: o.observed_at,
+          bid_amount: o.structured_data?.bid_amount || null,
+        }));
+      }
+    }
+
+    if (!comments || comments.length < 3) {
       return { success: false, error: "Not enough comments" };
     }
 
@@ -380,6 +404,14 @@ async function extractClaims(
     const vehicle = vehicleMap.get(vId);
     if (!vehicle) continue;
 
+    // Detect source platform for this vehicle
+    const { data: veRows } = await supabase
+      .from("vehicle_events")
+      .select("source_platform")
+      .eq("vehicle_id", vId)
+      .limit(1);
+    const sourcePlatform = veRows?.[0]?.source_platform || "bat";
+
     // Get pending comments for this vehicle (above threshold, not yet processed)
     const { data: pendingComments } = await supabase
       .from("comment_claims_progress")
@@ -394,11 +426,33 @@ async function extractClaims(
 
     const commentIds = pendingComments.map((p: any) => p.comment_id);
 
-    // Fetch full comment text
-    const { data: fullComments } = await supabase
+    // Fetch full comment text — try auction_comments first, then vehicle_observations
+    let fullComments: any[] | null = null;
+    const { data: acComments } = await supabase
       .from("auction_comments")
       .select("id, comment_text, author_username, is_seller, posted_at, bid_amount")
       .in("id", commentIds);
+
+    if (acComments && acComments.length > 0) {
+      fullComments = acComments;
+    } else {
+      // Fallback: Hagerty comments stored as vehicle_observations (kind='comment')
+      const { data: obsComments } = await supabase
+        .from("vehicle_observations")
+        .select("id, content_text, structured_data, observed_at")
+        .in("id", commentIds);
+
+      if (obsComments && obsComments.length > 0) {
+        fullComments = obsComments.map((o: any) => ({
+          id: o.id,
+          comment_text: o.content_text || "",
+          author_username: o.structured_data?.author || o.structured_data?.author_username || "anon",
+          is_seller: o.structured_data?.is_seller || false,
+          posted_at: o.observed_at,
+          bid_amount: o.structured_data?.bid_amount || null,
+        }));
+      }
+    }
 
     if (!fullComments || fullComments.length === 0) continue;
 
@@ -544,13 +598,42 @@ async function extractClaims(
         if (feErr) errors.push(`field_evidence write: ${feErr.message}`);
       }
 
+      // Write Category B claims as condition observations via ingest-observation
+      const conditionClaims = claims.filter(c => c.category === 'B');
+      for (const c of conditionClaims) {
+        try {
+          await supabase.functions.invoke("ingest-observation", {
+            body: {
+              source_slug: sourcePlatform,
+              kind: "condition",
+              observed_at: c.temporal_anchor && c.temporal_anchor !== 'null'
+                ? c.temporal_anchor
+                : batch.find((b: any) => b.id === c.comment_id)?.posted_at || new Date().toISOString(),
+              content_text: c.quote,
+              structured_data: {
+                claim_type: c.claim_type,
+                proposed_value: c.proposed_value,
+                confidence: c.confidence,
+                author: batch.find((b: any) => b.id === c.comment_id)?.author_username || 'unknown',
+                category: 'B',
+              },
+              vehicle_id: vId,
+              extraction_method: "comment_refinery_condition_v1",
+              agent_model: modelUsed,
+            },
+          });
+        } catch (condErr: any) {
+          errors.push(`condition-obs: ${condErr.message?.slice(0, 100)}`);
+        }
+      }
+
       // Write Category C claims as vehicle_observations via ingest-observation
       const provClaims = claims.filter(c => c.category === 'C');
       for (const c of provClaims) {
         try {
           await supabase.functions.invoke("ingest-observation", {
             body: {
-              source_slug: "bat",
+              source_slug: sourcePlatform,
               kind: c.observation_kind || "expert_opinion",
               observed_at: c.temporal_anchor && c.temporal_anchor !== 'null'
                 ? c.temporal_anchor

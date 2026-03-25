@@ -184,6 +184,58 @@ async function scoreVehicle(vehicleId: string, sb: any, key: string) {
     }
   } catch (e) { console.warn("[score] paint write failed:", e); }
 
+  // --- Condition observations (fire-and-forget) ---
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+  // Summary observation
+  fetch(`${supabaseUrl}/functions/v1/ingest-observation`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      source_slug: "nuke-vision",
+      kind: "condition",
+      observed_at: new Date().toISOString(),
+      content_text: `Vision condition assessment: ${agg.overall}/100 overall (exterior ${agg.exterior}/30, interior ${agg.interior}/20, mechanical ${agg.mechanical}/20). ${agg.concerns.length} concerns flagged. ${agg.images_scored} images scored.`,
+      structured_data: {
+        assessment_type: "vision_summary",
+        overall_score: agg.overall,
+        exterior_score: agg.exterior,
+        interior_score: agg.interior,
+        mechanical_score: agg.mechanical,
+        undercarriage_score: agg.undercarriage,
+        completeness: agg.completeness,
+        images_scored: agg.images_scored,
+        condition_multiplier: agg.multiplier,
+      },
+      vehicle_id: vehicleId,
+      extraction_method: "vision_condition_v1",
+      agent_model: "claude-3-5-haiku-latest",
+    }),
+  }).catch(e => console.warn("[score] Summary obs failed:", e));
+
+  // Per-concern observations
+  for (const concern of agg.concerns) {
+    fetch(`${supabaseUrl}/functions/v1/ingest-observation`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source_slug: "nuke-vision",
+        kind: "condition",
+        observed_at: new Date().toISOString(),
+        content_text: concern,
+        structured_data: {
+          assessment_type: "vision_concern",
+          severity: "flagged",
+          overall_context_score: agg.overall,
+        },
+        vehicle_id: vehicleId,
+        extraction_method: "vision_condition_v1",
+        agent_model: "claude-3-5-haiku-latest",
+      }),
+    }).catch(e => console.warn("[score] Concern obs failed:", e));
+  }
+
   const dur = Math.round((Date.now() - t0) / 100) / 10;
   return {
     vehicle_id: vehicleId, overall_score: agg.overall, exterior_rating: agg.exterior,
@@ -228,7 +280,10 @@ Deno.serve(async (req) => {
 
     console.log(`[score] Batch: ${vids.length} vehicles`);
     const results: any[] = [];
-    for (const v of vids) results.push(await scoreVehicle(v, sb, key));
+    for (let vi = 0; vi < vids.length; vi++) {
+      results.push(await scoreVehicle(vids[vi], sb, key));
+      if (vi < vids.length - 1) await new Promise(r => setTimeout(r, 2000));
+    }
     return json({ vehicles_processed: results.length, results });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
