@@ -27,6 +27,7 @@ const CONCURRENCY = getArg('--concurrency', 20);
 const DELAY_MS = getArg('--delay-ms', 500);
 const MAX_TOTAL = getArg('--max', 999999);
 const CLAIM_SIZE = getArg('--claim', 100);
+const SKIP_IMAGES = args.includes('--skip-images');
 const VERSION = 'bat-drain:1.0.0';
 
 const BROWSER_HEADERS = {
@@ -145,7 +146,7 @@ async function main() {
   let consecutiveRateLimits = 0;
 
   console.log(`\n=== BAT DRAIN QUEUE ===`);
-  console.log(`Concurrency: ${CONCURRENCY} | Delay: ${DELAY_MS}ms | Claim: ${CLAIM_SIZE} | Max: ${MAX_TOTAL}`);
+  console.log(`Concurrency: ${CONCURRENCY} | Delay: ${DELAY_MS}ms | Claim: ${CLAIM_SIZE} | Max: ${MAX_TOTAL} | SkipImages: ${SKIP_IMAGES}`);
 
   // SINGLE persistent connection
   const client = new Client({
@@ -272,8 +273,8 @@ async function main() {
           }
         }
 
-        // Insert images
-        if (f.image_urls?.length > 0) {
+        // Insert images (skip if --skip-images flag is set for speed)
+        if (!SKIP_IMAGES && f.image_urls?.length > 0) {
           try {
             const { rows: vr } = await client.query(`SELECT id FROM vehicles WHERE listing_url=$1 OR listing_url=$2 LIMIT 1`, [u1, u2]);
             if (vr.length > 0) {

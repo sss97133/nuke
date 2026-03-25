@@ -1,110 +1,74 @@
 /**
- * useHeroFinds -- React Query hook for the hero_finds() RPC.
+ * useHeroFinds -- React Query hook for hero_finds() RPC.
  *
- * Fetches top FINDS from mv_finds: vehicles where multiple interesting
- * signals align (deal score, rarity, condition, cross-platform, etc.).
- * Each item includes a signal_breakdown for building "WHY THIS IS A FIND" text.
+ * Returns three categories of interesting vehicles:
+ * - multi_signal: deal_score > 70 AND heat_score > 0
+ * - multi_platform: vehicles appearing on multiple platforms
+ * - rare_finds: recently discovered rare models (low count + high price)
+ *
+ * Cached for 5 minutes.
  */
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 
 // ---------------------------------------------------------------------------
-// Types (match hero_finds() RETURNS TABLE output)
+// Types (match hero_finds() jsonb output)
 // ---------------------------------------------------------------------------
 
-export interface FindSignalBreakdown {
-  deal_score: number;
-  heat_score: number;
-  rare: boolean;
-  model_count: number;
-  condition: string | null;
-  red_flags: number;
-  mods: number;
-  cross_platform: number;
-  old_discovery: boolean;
-}
-
-export interface FindItem {
-  vehicle_id: string;
+export interface MultiSignalItem {
+  id: string;
   year: number | null;
   make: string | null;
   model: string | null;
-  display_price: number | null;
-  primary_image_url: string | null;
-  listing_url: string | null;
-  discovery_source: string | null;
-  is_for_sale: boolean;
-  find_score: number;
   deal_score: number | null;
   heat_score: number | null;
-  model_total: number | null;
-  red_flag_count: number;
-  mod_count: number;
-  cross_platform_count: number;
-  condition_grade: string | null;
-  signal_breakdown: FindSignalBreakdown;
+  price: number | null;
+  thumbnail: string | null;
+  recent_comments: number;
 }
 
-// ---------------------------------------------------------------------------
-// Signal explanation builder
-// ---------------------------------------------------------------------------
+export interface MultiPlatformItem {
+  id: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  platform_count: number;
+  platforms: string[];
+  price: number | null;
+  thumbnail: string | null;
+}
 
-export function buildFindExplanation(item: FindItem): string {
-  const parts: string[] = [];
-  const sb = item.signal_breakdown;
+export interface RareFindItem {
+  id: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  price: number | null;
+  thumbnail: string | null;
+  deal_score: number | null;
+  model_count: number;
+}
 
-  if (sb.deal_score > 70) {
-    parts.push(`${sb.deal_score}% deal score`);
-  } else if (sb.deal_score > 50) {
-    parts.push(`${sb.deal_score}% deal`);
-  }
-
-  if (sb.heat_score > 60) {
-    parts.push('high heat');
-  } else if (sb.heat_score > 30) {
-    parts.push('warm heat');
-  }
-
-  if (sb.rare && sb.model_count != null) {
-    parts.push(`rare model (${sb.model_count} in DB)`);
-  }
-
-  if (sb.condition === 'excellent' || sb.condition === 'concours') {
-    parts.push(sb.condition + ' condition');
-  }
-
-  if (sb.red_flags > 0) {
-    parts.push(`${sb.red_flags} red flag${sb.red_flags > 1 ? 's' : ''}`);
-  }
-
-  if (sb.cross_platform > 1) {
-    parts.push(`${sb.cross_platform} platforms`);
-  }
-
-  if (sb.old_discovery) {
-    parts.push('recent discovery');
-  }
-
-  if (sb.mods > 3) {
-    parts.push(`${sb.mods} mods`);
-  }
-
-  return parts.join(' + ');
+export interface HeroFindsData {
+  multi_signal: MultiSignalItem[];
+  multi_platform: MultiPlatformItem[];
+  rare_finds: RareFindItem[];
 }
 
 // ---------------------------------------------------------------------------
 // Fetcher
 // ---------------------------------------------------------------------------
 
-async function fetchHeroFinds(limit: number = 20): Promise<FindItem[]> {
-  const { data, error } = await supabase.rpc('hero_finds', { lim: limit });
-
-  if (error) {
-    throw new Error(`hero_finds RPC error: ${error.message}`);
-  }
-
-  return (data ?? []) as FindItem[];
+async function fetchHeroFinds(): Promise<HeroFindsData> {
+  const { data, error } = await supabase.rpc('hero_finds');
+  if (error) throw new Error(`hero_finds RPC error: ${error.message}`);
+  const d = data as any;
+  return {
+    multi_signal: d.multi_signal ?? [],
+    multi_platform: d.multi_platform ?? [],
+    rare_finds: d.rare_finds ?? [],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -112,12 +76,12 @@ async function fetchHeroFinds(limit: number = 20): Promise<FindItem[]> {
 // ---------------------------------------------------------------------------
 
 export function useHeroFinds(enabled: boolean = true) {
-  return useQuery<FindItem[]>({
+  return useQuery<HeroFindsData>({
     queryKey: ['hero_finds'],
-    queryFn: () => fetchHeroFinds(20),
+    queryFn: fetchHeroFinds,
     enabled,
-    staleTime: 2 * 60_000,
-    gcTime: 5 * 60_000,
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
     refetchOnWindowFocus: false,
     retry: 1,
   });
