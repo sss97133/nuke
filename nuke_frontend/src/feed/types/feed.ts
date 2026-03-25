@@ -89,9 +89,30 @@ export interface FeedVehicle {
   // Data quality
   data_completeness_tier?: string | null;
 
+  // FINDS scoring (present when sort=finds)
+  find_score?: number | null;
+  find_signal_breakdown?: FindSignalBreakdown | null;
+  find_model_total?: number | null;
+  find_red_flag_count?: number | null;
+  find_mod_count?: number | null;
+  find_cross_platform_count?: number | null;
+  find_condition_grade?: string | null;
+
   // Timestamps
   created_at: string;
   updated_at?: string | null;
+}
+
+export interface FindSignalBreakdown {
+  deal_score: number;
+  heat_score: number;
+  rare: boolean;
+  model_count: number;
+  condition: string | null;
+  red_flags: number;
+  mods: number;
+  cross_platform: number;
+  old_discovery: boolean;
 }
 
 export type PriceSource =
@@ -169,7 +190,8 @@ export type FeedSortField =
   | 'year'
   | 'make'
   | 'mileage'
-  | 'feed_rank';
+  | 'feed_rank'
+  | 'find_score';
 
 export interface FeedQueryResponse {
   items: FeedVehicle[];

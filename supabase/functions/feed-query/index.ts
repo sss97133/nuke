@@ -58,7 +58,7 @@ interface FeedRequest {
 }
 
 // Valid sort fields mapped to MV columns
-const SORT_MAP: Record<string, { column: string; defaultDir: "asc" | "desc" }> = {
+const SORT_MAP: Record<string, { column: string; defaultDir: "asc" | "desc"; view?: string }> = {
   newest:     { column: "created_at",  defaultDir: "desc" },
   oldest:     { column: "created_at",  defaultDir: "asc" },
   updated:    { column: "updated_at",  defaultDir: "desc" },
@@ -70,6 +70,7 @@ const SORT_MAP: Record<string, { column: string; defaultDir: "asc" | "desc" }> =
   make:       { column: "make",        defaultDir: "asc" },
   mileage:    { column: "mileage",     defaultDir: "asc" },
   feed_rank:  { column: "feed_rank_score", defaultDir: "desc" },
+  find_score: { column: "find_score",  defaultDir: "desc", view: "vehicle_valuation_feed_with_finds" },
 };
 
 // ---------------------------------------------------------------------------
@@ -99,9 +100,13 @@ Deno.serve(async (req) => {
       : sortDef.defaultDir;
     const ascending = direction === "asc";
 
-    // ----- Build the query on vehicle_valuation_feed -----
+    // ----- Build the query on vehicle_valuation_feed (or enriched view for finds) -----
+    const feedView = sortDef.view ?? "vehicle_valuation_feed";
+    const extraCols = sortKey === "find_score"
+      ? ", find_score, find_signal_breakdown, find_model_total, find_red_flag_count, find_mod_count, find_cross_platform_count, find_condition_grade"
+      : "";
     let query = supabase
-      .from("vehicle_valuation_feed")
+      .from(feedView)
       .select(`
         vehicle_id,
         year, make, model, series, trim,
@@ -120,6 +125,7 @@ Deno.serve(async (req) => {
         heat_score, heat_score_label,
         is_record_price, segment_record_price,
         feed_rank_score
+        ${extraCols}
       `)
       .order(sortDef.column, { ascending })
       // Secondary sort by vehicle_id for stable keyset pagination
@@ -498,6 +504,17 @@ Deno.serve(async (req) => {
 
         created_at: row.created_at,
         updated_at: row.updated_at,
+
+        // FINDS data (only present when sort=find_score)
+        ...(row.find_score != null ? {
+          find_score: row.find_score,
+          find_signal_breakdown: row.find_signal_breakdown,
+          find_model_total: row.find_model_total,
+          find_red_flag_count: row.find_red_flag_count,
+          find_mod_count: row.find_mod_count,
+          find_cross_platform_count: row.find_cross_platform_count,
+          find_condition_grade: row.find_condition_grade,
+        } : {}),
       };
     });
 
