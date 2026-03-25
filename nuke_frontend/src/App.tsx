@@ -7,6 +7,7 @@ import { ToastProvider } from './components/ui/Toast';
 import { ToastProvider as OldToastProvider } from './hooks/useToast';
 import { UploadStatusProvider } from './contexts/UploadStatusContext';
 import { UploadProgressBar } from './components/UploadProgressBar';
+import { PopupStackProvider } from './components/popups';
 import GlobalUploadStatus from './components/GlobalUploadStatus';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Toaster } from 'react-hot-toast';
@@ -33,6 +34,7 @@ export default function App() {
         <OldToastProvider>
           <UploadStatusProvider>
             <Router>
+              <PopupStackProvider>
               <GlobalUploadStatus />
 
               <ErrorBoundary>
@@ -49,6 +51,7 @@ export default function App() {
               </ErrorBoundary>
 
               <UploadProgressBar />
+              </PopupStackProvider>
             </Router>
           </UploadStatusProvider>
 

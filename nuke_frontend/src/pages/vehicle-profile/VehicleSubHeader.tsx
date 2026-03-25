@@ -229,7 +229,6 @@ const BADGE_VARIANTS: Record<string, React.CSSProperties> = {
 
 interface StatsStackData {
   count: number;
-  avgPrice: number | null;
   medianPrice: number | null;
   priceRange: { min: number; max: number } | null;
 }
@@ -257,7 +256,7 @@ function useStatsStack(dimension: 'year' | 'make' | 'model' | 'trim', value: str
 
       const { data: rows } = await query.limit(500);
       if (!rows || rows.length === 0) {
-        setData({ count: 0, avgPrice: null, medianPrice: null, priceRange: null });
+        setData({ count: 0, medianPrice: null, priceRange: null });
         setLoading(false);
         return;
       }
@@ -269,7 +268,7 @@ function useStatsStack(dimension: 'year' | 'make' | 'model' | 'trim', value: str
       const avg = prices.length > 0 ? Math.round(prices.reduce((s: number, p: number) => s + p, 0) / prices.length) : null;
       const median = prices.length > 0 ? prices[Math.floor(prices.length / 2)] : null;
       const range = prices.length > 0 ? { min: prices[0], max: prices[prices.length - 1] } : null;
-      setData({ count, avgPrice: avg, medianPrice: median, priceRange: range });
+      setData({ count, medianPrice: median, priceRange: range });
     } catch {
       setData(null);
     }
@@ -384,12 +383,6 @@ const YMMBadge: React.FC<YMMBadgeProps> = ({ label, dimension, value, onClick })
                 <span style={STATS_LABEL}>In garage</span>
                 <span style={STATS_VALUE}>{data.count}</span>
               </div>
-              {data.avgPrice != null && (
-                <div style={STATS_ROW}>
-                  <span style={STATS_LABEL}>Avg price</span>
-                  <span style={STATS_VALUE}>{formatPrice(data.avgPrice)}</span>
-                </div>
-              )}
               {data.medianPrice != null && (
                 <div style={STATS_ROW}>
                   <span style={STATS_LABEL}>Median</span>

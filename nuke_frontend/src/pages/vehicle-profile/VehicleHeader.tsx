@@ -1734,16 +1734,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             ) : popoverData ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ fontWeight: 700, fontSize: '11px' }}>{vehicle?.year} Market Overview</div>
-                {popoverData.avg_price != null && (
+                {(popoverData.median_price != null || popoverData.total_listings != null) ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Market Stats</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Total listings</span>
                       <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{popoverData.total_listings?.toLocaleString() || '—'}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Avg. price</span>
-                      <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{formatCurrency(popoverData.avg_price)}</span>
                     </div>
                     {popoverData.median_price != null && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1758,7 +1754,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       </div>
                     )}
                   </div>
-                )}
+                ) : null}
                 {popoverData.top_makes && Array.isArray(popoverData.top_makes) && popoverData.top_makes.length > 0 && (
                   <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                     <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Top Makes</div>
@@ -1770,7 +1766,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     ))}
                   </div>
                 )}
-                {!popoverData.avg_price && (
+                {!popoverData.median_price && !popoverData.total_listings && (
                   <div style={{ color: 'var(--text-muted)', fontSize: '9px', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
                     No aggregated market data available yet for {vehicle?.year} vehicles.
                   </div>
@@ -1793,16 +1789,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             ) : popoverData ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ fontWeight: 700, fontSize: '11px' }}>{vehicle?.make} Market Overview</div>
-                {popoverData.avg_price != null && (
+                {(popoverData.median_price != null || popoverData.total_listings != null) ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Make Stats</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Total listed</span>
                       <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{popoverData.total_listings?.toLocaleString() || '—'}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Avg. price</span>
-                      <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{formatCurrency(popoverData.avg_price)}</span>
                     </div>
                     {popoverData.median_price != null && (
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1817,7 +1809,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       </div>
                     )}
                   </div>
-                )}
+                ) : null}
                 {popoverData.top_models && Array.isArray(popoverData.top_models) && popoverData.top_models.length > 0 && (
                   <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                     <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Top Models by Volume</div>
@@ -1825,13 +1817,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0' }}>
                         <span>{m.model || m.name}</span>
                         <span style={{ fontFamily: "'Courier New', Courier, monospace", color: 'var(--text-muted)' }}>
-                          {m.avg_price ? formatCurrency(m.avg_price) : ''} {m.count ? `(${m.count})` : ''}
+                          {m.count ? `(${m.count})` : ''}
                         </span>
                       </div>
                     ))}
                   </div>
                 )}
-                {!popoverData.avg_price && (
+                {!popoverData.median_price && !popoverData.total_listings && (
                   <div style={{ color: 'var(--text-muted)', fontSize: '9px', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
                     No aggregated market data available yet for {vehicle?.make}.
                   </div>
@@ -1854,7 +1846,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             ) : popoverData ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ fontWeight: 700, fontSize: '11px' }}>{vehicle?.make} {displayModel}</div>
-                {popoverData.avg_price != null && (
+                {(popoverData.p25 != null || popoverData.total_listings != null) && (
                   <>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <div style={{ fontWeight: 700, fontSize: '8px', fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Advisors</div>
@@ -1863,10 +1855,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>
                           {popoverData.p25 != null ? `${formatCurrency(popoverData.p25)}–${formatCurrency(popoverData.p75)}` : '—'}
                         </span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>Avg. price</span>
-                        <span style={{ fontFamily: "'Courier New', Courier, monospace", fontWeight: 700 }}>{formatCurrency(popoverData.avg_price)}</span>
                       </div>
                       {popoverData.sell_through_pct != null && (
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1928,7 +1916,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     )}
                   </div>
                 )}
-                {!popoverData.avg_price && (
+                {!popoverData.p25 && !popoverData.total_listings && (
                   <div style={{ color: 'var(--text-muted)', fontSize: '9px', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
                     No aggregated market data available yet for this model.
                   </div>

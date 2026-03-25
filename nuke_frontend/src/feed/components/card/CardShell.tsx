@@ -22,6 +22,8 @@ export interface CardShellProps {
   style?: CSSProperties;
   onHoverStart?: (rect: DOMRect) => void;
   onHoverEnd?: () => void;
+  /** If provided, called on click instead of default expand behavior (popup rhizome) */
+  onCardClick?: () => void;
 }
 
 export function CardShell({

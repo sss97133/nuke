@@ -46,9 +46,7 @@ function buildTooltipLines(
 
   switch (dimension) {
     case 'source': {
-      // "Avg $42K · 98% photos · 93% VIN"
       const parts: string[] = [];
-      if (stats.avg_price) parts.push(`Avg ${formatTooltipPrice(stats.avg_price)}`);
       if (stats.fill_rates && stats.fill_rates.length > 0) {
         // Pick top 2 fill rates
         const top = stats.fill_rates.slice(0, 2);
@@ -65,9 +63,7 @@ function buildTooltipLines(
       break;
     }
     case 'make': {
-      // "Avg $38K · 1955-2026"
       const parts: string[] = [];
-      if (stats.avg_price) parts.push(`Avg ${formatTooltipPrice(stats.avg_price)}`);
       if (stats.min_year != null && stats.max_year != null) {
         parts.push(stats.min_year === stats.max_year
           ? String(stats.min_year)
@@ -82,9 +78,7 @@ function buildTooltipLines(
       break;
     }
     case 'model': {
-      // "Avg $52K · 1965-2024"
       const parts: string[] = [];
-      if (stats.avg_price) parts.push(`Avg ${formatTooltipPrice(stats.avg_price)}`);
       if (stats.min_year != null && stats.max_year != null) {
         parts.push(stats.min_year === stats.max_year
           ? String(stats.min_year)
@@ -99,9 +93,7 @@ function buildTooltipLines(
       break;
     }
     case 'body_style': {
-      // "Avg $31K"
       const parts: string[] = [];
-      if (stats.avg_price) parts.push(`Avg ${formatTooltipPrice(stats.avg_price)}`);
       if (stats.min_year != null && stats.max_year != null) {
         parts.push(`${stats.min_year}\u2013${stats.max_year}`);
       }
@@ -114,8 +106,6 @@ function buildTooltipLines(
     }
     case 'year': {
       const parts: string[] = [];
-      if (stats.avg_price) parts.push(`Avg ${formatTooltipPrice(stats.avg_price)}`);
-      if (parts.length > 0) lines.push(parts);
       if (stats.top_facets.length > 0) {
         const names = stats.top_facets.slice(0, 3).map((f) => f.label);
         lines.push([`Top: ${names.join(', ')}`]);
@@ -125,7 +115,6 @@ function buildTooltipLines(
     default: {
       // deal_score, status, drivetrain, transmission
       const parts: string[] = [];
-      if (stats.avg_price) parts.push(`Avg ${formatTooltipPrice(stats.avg_price)}`);
       if (stats.min_year != null && stats.max_year != null) {
         parts.push(`${stats.min_year}\u2013${stats.max_year}`);
       }

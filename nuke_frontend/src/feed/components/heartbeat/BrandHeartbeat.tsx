@@ -41,7 +41,7 @@ export function BrandHeartbeat({ make, model }: BrandHeartbeatProps) {
   const d = makeStats.data;
 
   // Guard against incomplete data
-  if (d.total_listings == null || d.avg_price == null) return null;
+  if (d.total_listings == null) return null;
 
   if (collapsed) {
     return (
@@ -64,7 +64,7 @@ export function BrandHeartbeat({ make, model }: BrandHeartbeatProps) {
           letterSpacing: '0.5px',
           color: 'var(--text)',
         }}>
-          {make} — {d.total_listings.toLocaleString()} listings — {formatPrice(d.avg_price)} avg
+          {make} — {d.total_listings.toLocaleString()} listings
         </span>
         <button
           type="button"

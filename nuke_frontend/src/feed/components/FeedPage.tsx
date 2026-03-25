@@ -184,7 +184,6 @@ export default function FeedPage() {
     return {
       count: vehicles.length,
       totalValue,
-      avgPrice: pricedCount > 0 ? Math.round(totalValue / pricedCount) : 0,
       forSaleCount,
       liveCount,
     };

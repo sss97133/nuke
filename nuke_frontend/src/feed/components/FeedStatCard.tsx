@@ -43,7 +43,6 @@ export function FeedStatCard({
   // Use filtered stats when available, fall back to global stats
   const count = filteredStats?.count ?? stats.total_vehicles;
   const totalValue = filteredStats?.totalValue ?? stats.total_value;
-  const avgPrice = filteredStats?.avgPrice ?? stats.avg_price;
   const forSaleCount = filteredStats?.forSaleCount ?? stats.for_sale_count;
   const liveCount = filteredStats?.liveCount ?? stats.active_auctions;
 
@@ -72,12 +71,6 @@ export function FeedStatCard({
             <div style={labelStyle}>VALUE</div>
             <div style={valueStyle}>{formatDollar(totalValue)}</div>
           </div>
-          {avgPrice > 0 && (
-            <div>
-              <div style={labelStyle}>AVG PRICE</div>
-              <div style={valueStyle}>{formatDollar(avgPrice)}</div>
-            </div>
-          )}
         </>
       )}
       {variant === 1 && (

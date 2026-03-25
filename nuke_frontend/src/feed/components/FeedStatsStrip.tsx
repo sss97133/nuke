@@ -1,7 +1,7 @@
 /**
  * FeedStatsStrip — Sticky stats bar above the feed.
  *
- * Shows SHOWING (filtered/total), VALUE (of filtered set), AVG PRICE,
+ * Shows SHOWING (filtered/total), VALUE (of filtered set),
  * plus for-sale count and live auctions. All numbers in Courier New.
  *
  * Stats reflect the FILTERED set, not the global database.
@@ -15,8 +15,6 @@ export interface FilteredStats {
   count: number;
   /** Sum of display_price for loaded vehicles */
   totalValue: number;
-  /** Average display_price for loaded vehicles */
-  avgPrice: number;
   /** Number of for-sale vehicles in loaded set */
   forSaleCount: number;
   /** Number with active auction (live bid) in loaded set */
@@ -138,7 +136,6 @@ export function FeedStatsStrip({
   const filtered = filteredStats ?? {
     count: 0,
     totalValue: 0,
-    avgPrice: 0,
     forSaleCount: 0,
     liveCount: 0,
   };
@@ -177,15 +174,6 @@ export function FeedStatsStrip({
         active={activeMetric === 'value'}
         hoverHint="Sort by price"
       />
-
-      {/* AVG PRICE: filtered set average */}
-      {filtered.avgPrice > 0 && (
-        <Stat
-          label="AVG PRICE"
-          value={formatDollarCompact(filtered.avgPrice)}
-          hoverHint="Average price of shown vehicles"
-        />
-      )}
 
       {/* TODAY */}
       {stats.vehicles_added_today > 0 && (
