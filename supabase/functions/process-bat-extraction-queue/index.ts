@@ -23,10 +23,10 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { batchSize = 1, maxAttempts = 3 } = await req.json().catch(() => ({ batchSize: 1, maxAttempts: 3 }));
+    const { batchSize = 10, maxAttempts = 3 } = await req.json().catch(() => ({ batchSize: 10, maxAttempts: 3 }));
 
-    // SLOW AND ACCURATE: Process ONE at a time
-    const safeBatchSize = Math.max(1, Math.min(Number(batchSize) || 1, 1)); // Force to 1 for accuracy
+    // Process up to 15 per invocation (was capped at 1, causing 104-day backlog)
+    const safeBatchSize = Math.max(1, Math.min(Number(batchSize) || 10, 15));
     const safeMaxAttempts = Math.max(1, Math.min(Number(maxAttempts) || 3, 20));
     const workerId = `process-bat-extraction-queue:${crypto.randomUUID?.() || String(Date.now())}`;
 
