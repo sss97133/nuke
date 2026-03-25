@@ -12,12 +12,14 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import type { FeedVehicle } from '../types/feed';
 import type { SortBy } from '../../types/feedTypes';
+import { DealsHeroPanel } from './hero/DealsHeroPanel';
+import { HeroNewestPanel } from './hero/HeroNewestPanel';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type HeroDimension = 'deal_score' | 'heat_score' | 'year' | 'price_high' | 'price_low' | 'mileage' | 'finds';
+export type HeroDimension = 'newest' | 'deal_score' | 'heat_score' | 'year' | 'price_high' | 'price_low' | 'mileage' | 'finds';
 
 export interface HeroPanelProps {
   dimension: HeroDimension | null;
@@ -491,6 +493,7 @@ function fmtNum(n: number): string {
 
 // Map SortBy values to their hero dimension
 const SORT_TO_DIMENSION: Record<string, HeroDimension | null> = {
+  newest: 'newest',
   deal_score: 'deal_score',
   heat_score: 'heat_score',
   year: 'year',
@@ -504,9 +507,10 @@ export function sortToDimension(sort: SortBy): HeroDimension | null {
   return SORT_TO_DIMENSION[sort] ?? null;
 }
 
-// Dimensions that use treemap layout vs bar chart
-const TREEMAP_DIMS = new Set<HeroDimension>(['deal_score', 'heat_score', 'finds']);
+// Dimensions that use treemap layout vs bar chart vs custom server-powered panels
+const TREEMAP_DIMS = new Set<HeroDimension>(['heat_score', 'finds']);
 const BAR_DIMS = new Set<HeroDimension>(['year', 'price_high', 'price_low', 'mileage']);
+const SERVER_DIMS = new Set<HeroDimension>(['newest', 'deal_score']);
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -530,21 +534,21 @@ export function HeroPanel({ dimension, vehicles, onFilter, onClose }: HeroPanelP
     return () => observer.disconnect();
   }, [dimension]);
 
-  // Animate open/close
+  const isServerPanel = dimension && SERVER_DIMS.has(dimension);
+
+  // Animate open/close — server panels get more height for card strip
   useEffect(() => {
     if (dimension) {
-      // Delay to let DOM paint, then slide open
-      requestAnimationFrame(() => setPanelHeight(200));
+      const targetHeight = SERVER_DIMS.has(dimension) ? 240 : 200;
+      requestAnimationFrame(() => setPanelHeight(targetHeight));
     } else {
       setPanelHeight(0);
     }
   }, [dimension]);
 
   const buckets = useMemo(() => {
-    if (!dimension) return [];
+    if (!dimension || SERVER_DIMS.has(dimension)) return [];
     switch (dimension) {
-      case 'deal_score':
-        return buildDealBuckets(vehicles);
       case 'heat_score':
         return buildHeatBuckets(vehicles);
       case 'year':
@@ -601,9 +605,19 @@ export function HeroPanel({ dimension, vehicles, onFilter, onClose }: HeroPanelP
         style={{
           position: 'relative',
           width: '100%',
-          height: '200px',
+          height: isServerPanel ? '240px' : '200px',
         }}
       >
+        {/* Server-powered panel: NEWEST */}
+        {dimension === 'newest' && (
+          <HeroNewestPanel onFilter={handleCellClick} />
+        )}
+
+        {/* Server-powered panel: DEALS */}
+        {dimension === 'deal_score' && (
+          <DealsHeroPanel onFilter={handleCellClick} />
+        )}
+
         {/* Treemap layout */}
         {isTreemap && containerWidth > 0 && (
           <div style={{ position: 'relative', width: '100%', height: '170px', margin: '0' }}>
@@ -623,7 +637,6 @@ export function HeroPanel({ dimension, vehicles, onFilter, onClose }: HeroPanelP
                 pointerEvents: 'none',
               }}
             >
-              {dimension === 'deal_score' && 'DEALS BY MAKE'}
               {dimension === 'heat_score' && 'HEAT BY MAKE'}
               {dimension === 'finds' && 'FINDS BY SOURCE (7D)'}
             </div>
