@@ -37,4 +37,5 @@
 ~DONE~ | FEED-FIX | MV refresh fixed (cron timeout 120s->600s), clickable header metrics wired, feed-query deployed with added_today filter
 ~DONE~ | ROUTE-AUDIT | Route audit complete — all routes verified, no issues found at HEAD | nuke_frontend/src/
 09:25 | BAT-DISCOVERY | BaT REST API full crawl running — 234K listings across 6527 pages, ~32K gap. Script: bat-models-discovery.mjs. ETA ~4hrs. | bat_extraction_queue, scripts/bat-models-discovery.mjs
-09:00 | BAT-SHALLOW-FIX | Fix 2,011 shallow BaT vehicles + comment extraction gap audit | vehicles, listing_page_snapshots, auction_comments, extract-auction-comments
+~DONE~ | BAT-SHALLOW-FIX | Fixed: 156+ shallow vehicles extracted, K10 fully populated, comment backfill cron re-enabled, RPC+index created, backfill script running in background (~1,842 remaining). Comment gap: 809 vehicles, cron+RPC now draining. | vehicles, listing_page_snapshots, auction_comments, backfill-comments
+10:00 | CONDITION-OBS | Condition observation extraction at scale — 6 steps: migration, description→condition, hagerty comments, comment→condition, photo→condition, backfill orchestrator | supabase/functions/discover-description-data, extract-hagerty-listing, batch-comment-discovery, score-vehicle-condition, scripts/backfill-condition-observations.mjs

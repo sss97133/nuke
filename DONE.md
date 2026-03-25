@@ -2,6 +2,21 @@
 
 ## 2026-03-25
 
+### [extraction] Shallow BaT Vehicle Backfill + Comment Gap Fix
+- Identified 1,998 BaT vehicles with listing_url but no description/VIN/specs
+- 629 had archived snapshots, 1,369 did not (262 were URL normalization mismatches with double slashes)
+- Created `scripts/backfill-shallow-bat.mjs` to batch-extract no-snapshot vehicles via extract-bat-core
+- Manually extracted K10 (1101eaed) — now has description (481 chars), sale price ($10K), mileage (62K), 33 comments, 76 images
+- Fixed comment backfill cron (job 81 was DISABLED, re-enabled at 10min interval)
+- Rewrote `backfill-comments` function: replaced 10-page cycling with RPC (`get_unextracted_comment_events`) for O(1) lookup
+- Created partial index `idx_vehicle_events_bat_unextracted_comments` for fast unextracted event queries
+- Created `get_unextracted_comment_events()` RPC function (SECURITY DEFINER, filters metadata->>'comments_extracted_at' IS NULL)
+- Fixed self-continuation bug: function now continues even when some items error (was stopping on any failure)
+- Deployed updated backfill-comments function
+- Progress: 156 shallow vehicles fixed, 170+ new comment extractions, 22 malformed /carfax URLs skipped
+- Comment gap: 809 vehicles missing 52,656 expected comments. ~128K total events still need extraction.
+- Backfill running in background, cron will continue
+
 ### [discovery] Auction Platform Gap Analysis — coverage audit + 3 new feeds live
 - Audited all 111 distinct vehicle sources (356K vehicles) and cross-referenced against source_registry (96 entries), observation_sources (144 entries), and listing_feeds (10 source slugs)
 - Researched 22 missing/underserved platforms across 5 tiers: major missing, European auctions, wholesale/salvage, niche/regional, Japanese market

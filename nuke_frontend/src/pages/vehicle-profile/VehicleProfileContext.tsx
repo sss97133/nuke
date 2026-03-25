@@ -12,6 +12,7 @@ import { supabase } from '../../lib/supabase';
 import { readCachedSession } from '../../utils/cachedSession';
 import { useVehiclePermissions } from '../../hooks/useVehiclePermissions';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
+import { useViewHistory } from '../../hooks/useViewHistory';
 import { AdminNotificationService } from '../../services/adminNotificationService';
 import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
 import { loadVehicleImpl, selectBestHeroImage } from './loadVehicleData';
@@ -348,6 +349,14 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
     return () => subscription.unsubscribe();
   }, []);
+
+  // ── View history tracking ──
+  const { recordView: _recordView, endView: _endView } = useViewHistory();
+  useEffect(() => {
+    if (!vehicleId) return;
+    _recordView(vehicleId, 'profile');
+    return () => { _endView(vehicleId); };
+  }, [vehicleId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Initial data load ──
 
