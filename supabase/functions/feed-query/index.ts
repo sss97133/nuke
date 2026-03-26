@@ -530,6 +530,9 @@ Deno.serve(async (req) => {
         listing_status: auction?.event_status ?? null,
         listing_url: auction?.source_url ?? null,
 
+        // Description (from vehicles table, truncated)
+        description: descMap.get(row.vehicle_id) ?? null,
+
         created_at: row.created_at,
         updated_at: row.updated_at,
 

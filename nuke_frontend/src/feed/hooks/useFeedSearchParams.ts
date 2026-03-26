@@ -139,6 +139,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
       filters.hideDealerListings !== d.hideDealerListings ||
       filters.hideDealerSites !== d.hideDealerSites ||
       (filters.hiddenSources?.length ?? 0) > 0 ||
+      (filters.includedSources?.length ?? 0) > 0 ||
       filters.zipCode !== '' ||
       filters.showPending !== d.showPending ||
       searchText !== '' ||
