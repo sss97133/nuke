@@ -4,6 +4,7 @@
  * Each popup:
  *   - White bg (#f5f5f5), 2px solid #2a2a2a border, zero radius
  *   - Title bar: #2a2a2a bg, white text, 9px UPPERCASE Arial, close X on right
+ *   - Search input between title and X (if searchable)
  *   - Scrollable content, max-height 70vh
  *   - Stack offset: +20px right, +20px down per layer
  *   - Dim overlay: rgba(0,0,0,0.2) behind the BOTTOM popup only
@@ -11,7 +12,7 @@
  *   - 150ms ease transitions
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { cloneElement, isValidElement, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { PopupEntry } from './PopupStack';
 
@@ -23,6 +24,7 @@ interface Props {
 
 const STACK_OFFSET = 20;
 const ANIM_DURATION = 150;
+const DEBOUNCE_MS = 300;
 
 export function PopupContainer({ stack, onClose, onCloseTop }: Props) {
   // Escape closes top popup
@@ -91,9 +93,31 @@ function PopupWindow({
     mouseX: 0, mouseY: 0, offX: 0, offY: 0,
   });
 
+  // Search state — debounced
+  const [rawSearch, setRawSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setRawSearch(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearchQuery(val);
+    }, DEBOUNCE_MS);
+  }, []);
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Only drag from title bar (not close button)
+    // Only drag from title bar (not close button or search input)
     if ((e.target as HTMLElement).closest('[data-popup-close]')) return;
+    if ((e.target as HTMLElement).closest('[data-popup-search]')) return;
     e.preventDefault();
     dragging.current = true;
     dragStart.current = {
@@ -125,6 +149,11 @@ function PopupWindow({
   const baseLeft = `calc(50% - ${entry.width / 2}px + ${index * STACK_OFFSET}px + ${dragOffset.x}px)`;
   const baseTop = `calc(15vh + ${index * STACK_OFFSET}px + ${dragOffset.y}px)`;
 
+  // Inject searchQuery into content via cloneElement
+  const contentWithSearch = entry.searchable && isValidElement(entry.content)
+    ? cloneElement(entry.content as React.ReactElement<any>, { searchQuery })
+    : entry.content;
+
   return (
     <div
       onClick={(e) => e.stopPropagation()}
@@ -148,13 +177,13 @@ function PopupWindow({
         onMouseDown={handleMouseDown}
         style={{
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
           background: '#2a2a2a',
           padding: '6px 8px',
           cursor: 'grab',
           userSelect: 'none',
           flexShrink: 0,
+          gap: 6,
         }}
       >
         <span
@@ -169,10 +198,38 @@ function PopupWindow({
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
+            flexShrink: 0,
+            maxWidth: '40%',
           }}
         >
           {entry.title}
         </span>
+
+        {/* Search input */}
+        {entry.searchable && (
+          <input
+            data-popup-search
+            type="text"
+            value={rawSearch}
+            onChange={handleSearchChange}
+            placeholder="SEARCH..."
+            style={{
+              flex: 1,
+              minWidth: 0,
+              height: 18,
+              padding: '0 4px',
+              fontFamily: "'Courier New', Courier, monospace",
+              fontSize: 8,
+              color: '#1a1a1a',
+              background: 'var(--surface, #f5f5f5)',
+              border: '2px solid var(--border, #555)',
+              borderRadius: 0,
+              outline: 'none',
+              lineHeight: '18px',
+            }}
+          />
+        )}
+
         <button
           data-popup-close
           onClick={onClose}
@@ -186,7 +243,7 @@ function PopupWindow({
             lineHeight: 1,
             cursor: 'pointer',
             padding: '0 2px',
-            marginLeft: '8px',
+            marginLeft: entry.searchable ? 0 : 8,
             flexShrink: 0,
             transition: `color ${ANIM_DURATION}ms ease`,
           }}
@@ -206,7 +263,7 @@ function PopupWindow({
           padding: 0,
         }}
       >
-        {entry.content}
+        {contentWithSearch}
       </div>
     </div>
   );

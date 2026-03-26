@@ -13,6 +13,7 @@ interface Props {
   bidCount?: number;
   highBid?: number | null;
   listingUrl?: string | null;
+  searchQuery?: string;
 }
 
 interface BidRow {
@@ -44,7 +45,7 @@ function formatTimeAgo(dateString: string): string {
   }
 }
 
-export function BidsPopup({ vehicleId, bidCount, highBid, listingUrl }: Props) {
+export function BidsPopup({ vehicleId, bidCount, highBid, listingUrl, searchQuery }: Props) {
   const [bids, setBids] = useState<BidRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +79,15 @@ export function BidsPopup({ vehicleId, bidCount, highBid, listingUrl }: Props) {
     return () => { cancelled = true; };
   }, [vehicleId]);
 
-  const maxBid = bids.length > 0 ? Math.max(...bids.map(b => Number(b.bid_amount))) : (highBid || null);
+  const sq = (searchQuery || '').toLowerCase().trim();
+  const filtered = sq
+    ? bids.filter(b =>
+        (b.author_username || '').toLowerCase().includes(sq) ||
+        String(b.bid_amount).includes(sq) ||
+        `$${Number(b.bid_amount).toLocaleString()}`.toLowerCase().includes(sq))
+    : bids;
+
+  const maxBid = filtered.length > 0 ? Math.max(...filtered.map(b => Number(b.bid_amount))) : (highBid || null);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -95,7 +104,7 @@ export function BidsPopup({ vehicleId, bidCount, highBid, listingUrl }: Props) {
             BIDS
           </span>
           <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: '#1a1a1a', marginLeft: 6 }}>
-            {loading ? '...' : bids.length > 0 ? bids.length : (bidCount || 0)}
+            {loading ? '...' : filtered.length > 0 ? filtered.length : (bidCount || 0)}
           </span>
         </div>
         {maxBid != null && maxBid > 0 && (
@@ -126,7 +135,15 @@ export function BidsPopup({ vehicleId, bidCount, highBid, listingUrl }: Props) {
           </div>
         )}
 
-        {!loading && !error && bids.length === 0 && (
+        {!loading && !error && filtered.length === 0 && sq && (
+          <div style={{ padding: '16px 12px', textAlign: 'center' }}>
+            <span style={{ fontFamily: MONO, fontSize: 9, color: '#999', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
+              No matching bids
+            </span>
+          </div>
+        )}
+
+        {!loading && !error && bids.length === 0 && !sq && (
           <div style={{ padding: '16px 12px' }}>
             <div style={{ fontFamily: SANS, fontSize: 10, color: '#666', marginBottom: 8 }}>
               No granular bid data extracted for this vehicle.
