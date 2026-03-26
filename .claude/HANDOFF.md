@@ -446,3 +446,256 @@ none
 2. Read above "What Was Happening" section
 3. Check git log if more detail needed: `git log --oneline -10`
 4. Register in .claude/ACTIVE_AGENTS.md before starting
+
+---
+# Auto-Checkpoint — 2026-03-26 01:20:03
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+2be243d28 Fix user journey audit: includedSources in hasActiveFilters + description in feed response
+4cbea7e6d E2E test report: 3 critical (hero_heat timeout, quality RPC timeout, Anthropic credits zero)
+54e75c2bb Buyer Intelligence Phase 1: 343K profiles, $4.4B tracked, 7 segments
+15b714689 Signal cards: live auctions, deals, price drops, source batches, comment highlights
+eb694c230 Signal cards: inject live-market drama into the feed grid
+
+## Uncommitted Changes
+package.json
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 04:25:22
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+package.json
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 09:02:07
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+package.json
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 09:12:26
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+package.json
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 09:22:32
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+package.json
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 09:39:28
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+package.json
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 10:04:08
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+66997b92a Add non-AI queue drainer for structured sources (140K items)
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+nuke_frontend/src/components/popups/MakePopup.tsx
+nuke_frontend/src/components/popups/ModelPopup.tsx
+nuke_frontend/src/components/popups/PopupContainer.tsx
+nuke_frontend/src/components/popups/PopupStack.tsx
+nuke_frontend/src/components/popups/index.ts
+package.json
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 10:13:06
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+66997b92a Add non-AI queue drainer for structured sources (140K items)
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+nuke_frontend/src/components/popups/MakePopup.tsx
+nuke_frontend/src/components/popups/ModelPopup.tsx
+nuke_frontend/src/components/popups/PopupContainer.tsx
+nuke_frontend/src/components/popups/PopupStack.tsx
+nuke_frontend/src/components/popups/index.ts
+package.json
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 10:56:02
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+nuke_frontend/src/components/popups/MakePopup.tsx
+nuke_frontend/src/components/popups/ModelPopup.tsx
+nuke_frontend/src/components/popups/PopupContainer.tsx
+nuke_frontend/src/components/popups/PopupStack.tsx
+nuke_frontend/src/components/popups/index.ts
+package.json
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 10:56:57
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+nuke_frontend/src/components/popups/MakePopup.tsx
+nuke_frontend/src/components/popups/ModelPopup.tsx
+nuke_frontend/src/components/popups/PopupContainer.tsx
+nuke_frontend/src/components/popups/PopupStack.tsx
+nuke_frontend/src/components/popups/index.ts
+package.json
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 11:09:21
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+nuke_frontend/src/components/popups/MakePopup.tsx
+nuke_frontend/src/components/popups/ModelPopup.tsx
+nuke_frontend/src/components/popups/PopupContainer.tsx
+nuke_frontend/src/components/popups/PopupStack.tsx
+nuke_frontend/src/components/popups/index.ts
+package.json
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`

@@ -1,13 +1,14 @@
 /**
- * PopupContainer — Finder-style popup windows with minimize, size toggle, and dock.
+ * PopupContainer — Finder-style popup windows with minimize, expand, resize, and dock.
  *
  * Each popup:
  *   - White bg (#f5f5f5), 2px solid #2a2a2a border, zero radius
  *   - Title bar: #2a2a2a bg, white text, 9px UPPERCASE Arial
- *   - Title bar layout: TITLE | [search input] | [S] [M] [L] | [---] [X]
- *   - S/M/L size toggle: 360px / 460px / 700px
+ *   - Title bar layout: TITLE | [search input] | [+] | [---] [X]
+ *   - "+" toggles between default width and expanded (700px)
  *   - Minimize (---) collapses to title bar docked at viewport bottom
- *   - Scrollable content, max-height 70vh
+ *   - Resizable by dragging bottom-right corner
+ *   - Scrollable content, max-height 70vh (or resized height)
  *   - Stack offset: +20px right, +20px down per layer
  *   - Dim overlay: rgba(0,0,0,0.2) behind the BOTTOM popup only
  *   - Draggable by title bar
@@ -16,21 +17,19 @@
 
 import React, { cloneElement, isValidElement, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { PopupEntry, PopupSize } from './PopupStack';
+import type { PopupEntry } from './PopupStack';
 
 interface Props {
   stack: PopupEntry[];
   onClose: (id: string) => void;
   onCloseTop: () => void;
   onToggleMinimize: (id: string) => void;
-  onSetSize: (id: string, size: PopupSize) => void;
+  onToggleExpanded: (id: string) => void;
 }
 
 const STACK_OFFSET = 20;
 const ANIM_DURATION = 150;
 const DEBOUNCE_MS = 300;
-
-const SIZES: PopupSize[] = ['s', 'm', 'l'];
 
 // Shared button style for title bar controls (16x16, 2px border, Courier New, zero radius)
 const titleBarBtnBase: React.CSSProperties = {
@@ -53,7 +52,7 @@ const titleBarBtnBase: React.CSSProperties = {
   justifyContent: 'center',
 };
 
-export function PopupContainer({ stack, onClose, onCloseTop, onToggleMinimize, onSetSize }: Props) {
+export function PopupContainer({ stack, onClose, onCloseTop, onToggleMinimize, onToggleExpanded }: Props) {
   const activePopups = stack.filter((e) => !e.minimized);
   const minimizedPopups = stack.filter((e) => e.minimized);
 
@@ -101,7 +100,7 @@ export function PopupContainer({ stack, onClose, onCloseTop, onToggleMinimize, o
               index={index}
               onClose={() => onClose(entry.id)}
               onMinimize={() => onToggleMinimize(entry.id)}
-              onSetSize={(size) => onSetSize(entry.id, size)}
+              onToggleExpanded={() => onToggleExpanded(entry.id)}
             />
           ))}
         </div>
@@ -227,19 +226,33 @@ function PopupWindow({
   index,
   onClose,
   onMinimize,
-  onSetSize,
+  onToggleExpanded,
 }: {
   entry: PopupEntry;
   index: number;
   onClose: () => void;
   onMinimize: () => void;
-  onSetSize: (size: PopupSize) => void;
+  onToggleExpanded: () => void;
 }) {
+  // Drag state
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const dragging = useRef(false);
   const dragStart = useRef<{ mouseX: number; mouseY: number; offX: number; offY: number }>({
     mouseX: 0, mouseY: 0, offX: 0, offY: 0,
   });
+
+  // Resize state — user-dragged dimensions override entry.width
+  const [resized, setResized] = useState<{ w: number; h: number } | null>(null);
+  const resizing = useRef(false);
+  const resizeStart = useRef<{ mouseX: number; mouseY: number; w: number; h: number }>({
+    mouseX: 0, mouseY: 0, w: 0, h: 0,
+  });
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  // Reset resize when expanded state changes
+  useEffect(() => {
+    setResized(null);
+  }, [entry.expanded]);
 
   // Search state -- debounced
   const [rawSearch, setRawSearch] = useState('');
@@ -262,11 +275,13 @@ function PopupWindow({
     };
   }, []);
 
+  // --- DRAG HANDLER ---
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Only drag from title bar (not buttons or search input)
     if ((e.target as HTMLElement).closest('[data-popup-close]')) return;
     if ((e.target as HTMLElement).closest('[data-popup-search]')) return;
     if ((e.target as HTMLElement).closest('[data-popup-btn]')) return;
+    if ((e.target as HTMLElement).closest('[data-popup-resize]')) return;
     e.preventDefault();
     dragging.current = true;
     dragStart.current = {
@@ -294,27 +309,62 @@ function PopupWindow({
     document.addEventListener('mouseup', handleUp);
   }, [dragOffset]);
 
+  // --- RESIZE HANDLER ---
+  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resizing.current = true;
+    const rect = popupRef.current?.getBoundingClientRect();
+    resizeStart.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      w: rect?.width ?? entry.width,
+      h: rect?.height ?? 400,
+    };
+
+    const handleMove = (ev: MouseEvent) => {
+      if (!resizing.current) return;
+      const newW = Math.max(280, resizeStart.current.w + (ev.clientX - resizeStart.current.mouseX));
+      const newH = Math.max(200, resizeStart.current.h + (ev.clientY - resizeStart.current.mouseY));
+      setResized({ w: newW, h: newH });
+    };
+
+    const handleUp = () => {
+      resizing.current = false;
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+  }, [entry.width]);
+
+  // Effective dimensions
+  const effectiveWidth = resized?.w ?? entry.width;
+
   // Center on screen, then offset by stack position + drag
-  const baseLeft = `calc(50% - ${entry.width / 2}px + ${index * STACK_OFFSET}px + ${dragOffset.x}px)`;
+  const baseLeft = `calc(50% - ${effectiveWidth / 2}px + ${index * STACK_OFFSET}px + ${dragOffset.x}px)`;
   const baseTop = `calc(15vh + ${index * STACK_OFFSET}px + ${dragOffset.y}px)`;
 
-  // Inject searchQuery and popupSize into content via cloneElement
+  // Inject searchQuery into content via cloneElement
   const contentWithProps = isValidElement(entry.content)
     ? cloneElement(entry.content as React.ReactElement<any>, {
         ...(entry.searchable ? { searchQuery } : {}),
-        popupSize: entry.size,
+        popupExpanded: entry.expanded,
       })
     : entry.content;
 
   return (
     <div
+      ref={popupRef}
       onClick={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
         left: baseLeft,
         top: baseTop,
-        width: entry.width,
+        width: effectiveWidth,
         maxWidth: 'calc(100vw - 32px)',
+        height: resized?.h ?? undefined,
         background: '#f5f5f5',
         border: '2px solid #2a2a2a',
         borderRadius: 0,
@@ -322,7 +372,7 @@ function PopupWindow({
         display: 'flex',
         flexDirection: 'column',
         animation: `popupSlideIn ${ANIM_DURATION}ms ease`,
-        transition: `width ${ANIM_DURATION}ms ease`,
+        transition: resizing.current ? undefined : `width ${ANIM_DURATION}ms ease`,
       }}
     >
       {/* Title bar */}
@@ -387,17 +437,34 @@ function PopupWindow({
         {/* Spacer when no search */}
         {!entry.searchable && <div style={{ flex: 1 }} />}
 
-        {/* Size toggle buttons: S M L */}
-        <div data-popup-btn style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
-          {SIZES.map((s) => (
-            <SizeButton
-              key={s}
-              label={s.toUpperCase()}
-              active={entry.size === s}
-              onClick={() => onSetSize(s)}
-            />
-          ))}
-        </div>
+        {/* Expand toggle: + */}
+        <button
+          data-popup-btn
+          onClick={onToggleExpanded}
+          style={{
+            ...titleBarBtnBase,
+            color: entry.expanded ? '#2a2a2a' : 'rgba(255,255,255,0.6)',
+            background: entry.expanded ? '#fff' : 'none',
+            borderColor: entry.expanded ? '#fff' : 'rgba(255,255,255,0.3)',
+            fontSize: '10px',
+            lineHeight: '10px',
+          }}
+          onMouseEnter={(e) => {
+            if (!entry.expanded) {
+              e.currentTarget.style.color = '#fff';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!entry.expanded) {
+              e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
+            }
+          }}
+          aria-label="Toggle expand"
+        >
+          +
+        </button>
 
         {/* Minimize button */}
         <button
@@ -448,54 +515,30 @@ function PopupWindow({
       <div
         style={{
           overflowY: 'auto',
-          maxHeight: '70vh',
+          maxHeight: resized?.h ? undefined : '70vh',
+          flex: resized?.h ? 1 : undefined,
           padding: 0,
         }}
       >
         {contentWithProps}
       </div>
+
+      {/* Resize handle — bottom-right corner */}
+      <div
+        data-popup-resize
+        onMouseDown={handleResizeMouseDown}
+        style={{
+          position: 'absolute',
+          right: 0,
+          bottom: 0,
+          width: 14,
+          height: 14,
+          cursor: 'nwse-resize',
+          zIndex: 1,
+          // Visual grip indicator
+          backgroundImage: `linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.15) 60%, transparent 60%, transparent 75%, rgba(0,0,0,0.15) 75%, rgba(0,0,0,0.15) 85%, transparent 85%)`,
+        }}
+      />
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Size toggle button (S / M / L)
-// ---------------------------------------------------------------------------
-
-function SizeButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      data-popup-btn
-      onClick={onClick}
-      style={{
-        ...titleBarBtnBase,
-        color: active ? '#2a2a2a' : 'rgba(255,255,255,0.6)',
-        background: active ? '#fff' : 'none',
-        borderColor: active ? '#fff' : 'rgba(255,255,255,0.3)',
-      }}
-      onMouseEnter={(e) => {
-        if (!active) {
-          e.currentTarget.style.color = '#fff';
-          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!active) {
-          e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
-          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
-        }
-      }}
-      aria-label={`Size ${label}`}
-    >
-      {label}
-    </button>
   );
 }

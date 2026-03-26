@@ -11,7 +11,6 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { usePopup } from './usePopup';
 import { ModelPopup } from './ModelPopup';
@@ -41,7 +40,6 @@ function formatPrice(n: number | null): string {
 
 export function MakePopup({ make, searchQuery }: Props) {
   const { openPopup } = usePopup();
-  const navigate = useNavigate();
   const [data, setData] = useState<MakeData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -167,8 +165,8 @@ export function MakePopup({ make, searchQuery }: Props) {
     openPopup(<SourcePopup source={source} />, source.toUpperCase(), 360);
   };
 
-  const handleViewInFeed = () => {
-    navigate(`/?makes=${encodeURIComponent(make)}`);
+  const handleOpenTab = () => {
+    window.open(`/?makes=${encodeURIComponent(make)}`, '_blank');
   };
 
   const maxBracketCount = Math.max(...data.priceBrackets.map((b) => b.count), 1);
@@ -253,10 +251,10 @@ export function MakePopup({ make, searchQuery }: Props) {
         </div>
       )}
 
-      {/* VIEW IN FEED */}
+      {/* TAB — opens filtered feed in new browser tab */}
       <div style={{ padding: '10px 12px', textAlign: 'right' }}>
         <button
-          onClick={handleViewInFeed}
+          onClick={handleOpenTab}
           style={{
             fontFamily: sans, fontSize: 9, fontWeight: 800,
             textTransform: 'uppercase', letterSpacing: '0.3px',
@@ -267,7 +265,7 @@ export function MakePopup({ make, searchQuery }: Props) {
           onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
           onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
         >
-          VIEW IN FEED
+          TAB
         </button>
       </div>
     </div>

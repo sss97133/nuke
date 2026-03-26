@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A: Bloomberg Card — Nuke Wireframes</title>
+<style>
+  :root {
+    --bg: #f5f5f5; --surface: #ebebeb; --surface-hover: #e0e0e0;
+    --border: #bdbdbd; --border-focus: #2a2a2a;
+    --text: #2a2a2a; --text-secondary: #666666; --text-disabled: #999999;
+    --accent: #2a2a2a;
+    --success: #16825d; --success-dim: rgba(22,130,93,0.1);
+    --warning: #b05a00; --warning-dim: rgba(176,90,0,0.1);
+    --error: #d13438; --error-dim: rgba(209,52,56,0.1);
+    --font-family: Arial, sans-serif; --font-mono: 'Courier New', monospace;
+    --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+    --transition: 0.12s ease;
+  }
+  [data-theme="dark"] {
+    --bg: #1e1e1e; --surface: #252526; --surface-hover: #2d2d30;
+    --border: #3e3e42; --border-focus: #cccccc;
+    --text: #cccccc; --text-secondary: #858585; --text-disabled: #656565;
+    --accent: #cccccc;
+    --success-dim: rgba(22,130,93,0.15); --warning-dim: rgba(176,90,0,0.15); --error-dim: rgba(209,52,56,0.15);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; border-radius:0!important; box-shadow:none!important; }
+  body { font-family:var(--font-family); font-size:10px; color:var(--text); background:var(--bg); }
+
+  .nav {
+    position:sticky; top:0; z-index:100; background:var(--surface);
+    border-bottom:2px solid var(--border); padding:var(--space-2) var(--space-4);
+    display:flex; align-items:center; gap:var(--space-3); height:40px;
+  }
+  .nav-brand { font-size:13px; font-weight:700; letter-spacing:0.10em; color:var(--text); text-decoration:none; }
+  .nav-links { display:flex; gap:var(--space-1); margin-left:var(--space-4); }
+  .nav-link {
+    font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;
+    padding:var(--space-1) var(--space-2); border:2px solid var(--border);
+    background:var(--bg); color:var(--text-secondary); cursor:pointer; text-decoration:none;
+    transition:var(--transition);
+  }
+  .nav-link:hover { border-color:var(--border-focus); color:var(--text); }
+  .nav-link.active { border-color:var(--text); color:var(--text); background:var(--surface-hover); }
+  .nav-right { margin-left:auto; display:flex; gap:var(--space-2); align-items:center; }
+  .theme-toggle {
+    font-size:9px; font-weight:700; text-transform:uppercase;
+    padding:var(--space-1) var(--space-2); border:2px solid var(--border);
+    background:var(--bg); color:var(--text-secondary); cursor:pointer;
+  }
+
+  .desc {
+    padding:var(--space-3) var(--space-4); border-bottom:1px solid var(--border);
+    background:var(--surface);
+  }
+  .desc h2 { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; }
+  .desc p { font-size:9px; color:var(--text-secondary); margin-top:var(--space-1); }
+
+  /* GRID */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--space-1);
+    padding: var(--space-2);
+  }
+
+  /* CARD */
+  .card {
+    border: 2px solid var(--border);
+    background: var(--surface);
+    transition: var(--transition);
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .card:hover { border-color: var(--text); }
+
+  .card-img {
+    width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .card-title {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.03em; padding: var(--space-2) var(--space-2) 0;
+    line-height: 1.3;
+  }
+
+  /* PRICE ROW */
+  .card-price-row {
+    display: grid; grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--border); margin-top: var(--space-2);
+  }
+  .card-price-cell {
+    padding: var(--space-2);
+  }
+  .card-price-cell + .card-price-cell {
+    border-left: 1px solid var(--border);
+  }
+  .card-price-label {
+    font-size: 8px; font-weight: 700; text-transform: uppercase;
+    color: var(--text-disabled); letter-spacing: 0.05em;
+  }
+  .card-price-value {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+    margin-top: 2px;
+  }
+
+  /* DELTA BADGE */
+  .delta-badge {
+    display: inline-block; font-family: var(--font-mono);
+    font-size: 9px; font-weight: 700;
+    padding: 2px 4px; margin-top: 2px;
+  }
+
+  /* SIGNALS */
+  .card-signals {
+    padding: var(--space-2);
+    border-top: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .signal-row {
+    display: flex; align-items: center; gap: var(--space-2);
+  }
+  .signal-label {
+    font-size: 8px; font-weight: 700; text-transform: uppercase;
+    color: var(--text-disabled); letter-spacing: 0.05em;
+    width: 36px; flex-shrink: 0;
+  }
+  .signal-bar-track {
+    flex: 1; height: 6px; background: var(--bg);
+    border: 1px solid var(--border);
+  }
+  .signal-bar-fill { height: 100%; transition: width 0.3s ease; }
+  .signal-value {
+    font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+    width: 36px; text-align: right; flex-shrink: 0;
+  }
+
+  /* DEAL + META */
+  .card-footer {
+    padding: var(--space-1) var(--space-2) var(--space-2);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .deal-badge {
+    font-size: 9px; font-weight: 700; font-family: var(--font-mono);
+    padding: 2px 6px; border: 2px solid;
+  }
+  .card-meta {
+    font-size: 8px; color: var(--text-disabled); text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .source-badge {
+    font-size: 8px; font-weight: 700; text-transform: uppercase;
+    color: var(--text-secondary); letter-spacing: 0.04em;
+    padding: var(--space-1) var(--space-2) 0;
+  }
+  .status-live { color: var(--success); }
+  .status-time { color: var(--error); }
+</style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav-brand" href="index.html">NUKE</a>
+    <span style="font-size:9px;color:var(--text-disabled);text-transform:uppercase;letter-spacing:0.05em;">wireframes</span>
+    <div class="nav-links">
+      <a class="nav-link" href="index.html">overview</a>
+      <a class="nav-link active" href="a-bloomberg.html">a: bloomberg</a>
+      <a class="nav-link" href="b-signal-strip.html">b: signal strip</a>
+      <a class="nav-link" href="c-overlay.html">c: overlay</a>
+      <a class="nav-link" href="d-dashboard.html">d: dashboard</a>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" onclick="toggleTheme()">DARK</button>
+    </div>
+  </nav>
+
+  <div class="desc">
+    <h2>A: The Bloomberg Card</h2>
+    <p>Data-forward. Every card is a mini terminal readout. Nuke Estimate, price delta, heat, data completeness, and deal label are all visible at idle — no click required.</p>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <script src="shared.js"></script>
+  <script>
+    const grid = document.getElementById('grid');
+
+    VEHICLES.forEach(v => {
+      const dColor = deltaColor(v.deltaDir);
+      const dBg = deltaBg(v.deltaDir);
+      const dlColor = dealColor(v.dealLabel);
+      const hPct = heatBar(v.heatScore, v.heatMax);
+      const title = formatTitle(v);
+
+      // Heat color: low=text-disabled, mid=warning, high=error
+      let heatColor = 'var(--text-disabled)';
+      if (v.heatScore > 40) heatColor = 'var(--error)';
+      else if (v.heatScore > 25) heatColor = 'var(--warning)';
+
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <img class="card-img" src="${v.img}" alt="${title}" loading="lazy"
+             onerror="this.style.background='var(--surface-hover)';this.style.height='180px';">
+        <div class="source-badge">
+          ${v.source} · <span class="status-live">${v.status}</span> · <span class="status-time">${v.timeLabel}</span>
+        </div>
+        <div class="card-title">${title}</div>
+        <div class="card-price-row">
+          <div class="card-price-cell">
+            <div class="card-price-label">Current Bid</div>
+            <div class="card-price-value">${v.bidLabel}</div>
+          </div>
+          <div class="card-price-cell">
+            <div class="card-price-label">Nuke Estimate</div>
+            <div class="card-price-value" style="font-size:9px;">${v.estimateLabel}</div>
+            <div class="delta-badge" style="color:${dColor};background:${dBg};">
+              ${v.deltaDir === 'below' ? '&#9660;' : '&#9650;'} ${v.deltaLabel}
+            </div>
+          </div>
+        </div>
+        <div class="card-signals">
+          <div class="signal-row">
+            <span class="signal-label">HEAT</span>
+            <div class="signal-bar-track">
+              <div class="signal-bar-fill" style="width:${hPct}%;background:${heatColor};"></div>
+            </div>
+            <span class="signal-value" style="color:${heatColor};">${v.heatScore}/${v.heatMax}</span>
+          </div>
+          <div class="signal-row">
+            <span class="signal-label">DATA</span>
+            <div class="signal-bar-track">
+              <div class="signal-bar-fill" style="width:${v.dataCompleteness}%;background:var(--accent);"></div>
+            </div>
+            <span class="signal-value">${v.dataCompleteness}%</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="deal-badge" style="color:${dlColor};border-color:${dlColor};">${v.dealLabel}</span>
+          <span class="card-meta">${v.location} · ${v.bidCount} BIDS · ${v.imageCount} PHOTOS</span>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  </script>
+</body>
+</html>
