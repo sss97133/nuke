@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { VehicleHeaderProps } from './types';
@@ -17,6 +17,9 @@ const FollowAuctionCard = React.lazy(() => import('../../components/auction/Foll
 const OrganizationInvestmentCard = React.lazy(() => import('../../components/organization/OrganizationInvestmentCard'));
 import { CircularAvatar } from '../../components/common/CircularAvatar';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
+import { PopupStackContext } from '../../components/popups/PopupStack';
+import { CommentsPopup } from '../../components/popups/CommentsPopup';
+import { BidsPopup } from '../../components/popups/BidsPopup';
 
 // Extracted pure utilities (no React dependencies)
 import {
@@ -81,6 +84,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     liveSession,
     auctionPulse,
   } = useVehicleProfile();
+  const popupCtx = useContext(PopupStackContext);
   const isOwner = isRowOwner || ctxVerifiedOwner;
   const { isVerifiedOwner, contributorRole } = permissions || {};
   const suppressExternalListing = !!userOwnershipClaim;
@@ -4615,9 +4619,45 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         {formatCountdownClock(timerEndDate, true) || formatRemaining(timerEndDate) || '—'}
                       </span>
                     ) : null}
-                    {typeof currentBid === 'number' ? <span style={{ fontWeight: 700, fontFamily: "'Courier New', Courier, monospace" }}>Bid {formatCurrency(currentBid)}</span> : null}
+                    {typeof currentBid === 'number' ? (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        style={{ fontWeight: 700, fontFamily: "'Courier New', Courier, monospace", cursor: 'pointer', borderBottom: '1px dashed var(--text-muted)' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (popupCtx && vehicle?.id) {
+                            popupCtx.push(
+                              <BidsPopup vehicleId={vehicle.id} bidCount={typeof auctionPulse?.bid_count === 'number' ? auctionPulse.bid_count : undefined} highBid={currentBid} listingUrl={(auctionPulse as any)?.listing_url || null} />,
+                              `BID HISTORY`,
+                              420,
+                            );
+                          }
+                        }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLElement).click(); }}
+                      >
+                        Bid {formatCurrency(currentBid)}
+                      </span>
+                    ) : null}
                     {typeof commentCount === 'number' ? (
-                      <span style={{ color: 'var(--text-muted)' }}>{commentCount} comments</span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        style={{ color: 'var(--text-muted)', cursor: 'pointer', borderBottom: '1px dashed var(--text-disabled)' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (popupCtx && vehicle?.id) {
+                            popupCtx.push(
+                              <CommentsPopup vehicleId={vehicle.id} expectedCount={commentCount} />,
+                              `COMMENTS (${commentCount})`,
+                              460,
+                            );
+                          }
+                        }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLElement).click(); }}
+                      >
+                        {commentCount} comments
+                      </span>
                     ) : null}
                     {lastCommentAt ? (
                       <span style={{ color: 'var(--text-muted)' }}>last {formatAge(lastCommentAt) || '—'} ago</span>
@@ -4688,10 +4728,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  const el = document.getElementById('vehicle-comments');
-                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  if (popupCtx && vehicle?.id) {
+                    popupCtx.push(
+                      <CommentsPopup vehicleId={vehicle.id} expectedCount={typeof commentCount === 'number' ? commentCount : undefined} />,
+                      `COMMENTS${typeof commentCount === 'number' ? ` (${commentCount})` : ''}`,
+                      460,
+                    );
+                  } else {
+                    const el = document.getElementById('vehicle-comments');
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
                 }}
-                title="Jump to comments & bids"
+                title="Open comments popup"
               >
                 {hasFreshComment ? (
                   <span
