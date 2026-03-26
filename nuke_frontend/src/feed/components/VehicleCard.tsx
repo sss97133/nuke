@@ -102,7 +102,7 @@ export function VehicleCard({
     const fsSm = 'var(--feed-font-size-sm, 10px)';
 
     return (
-      <CardShell vehicleId={vehicle.id} viewMode="technical" style={style}>
+      <CardShell vehicleId={vehicle.id} viewMode="technical" displayPrice={vehicle.display_price} style={style}>
         {/* Thumbnail */}
         <CardImage thumbnailUrl={vehicle.thumbnail_url} alt={alt} viewMode="technical" />
         {/* Year */}
@@ -187,6 +187,7 @@ export function VehicleCard({
       <CardShell
         vehicleId={vehicle.id}
         viewMode="gallery"
+        displayPrice={vehicle.display_price}
         onHoverStart={onHoverStart}
         onHoverEnd={onHoverEnd}
         style={style}
@@ -509,6 +510,7 @@ export function VehicleCard({
       popupImageUrl={vehicle.thumbnail_url}
       popupTitle={alt}
       popupPrice={infoPriceText || undefined}
+      displayPrice={vehicle.display_price}
       onHoverStart={onHoverStart}
       onHoverEnd={onHoverEnd}
       onCardClick={handleCardClick}
