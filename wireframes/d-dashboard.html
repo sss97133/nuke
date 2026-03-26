@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D: Dashboard Row — Nuke Wireframes</title>
+<style>
+  :root {
+    --bg: #f5f5f5; --surface: #ebebeb; --surface-hover: #e0e0e0;
+    --border: #bdbdbd; --border-focus: #2a2a2a;
+    --text: #2a2a2a; --text-secondary: #666666; --text-disabled: #999999;
+    --accent: #2a2a2a;
+    --success: #16825d; --success-dim: rgba(22,130,93,0.1);
+    --warning: #b05a00; --warning-dim: rgba(176,90,0,0.1);
+    --error: #d13438; --error-dim: rgba(209,52,56,0.1);
+    --font-family: Arial, sans-serif; --font-mono: 'Courier New', monospace;
+    --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+    --transition: 0.12s ease;
+  }
+  [data-theme="dark"] {
+    --bg: #1e1e1e; --surface: #252526; --surface-hover: #2d2d30;
+    --border: #3e3e42; --border-focus: #cccccc;
+    --text: #cccccc; --text-secondary: #858585; --text-disabled: #656565;
+    --accent: #cccccc;
+    --success-dim: rgba(22,130,93,0.15); --warning-dim: rgba(176,90,0,0.15); --error-dim: rgba(209,52,56,0.15);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; border-radius:0!important; box-shadow:none!important; }
+  body { font-family:var(--font-family); font-size:10px; color:var(--text); background:var(--bg); }
+
+  .nav {
+    position:sticky; top:0; z-index:100; background:var(--surface);
+    border-bottom:2px solid var(--border); padding:var(--space-2) var(--space-4);
+    display:flex; align-items:center; gap:var(--space-3); height:40px;
+  }
+  .nav-brand { font-size:13px; font-weight:700; letter-spacing:0.10em; color:var(--text); text-decoration:none; }
+  .nav-links { display:flex; gap:var(--space-1); margin-left:var(--space-4); }
+  .nav-link {
+    font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;
+    padding:var(--space-1) var(--space-2); border:2px solid var(--border);
+    background:var(--bg); color:var(--text-secondary); cursor:pointer; text-decoration:none;
+    transition:var(--transition);
+  }
+  .nav-link:hover { border-color:var(--border-focus); color:var(--text); }
+  .nav-link.active { border-color:var(--text); color:var(--text); background:var(--surface-hover); }
+  .nav-right { margin-left:auto; }
+  .theme-toggle {
+    font-size:9px; font-weight:700; text-transform:uppercase;
+    padding:var(--space-1) var(--space-2); border:2px solid var(--border);
+    background:var(--bg); color:var(--text-secondary); cursor:pointer;
+  }
+
+  .desc {
+    padding:var(--space-3) var(--space-4); border-bottom:1px solid var(--border);
+    background:var(--surface);
+  }
+  .desc h2 { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; }
+  .desc p { font-size:9px; color:var(--text-secondary); margin-top:var(--space-1); }
+
+  /* TABLE */
+  .table-wrap {
+    padding: var(--space-2);
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 2px solid var(--border);
+  }
+
+  thead th {
+    font-size: 8px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-disabled);
+    padding: var(--space-2) var(--space-2);
+    text-align: left; white-space: nowrap;
+    border-bottom: 2px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 40px; z-index: 10;
+    cursor: pointer; user-select: none;
+  }
+  thead th:hover { color: var(--text); }
+  thead th.sorted { color: var(--text); border-bottom-color: var(--text); }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: var(--transition);
+    cursor: pointer;
+  }
+  tbody tr:hover { background: var(--surface-hover); }
+
+  td {
+    padding: 6px var(--space-2);
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  .row-img {
+    width: 64px; height: 44px; object-fit: cover;
+    border: 1px solid var(--border); display: block;
+  }
+
+  .row-title {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .row-subtitle {
+    font-size: 8px; color: var(--text-secondary); text-transform: uppercase;
+    letter-spacing: 0.03em; margin-top: 1px;
+  }
+
+  .row-mono {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  }
+  .row-mono-sm {
+    font-family: var(--font-mono); font-size: 9px; color: var(--text-secondary);
+  }
+
+  .row-delta {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+    padding: 2px 6px; display: inline-block;
+  }
+
+  .deal-cell {
+    font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+    padding: 2px 6px; border: 2px solid; display: inline-block;
+  }
+
+  /* Heat bar in table */
+  .heat-cell {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .heat-bar-t {
+    width: 40px; height: 6px; background: var(--bg);
+    border: 1px solid var(--border);
+  }
+  .heat-bar-f { height: 100%; }
+
+  .data-cell {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .data-bar-t {
+    width: 32px; height: 4px; background: var(--bg);
+    border: 1px solid var(--border);
+  }
+  .data-bar-f { height: 100%; background: var(--accent); }
+
+  .status-live { color: var(--success); }
+  .status-time { color: var(--error); font-family: var(--font-mono); font-size: 9px; }
+
+  /* Sort indicator */
+  .sort-arrow { font-size: 8px; margin-left: 2px; }
+</style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav-brand" href="index.html">NUKE</a>
+    <span style="font-size:9px;color:var(--text-disabled);text-transform:uppercase;letter-spacing:0.05em;">wireframes</span>
+    <div class="nav-links">
+      <a class="nav-link" href="index.html">overview</a>
+      <a class="nav-link" href="a-bloomberg.html">a: bloomberg</a>
+      <a class="nav-link" href="b-signal-strip.html">b: signal strip</a>
+      <a class="nav-link" href="c-overlay.html">c: overlay</a>
+      <a class="nav-link active" href="d-dashboard.html">d: dashboard</a>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" onclick="toggleTheme()">DARK</button>
+    </div>
+  </nav>
+
+  <div class="desc">
+    <h2>D: The Dashboard Row</h2>
+    <p>Abandon masonry. Uniform rows, sortable columns. Image, identity, bid, estimate range, delta, deal, heat, data, time. This IS the Bloomberg Terminal. Click any column header to sort. Every vehicle gets equal visual weight — the novel data columns are immediately comparable across rows.</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:72px;"></th>
+          <th data-sort="title" class="sorted">VEHICLE <span class="sort-arrow">&#9660;</span></th>
+          <th data-sort="bid">BID</th>
+          <th data-sort="estimate">NUKE EST</th>
+          <th data-sort="delta">&#9650;/&#9660; VS EST</th>
+          <th data-sort="deal">DEAL</th>
+          <th data-sort="heat">HEAT</th>
+          <th data-sort="data">DATA</th>
+          <th data-sort="miles">MILES</th>
+          <th data-sort="body">BODY</th>
+          <th data-sort="location">LOCATION</th>
+          <th data-sort="time">TIME</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <script src="shared.js"></script>
+  <script>
+    const tbody = document.getElementById('tbody');
+    let currentSort = 'title';
+    let sortDir = 'asc';
+
+    function renderTable(vehicles) {
+      tbody.innerHTML = '';
+      vehicles.forEach(v => {
+        const dColor = deltaColor(v.deltaDir);
+        const dBg = deltaBg(v.deltaDir);
+        const dlColor = dealColor(v.dealLabel);
+        const hPct = heatBar(v.heatScore, v.heatMax);
+
+        let heatColor = 'var(--text-disabled)';
+        if (v.heatScore > 40) heatColor = 'var(--error)';
+        else if (v.heatScore > 25) heatColor = 'var(--warning)';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>
+            <img class="row-img" src="${v.img}" alt="${shortTitle(v)}" loading="lazy"
+                 onerror="this.style.background='var(--surface-hover)';">
+          </td>
+          <td>
+            <div class="row-title">${shortTitle(v)}</div>
+            <div class="row-subtitle">${v.series || ''} · ${v.source}</div>
+          </td>
+          <td>
+            <span class="row-mono">${v.bidLabel}</span>
+          </td>
+          <td>
+            <span class="row-mono-sm">${v.estimateLabel}</span>
+          </td>
+          <td>
+            <span class="row-delta" style="color:${dColor};background:${dBg};">
+              ${v.deltaDir === 'below' ? '&#9660;' : '&#9650;'} ${Math.abs(v.delta)}%
+            </span>
+          </td>
+          <td>
+            <span class="deal-cell" style="color:${dlColor};border-color:${dlColor};">${v.dealLabel}</span>
+          </td>
+          <td>
+            <div class="heat-cell">
+              <div class="heat-bar-t">
+                <div class="heat-bar-f" style="width:${hPct}%;background:${heatColor};"></div>
+              </div>
+              <span style="font-family:var(--font-mono);font-size:9px;font-weight:700;color:${heatColor};">${v.heatScore}</span>
+            </div>
+          </td>
+          <td>
+            <div class="data-cell">
+              <div class="data-bar-t">
+                <div class="data-bar-f" style="width:${v.dataCompleteness}%;"></div>
+              </div>
+              <span style="font-family:var(--font-mono);font-size:9px;">${v.dataCompleteness}%</span>
+            </div>
+          </td>
+          <td><span class="row-mono-sm">${v.miles}</span></td>
+          <td><span style="font-size:8px;text-transform:uppercase;color:var(--text-disabled);">${v.body}</span></td>
+          <td><span style="font-size:8px;text-transform:uppercase;color:var(--text-disabled);">${v.location}</span></td>
+          <td>
+            <span class="status-live">${v.status}</span>
+            <span class="status-time">${v.timeLabel}</span>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // Sorting
+    function sortVehicles(key, dir) {
+      const sorted = [...VEHICLES].sort((a, b) => {
+        let va, vb;
+        switch(key) {
+          case 'bid': va = a.bid; vb = b.bid; break;
+          case 'estimate': va = a.estimateMid; vb = b.estimateMid; break;
+          case 'delta': va = a.delta; vb = b.delta; break;
+          case 'deal': va = a.dealScore; vb = b.dealScore; break;
+          case 'heat': va = a.heatScore; vb = b.heatScore; break;
+          case 'data': va = a.dataCompleteness; vb = b.dataCompleteness; break;
+          default: va = formatTitle(a); vb = formatTitle(b);
+            return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+        }
+        return dir === 'asc' ? va - vb : vb - va;
+      });
+      return sorted;
+    }
+
+    // Click handlers for column headers
+    document.querySelectorAll('thead th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (currentSort === key) {
+          sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          currentSort = key;
+          sortDir = key === 'title' ? 'asc' : 'desc'; // default desc for numbers
+        }
+
+        // Update header styles
+        document.querySelectorAll('thead th').forEach(h => {
+          h.classList.remove('sorted');
+          const arrow = h.querySelector('.sort-arrow');
+          if (arrow) arrow.remove();
+        });
+        th.classList.add('sorted');
+        const arrow = document.createElement('span');
+        arrow.className = 'sort-arrow';
+        arrow.innerHTML = sortDir === 'asc' ? '&#9650;' : '&#9660;';
+        th.appendChild(arrow);
+
+        renderTable(sortVehicles(currentSort, sortDir));
+      });
+    });
+
+    // Initial render (sort by deal score desc — show best deals first)
+    currentSort = 'deal';
+    sortDir = 'desc';
+    document.querySelectorAll('thead th').forEach(h => h.classList.remove('sorted'));
+    const dealTh = document.querySelector('th[data-sort="deal"]');
+    dealTh.classList.add('sorted');
+    dealTh.innerHTML = 'DEAL <span class="sort-arrow">&#9660;</span>';
+    renderTable(sortVehicles('deal', 'desc'));
+  </script>
+</body>
+</html>

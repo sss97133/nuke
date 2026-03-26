@@ -10,6 +10,7 @@
  *   - Escape closes the TOP popup only
  *   - Click on dim overlay closes the TOP popup only
  *   - Popups are draggable by their title bar
+ *   - "+" expands to full size, resize handles on corners
  */
 
 import React, {
@@ -21,22 +22,17 @@ import React, {
 } from 'react';
 import { PopupContainer } from './PopupContainer';
 
-export type PopupSize = 's' | 'm' | 'l';
-
-export const POPUP_SIZE_WIDTHS: Record<PopupSize, number> = {
-  s: 360,
-  m: 460,
-  l: 700,
-};
+export const POPUP_EXPANDED_WIDTH = 700;
 
 export interface PopupEntry {
   id: string;
   title: string;
   content: ReactNode;
   width: number;
+  defaultWidth: number;
   searchable: boolean;
   minimized: boolean;
-  size: PopupSize;
+  expanded: boolean;
 }
 
 export interface PopupStackContextValue {
@@ -46,7 +42,7 @@ export interface PopupStackContextValue {
   popTop: () => void;
   closeAll: () => void;
   toggleMinimize: (id: string) => void;
-  setSize: (id: string, size: PopupSize) => void;
+  toggleExpanded: (id: string) => void;
 }
 
 export const PopupStackContext = createContext<PopupStackContextValue | null>(null);
@@ -63,8 +59,10 @@ export function PopupStackProvider({ children }: { children: ReactNode }) {
 
   const push = useCallback((content: ReactNode, title: string, width = 460, searchable = true): string => {
     const id = nextId();
-    const size: PopupSize = width <= 360 ? 's' : width >= 700 ? 'l' : 'm';
-    setStack((prev) => [...prev, { id, title, content, width, searchable, minimized: false, size }]);
+    setStack((prev) => [...prev, {
+      id, title, content, width, defaultWidth: width,
+      searchable, minimized: false, expanded: false,
+    }]);
     return id;
   }, []);
 
@@ -89,15 +87,21 @@ export function PopupStackProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const setSize = useCallback((id: string, size: PopupSize) => {
+  const toggleExpanded = useCallback((id: string) => {
     setStack((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, size, width: POPUP_SIZE_WIDTHS[size] } : p,
-      ),
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const nowExpanded = !p.expanded;
+        return {
+          ...p,
+          expanded: nowExpanded,
+          width: nowExpanded ? Math.max(POPUP_EXPANDED_WIDTH, p.defaultWidth) : p.defaultWidth,
+        };
+      }),
     );
   }, []);
 
-  const value: PopupStackContextValue = { stack, push, pop, popTop, closeAll, toggleMinimize, setSize };
+  const value: PopupStackContextValue = { stack, push, pop, popTop, closeAll, toggleMinimize, toggleExpanded };
 
   return (
     <PopupStackContext.Provider value={value}>
@@ -108,7 +112,7 @@ export function PopupStackProvider({ children }: { children: ReactNode }) {
           onClose={pop}
           onCloseTop={popTop}
           onToggleMinimize={toggleMinimize}
-          onSetSize={setSize}
+          onToggleExpanded={toggleExpanded}
         />
       )}
     </PopupStackContext.Provider>

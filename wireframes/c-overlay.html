@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C: Overlay — Nuke Wireframes</title>
+<style>
+  :root {
+    --bg: #f5f5f5; --surface: #ebebeb; --surface-hover: #e0e0e0;
+    --border: #bdbdbd; --border-focus: #2a2a2a;
+    --text: #2a2a2a; --text-secondary: #666666; --text-disabled: #999999;
+    --accent: #2a2a2a;
+    --success: #16825d; --success-dim: rgba(22,130,93,0.1);
+    --warning: #b05a00; --warning-dim: rgba(176,90,0,0.1);
+    --error: #d13438; --error-dim: rgba(209,52,56,0.1);
+    --font-family: Arial, sans-serif; --font-mono: 'Courier New', monospace;
+    --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+    --transition: 0.12s ease;
+  }
+  [data-theme="dark"] {
+    --bg: #1e1e1e; --surface: #252526; --surface-hover: #2d2d30;
+    --border: #3e3e42; --border-focus: #cccccc;
+    --text: #cccccc; --text-secondary: #858585; --text-disabled: #656565;
+    --accent: #cccccc;
+    --success-dim: rgba(22,130,93,0.15); --warning-dim: rgba(176,90,0,0.15); --error-dim: rgba(209,52,56,0.15);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; border-radius:0!important; box-shadow:none!important; }
+  body { font-family:var(--font-family); font-size:10px; color:var(--text); background:var(--bg); }
+
+  .nav {
+    position:sticky; top:0; z-index:100; background:var(--surface);
+    border-bottom:2px solid var(--border); padding:var(--space-2) var(--space-4);
+    display:flex; align-items:center; gap:var(--space-3); height:40px;
+  }
+  .nav-brand { font-size:13px; font-weight:700; letter-spacing:0.10em; color:var(--text); text-decoration:none; }
+  .nav-links { display:flex; gap:var(--space-1); margin-left:var(--space-4); }
+  .nav-link {
+    font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;
+    padding:var(--space-1) var(--space-2); border:2px solid var(--border);
+    background:var(--bg); color:var(--text-secondary); cursor:pointer; text-decoration:none;
+    transition:var(--transition);
+  }
+  .nav-link:hover { border-color:var(--border-focus); color:var(--text); }
+  .nav-link.active { border-color:var(--text); color:var(--text); background:var(--surface-hover); }
+  .nav-right { margin-left:auto; }
+  .theme-toggle {
+    font-size:9px; font-weight:700; text-transform:uppercase;
+    padding:var(--space-1) var(--space-2); border:2px solid var(--border);
+    background:var(--bg); color:var(--text-secondary); cursor:pointer;
+  }
+
+  .desc {
+    padding:var(--space-3) var(--space-4); border-bottom:1px solid var(--border);
+    background:var(--surface);
+  }
+  .desc h2 { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; }
+  .desc p { font-size:9px; color:var(--text-secondary); margin-top:var(--space-1); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--space-1);
+    padding: var(--space-2);
+  }
+
+  .card {
+    border: 2px solid var(--border); background: var(--surface);
+    transition: var(--transition); cursor: pointer; overflow: hidden;
+  }
+  .card:hover { border-color: var(--text); }
+
+  /* IMAGE WITH OVERLAYS */
+  .card-image-wrap {
+    position: relative; overflow: hidden;
+  }
+  .card-img {
+    width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block;
+  }
+
+  /* Overlay badges */
+  .overlay-tl, .overlay-tr, .overlay-bl, .overlay-br {
+    position: absolute; z-index: 2;
+  }
+  .overlay-tl { top: 0; left: 0; }
+  .overlay-tr { top: 0; right: 0; }
+  .overlay-bl { bottom: 0; left: 0; }
+  .overlay-br { bottom: 0; right: 0; }
+
+  .overlay-badge {
+    font-size: 9px; font-weight: 700; font-family: var(--font-mono);
+    padding: 3px 6px; text-transform: uppercase; letter-spacing: 0.03em;
+    backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+  }
+  .overlay-badge-dark {
+    background: rgba(0,0,0,0.72); color: #fff;
+  }
+  .overlay-badge-deal {
+    font-size: 10px; padding: 4px 8px;
+  }
+
+  /* Bottom gradient for readability */
+  .card-image-wrap::after {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0; height: 60px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.5));
+    pointer-events: none;
+  }
+  .overlay-bl, .overlay-br { z-index: 3; }
+
+  /* DATA BAR at bottom-right of image */
+  .data-bar-wrap {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .data-bar {
+    width: 32px; height: 4px; background: rgba(255,255,255,0.25);
+  }
+  .data-bar-fill { height: 100%; background: rgba(255,255,255,0.8); }
+  .data-bar-label {
+    font-family: var(--font-mono); font-size: 8px; color: rgba(255,255,255,0.8);
+    font-weight: 700;
+  }
+
+  /* CARD BODY */
+  .card-body {
+    padding: var(--space-2);
+  }
+  .card-title {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.03em; line-height: 1.3;
+  }
+  .card-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-top: var(--space-1);
+  }
+  .card-bid {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  }
+  .card-est {
+    font-family: var(--font-mono); font-size: 9px; color: var(--text-secondary);
+  }
+  .card-source {
+    font-size: 8px; font-weight: 700; text-transform: uppercase;
+    color: var(--text-disabled); letter-spacing: 0.04em;
+  }
+  .status-live { color: var(--success); }
+  .status-time { color: var(--error); }
+</style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav-brand" href="index.html">NUKE</a>
+    <span style="font-size:9px;color:var(--text-disabled);text-transform:uppercase;letter-spacing:0.05em;">wireframes</span>
+    <div class="nav-links">
+      <a class="nav-link" href="index.html">overview</a>
+      <a class="nav-link" href="a-bloomberg.html">a: bloomberg</a>
+      <a class="nav-link" href="b-signal-strip.html">b: signal strip</a>
+      <a class="nav-link active" href="c-overlay.html">c: overlay</a>
+      <a class="nav-link" href="d-dashboard.html">d: dashboard</a>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" onclick="toggleTheme()">DARK</button>
+    </div>
+  </nav>
+
+  <div class="desc">
+    <h2>C: The Overlay</h2>
+    <p>"See First, Know Later" taken literally. Vehicle image is the entry point. Novel data (deal label, delta, heat, estimate, data completeness) lives ON the image as ambient intelligence. Your eye sees the car first, then notices the signals.</p>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <script src="shared.js"></script>
+  <script>
+    const grid = document.getElementById('grid');
+
+    VEHICLES.forEach(v => {
+      const dColor = deltaColor(v.deltaDir);
+      const dlColor = dealColor(v.dealLabel);
+      const hPct = heatBar(v.heatScore, v.heatMax);
+      const title = formatTitle(v);
+
+      let heatColor = 'rgba(255,255,255,0.7)';
+      if (v.heatScore > 40) heatColor = '#ff6b6b';
+      else if (v.heatScore > 25) heatColor = '#ffa94d';
+
+      // Only show deal badge if notable
+      const showDeal = ['STEAL', 'GREAT', 'ABOVE', 'OVER'].includes(v.dealLabel);
+
+      // Delta arrow for overlay
+      const deltaArrow = v.deltaDir === 'below' ? '&#9660;' : '&#9650;';
+      const deltaOverlayColor = v.deltaDir === 'below' ? '#4ade80' : '#f87171';
+
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="card-image-wrap">
+          <img class="card-img" src="${v.img}" alt="${title}" loading="lazy"
+               onerror="this.style.background='var(--surface-hover)';this.style.height='200px';">
+
+          ${showDeal ? `
+          <div class="overlay-tl">
+            <div class="overlay-badge overlay-badge-dark overlay-badge-deal" style="color:${deltaOverlayColor};">
+              ${v.dealLabel} ${deltaArrow}${Math.abs(v.delta)}%
+            </div>
+          </div>` : ''}
+
+          <div class="overlay-tr">
+            <div class="overlay-badge overlay-badge-dark" style="color:${heatColor};">
+              ${v.heatScore}
+            </div>
+          </div>
+
+          <div class="overlay-bl">
+            <div class="overlay-badge overlay-badge-dark" style="font-size:8px;font-family:var(--font-mono);">
+              EST ${v.estimateLabel}
+            </div>
+          </div>
+
+          <div class="overlay-br">
+            <div class="overlay-badge overlay-badge-dark">
+              <div class="data-bar-wrap">
+                <div class="data-bar">
+                  <div class="data-bar-fill" style="width:${v.dataCompleteness}%;"></div>
+                </div>
+                <span class="data-bar-label">${v.dataCompleteness}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="card-title">${title}</div>
+          <div class="card-row">
+            <span class="card-source">
+              ${v.source} · <span class="status-live">${v.status}</span> · <span class="status-time">${v.timeLabel}</span>
+            </span>
+            <span class="card-bid">${v.bidLabel}</span>
+          </div>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nuke Wireframes — Novel Data Display</title>
+<style>
+  :root {
+    --bg: #f5f5f5;
+    --surface: #ebebeb;
+    --surface-hover: #e0e0e0;
+    --border: #bdbdbd;
+    --border-focus: #2a2a2a;
+    --text: #2a2a2a;
+    --text-secondary: #666666;
+    --text-disabled: #999999;
+    --accent: #2a2a2a;
+    --success: #16825d;
+    --success-dim: rgba(22, 130, 93, 0.1);
+    --warning: #b05a00;
+    --warning-dim: rgba(176, 90, 0, 0.1);
+    --error: #d13438;
+    --error-dim: rgba(209, 52, 56, 0.1);
+    --font-family: Arial, sans-serif;
+    --font-mono: 'Courier New', monospace;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --transition: 0.12s ease;
+  }
+
+  [data-theme="dark"] {
+    --bg: #1e1e1e;
+    --surface: #252526;
+    --surface-hover: #2d2d30;
+    --border: #3e3e42;
+    --border-focus: #cccccc;
+    --text: #cccccc;
+    --text-secondary: #858585;
+    --text-disabled: #656565;
+    --accent: #cccccc;
+    --success-dim: rgba(22, 130, 93, 0.15);
+    --warning-dim: rgba(176, 90, 0, 0.15);
+    --error-dim: rgba(209, 52, 56, 0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; border-radius: 0 !important; box-shadow: none !important; }
+
+  body {
+    font-family: var(--font-family);
+    font-size: 10px;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.4;
+  }
+
+  /* NAV */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--surface);
+    border-bottom: 2px solid var(--border);
+    padding: var(--space-2) var(--space-4);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    height: 40px;
+  }
+  .nav-brand {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .nav-links { display: flex; gap: var(--space-1); margin-left: var(--space-4); }
+  .nav-link {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: var(--space-1) var(--space-2);
+    border: 2px solid var(--border);
+    background: var(--bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    text-decoration: none;
+    transition: var(--transition);
+  }
+  .nav-link:hover { border-color: var(--border-focus); color: var(--text); }
+  .nav-link.active { border-color: var(--text); color: var(--text); background: var(--surface-hover); }
+
+  .nav-right { margin-left: auto; display: flex; gap: var(--space-2); align-items: center; }
+  .theme-toggle {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    padding: var(--space-1) var(--space-2);
+    border: 2px solid var(--border); background: var(--bg);
+    color: var(--text-secondary); cursor: pointer;
+  }
+  .theme-toggle:hover { border-color: var(--border-focus); }
+
+  /* FRAMES */
+  iframe {
+    width: 100%;
+    height: calc(100vh - 40px);
+    border: none;
+    display: block;
+  }
+
+  .intro {
+    max-width: 800px;
+    margin: var(--space-6) auto;
+    padding: var(--space-4);
+  }
+  .intro h1 {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: var(--space-3);
+  }
+  .intro p {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-2);
+    line-height: 1.6;
+  }
+  .intro .cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+  }
+  .intro .card {
+    border: 2px solid var(--border);
+    padding: var(--space-3);
+    background: var(--surface);
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  .intro .card:hover { border-color: var(--text); }
+  .intro .card h2 {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; margin-bottom: var(--space-1);
+  }
+  .intro .card p { font-size: 9px; color: var(--text-secondary); }
+  .intro .card .tag {
+    display: inline-block;
+    font-size: 8px; font-weight: 700; text-transform: uppercase;
+    padding: 2px 4px;
+    border: 1px solid var(--border);
+    margin-top: var(--space-2);
+    color: var(--text-disabled);
+  }
+</style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav-brand" href="index.html">NUKE</a>
+    <span style="font-size:9px;color:var(--text-disabled);text-transform:uppercase;letter-spacing:0.05em;">wireframes</span>
+    <div class="nav-links">
+      <a class="nav-link active" href="index.html">overview</a>
+      <a class="nav-link" href="a-bloomberg.html">a: bloomberg</a>
+      <a class="nav-link" href="b-signal-strip.html">b: signal strip</a>
+      <a class="nav-link" href="c-overlay.html">c: overlay</a>
+      <a class="nav-link" href="d-dashboard.html">d: dashboard</a>
+      <a class="nav-link" href="e-badge-portals.html">e: portals</a>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" onclick="toggleTheme()">dark</button>
+    </div>
+  </nav>
+
+  <div class="intro">
+    <h1>Novel Data Display Wireframes</h1>
+    <p>Four approaches to surfacing Nuke's competitive advantage — data no other car listing site has. Each wireframe uses the same 12 sample vehicles with real-ish Nuke data: estimate ranges, price deltas, heat scores, deal labels, and data completeness.</p>
+    <p>Click any card to open that wireframe, or use the nav above.</p>
+
+    <div class="cards">
+      <a class="card" href="a-bloomberg.html" style="text-decoration:none;color:inherit;">
+        <h2>A: The Bloomberg Card</h2>
+        <p>Data-forward grid. Every card is a mini terminal readout with estimate range, delta, heat bar, data completeness, and deal label visible at idle.</p>
+        <span class="tag">max data density</span>
+      </a>
+      <a class="card" href="b-signal-strip.html" style="text-decoration:none;color:inherit;">
+        <h2>B: The Signal Strip</h2>
+        <p>Image-dominant card with a 3-cell signal footer. Price position + heat + data confidence as a color-coded strip below each card.</p>
+        <span class="tag">balanced</span>
+      </a>
+      <a class="card" href="c-overlay.html" style="text-decoration:none;color:inherit;">
+        <h2>C: The Overlay</h2>
+        <p>Novel data lives ON the image as transparent badges. Image stays huge. Deal label, heat, data completeness, and estimate are ambient overlays.</p>
+        <span class="tag">image-first</span>
+      </a>
+      <a class="card" href="d-dashboard.html" style="text-decoration:none;color:inherit;">
+        <h2>D: The Dashboard Row</h2>
+        <p>Abandon masonry. Uniform rows with sortable columns: image, identity, bid, estimate range, delta, heat. Pure Bloomberg terminal.</p>
+        <span class="tag">power user</span>
+      </a>
+      <a class="card" href="e-badge-portals.html" style="text-decoration:none;color:inherit;grid-column:1/-1;">
+        <h2>E: Badge Portals — Every Data Point is a Door</h2>
+        <p>The novel interaction pattern. Every piece of data (year, make, body, transmission, location, deal score) is a clickable badge. Click it and a cluster panel expands inline showing related vehicles, estimate comparisons, and a "VIEW ALL" action. Click again or ESC to collapse. Hover shows depth count. This is what makes Nuke fundamentally different from any listing site.</p>
+        <span class="tag">core interaction</span>
+      </a>
+    </div>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const btn = document.querySelector('.theme-toggle');
+      if (html.getAttribute('data-theme') === 'dark') {
+        html.removeAttribute('data-theme');
+        btn.textContent = 'dark';
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        btn.textContent = 'light';
+      }
+    }
+  </script>
+</body>
+</html>

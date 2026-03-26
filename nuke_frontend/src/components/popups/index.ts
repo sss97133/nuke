@@ -3,8 +3,8 @@
  */
 
 export { PopupStackProvider, PopupStackContext } from './PopupStack';
-export type { PopupEntry, PopupStackContextValue, PopupSize } from './PopupStack';
-export { POPUP_SIZE_WIDTHS } from './PopupStack';
+export type { PopupEntry, PopupStackContextValue } from './PopupStack';
+export { POPUP_EXPANDED_WIDTH } from './PopupStack';
 export { PopupContainer } from './PopupContainer';
 export { usePopup } from './usePopup';
 export { VehiclePopup } from './VehiclePopup';
