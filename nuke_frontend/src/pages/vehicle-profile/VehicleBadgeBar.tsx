@@ -1,26 +1,34 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
+import { PopupStackContext } from '../../components/popups/PopupStack';
+import { CommentsPopup } from '../../components/popups/CommentsPopup';
+import { BidsPopup } from '../../components/popups/BidsPopup';
+import { WatchersPopup } from '../../components/popups/WatchersPopup';
 
 function formatPrice(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n) || n <= 0) return '—';
+  if (n == null || !Number.isFinite(n) || n <= 0) return '--';
   return `$${n.toLocaleString()}`;
 }
 
 /**
- * Supplementary badge bar — shows engagement metrics that VehicleHeader doesn't display.
+ * Supplementary badge bar -- shows engagement metrics that VehicleHeader doesn't display.
  * VehicleHeader already renders: SOLD, source, price, seller, buyer, location, mileage, time.
  * This bar adds: BIDS, COMMENTS, WATCHERS, DQ score.
+ *
+ * Every badge is clickable and opens a popup with full data.
  */
 const VehicleBadgeBar: React.FC = () => {
   const { vehicle, auctionPulse } = useVehicleProfile();
+  const popupCtx = useContext(PopupStackContext);
   const v = vehicle as any;
 
-  // Engagement stats — only data VehicleHeader doesn't show
+  // Engagement stats
   const bidCount = auctionPulse?.bid_count || v.bid_count;
   const commentCount = auctionPulse?.comment_count || v.comment_count;
   const watcherCount = auctionPulse?.watcher_count || v.bat_watchers;
   const dqScore = v.data_quality_score;
   const highBid = v.high_bid || auctionPulse?.current_bid;
+  const listingUrl = (auctionPulse as any)?.listing_url || v.bat_auction_url || v.discovery_url || null;
 
   const hasBadges = (bidCount != null && bidCount > 0) ||
     (commentCount != null && commentCount > 0) ||
@@ -29,39 +37,98 @@ const VehicleBadgeBar: React.FC = () => {
 
   if (!hasBadges) return null;
 
+  const handleBidsClick = () => {
+    if (!popupCtx || !v.id) return;
+    popupCtx.push(
+      <BidsPopup vehicleId={v.id} bidCount={bidCount} highBid={highBid} listingUrl={listingUrl} />,
+      `BID HISTORY (${bidCount})`,
+      420,
+    );
+  };
+
+  const handleCommentsClick = () => {
+    if (!popupCtx || !v.id) return;
+    popupCtx.push(
+      <CommentsPopup vehicleId={v.id} expectedCount={commentCount} />,
+      `COMMENTS (${commentCount})`,
+      460,
+    );
+  };
+
+  const handleWatchersClick = () => {
+    if (!popupCtx || !v.id) return;
+    popupCtx.push(
+      <WatchersPopup
+        vehicleId={v.id}
+        watcherCount={watcherCount}
+        viewCount={v.bat_views || (auctionPulse as any)?.view_count || null}
+        make={v.make || null}
+        model={v.model || null}
+      />,
+      `WATCHERS (${watcherCount?.toLocaleString()})`,
+      380,
+    );
+  };
+
+  const badgeStyle: React.CSSProperties = {
+    cursor: 'pointer',
+    transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+  };
+
   return (
     <div className="vehicle-sub__badges" style={{ padding: '3px 12px', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', borderBottom: '1px solid var(--vp-ghost, #e0e0e0)' }}>
       {/* BIDS */}
       {bidCount != null && bidCount > 0 && (
-        <span className="badge badge--bids">
+        <span
+          className="badge badge--bids"
+          role="button"
+          tabIndex={0}
+          style={badgeStyle}
+          onClick={handleBidsClick}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleBidsClick(); } }}
+        >
           BIDS {bidCount}
           <span className="badge__tooltip">
             {bidCount} total bids<br />
             {highBid && <>High bid: {formatPrice(highBid)}<br /></>}
-            <span className="tt-db">vehicles.bid_count</span>
+            Click to view bid history
           </span>
         </span>
       )}
 
       {/* COMMENTS */}
       {commentCount != null && commentCount > 0 && (
-        <span className="badge badge--comments">
+        <span
+          className="badge badge--comments"
+          role="button"
+          tabIndex={0}
+          style={badgeStyle}
+          onClick={handleCommentsClick}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCommentsClick(); } }}
+        >
           COMMENTS {commentCount}
           <span className="badge__tooltip">
-            {commentCount} total comments
-            <span className="tt-db">vehicles.comment_count</span>
+            {commentCount} total comments<br />
+            Click to read comments
           </span>
         </span>
       )}
 
       {/* WATCHERS */}
       {watcherCount != null && watcherCount > 0 && (
-        <span className="badge badge--watchers">
+        <span
+          className="badge badge--watchers"
+          role="button"
+          tabIndex={0}
+          style={badgeStyle}
+          onClick={handleWatchersClick}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleWatchersClick(); } }}
+        >
           WATCHERS {watcherCount}
           <span className="badge__tooltip">
             {watcherCount} watchers<br />
             {v.bat_views && <>{Number(v.bat_views).toLocaleString()} page views<br /></>}
-            <span className="tt-db">vehicles.bat_watchers · vehicles.bat_views</span>
+            Click to see watcher analysis
           </span>
         </span>
       )}

@@ -738,6 +738,7 @@ const VehicleSubHeader: React.FC = () => {
                 ? `High bid ${formatPrice(price)} — reserve not met`
                 : `Current high bid: ${formatPrice(price)}`
             }
+            onClick={openPricePopup}
           />
         )}
 
@@ -747,6 +748,7 @@ const VehicleSubHeader: React.FC = () => {
             variant="finance"
             label={finance.label}
             tooltip={finance.tooltip}
+            onClick={openPricePopup}
           />
         )}
 
@@ -756,6 +758,7 @@ const VehicleSubHeader: React.FC = () => {
             variant="bids"
             label={`${bidCount} BID${bidCount !== 1 ? 'S' : ''}`}
             tooltip={`${bidCount} bid${bidCount !== 1 ? 's' : ''} placed`}
+            onClick={openBidsPopup}
           />
         )}
 
@@ -765,6 +768,17 @@ const VehicleSubHeader: React.FC = () => {
             variant="comments"
             label={`${commentCount} Comment${commentCount !== 1 ? 's' : ''}`}
             tooltip={`${commentCount} comment${commentCount !== 1 ? 's' : ''}`}
+            onClick={openCommentsPopup}
+          />
+        )}
+
+        {/* Watchers */}
+        {watcherCount > 0 && (
+          <Badge
+            variant="watchers"
+            label={`${watcherCount.toLocaleString()} WATCHERS`}
+            tooltip={`${watcherCount.toLocaleString()} watchers`}
+            onClick={openWatchersPopup}
           />
         )}
 
