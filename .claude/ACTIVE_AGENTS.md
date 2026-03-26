@@ -16,3 +16,5 @@
 ---
 
 
+
+18:30 | DEEP-EXTRACT-SAMPLES | Deeply extracting 10 skeleton vehicles per major source (110+ total) using Firecrawl + extract-vehicle-data-ai. Goal: quality samples for founder demo. | vehicles table (updates only)

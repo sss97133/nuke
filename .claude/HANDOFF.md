@@ -193,3 +193,49 @@ none
 2. `tail -40 DONE.md` — what exists
 3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
 4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-25 18:19:00
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+66f5b8133 Revive all dead sources: Mecum Algolia (303K lots), BJ Strapi API (64K lots), RM 56 new
+9039aa705 Fix condition backfill self-chaining (remaining count was timing out)
+8aba867db Add Kimi k2-turbo as primary LLM, reorder fallback chain
+b42f04e07 18 niche sources: 98K URLs, 5 RSS feeds, The Market by Bonhams 5.5K, ER Classics 1.8K
+026e7e174 ClassicCars.com: 35,070 listings from Azure sitemaps, all queued
+c78c83a09 Classic Driver: 54,890 European vehicle URLs from sitemap, all queued
+
+## Uncommitted Changes
+none
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-25 18:41:37
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+5890d31cd Fix condition backfill: 500 char min desc, ORDER BY longest first, adaptive loop
+66f5b8133 Revive all dead sources: Mecum Algolia (303K lots), BJ Strapi API (64K lots), RM 56 new
+9039aa705 Fix condition backfill self-chaining (remaining count was timing out)
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
