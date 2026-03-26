@@ -23,6 +23,8 @@ export interface FeedLayoutProps {
   renderStatCard?: (index: number) => ReactNode;
   /** How many vehicle rows between stat cards (default 5) */
   statCardInterval?: number;
+  /** Estimated height for injected stat/signal card rows (default 48) */
+  statCardHeight?: number;
   /** Current sort key (for table column header highlighting) */
   sort?: SortBy;
   /** Current sort direction */
@@ -69,6 +71,7 @@ export function FeedLayout({
   renderCard,
   renderStatCard,
   statCardInterval = 5,
+  statCardHeight = 48,
   sort,
   sortDirection,
   onSortChange,
@@ -98,14 +101,13 @@ export function FeedLayout({
     return { type: 'vehicle' as const, vehicleRowIdx: group * statCardInterval + offset };
   }, [useStatCards, statCardInterval]);
 
-  const STAT_CARD_HEIGHT = 48;
   const estimateSize = useCallback((idx: number) => {
     if (useStatCards) {
       const row = resolveRow(idx);
-      if (row.type === 'stat') return STAT_CARD_HEIGHT;
+      if (row.type === 'stat') return statCardHeight;
     }
     return ROW_HEIGHTS[viewMode] ?? 320;
-  }, [viewMode, useStatCards, resolveRow]);
+  }, [viewMode, useStatCards, resolveRow, statCardHeight]);
 
   const virtualizer = useWindowVirtualizer({
     count: rowCount,
