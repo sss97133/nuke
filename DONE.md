@@ -2,6 +2,17 @@
 
 ## 2026-03-25
 
+### [data-quality] Enrichment Quality Metrics RPC — enrichment_quality_report()
+- Created `enrichment_quality_report()` SQL RPC function returning jsonb with 8 sections: by_source (35 sources), by_extractor (16 extractors), observation_depth, evidence_by_field (16 fields), evidence_by_source_type (30 types), observations_by_method (9 methods), summary, metadata
+- Granted to anon + authenticated, callable via `POST /rest/v1/rpc/enrichment_quality_report`
+- Key baseline findings: 387K vehicles, 64.1% avg completeness across 10 key fields
+- Best sources: Cars & Bids (84.3%), Mecum (83.2%), BaT (75.6%)
+- Worst sources needing Sonar enrichment: KSL (1.3%), Facebook Marketplace (10.0%), ConceptCarz (10.1%)
+- Best extractor: extract-bat-core:3.0.0 (91.3%), worst: extract-vehicle-data-ai:1.1 (12.6%)
+- Sonar/research enrichment will appear in evidence_by_source_type + observations_by_method once pipeline runs
+- Optimized for anon 15s timeout: uses pg_class reltuples for big-table counts, avoids count(DISTINCT) on 3M+ row tables
+- Marked agent_task 29814fe7 as completed
+
 ### [revenue] Fix 3 deal-flow tasks — exchange tables, invoice payments, Stripe Connect
 - **Exchange trade flow (P80)**: `market_orders` and `market_trades` tables were dropped by `drop-empty-tables-cascade.sql`. Recreated with full schema, RLS policies, indexes, and service_role grants. The `match_order_book()`, `cancel_market_order()`, `execute_trade()` RPCs and Portfolio.tsx now have their backing tables. 6 vehicle_offerings exist in `trading` status, 6 share_holdings, 4 market_funds, 1 user_cash_balance.
 - **Stripe invoice payment (P75)**: The `stripe-webhook` handler called `mark_invoice_paid(p_payment_token)` but the RPC didn't exist. Created it with idempotent paid marking. Added `payment_token` column to `generated_invoices`. 7 invoices exist (all unpaid). **Remaining blocker**: No frontend "Pay Invoice" button that creates a Stripe Checkout session with `purchase_type: 'invoice_payment'` metadata. The webhook handler is now ready to receive these.
