@@ -1,8 +1,13 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { BadgePortal } from '../../components/badges/BadgePortal';
+import { PopupStackContext } from '../../components/popups/PopupStack';
+import { CommentsPopup } from '../../components/popups/CommentsPopup';
+import { BidsPopup } from '../../components/popups/BidsPopup';
+import { WatchersPopup } from '../../components/popups/WatchersPopup';
+import { PriceContextPopup } from '../../components/popups/PriceContextPopup';
 
 /** Capitalize first letter of each word for display (e.g. "K5 JIMMY" -> "K5 Jimmy") */
 function toTitleCase(s: string): string {
@@ -509,8 +514,9 @@ function resolveFinance(vehicle: any): { label: string; variant: string; tooltip
 // ---------------------------------------------------------------------------
 
 const VehicleSubHeader: React.FC = () => {
-  const { vehicle } = useVehicleProfile();
+  const { vehicle, auctionPulse } = useVehicleProfile();
   const navigate = useNavigate();
+  const popupCtx = useContext(PopupStackContext);
   if (!vehicle) return null;
 
   const year      = vehicle.year   ?? vehicle.model_year   ?? '';
@@ -523,12 +529,73 @@ const VehicleSubHeader: React.FC = () => {
   const mileage   = vehicle.mileage    ?? vehicle.odometer   ?? vehicle.miles;
   const bidCount  = vehicle.bid_count  ?? vehicle.bidCount   ?? vehicle.bids ?? 0;
   const commentCount = vehicle.comment_count ?? vehicle.commentCount ?? vehicle.comments ?? 0;
+  const watcherCount = (auctionPulse as any)?.watcher_count || vehicle.bat_watchers || 0;
 
   const price     = vehicle.sold_price ?? vehicle.final_price ?? vehicle.high_bid ?? vehicle.price;
+  const priceNum  = typeof price === 'number' ? price : (typeof price === 'string' ? parseFloat(String(price).replace(/[^0-9.]/g, '')) : null);
+  const highBid   = vehicle.high_bid || (auctionPulse as any)?.current_bid || null;
+  const isSold    = (vehicle.status || '').toLowerCase() === 'sold';
+  const listingUrl = (auctionPulse as any)?.listing_url || vehicle.bat_auction_url || vehicle.discovery_url || null;
   const location  = resolveLocation(vehicle);
   const source    = resolvePlatformSource(vehicle);
   const status    = resolveStatus(vehicle);
   const finance   = resolveFinance(vehicle);
+
+  // --- Badge click handlers ---
+  const openCommentsPopup = () => {
+    if (!popupCtx || !vehicle.id) return;
+    popupCtx.push(
+      <CommentsPopup vehicleId={vehicle.id} expectedCount={commentCount} />,
+      `COMMENTS (${commentCount})`,
+      460,
+    );
+  };
+
+  const openBidsPopup = () => {
+    if (!popupCtx || !vehicle.id) return;
+    popupCtx.push(
+      <BidsPopup
+        vehicleId={vehicle.id}
+        bidCount={bidCount}
+        highBid={highBid}
+        listingUrl={listingUrl}
+      />,
+      `BID HISTORY (${bidCount})`,
+      420,
+    );
+  };
+
+  const openWatchersPopup = () => {
+    if (!popupCtx || !vehicle.id) return;
+    popupCtx.push(
+      <WatchersPopup
+        vehicleId={vehicle.id}
+        watcherCount={watcherCount}
+        viewCount={vehicle.bat_views || (auctionPulse as any)?.view_count || null}
+        make={make ? String(make) : null}
+        model={model ? String(model) : null}
+      />,
+      `WATCHERS (${watcherCount.toLocaleString()})`,
+      380,
+    );
+  };
+
+  const openPricePopup = () => {
+    if (!popupCtx || !vehicle.id) return;
+    popupCtx.push(
+      <PriceContextPopup
+        vehicleId={vehicle.id}
+        price={priceNum}
+        nukeEstimate={vehicle.nuke_estimate || null}
+        make={make ? String(make) : null}
+        model={model ? String(model) : null}
+        year={year ? Number(year) : null}
+        isSold={isSold}
+      />,
+      `PRICE CONTEXT`,
+      440,
+    );
+  };
 
   // --- Styles ---
   const containerStyle: React.CSSProperties = {

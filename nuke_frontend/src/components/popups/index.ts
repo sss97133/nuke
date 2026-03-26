@@ -10,3 +10,7 @@ export { VehiclePopup } from './VehiclePopup';
 export { MakePopup } from './MakePopup';
 export { SourcePopup } from './SourcePopup';
 export { ModelPopup } from './ModelPopup';
+export { CommentsPopup } from './CommentsPopup';
+export { BidsPopup } from './BidsPopup';
+export { WatchersPopup } from './WatchersPopup';
+export { PriceContextPopup } from './PriceContextPopup';
