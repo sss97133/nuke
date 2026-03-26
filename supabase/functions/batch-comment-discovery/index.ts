@@ -477,12 +477,42 @@ async function extractClaims(
 
       const prompt = buildClaimExtractionPrompt(vehicleCtx, batch, existingFieldNames);
 
-      // Call LLM — try xAI Grok Mini (cheapest), then Gemini, then Haiku
+      // Call LLM — try Kimi (fast), then Grok, then Gemini, then Haiku
       let content = "";
       let costCents = 0;
       let modelUsed = "";
 
-      // 1. xAI Grok-3-Mini ($0.30/M in, $0.50/M out — cheapest available)
+      // 0. Kimi k2-turbo (fast ~2s, OpenAI-compatible)
+      const kimiKey = Deno.env.get("KIMI_API_KEY") || "";
+      if (!content && kimiKey) {
+        try {
+          const resp = await fetch("https://api.moonshot.ai/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${kimiKey}` },
+            body: JSON.stringify({
+              model: "kimi-k2-turbo-preview",
+              temperature: 0.1,
+              max_tokens: 4096,
+              messages: [{ role: "user", content: prompt }],
+            }),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            content = data.choices?.[0]?.message?.content || "";
+            // Strip markdown code blocks
+            content = content.replace(/```(?:json)?\s*/gi, "").replace(/```\s*/g, "").trim();
+            const inTok = data.usage?.prompt_tokens || 0;
+            const outTok = data.usage?.completion_tokens || 0;
+            costCents = (inTok * 0.02 + outTok * 0.02) / 1000; // estimated
+            modelUsed = "kimi-k2-turbo";
+          } else {
+            const errBody = await resp.text().catch(() => "");
+            errors.push(`Kimi ${resp.status}: ${errBody.slice(0, 150)}`);
+          }
+        } catch (e: any) { errors.push(`Kimi error: ${e.message}`); }
+      }
+
+      // 1. xAI Grok-3-Mini ($0.30/M in, $0.50/M out)
       const xaiKey = Deno.env.get("XAI_API_KEY") || "";
       if (!content && xaiKey) {
         try {
