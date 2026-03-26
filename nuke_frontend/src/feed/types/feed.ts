@@ -86,6 +86,9 @@ export interface FeedVehicle {
   city?: string | null;
   state?: string | null;
 
+  // Description (first ~200 chars for popup, full from profile)
+  description?: string | null;
+
   // Data quality
   data_completeness_tier?: string | null;
 
@@ -169,6 +172,7 @@ export interface FeedQueryParams {
   hide_sold?: boolean;
   has_images?: boolean;
   excluded_sources?: string[];
+  included_sources?: string[];
   include_dealers?: boolean;
   added_today?: boolean;
   sort: FeedSortField;

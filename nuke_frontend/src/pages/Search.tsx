@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useSearchPage } from '../hooks/useSearchPage';
 import { useSearchEmptyState } from '../hooks/useSearchEmptyState';
 import SearchResults from '../components/search/SearchResults';
@@ -45,6 +46,33 @@ export default function Search() {
             onLoadMore={handleLoadMore}
             loadingMore={loadingMore}
           />
+        </div>
+      )}
+
+      {/* View in Feed link — preserves search terms */}
+      {query && (
+        <div style={{ padding: '8px 0', textAlign: 'right' }}>
+          <Link
+            to={`/?tab=feed&q=${encodeURIComponent(query)}`}
+            style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: '9px',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '0.3px',
+              padding: '4px 14px',
+              border: '2px solid var(--text, #1a1a1a)',
+              background: 'var(--surface, #fff)',
+              color: 'var(--text, #1a1a1a)',
+              textDecoration: 'none',
+              display: 'inline-block',
+              transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+          >
+            VIEW IN FEED &rarr;
+          </Link>
         </div>
       )}
 

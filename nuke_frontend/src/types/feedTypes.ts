@@ -93,6 +93,8 @@ export interface FilterState {
   hideBat: boolean;
   hideClassic: boolean;
   hiddenSources?: string[];
+  /** When set, only show vehicles from these sources (hero panel source filter) */
+  includedSources?: string[];
   zipCode: string;
   radiusMiles: number;
   locations: Array<{ zipCode: string; radiusMiles: number; label?: string }>;

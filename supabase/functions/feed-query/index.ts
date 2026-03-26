@@ -42,6 +42,7 @@ interface FeedRequest {
   hide_sold?: boolean;
   has_images?: boolean;
   excluded_sources?: string[];
+  included_sources?: string[];
   added_today?: boolean;
   sort?: string;
   direction?: "asc" | "desc";
@@ -317,6 +318,16 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Included sources — only show vehicles from these sources (hero panel)
+    if (body.included_sources && body.included_sources.length > 0) {
+      const safeSources = body.included_sources
+        .map((s) => s.replace(/[%_'"\\]/g, ""))
+        .filter(Boolean);
+      if (safeSources.length > 0) {
+        query = query.in("discovery_source", safeSources);
+      }
+    }
+
     // ----- Full-text search -----
     if (body.q && body.q.trim()) {
       const terms = body.q.trim().split(/\s+/).filter(Boolean);
@@ -363,7 +374,7 @@ Deno.serve(async (req) => {
     // ----- Enrich: thumbnails + auction state (parallel) -----
     const vehicleIds = items.map((r: any) => r.vehicle_id);
 
-    const [thumbResult, auctionResult] = await Promise.all([
+    const [thumbResult, auctionResult, descResult] = await Promise.all([
       vehicleIds.length > 0
         ? supabase
             .from("vehicle_images")
@@ -382,6 +393,15 @@ Deno.serve(async (req) => {
             .gt("ended_at", new Date().toISOString())
             .order("updated_at", { ascending: false })
             .limit(vehicleIds.length * 2)
+        : { data: [], error: null },
+      // Fetch descriptions (not in MV) — truncated server-side for payload size
+      vehicleIds.length > 0
+        ? supabase
+            .from("vehicles")
+            .select("id, description")
+            .in("id", vehicleIds)
+            .not("description", "is", null)
+            .limit(vehicleIds.length)
         : { data: [], error: null },
     ]);
 
@@ -423,6 +443,14 @@ Deno.serve(async (req) => {
     for (const listing of auctionResult.data ?? []) {
       if (!auctionMap.has(listing.vehicle_id)) {
         auctionMap.set(listing.vehicle_id, listing);
+      }
+    }
+
+    // Description map — truncate to 300 chars server-side to keep payload lean
+    const descMap = new Map<string, string>();
+    for (const row of descResult.data ?? []) {
+      if (row.description) {
+        descMap.set(row.id, row.description.length > 300 ? row.description.slice(0, 300) : row.description);
       }
     }
 
