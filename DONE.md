@@ -2,6 +2,26 @@
 
 ## 2026-03-25
 
+### [data] Niche collector car site onboarding — 20 sources registered, ~98K URLs queued
+- **5 new RSS feeds registered and flowing** (poll-listing-feeds cron, every 15min):
+  - barnfinds.com (17 items, vehicle titles auto-parsed to Y/M/M)
+  - silodrome.com (10 items)
+  - thedrive.com (18 items)
+  - hagerty.com/media (100 items)
+  - hiconsumption.com (10 items)
+- **3 sitemap-based bulk ingests completed**:
+  - Classic Driver: 51,377 car listing URLs across 27 sitemap pages → 54,725 queued (48K still ingesting in background)
+  - Car and Classic: 401 auction listings from sitemap → all queued
+  - ER Classics: 1,785 car listings from sitemap → all queued
+  - The Market by Bonhams: 5,511 auction listings from sitemap → all queued
+- **10 new observation_sources registered**: barnfinds, thedrive, hagerty-media, petrolicious, hiconsumption, coolnvintage, uncrate, throtl, themarket-bonhams, erclassics
+- **4 HTML listing feeds registered** for ongoing monitoring: carandclassic, classicdriver, erclassics, autohunter
+- **Existing RSS feeds verified flowing**: motorious (25), guyswithrides (10), allcollectorcars (14)
+- **Sites onboarded via onboard-source**: classiccars.com (35K already queued), hemmings (286 queued), dupontregistry (onboarded+profiled), autohunter, petrolicious, coolnvintage, uncrate, autotrader, themarket.co.uk, throtl, barnfinds
+- **Sites behind Cloudflare (need Playwright)**: classiccars.com (403), cargurus (403/DataDome), autotrader (JS SPA)
+- **Throtl confirmed as parts marketplace** (not vehicle listings) — deprioritized
+- Total niche collector URLs now in import_queue: ~98K across 18 sources
+
 ### [feed] HEAT hero lens — server-powered attention visualization
 - Created `hero_heat()` PostgreSQL RPC function: returns top 30 hottest vehicles by heat_score, 30-day comment velocity (top 10), and avg heat by make (min 20 vehicles, top 20 makes)
 - Built `HeatHeroPanel` component: scrollable horizontal strip of hot vehicle cards with thermometer bars (blue-to-red gradient), make heat sidebar bars, "Most Discussed (30D)" mini-list
