@@ -398,21 +398,24 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Check remaining
+      // Check if more work exists (fast: just check if 1 more vehicle exists, not full count)
       const { data: remData } = await supabase.rpc("execute_sql", {
-        query: `SELECT count(*) AS remaining FROM vehicles v
-                WHERE v.description IS NOT NULL AND length(v.description) >= 100
-                AND v.deleted_at IS NULL
-                AND NOT EXISTS (
-                  SELECT 1 FROM vehicle_observations vo
-                  WHERE vo.vehicle_id = v.id AND vo.kind = 'condition'
-                )`
+        query: `SELECT EXISTS(
+                  SELECT 1 FROM vehicles v
+                  WHERE v.description IS NOT NULL AND length(v.description) >= 100
+                  AND v.deleted_at IS NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM vehicle_observations vo
+                    WHERE vo.vehicle_id = v.id AND vo.kind = 'condition'
+                  ) LIMIT 1
+                ) AS has_more`
       });
-      const remaining = Array.isArray(remData) ? Number(remData[0]?.remaining || 0) : 0;
+      const hasMore = Array.isArray(remData) ? (remData[0]?.has_more === true) : false;
+      const remaining = hasMore ? -1 : 0; // -1 = more work exists, exact count too expensive
 
       // Self-chain if requested
       const shouldContinue = body.continue ?? false;
-      if (shouldContinue && remaining > 0 && totalIngested > 0) {
+      if (shouldContinue && hasMore && totalIngested > 0) {
         fetch(`${supabaseUrl}/functions/v1/discover-description-data`, {
           method: "POST",
           headers: {
@@ -430,7 +433,7 @@ Deno.serve(async (req) => {
         conditions_ingested: totalIngested,
         condition_errors: totalErrors,
         remaining,
-        continued: shouldContinue && remaining > 0,
+        continued: shouldContinue && hasMore,
         elapsed_ms: Date.now() - startTime,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
