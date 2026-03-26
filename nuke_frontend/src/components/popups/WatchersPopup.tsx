@@ -14,6 +14,7 @@ interface Props {
   viewCount?: number | null;
   make?: string | null;
   model?: string | null;
+  searchQuery?: string;
 }
 
 interface ModelStats {

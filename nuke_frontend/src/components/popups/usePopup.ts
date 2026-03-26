@@ -17,8 +17,8 @@ export function usePopup() {
   }
 
   const openPopup = useCallback(
-    (content: ReactNode, title: string, width?: number) => {
-      return ctx.push(content, title, width);
+    (content: ReactNode, title: string, width?: number, searchable?: boolean) => {
+      return ctx.push(content, title, width, searchable);
     },
     [ctx],
   );

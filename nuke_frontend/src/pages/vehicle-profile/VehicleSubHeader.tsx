@@ -577,6 +577,7 @@ const VehicleSubHeader: React.FC = () => {
       />,
       `WATCHERS (${watcherCount.toLocaleString()})`,
       380,
+      false,
     );
   };
 
