@@ -177,7 +177,7 @@ export function BidsPopup({ vehicleId, bidCount, highBid, listingUrl, searchQuer
           </div>
         )}
 
-        {!loading && bids.map((b, i) => {
+        {!loading && filtered.map((b, i) => {
           const isHighest = i === 0;
           const barWidth = maxBid && maxBid > 0 ? Math.max(4, (Number(b.bid_amount) / maxBid) * 100) : 100;
 

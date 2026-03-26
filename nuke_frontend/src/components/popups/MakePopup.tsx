@@ -19,6 +19,7 @@ import { SourcePopup } from './SourcePopup';
 
 interface Props {
   make: string;
+  searchQuery?: string;
 }
 
 interface MakeData {
@@ -38,7 +39,7 @@ function formatPrice(n: number | null): string {
   return `$${n.toLocaleString()}`;
 }
 
-export function MakePopup({ make }: Props) {
+export function MakePopup({ make, searchQuery }: Props) {
   const { openPopup } = usePopup();
   const navigate = useNavigate();
   const [data, setData] = useState<MakeData | null>(null);
@@ -147,6 +148,17 @@ export function MakePopup({ make }: Props) {
     );
   }
 
+  const sq = (searchQuery || '').toLowerCase().trim();
+  const filteredModels = sq
+    ? data.topModels.filter(m => m.label.toLowerCase().includes(sq))
+    : data.topModels;
+  const filteredSources = sq
+    ? data.topSources.filter(s => s.label.toLowerCase().includes(sq))
+    : data.topSources;
+  const filteredBrackets = sq
+    ? data.priceBrackets.filter(b => b.label.toLowerCase().includes(sq))
+    : data.priceBrackets;
+
   const handleModelClick = (model: string) => {
     openPopup(<ModelPopup make={make} model={model} />, model, 360);
   };
@@ -184,11 +196,11 @@ export function MakePopup({ make }: Props) {
       </div>
 
       {/* Top models */}
-      {data.topModels.length > 0 && (
+      {filteredModels.length > 0 && (
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
           <SectionLabel>TOP MODELS</SectionLabel>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-            {data.topModels.map((m) => (
+            {filteredModels.map((m) => (
               <FacetChip key={m.label} label={m.label} count={m.count} onClick={() => handleModelClick(m.label)} />
             ))}
           </div>
@@ -196,11 +208,11 @@ export function MakePopup({ make }: Props) {
       )}
 
       {/* Top sources */}
-      {data.topSources.length > 0 && (
+      {filteredSources.length > 0 && (
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
           <SectionLabel>TOP SOURCES</SectionLabel>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-            {data.topSources.map((s) => (
+            {filteredSources.map((s) => (
               <FacetChip key={s.label} label={s.label} count={s.count} onClick={() => handleSourceClick(s.label)} />
             ))}
           </div>
@@ -208,11 +220,11 @@ export function MakePopup({ make }: Props) {
       )}
 
       {/* Price brackets */}
-      {data.priceBrackets.length > 0 && (
+      {filteredBrackets.length > 0 && (
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
           <SectionLabel>PRICE DISTRIBUTION</SectionLabel>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 }}>
-            {data.priceBrackets.map((b) => (
+            {filteredBrackets.map((b) => (
               <div key={b.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{
                   fontFamily: sans, fontSize: 8, fontWeight: 700,

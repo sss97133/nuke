@@ -21,6 +21,7 @@ import { SourcePopup } from './SourcePopup';
 
 interface Props {
   vehicle: FeedVehicle;
+  searchQuery?: string;
 }
 
 interface Comparable {
@@ -42,7 +43,7 @@ function formatPrice(n: number | null): string {
   return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
-export function VehiclePopup({ vehicle }: Props) {
+export function VehiclePopup({ vehicle, searchQuery }: Props) {
   const { openPopup } = usePopup();
   const { recordView, endView } = useViewHistory();
   const { recordInterest } = useInterests();
@@ -155,6 +156,21 @@ export function VehiclePopup({ vehicle }: Props) {
       });
   };
 
+  const sq = (searchQuery || '').toLowerCase().trim();
+  const allSpecs = buildSpecs(vehicle, handleMakeClick, handleModelClick);
+  const filteredSpecs = sq
+    ? allSpecs.filter(s =>
+        s.label.toLowerCase().includes(sq) ||
+        s.value.toLowerCase().includes(sq))
+    : allSpecs;
+  const filteredComps = sq
+    ? comparables.filter(c =>
+        String(c.year || '').includes(sq) ||
+        (c.model || '').toLowerCase().includes(sq) ||
+        (c.make || '').toLowerCase().includes(sq) ||
+        formatPrice(c.sale_price).toLowerCase().includes(sq))
+    : comparables;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Hero image */}
@@ -217,9 +233,11 @@ export function VehiclePopup({ vehicle }: Props) {
       </div>
 
       {/* Key specs — no duplicates */}
-      <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
-        <SpecGrid specs={buildSpecs(vehicle, handleMakeClick, handleModelClick)} />
-      </div>
+      {filteredSpecs.length > 0 && (
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
+          <SpecGrid specs={filteredSpecs} />
+        </div>
+      )}
 
       {/* Price vs median context */}
       {medianData && medianData.median_price && price.amount && (
@@ -250,11 +268,11 @@ export function VehiclePopup({ vehicle }: Props) {
       )}
 
       {/* Comparable sales */}
-      {comparables.length > 0 && (
+      {filteredComps.length > 0 && (
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
           <Label>COMPARABLE SALES</Label>
           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-            {comparables.map((c) => (
+            {filteredComps.map((c) => (
               <div
                 key={c.id}
                 onClick={() => handleCompClick(c)}

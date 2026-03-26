@@ -18,6 +18,7 @@ import type { FeedVehicle } from '../../feed/types/feed';
 interface Props {
   make: string;
   model: string;
+  searchQuery?: string;
 }
 
 interface RecentSale {
@@ -45,7 +46,7 @@ function formatPrice(n: number | null): string {
   return `$${n.toLocaleString()}`;
 }
 
-export function ModelPopup({ make, model }: Props) {
+export function ModelPopup({ make, model, searchQuery }: Props) {
   const { openPopup } = usePopup();
   const navigate = useNavigate();
   const [data, setData] = useState<ModelData | null>(null);
@@ -129,6 +130,15 @@ export function ModelPopup({ make, model }: Props) {
     );
   }
 
+  const sq = (searchQuery || '').toLowerCase().trim();
+  const filteredSales = sq
+    ? data.recentSales.filter(s =>
+        String(s.year || '').includes(sq) ||
+        (s.model || '').toLowerCase().includes(sq) ||
+        (s.make || '').toLowerCase().includes(sq) ||
+        formatPrice(s.sale_price).toLowerCase().includes(sq))
+    : data.recentSales;
+
   const handleVehicleClick = (sale: RecentSale) => {
     supabase
       .from('vehicles')
@@ -173,11 +183,11 @@ export function ModelPopup({ make, model }: Props) {
       </div>
 
       {/* Recent sales */}
-      {data.recentSales.length > 0 && (
+      {filteredSales.length > 0 && (
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
           <SectionLabel>RECENT SALES</SectionLabel>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginTop: 6 }}>
-            {data.recentSales.map((s) => (
+            {filteredSales.map((s) => (
               <div
                 key={s.id}
                 onClick={() => handleVehicleClick(s)}

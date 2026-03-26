@@ -15,6 +15,7 @@ import { MakePopup } from './MakePopup';
 
 interface Props {
   source: string;
+  searchQuery?: string;
 }
 
 interface SourceData {
@@ -33,7 +34,7 @@ function formatPrice(n: number | null): string {
   return `$${n.toLocaleString()}`;
 }
 
-export function SourcePopup({ source }: Props) {
+export function SourcePopup({ source, searchQuery }: Props) {
   const { openPopup } = usePopup();
   const [data, setData] = useState<SourceData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -131,6 +132,14 @@ export function SourcePopup({ source }: Props) {
     );
   }
 
+  const sq = (searchQuery || '').toLowerCase().trim();
+  const filteredMakes = sq
+    ? data.topMakes.filter(m => m.label.toLowerCase().includes(sq))
+    : data.topMakes;
+  const filteredFillRates = sq
+    ? data.fillRates.filter(r => r.field.toLowerCase().includes(sq))
+    : data.fillRates;
+
   const handleMakeClick = (make: string) => {
     openPopup(<MakePopup make={make} />, make, 360);
   };
@@ -154,11 +163,11 @@ export function SourcePopup({ source }: Props) {
       </div>
 
       {/* Fill rates */}
-      {data.fillRates.length > 0 && (
+      {filteredFillRates.length > 0 && (
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
           <SectionLabel>DATA FILL RATES</SectionLabel>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-            {data.fillRates.map((r) => {
+            {filteredFillRates.map((r) => {
               const barColor = r.pct >= 80 ? '#16825d' : r.pct >= 50 ? '#b05a00' : '#999';
               return (
                 <div key={r.field} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -191,11 +200,11 @@ export function SourcePopup({ source }: Props) {
       )}
 
       {/* Top makes */}
-      {data.topMakes.length > 0 && (
+      {filteredMakes.length > 0 && (
         <div style={{ padding: '8px 12px' }}>
           <SectionLabel>TOP MAKES</SectionLabel>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-            {data.topMakes.map((m) => (
+            {filteredMakes.map((m) => (
               <FacetChip key={m.label} label={m.label} count={m.count} onClick={() => handleMakeClick(m.label)} />
             ))}
           </div>

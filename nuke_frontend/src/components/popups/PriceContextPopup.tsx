@@ -21,6 +21,7 @@ interface Props {
   model?: string | null;
   year?: number | null;
   isSold?: boolean;
+  searchQuery?: string;
 }
 
 interface Comparable {
@@ -41,7 +42,7 @@ function formatPrice(n: number | null): string {
   return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
-export function PriceContextPopup({ vehicleId, price, nukeEstimate, make, model, year, isSold }: Props) {
+export function PriceContextPopup({ vehicleId, price, nukeEstimate, make, model, year, isSold, searchQuery }: Props) {
   const { openPopup } = usePopup();
   const [comparables, setComparables] = useState<Comparable[]>([]);
   const [medianPrice, setMedianPrice] = useState<number | null>(null);
@@ -111,6 +112,15 @@ export function PriceContextPopup({ vehicleId, price, nukeEstimate, make, model,
   const vsMedian = price && medianPrice && medianPrice > 0
     ? Math.round(((price - medianPrice) / medianPrice) * 100)
     : null;
+
+  const sq = (searchQuery || '').toLowerCase().trim();
+  const filteredComps = sq
+    ? comparables.filter(c =>
+        String(c.year || '').includes(sq) ||
+        (c.model || '').toLowerCase().includes(sq) ||
+        (c.make || '').toLowerCase().includes(sq) ||
+        formatPrice(c.sale_price).toLowerCase().includes(sq))
+    : comparables;
 
   const handleCompClick = (comp: Comparable) => {
     supabase
@@ -229,7 +239,7 @@ export function PriceContextPopup({ vehicleId, price, nukeEstimate, make, model,
       )}
 
       {/* Comparable sales */}
-      {!loading && comparables.length > 0 && (
+      {!loading && filteredComps.length > 0 && (
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #e0e0e0' }}>
           <div style={{
             fontFamily: SANS, fontSize: 7, fontWeight: 800,
@@ -239,7 +249,7 @@ export function PriceContextPopup({ vehicleId, price, nukeEstimate, make, model,
             COMPARABLE SALES
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {comparables.map((c) => {
+            {filteredComps.map((c) => {
               const diff = price && c.sale_price ? Math.round(((c.sale_price - price) / price) * 100) : null;
 
               return (
@@ -291,7 +301,7 @@ export function PriceContextPopup({ vehicleId, price, nukeEstimate, make, model,
       )}
 
       {/* No data fallback */}
-      {!loading && !medianPrice && comparables.length === 0 && (
+      {!loading && !medianPrice && filteredComps.length === 0 && (
         <div style={{ padding: '16px 12px', textAlign: 'center' }}>
           <span style={{ fontFamily: MONO, fontSize: 9, color: '#999', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
             {make && model

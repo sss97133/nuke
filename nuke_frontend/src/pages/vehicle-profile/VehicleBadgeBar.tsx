@@ -67,6 +67,7 @@ const VehicleBadgeBar: React.FC = () => {
       />,
       `WATCHERS (${watcherCount?.toLocaleString()})`,
       380,
+      false,
     );
   };
 
