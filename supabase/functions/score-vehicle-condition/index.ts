@@ -84,12 +84,53 @@ function aggregate(results: ImageResult[]) {
   };
 }
 
-// Multi-LLM vision scoring: Gemini → Grok → Haiku
+// Strip markdown code blocks from LLM responses
+function stripCodeBlocks(text: string): string {
+  return text.replace(/```(?:json)?\s*/gi, "").replace(/```\s*/g, "").trim();
+}
+
+// Multi-LLM vision scoring: Kimi → Gemini → Grok → Haiku
 async function scoreImage(url: string, id: string, _key: string): Promise<ImageResult> {
   const fail = (e: string): ImageResult => ({ image_id: id, image_url: url, scores: {}, concerns: [], image_summary: "", error: e });
   const errors: string[] = [];
 
-  // 1. Gemini 2.5 Flash vision (free tier — fetch image, base64-encode, send inline)
+  // 1. Kimi k2-turbo vision (fast, supports image_url)
+  const kimiKey = Deno.env.get("KIMI_API_KEY") || "";
+  if (kimiKey) {
+    try {
+      const resp = await fetch("https://api.moonshot.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${kimiKey}` },
+        body: JSON.stringify({
+          model: "moonshot-v1-128k-vision-preview",
+          temperature: 0.1,
+          max_tokens: 1500,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image_url", image_url: { url } },
+              { type: "text", text: PROMPT },
+            ],
+          }],
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const text = stripCodeBlocks(data.choices?.[0]?.message?.content || "");
+        const m = text.match(/\{[\s\S]*\}/);
+        if (m) {
+          const p = JSON.parse(m[0]);
+          return { image_id: id, image_url: url, scores: p.visible_categories || {}, concerns: p.concerns || [], image_summary: p.image_summary || "" };
+        }
+        errors.push("Kimi: no JSON in response");
+      } else {
+        const errBody = await resp.text().catch(() => "");
+        errors.push(`Kimi ${resp.status}: ${errBody.slice(0, 100)}`);
+      }
+    } catch (e: any) { errors.push(`Kimi: ${e.message}`); }
+  }
+
+  // 2. Gemini 2.5 Flash Lite vision (free tier — fetch image, base64-encode, send inline)
   const googleKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY") || "";
   if (googleKey) {
     try {

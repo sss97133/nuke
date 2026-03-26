@@ -111,11 +111,61 @@ Return a JSON array of condition items. Each item:
 Be thorough — extract every condition-relevant statement. Include both positive and negative observations.
 Return ONLY a valid JSON array. If no conditions found, return [].`;
 
-// Multi-LLM fallback: Gemini (free, fast) → Grok → Haiku
+// Multi-LLM fallback: Kimi (fast, cheap) → Grok → Gemini → Haiku
 async function callLLM(prompt: string): Promise<{ content: string; model: string }> {
   const errors: string[] = [];
 
-  // 1. Gemini 2.5 Flash Lite (free tier, fastest)
+  // 1. Kimi k2-turbo (OpenAI-compatible, fast ~2s, good JSON)
+  const kimiKey = Deno.env.get("KIMI_API_KEY") || "";
+  if (kimiKey) {
+    try {
+      const resp = await fetch("https://api.moonshot.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${kimiKey}` },
+        body: JSON.stringify({
+          model: "kimi-k2-turbo-preview",
+          temperature: 0.1,
+          max_tokens: 2048,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const content = data.choices?.[0]?.message?.content || "";
+        if (content) return { content, model: "kimi-k2-turbo" };
+      } else {
+        const errBody = await resp.text().catch(() => "");
+        errors.push(`Kimi ${resp.status}: ${errBody.slice(0, 100)}`);
+      }
+    } catch (e: any) { errors.push(`Kimi: ${e.message}`); }
+  }
+
+  // 2. xAI Grok-3-Mini (cheap, uses reasoning tokens = slower ~10-40s)
+  const xaiKey = Deno.env.get("XAI_API_KEY") || "";
+  if (xaiKey) {
+    try {
+      const resp = await fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${xaiKey}` },
+        body: JSON.stringify({
+          model: "grok-3-mini",
+          temperature: 0.1,
+          max_tokens: 2048,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const content = data.choices?.[0]?.message?.content || "";
+        if (content) return { content, model: "grok-3-mini" };
+      } else {
+        const errBody = await resp.text().catch(() => "");
+        errors.push(`Grok ${resp.status}: ${errBody.slice(0, 100)}`);
+      }
+    } catch (e: any) { errors.push(`Grok: ${e.message}`); }
+  }
+
+  // 3. Gemini 2.5 Flash Lite (free tier)
   const googleKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY") || "";
   if (googleKey) {
     try {
@@ -139,31 +189,6 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
         errors.push(`Gemini ${resp.status}: ${errBody.slice(0, 100)}`);
       }
     } catch (e: any) { errors.push(`Gemini: ${e.message}`); }
-  }
-
-  // 2. xAI Grok-3-Mini (cheap but uses reasoning tokens = slow)
-  const xaiKey = Deno.env.get("XAI_API_KEY") || "";
-  if (xaiKey) {
-    try {
-      const resp = await fetch("https://api.x.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${xaiKey}` },
-        body: JSON.stringify({
-          model: "grok-3-mini",
-          temperature: 0.1,
-          max_tokens: 2048,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        const content = data.choices?.[0]?.message?.content || "";
-        if (content) return { content, model: "grok-3-mini" };
-      } else {
-        const errBody = await resp.text().catch(() => "");
-        errors.push(`Grok ${resp.status}: ${errBody.slice(0, 100)}`);
-      }
-    } catch (e: any) { errors.push(`Grok: ${e.message}`); }
   }
 
   // 3. Anthropic Haiku (fallback)
@@ -198,6 +223,11 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
   throw new Error(`All LLMs failed: ${errors.join("; ")}`);
 }
 
+// Strip markdown code blocks (Kimi wraps JSON in ```json ... ```)
+function stripCodeBlocks(text: string): string {
+  return text.replace(/```(?:json)?\s*/gi, "").replace(/```\s*/g, "").trim();
+}
+
 async function discoverWithLLM(
   description: string,
   vehicle: { year: number; make: string; model: string; sale_price: number },
@@ -209,7 +239,8 @@ async function discoverWithLLM(
     .replace("{sale_price}", vehicle.sale_price ? `$${vehicle.sale_price.toLocaleString()}` : "Unknown")
     .replace("{description}", description.substring(0, 8000));
 
-  const { content, model } = await callLLM(prompt);
+  const { content: raw, model } = await callLLM(prompt);
+  const content = stripCodeBlocks(raw);
 
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
@@ -229,7 +260,8 @@ async function extractConditionsWithLLM(
     .replace("{model}", vehicle.model || "Unknown")
     .replace("{description}", description.substring(0, 8000));
 
-  const { content, model } = await callLLM(prompt);
+  const { content: raw, model } = await callLLM(prompt);
+  const content = stripCodeBlocks(raw);
 
   const arrayMatch = content.match(/\[[\s\S]*\]/);
   if (arrayMatch) {
@@ -304,9 +336,9 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     // At least one LLM key is required
-    const hasAnyKey = Deno.env.get("XAI_API_KEY") || Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY") || Deno.env.get("ANTHROPIC_API_KEY");
+    const hasAnyKey = Deno.env.get("KIMI_API_KEY") || Deno.env.get("XAI_API_KEY") || Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY") || Deno.env.get("ANTHROPIC_API_KEY");
     if (!hasAnyKey) {
-      throw new Error("No LLM API key configured (need XAI_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY)");
+      throw new Error("No LLM API key configured (need KIMI_API_KEY, XAI_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY)");
     }
 
     const body = await req.json().catch(() => ({}));
