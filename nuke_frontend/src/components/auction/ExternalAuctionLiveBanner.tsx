@@ -29,18 +29,18 @@ interface ExternalAuctionLiveBannerProps {
   lastUpdatedAt: string | null;
 }
 
-const platformNames: Record<string, string> = {
-  bat: 'Bring a Trailer',
-  cars_and_bids: 'Cars & Bids',
-  ebay_motors: 'eBay Motors',
-  hemmings: 'Hemmings',
-};
-
-const platformColors: Record<string, { bg: string; text: string; accent: string }> = {
-  bat: { bg: 'var(--text)', text: 'var(--bg)', accent: 'var(--warning)' },
-  cars_and_bids: { bg: 'var(--error)', text: 'var(--bg)', accent: 'var(--warning)' },
-  ebay_motors: { bg: '#0064d2', text: 'var(--bg)', accent: '#f5af02' },
-  hemmings: { bg: '#8b0000', text: 'var(--bg)', accent: '#ffd700' },
+/** Short abbreviation shown in the dark platform badge */
+const platformShortNames: Record<string, string> = {
+  bat: 'BAT',
+  cars_and_bids: 'C&B',
+  ebay_motors: 'EBAY',
+  hemmings: 'HEM',
+  mecum: 'MECUM',
+  rm_sothebys: 'RM',
+  bonhams: 'BON',
+  gooding: 'GOOD',
+  pcarmarket: 'PCAR',
+  hagerty: 'HAG',
 };
 
 type UrgencyLevel = 'ended' | 'lastMinute' | 'critical' | 'urgent' | 'gettingClose' | 'normal';
@@ -85,8 +85,8 @@ const urgencyColors: Record<UrgencyLevel, { color: string; glow?: string }> = {
   critical: { color: 'var(--error)', glow: '0 0 8px rgba(220, 38, 38, 0.5)' },
   urgent: { color: 'var(--orange)', glow: '0 0 6px rgba(234, 88, 12, 0.4)' },
   gettingClose: { color: '#e07960' },
-  normal: { color: 'inherit' },
-  ended: { color: 'var(--text-disabled)' },
+  normal: { color: '#ccc' },
+  ended: { color: '#666' },
 };
 
 function formatCurrency(amount: number | null, currencyCode?: string | null): string {
@@ -127,7 +127,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
   const endDate = syncResult?.end_date ?? initialEndDate;
   const status = syncResult?.listing_status ?? listingStatus;
 
-  // Platform credential check
+  // Platform credential check (kept for future use but not shown in banner)
   const [hasCredential, setHasCredential] = useState<boolean | null>(null);
   const [showCredentialForm, setShowCredentialForm] = useState(false);
 
@@ -199,112 +199,206 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
     prevBidRef.current = currentBid;
   }, [currentBid]);
 
-  const colors = platformColors[platform] || platformColors.bat;
-  const platformName = platformNames[platform] || platform.toUpperCase();
+  const platformShort = platformShortNames[platform] || platform.toUpperCase().slice(0, 4);
 
   // Don't show banner for non-active auctions
   if (!isActive && !timeState.ended) {
     return null;
   }
 
-  const handleViewOnPlatform = () => {
+  const handleBidNow = () => {
+    // Link directly to the listing page -- the platform handles login/auth
+    window.open(listingUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleViewListing = () => {
     window.open(listingUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
     <div
       style={{
-        background: colors.bg, padding: '10px 14px',
+        background: '#2a2a2a',
+        padding: '10px 14px',
         marginBottom: '12px',
         fontSize: '11px',
-        color: colors.text, }}
+        color: '#e0e0e0',
+      }}
     >
-      {/* Header row */}
+      {/* Header row: LIVE badge + platform badge + timer + action buttons */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Live indicator */}
-          {isActive && !timeState.ended && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {/* LIVE / ENDED indicator */}
+          {isActive && !timeState.ended ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                background: '#1a1a1a',
+                border: '2px solid var(--error)',
+                padding: '2px 8px',
+              }}
+            >
               <div
                 style={{
-                  width: '8px',
-                  height: '8px', background: ['lastMinute', 'critical', 'urgent'].includes(timeState.urgency) ? 'var(--error)' : 'var(--success)',
-                  animation: 'pulse 1.5s ease-in-out infinite', }}
+                  width: '6px',
+                  height: '6px',
+                  background: ['lastMinute', 'critical', 'urgent'].includes(timeState.urgency) ? 'var(--error)' : 'var(--success)',
+                  animation: 'pulse 1.5s ease-in-out infinite',
+                }}
               />
-              <span style={{ fontWeight: 700, fontSize: '9px', letterSpacing: '0.5px' }}>LIVE</span>
+              <span style={{ fontWeight: 700, fontSize: '9px', letterSpacing: '0.5px', color: '#fff' }}>LIVE</span>
+            </div>
+          ) : (
+            <div
+              style={{
+                background: '#1a1a1a',
+                border: '2px solid #555',
+                padding: '2px 8px',
+              }}
+            >
+              <span style={{ fontWeight: 700, fontSize: '9px', letterSpacing: '0.5px', color: '#666' }}>ENDED</span>
             </div>
           )}
 
-          {timeState.ended && (
+          {/* Platform abbreviation badge */}
+          <div
+            style={{
+              background: '#1a1a1a',
+              border: '2px solid #444',
+              padding: '2px 8px',
+            }}
+          >
             <span
               style={{
                 fontWeight: 700,
                 fontSize: '9px',
-                background: 'rgba(255,255,255,0.2)',
-                padding: '2px 6px', }}
+                letterSpacing: '0.5px',
+                color: '#999',
+                fontFamily: "'Courier New', monospace",
+              }}
             >
-              ENDED
+              {platformShort}
             </span>
-          )}
+          </div>
 
-          <span style={{ opacity: 0.8, fontSize: '9px' }}>on {platformName}</span>
+          {/* Countdown timer */}
+          <span
+            style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: ['lastMinute', 'critical'].includes(timeState.urgency) ? '13px' : '11px',
+              fontWeight: 700,
+              color: urgencyColors[timeState.urgency].color,
+              textShadow: urgencyColors[timeState.urgency].glow || 'none',
+              opacity: ['lastMinute', 'critical'].includes(timeState.urgency) ? (pulsePhase === 0 ? 1 : 0.6) : 1,
+              transform: timeState.urgency === 'lastMinute' && pulsePhase === 1 ? 'scale(1.05)' : 'scale(1)',
+              transition: 'opacity 0.15s, transform 0.15s',
+              display: 'inline-block',
+            }}
+          >
+            {timeState.text}
+          </span>
         </div>
 
-        {/* Timer - with urgency colors (NO YELLOW - BaT uses yellow) */}
-        <div
-          style={{
-            fontFamily: "'Courier New', monospace",
-            fontSize: ['lastMinute', 'critical'].includes(timeState.urgency) ? '11pt' : '9pt',
-            fontWeight: 700,
-            color: urgencyColors[timeState.urgency].color === 'inherit' ? colors.text : urgencyColors[timeState.urgency].color,
-            textShadow: urgencyColors[timeState.urgency].glow || 'none',
-            opacity: ['lastMinute', 'critical'].includes(timeState.urgency) ? (pulsePhase === 0 ? 1 : 0.6) : 1,
-            transform: timeState.urgency === 'lastMinute' && pulsePhase === 1 ? 'scale(1.05)' : 'scale(1)',
-            transition: 'opacity 0.15s, transform 0.15s',
-          }}
-        >
-          {timeState.text}
+        {/* Action buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* BID NOW - primary action, only for live auctions */}
+          {isActive && !timeState.ended && (
+            <button
+              onClick={handleBidNow}
+              style={{
+                background: 'var(--success)',
+                border: '2px solid var(--success)',
+                color: '#000',
+                padding: '4px 14px',
+                fontSize: '10px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                letterSpacing: '0.5px',
+                transition: 'opacity 0.12s ease',
+                fontFamily: 'Arial, sans-serif',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.85'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+            >
+              BID NOW
+            </button>
+          )}
+
+          {/* VIEW LISTING - always visible */}
+          <button
+            onClick={handleViewListing}
+            style={{
+              background: 'transparent',
+              border: '2px solid #555',
+              color: '#ccc',
+              padding: '4px 14px',
+              fontSize: '10px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              letterSpacing: '0.3px',
+              transition: 'border-color 0.12s ease, color 0.12s ease',
+              fontFamily: 'Arial, sans-serif',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#888';
+              e.currentTarget.style.color = '#fff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#555';
+              e.currentTarget.style.color = '#ccc';
+            }}
+          >
+            VIEW LISTING
+          </button>
         </div>
       </div>
 
       {/* Stats row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-        {/* Current bid - with visual accent box */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        {/* Current bid */}
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
             gap: '2px',
             padding: '6px 10px',
-            background: 'rgba(255, 255, 255, 0.08)', border: `1px solid ${colors.accent}40`, }}
+            background: '#1a1a1a',
+            border: '2px solid #444',
+          }}
         >
-          <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase' }}>Current Bid</span>
+          <span style={{ fontSize: '8px', color: '#777', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Current Bid</span>
           <span
             style={{
               fontSize: '16px',
               fontWeight: 700,
-              color: colors.accent,
+              fontFamily: "'Courier New', monospace",
+              color: '#fff',
               transition: 'all 0.3s ease',
               transform: bidChanged ? 'scale(1.1)' : 'scale(1)',
-              textShadow: bidChanged ? `0 0 12px ${colors.accent}` : 'none',
+              display: 'inline-block',
             }}
           >
             {formatCurrency(currentBid, currencyCode)}
           </span>
         </div>
 
-        {/* Bid count - with subtle accent */}
+        {/* Bid count */}
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
             gap: '2px',
             padding: '6px 10px',
-            background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
+            background: '#1a1a1a',
+            border: '2px solid #333',
           }}
         >
-          <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase' }}>Bids</span>
-          <span style={{ fontSize: '13px', fontWeight: 600 }}>{bidCount ?? '--'}</span>
+          <span style={{ fontSize: '8px', color: '#777', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Bids</span>
+          <span style={{ fontSize: '13px', fontWeight: 600, fontFamily: "'Courier New', monospace", color: '#ccc' }}>
+            {bidCount ?? '--'}
+          </span>
         </div>
 
         {/* Watchers */}
@@ -315,11 +409,14 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               flexDirection: 'column',
               gap: '2px',
               padding: '6px 10px',
-              background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: '#1a1a1a',
+              border: '2px solid #333',
             }}
           >
-            <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase' }}>Watching</span>
-            <span style={{ fontSize: '13px', fontWeight: 600 }}>{watcherCount.toLocaleString()}</span>
+            <span style={{ fontSize: '8px', color: '#777', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Watching</span>
+            <span style={{ fontSize: '13px', fontWeight: 600, fontFamily: "'Courier New', monospace", color: '#ccc' }}>
+              {watcherCount.toLocaleString()}
+            </span>
           </div>
         )}
 
@@ -331,91 +428,16 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               flexDirection: 'column',
               gap: '2px',
               padding: '6px 10px',
-              background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: '#1a1a1a',
+              border: '2px solid #333',
             }}
           >
-            <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase' }}>Comments</span>
-            <span style={{ fontSize: '13px', fontWeight: 600 }}>{commentCount}</span>
+            <span style={{ fontSize: '8px', color: '#777', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Comments</span>
+            <span style={{ fontSize: '13px', fontWeight: 600, fontFamily: "'Courier New', monospace", color: '#ccc' }}>
+              {commentCount}
+            </span>
           </div>
         )}
-
-        {/* Actions */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {syncing && (
-            <span style={{ fontSize: '8px', opacity: 0.6 }}>syncing...</span>
-          )}
-          {pollingInterval && !syncing && (
-            <span style={{ fontSize: '8px', opacity: 0.5 }}>
-              {pollingInterval < 10000 ? 'FAST' : pollingInterval < 30000 ? 'MED' : ''} sync
-            </span>
-          )}
-
-          {/* Connect to Bid button when no credentials */}
-          {isActive && !timeState.ended && hasCredential === false && (
-            <button
-              onClick={() => setShowCredentialForm(true)}
-              style={{
-                background: colors.accent,
-                border: 'none',
-                color: 'var(--text)',
-                padding: '6px 12px', fontSize: '9px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.05)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-            >
-              <span>🔐</span>
-              Connect {platformName.split(' ')[0]} to Bid
-            </button>
-          )}
-
-          {/* Ready to bid indicator when credentials exist */}
-          {isActive && !timeState.ended && hasCredential === true && (
-            <span
-              style={{
-                background: 'rgba(34, 197, 94, 0.2)',
-                color: 'var(--success)',
-                padding: '4px 8px', fontSize: '8px',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              <span>✓</span> Ready to Bid
-            </span>
-          )}
-
-          <button
-            onClick={handleViewOnPlatform}
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              border: 'none',
-              color: colors.text,
-              padding: '4px 10px', fontSize: '9px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-            }}
-          >
-            View on {platformName.split(' ')[0]} →
-          </button>
-        </div>
       </div>
 
       {/* CSS for pulse animation */}
@@ -426,7 +448,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
         }
       `}</style>
 
-      {/* Platform credential form modal */}
+      {/* Platform credential form modal (kept for programmatic use) */}
       <PlatformCredentialForm
         isOpen={showCredentialForm}
         onClose={() => setShowCredentialForm(false)}
