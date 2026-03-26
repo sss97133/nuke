@@ -5430,3 +5430,16 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - Created scripts/bat-gap-discovery.mjs — API-based discovery + DB comparison + reconciliation
 - Created scripts/bat-deep-discovery.mjs — Playwright-based deep discovery to find the remaining ~69K
 - Queue processor bottleneck: process-bat-extraction-queue forces batchSize=1 despite cron sending 15. At 1/5min = 288/day, 30K queue would take 104 days.
+
+### [data] Classic Driver sitemap intake — 54,428 European collector car listings
+- Classic Driver = largest European collector car marketplace, zero previous coverage
+- Sitemap: 31 pages, 54,890 total car URLs extracted from classicdriver.com/sitemap.xml
+- URL pattern: /en/car/MAKE/MODEL/YEAR/ID — parsed make/model/year directly from URLs
+- Registered as observation_source (slug: classic-driver, category: marketplace, trust: 0.80)
+- Also registered in scrape_sources (FK requirement for import_queue)
+- Queued 54,428 URLs into import_queue (54,419 with Y/M/M + 9 ID-only)
+- Parse quality: 99.4% have make, 98.9% have model, 99.9% valid year range
+- Top makes: Porsche (5,288), Mercedes-Benz (5,211), Ferrari (4,213), Jaguar (3,573), Ford (2,630)
+- Year range: 1886-2025, heaviest in 1960s (11,621) and 1950s (7,268)
+- 1,084 unique makes, 154 unique years — massive European market diversity
+- All queued at priority 5 (bulk sitemap) for extraction via existing pipeline
