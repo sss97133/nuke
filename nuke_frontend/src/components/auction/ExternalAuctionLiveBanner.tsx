@@ -85,8 +85,8 @@ const urgencyColors: Record<UrgencyLevel, { color: string; glow?: string }> = {
   critical: { color: 'var(--error)', glow: '0 0 8px rgba(220, 38, 38, 0.5)' },
   urgent: { color: 'var(--orange)', glow: '0 0 6px rgba(234, 88, 12, 0.4)' },
   gettingClose: { color: '#e07960' },
-  normal: { color: '#ccc' },
-  ended: { color: '#666' },
+  normal: { color: 'var(--text-secondary)' },
+  ended: { color: 'var(--text-disabled)' },
 };
 
 function formatCurrency(amount: number | null, currencyCode?: string | null): string {
@@ -218,11 +218,12 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
   return (
     <div
       style={{
-        background: '#2a2a2a',
+        background: 'var(--surface)',
+        border: '2px solid var(--border)',
         padding: '10px 14px',
         marginBottom: '12px',
         fontSize: '11px',
-        color: '#e0e0e0',
+        color: 'var(--text)',
       }}
     >
       {/* Header row: LIVE badge + platform badge + timer + action buttons */}
@@ -235,7 +236,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px',
-                background: '#1a1a1a',
+                background: 'var(--bg)',
                 border: '2px solid var(--error)',
                 padding: '2px 8px',
               }}
@@ -248,25 +249,25 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
                   animation: 'pulse 1.5s ease-in-out infinite',
                 }}
               />
-              <span style={{ fontWeight: 700, fontSize: '9px', letterSpacing: '0.5px', color: '#fff' }}>LIVE</span>
+              <span style={{ fontWeight: 700, fontSize: '9px', letterSpacing: '0.5px', color: 'var(--text)' }}>LIVE</span>
             </div>
           ) : (
             <div
               style={{
-                background: '#1a1a1a',
-                border: '2px solid #555',
+                background: 'var(--bg)',
+                border: '2px solid var(--border)',
                 padding: '2px 8px',
               }}
             >
-              <span style={{ fontWeight: 700, fontSize: '9px', letterSpacing: '0.5px', color: '#666' }}>ENDED</span>
+              <span style={{ fontWeight: 700, fontSize: '9px', letterSpacing: '0.5px', color: 'var(--text-disabled)' }}>ENDED</span>
             </div>
           )}
 
           {/* Platform abbreviation badge */}
           <div
             style={{
-              background: '#1a1a1a',
-              border: '2px solid #444',
+              background: 'var(--surface)',
+              border: '2px solid var(--border)',
               padding: '2px 8px',
             }}
           >
@@ -275,7 +276,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
                 fontWeight: 700,
                 fontSize: '9px',
                 letterSpacing: '0.5px',
-                color: '#999',
+                color: 'var(--text-secondary)',
                 fontFamily: "'Courier New', monospace",
               }}
             >

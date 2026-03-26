@@ -1,9 +1,17 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
+import { PopupStackContext } from '../../components/popups/PopupStack';
+import { CommentsPopup } from '../../components/popups/CommentsPopup';
 
-/** Quick Stats line shown below hero image — reads from context */
+interface StatPart {
+  text: string;
+  onClick?: () => void;
+}
+
+/** Quick Stats line shown below hero image -- reads from context */
 const QuickStatsBar: React.FC = () => {
   const { vehicleImages, timelineEvents, totalCommentCount, observationCount, vehicle } = useVehicleProfile();
+  const popupCtx = useContext(PopupStackContext);
   const updatedAt = vehicle?.updated_at;
 
   const timeAgo = React.useMemo(() => {
@@ -25,12 +33,23 @@ const QuickStatsBar: React.FC = () => {
     }
   }, [updatedAt]);
 
-  const parts: string[] = [];
-  if (vehicleImages.length > 0) parts.push(`${vehicleImages.length} image${vehicleImages.length === 1 ? '' : 's'}`);
-  if (observationCount > 0) parts.push(`${observationCount} observation${observationCount === 1 ? '' : 's'}`);
-  if (timelineEvents.length > 0) parts.push(`${timelineEvents.length} event${timelineEvents.length === 1 ? '' : 's'}`);
-  if (totalCommentCount > 0) parts.push(`${totalCommentCount} comment${totalCommentCount === 1 ? '' : 's'}`);
-  if (timeAgo) parts.push(`Updated ${timeAgo}`);
+  const parts: StatPart[] = [];
+  if (vehicleImages.length > 0) parts.push({ text: `${vehicleImages.length} image${vehicleImages.length === 1 ? '' : 's'}` });
+  if (observationCount > 0) parts.push({ text: `${observationCount} observation${observationCount === 1 ? '' : 's'}` });
+  if (timelineEvents.length > 0) parts.push({ text: `${timelineEvents.length} event${timelineEvents.length === 1 ? '' : 's'}` });
+  if (totalCommentCount > 0) parts.push({
+    text: `${totalCommentCount} comment${totalCommentCount === 1 ? '' : 's'}`,
+    onClick: () => {
+      if (popupCtx && vehicle?.id) {
+        popupCtx.push(
+          <CommentsPopup vehicleId={vehicle.id} expectedCount={totalCommentCount} />,
+          `COMMENTS (${totalCommentCount})`,
+          460,
+        );
+      }
+    },
+  });
+  if (timeAgo) parts.push({ text: `Updated ${timeAgo}` });
 
   if (parts.length === 0) return null;
 
@@ -51,7 +70,25 @@ const QuickStatsBar: React.FC = () => {
         {parts.map((p, i) => (
           <React.Fragment key={i}>
             {i > 0 && <span style={{ opacity: 0.4 }}>&middot;</span>}
-            <span>{p}</span>
+            {p.onClick ? (
+              <span
+                role="button"
+                tabIndex={0}
+                style={{
+                  cursor: 'pointer',
+                  borderBottom: '1px dashed var(--text-disabled)',
+                  transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+                }}
+                onClick={p.onClick}
+                onKeyDown={(e) => { if (e.key === 'Enter' && p.onClick) p.onClick(); }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-disabled)'; }}
+              >
+                {p.text}
+              </span>
+            ) : (
+              <span>{p.text}</span>
+            )}
           </React.Fragment>
         ))}
       </div>
