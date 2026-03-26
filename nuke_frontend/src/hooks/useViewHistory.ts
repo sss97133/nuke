@@ -26,6 +26,8 @@ export interface ViewEntry {
   timestamp: number;
   source: ViewSource;
   duration_ms: number;
+  /** Price at the time of viewing (for price-drop detection on return visits) */
+  priceAtView?: number | null;
 }
 
 export interface ViewHistoryData {
@@ -55,9 +57,11 @@ export function useViewHistory() {
   /**
    * Record a vehicle view. If same vehicle was viewed within 5 minutes,
    * updates duration instead of adding a new entry.
+   *
+   * @param priceAtView — optional display_price at view time (for price-drop detection)
    */
   const recordView = useCallback(
-    (vehicleId: string, source: ViewSource) => {
+    (vehicleId: string, source: ViewSource, priceAtView?: number | null) => {
       if (!vehicleId) return;
 
       const now = Date.now();
@@ -78,6 +82,8 @@ export function useViewHistory() {
               ...last,
               duration_ms: last.duration_ms + elapsed,
               source, // update source to latest
+              // Only overwrite price if we have a newer one
+              priceAtView: priceAtView ?? last.priceAtView,
             };
             return { views };
           }
@@ -89,6 +95,7 @@ export function useViewHistory() {
           timestamp: now,
           source,
           duration_ms: 0,
+          priceAtView: priceAtView ?? null,
         };
 
         const updated = [entry, ...views].slice(0, MAX_ENTRIES);
@@ -207,6 +214,26 @@ export function useViewHistory() {
     };
   }, [data.views]);
 
+  /** Get all viewed vehicles that had a recorded price (for price-drop detection). */
+  const getViewedWithPrices = useCallback(
+    (): { vehicleId: string; priceAtView: number; timestamp: number }[] => {
+      const seen = new Set<string>();
+      const result: { vehicleId: string; priceAtView: number; timestamp: number }[] = [];
+      for (const entry of data.views) {
+        if (!seen.has(entry.vehicleId) && entry.priceAtView && entry.priceAtView > 0) {
+          seen.add(entry.vehicleId);
+          result.push({
+            vehicleId: entry.vehicleId,
+            priceAtView: entry.priceAtView,
+            timestamp: entry.timestamp,
+          });
+        }
+      }
+      return result;
+    },
+    [data.views],
+  );
+
   /** Clear all view history. */
   const clearHistory = useCallback(() => {
     setData(EMPTY_HISTORY);
@@ -227,6 +254,7 @@ export function useViewHistory() {
     getMostViewed,
     getViewCount,
     hasViewed,
+    getViewedWithPrices,
     viewedIds,
     todayStats,
     clearHistory,

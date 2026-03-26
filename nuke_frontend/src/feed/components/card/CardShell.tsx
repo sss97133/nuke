@@ -28,6 +28,8 @@ export interface CardShellProps {
   popupTitle?: string;
   /** Card price text for popup */
   popupPrice?: string;
+  /** Numeric display price — stored in view history for price-drop detection */
+  displayPrice?: number | null;
   style?: CSSProperties;
   onHoverStart?: (rect: DOMRect) => void;
   onHoverEnd?: () => void;
@@ -43,6 +45,7 @@ export function CardShell({
   popupImageUrl,
   popupTitle,
   popupPrice,
+  displayPrice,
   style,
   onHoverStart,
   onHoverEnd,
@@ -120,10 +123,10 @@ export function CardShell({
         return;
       }
 
-      recordView(vehicleId, 'feed');
+      recordView(vehicleId, 'feed', displayPrice);
       setPopupOpen(true);
     },
-    [vehicleId],
+    [vehicleId, displayPrice],
   );
 
   // Gallery / Technical modes: use Link

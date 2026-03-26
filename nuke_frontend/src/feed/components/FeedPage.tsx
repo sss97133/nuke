@@ -22,6 +22,8 @@ import { FeedStatCard } from './FeedStatCard';
 import { SignalCard, useSignalCards } from './SignalCard';
 import { InterestsBar } from './InterestsBar';
 import { RecentlyViewed } from './RecentlyViewed';
+import { ReturnVisitBanner } from './ReturnVisitBanner';
+import { FreshFindsStrip } from './FreshFindsStrip';
 import { HeroPanel, type HeroDimension, type HeroFilter } from './HeroPanel';
 import { DEFAULT_FILTERS } from '../../lib/filterPersistence';
 import { useInterests } from '../../hooks/useInterests';
@@ -63,7 +65,10 @@ export default function FeedPage() {
   } = useInterests();
 
   // View history — tracks which vehicles user has seen
-  const { viewedIds } = useViewHistory();
+  const { viewedIds, getViewedWithPrices } = useViewHistory();
+
+  // Get viewed vehicles with price data (for return-visit price-drop detection)
+  const viewedWithPrices = useMemo(() => getViewedWithPrices(), [getViewedWithPrices]);
 
   // Update lastVisit on mount so we can count "new since last visit"
   useEffect(() => {
@@ -334,6 +339,22 @@ export default function FeedPage() {
           vehicles={vehicles}
           onFilter={handleHeroFilter}
           onClose={() => setActiveHeroPanel(null)}
+        />
+
+        {/* Return visit banner — personalized "what's new since last visit" */}
+        <ReturnVisitBanner
+          previousVisit={previousVisit}
+          hasInterests={hasInterests}
+          topMakes={topMakes}
+          vehicles={vehicles}
+          viewedWithPrices={viewedWithPrices}
+        />
+
+        {/* Fresh finds strip — top new vehicles matching interests since last visit */}
+        <FreshFindsStrip
+          previousVisit={previousVisit}
+          hasInterests={hasInterests}
+          topMakes={topMakes}
         />
 
         {/* Interest chips — shown when user has interests and no active filters */}
