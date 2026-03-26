@@ -18,3 +18,7 @@
 
 
 18:30 | DEEP-EXTRACT-SAMPLES | DONE — 75 vehicles enriched across 11 sources. See DONE.md for details.
+
+$(date +%H:%M) | REVENUE-INFRA | Investigating 3 deal-flow tasks: exchange trade flow, Stripe invoice payment, Stripe Connect onboarding | fund_trades, market_orders, stripe-related functions/pages
+
+$(date +%H:%M) | ENRICHMENT-QUALITY-METRICS | Building enrichment_quality_report() RPC | vehicles, vehicle_observations, field_evidence, description_discoveries

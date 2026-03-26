@@ -127,10 +127,36 @@ const mutedText: React.CSSProperties = {
 export default function StripeConnect() {
   const [searchParams] = useSearchParams();
 
-  // Local state: connected account ID (persisted in localStorage for demo purposes)
+  // Local state: connected account ID (check DB first, fallback to localStorage)
   const [accountId, setAccountId] = useState<string>(() =>
     localStorage.getItem('stripe_connect_account_id') || ''
   );
+  const [dbChecked, setDbChecked] = useState(false);
+
+  // On mount, check if user has a connected account in the DB
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { setDbChecked(true); return; }
+        const { data } = await supabase
+          .from('stripe_connect_accounts')
+          .select('stripe_account_id')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (data?.stripe_account_id) {
+          setAccountId(data.stripe_account_id);
+          localStorage.setItem('stripe_connect_account_id', data.stripe_account_id);
+        }
+      } catch {
+        // ignore — fallback to localStorage
+      } finally {
+        setDbChecked(true);
+      }
+    })();
+  }, []);
 
   // Create account form
   const [displayName, setDisplayName] = useState('');

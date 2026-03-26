@@ -65,7 +65,31 @@ Deno.serve(async (req) => {
           case 'v2.core.account[requirements].updated': {
             const accountId = event.related_object?.id
             console.log(`[stripe-webhook] Account requirements updated for ${accountId}`)
-            // Could update stripe_connect_accounts with requirements status if needed
+            if (accountId) {
+              // Fetch latest account status from Stripe to persist
+              try {
+                const acct = await stripe.v2.core.accounts.retrieve(accountId, {
+                  include: ['configuration.merchant', 'requirements'],
+                })
+                const requirementsStatus = acct.requirements?.summary?.minimum_deadline?.status
+                const onboardingComplete = requirementsStatus !== 'currently_due' && requirementsStatus !== 'past_due'
+                const paymentsEnabled = acct?.configuration?.merchant?.capabilities?.card_payments?.status === 'active'
+
+                await supabase
+                  .from('stripe_connect_accounts')
+                  .update({
+                    onboarding_complete: onboardingComplete,
+                    payments_enabled: paymentsEnabled,
+                    requirements_status: requirementsStatus || null,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('stripe_account_id', accountId)
+
+                console.log(`[stripe-webhook] Persisted onboarding status for ${accountId}: onboarding=${onboardingComplete}, payments=${paymentsEnabled}`)
+              } catch (err) {
+                console.error(`[stripe-webhook] Failed to persist requirements status for ${accountId}:`, err)
+              }
+            }
             break
           }
 
@@ -73,6 +97,18 @@ Deno.serve(async (req) => {
             const accountId = event.related_object?.id
             const data = (event as any).data
             console.log(`[stripe-webhook] Merchant capability updated for ${accountId}:`, data)
+            if (accountId) {
+              const cardPaymentsActive = data?.capability === 'card_payments' && data?.status === 'active'
+              await supabase
+                .from('stripe_connect_accounts')
+                .update({
+                  payments_enabled: cardPaymentsActive || undefined,
+                  capabilities: { merchant: data },
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('stripe_account_id', accountId)
+              console.log(`[stripe-webhook] Persisted merchant capability for ${accountId}: card_payments=${cardPaymentsActive}`)
+            }
             break
           }
 
@@ -80,6 +116,15 @@ Deno.serve(async (req) => {
             const accountId = event.related_object?.id
             const data = (event as any).data
             console.log(`[stripe-webhook] Customer capability updated for ${accountId}:`, data)
+            if (accountId) {
+              await supabase
+                .from('stripe_connect_accounts')
+                .update({
+                  capabilities: { customer: data },
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('stripe_account_id', accountId)
+            }
             break
           }
 
