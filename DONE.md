@@ -2,6 +2,18 @@
 
 ## 2026-03-26
 
+### [buyer-intelligence] Phase 1: BaT User Behavioral Segmentation
+- Created `mv_buyer_profiles` materialized view: **343,661 profiles** segmented from 517K BaT user profiles + 108K vehicle purchase records + 130K sale records
+- 8 behavioral segments: WHALE (128), DEALER (1,161), COLLECTOR (1,576), FLIPPER (275), ENTHUSIAST (34,589), BIDDER (57,029), CASUAL (243,992), INACTIVE (4,911)
+- $4.4B total tracked transaction volume across all segments
+- Whale segment: 128 users, $367M total spend, avg $99K/vehicle, 3,697 vehicles purchased
+- Dealer segment: 1,161 users, $2.2B total earned, 40,732 vehicles sold
+- Created SQL functions: `classify_buyer_segment()`, `refresh_buyer_profiles()`, `buyer_intelligence_summary()`, `get_buyer_profile(username)`
+- Indexes: unique on username, segment, total_spent DESC, vehicles_purchased DESC
+- Known issue: ~6K junk usernames from bat_buyer parsing (common English words). Clean buyer count: 101,795
+- Data sources: `bat_user_profiles` (pre-aggregated comments/bids), `vehicles.bat_buyer/bat_seller` (purchase/sale records)
+- Intermediate tables preserved for MV refresh: `_tmp_buyer_makes_agg`, `_tmp_purchase_stats`, `_tmp_sale_stats`
+
 ### [library] Applied Ontology Research Paper Series (5 papers)
 - Extended trilogy to full 5-paper series:
   - `from-protege-to-production.md` — Comparative analysis: 5 structural failures of OWL/RDF/Protege for physical asset domains (T-Box/A-Box imbalance, Open World Assumption, atemporal assumption, single-authority assumption, schema-data separation). Full OWL→PostgreSQL equivalence table. Honest "what we lost" section. Decision framework for when to use what.

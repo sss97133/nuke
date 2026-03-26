@@ -510,6 +510,7 @@ export function VehicleCard({
       popupImageUrl={vehicle.thumbnail_url}
       popupTitle={alt}
       popupPrice={infoPriceText || undefined}
+      popupSourceUrl={vehicle.discovery_url || vehicle.listing_url}
       displayPrice={vehicle.display_price}
       onHoverStart={onHoverStart}
       onHoverEnd={onHoverEnd}
