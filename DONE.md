@@ -5486,3 +5486,27 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - No RSS feed found; no public API discovered; search page returns HTML only
 - Observation source already existed: classiccars-com (495e3f21-973c-43b1-9580-c214c8b7cb91)
 - Also found: 550 dealer pages, 21 auction pages in separate sitemaps
+
+### [data] Deep extraction of 109 skeleton vehicles across 11 major sources
+- **Goal:** Founder wanted quality samples from every source — fully extracted with description, VIN, price, images
+- **Problem:** OpenAI quota exhausted, edge function `extract-vehicle-data-ai` LLM fallback chain broken (not falling to Anthropic/Google despite code)
+- **Solution:** Built local extraction pipeline: Firecrawl scrape → xAI/Grok AI extraction → direct PostgREST DB update
+- **Results:** 75/109 vehicles enriched with real data in the database:
+  - **bat**: 10/10 — Excellent. All have description, price, mileage, color, transmission, engine. 8/10 VIN.
+  - **barrett-jackson**: 10/10 — Excellent. 8/10 VIN, 6/10 price (upcoming auctions), all have descriptions.
+  - **pcarmarket**: 10/10 — Excellent. All have description, price, full specs. 4/10 VIN.
+  - **bonhams**: 10/10 — Good. All have descriptions, 8/10 price (CHF/GBP currencies), 10/10 VIN from chassis numbers.
+  - **gooding**: 9/10 — Good. 7/10 price, descriptions, rare pre-war vehicles. 1 xAI parse failure.
+  - **jamesedition**: 9/10 — Good. 10/10 VIN, 9/10 mileage/transmission. Low descriptions (dealer site). 1 scrape fail.
+  - **mecum**: 6/9 — Medium. 3 scrape failures (Mecum blocks). 8/9 VIN for those scraped. No prices (auctions).
+  - **craigslist**: 6/10 — Medium. 4 scrape failures (listings expired). 6/10 with description + price.
+  - **collecting_cars**: 4/10 — Low. Site scraped OK but xAI had trouble with Collecting Cars format. Some prices found.
+  - **cars_and_bids**: 1/10 — Low. 6 scrape failures (Cloudflare/timeouts). Only 1 fully extracted.
+  - **rm-sothebys**: 0/10 — Failed. Pages scrape OK but contain mostly navigation/catalog UI, not listing content.
+- **Key finding:** `extract-vehicle-data-ai` edge function needs fix — all 3 LLM providers fail (OpenAI quota, Anthropic key issue, Google key as GEMINI_API_KEY not GOOGLE_AI_API_KEY). The Supabase secrets have the keys but the deployed code may not resolve them correctly.
+- **Showcase vehicles with full data:**
+  - 2023 Corvette Z06: $135,500, 4 miles, VIN, full description, all specs
+  - 2020 Mercedes-AMG GT R Roadster: $124,500, 19K miles, VIN, full description
+  - 2025 Lotus Emira (BJ): $129,800, VIN, 320 miles, all specs
+  - 1997 Porsche 993 Turbo S (PCM): $575,000, 21K miles, VIN, full description
+  - 1936 Harley-Davidson E Knucklehead (Gooding): $93,500, all specs
