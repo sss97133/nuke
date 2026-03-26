@@ -355,3 +355,26 @@ none
 2. `tail -40 DONE.md` — what exists
 3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
 4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 00:46:24
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+08662f949 Profile cleanup: dimension-only SubHeader, timeline compression fix, tab title
+d52d35130 Fix vehicle profile: deduplicate SubHeader, compress timeline, fix tab title
+cb52aedbd Fix profile bugs: live comment count, "91% OVER" → "91% OVER EST", restore working tree
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+DONE.md
+nuke_frontend/src/components/popups/PopupStack.tsx
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`

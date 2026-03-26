@@ -22,3 +22,5 @@
 $(date +%H:%M) | REVENUE-INFRA | Investigating 3 deal-flow tasks: exchange trade flow, Stripe invoice payment, Stripe Connect onboarding | fund_trades, market_orders, stripe-related functions/pages
 
 DONE | ENRICHMENT-QUALITY-METRICS | COMPLETE — enrichment_quality_report() RPC created, granted, tested via REST API. Task 29814fe7 marked completed.
+
+$(date +%H:%M) | BUYER-INTELLIGENCE-P1 | Phase 1 Buyer Intelligence: segment BaT users from comment/purchase behavior. Building mv_buyer_profiles materialized view + buyer_segment classification. | auction_comments, bat_user_profiles, vehicles, new MV + function

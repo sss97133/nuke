@@ -2,7 +2,12 @@
 
 ## 2026-03-26
 
-### [library] Applied Ontology Research Paper Trilogy
+### [library] Applied Ontology Research Paper Series (5 papers)
+- Extended trilogy to full 5-paper series:
+  - `from-protege-to-production.md` — Comparative analysis: 5 structural failures of OWL/RDF/Protege for physical asset domains (T-Box/A-Box imbalance, Open World Assumption, atemporal assumption, single-authority assumption, schema-data separation). Full OWL→PostgreSQL equivalence table. Honest "what we lost" section. Decision framework for when to use what.
+  - `ontological-lexicon.md` — 50+ term lexicon organized across 8 ontological layers (identity, observation, epistemology, spatial, lifecycle, condition, actor, resolution, meta). Each term: formal origin, platform definition, database implementation, operational example. Quick reference appendix with row counts.
+
+### [library] Applied Ontology Research Paper Trilogy (earlier today)
 - Created 3 interconnected papers in `docs/library/intellectual/papers/`:
   - `applied-ontology-vehicle-domain.md` — Framework paper positioning Nuke within formal ontology research. Cites Gruber, Guarino, CIDOC-CRM, PROV-O, DOLCE, BFO, Goldman, Shapin, Deleuze. Covers: immutable identity ontology, epistemological trust layer, schema-as-prompt, actor layer, rhizomatic connectivity, ontological pluralism.
   - `applied-ontology-evidence-map.md` — Evidence map tracing every theoretical claim to exact tables, functions, row counts, code paths. 3.3M observations, 158 sources, 14 half-life tiers, 63 component tables, 150+ views.
