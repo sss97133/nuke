@@ -12,6 +12,7 @@ import { supabase } from '../../lib/supabase';
 interface Props {
   vehicleId: string;
   expectedCount?: number;
+  searchQuery?: string;
 }
 
 interface CommentRow {
@@ -46,7 +47,7 @@ function formatTimeAgo(dateString: string): string {
   }
 }
 
-export function CommentsPopup({ vehicleId, expectedCount }: Props) {
+export function CommentsPopup({ vehicleId, expectedCount, searchQuery }: Props) {
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,8 +78,15 @@ export function CommentsPopup({ vehicleId, expectedCount }: Props) {
     return () => { cancelled = true; };
   }, [vehicleId]);
 
-  const bidComments = comments.filter(c => c.bid_amount != null && Number(c.bid_amount) > 0);
-  const sellerComments = comments.filter(c => c.is_seller);
+  const sq = (searchQuery || '').toLowerCase().trim();
+  const filtered = sq
+    ? comments.filter(c =>
+        (c.comment_text || '').toLowerCase().includes(sq) ||
+        (c.author_username || '').toLowerCase().includes(sq))
+    : comments;
+
+  const bidComments = filtered.filter(c => c.bid_amount != null && Number(c.bid_amount) > 0);
+  const sellerComments = filtered.filter(c => c.is_seller);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -96,9 +104,14 @@ export function CommentsPopup({ vehicleId, expectedCount }: Props) {
             TOTAL
           </span>
           <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: '#1a1a1a', marginLeft: 6 }}>
-            {loading ? '...' : comments.length}
+            {loading ? '...' : filtered.length}
           </span>
-          {expectedCount != null && expectedCount !== comments.length && !loading && (
+          {sq && !loading && (
+            <span style={{ fontFamily: MONO, fontSize: 9, color: '#999', marginLeft: 4 }}>
+              / {comments.length}
+            </span>
+          )}
+          {!sq && expectedCount != null && expectedCount !== comments.length && !loading && (
             <span style={{ fontFamily: MONO, fontSize: 9, color: '#999', marginLeft: 4 }}>
               / {expectedCount} expected
             </span>
@@ -144,15 +157,15 @@ export function CommentsPopup({ vehicleId, expectedCount }: Props) {
           </div>
         )}
 
-        {!loading && !error && comments.length === 0 && (
+        {!loading && !error && filtered.length === 0 && (
           <div style={{ padding: '20px 12px', textAlign: 'center' }}>
             <span style={{ fontFamily: MONO, fontSize: 9, color: '#999', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
-              No comments extracted yet
+              {sq ? 'No matching comments' : 'No comments extracted yet'}
             </span>
           </div>
         )}
 
-        {!loading && comments.map((c) => {
+        {!loading && filtered.map((c) => {
           const isBid = c.bid_amount != null && Number(c.bid_amount) > 0;
           const isSeller = Boolean(c.is_seller);
 

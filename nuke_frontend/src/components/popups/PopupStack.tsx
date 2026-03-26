@@ -31,7 +31,7 @@ export interface PopupEntry {
 
 export interface PopupStackContextValue {
   stack: PopupEntry[];
-  push: (content: ReactNode, title: string, width?: number) => string;
+  push: (content: ReactNode, title: string, width?: number, searchable?: boolean) => string;
   pop: (id: string) => void;
   popTop: () => void;
   closeAll: () => void;
@@ -49,9 +49,9 @@ export function PopupStackProvider({ children }: { children: ReactNode }) {
   const stackRef = useRef(stack);
   stackRef.current = stack;
 
-  const push = useCallback((content: ReactNode, title: string, width = 420): string => {
+  const push = useCallback((content: ReactNode, title: string, width = 420, searchable = true): string => {
     const id = nextId();
-    setStack((prev) => [...prev, { id, title, content, width }]);
+    setStack((prev) => [...prev, { id, title, content, width, searchable }]);
     return id;
   }, []);
 
