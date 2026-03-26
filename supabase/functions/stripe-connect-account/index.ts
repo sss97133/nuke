@@ -189,6 +189,17 @@ Deno.serve(async (req) => {
       const onboardingComplete =
         requirementsStatus !== 'currently_due' && requirementsStatus !== 'past_due'
 
+      // Persist status to DB so it survives without re-polling Stripe
+      await sb
+        .from('stripe_connect_accounts')
+        .update({
+          onboarding_complete: onboardingComplete,
+          payments_enabled: readyToProcessPayments,
+          requirements_status: requirementsStatus || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('stripe_account_id', stripeAccountId)
+
       // Return only safe, derived fields — do NOT return the full Stripe account object
       return new Response(
         JSON.stringify({
