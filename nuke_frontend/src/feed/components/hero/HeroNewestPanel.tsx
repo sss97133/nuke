@@ -47,27 +47,41 @@ interface NewestData {
 // Source display names
 const SOURCE_LABELS: Record<string, string> = {
   bat: 'BAT',
-  'facebook-marketplace': 'FB MKTPLACE',
+  facebook_marketplace: 'FB',
+  'facebook-marketplace': 'FB',
   bonhams: 'BONHAMS',
   gooding: 'GOODING',
   pcarmarket: 'PCAR',
   hagerty: 'HAGERTY',
-  jamesedition: 'JAMES ED',
+  jamesedition: 'JAMES',
+  cars_and_bids: 'C&B',
   'cars-and-bids': 'C&B',
   craigslist: 'CL',
   mecum: 'MECUM',
   'rm-sothebys': 'RM',
+  'rm_sothebys': 'RM',
   ebay: 'EBAY',
   hemmings: 'HEMMINGS',
-  unknown: 'OTHER',
   'barrett-jackson': 'BJ',
+  barrettjackson: 'BJ',
   ksl: 'KSL',
-  conceptcarz: 'CONCEPTCARZ',
+  conceptcarz: 'CCARZ',
   'beverly-hills-car-club': 'BHCC',
+  collecting_cars: 'CC',
+  'collecting-cars': 'CC',
+  broad_arrow: 'BROAD',
+  'classic-driver': 'CD',
+  'classiccars-com': 'CCC',
+  'facebook-saved': 'FB SAVED',
+  unknown: 'UNKNOWN',
 };
 
 function sourceLabel(source: string): string {
-  return SOURCE_LABELS[source] ?? source.toUpperCase().replace(/[-_]/g, ' ').slice(0, 10);
+  // Try exact match, then underscore variant, then hyphen variant
+  return SOURCE_LABELS[source]
+    ?? SOURCE_LABELS[source.replace(/-/g, '_')]
+    ?? SOURCE_LABELS[source.replace(/_/g, '-')]
+    ?? source.toUpperCase().replace(/[-_]/g, ' ');
 }
 
 function fmtNum(n: number): string {
