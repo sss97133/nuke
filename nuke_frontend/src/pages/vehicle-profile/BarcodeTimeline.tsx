@@ -303,6 +303,92 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     return s === e ? String(s) : `${s}—${e}`;
   }, [startDate, endDate]);
 
+  // Compressed heatmap: only show years that have events + current year, with gap indicators
+  type HeatmapSegment =
+    | { type: 'year'; year: number; weeks: { d: Date; s: string; inRange: boolean }[][]; weekOffset: number }
+    | { type: 'gap'; gapYears: number; weekOffset: number };
+
+  const { compressedHeatmap, compressedMonthLabels } = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+
+    // Find which years have events
+    const eventYears = new Set<number>();
+    for (const ds of Object.keys(eventMap)) {
+      eventYears.add(new Date(ds + 'T00:00:00').getFullYear());
+    }
+    // Always include current year for context
+    eventYears.add(currentYear);
+
+    const startYear = startDate.getFullYear();
+    const endYear = endDate.getFullYear();
+
+    // Group heatmapWeeks by year
+    const weeksByYear: Record<number, { d: Date; s: string; inRange: boolean }[][]> = {};
+    for (const week of heatmapWeeks) {
+      // Use the Thursday of the week to determine which year (ISO week convention)
+      const thursday = week[3] || week[0];
+      if (!thursday) continue;
+      const yr = thursday.d.getFullYear();
+      if (!weeksByYear[yr]) weeksByYear[yr] = [];
+      weeksByYear[yr].push(week);
+    }
+
+    // Build segments: include years with events, compress gaps
+    const segments: HeatmapSegment[] = [];
+    let weekOffset = 0;
+    let gapStart: number | null = null;
+
+    for (let yr = startYear; yr <= endYear; yr++) {
+      const hasEvents = eventYears.has(yr);
+      const yearWeeks = weeksByYear[yr] || [];
+
+      if (!hasEvents && yearWeeks.length > 0) {
+        // Empty year — start or extend gap
+        if (gapStart === null) gapStart = yr;
+      } else {
+        // Flush any accumulated gap
+        if (gapStart !== null) {
+          const gapYears = yr - gapStart;
+          segments.push({ type: 'gap', gapYears, weekOffset });
+          weekOffset += 1; // gap takes ~1 column width
+          gapStart = null;
+        }
+        if (yearWeeks.length > 0) {
+          segments.push({ type: 'year', year: yr, weeks: yearWeeks, weekOffset });
+          weekOffset += yearWeeks.length;
+        }
+      }
+    }
+    // Flush trailing gap
+    if (gapStart !== null) {
+      const gapYears = endYear - gapStart + 1;
+      segments.push({ type: 'gap', gapYears, weekOffset });
+    }
+
+    // Build month labels for compressed layout
+    const monthLabels: { key: string; left: number; label: string }[] = [];
+    for (const seg of segments) {
+      if (seg.type !== 'year') continue;
+      seg.weeks.forEach((week, wi) => {
+        const firstDay = week.find((d) => d.inRange && d.d.getDate() <= 7);
+        if (firstDay && firstDay.d.getDate() <= 7) {
+          const month = firstDay.d.getMonth();
+          const year = firstDay.d.getFullYear();
+          const key = `${year}-${month}`;
+          if (!monthLabels.find((m) => m.key === key)) {
+            monthLabels.push({
+              key,
+              left: (seg.weekOffset + wi) * 11 + 22,
+              label: MONTH_NAMES[month] + (month === 0 ? ` ${year}` : ''),
+            });
+          }
+        }
+      });
+    }
+
+    return { compressedHeatmap: segments, compressedMonthLabels: monthLabels };
+  }, [heatmapWeeks, eventMap, startDate, endDate]);
+
   // Toggle expand
   const toggleExpand = useCallback(() => {
     setExpanded((prev) => {
@@ -421,41 +507,9 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
 
   const receiptEvent = receiptDate ? eventMap[receiptDate] : null;
 
-  // If no timeline events at all, show empty state with vehicle context
+  // If no timeline events at all, hide the section entirely
   if (timelineEvents.length === 0) {
-    const vYear = (vehicle as any)?.year;
-    const vMake = (vehicle as any)?.make;
-    return (
-      <div
-        className="barcode-strip barcode-strip--collapsed"
-        style={{ opacity: 0.6 }}
-      >
-        <div className="barcode-bar" style={{ cursor: 'default' }}>
-          <span className="barcode-bar__label-left">TIMELINE</span>
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '8px',
-            fontWeight: 700,
-            textTransform: 'uppercase' as const,
-            letterSpacing: '0.5px',
-            color: 'var(--text-disabled)',
-          }}>
-            NO EVENTS RECORDED
-            {(vYear || vMake) && (
-              <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>
-                · EXPLORE {[vYear, vMake].filter(Boolean).join(' ')} VEHICLES FOR COMPARABLES
-              </span>
-            )}
-          </div>
-          <span className="barcode-bar__label-right" />
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -485,11 +539,8 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
           <span className="barcode-bar__label-right">{yearRange}</span>
         </div>
 
-        {/* Expanded heatmap */}
+        {/* Expanded heatmap — compressed to only show years with events */}
         <div className="barcode-heatmap" ref={heatmapRef}>
-          <div className="timeline-section__header">
-            Activity Timeline · {yearRange}
-          </div>
           <div className="timeline-heatmap">
             <div className="hm-day-labels">
               {['', 'MON', '', 'WED', '', 'FRI', ''].map((name, i) => (
@@ -499,47 +550,45 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
               ))}
             </div>
             <div className="hm-wrap">
-              {heatmapWeeks.map((week, wi) => (
-                <div className="hm-week" key={wi}>
-                  {week.map((day, di) => {
-                    if (!day.inRange) {
-                      return <div className="hm-c empty" key={di} />;
-                    }
-                    const ev = eventMap[day.s];
-                    const level = ev ? ev.level : 0;
-                    const isHighlighted = highlightGroup && ev?.group === highlightGroup;
-                    return (
-                      <div
-                        key={di}
-                        className={`hm-c ${level > 0 ? `l${level}` : ''} ${isHighlighted ? 'hl' : ''}`}
-                        data-date={ev ? day.s : undefined}
-                        title={ev ? `${day.s}: ${ev.label}` : undefined}
-                        onClick={ev ? (e) => onCellClick(day.s, e) : undefined}
-                      />
-                    );
-                  })}
-                </div>
+              {compressedHeatmap.map((segment, si) => (
+                <React.Fragment key={si}>
+                  {segment.type === 'gap' ? (
+                    <div className="hm-gap" title={`${segment.gapYears} years with no events`}>
+                      <span className="hm-gap__dots">···</span>
+                    </div>
+                  ) : (
+                    segment.weeks.map((week, wi) => (
+                      <div className="hm-week" key={`${si}-${wi}`}>
+                        {week.map((day, di) => {
+                          if (!day.inRange) {
+                            return <div className="hm-c empty" key={di} />;
+                          }
+                          const ev = eventMap[day.s];
+                          const level = ev ? ev.level : 0;
+                          const isHighlighted = highlightGroup && ev?.group === highlightGroup;
+                          return (
+                            <div
+                              key={di}
+                              className={`hm-c ${level > 0 ? `l${level}` : ''} ${isHighlighted ? 'hl' : ''}`}
+                              data-date={ev ? day.s : undefined}
+                              title={ev ? `${day.s}: ${ev.label}` : undefined}
+                              onClick={ev ? (e) => onCellClick(day.s, e) : undefined}
+                            />
+                          );
+                        })}
+                      </div>
+                    ))
+                  )}
+                </React.Fragment>
               ))}
             </div>
             <div className="hm-months">
-              {/* Month labels positioned by week index */}
-              {heatmapWeeks.reduce<React.ReactNode[]>((acc, week, wi) => {
-                const firstDay = week.find((d) => d.inRange && d.d.getDate() <= 7);
-                if (firstDay && firstDay.d.getDate() <= 7) {
-                  const month = firstDay.d.getMonth();
-                  const year = firstDay.d.getFullYear();
-                  const key = `${year}-${month}`;
-                  if (!acc.find((n) => n && (n as React.ReactElement).key === key)) {
-                    acc.push(
-                      <span key={key} style={{ left: `${wi * 11 + 22}px` }}>
-                        {MONTH_NAMES[month]}
-                        {month === 0 ? ` ${year}` : ''}
-                      </span>
-                    );
-                  }
-                }
-                return acc;
-              }, [])}
+              {/* Month labels positioned by accumulated week offset */}
+              {compressedMonthLabels.map(({ key, left, label }) => (
+                <span key={key} style={{ left: `${left}px` }}>
+                  {label}
+                </span>
+              ))}
             </div>
           </div>
 
