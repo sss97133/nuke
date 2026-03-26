@@ -239,3 +239,22 @@ none
 2. `tail -40 DONE.md` — what exists
 3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
 4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-25 22:36:34
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+a9513ee38 Badge Ontology: canonical spec for all badges — every badge is a data portal
+
+## Uncommitted Changes
+none
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
