@@ -26,6 +26,7 @@ export interface PopupEntry {
   title: string;
   content: ReactNode;
   width: number;
+  searchable: boolean;
 }
 
 export interface PopupStackContextValue {
