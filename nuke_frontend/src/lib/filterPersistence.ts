@@ -27,6 +27,7 @@ export const DEFAULT_FILTERS: FilterState = {
   hideBat: false,
   hideClassic: false,
   hiddenSources: [],
+  includedSources: [],
   zipCode: '',
   radiusMiles: 50,
   locations: [],

@@ -130,8 +130,9 @@ export default function FeedPage() {
         newFilters.makes = filter.makes;
       }
       if (filter.sources && filter.sources.length > 0) {
-        // Source filter from NEWEST panel — show today's intake, sorted newest
+        // Source filter from NEWEST panel — show only vehicles from these sources
         newFilters.addedTodayOnly = true;
+        newFilters.includedSources = filter.sources;
       }
       if (filter.yearMin != null) {
         newFilters.yearMin = filter.yearMin;
@@ -212,10 +213,42 @@ export default function FeedPage() {
 
   const feedQuery = useFeedQuery({ filters, sortBy, sortDirection, searchText });
 
-  const vehicles = useMemo(
+  const rawVehicles = useMemo(
     () => feedQuery.data?.pages.flatMap((p) => p.items) ?? [],
     [feedQuery.data],
   );
+
+  // "FOR YOU" boost: when sort=finds and user has interests, interleave
+  // interest-matching vehicles at the top while preserving relative order.
+  const vehicles = useMemo(() => {
+    if (sortBy !== 'finds' || !hasInterests || rawVehicles.length === 0) {
+      return rawVehicles;
+    }
+    const interestMakeSet = new Set(topMakes.slice(0, 5).map((m) => m.name.toUpperCase()));
+    const boosted: FeedVehicle[] = [];
+    const rest: FeedVehicle[] = [];
+    for (const v of rawVehicles) {
+      if (v.make && interestMakeSet.has(v.make.toUpperCase())) {
+        boosted.push(v);
+      } else {
+        rest.push(v);
+      }
+    }
+    // Interleave: every 3rd slot insert a non-boosted vehicle to keep variety
+    const result: FeedVehicle[] = [];
+    let bIdx = 0;
+    let rIdx = 0;
+    let slot = 0;
+    while (bIdx < boosted.length || rIdx < rest.length) {
+      if (bIdx < boosted.length && (slot % 4 !== 3 || rIdx >= rest.length)) {
+        result.push(boosted[bIdx++]);
+      } else if (rIdx < rest.length) {
+        result.push(rest[rIdx++]);
+      }
+      slot++;
+    }
+    return result;
+  }, [rawVehicles, sortBy, hasInterests, topMakes]);
 
   const stats = feedQuery.data?.pages[0]?.stats ?? null;
 

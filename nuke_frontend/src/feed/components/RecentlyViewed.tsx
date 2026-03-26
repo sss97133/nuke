@@ -27,6 +27,13 @@ interface RecentVehicleMini {
   primary_image_url: string | null;
   sale_price: number | null;
   display_price: number | null;
+  mileage: number | null;
+  transmission: string | null;
+  body_style: string | null;
+  vin: string | null;
+  discovery_source: string | null;
+  discovery_url: string | null;
+  description: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +163,7 @@ export function RecentlyViewed({ limit = 20 }: RecentlyViewedProps) {
     async function fetchVehicles() {
       const { data } = await supabase
         .from('vehicles')
-        .select('id, year, make, model, primary_image_url, sale_price, asking_price')
+        .select('id, year, make, model, primary_image_url, sale_price, asking_price, mileage, transmission, body_style, vin, discovery_source, discovery_url, description')
         .in('id', recentIds.slice(0, limit));
 
       if (cancelled || !data) return;
@@ -191,7 +198,7 @@ export function RecentlyViewed({ limit = 20 }: RecentlyViewedProps) {
   };
 
   const handleClick = (v: RecentVehicleMini) => {
-    // Build a minimal FeedVehicle for the popup
+    // Build a FeedVehicle with specs for the popup
     const feedVehicle: FeedVehicle = {
       id: v.id,
       year: v.year,
@@ -201,6 +208,13 @@ export function RecentlyViewed({ limit = 20 }: RecentlyViewedProps) {
       price_source: v.sale_price ? 'sale' : 'none',
       is_for_sale: false,
       thumbnail_url: v.primary_image_url,
+      mileage: v.mileage,
+      transmission: v.transmission,
+      body_style: v.body_style,
+      vin: v.vin,
+      discovery_source: v.discovery_source,
+      discovery_url: v.discovery_url,
+      description: v.description,
       created_at: '',
     };
     const title = [v.year, v.make, v.model].filter(Boolean).join(' ') || 'Vehicle';

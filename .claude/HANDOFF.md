@@ -402,3 +402,47 @@ none
 2. `tail -40 DONE.md` — what exists
 3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
 4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Session Handoff — 2026-03-26 01:05:24
+*(Written explicitly by agent — high-quality context for next session)*
+
+## What Was Happening
+48+ hour marathon session. 100+ commits, 70+ agents. Last wave: buyer segmentation complete (343K profiles, $4.4B), signal cards in feed, return visit hooks, popup finder windows (minimize/S/M/L), canonical Badge component, profile cleanup (SubHeader/timeline/tab title). Still running: HIGH/MEDIUM bug fix agent (source filter, VIEW ON SOURCE link, description in popup, search→feed bridge) + E2E test agent. BaT fetch draining in background. 148K import queue processing via Gemini 10K/day. All hero lenses built. User journey audit found 25 issues — fixing them. Next: finish bug fixes, verify on nuke.ag, buyer intelligence Phase 2 (price probability), popup tab merging, design system sweep.
+
+## Branch
+main
+
+## Recent Commits (last 3h)
+54e75c2bb Buyer Intelligence Phase 1: 343K profiles, $4.4B tracked, 7 segments
+15b714689 Signal cards: live auctions, deals, price drops, source batches, comment highlights
+eb694c230 Signal cards: inject live-market drama into the feed grid
+faae9b5be Popup Finder windows: minimize to dock, S/M/L size toggle
+a24ad6d2a Canonical Badge component: one component for all 3 badge types (dimension/metric/status)
+1c8eda4ec Finder-style popup windows: minimize, S/M/L size toggle, dock strip
+08662f949 Profile cleanup: dimension-only SubHeader, timeline compression fix, tab title
+d52d35130 Fix vehicle profile: deduplicate SubHeader, compress timeline, fix tab title
+cb52aedbd Fix profile bugs: live comment count, "91% OVER" → "91% OVER EST", restore working tree
+2ed610acd Fix hero_newest: use v.source not platform fields, fix source abbreviations
+52c885029 Wire popup search filtering: every popup now filters content via title bar search input
+6f0233a76 Contextual Agent Harness architecture: BYOK AI in every popup, cost model, subscription tiers
+7bffa0243 Context harness + popup terminal vision: AI-aware search, CLI-style popup windows
+294f97969 Buyer Intelligence Thesis + Popup Finder Windows feedback
+a9513ee38 Badge Ontology: canonical spec for all badges — every badge is a data portal
+
+## Uncommitted Changes (not yet committed)
+nuke_frontend/src/feed/components/FeedPage.tsx
+nuke_frontend/src/feed/hooks/useFeedQuery.ts
+nuke_frontend/src/feed/types/feed.ts
+nuke_frontend/src/lib/filterPersistence.ts
+nuke_frontend/src/types/feedTypes.ts
+supabase/functions/feed-query/index.ts
+
+## Staged
+none
+
+## Pickup Instructions
+1. Read PROJECT_STATE.md for sprint context
+2. Read above "What Was Happening" section
+3. Check git log if more detail needed: `git log --oneline -10`
+4. Register in .claude/ACTIVE_AGENTS.md before starting
