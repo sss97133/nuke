@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { BadgePortal } from '../../components/badges/BadgePortal';
+import { Badge } from '../../components/ui/badge';
 
 /** Capitalize first letter of each word for display (e.g. "K5 JIMMY" -> "K5 Jimmy") */
 function toTitleCase(s: string): string {
@@ -32,111 +33,14 @@ function resolveLocation(vehicle: any): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// Base CSS values inlined as React style objects
+// Token constants
 // ---------------------------------------------------------------------------
 
 const TOKEN = {
   fontBody: 'Arial, Helvetica, sans-serif' as const,
-  fontMono: 'var(--font-mono, "Courier New", Courier, monospace)' as const,
   ink:      'var(--text, var(--ink, #1a1a1a))',
-  ink2:     'var(--text-muted, var(--text-secondary, #888888))',
   surface:  'var(--surface, #ffffff)',
-  borderSubtle: '1px solid var(--border, var(--border-subtle, #dddddd))',
   borderPrimary: '2px solid var(--border, #1a1a1a)',
-};
-
-const BADGE_BASE: React.CSSProperties = {
-  position:      'relative',
-  display:       'inline-flex',
-  alignItems:    'center',
-  gap:           3,
-  fontFamily:    TOKEN.fontBody,
-  fontSize:      8,
-  fontWeight:    700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.10em',
-  lineHeight:    1,
-  padding:       '2px 6px',
-  border:        TOKEN.borderSubtle,
-  background:    'transparent',
-  color:         TOKEN.ink,
-  whiteSpace:    'nowrap',
-  cursor:        'default',
-  flexShrink:    0,
-  userSelect:    'none',
-};
-
-const BADGE_VARIANTS: Record<string, React.CSSProperties> = {
-  source:       { background: 'rgba(26,26,26,0.06)',    borderColor: 'rgba(26,26,26,0.20)',   color: TOKEN.ink, letterSpacing: '0.14em' },
-  location:     { background: 'transparent', fontFamily: TOKEN.fontMono, fontSize: 7, letterSpacing: '0.06em', color: TOKEN.ink2 },
-  mileage:      { background: 'transparent', fontFamily: TOKEN.fontMono, fontSize: 7, color: TOKEN.ink2, letterSpacing: '0.06em' },
-};
-
-// ---------------------------------------------------------------------------
-// Badge (simple)
-// ---------------------------------------------------------------------------
-
-interface BadgeProps {
-  variant?: string;
-  label: string;
-  tooltip?: string;
-}
-
-const Badge: React.FC<BadgeProps> = ({ variant = '', label, tooltip }) => {
-  const [hovered, setHovered] = useState(false);
-
-  const variantStyle = variant ? (BADGE_VARIANTS[variant] ?? {}) : {};
-  const style: React.CSSProperties = {
-    ...BADGE_BASE,
-    ...variantStyle,
-  };
-
-  const tooltipStyle: React.CSSProperties = {
-    position:       'absolute',
-    top:            'calc(100% + 6px)',
-    left:           '50%',
-    transform:      'translateX(-50%)',
-    zIndex:         200,
-    background:     TOKEN.ink,
-    color:          'var(--surface-elevated)',
-    fontFamily:     TOKEN.fontBody,
-    fontSize:       7,
-    fontWeight:     400,
-    textTransform:  'none',
-    letterSpacing:  0,
-    padding:        '4px 7px',
-    whiteSpace:     'nowrap',
-    pointerEvents:  'none',
-    opacity:        hovered ? 1 : 0,
-    visibility:     hovered ? 'visible' : 'hidden',
-    transition:     'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1), visibility 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-  };
-
-  const arrowStyle: React.CSSProperties = {
-    content:       '""',
-    position:      'absolute',
-    bottom:        '100%',
-    left:          '50%',
-    transform:     'translateX(-50%)',
-    border:        '4px solid transparent',
-    borderBottomColor: TOKEN.ink,
-  };
-
-  return (
-    <span
-      style={style}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {label}
-      {tooltip && (
-        <span style={tooltipStyle}>
-          <span style={arrowStyle} />
-          {tooltip}
-        </span>
-      )}
-    </span>
-  );
 };
 
 // ---------------------------------------------------------------------------
@@ -221,7 +125,7 @@ const VehicleSubHeader: React.FC = () => {
 
   return (
     <div className="vp-sub-header" style={containerStyle}>
-      {/* Left: YMM (+ trim) as BadgePortal — click expands cluster inline */}
+      {/* Left: YMM (+ trim) as BadgePortal -- click expands cluster inline */}
       <div className="vp-sub-header__left" style={leftStyle}>
         {titleStr ? (
           <>
@@ -264,9 +168,9 @@ const VehicleSubHeader: React.FC = () => {
 
         {mileage != null && mileage !== '' && (
           <Badge
-            variant="mileage"
-            label={formatMileage(mileage)}
-            tooltip={`Odometer: ${formatMileage(mileage)}`}
+            dimension="mileage"
+            value={formatMileage(mileage)}
+            size="sm"
           />
         )}
       </div>
@@ -274,41 +178,45 @@ const VehicleSubHeader: React.FC = () => {
       {/* Divider */}
       <div style={dividerStyle} />
 
-      {/* Dimension badges only — auction/engagement data lives in the banner below */}
+      {/* Dimension badges only -- auction/engagement data lives in the banner below */}
       <div className="vp-sub-header__badges" style={badgesWrapStyle}>
         {/* Body style */}
         {bodyStyle && (
           <Badge
-            variant="source"
-            label={toTitleCase(String(bodyStyle))}
-            tooltip={`Body style: ${bodyStyle}`}
+            dimension="body"
+            value={toTitleCase(String(bodyStyle))}
+            size="sm"
           />
         )}
 
         {/* Transmission */}
         {transmission && (
           <Badge
-            variant="source"
-            label={toTitleCase(String(transmission))}
-            tooltip={`Transmission: ${transmission}`}
+            dimension="trans"
+            value={toTitleCase(String(transmission))}
+            size="sm"
           />
         )}
 
         {/* Drivetrain */}
         {drivetrain && (
           <Badge
-            variant="source"
-            label={toTitleCase(String(drivetrain))}
-            tooltip={`Drivetrain: ${drivetrain}`}
+            dimension="drive"
+            value={toTitleCase(String(drivetrain))}
+            size="sm"
           />
         )}
 
-        {/* Location */}
+        {/* Location — uses dimension badge styling for consistency */}
         {location && (
           <Badge
-            variant="location"
-            label={location}
-            tooltip={`Vehicle location: ${location}`}
+            dimension="source"
+            value={location}
+            size="sm"
+            style={{
+              fontFamily: 'var(--font-mono, "Courier New", Courier, monospace)',
+              color: 'var(--text-secondary, #888)',
+            }}
           />
         )}
       </div>
