@@ -311,10 +311,16 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
   const { compressedHeatmap, compressedMonthLabels } = useMemo(() => {
     const currentYear = new Date().getFullYear();
 
-    // Find which years have events
+    // Find which years have events, and which months within each year
     const eventYears = new Set<number>();
+    const eventMonthsByYear: Record<number, Set<number>> = {};
     for (const ds of Object.keys(eventMap)) {
-      eventYears.add(new Date(ds + 'T00:00:00').getFullYear());
+      const d = new Date(ds + 'T00:00:00');
+      const yr = d.getFullYear();
+      const mo = d.getMonth();
+      eventYears.add(yr);
+      if (!eventMonthsByYear[yr]) eventMonthsByYear[yr] = new Set();
+      eventMonthsByYear[yr].add(mo);
     }
     // Always include current year for context
     eventYears.add(currentYear);
@@ -333,6 +339,20 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       weeksByYear[yr].push(week);
     }
 
+    // Trim year weeks to only include months with events +/- 1 month padding
+    const trimWeeksToEventMonths = (yr: number, weeks: { d: Date; s: string; inRange: boolean }[][]): { d: Date; s: string; inRange: boolean }[][] => {
+      const months = eventMonthsByYear[yr];
+      if (!months || months.size === 0) return weeks; // current year with no events: show all
+      const minMonth = Math.max(0, Math.min(...months) - 1);
+      const maxMonth = Math.min(11, Math.max(...months) + 1);
+      return weeks.filter((week) => {
+        const thursday = week[3] || week[0];
+        if (!thursday) return false;
+        const mo = thursday.d.getMonth();
+        return thursday.d.getFullYear() === yr && mo >= minMonth && mo <= maxMonth;
+      });
+    };
+
     // Build segments: include years with events, compress gaps
     const segments: HeatmapSegment[] = [];
     let weekOffset = 0;
@@ -343,7 +363,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       const yearWeeks = weeksByYear[yr] || [];
 
       if (!hasEvents && yearWeeks.length > 0) {
-        // Empty year — start or extend gap
+        // Empty year -- start or extend gap
         if (gapStart === null) gapStart = yr;
       } else {
         // Flush any accumulated gap
@@ -354,8 +374,11 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
           gapStart = null;
         }
         if (yearWeeks.length > 0) {
-          segments.push({ type: 'year', year: yr, weeks: yearWeeks, weekOffset });
-          weekOffset += yearWeeks.length;
+          const trimmed = trimWeeksToEventMonths(yr, yearWeeks);
+          if (trimmed.length > 0) {
+            segments.push({ type: 'year', year: yr, weeks: trimmed, weekOffset });
+            weekOffset += trimmed.length;
+          }
         }
       }
     }
@@ -379,7 +402,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
             monthLabels.push({
               key,
               left: (seg.weekOffset + wi) * 11 + 22,
-              label: MONTH_NAMES[month] + (month === 0 ? ` ${year}` : ''),
+              label: MONTH_NAMES[month] + ` ${year}`,
             });
           }
         }

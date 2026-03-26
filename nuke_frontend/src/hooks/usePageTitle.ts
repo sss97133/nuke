@@ -89,8 +89,25 @@ export function getVehicleTitle(vehicle: {
   }
 
   const identity = getVehicleIdentityParts(vehicle as any);
-  const title = [...identity.primary, ...identity.differentiators].join(' ').trim();
-  return title || 'Vehicle Profile';
+  // Build full title from primary + differentiators, but keep it concise for browser tabs.
+  // Browser tabs typically show ~60 chars before truncating; with " | Nuke" suffix that's ~52.
+  const fullParts = [...identity.primary, ...identity.differentiators];
+  let title = fullParts.join(' ').trim();
+  if (!title) return 'Vehicle Profile';
+
+  // If title is too long for a browser tab, progressively drop differentiators
+  const MAX_TAB_LENGTH = 55;
+  if (title.length > MAX_TAB_LENGTH && identity.differentiators.length > 0) {
+    // Try with fewer differentiators
+    for (let i = identity.differentiators.length - 1; i >= 0; i--) {
+      const shorter = [...identity.primary, ...identity.differentiators.slice(0, i)].join(' ').trim();
+      if (shorter.length <= MAX_TAB_LENGTH || i === 0) {
+        title = shorter;
+        break;
+      }
+    }
+  }
+  return title;
 }
 
 /**
