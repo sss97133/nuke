@@ -19,6 +19,7 @@ import { FeedEmptyState } from './FeedEmptyState';
 import { VehicleCard } from './VehicleCard';
 import { BrandHeartbeat } from './heartbeat/BrandHeartbeat';
 import { FeedStatCard } from './FeedStatCard';
+import { SignalCard, useSignalCards } from './SignalCard';
 import { InterestsBar } from './InterestsBar';
 import { RecentlyViewed } from './RecentlyViewed';
 import { HeroPanel, type HeroDimension, type HeroFilter } from './HeroPanel';
@@ -255,13 +256,29 @@ export default function FeedPage() {
   const singleMake = filters.makes.length === 1 ? filters.makes[0] : undefined;
   const singleModel = singleMake && filters.models.length === 1 ? filters.models[0] : undefined;
 
-  // Stat card renderer for FeedLayout
+  // Signal cards — inject drama and live-market feel between vehicle rows
+  const signalCards = useSignalCards(vehicles, viewedIds);
+
+  // Combined stat/signal card renderer for FeedLayout.
+  // Odd slots get signal cards, even slots get stat cards.
   const renderStatCard = useCallback(
-    (index: number) => (
-      <FeedStatCard index={index} stats={stats} filteredStats={filteredStats} />
-    ),
-    [stats, filteredStats],
+    (index: number) => {
+      // Alternate: signal card slots and stat card slots
+      if (signalCards.length > 0 && index % 2 === 0) {
+        const signalIdx = Math.floor(index / 2) % signalCards.length;
+        const signal = signalCards[signalIdx];
+        if (signal) {
+          return <SignalCard data={signal} />;
+        }
+      }
+      return <FeedStatCard index={index} stats={stats} filteredStats={filteredStats} />;
+    },
+    [stats, filteredStats, signalCards],
   );
+
+  // Signal cards are taller than stat cards — estimate height for virtualizer
+  const hasSignals = signalCards.length > 0;
+  const signalCardHeight = hasSignals ? 200 : 48;
 
   // CSS custom property for font size control
   const feedStyle = useMemo(() => ({
@@ -373,6 +390,7 @@ export default function FeedPage() {
                 renderCard={renderCard}
                 renderStatCard={renderStatCard}
                 statCardInterval={5}
+                statCardHeight={signalCardHeight}
                 sort={sortBy}
                 sortDirection={sortDirection}
                 onSortChange={setSortBy}
