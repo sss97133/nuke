@@ -2,6 +2,13 @@
 
 ## 2026-03-25
 
+### [revenue] Fix 3 deal-flow tasks — exchange tables, invoice payments, Stripe Connect
+- **Exchange trade flow (P80)**: `market_orders` and `market_trades` tables were dropped by `drop-empty-tables-cascade.sql`. Recreated with full schema, RLS policies, indexes, and service_role grants. The `match_order_book()`, `cancel_market_order()`, `execute_trade()` RPCs and Portfolio.tsx now have their backing tables. 6 vehicle_offerings exist in `trading` status, 6 share_holdings, 4 market_funds, 1 user_cash_balance.
+- **Stripe invoice payment (P75)**: The `stripe-webhook` handler called `mark_invoice_paid(p_payment_token)` but the RPC didn't exist. Created it with idempotent paid marking. Added `payment_token` column to `generated_invoices`. 7 invoices exist (all unpaid). **Remaining blocker**: No frontend "Pay Invoice" button that creates a Stripe Checkout session with `purchase_type: 'invoice_payment'` metadata. The webhook handler is now ready to receive these.
+- **Stripe Connect onboarding (P60)**: Added `onboarding_complete`, `payments_enabled`, `requirements_status`, `capabilities`, `updated_at` columns to `stripe_connect_accounts`. Updated webhook to persist V2 thin event status changes. Updated `stripe-connect-account` status action to write-through to DB. Frontend now loads account from DB (not just localStorage). 1 test account exists (`acct_1SKfhxAWmE1NEb2Y`, NULL user_id).
+- All Stripe secrets confirmed set: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PUBLISHABLE_KEY`, etc.
+- Deployed: `stripe-webhook`, `stripe-connect-account`
+
 ### [data] Dead source revival — Mecum, Barrett-Jackson, RM Sotheby's, Gooding back online
 - **Mecum**: Discovered Algolia search index (App: U6CFCQ7V52, 303K lots). Created `scripts/mecum-algolia-discovery.mjs`. Queued 18,516 new lots from 10 recent auctions (Kissimmee 2026, Indy 2025, Glendale 2026, etc). Created `mecum-batch-from-queue` cron (every 5 min).
 - **Barrett-Jackson**: Discovered public Strapi API at `barrett-jackson.com/api/docket` (63,832 lots). Created `scripts/bj-api-discovery.mjs`. Queued 10K+ lots. Full 63K discovery running in background. Created `bj-batch-from-queue` cron (every 5 min).
