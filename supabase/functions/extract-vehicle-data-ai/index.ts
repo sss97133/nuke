@@ -171,9 +171,11 @@ Deno.serve(async (req) => {
     let llmConfig;
     let llmResponse;
     const providerModels: [LLMProvider, string][] = [
+      // Google first — 10K/day free tier, $0.15/MTok input after
+      ['google', 'gemini-2.5-flash'],
+      // Anthropic fallback — $1/MTok input
       ['anthropic', 'claude-haiku-4-5-20251001'],
-      ['google', 'gemini-2.5-flash-preview-05-20'],
-      // OpenAI quota exhausted as of 2026-03 — keep as last resort
+      // OpenAI quota exhausted as of 2026-03
       // ['openai', 'gpt-4o-mini'],
     ];
     let lastError: Error | null = null;
