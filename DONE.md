@@ -2,6 +2,16 @@
 
 ## 2026-03-25
 
+### [data] Dead source revival — Mecum, Barrett-Jackson, RM Sotheby's, Gooding back online
+- **Mecum**: Discovered Algolia search index (App: U6CFCQ7V52, 303K lots). Created `scripts/mecum-algolia-discovery.mjs`. Queued 18,516 new lots from 10 recent auctions (Kissimmee 2026, Indy 2025, Glendale 2026, etc). Created `mecum-batch-from-queue` cron (every 5 min).
+- **Barrett-Jackson**: Discovered public Strapi API at `barrett-jackson.com/api/docket` (63,832 lots). Created `scripts/bj-api-discovery.mjs`. Queued 10K+ lots. Full 63K discovery running in background. Created `bj-batch-from-queue` cron (every 5 min).
+- **RM Sotheby's**: Processed 14 auctions (PA26, AZ26, CC26, MI26, S0226, and 2024-2025 auctions). Created 56 new vehicles. Existing `rmsothebys-discovery` cron continues.
+- **Broad Arrow**: Confirmed merged into RM Sotheby's. broadarrowauctions.com returns 403. Their lots now served via RM.
+- **Collecting Cars**: Discovery working, 198 active listings all already known. Cron active.
+- **Gooding**: Sitemap discovery found 9,278 lots. Batch extraction crons active.
+- **Hagerty**: Re-enabled listing_feed. Extractor works. Needs GraphQL discovery.
+- **Hemmings**: Still blocked by Cloudflare 403. Needs Firecrawl.
+
 ### [data] Niche collector car site onboarding — 20 sources registered, ~98K URLs queued
 - **5 new RSS feeds registered and flowing** (poll-listing-feeds cron, every 15min):
   - barnfinds.com (17 items, vehicle titles auto-parsed to Y/M/M)

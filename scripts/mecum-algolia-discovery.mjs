@@ -158,7 +158,8 @@ async function queueNewLots(lots) {
     return 0;
   }
 
-  const MECUM_SOURCE_ID = 'fee71d50-c59c-4340-b819-cd9a7d074d7f';
+  // scrape_sources.id for "Mecum Live Auctions"
+  const MECUM_SOURCE_ID = 'aacb688b-41d4-407c-8d5e-348ce7f02a18';
 
   // Insert into import_queue in batches
   let queued = 0;

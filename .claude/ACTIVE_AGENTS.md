@@ -11,6 +11,8 @@
 
 17:45 | NICHE-FEED-ONBOARDING | DONE (Classic Driver 48K background ingest still running — ~20K/48K done, will complete automatically via background node process) | listing_feeds, observation_sources, import_queue
 
+18:00 | DEAD-SOURCE-REVIVAL | DONE — Revived Mecum (18.5K queued via Algolia), Barrett-Jackson (10K+ queued via API), RM Sotheby's (processed 14 auctions), Gooding (9K discovered). New crons: mecum-batch-from-queue, bj-batch-from-queue. Full BJ discovery (63K) still running in background. | import_queue, cron.job, scripts/
+
 ---
 
 
