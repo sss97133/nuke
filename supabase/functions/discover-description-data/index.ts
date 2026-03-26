@@ -350,16 +350,18 @@ Deno.serve(async (req) => {
     // --- CONDITION BACKFILL MODE ---
     if (mode === "condition_backfill") {
       const backfillBatch = Math.max(1, Math.min(body.batch_size || 20, 50));
+      // Min 500 chars — shorter descriptions rarely contain condition data
       const { data: rows, error } = await supabase.rpc("execute_sql", {
         query: `SELECT v.id, v.year, v.make, v.model, v.description
                 FROM vehicles v
                 WHERE v.description IS NOT NULL
-                  AND length(v.description) >= 100
+                  AND length(v.description) >= 500
                   AND v.deleted_at IS NULL
                   AND NOT EXISTS (
                     SELECT 1 FROM vehicle_observations vo
                     WHERE vo.vehicle_id = v.id AND vo.kind = 'condition'
                   )
+                ORDER BY length(v.description) DESC
                 LIMIT ${backfillBatch}`
       });
 
@@ -386,12 +388,13 @@ Deno.serve(async (req) => {
         if (Date.now() - startTime > 50000) break;
         try {
           const { conditions, model: condModel } = await extractConditionsWithLLM(vehicle.description, vehicle);
+          console.log(`[discover-desc] ${vehicle.year} ${vehicle.make} ${vehicle.model}: LLM=${condModel}, ${conditions.length} conditions found, desc=${vehicle.description.length} chars`);
           const { ingested, errors: errs } = await ingestConditionObservations(
             vehicle.id, conditions, supabaseUrl, serviceKey, condModel
           );
           totalIngested += ingested;
           totalErrors += errs;
-          console.log(`[discover-desc] Backfill ${vehicle.year} ${vehicle.make} ${vehicle.model}: ${ingested} conditions`);
+          console.log(`[discover-desc] Backfill ${vehicle.year} ${vehicle.make} ${vehicle.model}: ${ingested} ingested, ${errs} errors`);
         } catch (e: any) {
           totalErrors++;
           console.error(`[discover-desc] Backfill error ${vehicle.id}: ${e.message}`);
@@ -402,7 +405,7 @@ Deno.serve(async (req) => {
       const { data: remData } = await supabase.rpc("execute_sql", {
         query: `SELECT EXISTS(
                   SELECT 1 FROM vehicles v
-                  WHERE v.description IS NOT NULL AND length(v.description) >= 100
+                  WHERE v.description IS NOT NULL AND length(v.description) >= 500
                   AND v.deleted_at IS NULL
                   AND NOT EXISTS (
                     SELECT 1 FROM vehicle_observations vo
@@ -415,7 +418,8 @@ Deno.serve(async (req) => {
 
       // Self-chain if requested
       const shouldContinue = body.continue ?? false;
-      if (shouldContinue && hasMore && totalIngested > 0) {
+      // Chain if more work exists — even if this batch had errors (LLM rate limits are transient)
+      if (shouldContinue && hasMore) {
         fetch(`${supabaseUrl}/functions/v1/discover-description-data`, {
           method: "POST",
           headers: {
