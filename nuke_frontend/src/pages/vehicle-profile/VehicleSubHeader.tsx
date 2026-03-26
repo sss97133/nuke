@@ -504,9 +504,9 @@ function resolveFinance(vehicle: any): { label: string; variant: string; tooltip
     return { label: 'FAIR MARKET', variant: 'finance', tooltip: `Estimate ${formatPrice(estimate)} vs ${formatPrice(salePrice)} (${pct >= 0 ? '+' : ''}${pct}%)`, color: TOKEN.ink2 };
   }
   if (diff > 0) {
-    return { label: `+${absPct}% UNDER`, variant: 'finance', tooltip: `Underpriced: estimate ${formatPrice(estimate)} vs paid ${formatPrice(salePrice)}`, color: '#004225' };
+    return { label: `${absPct}% UNDER EST`, variant: 'finance', tooltip: `Price ${formatPrice(salePrice)} vs estimate ${formatPrice(estimate)}`, color: 'var(--success, #004225)' };
   }
-  return { label: `${absPct}% OVER`, variant: 'finance', tooltip: `Overpriced: estimate ${formatPrice(estimate)} vs paid ${formatPrice(salePrice)}`, color: '#8a0020' };
+  return { label: `${absPct}% OVER EST`, variant: 'finance', tooltip: `Price ${formatPrice(salePrice)} vs estimate ${formatPrice(estimate)}`, color: 'var(--error, #8a0020)' };
 }
 
 // ---------------------------------------------------------------------------
