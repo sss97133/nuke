@@ -11,5 +11,4 @@
 
 ---
 
-17:00 | CLASSICCARS-RESEARCH | Researching ClassicCars.com structure, mapping URLs, registering as observation source, queueing listings | observation_sources, import_queue
 

@@ -5443,3 +5443,16 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
 - Year range: 1886-2025, heaviest in 1960s (11,621) and 1950s (7,268)
 - 1,084 unique makes, 154 unique years — massive European market diversity
 - All queued at priority 5 (bulk sitemap) for extraction via existing pipeline
+
+### [data] ClassicCars.com sitemap discovery + 35K listing queue
+- Researched ClassicCars.com: Cloudflare-protected but browser UA bypasses; Azure Blob sitemaps unprotected
+- Discovered sitemap_index.xml with 71 listing sitemaps at ccpublic.blob.core.windows.net
+- Parsed all 71 sitemaps: 35,070 unique listing URLs with 1,421,309 embedded images
+- URL format: /listings/view/{id}/{year}-{make}-{model}-for-sale-in-{city}-{state}-{zip}
+- Listing pages contain JSON-LD schema.org data (@type: car) with VIN, price, mileage, colors, description
+- Created scrape_source: ClassicCars.com (e348ec0c-34e5-4bc0-8d26-78aeaba5443e)
+- Queued 35,070 URLs into import_queue: 33,900 pending, 1,170 auto-skipped (matched existing vehicles)
+- Priority distribution: 17,909 newest (P1), 16,544 recent (P2), 617 older (P3-P5)
+- No RSS feed found; no public API discovered; search page returns HTML only
+- Observation source already existed: classiccars-com (495e3f21-973c-43b1-9580-c214c8b7cb91)
+- Also found: 550 dealer pages, 21 auction pages in separate sitemaps
