@@ -340,6 +340,55 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
         )}
       </div>
 
+      {/* Description snippet */}
+      {vehicle.description && (
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
+          <Label>DESCRIPTION</Label>
+          <p style={{
+            fontFamily: sans, fontSize: 10, color: '#444',
+            lineHeight: 1.4, margin: '4px 0 0',
+          }}>
+            {vehicle.description.length > 200
+              ? vehicle.description.slice(0, 200) + '...'
+              : vehicle.description}
+            {vehicle.description.length > 200 && (
+              <a
+                href={`/vehicle/${vehicle.id}`}
+                style={{
+                  fontFamily: sans, fontSize: 9, fontWeight: 700,
+                  color: '#2a2a2a', textDecoration: 'none',
+                  marginLeft: 4, borderBottom: '1px dashed #999',
+                }}
+              >
+                READ MORE
+              </a>
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* Source listing link */}
+      {(vehicle.discovery_url || vehicle.listing_url) && (
+        <div style={{ padding: '6px 12px', borderBottom: '1px solid #ccc' }}>
+          <a
+            href={vehicle.discovery_url || vehicle.listing_url || '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontFamily: mono, fontSize: 9, fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.3px',
+              color: '#2a2a2a', textDecoration: 'none',
+              borderBottom: '1px dashed #999',
+              transition: 'border-color 150ms ease',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderBottomColor = '#2a2a2a'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderBottomColor = '#999'; }}
+          >
+            VIEW ON SOURCE &rarr;
+          </a>
+        </div>
+      )}
+
       {/* View full profile link */}
       <div style={{ padding: '0 12px 10px', textAlign: 'right' }}>
         <a

@@ -28,6 +28,8 @@ export interface CardShellProps {
   popupTitle?: string;
   /** Card price text for popup */
   popupPrice?: string;
+  /** Source URL for "VIEW ON SOURCE" link */
+  popupSourceUrl?: string | null;
   /** Numeric display price — stored in view history for price-drop detection */
   displayPrice?: number | null;
   style?: CSSProperties;
@@ -45,6 +47,7 @@ export function CardShell({
   popupImageUrl,
   popupTitle,
   popupPrice,
+  popupSourceUrl,
   displayPrice,
   style,
   onHoverStart,
@@ -196,6 +199,7 @@ export function CardShell({
           imageUrl={popupImageUrl}
           title={popupTitle}
           price={popupPrice}
+          sourceUrl={popupSourceUrl}
           expandedContent={expandedContent}
           onClose={() => setPopupOpen(false)}
         />,
@@ -212,6 +216,7 @@ function VehiclePopupOverlay({
   imageUrl,
   title,
   price,
+  sourceUrl,
   expandedContent,
   onClose,
 }: {
@@ -219,6 +224,7 @@ function VehiclePopupOverlay({
   imageUrl?: string | null;
   title?: string;
   price?: string;
+  sourceUrl?: string | null;
   expandedContent?: ReactNode;
   onClose: () => void;
 }) {
@@ -322,6 +328,36 @@ function VehiclePopupOverlay({
         {expandedContent && (
           <div style={{ padding: '8px 12px' }}>
             {expandedContent}
+          </div>
+        )}
+
+        {/* Source listing link */}
+        {sourceUrl && (
+          <div style={{
+            padding: '6px 12px',
+            borderTop: '1px solid var(--border, #e0e0e0)',
+          }}>
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                fontFamily: "'Courier New', monospace",
+                fontSize: '9px',
+                fontWeight: 700,
+                textTransform: 'uppercase' as const,
+                letterSpacing: '0.3px',
+                color: 'var(--text, #1a1a1a)',
+                textDecoration: 'none',
+                borderBottom: '1px dashed var(--border, #999)',
+                transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderBottomColor = 'var(--text, #1a1a1a)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderBottomColor = 'var(--border, #999)'; }}
+            >
+              VIEW ON SOURCE &rarr;
+            </a>
           </div>
         )}
 
