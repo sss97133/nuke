@@ -21,12 +21,22 @@ import React, {
 } from 'react';
 import { PopupContainer } from './PopupContainer';
 
+export type PopupSize = 's' | 'm' | 'l';
+
+export const POPUP_SIZE_WIDTHS: Record<PopupSize, number> = {
+  s: 360,
+  m: 460,
+  l: 700,
+};
+
 export interface PopupEntry {
   id: string;
   title: string;
   content: ReactNode;
   width: number;
   searchable: boolean;
+  minimized: boolean;
+  size: PopupSize;
 }
 
 export interface PopupStackContextValue {
@@ -35,6 +45,8 @@ export interface PopupStackContextValue {
   pop: (id: string) => void;
   popTop: () => void;
   closeAll: () => void;
+  toggleMinimize: (id: string) => void;
+  setSize: (id: string, size: PopupSize) => void;
 }
 
 export const PopupStackContext = createContext<PopupStackContextValue | null>(null);
@@ -49,9 +61,10 @@ export function PopupStackProvider({ children }: { children: ReactNode }) {
   const stackRef = useRef(stack);
   stackRef.current = stack;
 
-  const push = useCallback((content: ReactNode, title: string, width = 420, searchable = true): string => {
+  const push = useCallback((content: ReactNode, title: string, width = 460, searchable = true): string => {
     const id = nextId();
-    setStack((prev) => [...prev, { id, title, content, width, searchable }]);
+    const size: PopupSize = width <= 360 ? 's' : width >= 700 ? 'l' : 'm';
+    setStack((prev) => [...prev, { id, title, content, width, searchable, minimized: false, size }]);
     return id;
   }, []);
 
@@ -70,13 +83,33 @@ export function PopupStackProvider({ children }: { children: ReactNode }) {
     setStack([]);
   }, []);
 
-  const value: PopupStackContextValue = { stack, push, pop, popTop, closeAll };
+  const toggleMinimize = useCallback((id: string) => {
+    setStack((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, minimized: !p.minimized } : p)),
+    );
+  }, []);
+
+  const setSize = useCallback((id: string, size: PopupSize) => {
+    setStack((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, size, width: POPUP_SIZE_WIDTHS[size] } : p,
+      ),
+    );
+  }, []);
+
+  const value: PopupStackContextValue = { stack, push, pop, popTop, closeAll, toggleMinimize, setSize };
 
   return (
     <PopupStackContext.Provider value={value}>
       {children}
       {stack.length > 0 && (
-        <PopupContainer stack={stack} onClose={pop} onCloseTop={popTop} />
+        <PopupContainer
+          stack={stack}
+          onClose={pop}
+          onCloseTop={popTop}
+          onToggleMinimize={toggleMinimize}
+          onSetSize={setSize}
+        />
       )}
     </PopupStackContext.Provider>
   );
