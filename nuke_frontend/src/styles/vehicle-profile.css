@@ -434,7 +434,7 @@
 
 /* Expanded heatmap */
 .barcode-heatmap {
-  padding: 10px 12px 12px;
+  padding: 8px 12px 8px;
   background: var(--vp-surface);
   position: relative;
   display: none;
@@ -442,14 +442,7 @@
 .barcode-strip--expanded .barcode-heatmap { display: block; }
 .barcode-strip--expanded .barcode-bar { border-bottom: 1px solid var(--vp-ghost); }
 
-.timeline-section__header {
-  font-size: 8px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--vp-pencil);
-  margin-bottom: 8px;
-}
+/* .timeline-section__header removed — redundant with barcode-bar labels */
 
 .timeline-heatmap {
   position: relative;
@@ -495,6 +488,20 @@
 .hm-c.l3 { background: var(--heat-4, #059669); }
 .hm-c.l4 { background: var(--heat-5, #047857); }
 .hm-c.empty { background: transparent; }
+.hm-gap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  flex-shrink: 0;
+}
+.hm-gap__dots {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--vp-pencil);
+  letter-spacing: 1px;
+  line-height: 1;
+}
 .hm-months {
   position: relative;
   height: 12px;
