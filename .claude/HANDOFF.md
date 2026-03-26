@@ -295,3 +295,63 @@ none
 2. Read above "What Was Happening" section
 3. Check git log if more detail needed: `git log --oneline -10`
 4. Register in .claude/ACTIVE_AGENTS.md before starting
+
+---
+# Auto-Checkpoint — 2026-03-26 00:13:18
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+2ed610acd Fix hero_newest: use v.source not platform fields, fix source abbreviations
+
+## Uncommitted Changes
+none
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 00:17:07
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+2ed610acd Fix hero_newest: use v.source not platform fields, fix source abbreviations
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 00:36:08
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+2ed610acd Fix hero_newest: use v.source not platform fields, fix source abbreviations
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/VehicleBadgeBar.tsx
+nuke_frontend/src/pages/vehicle-profile/VehicleSubHeader.tsx
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`

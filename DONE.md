@@ -1,5 +1,14 @@
 # DONE — Completed Work Log
 
+## 2026-03-26
+
+### [library] Applied Ontology Research Paper Trilogy
+- Created 3 interconnected papers in `docs/library/intellectual/papers/`:
+  - `applied-ontology-vehicle-domain.md` — Framework paper positioning Nuke within formal ontology research. Cites Gruber, Guarino, CIDOC-CRM, PROV-O, DOLCE, BFO, Goldman, Shapin, Deleuze. Covers: immutable identity ontology, epistemological trust layer, schema-as-prompt, actor layer, rhizomatic connectivity, ontological pluralism.
+  - `applied-ontology-evidence-map.md` — Evidence map tracing every theoretical claim to exact tables, functions, row counts, code paths. 3.3M observations, 158 sources, 14 half-life tiers, 63 component tables, 150+ views.
+  - `novel-ontological-contributions.md` — Seven novel contributions ahead of the formal literature: spatial condition ontology, palimpsest lifecycle model, recursive epistemological decay, disagreement-as-data, executable domain axioms, image fact fabric, component-level total resolution. Includes open research agenda.
+- Content positions platform as active participant in applied ontology research
+
 ## 2026-03-25
 
 ### [data-quality] Enrichment Quality Metrics RPC — enrichment_quality_report()

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
+import { supabase } from '../../lib/supabase';
 import OrphanedVehicleBanner from '../../components/vehicle/OrphanedVehicleBanner';
 
 const LiveAuctionBanner = React.lazy(() => import('../../components/auction/LiveAuctionBanner'));
@@ -14,6 +15,14 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
   onMergeComplete,
 }) => {
   const { vehicle, session, permissions, auctionPulse, auctionCurrency, isVerifiedOwner } = useVehicleProfile();
+  // Fetch live comment count instead of stale auctionPulse.comment_count
+  const [liveCommentCount, setLiveCommentCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!vehicle?.id) return;
+    supabase.from('auction_comments').select('id', { count: 'exact', head: true })
+      .eq('vehicle_id', vehicle.id)
+      .then(({ count }) => { if (count != null && count > 0) setLiveCommentCount(count); });
+  }, [vehicle?.id]);
   if (!vehicle) return null;
 
   return (
@@ -67,7 +76,7 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
             currentBid={typeof auctionPulse?.current_bid === 'number' ? auctionPulse.current_bid : null}
             bidCount={typeof auctionPulse?.bid_count === 'number' ? auctionPulse.bid_count : null}
             watcherCount={typeof auctionPulse?.watcher_count === 'number' ? auctionPulse.watcher_count : null}
-            commentCount={typeof auctionPulse?.comment_count === 'number' ? auctionPulse.comment_count : null}
+            commentCount={liveCommentCount || (typeof auctionPulse?.comment_count === 'number' ? auctionPulse.comment_count : null)}
             endDate={auctionPulse?.end_date || null}
             listingStatus={auctionPulse?.listing_status || null}
             lastUpdatedAt={auctionPulse?.updated_at || null}
