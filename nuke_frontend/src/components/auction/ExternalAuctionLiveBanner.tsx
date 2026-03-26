@@ -29,7 +29,7 @@ interface ExternalAuctionLiveBannerProps {
   lastUpdatedAt: string | null;
 }
 
-/** Short abbreviation shown in the dark platform badge */
+/** Short abbreviation shown in the platform badge */
 const platformShortNames: Record<string, string> = {
   bat: 'BAT',
   cars_and_bids: 'C&B',
@@ -311,7 +311,7 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               style={{
                 background: 'var(--success)',
                 border: '2px solid var(--success)',
-                color: '#000',
+                color: '#fff',
                 padding: '4px 14px',
                 fontSize: '10px',
                 fontWeight: 700,
@@ -332,8 +332,8 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
             onClick={handleViewListing}
             style={{
               background: 'transparent',
-              border: '2px solid #555',
-              color: '#ccc',
+              border: '2px solid var(--text)',
+              color: 'var(--text)',
               padding: '4px 14px',
               fontSize: '10px',
               fontWeight: 600,
@@ -343,12 +343,14 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               fontFamily: 'Arial, sans-serif',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#888';
-              e.currentTarget.style.color = '#fff';
+              e.currentTarget.style.borderColor = 'var(--text)';
+              e.currentTarget.style.color = 'var(--text)';
+              e.currentTarget.style.background = 'var(--surface-hover)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#555';
-              e.currentTarget.style.color = '#ccc';
+              e.currentTarget.style.borderColor = 'var(--text)';
+              e.currentTarget.style.color = 'var(--text)';
+              e.currentTarget.style.background = 'transparent';
             }}
           >
             VIEW LISTING
@@ -365,17 +367,17 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
             flexDirection: 'column',
             gap: '2px',
             padding: '6px 10px',
-            background: '#1a1a1a',
-            border: '2px solid #444',
+            background: 'var(--bg)',
+            border: '2px solid var(--border)',
           }}
         >
-          <span style={{ fontSize: '8px', color: '#777', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Current Bid</span>
+          <span style={{ fontSize: '8px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Current Bid</span>
           <span
             style={{
               fontSize: '16px',
               fontWeight: 700,
               fontFamily: "'Courier New', monospace",
-              color: '#fff',
+              color: 'var(--text)',
               transition: 'all 0.3s ease',
               transform: bidChanged ? 'scale(1.1)' : 'scale(1)',
               display: 'inline-block',
@@ -392,12 +394,12 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
             flexDirection: 'column',
             gap: '2px',
             padding: '6px 10px',
-            background: '#1a1a1a',
-            border: '2px solid #333',
+            background: 'var(--bg)',
+            border: '2px solid var(--border)',
           }}
         >
-          <span style={{ fontSize: '8px', color: '#777', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Bids</span>
-          <span style={{ fontSize: '13px', fontWeight: 600, fontFamily: "'Courier New', monospace", color: '#ccc' }}>
+          <span style={{ fontSize: '8px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Bids</span>
+          <span style={{ fontSize: '13px', fontWeight: 600, fontFamily: "'Courier New', monospace", color: 'var(--text)' }}>
             {bidCount ?? '--'}
           </span>
         </div>
@@ -410,12 +412,12 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               flexDirection: 'column',
               gap: '2px',
               padding: '6px 10px',
-              background: '#1a1a1a',
-              border: '2px solid #333',
+              background: 'var(--bg)',
+              border: '2px solid var(--border)',
             }}
           >
-            <span style={{ fontSize: '8px', color: '#777', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Watching</span>
-            <span style={{ fontSize: '13px', fontWeight: 600, fontFamily: "'Courier New', monospace", color: '#ccc' }}>
+            <span style={{ fontSize: '8px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Watching</span>
+            <span style={{ fontSize: '13px', fontWeight: 600, fontFamily: "'Courier New', monospace", color: 'var(--text)' }}>
               {watcherCount.toLocaleString()}
             </span>
           </div>
@@ -429,12 +431,12 @@ export const ExternalAuctionLiveBanner: React.FC<ExternalAuctionLiveBannerProps>
               flexDirection: 'column',
               gap: '2px',
               padding: '6px 10px',
-              background: '#1a1a1a',
-              border: '2px solid #333',
+              background: 'var(--bg)',
+              border: '2px solid var(--border)',
             }}
           >
-            <span style={{ fontSize: '8px', color: '#777', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Comments</span>
-            <span style={{ fontSize: '13px', fontWeight: 600, fontFamily: "'Courier New', monospace", color: '#ccc' }}>
+            <span style={{ fontSize: '8px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Comments</span>
+            <span style={{ fontSize: '13px', fontWeight: 600, fontFamily: "'Courier New', monospace", color: 'var(--text)' }}>
               {commentCount}
             </span>
           </div>
