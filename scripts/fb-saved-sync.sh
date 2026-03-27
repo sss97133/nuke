@@ -131,22 +131,31 @@ on run
           const m=l.href.match(/\\/marketplace\\/item\\/(\\d+)/);
           if(!m)continue;
           const fid=m[1];if(seen.has(fid))continue;seen.add(fid);
-          let card=l;for(let i=0;i<3;i++)if(card.parentElement)card=card.parentElement;
+          let card=l;for(let i=0;i<5;i++)if(card.parentElement)card=card.parentElement;
           const lines=(card.innerText||'').split('\\n').map(x=>x.trim()).filter(Boolean);
           if(lines.length<2)continue;
           const title=lines[0];
           if(NV.some(r=>r.test(title)))continue;
-          let price=null,seller=null,sold=false;
+          let price=null,seller=null,sold=false,location=null;
           const meta=lines[1];
           const pm=meta.match(/\\$(\\d[\\d,]*)/);
           if(pm)price=parseInt(pm[1].replace(/,/g,''),10);
           const parts=meta.split(/\\s*[\\u00b7\\u2022]\\s*/);
           if(parts.length>=3)seller=parts[2].replace(/\\s*Sold\\s*$/,'').trim()||null;
           sold=/\\bSold\\b/i.test(meta);
+          // Extract location from lines (often 'Saved from X in Y' or location line)
+          for(const ln of lines){
+            const lm=ln.match(/^([A-Z][a-z]+(?:\\s[A-Z][a-z]+)*),\\s*([A-Z]{2})$/);
+            if(lm){location=lm[0];break;}
+          }
+          // Extract thumbnail image
+          const imgs=[...card.querySelectorAll('img')];
+          const imgSrcs=imgs.map(i=>i.src).filter(s=>s&&(s.includes('scontent')||s.includes('fbcdn'))&&!s.includes('profile')&&!s.includes('emoji'));
           const p=pt(title);
           if(!p.year)continue;
           vs.push({facebook_id:fid,title:title,year:p.year,price:price,
-            seller:seller,sold:sold,parsed_make:p.make,parsed_model:p.model});
+            seller:seller,sold:sold,parsed_make:p.make,parsed_model:p.model,
+            location:location,image_url:imgSrcs[0]||null});
         }
         return JSON.stringify({vehicles:vs,total:vs.length});
       })();

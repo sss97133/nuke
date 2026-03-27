@@ -267,6 +267,76 @@ dotenvx run -- node scripts/fb-marketplace-local-scraper.mjs --all --max-pages 5
 dotenvx run -- node scripts/fb-marketplace-local-scraper.mjs --location austin --dry-run
 ```
 
+### Saved Items Pipeline (Automatic)
+
+A separate pipeline extracts vehicles the user saves on Facebook Marketplace. Unlike the geographic sweep (which discovers new listings across metros), this pipeline captures vehicles the user has already identified as interesting.
+
+**Architecture**: Two-phase extraction via AppleScript + curl, running as a macOS LaunchAgent.
+
+```
+User saves vehicle on FB Marketplace
+    ↓ (≤30 min — LaunchAgent fires)
+fb-saved-sync.sh
+    Phase 1: AppleScript → Chrome → facebook.com/saved
+             Auto-scrolls, parses DOM for titles/prices/sellers/images
+             Returns JSON array of vehicles
+    Phase 2: curl POSTs batch to extract-facebook-marketplace (mode: "batch")
+    ↓
+marketplace_listings (upserted, tagged source=facebook_saved)
+    ↓ (5 min cron: fb-marketplace-refine)
+refine-fb-listing → title parsing, structured field extraction
+    ↓ (5 min cron: fb-marketplace-import)
+import-fb-marketplace → vehicle record created (image gate bypassed for saved items)
+    ↓ (5-10 min crons: enrich-fb-marketplace-*)
+enrich-bulk → description mining for VIN, engine, transmission, colors
+    ↓
+Fully resolved vehicle profile (~35-50 min from save to complete)
+```
+
+**Why two phases?** Facebook's Content Security Policy blocks cross-origin `fetch()` from their pages. The browser JS extracts data from the DOM, but the HTTP POST to Supabase must happen outside the browser via `curl`.
+
+**Key implementation details:**
+
+| Component | File | What it does |
+|-----------|------|-------------|
+| LaunchAgent | `~/Library/LaunchAgents/com.nuke.fb-saved-sync.plist` | Fires every 30 min |
+| Sync script | `scripts/fb-saved-sync.sh` | AppleScript + curl orchestrator |
+| Batch endpoint | `extract-facebook-marketplace` (mode: "batch") | Upserts array of saved items |
+| Extractor JS | `scripts/fb-saved-extractor.js` | Standalone version (console/bookmarklet) |
+
+**Requirements:**
+- Chrome open with a facebook.com tab (any FB page works — script navigates to /saved)
+- Chrome → View → Developer → Allow JavaScript from Apple Events (one-time toggle)
+- Skips silently if Chrome is closed or no FB tab exists
+
+**Saved items bypass the image quality gate** in `import-fb-marketplace`. Geographic sweep listings are blocked without images (too much garbage), but saved items are user-curated — if someone saved it, it's a real vehicle. Images are backfilled later by the enrichment pipeline.
+
+**Description enrichment** requires a residential IP (Facebook blocks cloud/datacenter IPs on individual listing pages). The Playwright-based enricher runs locally:
+
+```bash
+# Enrich all saved items missing descriptions
+dotenvx run -- bash -c '
+for fid in $(psql -t -A "$DATABASE_URL" -c "
+  SELECT facebook_id FROM marketplace_listings
+  WHERE raw_scrape_data->'\''agent_context'\''->>'\'session_type'\'' = '\''facebook_saved'\''
+    AND description IS NULL AND status = '\''active'\''"); do
+  node scripts/fb-marketplace-enricher.mjs --facebook-id "$fid"
+done'
+```
+
+**Observed data quality from saved items (75 vehicles, March 2026):**
+
+| Field | Fill Rate | Source |
+|-------|-----------|--------|
+| Year/Make/Model | 100% | Title parsing |
+| Price | 99% | DOM extraction |
+| Seller | 100% | DOM extraction |
+| Description | 96% | Playwright fetch from residential IP |
+| Mileage | 31% | Mined from description |
+| Transmission | 35% | Mined from description |
+| Images | 9% | CDN URLs expire; needs download pipeline |
+| VIN | 0% | FB sellers almost never include VINs |
+
 ---
 
 ## Cars and Bids
