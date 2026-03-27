@@ -2,12 +2,13 @@ import React, { useState, useCallback } from 'react';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { useBuildProfile } from './hooks/useBuildProfile';
+import { useBuildStatus } from './hooks/useBuildStatus';
 
 // Lazy-load heavy components
 const WorkMemorySection = React.lazy(() => import('./WorkMemorySection'));
 const VehicleDossierPanel = React.lazy(() => import('./VehicleDossierPanel'));
 const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/vehicle/VehicleLedgerDocumentsCard').then(m => ({ default: m.VehicleLedgerDocumentsCard })));
-const VehicleDealJacketForensicsCard = React.lazy(() => import('../../components/vehicle/VehicleDealJacketForensicsCard'));
+// Deal Jacket Forensics removed — no pipeline exists yet, re-add when data available
 import WiringQueryContextBar from '../../components/wiring/WiringQueryContextBar';
 const PartsQuoteGenerator = React.lazy(() => import('../../components/PartsQuoteGenerator').then(m => ({ default: m.PartsQuoteGenerator })));
 const VehicleROISummaryCard = React.lazy(() => import('../../components/vehicle/VehicleROISummaryCard'));
@@ -29,6 +30,10 @@ const BuildSpendSummary = React.lazy(() => import('./BuildSpendSummary'));
 const VehicleListingDetailsCard = React.lazy(() => import('../../components/vehicle/VehicleListingDetailsCard'));
 const SimilarSalesSection = React.lazy(() => import('../../components/vehicle/SimilarSalesSection').then(m => ({ default: m.SimilarSalesSection })));
 const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
+const OwnerIdentityCard = React.lazy(() => import('./OwnerIdentityCard'));
+const BuildStatusPanel = React.lazy(() => import('./BuildStatusPanel'));
+
+const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 export type GalleryViewMode = 'ZONES' | 'GRID' | 'FULL' | 'INFO' | 'SESSIONS' | 'CATEGORY' | 'CHRONO' | 'SOURCE';
 
@@ -119,6 +124,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   const [leftPct, setLeftPct] = useState(DEFAULT_LEFT_PCT);
   const [galleryView, setGalleryView] = useState<GalleryViewMode>('CATEGORY');
   const { manifestByCategory, manifestStats, snapshots, spendProfile, loading: buildLoading } = useBuildProfile(vehicle?.id);
+  const { data: buildStatus } = useBuildStatus(vehicle?.id);
 
   const handleResize = useCallback((pct: number) => setLeftPct(pct), []);
   const handleReset = useCallback(() => setLeftPct(DEFAULT_LEFT_PCT), []);
@@ -155,7 +161,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   const paneHeight = `calc(100vh - var(--vp-sticky-top))`;
 
   return (
-    <div style={{ paddingBottom: '200px' }}>
+    <div>
       <div
         className="vp-columns"
         style={{
@@ -181,6 +187,16 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             <VehicleDossierPanel />
           </React.Suspense>
 
+          {/* Owner Identity — the throne */}
+          {buildStatus?.dealJacket?.contact && (
+            <React.Suspense fallback={null}>
+              <OwnerIdentityCard
+                dealJacket={buildStatus.dealJacket}
+                isOwnerView={isRowOwner || isVerifiedOwner || hasContributorAccess}
+              />
+            </React.Suspense>
+          )}
+
           {/* Description */}
           <VehicleDescriptionCard
             vehicleId={vehicle.id}
@@ -188,6 +204,17 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             isEditable={canEdit}
             onUpdate={() => {}}
           />
+
+          {/* Comments & Bids — right after description for natural reading flow */}
+          {totalCommentCount > 0 && (
+            <CollapsibleWidget variant="profile" title="Comments & Bids" defaultCollapsed={false}
+              badge={<span className="widget__count">{totalCommentCount}</span>}
+            >
+              <React.Suspense fallback={null}>
+                <VehicleCommentsCard vehicleId={vehicle.id} session={session} collapsed={false} />
+              </React.Suspense>
+            </CollapsibleWidget>
+          )}
 
           {/* Listing Details — highlights, equipment, modifications, flaws, service history */}
           <React.Suspense fallback={null}>
@@ -215,15 +242,13 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             </React.Suspense>
           </CollapsibleWidget>
 
-          {/* Pricing & Value */}
+          {/* Pricing & Value — self-guarding: returns null when no price data */}
           <VehiclePricingValueCard
             vehicle={vehicle}
             auctionPulse={auctionPulse}
             valuationIntel={valuationIntel as any}
             readinessSnapshot={readinessSnapshot as any}
           />
-
-          {/* Timeline — single timeline is the barcode strip at top of profile; no second timeline section here */}
 
           {/* Build Intelligence — owner/contributor only */}
           {(isRowOwner || isVerifiedOwner || hasContributorAccess) && !buildLoading && manifestStats.total > 0 && (
@@ -248,6 +273,27 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
                 </CollapsibleWidget>
               )}
             </>
+          )}
+
+          {/* Build Status — work order accounting */}
+          {buildStatus?.hasData && buildStatus.workOrders.length > 0 && (
+            <CollapsibleWidget variant="profile" title="Build Status" defaultCollapsed={false}
+              badge={
+                <span className="widget__count" style={{
+                  color: buildStatus.totals.balance > 0 ? 'var(--vp-martini-red)' : 'var(--vp-brg)',
+                }}>
+                  {buildStatus.totals.balance > 0 ? fmt(buildStatus.totals.balance) + ' DUE' : 'PAID'}
+                </span>
+              }
+            >
+              <React.Suspense fallback={null}>
+                <BuildStatusPanel
+                  workOrders={buildStatus.workOrders}
+                  totals={buildStatus.totals}
+                  isOwnerView={isRowOwner || isVerifiedOwner || hasContributorAccess}
+                />
+              </React.Suspense>
+            </CollapsibleWidget>
           )}
 
           {/* Engine Bay Analysis */}
@@ -282,14 +328,14 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             </CollapsibleWidget>
           )}
 
-          {/* Detail sections */}
-          <CollapsibleWidget variant="profile" title="Deal Jacket Forensics" defaultCollapsed={true}>
-            <VehicleDealJacketForensicsCard vehicleId={vehicle.id} />
-          </CollapsibleWidget>
+          {/* ROI Summary — self-guarding: returns null when no data */}
           <VehicleROISummaryCard vehicleId={vehicle.id} />
-          <CollapsibleWidget variant="profile" title="Nuke Estimate" defaultCollapsed={true}>
-            <NukeEstimatePanel vehicleId={vehicle.id} vehicle={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} />
-          </CollapsibleWidget>
+
+          {/* Nuke Estimate — self-guarding: returns null when no estimate + not owner */}
+          <React.Suspense fallback={null}>
+            <NukeEstimatePanel vehicleId={vehicle.id} vehicle={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} canCompute={isRowOwner || isVerifiedOwner || hasContributorAccess} />
+          </React.Suspense>
+
           <CollapsibleWidget variant="profile" title="Auction History" defaultCollapsed={true}>
             <ExternalListingCard vehicleId={vehicle.id} />
           </CollapsibleWidget>
@@ -319,31 +365,34 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
               <VehicleLedgerDocumentsCard vehicleId={vehicle.id} canManage={Boolean(isVerifiedOwner || hasContributorAccess)} />
             </CollapsibleWidget>
           )}
-          <CollapsibleWidget variant="profile" title="Reference Library" defaultCollapsed={true}>
+
+          {/* Reference Library — component handles its own CollapsibleWidget + null guard */}
+          <React.Suspense fallback={null}>
             <VehicleReferenceLibrary vehicleId={vehicle.id} userId={session?.user?.id} year={vehicle.year} make={vehicle.make} series={(vehicle as any).series} model={vehicle.model} bodyStyle={(vehicle as any).body_style} refreshKey={referenceLibraryRefreshKey} onUploadComplete={() => { reloadVehicle(); onSetReferenceLibraryRefreshKey((v) => v + 1); }} />
-          </CollapsibleWidget>
-          <CollapsibleWidget variant="profile" title="Data Sources" defaultCollapsed={true}
-            badge={dataSources.length > 0 ? <span className="widget__count">{dataSources.length}</span> : undefined}
-          >
-            <div>
-              {(importMeta.builder || importMeta.seller) && (
-                <div style={{ fontSize: '8px', color: 'var(--vp-pencil)', marginBottom: '8px' }}>
-                  {importMeta.builder ? `Builder: ${importMeta.builder}` : null}
-                  {importMeta.builder && importMeta.seller ? ' · ' : null}
-                  {importMeta.seller ? `Seller: ${importMeta.seller}` : null}
-                </div>
-              )}
-              {dataSources.length === 0 ? (
-                <div style={{ fontSize: '9px', color: 'var(--vp-pencil)' }}>No external sources attached yet.</div>
-              ) : (
+          </React.Suspense>
+
+          {/* Data Sources — only render if sources exist */}
+          {dataSources.length > 0 && (
+            <CollapsibleWidget variant="profile" title="Data Sources" defaultCollapsed={true}
+              badge={<span className="widget__count">{dataSources.length}</span>}
+            >
+              <div>
+                {(importMeta.builder || importMeta.seller) && (
+                  <div style={{ fontSize: '8px', color: 'var(--vp-pencil)', marginBottom: '8px' }}>
+                    {importMeta.builder ? `Builder: ${importMeta.builder}` : null}
+                    {importMeta.builder && importMeta.seller ? ' · ' : null}
+                    {importMeta.seller ? `Seller: ${importMeta.seller}` : null}
+                  </div>
+                )}
                 <ul style={{ margin: '0', paddingLeft: '18px', fontSize: '9px' }}>
                   {dataSources.map((url) => (
                     <li key={url}><a href={url} target="_blank" rel="noreferrer">{sourceLabel(url)}</a></li>
                   ))}
                 </ul>
-              )}
-            </div>
-          </CollapsibleWidget>
+              </div>
+            </CollapsibleWidget>
+          )}
+
           {!vehicle.isAnonymous && session && (
             <CollapsibleWidget variant="profile" title="Privacy Settings" defaultCollapsed={true}
               badge={<span className="widget__count">{isPublic ? 'PUBLIC' : 'PRIVATE'}</span>}
@@ -357,17 +406,6 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
                   </label>
                 </div>
               </div>
-            </CollapsibleWidget>
-          )}
-
-          {/* Comments & Bids — at bottom of left column; hide when empty */}
-          {totalCommentCount > 0 && (
-            <CollapsibleWidget variant="profile" title="Comments & Bids" defaultCollapsed={false}
-              badge={<span className="widget__count">{totalCommentCount}</span>}
-            >
-              <React.Suspense fallback={null}>
-                <VehicleCommentsCard vehicleId={vehicle.id} session={session} collapsed={false} />
-              </React.Suspense>
             </CollapsibleWidget>
           )}
         </div>

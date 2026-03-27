@@ -116,6 +116,13 @@ export function VehiclePricingValueCard(props: {
     return { rate, amount: Math.round(base * rate) };
   }, [nukeValue, readinessSnapshot?.readiness_score, (valuationIntel as any)?.confidence_score]);
 
+  // No Empty Shells: if no price data at all, don't render
+  const hasMarketData = liveBid || highBid || (sold && salePrice) || auctionPulse?.bid_count;
+  const hasOwnerData = !!askingPrice;
+  const hasNukeData = nukeValue || typeof (valuationIntel as any)?.confidence_score === 'number';
+  const hasFinanceData = financePreview && (financePreview.rate > 0 || financePreview.amount);
+  if (!hasMarketData && !hasOwnerData && !hasNukeData && !hasFinanceData) return null;
+
   const sub = (left: string, right: React.ReactNode, onClick?: () => void) => {
     // Hide rows that only show a dash placeholder
     if (right === '—' || right === '--') return null;

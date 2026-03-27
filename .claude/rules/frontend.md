@@ -44,6 +44,15 @@ Rules:
 - If you change ANY height in the stack, verify every anchor below it still adds up
 - The tab bar CSS (`VehicleTabBar.css`) references `--vp-stick-tab-bar` with a fallback
 
+## Horizontal Alignment
+- All layout containers: `padding: 0 12px`
+- Never inline `position: sticky` or `top:` in React — use CSS tokens only
+
+## No Empty Shells
+- Every widget MUST check for data before rendering. Return null if empty.
+- Never render a CollapsibleWidget whose body says "No data available"
+- If backend pipeline doesn't exist yet, don't render the widget
+
 ## Reference Files
 - Design reference: `/Users/skylar/Downloads/nuke-session-files/`
 - Design book: `docs/library/technical/design-book/`

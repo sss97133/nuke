@@ -69,9 +69,6 @@ const VehicleSubHeader: React.FC = () => {
 
   // --- Styles ---
   const containerStyle: React.CSSProperties = {
-    position:        'sticky',
-    top:             'var(--header-height, 48px)',
-    zIndex:          90,
     height:          36,
     backgroundColor: TOKEN.surface,
     borderBottom:    TOKEN.borderPrimary,

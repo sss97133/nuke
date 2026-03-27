@@ -1,7 +1,7 @@
 .vehicle-tab-bar {
   display: flex;
   gap: 0;
-  padding: 0 8px;
+  padding: 0 12px;
   overflow-x: auto;
   scrollbar-width: none;
   align-items: flex-end;

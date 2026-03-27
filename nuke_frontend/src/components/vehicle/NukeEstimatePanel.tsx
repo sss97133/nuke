@@ -10,6 +10,8 @@ interface NukeEstimatePanelProps {
     make?: string;
     model?: string;
   };
+  /** When false and no estimate exists, the panel returns null instead of showing a compute button. */
+  canCompute?: boolean;
 }
 
 interface NukeEstimate {
@@ -67,7 +69,7 @@ const SIGNAL_LABELS: Record<string, string> = {
   originality: 'Originality',
 };
 
-const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicle }) => {
+const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicle, canCompute = true }) => {
   const [estimate, setEstimate] = useState<NukeEstimate | null>(null);
   const [record, setRecord] = useState<RecordPrice | null>(null);
   const [survival, setSurvival] = useState<SurvivalRate | null>(null);
@@ -150,6 +152,9 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
     }
     setComputing(false);
   };
+
+  // No Empty Shells: if done loading/computing and no estimate, hide for non-owners
+  if (!loading && !computing && !estimate && !canCompute) return null;
 
   if (loading) {
     return (
