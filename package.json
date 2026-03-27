@@ -6,6 +6,7 @@
   "scripts": {
     "access:firecrawl-logs": "tsx scripts/access-firecrawl-logs-api.ts",
     "analyze:missing-make-sources": "tsx scripts/analyze-missing-make-sources.ts",
+    "analyze:user-stylometrics": "node scripts/user-stylometric-analyzer.mjs",
     "audit": "tsx scripts/run-autonomous-audit.ts",
     "audit:bat-titles": "tsx scripts/bat-title-signal-audit.ts",
     "audit:dry-run": "tsx scripts/run-autonomous-audit.ts --dry-run",
