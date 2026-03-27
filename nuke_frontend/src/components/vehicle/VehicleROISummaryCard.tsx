@@ -89,12 +89,17 @@ export default function VehicleROISummaryCard({ vehicleId }: { vehicleId: string
     };
   }, [vehicleId]);
 
+  // No Empty Shells: if RPC returned error or no meaningful data, don't render
+  if (!loading && (error || !data)) return null;
+  const hasAnyData = data?.spend?.attributed_spend_usd != null ||
+    data?.value?.current_value_usd != null ||
+    data?.roi?.roi_30d != null;
+  if (!loading && !hasAnyData) return null;
+
   return (
     <CollapsibleWidget variant="profile" className="vehicle-profile-section" title="Investment Summary" defaultCollapsed={false}>
       {loading ? (
         <div className="text-small text-muted">Loading ROI…</div>
-      ) : error ? (
-        <div className="text-small text-muted">ROI unavailable: {error}</div>
       ) : (
         <div className="vehicle-details">
           {data?.spend?.attributed_spend_usd != null && (

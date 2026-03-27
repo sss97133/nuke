@@ -556,6 +556,9 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
     );
   }
 
+  // No Empty Shells: if no factory books and no profile docs and not logged in, hide entirely
+  if (books.length === 0 && linkedDocs.length === 0 && !userId) return null;
+
   return (
     <>
       <section className="section" id="reference-library-section">

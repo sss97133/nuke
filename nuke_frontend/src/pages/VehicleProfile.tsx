@@ -20,7 +20,6 @@ const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceCon
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
 const BarcodeTimeline = React.lazy(() => import('./vehicle-profile/BarcodeTimeline'));
 
-const QuickStatsBar = React.lazy(() => import('./vehicle-profile/QuickStatsBar'));
 
 const VehicleProfileInner: React.FC = () => {
   const navigate = useNavigate();
@@ -230,8 +229,6 @@ const VehicleProfileInner: React.FC = () => {
             />
           </React.Suspense>
         </div>
-
-        <React.Suspense fallback={null}><QuickStatsBar /></React.Suspense>
 
         {/* Add Organization Relationship Modal */}
         {showAddOrgRelationship && vehicle && session?.user?.id && (
