@@ -606,6 +606,80 @@ async function handleUrlMode(body: { url: string; user_id?: string }) {
   });
 }
 
+// ── Batch Mode (Saved Items) ─────────────────────────────────────────────────
+
+interface BatchInput {
+  mode: "batch";
+  batch: Array<{
+    facebook_id: string;
+    title?: string;
+    price?: number;
+    seller?: string;
+    sold?: boolean;
+    url?: string;
+    parsed_make?: string;
+    parsed_model?: string;
+    year?: number;
+    _source?: string;
+  }>;
+  source?: string;
+}
+
+async function handleBatch(body: BatchInput) {
+  const items = body.batch;
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return jsonResponse({ error: "batch array required" }, 400);
+  }
+
+  const source = body.source || "facebook_saved";
+  const results = { total: items.length, created: 0, updated: 0, skipped: 0, errors: 0 };
+
+  for (const item of items) {
+    try {
+      if (!item.facebook_id) {
+        results.skipped++;
+        continue;
+      }
+
+      const directInput: DirectInput = {
+        mode: "direct",
+        facebook_id: item.facebook_id,
+        url: item.url || `https://www.facebook.com/marketplace/item/${item.facebook_id}/`,
+        title: item.title,
+        price: item.price ?? undefined,
+        parsed_year: item.year ?? undefined,
+        parsed_make: item.parsed_make ?? undefined,
+        parsed_model: item.parsed_model ?? undefined,
+        seller_name: item.seller ?? undefined,
+        status: item.sold ? "sold" : "active",
+        agent_context: {
+          agent_id: "fb-saved-sync",
+          session_type: source,
+        },
+      };
+
+      const resp = await handleDirect(directInput);
+      const respBody = await resp.json();
+
+      if (respBody.is_new) {
+        results.created++;
+      } else {
+        results.updated++;
+      }
+    } catch (e) {
+      console.error(`Batch item error (${item.facebook_id}):`, e);
+      results.errors++;
+    }
+  }
+
+  return jsonResponse({
+    success: true,
+    source,
+    ...results,
+    message: `Synced ${results.created} new, ${results.updated} existing, ${results.skipped} skipped, ${results.errors} errors`,
+  });
+}
+
 // ── Main Handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -615,6 +689,10 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
+
+    if (body.mode === "batch") {
+      return await handleBatch(body as BatchInput);
+    }
 
     if (body.mode === "direct") {
       return await handleDirect(body as DirectInput);

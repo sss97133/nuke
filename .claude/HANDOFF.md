@@ -1,4 +1,34 @@
-# Session Handoff — 2026-03-25 08:30
+# Session Handoff — 2026-03-26 evening
+
+## What Happened (Granholm build tracking session)
+
+User asked "update me on the Granholm build." System failed completely — couldn't resolve the name. Spent full session mapping the gap, extracting data from iMessage/Gmail/QB/Summit, and writing the playbook.
+
+### Complete
+- Full iMessage thread extracted (Dave Granholm +18453002345, 300+ msgs, 120+ photos, Feb 21 - Mar 26)
+- Amazon orders itemized from Gmail (4 orders, $454.50 exhaust parts)
+- Summit order history saved (`~/Downloads/Order History.html`, 10 orders)
+- Exhaust BOM complete (~$1,812, 19 line items)
+- **Playbook written: `docs/playbooks/POST_SALE_BUILD_TRACKING.md`** — THIS IS THE SHIPPABLE PRODUCT
+- Memory updated: `memory/post-sale-build-tracking.md`
+- Borla identified: 40842S, $193.99 ea on eBay 2023, different email/card
+
+### NOT Done — Pick Up Here
+1. **BALANCE UNKNOWN** — QB has ZERO income/deposit data. `qb-pull-purchases.mjs` only pulls expenses. Dave sent Zelles to nukebank (AFCU 45458288) — need to pull bank statement or build QB income pull. Parts spend confirmed ~$2,600-2,800. Dave's payments unknown.
+2. **QB multi-account** — user was in QB ready to link BDCU (1502) + AFCU personal (40949604). QB integration at `supabase/functions/quickbooks-connect/` stores creds in `parent_company` table with one realm_id.
+3. **Work orders stale** — WO `d18b1119` frozen Feb 27, scope 3x. Carr hoops → Davis Off Road steps. Full exhaust fab added. Rear brake rebuild added.
+4. **Parts mislinked** — Summit Mar 1 + Mar 17 linked to Blazer, should be K2500.
+5. **Receipt photos** — user took pics of physical receipts, need OCR. Image size issue with HEIC.
+6. **Blazer reorder** — Borla 40842S x2 (~$420), SS tubing (~$90), expanders (~$80), flange connectors (~$22) = ~$612.
+7. **The playbook needs to become code** — Contact-Vehicle Resolver, Gmail receipt mining, iMessage backfill, QB income pull, daily digest. User wants vanilla chat to just work.
+
+### Key Vehicle
+1983 GMC K2500 Sierra Classic — `a90c008a-3379-41d8-9eb2-b4eda365d74c` — VIN 1GTGK24M1DJ514592
+Buyer: Dave Granholm, dave@granholm.org, (845) 300-2345, 38 Perona Rd, Andover NJ 07821
+
+---
+
+# Previous Handoff — 2026-03-25 08:30
 
 ## What Happened (12+ hour session, 2026-03-23 23:00 → 2026-03-25 08:30)
 
@@ -690,6 +720,1974 @@ nuke_frontend/src/components/popups/PopupContainer.tsx
 nuke_frontend/src/components/popups/PopupStack.tsx
 nuke_frontend/src/components/popups/index.ts
 package.json
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 14:59:14
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+supabase/functions/extract-facebook-marketplace/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 15:01:59
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 15:02:26
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 15:07:48
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 15:19:00
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 15:52:09
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 16:05:42
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 16:06:04
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 16:09:19
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 16:10:47
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 16:19:29
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 16:22:09
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 16:25:07
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 17:17:27
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 17:23:37
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 17:41:38
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 17:43:34
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 17:56:53
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 18:00:37
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 18:34:34
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 18:52:04
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 18:54:08
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 19:36:26
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 19:37:38
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 19:38:46
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 19:39:15
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 19:39:45
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 19:40:15
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 19:50:33
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 19:58:35
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:00:36
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:05:10
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:11:32
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:26:28
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:28:08
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:30:15
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:34:21
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:35:33
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:39:00
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:39:46
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:44:49
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:46:19
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:51:23
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:51:49
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:55:55
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:57:51
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:58:23
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 20:59:22
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:04:14
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:05:29
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:07:57
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:08:28
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:12:49
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:14:35
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:19:22
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:28:57
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:32:59
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:33:24
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:34:04
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:34:54
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:44:42
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:57:49
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 21:59:22
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 22:04:16
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 22:09:02
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 22:09:55
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 22:43:56
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 22:48:49
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 23:20:52
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 23:31:33
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 23:31:35
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 23:32:58
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 23:36:31
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+supabase/functions/import-fb-marketplace/index.ts
+supabase/functions/refine-fb-listing/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 23:40:45
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+supabase/functions/import-fb-marketplace/index.ts
+supabase/functions/refine-fb-listing/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 23:42:22
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
+nuke_frontend/src/styles/vehicle-profile.css
+scripts/work-photos-intake.mjs
+supabase/functions/extract-facebook-marketplace/index.ts
+supabase/functions/import-fb-marketplace/index.ts
+supabase/functions/refine-fb-listing/index.ts
+wireframes/e-badge-portals.html
+wireframes/index.html
 
 ## Staged
 none

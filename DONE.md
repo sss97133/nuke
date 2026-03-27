@@ -2,6 +2,14 @@
 
 ## 2026-03-26
 
+### [work-order-intelligence] 5-Component Work Order Intelligence System
+Built wiring from data sources to defensible work order receipts:
+- **ingest-zelle.mjs**: Reads AFCU SMS from chat.db, found 4 Granholm Zelles ($4,416.73). Created `work_order_payments` table.
+- **ingest-receipts.mjs**: Extracted 15 itemized parts from Amazon + Summit via Gmail MCP ($1,074.95 total).
+- **balance.mjs**: Full cited receipt. 3 WOs: Parts $1,826 + Labor $3,805 - Payments $4,417 = $1,214 due.
+- **ingest-thread.mjs**: Decoded 456 iMessages, detected 15 scope changes, 2 price agreements, 19 status updates. 44 events → vehicle_observations.
+- **Labor engine**: Seeded 7 labor_operations, updated 11 labor rows with book times + cited rates.
+
 ### [buyer-intelligence] Phase 1: BaT User Behavioral Segmentation
 - Created `mv_buyer_profiles` materialized view: **343,661 profiles** segmented from 517K BaT user profiles + 108K vehicle purchase records + 130K sale records
 - 8 behavioral segments: WHALE (128), DEALER (1,161), COLLECTOR (1,576), FLIPPER (275), ENTHUSIAST (34,589), BIDDER (57,029), CASUAL (243,992), INACTIVE (4,911)
@@ -5554,3 +5562,41 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
   - 2025 Lotus Emira (BJ): $129,800, VIN, 320 miles, all specs
   - 1997 Porsche 993 Turbo S (PCM): $575,000, 21K miles, VIN, full description
   - 1936 Harley-Davidson E Knucklehead (Gooding): $93,500, all specs
+
+### [docs] Extraction Playbook — The Book of What Works (1,688 lines)
+- `docs/library/technical/extraction-playbook.md` — comprehensive extraction reference
+- 16 extraction methods documented with cards (status, throughput, cost, failure modes, LLM config)
+- 14 documented failures with root cause, fix, prevention rules
+- LLM configuration guide: 9 models, cost table, API endpoints, JSON quirks, full prompt inventory
+- 5 architecture patterns (Snapshot First, API Discovery, Validate Before Insert, Persistent Connections, Source-Agnostic Pipeline)
+- 5 copy-paste runbooks (condition extraction, new source setup, backfill, health check, deploy)
+- Current state dashboard (745K vehicles, 3.78M observations, 25 active crons, blockers)
+- 11 source-specific technical notes (BaT, C&B, Mecum, FB, Hagerty, BJ, Bonhams, RM, PCarMarket, ClassicCars, Classic Driver)
+- 3 appendices: file index (30 key files), 12 anti-patterns, confidence/trust scoring system
+- Sources: 6 research agents analyzed 43 edge functions, full DONE.md history, live DB metrics, session logs, all LLM prompts
+
+### [docs] Extraction Playbook v2 — post-critique revision (2,102 lines)
+- 4-agent critique simulation: fresh agent, security reviewer, data engineer, tech writer
+- SECURITY FIX: removed plaintext DB password (was in health check runbook)
+- SECURITY FIX: `--no-verify-jwt` deployment template replaced with JWT-by-default + warning
+- Added Section 0: Key Concepts (execution model, schema glossary, accuracy definition, batch size rules, terminology)
+- Added 2 new runbooks: Diagnose Queue Failures, Check Cron Status
+- Added Appendix D: Known Architectural Limitations (idempotency, backpressure, monitoring, rollback, connection pool)
+- Standardized all 16 method card headers (LLM, THROUGHPUT fields)
+- Added cross-references from runbooks to related failures
+- Clarified local-vs-cloud execution boundary for LLM routing
+- Documented `continue: true` parameter behavior
+- Explained dual table system (observation_sources vs scrape_sources)
+
+### [docs] The Extraction Handbook — expanded from playbook to textbook (2,745 lines)
+- Renamed from "Extraction Playbook" to "The Extraction Handbook" — complete institutional knowledge
+- Added Chapter 1: History — 16 eras of extraction from Feb 2025 to present, every pivot, every failure
+- Added Chapter 2: Repeated Mistakes — 12 documented patterns with occurrence tallies (7 still recurring)
+  - BaT extractor rewritten 7+ times, LLM credits exhausted 6+ times, batch timeouts 12+ incidents
+  - Auth redirect bug still affects 36/40 extractors
+- Added Chapter 10: Facebook Marketplace — complete status, the SLC square body use case, 6 fixes needed (~8 hrs)
+  - 33K FB vehicles, scraper running 4x/day, but location doesn't propagate and no proximity search exists
+- Added Chapter 11: Stalled Initiatives — 9 extraction efforts audited
+  - 4 ACTIVE (comments, valuations, RSS, FB), 4 STALLED (ConceptCarz, forums, OCR, iPhoto), 1 ABANDONED (tools)
+- Reordered chapters into 4 parts: Context (0-2), Methods (3-5), Operations (6-8), Sources (9-11) + 4 appendices
+- Total: 12 chapters, 4 appendices, 130 subsections, 17 major sections

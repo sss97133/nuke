@@ -562,6 +562,329 @@
       },
     };
 
+      // =============================================
+      // NOVEL ONTOLOGICAL DIMENSIONS
+      // These have no precedent in any vehicle UI
+      // =============================================
+
+      // EVIDENCE CHAIN → "How do we know what we know?"
+      evidence: (key, v) => {
+        const sources = [
+          { name: 'BAT LISTING', trust: 85, kind: 'LISTING', age: '2 DAYS', halfLife: 90, freshness: 97, claims: 14 },
+          { name: 'BAT COMMENTS', trust: 45, kind: 'COMMENT', age: '1 DAY', halfLife: 180, freshness: 99, claims: 8 },
+          { name: 'NHTSA VIN DECODE', trust: 100, kind: 'SPECIFICATION', age: '—', halfLife: 999999, freshness: 100, claims: 6 },
+          { name: 'AI IMAGE ANALYSIS', trust: 65, kind: 'CONDITION', age: '12 HOURS', halfLife: 365, freshness: 100, claims: 22 },
+          { name: 'MECUM COMP SALE', trust: 85, kind: 'SALE RESULT', age: '4 MONTHS', halfLife: 180, freshness: 48, claims: 3 },
+        ];
+        const totalClaims = sources.reduce((s,x) => s+x.claims, 0);
+        const avgFreshness = Math.round(sources.reduce((s,x) => s+x.freshness, 0) / sources.length);
+
+        return `
+          <div class="panel-header">
+            <span class="panel-title">EVIDENCE CHAIN — HOW DO WE KNOW THIS?</span>
+            <button class="panel-action">FULL PROVENANCE &rarr;</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-2);margin-bottom:var(--space-2);text-align:center;">
+            <div><div class="pv-label">SOURCES</div><div class="pv-value">${sources.length}</div></div>
+            <div><div class="pv-label">TOTAL CLAIMS</div><div class="pv-value">${totalClaims}</div></div>
+            <div><div class="pv-label">AVG FRESHNESS</div><div class="pv-value">${avgFreshness}%</div></div>
+          </div>
+          <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:var(--text-disabled);letter-spacing:0.05em;margin-bottom:var(--space-1);">
+            SOURCE DECOMPOSITION (TRUST × FRESHNESS × CLAIMS)
+          </div>
+          ${sources.map(s => {
+            const effectiveWeight = Math.round(s.trust * s.freshness / 100);
+            const trustColor = s.trust >= 85 ? 'var(--success)' : s.trust >= 60 ? 'var(--warning)' : 'var(--text-disabled)';
+            return `
+            <div style="padding:4px 0;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr auto auto auto auto;gap:var(--space-2);align-items:center;">
+              <div>
+                <div style="font-size:8px;font-weight:700;text-transform:uppercase;">${s.name}</div>
+                <div style="font-size:7px;color:var(--text-disabled);">${s.kind} · AGE: ${s.age}</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:7px;color:var(--text-disabled);">TRUST</div>
+                <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;color:${trustColor};">${s.trust}</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:7px;color:var(--text-disabled);">FRESH</div>
+                <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;">${s.freshness}%</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:7px;color:var(--text-disabled);">CLAIMS</div>
+                <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;">${s.claims}</div>
+              </div>
+              <div style="width:40px;">
+                <div style="height:6px;background:var(--bg);border:1px solid var(--border);"><div style="height:100%;width:${effectiveWeight}%;background:${trustColor};"></div></div>
+              </div>
+            </div>`;
+          }).join('')}
+          <div class="pv" style="margin-top:var(--space-2);border-top:2px solid var(--border);padding-top:var(--space-2);">
+            <span class="pv-label">EPISTEMOLOGICAL STATUS</span>
+            <span class="pv-value" style="font-size:9px;">CONSENSUS ON IDENTITY · THIN ON CONDITION · NO PHYSICAL INSPECTION</span>
+          </div>
+        `;
+      },
+
+      // LIFECYCLE → "Where is this vehicle in its material history?"
+      lifecycle: (key, v) => {
+        const states = [
+          { name: 'FRESH', desc: 'New / as-new. One era dominates.', pct: 0, active: false },
+          { name: 'WORN', desc: 'Normal aging. Single continuous process.', pct: 38, active: true },
+          { name: 'WEATHERED', desc: 'Extended exposure. Irreversible change.', pct: 22, active: false },
+          { name: 'RESTORED', desc: 'Intentional return to original condition.', pct: 15, active: false },
+          { name: 'PALIMPSEST', desc: 'Multiple eras visible simultaneously.', pct: 12, active: v.year < 1980 },
+          { name: 'GHOST', desc: 'Barely recognizable. Identity persists.', pct: 8, active: false },
+          { name: 'ARCHAEOLOGICAL', desc: 'More evidence than vehicle.', pct: 5, active: false },
+        ];
+
+        // Pick a dominant state based on vehicle age
+        const dominantIdx = v.year < 1970 ? 4 : v.year < 1990 ? 1 : v.year < 2010 ? 1 : 0;
+        states[dominantIdx].active = true;
+
+        const zoneStates = [
+          { zone: 'EXTERIOR', state: states[dominantIdx].name, severity: 0.4 },
+          { zone: 'ENGINE BAY', state: v.year < 1990 ? 'WEATHERED' : 'WORN', severity: 0.6 },
+          { zone: 'INTERIOR', state: 'WORN', severity: 0.3 },
+          { zone: 'UNDERCARRIAGE', state: v.year < 1985 ? 'GHOST' : 'WEATHERED', severity: 0.7 },
+        ];
+
+        return `
+          <div class="panel-header">
+            <span class="panel-title">LIFECYCLE STATE — MATERIAL HISTORY</span>
+          </div>
+          <div style="display:flex;gap:2px;margin-bottom:var(--space-2);">
+            ${states.map(s => `
+              <div style="flex:1;text-align:center;padding:4px 2px;border:2px solid ${s.active?'var(--text)':'var(--border)'};background:${s.active?'var(--surface-hover)':'var(--bg)'};">
+                <div style="font-size:7px;font-weight:700;letter-spacing:0.04em;color:${s.active?'var(--text)':'var(--text-disabled)'};">${s.name}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div class="pv"><span class="pv-label">DOMINANT STATE</span><span class="pv-value">${states[dominantIdx].name}</span></div>
+          <div class="pv"><span class="pv-label">INTERPRETATION</span><span class="pv-sub">${states[dominantIdx].desc}</span></div>
+          <div style="margin-top:var(--space-2);font-size:8px;font-weight:700;text-transform:uppercase;color:var(--text-disabled);letter-spacing:0.05em;margin-bottom:var(--space-1);">
+            LIFECYCLE BY ZONE (FROM ${zoneStates.length} OBSERVED ZONES)
+          </div>
+          ${zoneStates.map(z => `
+            <div class="geo-bar">
+              <span class="geo-label">${z.zone}</span>
+              <div style="font-family:var(--font-mono);font-size:8px;font-weight:700;width:80px;">${z.state}</div>
+              <div class="geo-track"><div class="geo-fill" style="width:${z.severity*100}%;background:${z.severity>0.5?'var(--warning)':'var(--text-disabled)'};"></div></div>
+              <span class="geo-val" style="font-size:7px;">${Math.round(z.severity*10)}/10</span>
+            </div>
+          `).join('')}
+          <div class="pv" style="margin-top:var(--space-2);border-top:2px solid var(--border);padding-top:var(--space-2);">
+            <span class="pv-label">MATCHING NUMBERS</span>
+            <span class="pv-value" style="font-size:9px;">${v.year<1980?'UNVERIFIED — REQUIRES PHYSICAL INSPECTION':'N/A — MODERN PRODUCTION'}</span>
+          </div>
+        `;
+      },
+
+      // CONFLICTS → "What do sources disagree about?"
+      conflicts: (key, v) => {
+        const hasConflicts = v.year < 2000;
+        const conflicts = hasConflicts ? [
+          { field: 'MILEAGE', claimA: '62,000 MI', sourceA: 'SELLER LISTING', claimB: '67,400 MI', sourceB: 'CARFAX RECORD', status: 'UNRESOLVED', severity: 'MEDIUM' },
+          { field: 'TRANSMISSION', claimA: 'ORIGINAL 5-SPEED', sourceA: 'SELLER DESCRIPTION', claimB: '6-SPEED SWAP DETECTED', sourceB: 'AI IMAGE ANALYSIS', status: 'UNRESOLVED', severity: 'HIGH' },
+        ] : [
+          { field: 'EXTERIOR COLOR', claimA: 'MIDNIGHT BLUE', sourceA: 'LISTING', claimB: 'DARK SAPPHIRE METALLIC', sourceB: 'VIN DECODE', status: 'ACCEPTED DISCREPANCY', severity: 'LOW' },
+        ];
+
+        return `
+          <div class="panel-header">
+            <span class="panel-title">CONTESTED FACTS — ${conflicts.length} DISAGREEMENT${conflicts.length>1?'S':''}</span>
+          </div>
+          <div style="font-size:8px;color:var(--text-secondary);margin-bottom:var(--space-2);line-height:1.5;">
+            When sources contradict each other, the contradiction is data — not an error to hide.
+            These are unresolved or accepted discrepancies across ${v.dataCompleteness > 60 ? '3-5' : '1-2'} sources.
+          </div>
+          ${conflicts.map(c => {
+            const sevColor = c.severity === 'HIGH' ? 'var(--error)' : c.severity === 'MEDIUM' ? 'var(--warning)' : 'var(--text-disabled)';
+            const statusColor = c.status === 'UNRESOLVED' ? 'var(--warning)' : 'var(--text-disabled)';
+            return `
+            <div style="border:2px solid var(--border);padding:var(--space-2);margin-bottom:var(--space-1);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <span style="font-size:9px;font-weight:700;text-transform:uppercase;">${c.field}</span>
+                <span style="font-size:7px;font-weight:700;padding:1px 4px;border:1px solid ${sevColor};color:${sevColor};">${c.severity}</span>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:var(--space-2);align-items:center;">
+                <div>
+                  <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;">${c.claimA}</div>
+                  <div style="font-size:7px;color:var(--text-disabled);text-transform:uppercase;">${c.sourceA}</div>
+                </div>
+                <div style="font-size:9px;font-weight:700;color:var(--text-disabled);">VS</div>
+                <div style="text-align:right;">
+                  <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;">${c.claimB}</div>
+                  <div style="font-size:7px;color:var(--text-disabled);text-transform:uppercase;">${c.sourceB}</div>
+                </div>
+              </div>
+              <div style="margin-top:4px;font-size:7px;font-weight:700;color:${statusColor};text-transform:uppercase;">${c.status}</div>
+            </div>`;
+          }).join('')}
+        `;
+      },
+
+      // ZONE COVERAGE → "What's been observed? What's blind?"
+      coverage: (key, v) => {
+        const zones = [
+          { name: 'FRONT EXTERIOR', observed: true, images: 8, conditions: 3, maxRes: 'ZONE' },
+          { name: 'DRIVER SIDE', observed: true, images: 5, conditions: 2, maxRes: 'ZONE' },
+          { name: 'PASSENGER SIDE', observed: true, images: 4, conditions: 1, maxRes: 'ZONE' },
+          { name: 'REAR EXTERIOR', observed: true, images: 6, conditions: 2, maxRes: 'ZONE' },
+          { name: 'ENGINE BAY', observed: v.imageCount > 50, images: v.imageCount > 50 ? 4 : 0, conditions: v.imageCount > 50 ? 3 : 0, maxRes: v.imageCount > 50 ? '6×6 GRID' : '—' },
+          { name: 'INTERIOR DASH', observed: true, images: 3, conditions: 1, maxRes: 'ZONE' },
+          { name: 'INTERIOR SEATS', observed: true, images: 2, conditions: 1, maxRes: 'ZONE' },
+          { name: 'UNDERCARRIAGE', observed: false, images: 0, conditions: 0, maxRes: '—' },
+          { name: 'TRUNK / CARGO', observed: v.imageCount > 60, images: v.imageCount > 60 ? 2 : 0, conditions: 0, maxRes: '—' },
+          { name: 'WHEEL WELLS', observed: false, images: 0, conditions: 0, maxRes: '—' },
+        ];
+        const observedCount = zones.filter(z => z.observed).length;
+        const blindCount = zones.length - observedCount;
+        const coveragePct = Math.round(observedCount / zones.length * 100);
+
+        return `
+          <div class="panel-header">
+            <span class="panel-title">ZONE COVERAGE — WHAT WE CAN AND CAN'T SEE</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-2);margin-bottom:var(--space-2);text-align:center;">
+            <div><div class="pv-label">ZONES OBSERVED</div><div class="pv-value">${observedCount}/${zones.length}</div></div>
+            <div><div class="pv-label">COVERAGE</div><div class="pv-value">${coveragePct}%</div></div>
+            <div><div class="pv-label">BLIND SPOTS</div><div class="pv-value" style="color:${blindCount>2?'var(--error)':'var(--warning)'};">${blindCount}</div></div>
+          </div>
+          ${zones.map(z => `
+            <div style="display:grid;grid-template-columns:100px 1fr auto auto;gap:var(--space-2);align-items:center;padding:3px 0;border-top:1px solid var(--border);">
+              <span style="font-size:8px;font-weight:700;text-transform:uppercase;color:${z.observed?'var(--text)':'var(--error)'};">${z.name}</span>
+              <div style="height:4px;background:var(--bg);border:1px solid var(--border);">
+                <div style="height:100%;width:${z.observed?Math.min(100,z.images*12)+'%':'0'};background:${z.observed?'var(--success)':'transparent'};"></div>
+              </div>
+              <span style="font-family:var(--font-mono);font-size:8px;color:${z.observed?'var(--text-secondary)':'var(--error)'};">${z.observed?z.images+' IMG':'BLIND'}</span>
+              <span style="font-family:var(--font-mono);font-size:7px;color:var(--text-disabled);">${z.maxRes}</span>
+            </div>
+          `).join('')}
+          <div class="pv" style="margin-top:var(--space-2);border-top:2px solid var(--border);padding-top:var(--space-2);">
+            <span class="pv-label">SUSPICION SIGNAL</span>
+            <span class="pv-value" style="font-size:9px;color:${blindCount>3?'var(--error)':'var(--text-secondary)'};">${blindCount > 3 ? 'UNDERCARRIAGE + WHEEL WELLS MISSING — COMMON RUST HIDE' : blindCount > 1 ? 'SOME BLIND SPOTS — TYPICAL FOR LISTING PHOTOS' : 'EXCELLENT COVERAGE'}</span>
+          </div>
+        `;
+      },
+
+      // SURVIVAL → "How rare is this?"
+      survival: (key, v) => {
+        const survivalData = {
+          totalProduced: v.year < 1975 ? Math.floor(Math.random()*50000)+5000 : Math.floor(Math.random()*200000)+20000,
+          decayRate: 0.035,
+          survivalPct: v.year < 1970 ? Math.floor(Math.random()*10)+3 : v.year < 1990 ? Math.floor(Math.random()*25)+10 : Math.floor(Math.random()*40)+30,
+        };
+        survivalData.surviving = Math.round(survivalData.totalProduced * survivalData.survivalPct / 100);
+        survivalData.nukeTracked = Math.floor(survivalData.surviving * (Math.random()*0.3+0.05));
+
+        return `
+          <div class="panel-header">
+            <span class="panel-title">SURVIVAL — ${v.year} ${v.make} ${v.model} RARITY</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-2);margin-bottom:var(--space-2);text-align:center;">
+            <div><div class="pv-label">PRODUCED</div><div class="pv-value">~${survivalData.totalProduced.toLocaleString()}</div></div>
+            <div><div class="pv-label">EST. SURVIVING</div><div class="pv-value" style="color:${survivalData.survivalPct<15?'var(--error)':'var(--text)'};">~${survivalData.surviving.toLocaleString()}</div></div>
+            <div><div class="pv-label">SURVIVAL RATE</div><div class="pv-value">${survivalData.survivalPct}%</div></div>
+          </div>
+          <div class="pv"><span class="pv-label">NUKE TRACKED</span><span class="pv-value">${survivalData.nukeTracked} <span style="font-size:8px;color:var(--text-disabled);">OF ~${survivalData.surviving.toLocaleString()} KNOWN</span></span></div>
+          <div class="pv"><span class="pv-label">DECAY MODEL</span><span class="pv-value">${survivalData.decayRate * 100}% / YEAR <span style="font-size:8px;color:var(--text-disabled);">EXPONENTIAL</span></span></div>
+          <div class="pv"><span class="pv-label">ESTIMATION METHOD</span><span class="pv-value" style="font-size:9px;">LISTING FREQUENCY + VIN CENSUS + DECAY MODEL</span></div>
+          <div class="pv" style="border-top:2px solid var(--border);margin-top:var(--space-2);padding-top:var(--space-2);">
+            <span class="pv-label">RARITY SIGNAL</span>
+            <span class="pv-value" style="color:${survivalData.survivalPct<10?'var(--error)':survivalData.survivalPct<25?'var(--warning)':'var(--text-secondary)'};">
+              ${survivalData.survivalPct < 10 ? 'RARE — FEWER EVERY YEAR' : survivalData.survivalPct < 25 ? 'UNCOMMON — DECLINING POPULATION' : 'COMMON — STABLE SUPPLY'}
+            </span>
+          </div>
+        `;
+      },
+
+      // FRESHNESS → "How stale is our knowledge?"
+      freshness: (key, v) => {
+        const fields = [
+          { name: 'IDENTITY (VIN/YMM)', halfLife: '∞', age: '—', freshness: 100, category: 'PERMANENT' },
+          { name: 'SPECIFICATIONS', halfLife: '∞', age: '—', freshness: 100, category: 'PERMANENT' },
+          { name: 'LISTING DATA', halfLife: '90 DAYS', age: '2 DAYS', freshness: 97, category: 'FAST DECAY' },
+          { name: 'SALE RESULT', halfLife: '180 DAYS', age: '—', freshness: 0, category: 'NOT YET' },
+          { name: 'CONDITION', halfLife: '365 DAYS', age: v.imageCount > 70 ? '1 WEEK' : '3 MONTHS', freshness: v.imageCount > 70 ? 98 : 62, category: 'MEDIUM DECAY' },
+          { name: 'BID DATA', halfLife: '30 DAYS', age: '1 DAY', freshness: 96, category: 'FAST DECAY' },
+          { name: 'COMMENTS', halfLife: '180 DAYS', age: '2 DAYS', freshness: 99, category: 'FAST DECAY' },
+          { name: 'OWNERSHIP', halfLife: '730 DAYS', age: 'UNKNOWN', freshness: 0, category: 'NOT YET' },
+        ];
+        const avgFreshness = Math.round(fields.filter(f=>f.freshness>0).reduce((s,f)=>s+f.freshness,0) / fields.filter(f=>f.freshness>0).length);
+
+        return `
+          <div class="panel-header">
+            <span class="panel-title">INFORMATION FRESHNESS — TEMPORAL DECAY</span>
+          </div>
+          <div style="font-size:8px;color:var(--text-secondary);margin-bottom:var(--space-2);line-height:1.5;">
+            Every fact has a half-life. A bid loses half its relevance in 30 days.
+            A factory spec never decays. This shows how current our knowledge is.
+          </div>
+          ${fields.map(f => {
+            const fColor = f.freshness >= 90 ? 'var(--success)' : f.freshness >= 50 ? 'var(--warning)' : f.freshness > 0 ? 'var(--error)' : 'var(--text-disabled)';
+            return `
+            <div style="display:grid;grid-template-columns:120px 60px 1fr auto;gap:var(--space-2);align-items:center;padding:3px 0;border-top:1px solid var(--border);">
+              <span style="font-size:8px;font-weight:700;text-transform:uppercase;">${f.name}</span>
+              <span style="font-family:var(--font-mono);font-size:7px;color:var(--text-disabled);">t½ ${f.halfLife}</span>
+              <div style="height:4px;background:var(--bg);border:1px solid var(--border);">
+                <div style="height:100%;width:${f.freshness}%;background:${fColor};"></div>
+              </div>
+              <span style="font-family:var(--font-mono);font-size:8px;font-weight:700;color:${fColor};width:32px;text-align:right;">${f.freshness > 0 ? f.freshness+'%' : '—'}</span>
+            </div>`;
+          }).join('')}
+          <div class="pv" style="margin-top:var(--space-2);border-top:2px solid var(--border);padding-top:var(--space-2);">
+            <span class="pv-label">AGGREGATE FRESHNESS</span>
+            <span class="pv-value">${avgFreshness}% <span style="font-size:8px;color:var(--text-disabled);">ACROSS KNOWN FIELDS</span></span>
+          </div>
+        `;
+      },
+
+      // PALIMPSEST → "Factory vs Now — what changed?"
+      palimpsest: (key, v) => {
+        const layers = v.year < 1990 ? [
+          { field: 'ENGINE', factory: 'ORIGINAL 350 V8', now: 'REBUILT 383 STROKER', source: 'AI IMAGE + LISTING', modified: true },
+          { field: 'PAINT', factory: v.year < 1975 ? 'FATHOM GREEN #48' : 'FACTORY SILVER', now: 'REPAINTED (THICKNESS UNKNOWN)', source: 'VISUAL ANALYSIS', modified: true },
+          { field: 'TRANSMISSION', factory: '3-SPEED MANUAL', now: '5-SPEED TREMEC SWAP', source: 'SELLER DESCRIPTION', modified: true },
+          { field: 'INTERIOR', factory: 'BLACK VINYL', now: 'BLACK VINYL (REUPHOLSTERED)', source: 'LISTING PHOTOS', modified: true },
+          { field: 'WHEELS', factory: '14" RALLY WHEELS', now: '15" AFTERMARKET', source: 'AI IMAGE ANALYSIS', modified: true },
+          { field: 'DRIVETRAIN', factory: 'RWD', now: 'RWD', source: 'VIN DECODE', modified: false },
+          { field: 'VIN', factory: v.year + ' PRODUCTION', now: 'MATCHES TITLE', source: 'NHTSA', modified: false },
+        ] : [
+          { field: 'ENGINE', factory: 'FACTORY SPEC', now: 'FACTORY SPEC', source: 'VIN DECODE', modified: false },
+          { field: 'PAINT', factory: 'FACTORY COLOR', now: 'FACTORY COLOR', source: 'VIN DECODE', modified: false },
+          { field: 'WHEELS', factory: 'OEM', now: v.year < 2010 ? 'AFTERMARKET' : 'OEM', source: 'AI IMAGE', modified: v.year < 2010 },
+        ];
+
+        const modCount = layers.filter(l => l.modified).length;
+        const origCount = layers.filter(l => !l.modified).length;
+
+        return `
+          <div class="panel-header">
+            <span class="panel-title">FACTORY vs NOW — ARCHAEOLOGICAL LAYERS</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-bottom:var(--space-2);text-align:center;">
+            <div><div class="pv-label">FACTORY ORIGINAL</div><div class="pv-value" style="color:var(--success);">${origCount} FIELDS</div></div>
+            <div><div class="pv-label">MODIFIED / UNKNOWN</div><div class="pv-value" style="color:${modCount>3?'var(--warning)':'var(--text-secondary)'};">${modCount} FIELDS</div></div>
+          </div>
+          ${layers.map(l => `
+            <div style="padding:4px 0;border-top:1px solid var(--border);">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:8px;font-weight:700;text-transform:uppercase;">${l.field}</span>
+                <span style="font-size:7px;font-weight:700;padding:1px 4px;border:1px solid ${l.modified?'var(--warning)':'var(--success)'};color:${l.modified?'var(--warning)':'var(--success)'};">${l.modified?'CHANGED':'ORIGINAL'}</span>
+              </div>
+              ${l.modified ? `
+              <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:var(--space-1);margin-top:2px;align-items:center;">
+                <div style="font-family:var(--font-mono);font-size:8px;color:var(--text-disabled);text-decoration:line-through;">${l.factory}</div>
+                <div style="font-size:8px;color:var(--text-disabled);">&rarr;</div>
+                <div style="font-family:var(--font-mono);font-size:8px;font-weight:700;">${l.now}</div>
+              </div>` : `
+              <div style="font-family:var(--font-mono);font-size:8px;color:var(--success);margin-top:2px;">${l.now}</div>`}
+              <div style="font-size:7px;color:var(--text-disabled);margin-top:1px;">SOURCE: ${l.source}</div>
+            </div>
+          `).join('')}
+        `;
+      },
+
     // State
     let activePanel = null;
     let activeBadge = null;
@@ -629,6 +952,13 @@
           <span class="badge ${dealBadgeClass}" data-type="deal" data-key="${v.dealLabel}">${v.dealLabel} ${deltaArrow}${Math.abs(v.delta)}%<span class="badge-depth"></span></span>
           <span class="badge" data-type="heat" data-key="${v.heatScore}" style="font-family:var(--font-mono);">HEAT ${v.heatScore}<span class="badge-depth"></span></span>
           <span class="badge" data-type="estimate" data-key="${v.estimateLabel}" style="font-family:var(--font-mono);">EST ${v.estimateLabel}<span class="badge-depth"></span></span>
+          <span class="badge" data-type="evidence" data-key="evidence" style="border-style:dashed;">EVIDENCE CHAIN<span class="badge-depth"></span></span>
+          <span class="badge" data-type="lifecycle" data-key="lifecycle" style="border-style:dashed;">LIFECYCLE<span class="badge-depth"></span></span>
+          <span class="badge" data-type="conflicts" data-key="conflicts" style="border-style:dashed;border-color:var(--warning);color:var(--warning);">CONTESTED<span class="badge-depth"></span></span>
+          <span class="badge" data-type="coverage" data-key="coverage" style="border-style:dashed;">ZONE COVERAGE<span class="badge-depth"></span></span>
+          <span class="badge" data-type="survival" data-key="survival" style="border-style:dashed;">SURVIVAL<span class="badge-depth"></span></span>
+          <span class="badge" data-type="freshness" data-key="freshness" style="border-style:dashed;font-family:var(--font-mono);">FRESHNESS<span class="badge-depth"></span></span>
+          <span class="badge" data-type="palimpsest" data-key="palimpsest" style="border-style:dashed;">FACTORY vs NOW<span class="badge-depth"></span></span>
         </div>
         <div class="panel" data-panel="true"></div>
       `;
@@ -643,6 +973,13 @@
         deal: { count: Math.floor(Math.random()*2000)+500 },
         heat: { count: '—' },
         estimate: { count: '—' },
+        evidence: { count: '5 sources' },
+        lifecycle: { count: '7 states' },
+        conflicts: { count: v.year < 2000 ? '2 contested' : '1 minor' },
+        coverage: { count: Math.floor(Math.random()*3+5) + '/10 zones' },
+        survival: { count: '~' + (Math.floor(Math.random()*500)+50) + ' left' },
+        freshness: { count: '14 half-lives' },
+        palimpsest: { count: (v.year < 1990 ? '5 changed' : '1 changed') },
       };
 
       card.querySelectorAll('.badge').forEach(badge => {

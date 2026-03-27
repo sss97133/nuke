@@ -303,115 +303,6 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     return s === e ? String(s) : `${s}—${e}`;
   }, [startDate, endDate]);
 
-  // Compressed heatmap: only show years that have events + current year, with gap indicators
-  type HeatmapSegment =
-    | { type: 'year'; year: number; weeks: { d: Date; s: string; inRange: boolean }[][]; weekOffset: number }
-    | { type: 'gap'; gapYears: number; weekOffset: number };
-
-  const { compressedHeatmap, compressedMonthLabels } = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-
-    // Find which years have events, and which months within each year
-    const eventYears = new Set<number>();
-    const eventMonthsByYear: Record<number, Set<number>> = {};
-    for (const ds of Object.keys(eventMap)) {
-      const d = new Date(ds + 'T00:00:00');
-      const yr = d.getFullYear();
-      const mo = d.getMonth();
-      eventYears.add(yr);
-      if (!eventMonthsByYear[yr]) eventMonthsByYear[yr] = new Set();
-      eventMonthsByYear[yr].add(mo);
-    }
-    // Always include current year for context
-    eventYears.add(currentYear);
-
-    const startYear = startDate.getFullYear();
-    const endYear = endDate.getFullYear();
-
-    // Group heatmapWeeks by year
-    const weeksByYear: Record<number, { d: Date; s: string; inRange: boolean }[][]> = {};
-    for (const week of heatmapWeeks) {
-      // Use the Thursday of the week to determine which year (ISO week convention)
-      const thursday = week[3] || week[0];
-      if (!thursday) continue;
-      const yr = thursday.d.getFullYear();
-      if (!weeksByYear[yr]) weeksByYear[yr] = [];
-      weeksByYear[yr].push(week);
-    }
-
-    // Trim year weeks to only include months with events +/- 1 month padding
-    const trimWeeksToEventMonths = (yr: number, weeks: { d: Date; s: string; inRange: boolean }[][]): { d: Date; s: string; inRange: boolean }[][] => {
-      const months = eventMonthsByYear[yr];
-      if (!months || months.size === 0) return weeks; // current year with no events: show all
-      const minMonth = Math.max(0, Math.min(...months) - 1);
-      const maxMonth = Math.min(11, Math.max(...months) + 1);
-      return weeks.filter((week) => {
-        const thursday = week[3] || week[0];
-        if (!thursday) return false;
-        const mo = thursday.d.getMonth();
-        return thursday.d.getFullYear() === yr && mo >= minMonth && mo <= maxMonth;
-      });
-    };
-
-    // Build segments: include years with events, compress gaps
-    const segments: HeatmapSegment[] = [];
-    let weekOffset = 0;
-    let gapStart: number | null = null;
-
-    for (let yr = startYear; yr <= endYear; yr++) {
-      const hasEvents = eventYears.has(yr);
-      const yearWeeks = weeksByYear[yr] || [];
-
-      if (!hasEvents && yearWeeks.length > 0) {
-        // Empty year -- start or extend gap
-        if (gapStart === null) gapStart = yr;
-      } else {
-        // Flush any accumulated gap
-        if (gapStart !== null) {
-          const gapYears = yr - gapStart;
-          segments.push({ type: 'gap', gapYears, weekOffset });
-          weekOffset += 1; // gap takes ~1 column width
-          gapStart = null;
-        }
-        if (yearWeeks.length > 0) {
-          const trimmed = trimWeeksToEventMonths(yr, yearWeeks);
-          if (trimmed.length > 0) {
-            segments.push({ type: 'year', year: yr, weeks: trimmed, weekOffset });
-            weekOffset += trimmed.length;
-          }
-        }
-      }
-    }
-    // Flush trailing gap
-    if (gapStart !== null) {
-      const gapYears = endYear - gapStart + 1;
-      segments.push({ type: 'gap', gapYears, weekOffset });
-    }
-
-    // Build month labels for compressed layout
-    const monthLabels: { key: string; left: number; label: string }[] = [];
-    for (const seg of segments) {
-      if (seg.type !== 'year') continue;
-      seg.weeks.forEach((week, wi) => {
-        const firstDay = week.find((d) => d.inRange && d.d.getDate() <= 7);
-        if (firstDay && firstDay.d.getDate() <= 7) {
-          const month = firstDay.d.getMonth();
-          const year = firstDay.d.getFullYear();
-          const key = `${year}-${month}`;
-          if (!monthLabels.find((m) => m.key === key)) {
-            monthLabels.push({
-              key,
-              left: (seg.weekOffset + wi) * 11 + 22,
-              label: MONTH_NAMES[month] + ` ${year}`,
-            });
-          }
-        }
-      });
-    }
-
-    return { compressedHeatmap: segments, compressedMonthLabels: monthLabels };
-  }, [heatmapWeeks, eventMap, startDate, endDate]);
-
   // Toggle expand
   const toggleExpand = useCallback(() => {
     setExpanded((prev) => {
@@ -562,8 +453,11 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
           <span className="barcode-bar__label-right">{yearRange}</span>
         </div>
 
-        {/* Expanded heatmap — compressed to only show years with events */}
+        {/* Expanded heatmap — full timeline from vehicle year to present */}
         <div className="barcode-heatmap" ref={heatmapRef}>
+          <div className="timeline-section__header">
+            Activity Timeline · {yearRange}
+          </div>
           <div className="timeline-heatmap">
             <div className="hm-day-labels">
               {['', 'MON', '', 'WED', '', 'FRI', ''].map((name, i) => (
@@ -573,45 +467,46 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
               ))}
             </div>
             <div className="hm-wrap">
-              {compressedHeatmap.map((segment, si) => (
-                <React.Fragment key={si}>
-                  {segment.type === 'gap' ? (
-                    <div className="hm-gap" title={`${segment.gapYears} years with no events`}>
-                      <span className="hm-gap__dots">···</span>
-                    </div>
-                  ) : (
-                    segment.weeks.map((week, wi) => (
-                      <div className="hm-week" key={`${si}-${wi}`}>
-                        {week.map((day, di) => {
-                          if (!day.inRange) {
-                            return <div className="hm-c empty" key={di} />;
-                          }
-                          const ev = eventMap[day.s];
-                          const level = ev ? ev.level : 0;
-                          const isHighlighted = highlightGroup && ev?.group === highlightGroup;
-                          return (
-                            <div
-                              key={di}
-                              className={`hm-c ${level > 0 ? `l${level}` : ''} ${isHighlighted ? 'hl' : ''}`}
-                              data-date={ev ? day.s : undefined}
-                              title={ev ? `${day.s}: ${ev.label}` : undefined}
-                              onClick={ev ? (e) => onCellClick(day.s, e) : undefined}
-                            />
-                          );
-                        })}
-                      </div>
-                    ))
-                  )}
-                </React.Fragment>
+              {heatmapWeeks.map((week, wi) => (
+                <div className="hm-week" key={wi}>
+                  {week.map((day, di) => {
+                    if (!day.inRange) {
+                      return <div className="hm-c empty" key={di} />;
+                    }
+                    const ev = eventMap[day.s];
+                    const level = ev ? ev.level : 0;
+                    const isHighlighted = highlightGroup && ev?.group === highlightGroup;
+                    return (
+                      <div
+                        key={di}
+                        className={`hm-c ${level > 0 ? `l${level}` : ''} ${isHighlighted ? 'hl' : ''}`}
+                        data-date={ev ? day.s : undefined}
+                        title={ev ? `${day.s}: ${ev.label}` : undefined}
+                        onClick={ev ? (e) => onCellClick(day.s, e) : undefined}
+                      />
+                    );
+                  })}
+                </div>
               ))}
             </div>
             <div className="hm-months">
-              {/* Month labels positioned by accumulated week offset */}
-              {compressedMonthLabels.map(({ key, left, label }) => (
-                <span key={key} style={{ left: `${left}px` }}>
-                  {label}
-                </span>
-              ))}
+              {heatmapWeeks.reduce<React.ReactNode[]>((acc, week, wi) => {
+                const firstDay = week.find((d) => d.inRange && d.d.getDate() <= 7);
+                if (firstDay && firstDay.d.getDate() <= 7) {
+                  const month = firstDay.d.getMonth();
+                  const year = firstDay.d.getFullYear();
+                  const key = `${year}-${month}`;
+                  if (!acc.find((n) => n && (n as React.ReactElement).key === key)) {
+                    acc.push(
+                      <span key={key} style={{ left: `${wi * 11 + 22}px` }}>
+                        {MONTH_NAMES[month]}
+                        {month === 0 ? ` ${year}` : ''}
+                      </span>
+                    );
+                  }
+                }
+                return acc;
+              }, [])}
             </div>
           </div>
 

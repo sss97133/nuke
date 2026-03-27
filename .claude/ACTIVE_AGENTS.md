@@ -9,6 +9,8 @@
 
 DONE | QUEUE-DRAIN-NO-AI | COMPLETE. Drained 130K/140K items. Created 102,251 vehicles ($0 LLM). CD 50.5K, CC 33.9K, Mecum 12.8K, BJ 5K, BaT 4. Queue: 9.8K remaining (other sources + memorabilia). | import_queue, vehicles, scripts/drain-queue-no-ai.mjs
 
+DONE | WORK-ORDER-INTELLIGENCE | COMPLETE. Built 5 scripts: ingest-zelle, ingest-receipts, balance, ingest-thread + labor engine. All acceptance tests pass. | mcp-servers/nuke-context/*.mjs, work_order_* tables, labor_operations
+
 ---
 
 ## Previously Active (2026-03-25)
@@ -31,4 +33,8 @@ DONE | ENRICHMENT-QUALITY-METRICS | COMPLETE — enrichment_quality_report() RPC
 
 DONE | BUYER-INTELLIGENCE-P1 | COMPLETE — 343,661 buyer profiles created in mv_buyer_profiles. 8 segments. 4 SQL functions deployed. See DONE.md.
 
-10:01 | EXTRACTION-PLAYBOOK | Writing extraction playbook doc | docs/library/technical/extraction-playbook.md
+
+$(date +%H:%M) | WORK-ORDER-INTELLIGENCE | Building 5 components: Zelle ingestion, Gmail receipt mining, iMessage thread parsing, labor pricing, balance computation | mcp-servers/nuke-context/*.mjs, work_order_* tables, labor_operations
+23:32 | EXTRACTION-HANDBOOK | Expanding handbook with prompt archaeology + graduation path | docs/library/technical/extraction-playbook.md
+
+DONE | SKELETON-ENRICHMENT-PLAYBOOK | Sampling 3 vehicles from each of 4 sources (Classic Driver, ClassicCars.com, Bonhams Market, ER Classics) to document extraction playbook | docs/playbook/
