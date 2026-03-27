@@ -1585,8 +1585,9 @@ async function questionClassify(supabase: any, supabaseUrl: string, serviceKey: 
     .eq("has_question", true)
     .is("question_classified_at", null);
 
-  // Self-chain
-  if (shouldContinue && (remaining ?? 0) > 0 && classified > 0) {
+  // Self-chain: continue if we classified anything (remaining=-1 means count timed out, assume more exist)
+  const shouldChain = shouldContinue && classified > 0 && (remaining === null || remaining === undefined || remaining !== 0);
+  if (shouldChain) {
     fetch(`${supabaseUrl}/functions/v1/analyze-comments-fast`, {
       method: "POST",
       headers: {
@@ -1610,7 +1611,7 @@ async function questionClassify(supabase: any, supabaseUrl: string, serviceKey: 
     updated,
     remaining: remaining ?? -1,
     l1_distribution: l1Counts,
-    continued: shouldContinue && (remaining ?? 0) > 0 && classified > 0,
+    continued: shouldChain,
     elapsed_ms: Date.now() - startTime,
   };
 }

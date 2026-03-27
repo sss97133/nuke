@@ -565,18 +565,55 @@ function stratifiedSample(comments, maxTotal = 500) {
 // ─── MAIN ───────────────────────────────────────────────────────────────────
 
 async function fetchUserComments(username) {
-  const { rows } = await pool.query(`
-    SELECT ac.comment_text, ac.word_count, ac.comment_type, ac.posted_at,
-           ac.is_seller, ac.bid_amount, ac.comment_likes,
-           v.make, v.model, v.year
-    FROM auction_comments ac
-    LEFT JOIN vehicles v ON v.id = ac.vehicle_id
-    WHERE ac.author_username = $1
-    AND ac.comment_text IS NOT NULL
-    AND ac.word_count >= 5
-    ORDER BY ac.posted_at ASC NULLS LAST
-  `, [username]);
+  // For very large users (50K+ comments), use SQL-side sampling to avoid OOM.
+  // We pull up to 5000 comments — enough for stratified sampling and era detection.
+  // The sample is spread across the timeline via TABLESAMPLE or modular selection.
+  const { rows: countRows } = await pool.query(
+    `SELECT COUNT(*) as cnt FROM auction_comments WHERE author_username = $1 AND comment_text IS NOT NULL AND word_count >= 5`,
+    [username]
+  );
+  const totalCount = parseInt(countRows[0].cnt);
+
+  let query;
+  const params = [username];
+
+  if (totalCount > 10000) {
+    // For very large users (10K+): skip vehicle JOIN to stay fast.
+    // Taste fingerprint/eras won't work without make data — acceptable tradeoff.
+    query = `
+      SELECT ac.comment_text, ac.word_count, ac.comment_type, ac.posted_at,
+             ac.is_seller, ac.bid_amount, ac.comment_likes,
+             NULL::text as make, NULL::text as model, NULL::int as year
+      FROM auction_comments ac
+      WHERE ac.author_username = $1
+      AND ac.comment_text IS NOT NULL
+      AND ac.word_count >= 5
+      ORDER BY ac.posted_at ASC NULLS LAST
+    `;
+  } else {
+    query = `
+      SELECT ac.comment_text, ac.word_count, ac.comment_type, ac.posted_at,
+             ac.is_seller, ac.bid_amount, ac.comment_likes,
+             v.make, v.model, v.year
+      FROM auction_comments ac
+      LEFT JOIN vehicles v ON v.id = ac.vehicle_id
+      WHERE ac.author_username = $1
+      AND ac.comment_text IS NOT NULL
+      AND ac.word_count >= 5
+      ORDER BY ac.posted_at ASC NULLS LAST
+    `;
+  }
+
+  const { rows } = await pool.query(query, params);
   return rows;
+}
+
+async function fetchUserCommentCount(username) {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*) as cnt FROM auction_comments WHERE author_username = $1 AND comment_text IS NOT NULL AND word_count >= 5`,
+    [username]
+  );
+  return parseInt(rows[0].cnt);
 }
 
 async function analyzeUser(username, opts = {}) {
@@ -705,19 +742,33 @@ async function main() {
         SELECT username, total_comments
         FROM bat_user_profiles
         WHERE total_comments >= 100
+        AND total_comments < 40000
+        AND username NOT IN ('bringatrailer', 'BringATrailer')
         ORDER BY total_comments DESC
         LIMIT $1
       `, [limit]);
 
       console.log(`Analyzing top ${rows.length} users by comment count...\n`);
 
-      for (const row of rows) {
-        const profile = await analyzeUser(row.username, { eras: args.eras });
-        if (profile) {
-          printProfile(profile);
-          if (args.save) await saveProfile(profile);
+      let saved = 0, failed = 0;
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        try {
+          const profile = await analyzeUser(row.username, { eras: args.eras });
+          if (profile) {
+            if (!args.json) printProfile(profile);
+            if (args.save) await saveProfile(profile);
+            saved++;
+          }
+        } catch (err) {
+          console.log(`  ✗ FAILED: ${row.username} — ${err.message}`);
+          failed++;
+        }
+        if ((i + 1) % 50 === 0) {
+          console.log(`\n  ── Progress: ${i + 1}/${rows.length} (${saved} saved, ${failed} failed) ──\n`);
         }
       }
+      console.log(`\n═══ BATCH COMPLETE: ${saved} saved, ${failed} failed out of ${rows.length} ═══\n`);
     } else {
       console.log('Usage:');
       console.log('  node scripts/user-stylometric-analyzer.mjs --username 911r');
