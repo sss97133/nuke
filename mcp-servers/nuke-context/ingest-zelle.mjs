@@ -14,30 +14,10 @@
  */
 
 import Database from 'better-sqlite3';
-import { createClient } from '@supabase/supabase-js';
-import { execSync } from 'child_process';
-import { join } from 'path';
+import { createSupabase, CHAT_DB_PATH, APPLE_EPOCH_OFFSET } from './lib/env.mjs';
 
-// ─── Load env via dotenvx ─────────────────────────────────────────────────────
-try {
-  const envOutput = execSync('cd /Users/skylar/nuke && dotenvx run -- env', {
-    encoding: 'utf-8', timeout: 10000
-  });
-  for (const line of envOutput.split('\n')) {
-    const eq = line.indexOf('=');
-    if (eq > 0) process.env[line.slice(0, eq)] = line.slice(eq + 1);
-  }
-} catch {
-  // fallback — trust env is already loaded
-}
-
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const CHAT_DB = join(process.env.HOME, 'Library/Messages/chat.db');
+const CHAT_DB = CHAT_DB_PATH;
 const ZELLE_SHORT_CODE = '767666';
-
-// Apple epoch offset
-const APPLE_EPOCH_OFFSET = 978307200;
 
 // CLI args
 const args = process.argv.slice(2);
@@ -254,7 +234,7 @@ async function main() {
   let targetPayments = inbound;
   if (VEHICLE_FILTER) {
     // Only process inbound payments for now — outbound are expenses, different flow
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const supabase = createSupabase();
 
     // Get work orders for the vehicle
     const { data: wos } = await supabase
@@ -285,13 +265,7 @@ async function main() {
   }
 
   // Write to database
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error('\nMissing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-    console.log('Run with: dotenvx run -- node mcp-servers/nuke-context/ingest-zelle.mjs');
-    return;
-  }
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const supabase = createSupabase();
   let written = 0;
   let skipped = 0;
 

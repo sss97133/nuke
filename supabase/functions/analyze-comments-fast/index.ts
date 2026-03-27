@@ -9,10 +9,12 @@
  * aggregate-sentiment works unchanged.
  *
  * Modes:
- *   calibrate  — mine existing AI data to report keyword frequencies
- *   analyze    — process a batch of vehicles programmatically
- *   validate   — compare programmatic vs AI scores on overlap set
- *   batch      — continuous processing with self-chaining
+ *   calibrate        — mine existing AI data to report keyword frequencies
+ *   analyze          — process a batch of vehicles programmatically
+ *   validate         — compare programmatic vs AI scores on overlap set
+ *   batch            — continuous processing with self-chaining
+ *   claim_triage     — regex pre-filter for claim extraction
+ *   question_classify — regex-based question taxonomy classification (Phase 3 Tier 1)
  *
  * POST /functions/v1/analyze-comments-fast
  */
@@ -357,6 +359,9 @@ Deno.serve(async (req) => {
         break;
       case "claim_triage":
         result = await claimTriage(supabase, supabaseUrl, serviceKey, body);
+        break;
+      case "question_classify":
+        result = await questionClassify(supabase, supabaseUrl, serviceKey, body);
         break;
       default:
         return jsonResponse({ error: `Unknown mode: ${mode}` }, 400);
@@ -1355,6 +1360,257 @@ async function claimTriage(supabase: any, supabaseUrl: string, serviceKey: strin
     pass_rate: comments.length > 0 ? Math.round((passedFilter / comments.length) * 100) : 0,
     remaining,
     continued: shouldContinue && remaining > 0 && inserted > 0,
+    elapsed_ms: Date.now() - startTime,
+  };
+}
+
+// ═══════════════════════════════════════════════════
+// MODE: QUESTION_CLASSIFY — Regex-based question taxonomy classification
+// ═══════════════════════════════════════════════════
+
+interface TaxonomyEntry {
+  id: string;
+  l1_category: string;
+  l2_subcategory: string;
+  regex_patterns: {
+    data_driven?: Array<{ pattern: string; weight: number }>;
+    keyword_based?: Array<{ pattern: string; weight: number }>;
+  };
+  keywords: string[];
+}
+
+// Cache taxonomy in module scope (lives for edge function cold start lifetime)
+let _taxonomyCache: TaxonomyEntry[] | null = null;
+let _taxonomyCacheTime = 0;
+const TAXONOMY_CACHE_TTL = 300_000; // 5 min
+
+async function loadTaxonomy(supabase: any): Promise<TaxonomyEntry[]> {
+  if (_taxonomyCache && Date.now() - _taxonomyCacheTime < TAXONOMY_CACHE_TTL) {
+    return _taxonomyCache;
+  }
+
+  const { data, error } = await supabase
+    .from("question_taxonomy")
+    .select("id, l1_category, l2_subcategory, regex_patterns, keywords");
+
+  if (error) throw new Error(`Load taxonomy: ${error.message}`);
+  if (!data || data.length === 0) throw new Error("question_taxonomy table is empty. Run discover:questions first.");
+
+  _taxonomyCache = data;
+  _taxonomyCacheTime = Date.now();
+  return data;
+}
+
+function classifyQuestion(text: string, taxonomy: TaxonomyEntry[]): {
+  categories: Array<{ id: string; l1: string; l2: string; score: number }>;
+  primary_l1: string | null;
+  primary_l2: string | null;
+  confidence: number;
+} {
+  const lowerText = text.toLowerCase();
+  const scores: Array<{ id: string; l1: string; l2: string; score: number }> = [];
+
+  for (const t of taxonomy) {
+    let score = 0;
+
+    // Check data-driven regex patterns
+    const dataDriven = t.regex_patterns?.data_driven || [];
+    for (const p of dataDriven) {
+      try {
+        const regex = new RegExp(p.pattern, "i");
+        if (regex.test(lowerText)) {
+          score += p.weight || 1.0;
+        }
+      } catch { /* skip invalid regex */ }
+    }
+
+    // Check keyword-based patterns
+    const keywordBased = t.regex_patterns?.keyword_based || [];
+    for (const p of keywordBased) {
+      try {
+        const regex = new RegExp(p.pattern, "i");
+        if (regex.test(lowerText)) {
+          score += p.weight || 0.8;
+        }
+      } catch { /* skip invalid regex */ }
+    }
+
+    // Check raw keywords
+    for (const kw of (t.keywords || [])) {
+      if (kw.length > 2 && lowerText.includes(kw.toLowerCase())) {
+        score += 0.5;
+      }
+    }
+
+    if (score > 0) {
+      scores.push({ id: t.id, l1: t.l1_category, l2: t.l2_subcategory, score });
+    }
+  }
+
+  // Sort by score descending
+  scores.sort((a, b) => b.score - a.score);
+
+  if (scores.length === 0) {
+    return { categories: [], primary_l1: null, primary_l2: null, confidence: 0 };
+  }
+
+  // Normalize confidence: top score / (top score + 1) gives 0-1 range
+  const topScore = scores[0].score;
+  const confidence = topScore / (topScore + 1);
+
+  return {
+    categories: scores.slice(0, 5), // Top 5 matches
+    primary_l1: scores[0].l1,
+    primary_l2: scores[0].l2,
+    confidence,
+  };
+}
+
+async function questionClassify(supabase: any, supabaseUrl: string, serviceKey: string, body: any) {
+  const batchSize = Math.min(body.batch_size || 1000, 2000);
+  const shouldContinue = body.continue ?? false;
+  const batchNum = body._batch_num || 1;
+  const minConfidence = body.min_confidence ?? 0.3; // Below this, leave for LLM
+  const startTime = Date.now();
+
+  // Load taxonomy
+  const taxonomy = await loadTaxonomy(supabase);
+  console.log(`[question_classify] Loaded ${taxonomy.length} taxonomy entries, batch ${batchNum}`);
+
+  // Find unclassified question comments (uses idx_ac_unclassified_questions)
+  const { data: comments, error: fetchErr } = await supabase
+    .from("auction_comments")
+    .select("id, comment_text")
+    .eq("has_question", true)
+    .is("question_classified_at", null)
+    .not("comment_text", "is", null)
+    .limit(batchSize);
+
+  if (fetchErr) return { error: fetchErr.message, classified: 0 };
+
+  if (!comments || comments.length === 0) {
+    return { classified: 0, skipped: 0, remaining: 0, batch_num: batchNum, note: "All question comments classified" };
+  }
+
+  // Classify each comment
+  let classified = 0;
+  let skipped = 0; // Below confidence threshold (left for LLM)
+  const l1Counts: Record<string, number> = {};
+  const updateBatch: Array<{
+    id: string;
+    question_categories: any;
+    question_primary_l1: string | null;
+    question_primary_l2: string | null;
+    question_classified_at: string;
+    question_classify_method: string;
+  }> = [];
+
+  for (const c of comments) {
+    const result = classifyQuestion(c.comment_text, taxonomy);
+
+    if (result.confidence >= minConfidence && result.primary_l1) {
+      classified++;
+      l1Counts[result.primary_l1] = (l1Counts[result.primary_l1] || 0) + 1;
+
+      updateBatch.push({
+        id: c.id,
+        question_categories: result.categories.length > 0 ? result.categories : null,
+        question_primary_l1: result.primary_l1,
+        question_primary_l2: result.primary_l2,
+        question_classified_at: new Date().toISOString(),
+        question_classify_method: "regex_v1",
+      });
+    } else if (result.confidence > 0) {
+      // Low confidence but some match — mark with method so LLM can pick it up
+      skipped++;
+      updateBatch.push({
+        id: c.id,
+        question_categories: result.categories.length > 0 ? result.categories : null,
+        question_primary_l1: null, // Stays null for LLM to handle
+        question_primary_l2: null,
+        question_classified_at: new Date().toISOString(),
+        question_classify_method: "regex_v1_low_conf",
+      });
+    } else {
+      // Zero match — mark for LLM
+      skipped++;
+      updateBatch.push({
+        id: c.id,
+        question_categories: null,
+        question_primary_l1: null,
+        question_primary_l2: null,
+        question_classified_at: new Date().toISOString(),
+        question_classify_method: "regex_v1_no_match",
+      });
+    }
+  }
+
+  // Update rows using Supabase client (avoids execute_sql RPC timeout)
+  let updated = 0;
+  const PARALLEL_UPDATES = 10;
+
+  for (let i = 0; i < updateBatch.length; i += PARALLEL_UPDATES) {
+    const chunk = updateBatch.slice(i, i + PARALLEL_UPDATES);
+
+    const results = await Promise.allSettled(
+      chunk.map(row =>
+        supabase
+          .from("auction_comments")
+          .update({
+            question_categories: row.question_categories,
+            question_primary_l1: row.question_primary_l1,
+            question_primary_l2: row.question_primary_l2,
+            question_classified_at: row.question_classified_at,
+            question_classify_method: row.question_classify_method,
+          })
+          .eq("id", row.id)
+      )
+    );
+
+    for (const r of results) {
+      if (r.status === "fulfilled" && !r.value.error) updated++;
+    }
+
+    // Check time budget
+    if (Date.now() - startTime > 50000) {
+      console.log(`[question_classify] Time budget hit at ${i + chunk.length}/${updateBatch.length}`);
+      break;
+    }
+  }
+
+  // Estimate remaining (uses idx_ac_unclassified_questions)
+  const { count: remaining } = await supabase
+    .from("auction_comments")
+    .select("id", { count: "exact", head: true })
+    .eq("has_question", true)
+    .is("question_classified_at", null);
+
+  // Self-chain
+  if (shouldContinue && (remaining ?? 0) > 0 && classified > 0) {
+    fetch(`${supabaseUrl}/functions/v1/analyze-comments-fast`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        mode: "question_classify",
+        batch_size: batchSize,
+        continue: true,
+        min_confidence: minConfidence,
+        _batch_num: batchNum + 1,
+      }),
+    }).catch(e => console.error("[question_classify] Chain failed:", e));
+  }
+
+  return {
+    batch_num: batchNum,
+    classified,
+    skipped,
+    updated,
+    remaining: remaining ?? -1,
+    l1_distribution: l1Counts,
+    continued: shouldContinue && (remaining ?? 0) > 0 && classified > 0,
     elapsed_ms: Date.now() - startTime,
   };
 }

@@ -250,6 +250,21 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 
 ---
 
+## Work Order Intelligence
+
+| Intent | Use This | Notes |
+|--------|----------|-------|
+| "Update me on the [name] build" | `resolve_work_order_status(p_query)` RPC | One call, full answer. Returns vehicle, contact, all work orders with itemized parts/labor/payments/balance. Callable via `supabase.rpc()`, curl, or `npm run wo:resolve` |
+| Get balance for a single work order | `work_order_balance(p_work_order_id)` RPC | Returns JSONB balance summary via `work_order_receipt_unified` view |
+| View unified receipt for all work orders | `SELECT * FROM work_order_receipt_unified` | Bridges system 1 (timeline_events) and system 2 (work_orders) |
+| Ingest Zelle payments from iMessage | `npm run wo:ingest-zelle -- --vehicle <id>` | Reads SMS short code 767666 from chat.db, dedupes, writes to `work_order_payments` |
+| Seed parts from known receipts | `npm run wo:ingest-receipts -- --seed` | Pre-extracted Amazon/Summit receipts → `work_order_parts` |
+| Ingest iMessage thread events | `npm run wo:ingest-thread -- "+1XXXXXXXXXX" --vehicle <id>` | Classifies messages into price_agreement, scope_change, status_update → `vehicle_observations` |
+| Look up book hours for an operation | `estimate_labor_from_description(text, year)` | Searches `labor_operations` table (64 operations) |
+| Resolve labor rate for a job | `resolve_labor_rate(org, user, vehicle, client)` | Cascade: contract → user → org → system_default ($125) |
+
+---
+
 ## Discovery & Lead Generation
 
 | Intent | Use This | Notes |
