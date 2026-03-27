@@ -941,6 +941,15 @@ Return JSON only (no markdown):
           }
         }
 
+        // Compute realization plan for newly created vehicle
+        if (vehicleId) {
+          try {
+            await supabase.rpc('persist_realization_plan', { p_vehicle_id: vehicleId });
+          } catch (rpErr: any) {
+            console.error(`[cl-queue] realization plan failed for ${vehicleId}: ${rpErr.message}`);
+          }
+        }
+
         // Mark as complete
         await supabase
           .from('craigslist_listing_queue')
