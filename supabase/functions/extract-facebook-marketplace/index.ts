@@ -651,6 +651,8 @@ async function handleBatch(body: BatchInput) {
         parsed_make: item.parsed_make ?? undefined,
         parsed_model: item.parsed_model ?? undefined,
         seller_name: item.seller ?? undefined,
+        location: item.location ?? undefined,
+        image_url: item.image_url ?? undefined,
         status: item.sold ? "sold" : "active",
         agent_context: {
           agent_id: "fb-saved-sync",

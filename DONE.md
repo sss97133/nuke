@@ -2,6 +2,30 @@
 
 ## 2026-03-27
 
+### [design] Visual Audit → Wireframe Prototyping → Design Ontology
+- Full forensic audit of nuke.ag: every UI element traced to its design spec prompt, identified gaps between spec and reality
+- Identified novel data advantages: 7 ontological dimensions no other platform surfaces (palimpsest lifecycle, evidence chains, epistemological decay, spatial condition, actor networks, market consensus, coverage depth)
+- Built 6 wireframe prototypes at `wireframes/` (A-F): Bloomberg data-forward, signal strip, overlay badges, sortable dashboard, badge portals, final synthesis
+- Simulated 7 design critics (Tufte, Rams, Ive, Ishii, Eames, Norman, Chimero) and synthesized feedback
+- Discovered badge portal interaction pattern: every data point is a clickable door into unique data shapes
+- Discovered image ownership ontology gap: 42K photos mis-assigned by bulk import, `vehicle_id` conflates storage/attribution/subject/provenance
+- Found album_sync_map: 65 albums, 11,316 photos, already mapped to vehicles, zero synced
+- Architecture docs: `docs/architecture/IMAGE_OWNERSHIP_ONTOLOGY.md` (4-relationship model), `docs/architecture/IMAGE_REVIEW_PASSES.md` (multi-pass correction framework)
+- Final wireframe (F) implements tiered progressive disclosure: image overlay → Tier 1 signal strip → Tier 2 deep data → leaf evidence nodes
+- Key design decisions: no data redundancy across layers, every leaf terminates at evidence (photo/doc/part/listing/actor), academic ontology renamed for consumers
+
+### [fb-saved] Facebook Saved Items Auto-Extraction Pipeline
+- Built batch mode on `extract-facebook-marketplace` (mode: "batch") for saved items ingestion
+- Created `scripts/fb-saved-sync.sh` — two-phase AppleScript+curl sync (DOM extract → POST)
+- Created LaunchAgent `com.nuke.fb-saved-sync.plist` — fires every 30 min automatically
+- Fixed chicken-and-egg bug: refine no longer requires vehicle_id (saved items arrive unlinked)
+- Fixed import image gate: saved items bypass image requirement (user-curated = real vehicles)
+- Fixed `isBlockedVehicleType` undefined error in import-fb-marketplace
+- Ran full enrichment on 75 saved vehicles via Playwright from residential IP
+- Results: 96% descriptions, 35% transmission, 31% mileage, 99% price
+- Documented in Engineering Manual Ch.8 (Scraping Sources → Saved Items Pipeline)
+- Deployed: extract-facebook-marketplace, refine-fb-listing, import-fb-marketplace
+
 ### [realization] Vehicle Realization Plan — persist_realization_plan() + Strategy Doc
 - Created `persist_realization_plan(vehicle_id)` SQL function: parses vehicle description for physical state (engine, trans, body, paint, interior, title, matching numbers), derives deterministic resolution steps with cost/time ranges, pulls comp tiers (project/driver/restomod/show) from our data, stores as JSONB on `vehicles.realization_plan`
 - Applied migration `vehicle_realization_plan`: `labor_estimates` table (designed months ago, never deployed), `realization_plan` JSONB column on `vehicles`
