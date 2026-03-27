@@ -2,6 +2,13 @@
 
 ## 2026-03-27
 
+### [data] Vehicle Realization Plan v2 — table-driven decomposition
+- `stage_transition_labor_map`: added `category` column + 13 new rows (powertrain, interior, electrical, chassis, assembly) — now 28 rows across 6 categories
+- `get_comp_tiers(year, make, model_root)`: new reusable SQL function returning 4 market tiers with counts/avg/min/max from sale data
+- `persist_realization_plan()`: rewritten as v2 orchestrator — reads enriched fields (engine_type, known_flaws, condition_rating, description_discoveries, vehicle_observations) before falling back to regex; steps now sourced from `stage_transition_labor_map` with `map_id` traceability; `data_sources` field tracks which inputs were available
+- Wired into 3 edge functions: `enrich-listing-content`, `discover-description-data`, `process-cl-queue` — plan recomputes after each extraction pass
+- Verified: C10 (project) → 7 steps/$17.5K-$34.2K; Packard (driver) → 3 steps/$2.6K-$8.7K; Camaro (show) → 3 optional steps
+
 ### [research] Auction Price Formation Theory — CBT empirically validated
 - Updated paper status from "Theoretical" to "Empirically validated — CBT = 4 serious bidders"
 - Added Section 1.4: Serious Bidder definition (max bid >= 70% of auction high, mode of 4 per BaT auction)

@@ -343,6 +343,13 @@ Return JSON with these fields (only extract what's stated in the listing):
     return { vehicle_id: vehicleId, status: `update_error: ${updateErr.message}`, fields_updated: [], before: vehicle, after: afterState };
   }
 
+  // Recompute realization plan now that enriched fields are populated
+  try {
+    await supabase.rpc('persist_realization_plan', { p_vehicle_id: vehicleId });
+  } catch (rpErr: any) {
+    console.error(`[enrich] realization plan failed for ${vehicleId}: ${rpErr.message}`);
+  }
+
   return { vehicle_id: vehicleId, status: "enriched", fields_updated: fieldsUpdated, before: vehicle, after: afterState };
 }
 

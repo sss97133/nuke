@@ -541,6 +541,13 @@ Deno.serve(async (req) => {
           conditionResult.errors = 1;
         }
 
+        // Recompute realization plan with new condition data
+        try {
+          await supabase.rpc('persist_realization_plan', { p_vehicle_id: vehicle.id });
+        } catch (rpErr: any) {
+          console.error(`[discover-desc] realization plan failed for ${vehicle.id}: ${rpErr.message}`);
+        }
+
         return {
           success: true,
           conditionResult,
