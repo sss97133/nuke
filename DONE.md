@@ -2,6 +2,33 @@
 
 ## 2026-03-27
 
+### [realization] Vehicle Realization Plan — persist_realization_plan() + Strategy Doc
+- Created `persist_realization_plan(vehicle_id)` SQL function: parses vehicle description for physical state (engine, trans, body, paint, interior, title, matching numbers), derives deterministic resolution steps with cost/time ranges, pulls comp tiers (project/driver/restomod/show) from our data, stores as JSONB on `vehicles.realization_plan`
+- Applied migration `vehicle_realization_plan`: `labor_estimates` table (designed months ago, never deployed), `realization_plan` JSONB column on `vehicles`
+- Test case: 1971 C10 Fleetside Short Bed ($10K, Las Vegas CL) — ingested as vehicle `507198f2`, 17 images, realization plan computed: 7 steps, $10.3-36.5K build, 1,412 comps across 4 tiers
+- Strategy doc: `docs/products/DEAL_FLOW_ACQUISITION_ENGINE.md` — full inventory of what exists vs schema-only vs missing for deal detection, 7-dimension scoring model, phased execution plan
+- Key finding: CL queue processor stalled since Feb 25 (124 items stuck in `processing`). 707 CL feeds active but queue not draining.
+- Key finding: `vehicle_watchlist`, `watchlist_matches`, `auto_buy_executions`, `price_monitoring`, `marketplace_deal_alerts`, `notification_channels`, `user_subscriptions` — all have migrations written but tables never created in production
+- Concept: realization plan is NOT a product — it's a computed field derived from vehicle state, same as ARS. Every vehicle gets one on ingest. The steps are physics, not features.
+
+### [extraction] Mecum Re-Extraction Phase 1 — Snapshot Pipeline Fix + Queue Population
+- **Bug fixed:** `repopulate_snapshot_queue()` had `s.html IS NOT NULL` condition that blocked ALL platforms — 100% of snapshots (440K+) use `html_storage_path` not inline html. Changed to `(s.html IS NOT NULL OR s.html_storage_path IS NOT NULL)`.
+- **URL normalization added:** repopulate function now handles www vs non-www and trailing slash mismatches. Previously only exact URL match worked.
+- **Queue populated:** 30K+ Mecum vehicles queued for extraction (up from 18K). Total queue: 77K items.
+- **Cron tuned:** `mecum-snapshot-parser` batch_size 50 -> 100. Disabled redundant `enrich-mecum-snapshots` offset-based cron.
+- **Drain rate:** ~3.6K items/hour (cron + manual batches). ~29K pending, ETA ~8 hours.
+- **Coverage lift (so far):** Engine 49.3% -> 61.5% (+12.2pp). Transmission, color, drivetrain all rising. Projected final: price +3.6pp, desc +3.8pp, mileage +6.7pp.
+- **Key discovery:** 78K "Mecum" vehicles are actually ConceptCarz stubs (conceptcarz:// URLs) with 0.7% VIN, 2.7% price. These drag down overall percentages but cannot be improved via snapshot extraction.
+
+### [user-simulation] User Stylometric Analyzer + Persona Simulation Methodology
+- **Layer 0 Instrument:** `scripts/user-stylometric-analyzer.mjs` — pure-math stylometric fingerprinting (zero API cost). Computes sentence length distribution, Yule's K vocabulary richness, function word profiles (Mosteller & Wallace), punctuation signatures, epistemic stance (Hyland hedge/boost), self/other reference rates, opening patterns.
+- **Stratified Sampler:** Samples by make AND time period to capture expertise phase transitions. Addresses the "SAE vs metric diorama" problem — automotive experts switch domains.
+- **Era Detection:** Identifies palimpsest layers of expertise (e.g., 1600veloce: BMW → Chevy → Porsche → BMW → Porsche). Core finding: **style is identity, topic is era**.
+- **Empirical Results:** 5 power users fingerprinted with clearly discriminative signatures. DENWERKS: 0.64 exclamation/sent. VivaLasVegas: 30.8 self-reference/1K. 911r: hedge/boost 0.87.
+- **Methodology Paper:** `docs/library/intellectual/papers/user-simulation-methodology.md` — full academic methodology grounding (Pennebaker, Yule, Hyland, Park, Schwartz, Mosteller-Wallace, Hullman, DPRF, PersonaCite, Santa Fe ASM). 10 sections, 30+ citations.
+- **Batch Run:** Top 1000 users processing, profiles saving to `bat_user_profiles.metadata.stylometric_profile`.
+- **Research Database:** Existing infrastructure mapped: `comment_persona_signals` (2,787 rows), `author_personas` (~30 rows), `personaPrompt.ts` (working persona→bot conversion). Identified gaps: scoring fields all zeros, Layer 3 extraction only 0.02% coverage.
+
 ### [question-taxonomy] "What Do Buyers Want To Know?" Pipeline — All 4 Phases
 - **Phase 1:** Discovery script (`scripts/question-taxonomy-discovery.mjs`) — stratified sampling across 20 price/era cells, Gemini Flash taxonomy discovery, Sonnet consolidation, TF-IDF regex extraction. 6 npm scripts registered.
 - **Phase 2:** Migrations — 5 new columns on `auction_comments` (question_categories, question_primary_l1/l2, question_classified_at, question_classify_method), `question_taxonomy` reference table, `question_profile` column on `comment_discoveries`. Partial indexes on l1/l2.
@@ -5632,3 +5659,9 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
   - Honest answer: extraction is not close to done, but the path is clear
 - Restructured into 5 parts: Context, Methods, Operations, Sources, The Big Picture
 - 14 chapters + 4 appendices, 18 major sections total
+
+### [extraction] 4 high-ROI actions from Extraction Handbook
+- **BaT queue cleanup:** 43,406 terminal failures reclassified to `skipped` (comment URLs 89%, non-vehicles 9.5%, garbled URLs). Failed items: 44K → 590.
+- **Proximity search RPC:** `find_vehicles_near()` deployed — Haversine distance, mile-based radius, bounding box pre-filter, optional year/make/source filters, GPS index added. **35 square body trucks within 250mi of SLC** (was 0 findable results). Replaces broken `find_vehicles_near_gps` (100m bounding box, wrong search_path).
+- **Barrett-Jackson VIN backfill:** Extracted chassis numbers from 20K+ conceptcarz:// URLs + 1.5K from import_queue raw_data. VIN any-length: 31.7% → 31.8% (most short chassis numbers hit dupe constraints). Snapshot queue fully processed (43K complete). BJ Strapi API now behind Cloudflare.
+- **Mecum snapshot re-extraction:** Fixed CRITICAL bug in `repopulate_snapshot_queue()` — `AND s.html IS NOT NULL` blocked ALL platforms since 100% of 440K+ snapshots use `html_storage_path`. Added URL normalization (9 match patterns). Batch_size doubled to 100. 29K queue items draining at 3,600/hr. Price: 44.4% → 44.9%, mileage: 28.3% → 28.8%, engine +12.2pp.
