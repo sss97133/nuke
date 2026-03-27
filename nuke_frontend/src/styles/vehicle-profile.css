@@ -37,10 +37,20 @@
   --h-hero: 550px;
   --vp-col-left: 30%;
   --vp-col-right: 70%;
-  --vp-h-site: var(--header-height, 48px);
-  --vp-h-sub: 36px;
-  --vp-h-barcode: 10px;
-  --vp-sticky-top: calc(var(--vp-h-site) + var(--vp-h-sub) + var(--vp-h-barcode));
+
+  /* ─── Sticky Stack ───
+     Each layer's height, then cumulative anchors.
+     To add a new sticky layer: add its height, insert a new anchor,
+     and bump all anchors below it. Never use raw px for sticky top. */
+  --vp-h-site: var(--header-height, 42px);       /* global header (NUKE + search) */
+  --vp-h-tab-bar: 28px;                           /* vehicle tab bar */
+  --vp-h-sub: 36px;                               /* sub-header (badge bar) */
+  --vp-h-barcode: 10px;                            /* barcode timeline strip */
+
+  --vp-stick-tab-bar: var(--vp-h-site);                                              /* tab bar sticks below header */
+  --vp-stick-sub: calc(var(--vp-h-site) + var(--vp-h-tab-bar));                      /* sub-header sticks below tab bar */
+  --vp-stick-barcode: calc(var(--vp-h-site) + var(--vp-h-tab-bar) + var(--vp-h-sub)); /* barcode sticks below sub-header */
+  --vp-sticky-top: calc(var(--vp-h-site) + var(--vp-h-tab-bar) + var(--vp-h-sub) + var(--vp-h-barcode)); /* columns stick below barcode */
 }
 
 /* Dark mode overrides for vehicle profile tokens */
@@ -60,11 +70,15 @@
   --heat-0: #3a3a3a;
   --heat-2: #4ade80;
 
-  /* Layout Heights */
-  --vp-h-site: var(--header-height, 48px);
+  /* Layout Heights — same sticky stack as light mode */
+  --vp-h-site: var(--header-height, 42px);
+  --vp-h-tab-bar: 28px;
   --vp-h-sub: 36px;
   --vp-h-barcode: 10px;
-  --vp-sticky-top: calc(var(--vp-h-site) + var(--vp-h-sub) + var(--vp-h-barcode));
+  --vp-stick-tab-bar: var(--vp-h-site);
+  --vp-stick-sub: calc(var(--vp-h-site) + var(--vp-h-tab-bar));
+  --vp-stick-barcode: calc(var(--vp-h-site) + var(--vp-h-tab-bar) + var(--vp-h-sub));
+  --vp-sticky-top: calc(var(--vp-h-site) + var(--vp-h-tab-bar) + var(--vp-h-sub) + var(--vp-h-barcode));
 
   /* Layout */
   --h-hero: 550px;
@@ -115,7 +129,7 @@
 
 .vehicle-profile-sub-header {
   position: sticky;
-  top: var(--header-height, 48px);
+  top: var(--vp-stick-sub);
   background: var(--vp-surface);
   border-bottom: 1px solid var(--vp-ghost);
   min-height: var(--vp-h-sub);
@@ -138,7 +152,7 @@
 .vehicle-profile-page .vp-sub-header {
   display: flex !important;
   position: sticky !important;
-  top: var(--header-height, 40px) !important;
+  top: var(--vp-stick-sub) !important;
   z-index: 900 !important;
 }
 
@@ -351,7 +365,7 @@
 
 .barcode-strip {
   position: sticky;
-  top: calc(var(--header-height, 40px) + var(--vp-h-sub));
+  top: var(--vp-stick-barcode);
   z-index: 850;
   background: var(--vp-surface);
   border-bottom: 1px solid var(--vp-ghost);

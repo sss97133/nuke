@@ -8,7 +8,7 @@
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   position: sticky;
-  top: 40px; /* below the 40px header */
+  top: var(--vp-stick-tab-bar, var(--header-height, 42px));
   z-index: 999;
 }
 
