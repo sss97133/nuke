@@ -2,6 +2,34 @@
 
 ## 2026-03-27
 
+### [research] Auction Price Formation Theory — CBT empirically validated
+- Updated paper status from "Theoretical" to "Empirically validated — CBT = 4 serious bidders"
+- Added Section 1.4: Serious Bidder definition (max bid >= 70% of auction high, mode of 4 per BaT auction)
+- Test 1 (bid count): PASS with cohort-controlled results (7 buckets, 36K vehicles)
+- Test 3 Original (unique bidders): INCONCLUSIVE — no threshold visible, game-players muddied signal
+- Test 3 Revised (serious bidders): PASS — threshold at 4, median deviation 0.0% from 4 through 10
+- Test 4 Revised (variance): PASS — stddev drops 0.941→0.739 from 2→4 serious bidders
+- Key finding: 2 serious bidders = highest overpay risk (mean +27.7%, "emotional duopoly")
+- Updated Research Frontier Q1 as answered, For the Next Agent section with remaining tests (2, 5, 6)
+
+### [frontend] Vehicle Profile 6-Phase Renovation — committed f90ac7d7a
+- Phase 1: AppHeader/VehicleTabBar z-index and sticky alignment fixes
+- Phase 2: VehicleSubHeader removed unused image count badge
+- Phase 3: WorkspaceContent — BuildStatusPanel + OwnerIdentityCard integration, empty state guards
+- Phase 4: VehiclePricingValueCard/ROISummaryCard null-safe rendering
+- Phase 5: NukeEstimatePanel empty data guard
+- Phase 6: VehicleReferenceLibrary comments-first reorder
+- 13 files committed (10 modified + 3 new: BuildStatusPanel, OwnerIdentityCard, useBuildStatus hook)
+- tsc clean, vite build clean (12s)
+
+### [frontend] Vehicle Profile: Owner Throne + Build Status Panel
+- Created `useBuildStatus.ts` hook — parallel fetch from `work_order_receipt_unified` + `deal_jackets` with contact join
+- Created `OwnerIdentityCard.tsx` — avatar + name + OWNER badge + sale price/date/deposit grid. Address gated to owner/contributor.
+- Created `BuildStatusPanel.tsx` — charged/paid/balance summary, work order rows with expand-on-click lazy loading parts/labor/payments. Rate source gated to owner view.
+- Modified `WorkspaceContent.tsx` — 2 lazy imports, hook call, 2 conditional render insertions (after dossier + after build timeline)
+- Self-guarding: both components return null when no data, no empty shells
+- TypeScript compiles clean, zero errors
+
 ### [design] Visual Audit → Wireframe Prototyping → Design Ontology
 - Full forensic audit of nuke.ag: every UI element traced to its design spec prompt, identified gaps between spec and reality
 - Identified novel data advantages: 7 ontological dimensions no other platform surfaces (palimpsest lifecycle, evidence chains, epistemological decay, spatial condition, actor networks, market consensus, coverage depth)
