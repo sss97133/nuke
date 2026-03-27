@@ -435,13 +435,13 @@ Deno.serve(async (req) => {
     if (action === "fetch_descriptions") {
       const limit = Math.min(batch_size || 10, 25); // conservative: bingbot fetches are slow
 
-      // Get listings that have a URL, are linked to a vehicle, have no description
+      // Get listings that have a URL and no description (vehicle_id not required —
+      // saved items arrive without vehicles and need enrichment before import)
       const { data: candidates, error: findErr } = await supabase
         .from("marketplace_listings")
         .select("facebook_id, url, title, vehicle_id, price, mileage, transmission, exterior_color")
         .is("description", null)
         .eq("status", "active")
-        .not("vehicle_id", "is", null)
         .not("facebook_id", "is", null)
         .order("first_seen_at", { ascending: false })
         .limit(limit);
@@ -729,12 +729,13 @@ Deno.serve(async (req) => {
     const limit = Math.min(batch_size || 50, 200);
 
     // Prioritize listings that have descriptions (more to extract from)
+    // NOTE: vehicle_id filter removed — saved items arrive without vehicles
+    // and need refinement before import can create vehicle records.
     const { data: listings, error: fetchError } = await supabase
       .from("marketplace_listings")
       .select("facebook_id, url, title, vehicle_id, description, mileage, transmission, exterior_color, all_images, price")
       .is("refined_at", null)
       .eq("status", "active")
-      .not("vehicle_id", "is", null)
       .not("description", "is", null)
       .order("first_seen_at", { ascending: false })
       .limit(limit);
@@ -755,7 +756,6 @@ Deno.serve(async (req) => {
         .is("description", null)
         .is("refined_at", null)
         .eq("status", "active")
-        .not("vehicle_id", "is", null)
         .not("title", "is", null)
         .order("first_seen_at", { ascending: false })
         .limit(fetchLimit);

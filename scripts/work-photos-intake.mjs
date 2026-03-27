@@ -152,7 +152,10 @@ function queryRecentPhotos() {
 
   const vehiclePhotos = photos.filter(p => {
     const labels = (p.labels || []).map(l => l.toLowerCase());
-    return labels.some(l => vehicleKeywords.has(l));
+    if (!labels.some(l => vehicleKeywords.has(l))) return false;
+    // Skip iCloud-only photos (no local path = can't export)
+    if (p.iscloudasset && !p.path) return false;
+    return true;
   });
 
   console.log(`  Found ${photos.length} unalbumized photos, ${vehiclePhotos.length} vehicle-related`);
@@ -230,19 +233,20 @@ function exportPhotoByUUID(uuid, destDir) {
 function exportPhotosBatch(uuids, destDir) {
   mkdirSync(destDir, { recursive: true });
   // osxphotos supports multiple --uuid flags
-  // Use --download-missing to fetch iCloud-only photos
-  const cmdArgs = ['export', destDir, '--overwrite', '--download-missing'];
+  // Skip --download-missing to avoid hanging on iCloud-only photos
+  const cmdArgs = ['export', destDir, '--overwrite'];
   for (const uuid of uuids) {
     cmdArgs.push('--uuid', uuid);
   }
-  // Pipe "y" to handle interactive iCloud download prompt
-  const result = spawnSync('bash', ['-c',
-    `echo "y" | osxphotos ${cmdArgs.map(a => `"${a}"`).join(' ')}`
-  ], {
-    encoding: 'utf8', stdio: 'pipe', timeout: 600000 // 10 min for iCloud downloads
+  const result = spawnSync('osxphotos', cmdArgs, {
+    encoding: 'utf8', stdio: 'pipe', timeout: 120000 // 2 min max per batch
   });
   if (result.status !== 0 && result.status !== null) {
-    console.error('  Export error:', (result.stderr || '').slice(0, 300));
+    // Don't log errors for iCloud-only "missing" photos
+    const stderr = (result.stderr || '');
+    if (!stderr.includes('missing')) {
+      console.error('  Export error:', stderr.slice(0, 300));
+    }
   }
   return result.status === 0 || result.status === null;
 }

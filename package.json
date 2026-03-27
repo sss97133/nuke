@@ -81,6 +81,7 @@
     "import:craigslist": "tsx scripts/craigslist-import/index.ts",
     "import:craigslist:dry-run": "tsx scripts/craigslist-import/index.ts --dry-run --verbose",
     "import:fb-saved": "dotenvx run -- node scripts/import-fb-saved.mjs",
+    "ingest:drop": "dotenvx run -- node scripts/drop-folder-ingest.mjs",
     "iphoto:intake": "dotenvx run -- node scripts/iphoto-intake.mjs",
     "iphoto:work": "dotenvx run -- node scripts/work-photos-intake.mjs",
     "iphoto:work:dry-run": "dotenvx run -- node scripts/work-photos-intake.mjs --dry-run",

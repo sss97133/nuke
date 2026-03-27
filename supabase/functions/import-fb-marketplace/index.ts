@@ -516,21 +516,30 @@ Deno.serve(async (req) => {
         }
 
         // ─── QUALITY GATE 3: Block non-car vehicle types ──────────
-        if (isBlockedVehicleType(make, model, listing.title)) {
+        const classification = classifyVehicle(make, model, listing.title, year);
+        if (classification.displayTier === 'hidden') {
           results.skipped_blocked_type++;
           if (!dryRun) await supabase.from('marketplace_listings').update({ status: 'blocked' }).eq('id', listing.id);
           continue;
         }
 
         // ─── QUALITY GATE 4: Must have at least one valid image ───
+        // User-saved items (facebook_saved) bypass this gate — they're
+        // explicitly curated and clearly real vehicles. Images will be
+        // backfilled later by the refine/enrich pipeline.
         const validImages = (listing.all_images || []).filter(isValidVehicleImage);
         const primaryImage = listing.image_url && isValidVehicleImage(listing.image_url)
           ? listing.image_url
           : validImages[0] || null;
 
-        if (!primaryImage && validImages.length === 0) {
+        const isSavedItem = (listing as any).raw_scrape_data?.agent_context?.session_type === 'facebook_saved';
+
+        if (!primaryImage && validImages.length === 0 && !isSavedItem) {
           results.skipped_no_image++;
-          if (!dryRun) await supabase.from('marketplace_listings').update({ status: 'blocked' }).eq('id', listing.id);
+          const isRefined = !!(listing as any).refined_at;
+          if (!dryRun && isRefined) {
+            await supabase.from('marketplace_listings').update({ status: 'blocked' }).eq('id', listing.id);
+          }
           continue;
         }
 
