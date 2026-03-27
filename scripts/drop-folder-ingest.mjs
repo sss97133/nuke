@@ -45,12 +45,14 @@ const folderPath = args.find(a => !a.startsWith('-'));
 const DRY_RUN = args.includes('--dry-run');
 const CLASSIFY_ONLY = args.includes('--classify-only');
 
-if (!folderPath) {
-  console.error('Usage: node scripts/drop-folder-ingest.mjs /path/to/folder [--dry-run] [--classify-only]');
+const REVIEW = args.includes('--review');
+
+if (!folderPath && !REVIEW) {
+  console.error('Usage: node scripts/drop-folder-ingest.mjs /path/to/folder [--dry-run] [--classify-only] [--review]');
   process.exit(1);
 }
 
-if (!existsSync(folderPath)) {
+if (folderPath && !existsSync(folderPath)) {
   console.error(`Folder not found: ${folderPath}`);
   process.exit(1);
 }
@@ -342,4 +344,142 @@ async function run() {
   }
 }
 
-run().catch(e => { console.error(e); process.exit(1); });
+// ─── AI Review: re-examine unknowns with a more targeted prompt ─────────────
+async function reviewUnknowns() {
+  console.log('\n--- AI Review Pass ---');
+  console.log('Fetching recently uploaded drop-folder photos assigned to Sierra Classic (potential misroutes)...\n');
+
+  // Get all drop-folder photos from the last 24 hours
+  const { data: recentPhotos, error } = await supabase
+    .from('vehicle_images')
+    .select('id, file_name, image_url, vehicle_id, storage_path')
+    .eq('source', 'drop-folder')
+    .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    .order('file_name');
+
+  if (error || !recentPhotos?.length) {
+    console.log('No recent drop-folder photos to review.');
+    return;
+  }
+
+  // Group by vehicle
+  const groups = {};
+  for (const p of recentPhotos) {
+    const vid = p.vehicle_id;
+    if (!groups[vid]) groups[vid] = [];
+    groups[vid].push(p);
+  }
+
+  console.log('Current distribution:');
+  for (const [vid, photos] of Object.entries(groups)) {
+    const v = VEHICLES.find(v => v.id === vid);
+    console.log(`  ${v?.label || vid}: ${photos.length} photos`);
+  }
+
+  // Only review photos assigned to Sierra Classic (the default bucket)
+  // These are the ones most likely to be misrouted
+  const sierraId = 'a90c008a-3379-41d8-9eb2-b4eda365d74c';
+  const toReview = groups[sierraId] || [];
+
+  if (toReview.length === 0) {
+    console.log('\nNo photos in default bucket to review.');
+    return;
+  }
+
+  console.log(`\nReviewing ${toReview.length} photos in Sierra Classic (default bucket)...`);
+
+  // Sample every 5th photo to keep it fast
+  const sampleIndices = [];
+  for (let i = 0; i < toReview.length; i += 5) {
+    sampleIndices.push(i);
+  }
+
+  const tmpDir = join(os.tmpdir(), `review_${Date.now()}`);
+  mkdirSync(tmpDir, { recursive: true });
+
+  let reassigned = 0;
+  let confirmed = 0;
+  let errors = 0;
+
+  for (const idx of sampleIndices) {
+    const photo = toReview[idx];
+
+    // Download thumbnail from Supabase for re-classification
+    try {
+      const { data: blob } = await supabase.storage
+        .from(BUCKET)
+        .download(photo.storage_path);
+
+      if (!blob) { errors++; continue; }
+
+      const buffer = Buffer.from(await blob.arrayBuffer());
+      const thumbPath = join(tmpDir, `review_${photo.id}.jpg`);
+
+      // Make thumbnail from downloaded image
+      const fullPath = join(tmpDir, `full_${photo.id}.jpg`);
+      writeFileSync(fullPath, buffer);
+      try {
+        execSync(`sips -s format jpeg "${fullPath}" --out "${thumbPath}" -s formatOptions 40 -Z 512 > /dev/null 2>&1`);
+      } catch {
+        // Already a jpeg, just use it
+        writeFileSync(thumbPath, buffer);
+      }
+
+      // Re-classify with a more specific prompt
+      const desc = await describePhoto(thumbPath);
+      const match = matchDescription(desc);
+
+      if (match && match.id && match.id !== sierraId) {
+        // Reassign this photo AND nearby photos (same session cluster)
+        const start = Math.max(0, idx - 2);
+        const end = Math.min(toReview.length, idx + 3);
+        const batch = toReview.slice(start, end);
+
+        process.stdout.write(`  ${photo.file_name}: "${desc.slice(0, 60)}" → ${match.label}`);
+
+        for (const p of batch) {
+          await supabase.from('vehicle_images')
+            .update({ vehicle_id: match.id })
+            .eq('id', p.id);
+        }
+        reassigned += batch.length;
+        process.stdout.write(` (${batch.length} photos reassigned)\n`);
+      } else {
+        confirmed++;
+      }
+    } catch (e) {
+      errors++;
+    }
+  }
+
+  console.log(`\n--- Review Results ---`);
+  console.log(`Confirmed in Sierra Classic: ${confirmed}`);
+  console.log(`Reassigned to other vehicles: ${reassigned}`);
+  console.log(`Errors: ${errors}`);
+
+  // Show final distribution
+  const { data: finalPhotos } = await supabase
+    .from('vehicle_images')
+    .select('vehicle_id')
+    .eq('source', 'drop-folder')
+    .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+  if (finalPhotos) {
+    const finalGroups = {};
+    for (const p of finalPhotos) {
+      finalGroups[p.vehicle_id] = (finalGroups[p.vehicle_id] || 0) + 1;
+    }
+    console.log('\nFinal distribution:');
+    for (const [vid, count] of Object.entries(finalGroups).sort((a, b) => b[1] - a[1])) {
+      const v = VEHICLES.find(v => v.id === vid);
+      console.log(`  ${v?.label || vid}: ${count}`);
+    }
+  }
+}
+
+// ─── Entry ──────────────────────────────────────────────────────────────────
+if (REVIEW) {
+  reviewUnknowns().catch(e => { console.error(e); process.exit(1); });
+} else {
+  run().catch(e => { console.error(e); process.exit(1); });
+}

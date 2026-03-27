@@ -35,6 +35,9 @@ DONE | BUYER-INTELLIGENCE-P1 | COMPLETE — 343,661 buyer profiles created in mv
 
 
 $(date +%H:%M) | WORK-ORDER-INTELLIGENCE | Building 5 components: Zelle ingestion, Gmail receipt mining, iMessage thread parsing, labor pricing, balance computation | mcp-servers/nuke-context/*.mjs, work_order_* tables, labor_operations
-23:32 | EXTRACTION-HANDBOOK | Expanding handbook with prompt archaeology + graduation path | docs/library/technical/extraction-playbook.md
 
 DONE | SKELETON-ENRICHMENT-PLAYBOOK | Sampling 3 vehicles from each of 4 sources (Classic Driver, ClassicCars.com, Bonhams Market, ER Classics) to document extraction playbook | docs/playbook/
+
+DONE | WO-ENV-HARDENING | COMPLETE. 4 migrations, RPC, 5 scripts refactored, tools registered, docs written. | supabase/migrations/2026032710000*, mcp-servers/nuke-context/*.mjs, TOOLS.md, package.json, docs/library/
+
+DONE | QUESTION-TAXONOMY | COMPLETE. 4-phase pipeline built, deployed, verified. 48 taxonomy entries, 82.8% regex hit rate on 600 test questions. | supabase/functions/analyze-comments-fast/, supabase/functions/batch-comment-discovery/, scripts/question-taxonomy-discovery.mjs, migrations

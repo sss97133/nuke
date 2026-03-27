@@ -17,50 +17,83 @@
  */
 
 import Database from 'better-sqlite3';
-import { createClient } from '@supabase/supabase-js';
-import { join } from 'path';
-import { execSync } from 'child_process';
+import { createSupabase, CHAT_DB_PATH, APPLE_EPOCH_OFFSET } from './lib/env.mjs';
 
-// ─── Env ──────────────────────────────────────────────────────────────────────
-try {
-  const out = execSync('cd /Users/skylar/nuke && dotenvx run -- env', { encoding: 'utf-8', timeout: 10000 });
-  for (const line of out.split('\n')) {
-    const eq = line.indexOf('=');
-    if (eq > 0) process.env[line.slice(0, eq)] = line.slice(eq + 1);
-  }
-} catch {}
-
-let supabase;
-const CHAT_DB = join(process.env.HOME, 'Library/Messages/chat.db');
+const CHAT_DB = CHAT_DB_PATH;
+const supabase = createSupabase();
 
 const query = process.argv[2];
 if (!query) { console.error('Usage: node resolve.mjs "the Granholm build"'); process.exit(1); }
 
-supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+// ─── Primary: Call DB RPC for resolution ──────────────────────────────────────
+async function resolveViaRPC(q) {
+  const { data, error } = await supabase.rpc('resolve_work_order_status', { p_query: q });
+  if (error) return null;
+  if (data?.error) return null;
+  return data;
+}
 
-// ─── Step 1: Resolve fuzzy query → vehicle + contact ──────────────────────────
-async function resolve(q) {
+/** Transform RPC JSONB → the shape our print function expects */
+function transformRPCResult(rpc) {
+  const vehicle = rpc.vehicle;
+  const contact = rpc.contact ? {
+    customer_name: rpc.contact.name,
+    customer_email: rpc.contact.email,
+    customer_phone: rpc.contact.phone,
+  } : null;
+
+  const workOrders = (rpc.work_orders || []).map(wo => ({
+    id: wo.id,
+    title: wo.title,
+    status: wo.status,
+    created_at: wo.created_at,
+  }));
+
+  const financials = (rpc.work_orders || []).map(wo => ({
+    parts: (wo.parts || []).map(p => ({
+      part_name: p.name,
+      part_number: p.number,
+      supplier: p.supplier,
+      total_price: p.price,
+      unit_price: p.unit_price,
+      quantity: p.quantity,
+      is_comped: p.is_comped,
+      comp_reason: p.comp_reason,
+      comp_retail_value: p.price,
+    })),
+    labor: (wo.labor || []).map(l => ({
+      task_name: l.task,
+      hours: l.hours,
+      hourly_rate: l.rate,
+      total_cost: l.total,
+      rate_source: l.rate_source,
+      is_comped: l.is_comped,
+    })),
+    payments: (wo.payments || []).map(p => ({
+      amount: p.amount,
+      payment_method: p.method,
+      sender_name: p.sender,
+      memo: p.memo,
+      payment_date: p.date,
+    })),
+  }));
+
+  return { vehicle, workOrders, contact, financials };
+}
+
+// ─── Fallback: Client-side resolution ─────────────────────────────────────────
+async function resolveFallback(q) {
   const term = q.toLowerCase().replace(/\b(the|my|that|this|build|truck|vehicle|car|update|me|on|status|of)\b/g, '').trim();
   const searchTerm = term.split(/\s+/).filter(t => t.length > 2).join(' ') || q;
 
-  // Search work orders
   const { data: wos } = await supabase.from('work_orders')
     .select('id, vehicle_id, customer_name, customer_email, customer_phone, title, status')
     .or(`customer_name.ilike.%${searchTerm}%,title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,notes.ilike.%${searchTerm}%`)
     .order('created_at', { ascending: false }).limit(10);
 
-  // Search contacts
-  const { data: contacts } = await supabase.from('deal_contacts')
-    .select('full_name, email, phone_mobile, vehicle_id, notes')
-    .or(`full_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
-    .limit(5);
-
-  // Collect vehicle IDs from all matches
   const vehicleIds = new Set();
   for (const wo of (wos || [])) if (wo.vehicle_id) vehicleIds.add(wo.vehicle_id);
-  for (const c of (contacts || [])) if (c.vehicle_id) vehicleIds.add(c.vehicle_id);
 
-  // Also search vehicles directly
   const { data: directVehicles } = await supabase.from('vehicles')
     .select('id, year, make, model, vin, status, sale_price')
     .or(`make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%,vin.ilike.%${searchTerm}%`)
@@ -69,29 +102,23 @@ async function resolve(q) {
 
   if (vehicleIds.size === 0) {
     console.error(`No matches for "${q}" (search term: "${searchTerm}")`);
-    console.error(`  WOs found: ${(wos || []).length}, contacts: ${(contacts || []).length}, vehicles: ${(directVehicles || []).length}`);
     process.exit(1);
   }
 
-  // Get the primary vehicle
   const vid = [...vehicleIds][0];
-  const { data: vehicle, error: vErr } = await supabase.from('vehicles')
-    .select('id, year, make, model, vin, status, sale_price')
-    .eq('id', vid).single();
-  if (vErr) console.error(`Vehicle fetch error: ${vErr.message} (vid: ${vid})`);
+  const { data: vehicle } = await supabase.from('vehicles')
+    .select('id, year, make, model, vin, status, sale_price').eq('id', vid).single();
 
-  // Get ALL work orders for this vehicle
   const { data: allWos } = await supabase.from('work_orders')
     .select('id, customer_name, customer_email, customer_phone, title, status, created_at')
     .eq('vehicle_id', vid).order('created_at');
 
-  // Primary contact from work orders
   const contact = (allWos || []).find(w => w.customer_name && w.customer_name !== 'Owner');
+  const financials = await Promise.all((allWos || []).map(wo => getFinancials(wo.id)));
 
-  return { vehicle, workOrders: allWos || [], contact, searchTerm };
+  return { vehicle, workOrders: allWos || [], contact, financials };
 }
 
-// ─── Step 2: Get full financials for each work order ──────────────────────────
 async function getFinancials(woId) {
   const [partsRes, laborRes, paymentsRes] = await Promise.all([
     supabase.from('work_order_parts')
@@ -105,11 +132,7 @@ async function getFinancials(woId) {
       .eq('work_order_id', woId).order('payment_date'),
   ]);
 
-  return {
-    parts: partsRes.data || [],
-    labor: laborRes.data || [],
-    payments: paymentsRes.data || [],
-  };
+  return { parts: partsRes.data || [], labor: laborRes.data || [], payments: paymentsRes.data || [] };
 }
 
 // ─── Step 3: Last communication from iMessage ─────────────────────────────────
@@ -279,13 +302,29 @@ function printReport(vehicle, contact, workOrders, financials, comms) {
 async function main() {
   const t0 = Date.now();
 
-  const { vehicle, workOrders, contact } = await resolve(query);
+  // Primary path: DB RPC (no filesystem, no Node dependencies)
+  let vehicle, workOrders, contact, financials;
+  const rpcResult = await resolveViaRPC(query);
+  if (rpcResult) {
+    const tx = transformRPCResult(rpcResult);
+    vehicle = tx.vehicle;
+    workOrders = tx.workOrders;
+    contact = tx.contact;
+    financials = tx.financials;
+    console.log('  [via RPC: resolve_work_order_status]');
+  } else {
+    // Fallback: client-side resolution (more queries but handles edge cases)
+    const fb = await resolveFallback(query);
+    vehicle = fb.vehicle;
+    workOrders = fb.workOrders;
+    contact = fb.contact;
+    financials = fb.financials;
+    console.log('  [via client-side fallback]');
+  }
+
   if (!vehicle) { console.log('Could not resolve vehicle.'); process.exit(1); }
 
-  // Get financials for all work orders in parallel
-  const financials = await Promise.all(workOrders.map(wo => getFinancials(wo.id)));
-
-  // Get last iMessage
+  // Enrich with local iMessage data (the DB function can't read chat.db)
   const phone = contact?.customer_phone;
   const comms = getLastMessage(phone);
 

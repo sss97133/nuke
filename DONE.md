@@ -1,5 +1,24 @@
 # DONE — Completed Work Log
 
+## 2026-03-27
+
+### [question-taxonomy] "What Do Buyers Want To Know?" Pipeline — All 4 Phases
+- **Phase 1:** Discovery script (`scripts/question-taxonomy-discovery.mjs`) — stratified sampling across 20 price/era cells, Gemini Flash taxonomy discovery, Sonnet consolidation, TF-IDF regex extraction. 6 npm scripts registered.
+- **Phase 2:** Migrations — 5 new columns on `auction_comments` (question_categories, question_primary_l1/l2, question_classified_at, question_classify_method), `question_taxonomy` reference table, `question_profile` column on `comment_discoveries`. Partial indexes on l1/l2.
+- **Phase 3:** `question_classify` mode added to `analyze-comments-fast` (regex, $0). `question_classify_llm` mode added to `batch-comment-discovery` (Gemini Flash fallback, $0). Both self-chaining, batched.
+- **Phase 4:** `mv_question_intelligence` materialized view, `refresh_question_intelligence()` function, `question_gap_analysis()` RPC. Grants to anon/authenticated.
+- **Pipeline sequence:** `npm run discover:questions` → taxonomy populates → `question_classify` regex pass → `question_classify_llm` LLM fallback → `refresh_question_intelligence()` → `question_gap_analysis()` reveals buyer intent distribution.
+- **Cost model:** ~$0.14 total (1 Sonnet consolidation call). Everything else is Gemini Flash (free) or regex ($0).
+
+### [work-order-intelligence] Environment Hardening — 7 Phases Complete
+- **Phase 1:** Schema reconciliation migration — codified work_order_payments, labor_operations, user_labor_rates (new), work_contracts (new). All IF NOT EXISTS. Data preserved (4 payments, 64 labor ops, 71 parts, 19 labor).
+- **Phase 2:** Seed data migration — 51 original + 7 new exhaust/brake labor operations, ON CONFLICT DO NOTHING.
+- **Phase 3:** `work_order_receipt_unified` view + `work_order_balance()` function. Bridges dual system (timeline_events + work_orders).
+- **Phase 4:** `resolve_work_order_status(p_query)` RPC — THE PRODUCT. One call, full answer. Fuzzy resolution, returns vehicle/contact/work orders/parts/labor/payments/balance as JSONB.
+- **Phase 5:** Script hardening — shared `lib/env.mjs` (no hardcoded paths), `package.json` for nuke-context, all 5 scripts refactored. `resolve.mjs` now calls RPC as primary path with client-side fallback + iMessage enrichment. Removed hardcoded K2500 vehicle ID from ingest-thread.mjs.
+- **Phase 6:** Registered `wo:resolve`, `wo:balance`, `wo:ingest-zelle`, `wo:ingest-receipts`, `wo:ingest-thread` in package.json. Added Work Order Intelligence section to TOOLS.md. 6 pipeline_registry rows.
+- **Phase 7:** Library documentation at `docs/library/technical/work-order-intelligence.md`.
+
 ## 2026-03-26
 
 ### [work-order-intelligence] 5-Component Work Order Intelligence System
@@ -5600,3 +5619,16 @@ Pass 3: Perplexity deep research — Rally $112M raised/$40M AUM/SEC fine, TheCa
   - 4 ACTIVE (comments, valuations, RSS, FB), 4 STALLED (ConceptCarz, forums, OCR, iPhoto), 1 ABANDONED (tools)
 - Reordered chapters into 4 parts: Context (0-2), Methods (3-5), Operations (6-8), Sources (9-11) + 4 appendices
 - Total: 12 chapters, 4 appendices, 130 subsections, 17 major sections
+
+### [docs] The Extraction Handbook v3 — full textbook (2,998 lines)
+- Added Chapter 12: Prompt Evolution — 8 eras from 12.6% Chevy-truck-specific template to testimony-grade forensics
+  - Documented the catastrophic hallucination discovery: reference injection caused 66% fabrication on Porsche
+  - Key lesson: "Reference library = decoder ring, NOT shopping list"
+  - Arc: generic ($0.50/vehicle, 12.6%) → open-ended ($0.05) → regex ($0, 68%) → testimony (citation-verified)
+- Added Chapter 13: Graduation Path — 4 graduation levels with measurable criteria
+  - Current state: 814K vehicles, 97% identity, 30% everything else
+  - Graduation 1 (Claims Exhausted): 3-6 months, all source material extracted with provenance
+  - Top ROI: re-extract Mecum+BJ (244K vehicles), decompose descriptions (286K), provenance backfill (363K)
+  - Honest answer: extraction is not close to done, but the path is clear
+- Restructured into 5 parts: Context, Methods, Operations, Sources, The Big Picture
+- 14 chapters + 4 appendices, 18 major sections total

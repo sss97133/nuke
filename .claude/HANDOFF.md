@@ -2697,3 +2697,816 @@ none
 2. `tail -40 DONE.md` — what exists
 3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
 4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 23:48:44
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+f976b23bc Extraction playbook: 642 lines documenting 4 skeleton sources, field mappings, quality notes
+ce3033fb6 Skeleton enrichment playbook: sampled 12 vehicles across 4 sources
+
+## Uncommitted Changes
+none
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 23:52:10
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+f976b23bc Extraction playbook: 642 lines documenting 4 skeleton sources, field mappings, quality notes
+ce3033fb6 Skeleton enrichment playbook: sampled 12 vehicles across 4 sources
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+docs/library/technical/extraction-playbook.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-26 23:55:02
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+f976b23bc Extraction playbook: 642 lines documenting 4 skeleton sources, field mappings, quality notes
+ce3033fb6 Skeleton enrichment playbook: sampled 12 vehicles across 4 sources
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+docs/library/technical/extraction-playbook.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 00:12:54
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+f976b23bc Extraction playbook: 642 lines documenting 4 skeleton sources, field mappings, quality notes
+ce3033fb6 Skeleton enrichment playbook: sampled 12 vehicles across 4 sources
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+docs/library/technical/extraction-playbook.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 01:22:03
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+docs/library/technical/extraction-playbook.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:16:47
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+docs/library/technical/extraction-playbook.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:21:54
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+docs/library/technical/extraction-playbook.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:22:17
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+docs/library/technical/extraction-playbook.md
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:25:16
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:31:08
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:31:09
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:31:25
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:34:15
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:35:39
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:36:40
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:41:10
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+nuke_frontend/src/styles/vehicle-profile.css
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:43:15
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+none
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+nuke_frontend/src/components/layout/VehicleTabBar.css
+nuke_frontend/src/styles/vehicle-profile.css
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:48:58
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+eff8808bb fix: restore full timeline heatmap, fix sticky stack positioning
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:49:29
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+eff8808bb fix: restore full timeline heatmap, fix sticky stack positioning
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:52:28
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+eff8808bb fix: restore full timeline heatmap, fix sticky stack positioning
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:54:02
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+eff8808bb fix: restore full timeline heatmap, fix sticky stack positioning
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 08:57:55
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+eff8808bb fix: restore full timeline heatmap, fix sticky stack positioning
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 09:07:09
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+eff8808bb fix: restore full timeline heatmap, fix sticky stack positioning
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 09:08:29
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+eff8808bb fix: restore full timeline heatmap, fix sticky stack positioning
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 09:09:15
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+eff8808bb fix: restore full timeline heatmap, fix sticky stack positioning
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 09:09:19
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+eff8808bb fix: restore full timeline heatmap, fix sticky stack positioning
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 09:10:38
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+eff8808bb fix: restore full timeline heatmap, fix sticky stack positioning
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`
+
+---
+# Auto-Checkpoint — 2026-03-27 09:13:38
+*(Written automatically by Stop hook. For richer context, agents should call `claude-handoff` explicitly.)*
+
+## Recent Commits (last 30 min)
+eff8808bb fix: restore full timeline heatmap, fix sticky stack positioning
+
+## Uncommitted Changes
+.claude/ACTIVE_AGENTS.md
+.claude/HANDOFF.md
+DONE.md
+TOOLS.md
+docs/library/technical/extraction-playbook.md
+docs/playbook/SKELETON_ENRICHMENT_PLAYBOOK.md
+mcp-servers/nuke-context/balance.mjs
+mcp-servers/nuke-context/ingest-receipts.mjs
+mcp-servers/nuke-context/ingest-thread.mjs
+mcp-servers/nuke-context/ingest-zelle.mjs
+mcp-servers/nuke-context/resolve.mjs
+package.json
+scripts/drop-folder-ingest.mjs
+supabase/functions/analyze-comments-fast/index.ts
+supabase/functions/batch-comment-discovery/index.ts
+
+## Staged
+none
+
+## On Next Session
+1. `cat PROJECT_STATE.md` — sprint focus
+2. `tail -40 DONE.md` — what exists
+3. `cat .claude/HANDOFF.md` — this file (pick up where left off)
+4. Register in `.claude/ACTIVE_AGENTS.md`

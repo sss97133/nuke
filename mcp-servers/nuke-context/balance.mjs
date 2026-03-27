@@ -16,29 +16,9 @@
  *   dotenvx run -- node mcp-servers/nuke-context/balance.mjs --vehicle <vehicle_id>
  */
 
-import { createClient } from '@supabase/supabase-js';
-import { execSync } from 'child_process';
+import { createSupabase } from './lib/env.mjs';
 
-// ─── Load env ─────────────────────────────────────────────────────────────────
-try {
-  const envOutput = execSync('cd /Users/skylar/nuke && dotenvx run -- env', {
-    encoding: 'utf-8', timeout: 10000
-  });
-  for (const line of envOutput.split('\n')) {
-    const eq = line.indexOf('=');
-    if (eq > 0) process.env[line.slice(0, eq)] = line.slice(eq + 1);
-  }
-} catch {}
-
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error('Missing env. Run with: dotenvx run -- node mcp-servers/nuke-context/balance.mjs "granholm"');
-  process.exit(1);
-}
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createSupabase();
 
 const args = process.argv.slice(2);
 const arg = name => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };

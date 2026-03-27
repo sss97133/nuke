@@ -17,35 +17,23 @@
  */
 
 import Database from 'better-sqlite3';
-import { createClient } from '@supabase/supabase-js';
-import { execSync } from 'child_process';
-import { join } from 'path';
+import { createSupabase, CHAT_DB_PATH, APPLE_EPOCH_OFFSET } from './lib/env.mjs';
 
-// ─── Load env ─────────────────────────────────────────────────────────────────
-try {
-  const envOutput = execSync('cd /Users/skylar/nuke && dotenvx run -- env', {
-    encoding: 'utf-8', timeout: 10000
-  });
-  for (const line of envOutput.split('\n')) {
-    const eq = line.indexOf('=');
-    if (eq > 0) process.env[line.slice(0, eq)] = line.slice(eq + 1);
-  }
-} catch {}
-
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const CHAT_DB = join(process.env.HOME, 'Library/Messages/chat.db');
-const APPLE_EPOCH_OFFSET = 978307200;
+const CHAT_DB = CHAT_DB_PATH;
 
 const args = process.argv.slice(2);
 const chatId = args.find(a => !a.startsWith('--'));
 const flag = name => args.includes(name);
 const arg = name => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
 const DRY_RUN = flag('--dry-run');
-const VEHICLE_ID = arg('--vehicle') || 'a90c008a-3379-41d8-9eb2-b4eda365d74c';
+const VEHICLE_ID = arg('--vehicle');
 
 if (!chatId) {
-  console.error('Usage: ingest-thread.mjs "+18453002345" [--dry-run] [--vehicle <id>]');
+  console.error('Usage: ingest-thread.mjs "+18453002345" --vehicle <id> [--dry-run]');
+  process.exit(1);
+}
+if (!VEHICLE_ID && !DRY_RUN) {
+  console.error('--vehicle <id> is required (no default). Use --dry-run to preview without writing.');
   process.exit(1);
 }
 
@@ -276,8 +264,8 @@ async function main() {
   }
 
   // ── Write to DB ──
-  if (!DRY_RUN && SUPABASE_URL && SUPABASE_KEY) {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  if (!DRY_RUN) {
+    const supabase = createSupabase();
 
     // Only write significant events (not photos or approvals — too noisy)
     const significantTypes = ['price_agreement', 'scope_change', 'scope_addition', 'status_update'];

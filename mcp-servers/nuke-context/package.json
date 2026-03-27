@@ -1,0 +1,10 @@
+{
+  "name": "@nuke/work-order-context",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Work order intelligence scripts: balance, resolve, ingestion (Zelle, receipts, iMessage)",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "better-sqlite3": "^11.0.0"
+  }
+}

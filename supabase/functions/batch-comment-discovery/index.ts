@@ -5,9 +5,10 @@
  * Processes vehicles with unanalyzed comments through Claude Haiku
  * to extract sentiment, condition signals, expert insights, market signals.
  *
- * Two-level output:
- * 1. Vehicle-level: comment_discoveries (per-vehicle expert analysis)
- * 2. Market-level: feeds into aggregate-sentiment for make/model trends
+ * Modes:
+ *   discover             — Claude Haiku vehicle-level comment analysis (default)
+ *   extract_claims       — Per-comment claim extraction via LLM
+ *   question_classify_llm — Gemini Flash fallback for question taxonomy classification
  *
  * POST /functions/v1/batch-comment-discovery
  * Body: {
@@ -99,13 +100,21 @@ Deno.serve(async (req) => {
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured");
-
     const body = await req.json().catch(() => ({}));
-    const mode = body.mode || "discover"; // "discover" (legacy) or "extract_claims"
+    const mode = body.mode || "discover"; // "discover", "extract_claims", or "question_classify_llm"
+
+    // Anthropic key required for discover and extract_claims modes, not question_classify_llm
+    if (mode !== "question_classify_llm" && !anthropicKey) {
+      throw new Error("ANTHROPIC_API_KEY not configured");
+    }
 
     if (mode === "extract_claims") {
       const result = await extractClaims(supabase, supabaseUrl, serviceKey, anthropicKey, body);
+      return jsonResponse({ success: true, mode, elapsed_ms: Date.now() - startTime, ...result });
+    }
+
+    if (mode === "question_classify_llm") {
+      const result = await questionClassifyLlm(supabase, supabaseUrl, serviceKey, body);
       return jsonResponse({ success: true, mode, elapsed_ms: Date.now() - startTime, ...result });
     }
 
@@ -736,6 +745,211 @@ async function extractClaims(
     claims_total: totalClaims,
     cost_cents: Math.round(totalCostCents * 100) / 100,
     errors: errors.slice(0, 10),
+  };
+}
+
+// ═══════════════════════════════════════════════════
+// MODE: QUESTION_CLASSIFY_LLM — Gemini Flash fallback for unclassified questions
+// ═══════════════════════════════════════════════════
+
+async function questionClassifyLlm(
+  supabase: any, supabaseUrl: string, serviceKey: string, body: any
+) {
+  const batchSize = Math.min(body.batch_size || 200, 500);
+  const shouldContinue = body.continue ?? false;
+  const batchNum = body._batch_num || 1;
+  const startTime = Date.now();
+
+  const googleKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY") || "";
+  if (!googleKey) throw new Error("GEMINI_API_KEY not configured for question_classify_llm");
+
+  // Load taxonomy for system prompt
+  const { data: taxonomy, error: taxErr } = await supabase
+    .from("question_taxonomy")
+    .select("id, l1_category, l2_subcategory, display_name, description")
+    .order("l1_category");
+
+  if (taxErr || !taxonomy?.length) {
+    throw new Error("question_taxonomy empty or error. Run discover:questions first.");
+  }
+
+  // Build taxonomy reference for system prompt
+  const taxonomyRef = taxonomy.map((t: any) =>
+    `${t.id}: ${t.display_name} — ${t.description || ''}`
+  ).join('\n');
+
+  // Find unclassified questions (regex attempted but no l1 assigned)
+  const { data: comments, error: fetchErr } = await supabase
+    .from("auction_comments")
+    .select("id, comment_text, vehicle_id")
+    .eq("has_question", true)
+    .is("question_primary_l1", null)
+    .not("question_classified_at", "is", null) // Already attempted by regex
+    .not("comment_text", "is", null)
+    .limit(batchSize);
+
+  if (fetchErr) return { error: fetchErr.message, classified: 0 };
+  if (!comments?.length) {
+    return { classified: 0, remaining: 0, batch_num: batchNum, note: "No unclassified questions remaining" };
+  }
+
+  console.log(`[question_classify_llm] Processing ${comments.length} questions, batch ${batchNum}`);
+
+  // Process in sub-batches of 200 (Gemini context limit)
+  let totalClassified = 0;
+  let totalErrors = 0;
+  const l1Counts: Record<string, number> = {};
+  const errors: string[] = [];
+
+  const subBatchSize = 200;
+  for (let i = 0; i < comments.length; i += subBatchSize) {
+    if (Date.now() - startTime > 45000) break; // Time budget
+
+    const batch = comments.slice(i, i + subBatchSize);
+    const questionBlock = batch
+      .map((q: any, idx: number) => `[${idx + 1}] ${q.comment_text.substring(0, 300)}`)
+      .join('\n');
+
+    const prompt = `Classify each question into the taxonomy below. Return a JSON array.
+
+TAXONOMY:
+${taxonomyRef}
+
+For each question, return:
+[{"index": 1, "id": "l1.l2", "intent": "information_request|evidence_request|clarification|challenge|logistics|negotiation"}]
+
+If a question doesn't fit any category, use "other.general" as the id.
+
+Return ONLY the JSON array.
+
+QUESTIONS:
+${questionBlock}`;
+
+    try {
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${googleKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
+          }),
+        }
+      );
+
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => "");
+        errors.push(`Gemini ${resp.status}: ${errText.slice(0, 150)}`);
+        totalErrors++;
+        continue;
+      }
+
+      const data = await resp.json();
+      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+      // Parse JSON
+      const jsonMatch = raw.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        errors.push(`No JSON in Gemini response for batch ${i}`);
+        totalErrors++;
+        continue;
+      }
+
+      let parsed: any[];
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch {
+        errors.push(`JSON parse failed for batch ${i}`);
+        totalErrors++;
+        continue;
+      }
+
+      // Update each classified comment
+      const updatePromises: Promise<any>[] = [];
+      for (const item of parsed) {
+        const idx = (item.index || 0) - 1;
+        if (idx < 0 || idx >= batch.length) continue;
+
+        const comment = batch[idx];
+        const taxId = item.id || "other.general";
+        const parts = taxId.split(".");
+        const l1 = parts[0] || null;
+        const l2 = parts[1] || null;
+
+        if (l1) {
+          l1Counts[l1] = (l1Counts[l1] || 0) + 1;
+          totalClassified++;
+
+          updatePromises.push(
+            supabase
+              .from("auction_comments")
+              .update({
+                question_categories: [{
+                  id: taxId, l1, l2, score: 1.0,
+                  intent: item.intent || "information_request",
+                }],
+                question_primary_l1: l1,
+                question_primary_l2: l2,
+                question_classified_at: new Date().toISOString(),
+                question_classify_method: "llm_gemini_v1",
+              })
+              .eq("id", comment.id)
+          );
+        }
+      }
+
+      // Execute updates in parallel (10 at a time)
+      for (let u = 0; u < updatePromises.length; u += 10) {
+        const results = await Promise.allSettled(updatePromises.slice(u, u + 10));
+        for (const r of results) {
+          if (r.status === "rejected" || r.value?.error) {
+            errors.push(`Update: ${r.status === "rejected" ? r.reason : r.value.error.message}`);
+          }
+        }
+      }
+    } catch (e: any) {
+      errors.push(`Batch ${i}: ${e.message?.slice(0, 100)}`);
+      totalErrors++;
+    }
+
+    // Rate limit pause between sub-batches
+    await new Promise(r => setTimeout(r, 4500));
+  }
+
+  // Estimate remaining
+  const { count: remaining } = await supabase
+    .from("auction_comments")
+    .select("id", { count: "exact", head: true })
+    .eq("has_question", true)
+    .is("question_primary_l1", null)
+    .not("question_classified_at", "is", null);
+
+  // Self-chain
+  if (shouldContinue && (remaining ?? 0) > 0 && totalClassified > 0) {
+    fetch(`${supabaseUrl}/functions/v1/batch-comment-discovery`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        mode: "question_classify_llm",
+        batch_size: batchSize,
+        continue: true,
+        _batch_num: batchNum + 1,
+      }),
+    }).catch(e => console.error("[question_classify_llm] Chain failed:", e));
+  }
+
+  return {
+    batch_num: batchNum,
+    classified: totalClassified,
+    errors_count: totalErrors,
+    remaining: remaining ?? -1,
+    l1_distribution: l1Counts,
+    continued: shouldContinue && (remaining ?? 0) > 0 && totalClassified > 0,
+    error_details: errors.slice(0, 10),
   };
 }
 

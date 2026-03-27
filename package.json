@@ -51,6 +51,11 @@
     "discover:groq": "dotenvx run -- node scripts/local-description-discovery.mjs --provider groq --batch 50 --parallel 10 --max 5000 --continue",
     "discover:llama": "dotenvx run -- node scripts/local-description-discovery.mjs --provider ollama --model llama3.1:8b --batch 50 --parallel 2 --max 5000 --continue",
     "discover:local": "dotenvx run -- node scripts/local-description-discovery.mjs",
+    "discover:questions": "dotenvx run -- node scripts/question-taxonomy-discovery.mjs --step all",
+    "discover:questions:sample": "dotenvx run -- node scripts/question-taxonomy-discovery.mjs --step sample",
+    "discover:questions:discover": "dotenvx run -- node scripts/question-taxonomy-discovery.mjs --step discover",
+    "discover:questions:consolidate": "dotenvx run -- node scripts/question-taxonomy-discovery.mjs --step consolidate",
+    "discover:questions:patterns": "dotenvx run -- node scripts/question-taxonomy-discovery.mjs --step extract-patterns",
     "discover:modal": "dotenvx run -- node scripts/local-description-discovery.mjs --provider modal --max 10000 --continue --parallel 4 --batch 50",
     "discover:openai": "dotenvx run -- node scripts/local-description-discovery.mjs --provider openai --batch 50 --parallel 10 --max 5000 --continue",
     "discover:qwen": "dotenvx run -- node scripts/local-description-discovery.mjs --provider ollama --model qwen2.5:7b --batch 50 --parallel 2 --max 5000 --continue",
@@ -142,7 +147,12 @@
     "yono:daily": "dotenvx run -- node yono/daily_progress.mjs",
     "yono:daily:dry": "dotenvx run -- node yono/daily_progress.mjs --dry-run",
     "yono:daily:report": "dotenvx run -- node yono/daily_progress.mjs --report-only",
-    "yono:daily:unstick": "dotenvx run -- node yono/daily_progress.mjs --unstick"
+    "yono:daily:unstick": "dotenvx run -- node yono/daily_progress.mjs --unstick",
+    "wo:resolve": "dotenvx run -- node mcp-servers/nuke-context/resolve.mjs",
+    "wo:balance": "dotenvx run -- node mcp-servers/nuke-context/balance.mjs",
+    "wo:ingest-zelle": "dotenvx run -- node mcp-servers/nuke-context/ingest-zelle.mjs",
+    "wo:ingest-receipts": "dotenvx run -- node mcp-servers/nuke-context/ingest-receipts.mjs",
+    "wo:ingest-thread": "dotenvx run -- node mcp-servers/nuke-context/ingest-thread.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",

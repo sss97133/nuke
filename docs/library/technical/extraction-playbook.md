@@ -30,6 +30,10 @@
 10. [Facebook Marketplace](#10-facebook-marketplace) — complete status + the SLC use case
 11. [Stalled Initiatives](#11-stalled-initiatives) — what was started, abandoned, and what it would take to finish
 
+**Part V — The Big Picture**
+12. [Prompt Evolution](#12-prompt-evolution) — from 12.6% to testimony-grade, every prompt era
+13. [Graduation Path](#13-graduation-path) — what "DONE" looks like and how far we are
+
 **Appendices**
 - [A: File Index](#appendix-a-file-index)
 - [B: Anti-Patterns](#appendix-b-anti-patterns-do-not-repeat)
@@ -1126,7 +1130,7 @@ START: What extraction task do you have?
   │
   ├─ "Extract CONDITIONS from descriptions"
   │    → METHOD 04: Kimi k2-turbo via discover-description-data
-  │    → See Runbook: Condition Extraction (Section 5)
+  │    → See Runbook: Condition Extraction (Section 7)
   │
   ├─ "Extract CLAIMS from auction comments"
   │    → METHOD 15: commentRefinery pipeline
@@ -1607,6 +1611,44 @@ Edge function batch of 10–20 items, each taking 15–30s = 504 Gateway Timeout
 
 ---
 
+### FAILURE 15: Comment Permalink URLs Ingested as Listings
+
+```
+SEVERITY:    HIGH
+DISCOVERED:  2026-03-27 (via handbook test simulation)
+IMPACT:      39,211 items (89.1% of all BaT queue failures)
+STATUS:      OPEN
+```
+
+**What happens:**
+BaT bulk URL discovery ingests comment permalink URLs (`https://bringatrailer.com/listing/slug/#comment-12345`) into `bat_extraction_queue`. The queue worker correctly identifies these as non-listing URLs and marks them failed at attempt 0, but they should never have entered the queue. 78% of the underlying listings are already `complete` in the queue.
+
+**Root cause:** The bulk ingest script does not strip URL fragments (`#comment-*`) before insertion or reject URLs containing `#comment-`.
+
+**Fix needed:**
+1. Reclassify the 39K items from `failed` to `skipped` (they will never succeed)
+2. Add URL validation at ingest time: strip `#` fragments or reject URLs containing `#comment-`
+
+**Prevention rule:** Before inserting into any extraction queue, strip URL fragments and reject URLs that are not actual listing pages. Comment URLs, contact pages, shipping pages, and JS asset URLs are not extraction targets.
+
+---
+
+### FAILURE 16: Diagnostic Runbook Env Vars Don't Exist
+
+```
+SEVERITY:    MEDIUM
+DISCOVERED:  2026-03-27 (via handbook test simulation)
+IMPACT:      All psql-based diagnostic commands in the handbook fail
+STATUS:      FIXED (in this update)
+```
+
+**What happens:**
+The diagnostic runbook used `$DB_HOST`, `$DB_PASSWORD`, `$DB_USER` env vars that don't exist in `.env`. The actual env vars are different. Agents must use the Supabase MCP (`mcp__claude_ai_Supabase__execute_sql`) or the `dotenvx run --` pattern with curl for diagnostics.
+
+**Fix:** All diagnostic SQL in the handbook now uses Supabase MCP instructions instead of psql.
+
+---
+
 ## 7. Quick Reference
 
 ### Runbook: Condition Extraction from Descriptions
@@ -1614,11 +1656,13 @@ Edge function batch of 10–20 items, each taking 15–30s = 504 Gateway Timeout
 ```bash
 cd /Users/skylar/nuke
 
-# 1. Check how many descriptions are eligible (≥500 chars, not yet processed)
+# 1. Run a small test batch (batch_size=1 to verify the pipeline works)
+# NOTE: batch_size=0 does NOT do a dry run — it defaults to processing ~20 items.
+# There is no count-only mode. Use a small batch to test instead.
 dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/functions/v1/discover-description-data" \
   -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
   -H "Content-Type: application/json" \
-  -d "{\"batch_size\": 0, \"mode\": \"condition_backfill\"}"' | jq
+  -d "{\"batch_size\": 1, \"mode\": \"condition_backfill\"}"' | jq
 
 # 2. Run a small batch to verify
 dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/functions/v1/discover-description-data" \
@@ -1641,12 +1685,13 @@ dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/rest/v1/vehicle_observations
 **Expected response (step 2 — success):**
 ```json
 {
-  "discovered": 5,
-  "errors": 0,
+  "success": true,
+  "mode": "condition_backfill",
+  "processed": 5,
   "conditions_ingested": 23,
   "condition_errors": 0,
   "remaining": 4821,
-  "llm_provider": "kimi",
+  "continued": false,
   "elapsed_ms": 8432
 }
 ```
@@ -1654,10 +1699,14 @@ dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/rest/v1/vehicle_observations
 **Expected response (step 2 — LLM failure):**
 ```json
 {
-  "discovered": 0,
-  "errors": 5,
-  "error_details": "All LLM providers failed: Kimi timeout, Grok 429, Gemini quota",
-  "remaining": 4826
+  "success": true,
+  "mode": "condition_backfill",
+  "processed": 5,
+  "conditions_ingested": 0,
+  "condition_errors": 5,
+  "remaining": 4826,
+  "continued": false,
+  "elapsed_ms": 45000
 }
 ```
 If all providers fail, check credit balances and Ollama availability.
@@ -1808,69 +1857,83 @@ dotenvx run -- bash -c 'curl -s "$VITE_SUPABASE_URL/functions/v1/get-logs?servic
 
 ### Runbook: Diagnose Queue Failures
 
-```bash
-cd /Users/skylar/nuke
+Use the Supabase MCP (`mcp__claude_ai_Supabase__execute_sql`, project_id `qkgaybvrernstplzjaam`) for all diagnostic queries. The psql env vars in `.env` may not match — the MCP is the reliable path.
 
-# 1. See queue status by source
-dotenvx run -- bash -c 'PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p 6543 -U "$DB_USER" -d postgres -c "
-  SELECT source_slug, status, count(*)
-  FROM import_queue
-  GROUP BY source_slug, status
-  ORDER BY source_slug, count DESC;"'
-
-# 2. See most common error messages for failed items
-dotenvx run -- bash -c 'PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p 6543 -U "$DB_USER" -d postgres -c "
-  SELECT LEFT(error_message, 80) as error, count(*)
-  FROM import_queue
-  WHERE status = '\''failed'\''
-  GROUP BY LEFT(error_message, 80)
-  ORDER BY count DESC
-  LIMIT 20;"'
-
-# 3. BaT extraction queue failures specifically
-dotenvx run -- bash -c 'PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p 6543 -U "$DB_USER" -d postgres -c "
-  SELECT status, count(*)
-  FROM bat_extraction_queue
-  GROUP BY status
-  ORDER BY count DESC;"'
-
-# 4. Retry failed items (after fixing root cause)
-# CAUTION: Only retry items whose failure cause has been fixed
-dotenvx run -- bash -c 'PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p 6543 -U "$DB_USER" -d postgres -c "
-  UPDATE import_queue
-  SET status = '\''pending'\'', error_message = NULL, locked_at = NULL, locked_by = NULL
-  WHERE status = '\''failed'\''
-    AND source_slug = '\''bat'\''
-    AND error_message ILIKE '\''%timeout%'\''
-  RETURNING count(*);"'
-
-# 5. Release stale locks (items stuck in processing > 30 min)
-dotenvx run -- bash -c 'PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p 6543 -U "$DB_USER" -d postgres -c "
-  SELECT release_stale_locks();"'
+**Step 1 — Queue status by source:**
+```sql
+SELECT source_slug, status, count(*)
+FROM import_queue
+GROUP BY source_slug, status
+ORDER BY source_slug, count DESC;
 ```
+
+**Step 2 — Most common error messages:**
+```sql
+SELECT LEFT(error_message, 80) as error, count(*)
+FROM import_queue
+WHERE status = 'failed'
+GROUP BY LEFT(error_message, 80)
+ORDER BY count DESC
+LIMIT 20;
+```
+
+**Step 3 — BaT extraction queue specifically:**
+```sql
+SELECT status, count(*)
+FROM bat_extraction_queue
+GROUP BY status
+ORDER BY count DESC;
+```
+
+**Step 4 — Error breakdown for BaT queue:**
+```sql
+SELECT LEFT(error_message, 120) as error_pattern, count(*)
+FROM bat_extraction_queue
+WHERE status = 'failed'
+GROUP BY LEFT(error_message, 120)
+ORDER BY count DESC
+LIMIT 25;
+```
+
+**Step 5 — Retry failed items (ONLY after fixing root cause):**
+```sql
+-- Example: retry timeout failures
+UPDATE import_queue
+SET status = 'pending', error_message = NULL, locked_at = NULL, locked_by = NULL
+WHERE status = 'failed'
+  AND source_slug = 'bat'
+  AND error_message ILIKE '%timeout%';
+```
+
+**Step 6 — Release stale locks:**
+```sql
+SELECT release_stale_locks();
+```
+
+**Interpreting results:** See FAILURE 15 (comment URLs = 89% of BaT failures), FAILURE 13 (non-vehicles = 9.5%), FAILURE 05 (VIN dupes = 1.3%). Terminal failures (comment URLs, non-vehicles, garbled URLs) should be reclassified to `skipped`, not retried.
 
 ### Runbook: Check Cron Status
 
-```bash
-cd /Users/skylar/nuke
+Use Supabase MCP:
 
-# List all extraction-related crons with active status
-dotenvx run -- bash -c 'PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p 6543 -U "$DB_USER" -d postgres -c "
-  SELECT jobname, schedule, active
-  FROM cron.job
-  WHERE jobname ILIKE '\''%extract%'\''
-     OR jobname ILIKE '\''%discover%'\''
-     OR jobname ILIKE '\''%batch%'\''
-     OR jobname ILIKE '\''%queue%'\''
-  ORDER BY jobname;"'
+**List extraction crons:**
+```sql
+SELECT jobname, schedule, active
+FROM cron.job
+WHERE jobname ILIKE '%extract%'
+   OR jobname ILIKE '%discover%'
+   OR jobname ILIKE '%batch%'
+   OR jobname ILIKE '%queue%'
+ORDER BY jobname;
+```
 
-# Check recent cron execution results
-dotenvx run -- bash -c 'PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p 6543 -U "$DB_USER" -d postgres -c "
-  SELECT jobname, status, return_message, start_time
-  FROM cron.job_run_details
-  WHERE start_time > now() - interval '\''1 hour'\''
-  ORDER BY start_time DESC
-  LIMIT 20;"'
+**Recent execution results:**
+```sql
+SELECT jobname, status, return_message, start_time
+FROM cron.job_run_details
+WHERE start_time > now() - interval '1 hour'
+ORDER BY start_time DESC
+LIMIT 20;
 ```
 
 ---
@@ -2426,11 +2489,11 @@ Facebook Marketplace is the CEO's daily-driver source. The use case: "Show me th
 Query result today: **1 vehicle** (a 1984 G30 motorhome — not a square body).
 
 Why:
-1. **Location doesn't propagate.** `marketplace_listings` has city/state text. But `import-fb-marketplace` doesn't copy location to `vehicles.location` or geocode it. 99% of FB vehicles have NULL location in the vehicles table.
-2. **No proximity search.** No "within X miles" query exists. No PostGIS. `gps_latitude`/`gps_longitude` columns exist but are 99% NULL for FB.
+1. **Location partially propagates but gaps remain.** `marketplace_listings` has city/state text. As of 2026-03-27, 79.1% of FB vehicles have `city` populated and 37.7% have GPS — improved from earlier. But specific vehicles (like a 1986 Silverado in St George) fall through with NULL location. The `location` text field is only 0.6% populated — the structured `city`/`state` columns are the working path.
+2. **No working proximity search.** A `find_vehicles_near_gps` function exists but is **broken** — uses `SET search_path TO ''` (can't find tables) and a ±0.001 degree bounding box (~100 meters, useless). An ad-hoc Haversine query works and found 19 BaT square bodies near SLC. Needs to be a proper RPC.
 3. **No "square body" classification.** Must rely on year 1973-1987 + Chevy/GMC + model pattern matching. Model data is messy.
 4. **SLC coverage is thin.** 89 SLC listings out of 33K total. The scraper hits SLC once per day.
-5. **Error rate increasing.** The most recent sweep (22:00 tonight) was 100% errors — 14/14 locations failed. FB may be tightening blocks.
+5. **Error rate intermittent.** The 2026-03-26 22:00 sweep was 100% errors (14/14 locations, 0 listings). But the 2026-03-27 10:00 sweep found 4,632 listings with 16 errors. The sweeper is fragile but not dead — periodic blocks then recovery.
 
 ### What Would Make It Work
 
@@ -2444,6 +2507,8 @@ Why:
 | Investigate 100% error rate on latest sweep | 1 hour | May need new doc_id |
 
 **Total to minimum viable SLC use case: ~8 hours.**
+
+**Update from 2026-03-27 test:** An agent ran a Haversine query and found **19 square body trucks within 250 miles of SLC** — all from BaT/KSL, zero from Facebook. 372 FB square bodies exist nationally but only 34% have city data. The fundamental gap is confirmed: FB square bodies in Utah = 0 findable results despite data existing.
 
 ### Key Files
 
@@ -2621,6 +2686,255 @@ ABANDONED (1):
 
 ---
 
+## 12. Prompt Evolution
+
+How extraction prompts evolved from 12.6% accuracy to testimony-grade forensics. Read this before writing any new extraction prompt.
+
+---
+
+### ERA 0: The Chevy Truck Prompt (Late 2025) — 12.6% accuracy
+
+The original `extract-vehicle-data-ai` prompt was **Chevrolet-truck-specific**. It literally instructed the model to normalize all pickups to model "Truck," included Chevy-specific series codes (C10/K10/C20/K20), Chevy-specific trim levels (Cheyenne, Scottsdale, Silverado), and contained hardcoded example values (`year: 1974`, `mileage: 123456`).
+
+**The LLM parroted the examples back.** A guard had to be added: reject if year=1974 AND make=Chevrolet AND mileage=123456. The LLM also invented round prices ($25K, $50K) for pages where no price existed — 7 Barrett-Jackson extractions had fabricated $50,000 prices.
+
+**LLM:** GPT-4o, single provider, no fallback.
+
+### ERA 1: Generalized + Hallucination Guards (Feb 2026) — ~30% accuracy
+
+Removed Chevy-specific content. Added anti-hallucination rules: "NEVER guess prices," "NEVER use round numbers unless explicitly stated." Added price hallucination guard at code level (checks if extracted price actually appears in page text). Added keyword check (rejects pages with fewer than 2 vehicle keywords).
+
+Still poor for unknown sources, but no longer actively inventing data.
+
+### ERA 2: Fixed Schema Intelligence (Jan 23, 2026) — ~60% accuracy
+
+**The shift from HTML to descriptions.** Instead of extracting from raw listing pages, this was the first attempt to extract from description TEXT already in the database. Fixed JSON schema with ~15 categories (acquisition, previous sales, ownership, service events, modifications, documentation, condition, provenance).
+
+**Why replaced:** Too rigid. Descriptions contain information that doesn't fit predefined categories. Whatever wasn't pre-built got missed.
+
+### ERA 3: Open-Ended Discovery (Mid-March 2026) — 98% spot-check accuracy
+
+**The Schema Discovery Principle applied to prompts.** Instead of a fixed schema: "Extract EVERYTHING factual... Return a JSON object. Create whatever keys make sense."
+
+The LLM decides what keys to create. 13+ categories listed as suggestions but not enforced. Freeform JSON output.
+
+**Scale:** 14,420 descriptions extracted across 7 models simultaneously (Ollama, GPT-4o-mini, Gemini, Groq, Modal). Key finding: Claude Haiku extracted ~30 fields/description vs ~26 for Qwen2.5:7b — only 15% difference in coverage, not 10x. Parse failure rate was the real quality gap.
+
+**Cost:** Ollama = $0/10K vehicles. Claude Haiku = ~$50/10K.
+
+### ERA 3.5: Layer 1 Regex ($0, 1.1ms/description)
+
+Not an LLM prompt. A $0 regex extractor: 22 field extractors, confidence scoring, negation-aware condition detection ("rust-free" = positive), 50+ condition keywords. **68% field coverage** at sub-millisecond speed.
+
+This became Layer 1 of a 4-layer stack: regex ($0) → library scanner ($0) → GLiNER NER ($0.11) → LLM (lazy eval).
+
+### ERA 4: Library-Injected Discovery (March 21) — Higher coverage, then disaster
+
+**Innovation:** Before prompting the LLM, query 7 reference data categories (RPO codes, engine specs, paint codes, known issues) and append as "REFERENCE DATA" at the end of the prompt.
+
+### ERA 4.5: The Catastrophic Hallucination Discovery (March 23)
+
+**A citation audit found that injecting reference data CAUSED proportional hallucination.**
+
+Porsche vehicles (344 reference entries) had **66.7% fabricated option codes** — the LLM was copying reference entries into its output with fabricated quotes at confidence=1.0. Mercedes (186 refs) had 62.5% fabrication. The more reference data provided, the more the LLM hallucinated.
+
+**The fix was a single prompt instruction change:**
+
+Before: "Known option codes for this make/year"
+After: "DECODER RING — do NOT copy these into your extraction, only use to identify codes you find in the description"
+
+**A/B result:** Old prompt: 38 Porsche option codes (66% fake). New prompt: 0 codes (correct — none existed in the description).
+
+This became a core epistemological principle: **"Reference library = decoder ring, NOT shopping list."**
+
+### ERA 5: Testimony-Grade v3 (March 21) — Citation-verified
+
+**"A description is TESTIMONY with a HALF-LIFE, not data."**
+
+System prompt: "You are a forensic vehicle data analyst." Every claim now requires three fields:
+- `value` — the extracted fact
+- `quote` — exact text from the description (max 60 chars)
+- `confidence` — 0.0 to 1.0
+
+**Output:** 12 structured categories including a `reference_validation` section that explicitly separates what was found in the description vs what appeared in reference data.
+
+**Critical rules:** "ONLY include codes that appear LITERALLY in the DESCRIPTION text." "REFERENCE DATA is for VALIDATION ONLY." "Every quote must be copied EXACTLY."
+
+The v2 prompt (written earlier but representing the same philosophy) was 862 lines and introduced temporal decay (claims classified as "fast" ≈ 15%/year, "medium," "slow," or "permanent"), vague language detection ("recently," "just," "a few years ago"), and trim forensics.
+
+### ERA 6: Tiered Worker Architecture (Current)
+
+Not one prompt — a tiered system:
+- **Haiku worker** (cheap, fast) with automatic quality scoring
+- **Sonnet supervisor** (quality review) for low-confidence extractions
+- Automatic escalation when quality < 0.6 or Y/M/M missing
+
+### ERA 7: Condition Extraction with Kimi (Current)
+
+"You are a vehicle condition assessor." 14 condition categories, 5 severity levels, exact quote validation. Results flow through `ingest-observation`. Kimi k2-turbo as primary (~2s, cheapest paid LLM).
+
+---
+
+### Prompt Evolution Summary
+
+```
+Era 0  12.6%   "Here's a Chevy truck template, fill it in"
+Era 1  ~30%    "Don't make things up" (hallucination guards)
+Era 2  ~60%    "Here's a fixed schema, fill it in" (description-first)
+Era 3  ~98%    "Extract everything, you decide the schema" (open-ended discovery)
+Era 3.5 68%    $0 regex, 1.1ms, no LLM at all
+Era 4  higher  "Here's reference data to help" (library injection)
+Era 4.5 66% FAKE  CATASTROPHE: reference injection causes proportional hallucination
+Era 5  verified "Every claim must cite its source text" (testimony model)
+Era 6  91.3%   Tiered architecture with automatic quality escalation
+Era 7  prod    Condition-specific extraction via cheapest viable LLM
+```
+
+**The key lessons:**
+1. Open-ended discovery beats fixed schemas (Era 3 > Era 2)
+2. Reference injection without guardrails causes proportional hallucination (Era 4.5)
+3. Quote validation is the single most important quality mechanism (Era 5)
+4. Regex at $0 gets 68% of the way — LLMs are for the last 30% (Era 3.5)
+5. Tiered LLMs with automatic escalation beat single-model extraction (Era 6)
+6. The cheapest model that produces valid JSON is the right model (Era 7: Kimi at $0.001/vehicle)
+
+---
+
+## 13. Graduation Path
+
+What does "DONE" look like for extraction? Four layers, each more expensive than the last.
+
+---
+
+### Current Field Coverage (814K vehicles, status != rejected)
+
+**Identity (Tier 1):**
+
+| Field | Coverage | Grade |
+|-------|----------|-------|
+| Make | 99.2% | A |
+| Model | 98.8% | A |
+| Year | 94.0% | A |
+| Body Style | 55.6% | C |
+| VIN (17-char) | 16.8% | F |
+| Trim | 7.7% | F |
+
+**Transaction (Tier 2):**
+
+| Field | Coverage | Grade |
+|-------|----------|-------|
+| Sale Price | 39.6% | D |
+| Primary Image | 43.6% | D |
+| Location | 37.7% | D |
+| Mileage | 27.7% | F |
+
+**Mechanical (Tier 3):**
+
+| Field | Coverage | Grade |
+|-------|----------|-------|
+| Engine Type | 43.1% | D |
+| Transmission | 34.2% | D |
+| Drivetrain | 31.6% | D |
+| Exterior Color | 32.1% | D |
+
+**Deep Spec (Tier 4):**
+
+| Field | Coverage | Grade |
+|-------|----------|-------|
+| Weight | 12.3% | F |
+| Wheelbase | 12.5% | F |
+| Horsepower | 12.7% | F |
+| Tire Spec | 0.5% | F |
+
+**Narrative (Tier 5):**
+
+| Field | Coverage | Grade |
+|-------|----------|-------|
+| Description | 35.2% | D |
+| Highlights | 3.8% | F |
+| Known Flaws | 2.0% | F |
+| Modifications | 2.6% | F |
+
+### Coverage by Source — The Gap Is Not Uniform
+
+| Source | Vehicles | VIN | Price | Desc | Image | Grade |
+|--------|----------|-----|-------|------|-------|-------|
+| BaT | 163K | 40.8% | 84.1% | 84.3% | 87.3% | B+ |
+| Cars & Bids | 35K | 71.2% | 86.2% | 74.4% | 90.1% | A- |
+| Mecum | 163K | 12.4% | 44.4% | 41.3% | 41.4% | D |
+| Barrett-Jackson | 81K | 10.1% | 39.3% | 37.9% | 35.7% | D |
+| Classic Driver | 51K | 0.0% | 0.0% | 0.0% | 0.0% | F |
+| ConceptCarz | 35K | 8.1% | 4.2% | 0.4% | 0.5% | F |
+
+BaT and Cars & Bids are 70-90% extracted. Everything else is under 50%. Classic Driver (51K vehicles) is at **0% across every field.** Mecum and Barrett-Jackson have rich source data in `external_listings` (137K rows) that has not been extracted.
+
+### The Four Graduation Levels
+
+**GRADUATION 1: "Claims Exhausted" — Layer 1 Complete**
+
+Every field that exists in any stored source material has been extracted with citation.
+
+Criteria:
+- All 286K vehicles with descriptions have highlights/equipment/modifications/flaws decomposed (currently 3%)
+- All extracted fields have `*_source` and `*_confidence` populated (currently < 1%)
+- Every source with >10K vehicles achieves >70% on fields available in that source's data (currently only BaT and C&B)
+- field_evidence rows for every extracted field (currently 45%)
+
+**Estimated: 3-6 months. This is the near-term target.**
+
+**GRADUATION 2: "Consensus Established" — Layer 2 Complete**
+
+Multi-source agreement scored. Disagreements surfaced.
+
+Criteria:
+- vehicle_field_provenance covers all multi-source vehicles
+- Discrepancy detection running (where sources disagree, system flags it)
+- Reference library validates but does not generate claims
+
+**Estimated: 2-4 months after Graduation 1.**
+
+**GRADUATION 3: "Condition Assessed" — Layer 3 Complete**
+
+Every vehicle with sufficient photos has automated condition observations.
+
+Criteria:
+- All vehicles with 6+ categorized photos have condition observations (target ~190K, currently 12K)
+- Vision pipeline classifying paint, chrome, interior, glass, undercarriage
+- Condition decay tracked over time
+
+**Estimated: 4-8 months.**
+
+**GRADUATION 4: "Digital Twin" — Layer 4 Complete (the long game)**
+
+Component-level tables populated from physical measurement.
+
+Criteria:
+- engine_blocks, brake_systems, paint_systems populated for inspected vehicles
+- Dyno/measurement data, service records, full lifecycle tracking
+- 10K-100K rows per vehicle at full resolution
+
+**Estimated: Years. Scales with physical operations, not software.**
+
+### Highest-ROI Next Actions (Ranked)
+
+| # | Action | Vehicles Affected | Expected Lift | Effort |
+|---|--------|-------------------|---------------|--------|
+| 1 | Re-extract Mecum + Barrett-Jackson | 244K | Price/desc/mileage from ~40% to ~75% | 2-3 weeks |
+| 2 | Decompose descriptions into structured fields | 286K | Highlights/flaws/mods from 3% to 35% | 2 weeks |
+| 3 | Backfill provenance on all extracted fields | 363K | Source tracking from <1% to 100% | 1 week (pipeline fix) |
+| 4 | Extract Classic Driver (currently 0%) | 51K | All fields from 0% to ~60% | 1 week |
+| 5 | Vision pipeline for condition | 190K | Condition obs from 12K to 100K+ vehicles | 4-8 weeks |
+| 6 | Reference data enrichment (factory specs by Y/M/M) | ~700K | Deep spec fields from 12% to ~60% | 2 weeks |
+| 7 | Long-tail source extraction | 58K | Breadth — new vehicles with basic fields | 2 weeks |
+
+### The Honest Answer
+
+**Extraction is not close to done.** 814K vehicles, 97% identity, but 30% average coverage on everything else. The single highest-leverage action is re-extracting Mecum and Barrett-Jackson using the pipeline that already works on BaT. After that, decomposing existing descriptions and backfilling provenance.
+
+Graduation 1 (Claims Exhausted) is achievable in 3-6 months and represents the point where software has done everything it can with existing source material. Everything after that requires new data sources or physical access.
+
+---
+
 ## Appendix A: File Index
 
 | File | Purpose |
@@ -2743,3 +3057,645 @@ PATTERN 4 recommends persistent DB connections for throughput, but Supabase edge
 ---
 
 *This playbook is a living document. When you discover a new failure mode or fix, add it here. When accuracy numbers change, update them. The next agent reading this should never have to learn the same lesson twice.*
+# Skeleton Vehicle Enrichment Playbook
+
+**Created:** 2026-03-26
+**Purpose:** Document exactly what data each source provides and how to extract it, before running bulk enrichment on ~91K skeleton vehicles.
+
+---
+
+## Executive Summary
+
+| Source | Skeletons | Structured Data | Access Method | Fields Available | Difficulty |
+|--------|-----------|-----------------|---------------|-----------------|------------|
+| Classic Driver | 50,528 | dataLayer JSON + HTML fields | Direct curl | 12-15 fields | Easy |
+| ClassicCars.com | 33,894 | Schema.org JSON-LD `@type: car` | Direct curl | 10-12 fields | Easy |
+| The Market (Bonhams) | 5,154 | SSR HTML (Nuxt.js) | Direct curl | 15-20 fields | Medium |
+| ER Classics | 1,763 | Magento li.label/data + dataLayer | Direct curl | 4-6 fields | Easy but sparse |
+| **Total** | **91,339** | | | | |
+
+**Key finding:** All four sources serve data via direct HTTP -- no Firecrawl or Playwright needed. ClassicCars.com has the richest structured data (Schema.org JSON-LD with full Car type). The Market has the richest content but requires HTML parsing. ER Classics has the least structured data (most vehicles are sold, minimal specs retained).
+
+---
+
+## Source 1: Classic Driver (50,528 skeletons)
+
+### URL Pattern
+```
+https://www.classicdriver.com/en/car/{make}/{model}/{year}/{entity_id}
+```
+
+### Access Method
+**Direct curl with browser UA.** No anti-bot protection detected. Pages are Drupal-rendered server-side HTML.
+
+```bash
+curl -s -L -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" "$URL"
+```
+
+### Available Structured Data
+
+**1. dataLayer (JavaScript object, top of page)**
+```json
+{
+  "entityType": "node",
+  "entityBundle": "car",
+  "entityId": "879037",
+  "entityLabel": "1999 Nissan Cima - (FGY-33)",
+  "entityName": "BHAuction",
+  "entityUid": "146331",
+  "entityCreated": "1639043525",
+  "Publish Date": "2021.12.09",
+  "Auction": "BH Auction - Collection Car Auction",
+  "Seller Type": "auction_house"
+}
+```
+Parse with: `dataLayer\s*=\s*\[({.*?})\]`
+
+**2. dataLayer.push ecommerce (separate push call)**
+```json
+{
+  "ecommerce": {
+    "detail": {
+      "products": [{
+        "name": "1999 Nissan Cima - (FGY-33)",
+        "id": "879037",
+        "price": 0,
+        "brand": "BINGO",
+        "category": "Car",
+        "label": "car/Nissan/Cima/1999",
+        "variant": "JP"
+      }]
+    },
+    "currencyCode": "EUR"
+  }
+}
+```
+Parse with: `dataLayer\.push\(({.*?ecommerce.*?})\)`
+
+**3. HTML field-label / field-item pairs (in page body)**
+Spec fields are in divs with `class="field-label"` and `class="field-item"`. The exact structure mixes labels and values in a stream. Best approach: regex for labeled values.
+
+### Extractable Fields
+
+| Vehicle Column | Source Location | Reliability | Notes |
+|---------------|----------------|-------------|-------|
+| `year` | dataLayer label, HTML field | HIGH | Always present |
+| `make` | dataLayer label path | HIGH | In `label: "car/Nissan/Cima/1999"` |
+| `model` | dataLayer `entityTaxonomy.make_and_model` | HIGH | |
+| `sale_price` | ecommerce `products[0].price` | MEDIUM | 0 = "Price on Request" |
+| `currency` | ecommerce `currencyCode` | HIGH | Usually EUR |
+| `mileage` | HTML "Mileage" field | MEDIUM | Format: "4 423 km / 2 749 mi" -- needs parsing |
+| `exterior_color` | HTML "Exterior colour" field | MEDIUM | Present when listed |
+| `interior_color` | HTML "Interior colour" field | MEDIUM | Present when listed |
+| `transmission` | HTML "Gearbox" field | MEDIUM | "Automatic", "Manual" |
+| `body_type` | HTML "Car type" field | MEDIUM | "Saloon", "Coupe", "Convertible" |
+| `description` | HTML description div | HIGH | Rich text, usually 200-500 words |
+| `drive_side` | HTML "Drive" field | MEDIUM | "LHD", "RHD" |
+| `condition` | HTML "Condition" field | MEDIUM | "Used", "Restored", etc. |
+| `location` | HTML near dealer info | MEDIUM | City/country |
+| `seller_name` | ecommerce `brand` or HTML dealer | HIGH | Dealer/auction house name |
+| `chassis_number` | HTML "Chassis number" field | LOW | Only for some listings |
+| `lot_number` | HTML "Lot number" field | MEDIUM | For auction listings |
+| `images` | CDN URLs in `<img>` srcset | HIGH | Pattern: `classicdriver.com/cdn-cgi/image/...` |
+
+### Quality Notes
+- **Price:** Many listings show `price: 0` meaning "Price on Request" -- do NOT write 0 as sale_price
+- **Mileage:** Uses non-breaking spaces as thousands separator ("4 423 km") -- strip `\xa0` and `&nbsp;`
+- **Images:** Use Cloudflare Image Resizing CDN. Base image path extractable from srcset: `sites/default/files/cars_images/{uid}/{car_folder}/{filename}.jpeg`
+- **Description:** Always present and substantive. Often includes history, provenance, condition notes
+- **Seller type:** Mix of dealers, auction houses, private sellers. Available in dataLayer `Seller Type`
+- **Auction context:** When from an auction, the auction name is in dataLayer `Auction` field
+
+### Parser Strategy
+```
+1. Fetch HTML
+2. Extract dataLayer JSON (entity metadata + ecommerce pricing)
+3. Regex-extract field-label/field-item pairs for specs
+4. Extract description from the large text block after specs
+5. Extract image URLs from srcset attributes
+6. Map to vehicle columns
+```
+
+### Rate Limits / Anti-Bot
+- No Cloudflare challenge detected
+- No CAPTCHA
+- Standard politeness: 1 req/sec should be fine
+- CDN-cached pages, fast response
+
+### Sample Extracted Record
+```json
+{
+  "source_id": "879037",
+  "url": "https://www.classicdriver.com/en/car/nissan/cima/1999/879037",
+  "year": 1999,
+  "make": "Nissan",
+  "model": "Cima",
+  "variant": "FGY-33",
+  "mileage": 4423,
+  "mileage_unit": "km",
+  "body_type": "Saloon",
+  "exterior_color": "Silver",
+  "interior_color": "Grey",
+  "transmission": "Automatic",
+  "drive_side": "RHD",
+  "condition": "Used",
+  "engine": "4.1L V8 (270 hp)",
+  "sale_price": null,
+  "currency": "EUR",
+  "description": "The FGY-33 is the third generation of the Cima that Nissan first unveiled in 1996...",
+  "seller_name": "BINGO",
+  "seller_type": "auction_house",
+  "location": "Chiyoda-ku, Tokyo, Japan",
+  "lot_number": "18",
+  "auction_name": "BH Auction - Collection Car Auction - Collection No. 7 - December 2021",
+  "image_count": 27,
+  "images": ["https://www.classicdriver.com/cdn-cgi/image/format=auto,fit=cover,width=1920,height=1029/sites/default/files/..."]
+}
+```
+
+---
+
+## Source 2: ClassicCars.com (33,894 skeletons)
+
+### URL Pattern
+```
+https://classiccars.com/listings/view/{listing_id}/{year}-{make}-{model}-for-sale-in-{city}-{state}-{zip}
+```
+
+### Access Method
+**Direct curl with browser UA.** Returns full server-rendered HTML. Note: WebFetch (headless browser) returns 403, but curl works fine.
+
+```bash
+curl -s -L -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" "$URL"
+```
+
+### Available Structured Data
+
+**1. Schema.org JSON-LD `@type: "car"` (BEST SOURCE)**
+Embedded in `<script type="application/ld+json">` tag. Full Schema.org Car type with all key fields:
+
+```json
+{
+  "@context": "https://schema.org",
+  "@type": "car",
+  "productID": "CC-1990675",
+  "mpn": "1990675",
+  "name": "1979 Ford Ranchero",
+  "brand": "Ford",
+  "model": "Ranchero",
+  "description": "1979 Ford Ranchero Rebuilt inside and out...",
+  "productionDate": "1979",
+  "bodyType": "",
+  "vehicleIdentificationNumber": "AMS38064",
+  "color": "Custom",
+  "vehicleInteriorColor": "",
+  "sku": "378547",
+  "image": "System.Collections.Generic.List`1[ClassicCars.Entity.ListingImage]",
+  "url": "https://classiccars.com/listings/view/...",
+  "offers": {
+    "@type": "offer",
+    "priceCurrency": "USC",
+    "price": "33995.0000"
+  },
+  "mileageFromOdometer": {
+    "@type": "QuantitativeValue",
+    "value": "120000",
+    "unitCode": "Miles"
+  }
+}
+```
+
+**2. HTML data-listing-* attributes**
+```html
+data-listing-year="1979"
+data-listing-make="Ford"
+data-listing-model="Ranchero"
+data-listing-formatted-price="$33,995"
+data-listing-id="1990675"
+```
+
+**3. HTML data-jumbo attributes (image gallery)**
+```html
+data-jumbo="https://photos.classiccars.com/cc-temp/listing/199/675/54831447-1979-ford-ranchero-std.jpg"
+```
+
+**4. OG Meta Tags**
+```
+og:title: For Sale: 1979 Ford Ranchero in Cadillac, Michigan
+og:description: Custom 1979 Ford Ranchero for sale located in Cadillac, Michigan - $33,995
+og:image: https://photos.classiccars.com/cc-temp/listing/199/675/54831447-1979-ford-ranchero-std.jpg
+```
+
+### Extractable Fields
+
+| Vehicle Column | Source Location | Reliability | Notes |
+|---------------|----------------|-------------|-------|
+| `year` | JSON-LD `productionDate` | HIGH | Always present |
+| `make` | JSON-LD `brand` | HIGH | Always present |
+| `model` | JSON-LD `model` | HIGH | Always present |
+| `sale_price` | JSON-LD `offers.price` | HIGH | Decimal string like "33995.0000" |
+| `currency` | JSON-LD `offers.priceCurrency` | HIGH | "USC" (USD) |
+| `vin` | JSON-LD `vehicleIdentificationNumber` | MEDIUM | Often short/partial (not full 17-char VIN) |
+| `mileage` | JSON-LD `mileageFromOdometer.value` | MEDIUM | "0" may mean unknown, not zero |
+| `exterior_color` | JSON-LD `color` | MEDIUM | Sometimes "Custom" or empty |
+| `interior_color` | JSON-LD `vehicleInteriorColor` | LOW | Often empty string |
+| `body_type` | JSON-LD `bodyType` | LOW | Often empty string |
+| `description` | JSON-LD `description` | HIGH | Full listing description, ~100-500 words |
+| `location` | URL slug or OG description | HIGH | City, State in URL pattern |
+| `images` | `data-jumbo` attributes | HIGH | 5-20 high-res JPGs per listing |
+
+### Quality Notes
+- **VIN field:** Contains the VIN but many are short identifiers, not full 17-character VINs. Example: "AMS38064" (8 chars). Validate length before writing to `vin` column
+- **Price:** Always numeric. "USC" appears to be their code for USD. Reliable
+- **Mileage:** "0" may mean "not reported" rather than literally zero miles. Cross-reference with description text
+- **Description:** Contains the full seller description. Sometimes includes structured data embedded in natural language: "cylinders: 8 cylinders drive: rwd fuel: gas odometer: 120000"
+- **Image bug:** JSON-LD `image` field contains a .NET serialization artifact: `"System.Collections.Generic.List\`1[ClassicCars.Entity.ListingImage]"` -- DO NOT USE. Use `data-jumbo` attributes instead
+- **Body type:** Almost always empty in JSON-LD. Could be extracted from description with AI
+- **Interior color:** Almost always empty in JSON-LD
+
+### Parser Strategy
+```
+1. Fetch HTML
+2. Find <script type="application/ld+json"> containing @type: "car"
+3. Parse JSON -- this gives year, make, model, price, VIN, mileage, color, description
+4. Extract data-jumbo attributes for image URLs
+5. Extract location from URL slug: /{year}-{make}-{model}-for-sale-in-{city}-{state}-{zip}
+6. Validate VIN length (only write if 17 chars)
+7. Validate mileage (skip if "0" unless description confirms)
+```
+
+### Rate Limits / Anti-Bot
+- Returns 403 to some automated tools (WebFetch blocked)
+- Direct curl with Chrome UA works fine
+- reCAPTCHA present on contact forms but not page loads
+- Recommend: 1-2 req/sec with browser UA
+
+### Sample Extracted Record
+```json
+{
+  "source_id": "CC-1990192",
+  "url": "https://classiccars.com/listings/view/1990192/1972-dodge-demon-for-sale-in-cadillac-michigan-49601",
+  "year": 1972,
+  "make": "Dodge",
+  "model": "Demon",
+  "sale_price": 28995,
+  "currency": "USD",
+  "vin": "AMB0998",
+  "vin_valid": false,
+  "mileage": 0,
+  "mileage_note": "0 likely means unreported for drag car",
+  "exterior_color": "Blue",
+  "interior_color": null,
+  "body_type": null,
+  "description": "1972 DODGE DEMON BUILT FOR THE DRAGSTRIP CAN BE MADE STREET WITH A LITTLE WORK...",
+  "location_city": "Cadillac",
+  "location_state": "Michigan",
+  "location_zip": "49601",
+  "image_count": 18,
+  "images": ["https://photos.classiccars.com/cc-temp/listing/199/192/54824588-1972-dodge-demon-std.jpg", "..."]
+}
+```
+
+---
+
+## Source 3: The Market by Bonhams (5,154 skeletons)
+
+### URL Pattern
+```
+https://themarket.co.uk/en/listings/{make}/{model}/{uuid}
+```
+
+### Access Method
+**Direct curl with browser UA.** The site is a Nuxt.js (Vue SSR) app. Pages are server-side rendered -- the full HTML body contains all vehicle text. No JavaScript execution needed for basic data extraction.
+
+```bash
+curl -s -L -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" "$URL"
+```
+
+### Available Structured Data
+
+**1. SSR HTML Body (primary data source)**
+The full page content is rendered server-side. Vehicle specs and description are in the HTML body as text nodes. The structure is:
+
+```
+Title: "1961 Daimler SP250"
+Bid count: "24 Bids"
+Sale status: "Vehicle sold"
+Sold price: "Sold for £27,100 (inc. Buyer's Premium)"
+Estimate: "£27,000 - £32,000" (in description text)
+Description: Multiple paragraphs (Background, Overview, Exterior, Interior, Mechanical, History, Summary)
+Specs: Fuel type, Vehicle location, Registration, Chassis/VIN, Mileage
+```
+
+**2. `window.__NUXT__` Config (metadata only)**
+Contains API URL, public keys, and app config. NOT listing data. The access token `zofLzhMgDXeT3nv3` is a Storyblok CMS token, not the listing API token.
+
+**3. OG Meta Tags**
+```
+og:title: "1961 Daimler SP250  For Sale by Auction"
+og:description: "Built in 1961, 'DMY 160A' is a B-Spec Daimler SP250 Dart..."
+og:image: "https://cdn.themarket.co.uk/{uuid}/{image_uuid}.jpg?optimizer=image&..."
+og:url: "https://themarket.co.uk//en/listings/daimler/sp250/{uuid}"
+```
+
+**4. API (requires authentication)**
+Base URL: `https://api.themarket.net/`
+The public access token does NOT work for listing endpoints (returns 406 Unauthorized). The API is for authenticated app users only.
+
+### Extractable Fields
+
+| Vehicle Column | Source Location | Reliability | Notes |
+|---------------|----------------|-------------|-------|
+| `year` | og:title, body text | HIGH | In title pattern: "{year} {make} {model}" |
+| `make` | URL path, og:title | HIGH | |
+| `model` | URL path, og:title | HIGH | |
+| `sale_price` | Body text "Sold for £X" | HIGH | Includes buyer's premium |
+| `currency` | Body text (£/EUR/$) | HIGH | Usually GBP |
+| `estimate_low` | Description text | MEDIUM | "£27,000 - £32,000" |
+| `estimate_high` | Description text | MEDIUM | |
+| `bid_count` | Body text "24 Bids" | HIGH | |
+| `description` | Body text (multiple sections) | HIGH | Very rich: 500-2000 words, sectioned |
+| `mileage` | Body text near specs | MEDIUM | "65,232 miles" or "378km" |
+| `registration` | Body text | MEDIUM | UK reg number like "DMY 160A" |
+| `chassis_number` | Body text | MEDIUM | When provided |
+| `exterior_color` | Description text | MEDIUM | Mentioned in description, not structured |
+| `interior_color` | Description text | MEDIUM | Mentioned in description, not structured |
+| `engine` | Description "Mechanical" section | HIGH | Very detailed |
+| `transmission` | Body text near specs | MEDIUM | |
+| `location` | Body text "Vehicle location" | HIGH | "Leicester, United Kingdom" |
+| `seller_type` | Body text "Private: {username}" | HIGH | "Private" or "Trade" |
+| `seller_name` | Body text after "Seller" | HIGH | Username |
+| `sale_status` | Body text | HIGH | "Vehicle sold" or auction timing |
+| `images` | og:image, CDN URLs | HIGH | Pattern: `cdn.themarket.co.uk/{listing_uuid}/{image_uuid}.jpg` |
+
+### Quality Notes
+- **Richest descriptions of any source.** Organized into sections: Background, Overview, Exterior, Interior, Mechanical, History, Summary. Professional editorial quality
+- **Auction data:** Includes final hammer price with buyer's premium, bid count, estimate range, reserve status
+- **No JSON-LD or Schema.org markup.** All data must be extracted from rendered HTML text
+- **Sold listings:** All 5,154 skeletons appear to be completed auctions. This means sold prices are available
+- **Color extraction:** Colors are mentioned narratively in descriptions ("finished in Jaguar Opalescent Grey") rather than in structured fields. AI extraction recommended for color
+- **Duplicated content:** The page renders the description twice (once in the main view, once in an expanded section). Deduplicate during extraction
+- **Mixed vehicles and motorcycles.** The Triumph Tiger 100 sample is a motorcycle, not a car. Filter or tag appropriately
+- **Image CDN:** `cdn.themarket.co.uk/{listing_uuid}/{image_uuid}.jpg` with optimizer params for sizing
+
+### Parser Strategy
+```
+1. Fetch HTML
+2. Extract og:title for year/make/model
+3. Strip <script> and <style> tags from body
+4. Extract text lines from body HTML
+5. Parse structured sections:
+   - "Sold for £X" -> sale_price
+   - "N Bids" -> bid_count
+   - "Vehicle location" -> next line is location
+   - "Seller" -> "Private: username" or similar
+6. Extract full description text (Background through Summary sections)
+7. For color, engine, mileage: either regex from description or use AI
+8. Extract images from og:image and CDN URL patterns
+```
+
+**AI-assisted extraction recommended** for fields embedded in narrative text (color, engine, VIN/chassis).
+
+### Rate Limits / Anti-Bot
+- No CAPTCHA on page loads
+- Nuxt SSR serves full HTML
+- Google reCAPTCHA v3 present but passive (no challenge)
+- Pusher.js for real-time bidding (not relevant for sold listings)
+- Recommend: 1 req/sec
+
+### Sample Extracted Record
+```json
+{
+  "source_id": "eab4d43e-34fa-4684-80d8-7debf592855a",
+  "url": "https://themarket.co.uk/en/listings/daimler/sp250/eab4d43e-34fa-4684-80d8-7debf592855a",
+  "year": 1961,
+  "make": "Daimler",
+  "model": "SP250",
+  "sale_price": 27100,
+  "currency": "GBP",
+  "price_includes_premium": true,
+  "estimate_low": 27000,
+  "estimate_high": 32000,
+  "bid_count": 24,
+  "mileage": 65232,
+  "mileage_unit": "miles",
+  "registration": "DMY 160A",
+  "chassis_number": "102683",
+  "exterior_color": "Jaguar Opalescent Grey",
+  "interior_color": "Oxblood leather",
+  "engine": "2.5-litre V8 (2548cc), 140 bhp",
+  "transmission": "Automatic",
+  "body_type": "Sports car",
+  "drive_side": "RHD",
+  "location": "Bonhams|Cars Online HQ, United Kingdom",
+  "seller_type": "consignment",
+  "seller_name": "Fraser Jackson",
+  "description": "Built in 1961, 'DMY 160A' is a B-Spec Daimler SP250 Dart...",
+  "description_sections": ["Background", "Overview", "Exterior", "Interior", "Mechanical", "History", "Summary"],
+  "image_count": 350,
+  "images": ["https://cdn.themarket.co.uk/eab4d43e-34fa-4684-80d8-7debf592855a/036a3af2-4018-43d5-94e7-18f6247fa29e.jpg"]
+}
+```
+
+---
+
+## Source 4: ER Classics (1,763 skeletons)
+
+### URL Pattern
+```
+https://www.erclassics.com/{make}-{year}-{sku}/
+```
+
+### Access Method
+**Direct curl with browser UA.** Magento e-commerce platform. Server-rendered HTML.
+
+```bash
+curl -s -L -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" "$URL"
+```
+
+### Available Structured Data
+
+**1. Magento `li > span.label / span.data` Pairs (BEST SOURCE)**
+```html
+<li><span class="label">Ref. nr.:</span> <span class="data">1250</span></li>
+<li><span class="label">Make:</span> <span class="data">SOLD</span></li>
+<li><span class="label">Model:</span> <span class="data">MG</span></li>
+<li><span class="label">Year:</span> <span class="data">1971</span></li>
+```
+Parse with: `<span class="label">([^<]+)</span>\s*<span class="data">([^<]+)</span>`
+
+**WARNING:** The "Make" field contains "SOLD" when the car is sold, not the actual make. The real make is in the URL slug or page title.
+
+**2. dataLayer.push ecommerce**
+```json
+{
+  "ecommerce": {
+    "detail": {
+      "products": [{
+        "id": "2540",
+        "name": "MG 1971",
+        "sku": "1250",
+        "price": "0.00"
+      }]
+    }
+  }
+}
+```
+
+**3. JSON-LD (Store/Organization only)**
+Four JSON-LD blocks present, but ALL are about the dealer (E&R Classics), NOT the vehicle:
+- BreadcrumbList
+- WebSite
+- Organization (contact info)
+- Store (address, hours, geo coords)
+
+No `@type: Car` or `@type: Product` JSON-LD.
+
+**4. Description in `div.std`**
+Full description text including specs mentioned narratively.
+
+### Extractable Fields
+
+| Vehicle Column | Source Location | Reliability | Notes |
+|---------------|----------------|-------------|-------|
+| `year` | li span.data for "Year:" | HIGH | Always present |
+| `make` | URL slug, page title, dataLayer name | HIGH | NOT from span.data (shows "SOLD") |
+| `model` | li span.data for "Model:" | MEDIUM | Sometimes shows make instead of model |
+| `sku` | li span.data for "Ref. nr.:" | HIGH | E&R internal ref number |
+| `sale_price` | dataLayer `price` | LOW | Always "0.00" for sold items |
+| `description` | div.std content | HIGH | Includes specs in narrative form |
+| `exterior_color` | Description text | MEDIUM | "British Racing Green" |
+| `engine` | Description text | MEDIUM | "1798 cc engine with 96 hp" |
+| `transmission` | Description text | LOW | "manual gearbox" |
+| `mileage` | Description text | LOW | "50 km after restoration" |
+| `condition` | Description text | MEDIUM | "body off restored" |
+| `title_origin` | Description text | MEDIUM | "USA title", "Romanian title" |
+| `images` | b-cdn.net URLs | HIGH | 60-150 photos per listing |
+
+### Quality Notes
+- **Most vehicles are sold.** All 1,763 skeletons show as SOLD. Prices are not retained (always 0.00)
+- **Make/Model confusion:** The `span.data` for "Make:" shows "SOLD" instead of the actual make. Must extract make from URL slug or `dataLayer.products[0].name`
+- **Very sparse structured data.** Only 4 fields in the spec list (ref, make/SOLD, model, year). Everything else must come from description text
+- **Description quality varies.** Some have detailed specs ("1798 cc engine with 96 hp and manual gearbox"), others just say "very good condition"
+- **Sold description overlay:** The description often starts with "*** THIS CAR HAS BEEN SOLD ***" boilerplate. Strip this prefix
+- **Image CDN:** Uses BunnyCDN: `erclassics.b-cdn.net/media/catalog/product/cache/2/{size}/...`. Multiple size variants available: `thumbnail/335x224`, `image/700x`, `thumbnail/1920x`
+- **Single dealer:** All vehicles are from E&R Classics in Waalwijk, Netherlands
+- **Import documentation:** Many listings note "USA title and document importduties for every EU country are paid by us" -- useful for provenance
+
+### Parser Strategy
+```
+1. Fetch HTML
+2. Extract li span.label/span.data pairs for year, model, sku
+3. Extract make from URL slug: erclassics.com/{make}-{year}-{sku}/
+4. Extract description from div.std (strip "THIS CAR HAS BEEN SOLD" prefix)
+5. Extract image URLs from b-cdn.net pattern
+6. For engine, color, mileage: regex from description or AI
+7. Note: No price data available for sold items
+```
+
+### Rate Limits / Anti-Bot
+- Google reCAPTCHA present but not on page loads
+- Magento standard protections
+- Recommend: 1 req/sec
+
+### Sample Extracted Record
+```json
+{
+  "source_id": "1250",
+  "url": "https://www.erclassics.com/mg-1971-1250/",
+  "year": 1971,
+  "make": "MG",
+  "model": "MGB Cabriolet",
+  "sale_price": null,
+  "sale_status": "sold",
+  "exterior_color": "British Racing Green",
+  "engine": "1798 cc, 96 hp",
+  "transmission": "Manual",
+  "mileage": 50,
+  "mileage_unit": "km",
+  "mileage_note": "after restoration",
+  "condition": "Body off restored",
+  "description": "MGB Cabriolet 1971 body off restored as new...",
+  "title_origin": "USA",
+  "seller_name": "E&R Classics",
+  "location": "Waalwijk, Netherlands",
+  "image_count": 157,
+  "images": ["https://erclassics.b-cdn.net/media/catalog/product/cache/2/image/700x/17f82f742ffe127f42dca9de82fb58b1/b/c/bcar_1250.jpg"]
+}
+```
+
+---
+
+## Extraction Priority & Approach
+
+### Recommended Processing Order
+
+| Priority | Source | Count | Method | Est. Time | Value |
+|----------|--------|-------|--------|-----------|-------|
+| 1 | ClassicCars.com | 33,894 | JSON-LD parse only | 6-8 hrs @ 2/sec | HIGH -- richest structured data |
+| 2 | Classic Driver | 50,528 | dataLayer + HTML parse | 10-14 hrs @ 1/sec | HIGH -- most vehicles, good specs |
+| 3 | The Market (Bonhams) | 5,154 | HTML text parse + AI | 4-6 hrs @ 1/sec | HIGH -- richest descriptions, sold prices |
+| 4 | ER Classics | 1,763 | HTML parse + AI | 1-2 hrs @ 1/sec | MEDIUM -- sparse data, no prices |
+
+### Implementation Plan
+
+**Phase 1: ClassicCars.com (no AI needed)**
+- Parse JSON-LD `@type: car` for all structured fields
+- Extract `data-jumbo` for images
+- Parse location from URL slug
+- Pure regex, no LLM cost
+- Fields filled: year, make, model, price, VIN (partial), mileage, color, description
+
+**Phase 2: Classic Driver (no AI needed)**
+- Parse dataLayer for entity metadata and pricing
+- Regex-extract HTML field-label/field-item pairs
+- Extract description block
+- Pure regex, no LLM cost
+- Fields filled: year, make, model, mileage, color, transmission, body_type, drive_side, condition, description, seller
+
+**Phase 3: The Market by Bonhams (AI for some fields)**
+- Parse og:title for year/make/model
+- Regex for sale_price, bid_count, location, seller
+- AI extraction for: color, engine, chassis from narrative text
+- Fields filled: year, make, model, sale_price, bid_count, estimate, mileage, description, and AI-extracted specs
+
+**Phase 4: ER Classics (AI for most fields)**
+- Parse li.label/data for year, model, sku
+- Extract make from URL
+- AI extraction for: color, engine, transmission, mileage from description
+- Fields filled: year, make, model, description, and AI-extracted specs
+
+### Cost Estimate
+
+| Source | Method | LLM Cost | Compute Time |
+|--------|--------|----------|-------------|
+| ClassicCars.com | Pure regex | $0 | ~8 hrs |
+| Classic Driver | Pure regex | $0 | ~14 hrs |
+| The Market | Regex + AI for 5K descriptions | ~$5-10 | ~6 hrs |
+| ER Classics | Regex + AI for 1.7K descriptions | ~$2-4 | ~2 hrs |
+| **Total** | | **~$7-14** | **~30 hrs** |
+
+---
+
+## Common Pitfalls
+
+1. **Do not write price=0.** Both Classic Driver and ER Classics use 0 to mean "Price on Request" or "Sold, no price retained"
+2. **Do not trust ClassicCars.com VINs at face value.** Many are short identifiers (8 chars), not valid 17-char VINs
+3. **Do not trust ER Classics "Make" field.** It shows "SOLD" for sold vehicles
+4. **Do not store ClassicCars.com JSON-LD `image` field.** It contains a .NET serialization bug
+5. **Do not double-count The Market descriptions.** The page renders the same text twice
+6. **Mileage value "0" needs validation.** Cross-reference with description text before writing
+7. **The Market includes motorcycles.** Not all 5,154 are cars -- filter or tag vehicle_type
+8. **ER Classics descriptions start with sold boilerplate.** Strip "*** THIS CAR HAS BEEN SOLD ***" prefix
+
+---
+
+## Appendix: Existing Extractors to Check
+
+Before building new parsers, check if any existing edge functions already handle these sources:
+
+```bash
+ls /Users/skylar/nuke/supabase/functions/ | grep -i -E "classic|market|bonhams|erclass"
+```
+
+Also check `TOOLS.md` and `observation_extractors` table for registered extractors.
