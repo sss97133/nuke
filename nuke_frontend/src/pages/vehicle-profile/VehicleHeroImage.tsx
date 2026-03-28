@@ -10,7 +10,7 @@ interface VehicleHeroImageProps {
 
 const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
   const { leadImageUrl, heroMeta } = useVehicleProfile();
-  const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
+  const [fitMode, setFitMode] = useState<'contain' | 'cover'>('cover');
   const [showGallery, setShowGallery] = useState(false);
   const isMobile = useIsMobile();
 
