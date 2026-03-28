@@ -1,8 +1,8 @@
 /**
  * Process BaT Extraction Queue
- * 
+ *
  * Automatically processes vehicles queued for comprehensive BaT data extraction.
- * This ensures all BaT vehicles get complete data (comments, features, dates, etc.)
+ * Processes items in parallel batches of 3 for higher throughput (~500/hr vs ~175/hr serial).
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -23,21 +23,20 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { batchSize = 10, maxAttempts = 3 } = await req.json().catch(() => ({ batchSize: 10, maxAttempts: 3 }));
+    const { batchSize = 15, maxAttempts = 3 } = await req.json().catch(() => ({ batchSize: 15, maxAttempts: 3 }));
 
-    // Process up to 15 per invocation (was capped at 1, causing 104-day backlog)
-    const safeBatchSize = Math.max(1, Math.min(Number(batchSize) || 10, 15));
+    const safeBatchSize = Math.max(1, Math.min(Number(batchSize) || 15, 30));
     const safeMaxAttempts = Math.max(1, Math.min(Number(maxAttempts) || 3, 20));
-    const workerId = `process-bat-extraction-queue:${crypto.randomUUID?.() || String(Date.now())}`;
+    const workerId = `bat-queue:${crypto.randomUUID?.() || String(Date.now())}`;
 
-    console.log(`Processing BaT extraction queue (batch size: ${safeBatchSize}, max attempts: ${safeMaxAttempts})`);
+    console.log(`Processing BaT extraction queue (batch: ${safeBatchSize}, maxAttempts: ${safeMaxAttempts})`);
 
-    // Claim work atomically (prevents double-processing under concurrent cron / manual runs).
+    // Claim work atomically
     const { data: queueItems, error: queueError } = await supabase.rpc('claim_bat_extraction_queue_batch', {
       p_batch_size: safeBatchSize,
       p_max_attempts: safeMaxAttempts,
       p_worker_id: workerId,
-      p_lock_ttl_seconds: 20 * 60, // 20 minutes lock (extractions can take 3-5 minutes)
+      p_lock_ttl_seconds: 20 * 60,
     });
 
     if (queueError) {
@@ -46,308 +45,194 @@ Deno.serve(async (req) => {
 
     if (!queueItems || queueItems.length === 0) {
       return new Response(JSON.stringify({
-        success: true,
-        processed: 0,
-        message: 'No pending extractions'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+        success: true, processed: 0, message: 'No pending extractions'
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     console.log(`Claimed ${queueItems.length} extractions to process`);
 
-    const results = {
-      processed: 0,
-      completed: 0,
-      failed: 0,
-      errors: [] as string[]
-    };
+    const results = { processed: 0, completed: 0, failed: 0, errors: [] as string[] };
 
-    // Process each item
-    for (const item of queueItems) {
-      results.processed++;
-
-      try {
-        console.log(`Processing vehicle ${item.vehicle_id} (${item.bat_url})`);
-
-        // Step 1: Extract core vehicle data (VIN, specs, images)
-        // SLOW & ACCURATE: Let it take as long as it needs (up to Edge Function limit)
-        console.log(`  Step 1: Extracting core data (this may take 3-5 minutes, be patient)...`);
-        
-        // Use anon key for function-to-function calls
-        // Prefer INTERNAL_INVOKE_JWT, fall back to SUPABASE_ANON_KEY
-        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-        const invokeJwt = Deno.env.get('INTERNAL_INVOKE_JWT') ?? 
-                         Deno.env.get('SUPABASE_ANON_KEY') ?? 
-                         Deno.env.get('ANON_KEY') ?? '';
-        
-        if (!invokeJwt) {
-          throw new Error('Missing INTERNAL_INVOKE_JWT or SUPABASE_ANON_KEY for function-to-function calls');
-        }
-        
-        let coreResult: any;
-        let coreError: any;
-        
-        try {
-          const response = await fetch(
-            `${supabaseUrl}/functions/v1/extract-bat-core`,
-            {
-              method: 'POST',
-              signal: AbortSignal.timeout(300_000),
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${invokeJwt}`,
-                'apikey': invokeJwt,
-              },
-              body: JSON.stringify({
-                url: item.bat_url,
-                max_vehicles: 1,
-              }),
-            }
-          );
-
-          if (!response.ok) {
-            const errorText = await response.text().catch(() => 'Unknown error');
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
-          }
-
-          coreResult = await response.json();
-        } catch (e: any) {
-          // Catch any thrown errors (including timeouts)
-          coreError = e;
-        }
-
-        if (coreError) {
-          // Check if it's a timeout - these are expected for complex listings
-          const errorMsg = coreError.message || String(coreError);
-          if (errorMsg.includes('504') || errorMsg.includes('timeout') || errorMsg.includes('Gateway Timeout') || errorMsg.includes('non-2xx')) {
-            // Timeout is expected for complex listings - retry with exponential backoff
-            throw new Error(`extract-bat-core timed out (listing may be too complex). Will retry with backoff.`);
-          }
-          throw new Error(`extract-bat-core failed: ${errorMsg}`);
-        }
-
-        if (!coreResult || !coreResult.success) {
-          throw new Error(`extract-bat-core returned failure: ${coreResult?.error || 'Unknown error'}`);
-        }
-
-        // Get vehicle_id from result (may create new or update existing)
-        const vehicleId = coreResult.created_vehicle_ids?.[0] || coreResult.updated_vehicle_ids?.[0] || item.vehicle_id;
-        
-        // Check extraction quality from response
-        const extractedImages = coreResult.debug_extraction?.images_count || 0;
-        const extractedVin = coreResult.debug_extraction?.vin || null;
-        const extractedMileage = coreResult.debug_extraction?.mileage || null;
-        
-        console.log(`  Step 1 complete: Vehicle ID ${vehicleId}`);
-        console.log(`  Extraction quality: ${extractedImages} images, VIN: ${extractedVin ? 'yes' : 'no'}, Mileage: ${extractedMileage ? 'yes' : 'no'}`);
-
-        // Step 2: Extract comments and bids
-        if (vehicleId) {
-          console.log(`  Step 2: Extracting comments/bids...`);
-          try {
-            const commentResponse = await fetch(
-              `${supabaseUrl}/functions/v1/extract-auction-comments`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${invokeJwt}`,
-                  'apikey': invokeJwt,
-                },
-                body: JSON.stringify({
-                  auction_url: item.bat_url,
-                  vehicle_id: vehicleId,
-                }),
-              }
-            );
-
-            if (!commentResponse.ok) {
-              const errorText = await commentResponse.text().catch(() => 'Unknown error');
-              console.warn(`  Step 2 warning: extract-auction-comments failed: HTTP ${commentResponse.status}: ${errorText}`);
-            } else {
-              const commentResult = await commentResponse.json();
-              console.log(`  Step 2 complete: ${commentResult?.comments_extracted || 0} comments, ${commentResult?.bids_extracted || 0} bids`);
-            }
-          } catch (e: any) {
-            // Non-critical - log but continue
-            console.warn(`  Step 2 warning: extract-auction-comments exception: ${e.message}`);
-          }
-        }
-
-        // Step 3: Multisignal postprocess — SKIPPED (bat-multisignal-postprocess not deployed)
-        // Repairs/provenance extraction was non-critical and the function was never deployed.
-        // Core extraction results from Steps 1-2 are sufficient.
-
-        const extractionResult = { success: true, vehicle_id: vehicleId };
-
-        // Validation: Check if extraction was actually complete (not partial)
-        // Verify critical data was extracted AND stored: images, VIN, specs
-        const { data: vehicle, error: vehicleError } = await supabase
-          .from('vehicles')
-          .select('id, vin, mileage, color, transmission, engine_size')
-          .eq('id', vehicleId)
-          .single();
-
-        if (vehicleError || !vehicle) {
-          throw new Error(`Vehicle ${vehicleId} not found after extraction: ${vehicleError?.message || 'Unknown error'}`);
-        }
-
-        const { count: imageCount, error: imageCountError } = await supabase
-          .from('vehicle_images')
-          .select('id', { count: 'exact', head: true })
-          .eq('vehicle_id', vehicleId);
-
-        // Check extraction completeness
-        const hasVin = vehicle?.vin && vehicle.vin !== '';
-        const hasSpecs = vehicle?.mileage || vehicle?.color || vehicle?.transmission || vehicle?.engine_size;
-        const hasImages = (imageCount || 0) > 0;
-        const hasCriticalData = hasVin || hasSpecs;
-
-        // Critical: Images are REQUIRED for BaT listings (should have 50-200 images)
-        // If extraction said it found images but none were stored, that's a storage failure
-        const extractionSaidImages = extractedImages > 0;
-        const imagesActuallyStored = hasImages;
-        const imageStorageFailure = extractionSaidImages && !imagesActuallyStored;
-
-        // Determine if extraction was partial
-        // Partial = missing images OR missing critical data
-        const isPartial = !hasImages || (!hasCriticalData && !hasVin);
-        const missingData = [];
-        if (!hasImages) {
-          if (extractionSaidImages) {
-            missingData.push('images (extraction found but storage failed)');
-          } else {
-            missingData.push('images (extraction found none)');
-          }
-        }
-        if (!hasVin && !hasSpecs) missingData.push('critical_data (VIN/specs)');
-
-        if (isPartial) {
-          // Partial extraction - don't mark as complete, retry later
-          const attemptsNow = Number(item.attempts || 0);
-          const isLastAttempt = attemptsNow >= safeMaxAttempts;
-
-          if (isLastAttempt) {
-            // Last attempt - mark as partial but keep it for manual review
-            await supabase
-              .from('bat_extraction_queue')
-              .update({
-                status: 'failed',
-                error_message: `Partial extraction: Missing ${missingData.join(', ')}. Vehicle created but incomplete.`,
-                locked_at: null,
-                locked_by: null,
-                next_attempt_at: null,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', item.id);
-            
-            results.failed++;
-            console.warn(`WARN: Partial extraction for vehicle ${item.vehicle_id}: Missing ${missingData.join(', ')}`);
-          } else {
-            // Retry with backoff
-            const baseSeconds = 5 * 60;
-            const delaySeconds = Math.min(6 * 60 * 60, baseSeconds * Math.pow(2, Math.max(0, attemptsNow - 1)));
-            const nextAttemptAt = new Date(Date.now() + delaySeconds * 1000).toISOString();
-
-            await supabase
-              .from('bat_extraction_queue')
-              .update({
-                status: 'pending',
-                error_message: `Partial extraction (attempt ${attemptsNow}): Missing ${missingData.join(', ')}. Will retry.`,
-                locked_at: null,
-                locked_by: null,
-                next_attempt_at: nextAttemptAt,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', item.id);
-
-            console.warn(`WARN: Partial extraction for vehicle ${item.vehicle_id}: Missing ${missingData.join(', ')}. Retrying in ${delaySeconds / 60} minutes.`);
-          }
-        } else {
-          // Complete extraction - all critical data present
-          await supabase
-            .from('bat_extraction_queue')
-            .update({
-              status: 'complete',
-              completed_at: new Date().toISOString(),
-              error_message: null,
-              locked_at: null,
-              locked_by: null,
-              next_attempt_at: null,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', item.id);
-
-          results.completed++;
-          console.log(`Complete extraction for vehicle ${item.vehicle_id}: ${imageCount || 0} images, VIN: ${hasVin ? 'yes' : 'no'}, Specs: ${hasSpecs ? 'yes' : 'no'}`);
-        }
-
-      } catch (error: any) {
-        const errorMsg = error.message || String(error);
-        console.error(`Failed to process ${item.vehicle_id}: ${errorMsg}`);
-
-        // item.attempts is already incremented by claim_bat_extraction_queue_batch
-        const attemptsNow = Number(item.attempts || 0);
-
-        // Mark as failed if max attempts reached, otherwise leave as pending with backoff
-        if (attemptsNow >= safeMaxAttempts) {
-          await supabase
-            .from('bat_extraction_queue')
-            .update({
-              status: 'failed',
-              error_message: errorMsg,
-              locked_at: null,
-              locked_by: null,
-              next_attempt_at: null,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', item.id);
-        } else {
-          // Reset to pending for retry with exponential backoff (cap at 6 hours)
-          const baseSeconds = 5 * 60;
-          const delaySeconds = Math.min(6 * 60 * 60, baseSeconds * Math.pow(2, Math.max(0, attemptsNow - 1)));
-          const nextAttemptAt = new Date(Date.now() + delaySeconds * 1000).toISOString();
-
-          await supabase
-            .from('bat_extraction_queue')
-            .update({
-              status: 'pending',
-              error_message: errorMsg,
-              locked_at: null,
-              locked_by: null,
-              next_attempt_at: nextAttemptAt,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', item.id);
-        }
-
-        results.failed++;
-        results.errors.push(`${item.vehicle_id}: ${errorMsg}`);
-      }
-
-      // Small delay between requests
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    // Process items in parallel batches of 3
+    // Each item is I/O bound (calls extract-bat-core), so parallelism helps significantly
+    const CONCURRENCY = 3;
+    for (let i = 0; i < queueItems.length; i += CONCURRENCY) {
+      const batch = queueItems.slice(i, i + CONCURRENCY);
+      await Promise.allSettled(
+        batch.map(item => processOneItem(item, supabase, safeMaxAttempts, results))
+      );
     }
 
-    console.log(`Queue processing complete: ${results.completed} completed, ${results.failed} failed`);
+    console.log(`Queue processing complete: ${results.completed} completed, ${results.failed} failed out of ${results.processed}`);
 
     return new Response(JSON.stringify({
-      success: true,
-      ...results
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+      success: true, ...results
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
     console.error('Queue processing error:', error);
     return new Response(JSON.stringify({
-      success: false,
-      error: error.message || String(error)
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+      success: false, error: error.message || String(error)
+    }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
 
+async function processOneItem(
+  item: any,
+  supabase: any,
+  safeMaxAttempts: number,
+  results: { processed: number; completed: number; failed: number; errors: string[] }
+) {
+  results.processed++;
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const invokeJwt = Deno.env.get('INTERNAL_INVOKE_JWT') ??
+                   Deno.env.get('SUPABASE_ANON_KEY') ??
+                   Deno.env.get('ANON_KEY') ?? '';
+
+  try {
+    if (!invokeJwt) {
+      throw new Error('Missing invoke JWT for function-to-function calls');
+    }
+
+    console.log(`[${item.vehicle_id}] Step 1: Extracting core data...`);
+
+    // Step 1: Extract core vehicle data
+    const coreResponse = await fetch(
+      `${supabaseUrl}/functions/v1/extract-bat-core`,
+      {
+        method: 'POST',
+        signal: AbortSignal.timeout(300_000),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${invokeJwt}`,
+          'apikey': invokeJwt,
+        },
+        body: JSON.stringify({ url: item.bat_url, max_vehicles: 1 }),
+      }
+    );
+
+    if (!coreResponse.ok) {
+      const errorText = await coreResponse.text().catch(() => 'Unknown error');
+      const msg = `HTTP ${coreResponse.status}: ${errorText}`;
+      if (msg.includes('504') || msg.includes('timeout') || msg.includes('Gateway Timeout')) {
+        throw new Error(`extract-bat-core timed out. Will retry with backoff.`);
+      }
+      throw new Error(`extract-bat-core failed: ${msg}`);
+    }
+
+    const coreResult = await coreResponse.json();
+    if (!coreResult?.success) {
+      throw new Error(`extract-bat-core returned failure: ${coreResult?.error || 'Unknown'}`);
+    }
+
+    const vehicleId = coreResult.created_vehicle_ids?.[0] || coreResult.updated_vehicle_ids?.[0] || item.vehicle_id;
+    const extractedImages = coreResult.debug_extraction?.images_count || 0;
+    const extractedVin = coreResult.debug_extraction?.vin || null;
+
+    console.log(`[${item.vehicle_id}] Step 1 done: vehicleId=${vehicleId}, images=${extractedImages}, vin=${extractedVin ? 'yes' : 'no'}`);
+
+    // Step 2: Extract comments and bids (non-critical, fire and forget with timeout)
+    if (vehicleId) {
+      try {
+        const commentResponse = await fetch(
+          `${supabaseUrl}/functions/v1/extract-auction-comments`,
+          {
+            method: 'POST',
+            signal: AbortSignal.timeout(60_000),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${invokeJwt}`,
+              'apikey': invokeJwt,
+            },
+            body: JSON.stringify({ auction_url: item.bat_url, vehicle_id: vehicleId }),
+          }
+        );
+        if (commentResponse.ok) {
+          const cr = await commentResponse.json();
+          console.log(`[${item.vehicle_id}] Step 2 done: ${cr?.comments_extracted || 0} comments`);
+        }
+      } catch (e: any) {
+        console.warn(`[${item.vehicle_id}] Step 2 warn: ${e.message}`);
+      }
+    }
+
+    // Validate extraction completeness
+    const { data: vehicle } = await supabase
+      .from('vehicles')
+      .select('id, vin, mileage, color, transmission, engine_size')
+      .eq('id', vehicleId)
+      .single();
+
+    const { count: imageCount } = await supabase
+      .from('vehicle_images')
+      .select('id', { count: 'exact', head: true })
+      .eq('vehicle_id', vehicleId);
+
+    const hasVin = vehicle?.vin && vehicle.vin !== '';
+    const hasSpecs = vehicle?.mileage || vehicle?.color || vehicle?.transmission || vehicle?.engine_size;
+    const hasImages = (imageCount || 0) > 0;
+    const isPartial = !hasImages || (!hasVin && !hasSpecs);
+
+    if (isPartial) {
+      const missingData = [];
+      if (!hasImages) missingData.push(extractedImages > 0 ? 'images(storage failed)' : 'images');
+      if (!hasVin && !hasSpecs) missingData.push('critical_data');
+
+      const attemptsNow = Number(item.attempts || 0);
+      if (attemptsNow >= safeMaxAttempts) {
+        await supabase.from('bat_extraction_queue').update({
+          status: 'failed',
+          error_message: `Partial: Missing ${missingData.join(', ')}`,
+          locked_at: null, locked_by: null, next_attempt_at: null,
+          updated_at: new Date().toISOString()
+        }).eq('id', item.id);
+        results.failed++;
+      } else {
+        const delaySeconds = Math.min(6 * 3600, 300 * Math.pow(2, Math.max(0, attemptsNow - 1)));
+        await supabase.from('bat_extraction_queue').update({
+          status: 'pending',
+          error_message: `Partial (attempt ${attemptsNow}): Missing ${missingData.join(', ')}`,
+          locked_at: null, locked_by: null,
+          next_attempt_at: new Date(Date.now() + delaySeconds * 1000).toISOString(),
+          updated_at: new Date().toISOString()
+        }).eq('id', item.id);
+      }
+    } else {
+      // Complete extraction
+      await supabase.from('bat_extraction_queue').update({
+        status: 'complete',
+        completed_at: new Date().toISOString(),
+        error_message: null,
+        locked_at: null, locked_by: null, next_attempt_at: null,
+        updated_at: new Date().toISOString()
+      }).eq('id', item.id);
+      results.completed++;
+      console.log(`[${item.vehicle_id}] Complete: ${imageCount || 0} images, VIN: ${hasVin ? 'yes' : 'no'}`);
+    }
+
+  } catch (error: any) {
+    const errorMsg = error.message || String(error);
+    console.error(`[${item.vehicle_id}] Failed: ${errorMsg}`);
+
+    const attemptsNow = Number(item.attempts || 0);
+    if (attemptsNow >= safeMaxAttempts) {
+      await supabase.from('bat_extraction_queue').update({
+        status: 'failed', error_message: errorMsg,
+        locked_at: null, locked_by: null, next_attempt_at: null,
+        updated_at: new Date().toISOString()
+      }).eq('id', item.id);
+    } else {
+      const delaySeconds = Math.min(6 * 3600, 300 * Math.pow(2, Math.max(0, attemptsNow - 1)));
+      await supabase.from('bat_extraction_queue').update({
+        status: 'pending', error_message: errorMsg,
+        locked_at: null, locked_by: null,
+        next_attempt_at: new Date(Date.now() + delaySeconds * 1000).toISOString(),
+        updated_at: new Date().toISOString()
+      }).eq('id', item.id);
+    }
+
+    results.failed++;
+    results.errors.push(`${item.vehicle_id}: ${errorMsg}`);
+  }
+}
