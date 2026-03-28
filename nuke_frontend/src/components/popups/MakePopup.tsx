@@ -13,7 +13,7 @@
  * Single RPC call via popup_make_intel() — one round trip.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { usePopup } from './usePopup';
 import { ModelPopup } from './ModelPopup';
@@ -230,6 +230,14 @@ export function MakePopup({ make, searchQuery }: Props) {
         </div>
       )}
 
+      {/* Price scatter — the "shape" of this make's market */}
+      {data.price_scatter && data.price_scatter.length >= 5 && (
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
+          <SectionLabel>PRICE TOPOLOGY</SectionLabel>
+          <PriceScatter points={data.price_scatter} />
+        </div>
+      )}
+
       {/* Source distribution */}
       {filteredSources.length > 0 && (
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
@@ -309,6 +317,75 @@ function FacetChip({ label, count, onClick }: { label: string; count: number; on
       <span style={{ fontFamily: MONO, fontSize: 7, fontWeight: 400, color: '#999' }}>{count}</span>
     </span>
   );
+}
+
+/**
+ * PriceScatter — Canvas-rendered year vs price dot plot.
+ */
+function PriceScatter({ points }: { points: { y: number; p: number }[] }) {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+  const { minY, maxY, maxP } = useMemo(() => {
+    const years = points.map(d => d.y);
+    const prices = points.map(d => d.p);
+    return { minY: Math.min(...years), maxY: Math.max(...years), maxP: Math.max(...prices) };
+  }, [points]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    ctx.scale(dpr, dpr);
+
+    ctx.fillStyle = '#f8f8f8';
+    ctx.fillRect(0, 0, w, h);
+
+    const pad = { l: 36, r: 8, t: 6, b: 16 };
+    const pw = w - pad.l - pad.r;
+    const ph = h - pad.t - pad.b;
+    const yearSpan = maxY - minY || 1;
+    const priceSpan = maxP || 1;
+
+    // Y-axis
+    ctx.fillStyle = '#999';
+    ctx.font = '7px Arial';
+    ctx.textAlign = 'right';
+    for (const tick of [0, Math.round(maxP / 2), maxP]) {
+      const py = pad.t + ph - (tick / priceSpan) * ph;
+      ctx.fillText(tick >= 1000 ? `$${Math.round(tick / 1000)}K` : `$${tick}`, pad.l - 4, py + 3);
+      ctx.strokeStyle = '#e8e8e8';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(pad.l, py);
+      ctx.lineTo(pad.l + pw, py);
+      ctx.stroke();
+    }
+
+    // X-axis
+    ctx.textAlign = 'center';
+    for (const tick of [minY, Math.round((minY + maxY) / 2), maxY]) {
+      ctx.fillText(String(tick), pad.l + ((tick - minY) / yearSpan) * pw, h - 2);
+    }
+
+    // Dots
+    for (const pt of points) {
+      const px = pad.l + ((pt.y - minY) / yearSpan) * pw;
+      const py = pad.t + ph - (pt.p / priceSpan) * ph;
+      ctx.beginPath();
+      ctx.arc(px, py, 2, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(42, 42, 42, 0.4)';
+      ctx.fill();
+    }
+  }, [points, minY, maxY, maxP]);
+
+  return <canvas ref={canvasRef} style={{ width: '100%', height: 90, marginTop: 4, display: 'block' }} />;
 }
 
 function VehicleMiniCard({

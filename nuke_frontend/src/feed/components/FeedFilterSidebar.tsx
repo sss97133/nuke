@@ -115,6 +115,8 @@ export function FeedFilterSidebar({
   onToggleCollapsed,
 }: FeedFilterSidebarProps) {
 
+  const [makeSearch, setMakeSearch] = useState('');
+
   const update = useCallback(
     (partial: Partial<FilterState>) => {
       onFiltersChange({ ...filters, ...partial });
@@ -130,6 +132,7 @@ export function FeedFilterSidebar({
         ? current.filter((m) => m !== make)
         : [...current, make];
       update({ makes: next });
+      setMakeSearch('');
     },
     [filters.makes, update],
   );
@@ -168,6 +171,14 @@ export function FeedFilterSidebar({
     const num = localYearMax ? Number(localYearMax) : null;
     update({ yearMax: num });
   }, [localYearMax, update]);
+
+  // Filtered makes for search
+  const visibleMakes = useMemo(() => {
+    const available = TOP_MAKES.filter((m) => !filters.makes.includes(m));
+    if (!makeSearch.trim()) return available;
+    const q = makeSearch.trim().toUpperCase();
+    return available.filter((m) => m.includes(q));
+  }, [makeSearch, filters.makes]);
 
   // Active filter count
   const filterCount = useMemo(() => {
@@ -329,9 +340,23 @@ export function FeedFilterSidebar({
             ))}
           </div>
         )}
+        {/* Search input */}
+        <input
+          type="text"
+          placeholder="Type to filter..."
+          value={makeSearch}
+          onChange={(e) => setMakeSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              const match = visibleMakes[0];
+              if (match) toggleMake(match);
+            }
+          }}
+          style={{ ...inputStyle, marginBottom: '6px', fontSize: '9px' }}
+        />
         {/* Make grid */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
-          {TOP_MAKES.filter((m) => !filters.makes.includes(m)).map((make) => (
+          {visibleMakes.map((make) => (
             <button
               key={make}
               type="button"
