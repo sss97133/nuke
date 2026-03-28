@@ -35,14 +35,15 @@ export const PROVIDER_MODELS: Record<LLMProvider, ProviderModel[]> = {
     { name: 'claude-opus-4-5', costPer1kTokens: 15.00, maxTokens: 200000, supportsVision: true, speed: 'slow', quality: 'excellent' },
   ],
   google: [
-    { name: 'gemini-2.0-flash-lite', costPer1kTokens: 0.00, maxTokens: 1000000, supportsVision: true, speed: 'fast', quality: 'good' }, // FREE
-    { name: 'gemini-1.5-pro', costPer1kTokens: 0.00, maxTokens: 2000000, supportsVision: true, speed: 'medium', quality: 'excellent' }, // FREE
+    { name: 'gemini-2.5-flash-lite', costPer1kTokens: 0.00, maxTokens: 1048576, supportsVision: true, speed: 'fast', quality: 'good' }, // FREE, separate quota
+    { name: 'gemini-2.5-flash', costPer1kTokens: 0.15, maxTokens: 1048576, supportsVision: true, speed: 'fast', quality: 'excellent' },
+    { name: 'gemini-2.5-pro', costPer1kTokens: 1.25, maxTokens: 1048576, supportsVision: true, speed: 'medium', quality: 'excellent' },
   ],
 };
 
 export const TIER_CONFIGS: Record<AnalysisTier, { provider: LLMProvider; model: string; description: string }> = {
-  tier1: { provider: 'google', model: 'gemini-2.0-flash-lite', description: 'Fast, free basic analysis' },
-  tier2: { provider: 'google', model: 'gemini-2.0-flash-lite', description: 'Good quality, free' },
+  tier1: { provider: 'google', model: 'gemini-2.5-flash-lite', description: 'Fast, free basic analysis' },
+  tier2: { provider: 'google', model: 'gemini-2.5-flash', description: 'Good quality, cheap' },
   tier3: { provider: 'openai', model: 'gpt-4o', description: 'High quality, balanced cost' },
   expert: { provider: 'anthropic', model: 'claude-sonnet-4-5', description: 'Highest quality, comprehensive analysis' },
 };
@@ -91,19 +92,19 @@ export async function getLLMConfig(
       preferredProvider === 'anthropic' ? 'ANTHROPIC_API_KEY' :
       'GOOGLE_AI_API_KEY'
     );
-    
-    if (apiKeyResult.apiKey) {
-      return {
-        provider: preferredProvider,
-        model: preferredModel,
-        apiKey: apiKeyResult.apiKey,
-        source: apiKeyResult.source
-      };
-    }
+
+    // Always return the config for the preferred provider (even if key is null)
+    // This lets the caller handle missing keys in their own fallback chain
+    return {
+      provider: preferredProvider,
+      model: preferredModel,
+      apiKey: apiKeyResult.apiKey || '',
+      source: apiKeyResult.source
+    };
   }
-  
-  // Fallback: Try providers in order (Anthropic first since OpenAI quota exhausted)
-  const fallbackOrder: LLMProvider[] = ['anthropic', 'google', 'openai'];
+
+  // Fallback: Try providers in order (Google first since it's cheapest)
+  const fallbackOrder: LLMProvider[] = ['google', 'anthropic', 'openai'];
   
   for (const provider of fallbackOrder) {
     const { getUserApiKey } = await import('./getUserApiKey.ts');
@@ -248,14 +249,19 @@ async function callAnthropic(config: LLMConfig, messages: any[], options?: any):
 }
 
 async function callGoogle(config: LLMConfig, messages: any[], options?: any): Promise<any> {
-  // Convert messages format for Google
-  const parts = messages
+  // Extract system instruction if present
+  const systemMessage = messages.find(m => m.role === 'system')?.content || '';
+
+  // Convert messages to Google format (multi-turn conversation)
+  const contents = messages
     .filter(m => m.role !== 'system')
-    .flatMap(m => {
+    .map(m => {
+      const role = m.role === 'assistant' ? 'model' : 'user';
+      let parts: any[];
       if (typeof m.content === 'string') {
-        return [{ text: m.content }];
+        parts = [{ text: m.content }];
       } else if (Array.isArray(m.content)) {
-        return m.content.map(c => {
+        parts = m.content.map((c: any) => {
           if (c.type === 'text') return { text: c.text };
           if (c.type === 'image_url') {
             return {
@@ -267,22 +273,31 @@ async function callGoogle(config: LLMConfig, messages: any[], options?: any): Pr
           }
           return { text: JSON.stringify(c) };
         });
+      } else {
+        parts = [{ text: JSON.stringify(m.content) }];
       }
-      return [{ text: JSON.stringify(m.content) }];
+      return { role, parts };
     });
-  
+
+  const requestBody: any = {
+    contents,
+    generationConfig: {
+      temperature: options?.temperature ?? 0.7,
+      maxOutputTokens: options?.maxTokens,
+    },
+  };
+
+  // Add system instruction if present
+  if (systemMessage) {
+    requestBody.systemInstruction = { parts: [{ text: systemMessage }] };
+  }
+
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          temperature: options?.temperature ?? 0.7,
-          maxOutputTokens: options?.maxTokens,
-        },
-      }),
+      body: JSON.stringify(requestBody),
     }
   );
   

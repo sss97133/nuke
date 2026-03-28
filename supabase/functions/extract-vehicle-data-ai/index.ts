@@ -166,23 +166,34 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // Get LLM config with automatic fallback (Anthropic → Google → OpenAI)
-    // Anthropic first since OpenAI quota is exhausted and no Google key configured
+    // Get LLM config with automatic fallback chain
+    // Google first (cheapest), Anthropic fallback, OpenAI last resort
     let llmConfig;
     let llmResponse;
     const providerModels: [LLMProvider, string][] = [
-      // Google first — 10K/day free tier, $0.15/MTok input after
+      // Google (lite) first — free tier, separate quota from 2.5-flash
+      ['google', 'gemini-2.5-flash-lite'],
+      // Google (full) — may hit 10K/day quota
       ['google', 'gemini-2.5-flash'],
-      // Anthropic fallback — $1/MTok input
+      // Anthropic fallback — $1/MTok input (may have no credits)
       ['anthropic', 'claude-haiku-4-5-20251001'],
-      // OpenAI quota exhausted as of 2026-03
-      // ['openai', 'gpt-4o-mini'],
+      // OpenAI last resort — quota may be exhausted
+      ['openai', 'gpt-4o-mini'],
     ];
     let lastError: Error | null = null;
+    const failedProviders: string[] = [];
 
     for (const [provider, model] of providerModels) {
       try {
         llmConfig = await getLLMConfig(supabase, null, provider, model);
+
+        // Skip if no API key was found for this provider
+        if (!llmConfig.apiKey) {
+          console.log(`[extract-vehicle-data-ai] ⏭️ ${provider}: no API key configured, skipping`);
+          failedProviders.push(`${provider}: no key`);
+          continue;
+        }
+
         console.log(`[extract-vehicle-data-ai] Trying provider: ${llmConfig.provider}/${llmConfig.model}`);
 
         llmResponse = await Promise.race([
@@ -211,22 +222,15 @@ Deno.serve(async (req) => {
         lastError = error;
         const errMsg = error instanceof Error ? error.message : String(error);
         console.log(`[extract-vehicle-data-ai] ❌ ${provider} failed: ${errMsg}`);
+        failedProviders.push(`${provider}: ${errMsg.slice(0, 100)}`);
 
-        // If it's a quota error, try next provider
-        if (errMsg?.includes('quota') ||
-            errMsg?.includes('insufficient') ||
-            errMsg?.includes('rate_limit') ||
-            errMsg?.includes('429')) {
-          continue;
-        }
-
-        // For other errors, still try next provider
+        // Always try next provider regardless of error type
         continue;
       }
     }
 
     if (!llmResponse) {
-      throw lastError || new Error('All LLM providers failed');
+      throw lastError || new Error(`All LLM providers failed: ${failedProviders.join('; ')}`);
     }
 
     // Parse response - handle both JSON and text responses
