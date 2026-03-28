@@ -27,7 +27,8 @@ Anyone who clicks "OPEN FULL PROFILE" from a popup or navigates to `/vehicle/:id
 ├─────────────────────────────────────────────────────────┤
 │ ┌─ TIMELINE (compressed, only event months) ───────────┐│
 │ │ ··· [MAR APR] 2026                                   ││
-│ │     [■ ■]  ← green dots = events                     ││
+│ │     [■ ■]  ← green dots = events, work sessions      ││
+│ │     click day → receipt popup → OPEN DAY CARD         ││
 │ └──────────────────────────────────────────────────────┘│
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
@@ -65,6 +66,18 @@ Anyone who clicks "OPEN FULL PROFILE" from a popup or navigates to `/vehicle/:id
 │ · Modifications (4)  │                                  │
 │ · Service History (6)│                                  │
 │ · Title: Clean IL    │                                  │
+│                      │                                  │
+│ BUILD STATUS (if     │                                  │
+│  work orders exist)  │                                  │
+│ ┌ WO-001 Exhaust ──┐│                                  │
+│ │ [x] Fab headers   ││                                  │
+│ │ [x] Weld pipes    ││                                  │
+│ │ [ ] Test fit      ││                                  │
+│ │ 2/3 · $1,200      ││                                  │
+│ └───────────────────┘│                                  │
+│ TOTAL: $3,301.02     │                                  │
+│ [GENERATE BILL]      │                                  │
+│ [SIGN OFF]           │                                  │
 │                      │                                  │
 │ COMPARABLE SALES     │                                  │
 │ ┌──────┐┌──────┐    │                                  │
@@ -104,10 +117,21 @@ Anyone who clicks "OPEN FULL PROFILE" from a popup or navigates to `/vehicle/:id
   - WATCHING → WatchersPopup (vs model average)
   - CURRENT BID → PriceContextPopup (estimate, comps, vs median)
 
-### Timeline
+### Timeline (BarcodeTimeline)
 - Compressed: only shows months with events, gaps shown as "···"
 - For a 1989 car with 2026 events: one gap + ~4 months, NOT 37 years of empty cells
 - Hidden entirely if zero events
+- Work sessions loaded in parallel with timeline_events, merged as event_type `work_session`
+- Days with work sessions get heatmap coloring (green intensity by activity)
+- Click a day with work sessions → receipt popup showing duration, photos, description, costs
+- Receipt popup has "OPEN DAY CARD" button → opens DayCard in PopupStack
+
+### DayCard (popup via PopupStack)
+- Opened from BarcodeTimeline receipt popup ("OPEN DAY CARD" button)
+- Loads detail via `get_daily_work_receipt` RPC
+- Shows: work type label, description, line items with costs, photos from that day
+- Operates in popup mode (isPopup + vehicleId props) — no standalone route
+- Part of the PopupStack, not a separate page
 
 ### Hero Image
 - Primary vehicle image, large
@@ -125,8 +149,31 @@ Anyone who clicks "OPEN FULL PROFILE" from a popup or navigates to `/vehicle/:id
   - Conflicting evidence if any
 - DESCRIPTION: Full listing text
 - LISTING DETAILS: Highlights, equipment, mods, service history, title
+- BUILD STATUS (if work orders exist) — see BuildStatusPanel below
 - COMPARABLE SALES: 3-8 similar vehicles with prices, clickable
 - OBSERVATION TIMELINE: All observations chronologically
+
+### BuildStatusPanel (CollapsibleWidget, left column)
+- Shown only when vehicle has work orders (post-sale build context)
+- Contains one WorkOrderProgress per work order
+- Footer shows: total outstanding amount, GENERATE BILL button, SIGN OFF button
+- SIGN OFF marks all line items complete and closes the work order
+- Data source: work_orders + work_order_line_items tables
+
+### WorkOrderProgress (inside BuildStatusPanel)
+- One per work order (e.g., "WO-001 Exhaust Fabrication")
+- Checkbox list of line items from work_order_line_items
+- Each checkbox toggles line item completion status
+- Progress bar: completed / total items
+- Cost subtotal per work order
+- Clicking work order title expands/collapses the item list
+
+### GenerateBill (inside BuildStatusPanel)
+- Renders a formatted invoice from work orders + line items
+- Shows: vehicle, contact, line items with costs, subtotal, tax, total
+- SEND button triggers `send-invoice-email` edge function
+- Invoice data pulled from work_orders, work_order_line_items, contacts tables
+- PDF-ready layout (can be printed or emailed)
 
 ### Right Column: Images
 - Tab bar: ZONES, GRID, FULL, INFO, SESSIONS, CATEGORY, CHRONO, SOURCE

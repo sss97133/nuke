@@ -262,6 +262,7 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 | Ingest iMessage thread events | `npm run wo:ingest-thread -- "+1XXXXXXXXXX" --vehicle <id>` | Classifies messages into price_agreement, scope_change, status_update → `vehicle_observations` |
 | Look up book hours for an operation | `estimate_labor_from_description(text, year)` | Searches `labor_operations` table (64 operations) |
 | Resolve labor rate for a job | `resolve_labor_rate(org, user, vehicle, client)` | Cascade: contract → user → org → system_default ($125) |
+| Send invoice email to customer | `send-invoice-email` | POST `{ to, subject, invoice_number, customer_name, vehicle_title, invoice_date, total, paid, balance, line_items }`. Builds HTML email, sends via Resend, updates `generated_invoices.sent_at`. Called from GenerateBill.tsx. |
 
 ---
 
