@@ -200,9 +200,9 @@ export function FeedFilterSidebar({
           cursor: 'pointer',
           background: 'var(--surface)',
           position: 'sticky',
-          top: 'calc(var(--header-height, 48px) + 32px)',
+          top: 'var(--header-height, 42px)',
           alignSelf: 'flex-start',
-          height: 'calc(100vh - var(--header-height, 48px) - 32px)',
+          height: 'calc(100vh - var(--header-height, 42px))',
         }}
         onClick={onToggleCollapsed}
         title="Show filters"
@@ -233,9 +233,9 @@ export function FeedFilterSidebar({
         background: 'var(--surface)',
         fontSize: '9px',
         position: 'sticky',
-        top: '32px',
+        top: 'var(--header-height, 42px)',
         alignSelf: 'flex-start',
-        height: 'calc(100vh - 72px)',
+        height: 'calc(100vh - var(--header-height, 42px))',
       }}
     >
       {/* Header */}
