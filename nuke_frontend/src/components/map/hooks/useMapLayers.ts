@@ -4,6 +4,7 @@ import { createEventPointLayer } from '../layers/eventPointLayer';
 import { createClusterLayer } from '../layers/clusterLayer';
 import { createBusinessLayer, createCollectionLayer } from '../layers/businessLayer';
 import { createHeatmapLayer } from '../layers/heatmapLayer';
+import { createCountyLayer, type CountyLayerData } from '../layers/countyLayer';
 
 interface UseMapLayersParams {
   data: MapFeatureCollection | null;
@@ -13,15 +14,26 @@ interface UseMapLayersParams {
   showCollections: boolean;
   businesses: BizPin[];
   collections: ColPin[];
+  countyLayerData: CountyLayerData | null;
   onEventClick: (info: any) => void;
   onClusterClick: (info: any) => void;
   onBusinessClick: (info: any) => void;
   onCollectionClick: (info: any) => void;
+  onCountyHover?: (info: any) => void;
+  onCountyClick?: (info: any) => void;
 }
 
 export function useMapLayers(params: UseMapLayersParams) {
   return useMemo(() => {
     const layers: any[] = [];
+
+    // County choropleth mode
+    if (params.mode === 'county') {
+      if (params.countyLayerData) {
+        layers.push(createCountyLayer(params.countyLayerData, params.onCountyHover, params.onCountyClick));
+      }
+      return layers;
+    }
 
     if (!params.data) return layers;
 
@@ -50,7 +62,9 @@ export function useMapLayers(params: UseMapLayersParams) {
     params.data, params.zoom, params.mode,
     params.showBusinesses, params.showCollections,
     params.businesses, params.collections,
+    params.countyLayerData,
     params.onEventClick, params.onClusterClick,
     params.onBusinessClick, params.onCollectionClick,
+    params.onCountyHover, params.onCountyClick,
   ]);
 }

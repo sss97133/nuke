@@ -798,13 +798,42 @@ Deno.serve(async (req) => {
               if (!vehicle.make && parsed.make) { vehicleUpdates.make = parsed.make; fields++; }
               if (!vehicle.model && parsed.model) { vehicleUpdates.model = parsed.model; fields++; }
 
-              // Location from raw_scrape_data
-              if (!vehicle.listing_location && raw) {
+              // Location from raw_scrape_data — propagate city, state, listing_location, GPS
+              if (raw) {
                 const loc = raw.location as Record<string, unknown> | null;
                 const geo = loc?.reverse_geocode as Record<string, unknown> | null;
                 if (geo?.city && geo?.state) {
-                  vehicleUpdates.listing_location = `${geo.city}, ${geo.state}`;
-                  fields++;
+                  const cityStr = geo.city as string;
+                  const stateStr = geo.state as string;
+                  if (!vehicle.listing_location) {
+                    vehicleUpdates.listing_location = `${cityStr}, ${stateStr}`;
+                    fields++;
+                  }
+                  // Also set city/state if missing
+                  const { data: fullVehicle } = await supabase
+                    .from("vehicles")
+                    .select("city, state, gps_latitude")
+                    .eq("id", listing.vehicle_id)
+                    .maybeSingle();
+                  if (fullVehicle && !fullVehicle.city) vehicleUpdates.city = cityStr;
+                  if (fullVehicle && !fullVehicle.state) vehicleUpdates.state = stateStr;
+                  // Geocode from city_geocode_lookup if no GPS
+                  if (fullVehicle && !fullVehicle.gps_latitude) {
+                    const { data: geo2 } = await supabase
+                      .from("city_geocode_lookup")
+                      .select("latitude, longitude")
+                      .eq("city", cityStr)
+                      .eq("state", stateStr)
+                      .limit(1)
+                      .maybeSingle();
+                    if (geo2) {
+                      vehicleUpdates.gps_latitude = geo2.latitude;
+                      vehicleUpdates.gps_longitude = geo2.longitude;
+                      vehicleUpdates.listing_location_source = 'city_geocode_lookup';
+                      vehicleUpdates.listing_location_confidence = 0.7;
+                      fields++;
+                    }
+                  }
                 }
               }
 

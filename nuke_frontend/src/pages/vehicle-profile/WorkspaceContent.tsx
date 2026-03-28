@@ -32,6 +32,9 @@ const SimilarSalesSection = React.lazy(() => import('../../components/vehicle/Si
 const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
 const OwnerIdentityCard = React.lazy(() => import('./OwnerIdentityCard'));
 const BuildStatusPanel = React.lazy(() => import('./BuildStatusPanel'));
+// BuildLog removed — work sessions now surface via BarcodeTimeline Day Card popups
+const GenerateBill = React.lazy(() => import('./GenerateBill'));
+const WorkOrderProgress = React.lazy(() => import('./WorkOrderProgress'));
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
@@ -275,7 +278,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             </>
           )}
 
-          {/* Build Status — work order accounting */}
+          {/* Build Status — work order accounting + invoice generation */}
           {buildStatus?.hasData && buildStatus.workOrders.length > 0 && (
             <CollapsibleWidget variant="profile" title="Build Status" defaultCollapsed={false}
               badge={
@@ -293,8 +296,31 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
                   isOwnerView={isRowOwner || isVerifiedOwner || hasContributorAccess}
                 />
               </React.Suspense>
+              {/* Work Order Sign-off — line item checklist (owner view) */}
+              {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
+                <React.Suspense fallback={null}>
+                  <WorkOrderProgress vehicleId={vehicle.id} isOwnerView={isRowOwner || isVerifiedOwner || hasContributorAccess} />
+                </React.Suspense>
+              )}
+              {/* Generate Bill — same data, document render. The bill is a button. */}
+              {(isRowOwner || isVerifiedOwner || hasContributorAccess) && buildStatus.totals.orderCount > 0 && (
+                <React.Suspense fallback={null}>
+                  <GenerateBill
+                    vehicleId={vehicle.id}
+                    workOrders={buildStatus.workOrders}
+                    totals={buildStatus.totals}
+                    contact={buildStatus.dealJacket?.contact}
+                    vehicle={vehicle}
+                    isOwnerView={isRowOwner || isVerifiedOwner || hasContributorAccess}
+                  />
+                </React.Suspense>
+              )}
             </CollapsibleWidget>
           )}
+
+          {/* Build Log removed — work sessions now surface through BarcodeTimeline.
+               Click a day on the timeline to open a Day Card popup with full-resolution detail.
+               Build Status panel (above) shows work order accounting + Generate Bill. */}
 
           {/* Engine Bay Analysis */}
           {(vehicle as any)?.origin_metadata?.engine_bay_analysis?.engine_family && (

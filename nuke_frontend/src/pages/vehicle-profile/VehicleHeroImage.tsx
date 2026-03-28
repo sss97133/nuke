@@ -10,7 +10,9 @@ interface VehicleHeroImageProps {
 
 const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
   const { leadImageUrl, heroMeta } = useVehicleProfile();
-  const [fitMode, setFitMode] = useState<'contain' | 'cover'>('cover');
+  // Default to contain: show the full vehicle, letterbox if needed.
+  // "The user came to see the vehicle, not a cropped fragment." — 2026-03-21 audit
+  const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
   const [showGallery, setShowGallery] = useState(false);
   const isMobile = useIsMobile();
 

@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useHeaderHeight } from './hooks/useHeaderHeight';
 import { useSession } from './hooks/useSession';
 import { useNotificationBadge } from './hooks/useNotificationBadge';
@@ -27,9 +27,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 }) => {
   const headerRef = useRef<HTMLDivElement>(null);
   useHeaderHeight(headerRef);
-
-  const location = useLocation();
-  const hideSearch = location.pathname === '/';
 
   const { session, userProfile } = useSession();
   const userId = session?.user?.id;
@@ -61,13 +58,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         </Link>
 
         {/* Zone 2: Command Input */}
-        {!hideSearch ? (
-          <div className="header-command">
-            <AIDataIngestionSearch />
-          </div>
-        ) : (
-          <div className="header-command" />
-        )}
+        <div className="header-command">
+          <AIDataIngestionSearch />
+        </div>
 
         {/* Zone 3: Session */}
         <div className="header-session">

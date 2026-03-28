@@ -421,11 +421,11 @@ const NON_AUTO_MAKES_LC = new Set([
  * These makes produce BOTH cars and motorcycles — we classify by model.
  */
 const MOTORCYCLE_MODEL_PATTERNS = [
-  // Honda motorcycle series (1960-1999)
-  /^CB\d/i, /^CL\d/i, /^CT\d/i, /^XL\d/i, /^XR\d/i, /^CR\d/i, /^GL\d/i,
-  /^VT\d/i, /^VF\d/i, /^CBR/i, /^CRF/i, /^NX\d/i, /^CMX/i,
+  // Honda motorcycle series (1960-2006)
+  /^CB\d/i, /^CB$/i, /^CL\d/i, /^CT\d/i, /^CT$/i, /^XL\d/i, /^XL$/i, /^XR\d/i, /^XR$/i, /^CR\d/i, /^CR$/i, /^GL\d/i,
+  /^VT\d/i, /^VTX/i, /^VF\d/i, /^CBR/i, /^CRF/i, /^NX\d/i, /^CMX/i,
   /^Shadow/i, /^Rebel/i, /^Nighthawk/i, /^Magna/i, /^Gold\s?Wing/i,
-  /^Interceptor/i, /^Pacific Coast/i, /^Valkyrie/i,
+  /^Interceptor/i, /^Pacific Coast/i, /^Valkyrie/i, /^Sabre/i, /^Aero/i,
   // Suzuki motorcycle series
   /^GS\d/i, /^GSX/i, /^DR\d/i, /^RM\d/i, /^VS\d/i, /^SV\d/i, /^TL\d/i,
   /^Intruder/i, /^Katana/i, /^Bandit/i, /^Boulevard/i, /^Hayabusa/i,
@@ -749,6 +749,7 @@ function extractAllImages(edge) {
 }
 
 // Extract per-listing lat/lng from GraphQL location data
+// Falls back to city geocoding when GraphQL doesn't provide coordinates
 function extractCoords(edge) {
   const listing = edge?.node?.listing;
   if (!listing) return { lat: null, lng: null };
@@ -756,10 +757,28 @@ function extractCoords(edge) {
   const loc = listing.location;
   if (!loc) return { lat: null, lng: null };
 
+  // Try direct coordinates first (FB rarely provides these)
   const lat = loc.latitude || loc.lat || null;
   const lng = loc.longitude || loc.lng || null;
 
-  return { lat: lat ? parseFloat(lat) : null, lng: lng ? parseFloat(lng) : null };
+  if (lat && lng) return { lat: parseFloat(lat), lng: parseFloat(lng) };
+
+  // Fallback: geocode from city name using METRO_AREAS
+  const city = loc.reverse_geocode?.city;
+  if (city) {
+    const cityLower = city.toLowerCase().replace(/\s+/g, '-');
+    const metro = METRO_AREAS[cityLower];
+    if (metro) return { lat: metro.lat, lng: metro.lng };
+
+    // Fuzzy match: check if any metro label starts with this city
+    for (const [slug, meta] of Object.entries(METRO_AREAS)) {
+      if (meta.label.toLowerCase().startsWith(city.toLowerCase())) {
+        return { lat: meta.lat, lng: meta.lng };
+      }
+    }
+  }
+
+  return { lat: null, lng: null };
 }
 
 // Extract seller info from GraphQL edge
@@ -880,6 +899,21 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
     console.log(`    ★ FIND [${signal}]: ${year} ${make} ${model || ''} $${price || '?'} (market $${comps?.median || '?'}, ratio ${ratio}, ${comps?.n || 0} comps)`);
   } else if (signal >= 40) {
     console.log(`    ◆ Interesting [${signal}]: ${year} ${make} ${model || ''} $${price || '?'}`);
+  }
+
+  // GPS fallback: if extractCoords returned null, try city_geocode_lookup table
+  if (!listingLat && city && state) {
+    const { data: geo } = await supabase
+      .from("city_geocode_lookup")
+      .select("latitude, longitude")
+      .eq("city", city)
+      .eq("state", state)
+      .limit(1)
+      .maybeSingle();
+    if (geo) {
+      listingLat = parseFloat(geo.latitude);
+      listingLng = parseFloat(geo.longitude);
+    }
   }
 
   const fbUrl = `https://www.facebook.com/marketplace/item/${facebookId}`;
