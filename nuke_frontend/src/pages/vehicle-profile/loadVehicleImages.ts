@@ -149,10 +149,13 @@ export async function loadVehicleImagesImpl({
         return recordUrl === bestMoneyShot;
       })) : 0;
 
-      // Heal primary if: missing, filtered out, OR if a significantly better money shot exists
+      // Heal primary ONLY if: missing or filtered out (invalid).
+      // NEVER override an existing valid primary with a "better" score — the primary
+      // was set deliberately (by user or by a previous heal) and overriding it causes
+      // wrong-vehicle hero images when unverified bulk imports (iphoto, drop-folder)
+      // contain photos from different vehicles.
       const shouldHealPrimary = (!hasPrimary && imageRecords[0]) ||
-                                (hasPrimary && !primaryOk) ||
-                                (hasPrimary && primaryOk && bestMoneyShotScore > primaryScore + 20); // 20 point threshold
+                                (hasPrimary && !primaryOk);
       if (shouldHealPrimary && session?.user?.id) {
         // Find the best money shot from available images using scoring (isValidForPrimary imported from imageFilterUtils)
         const scoredDbRows = imageRecords

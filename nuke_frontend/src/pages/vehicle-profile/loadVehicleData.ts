@@ -98,10 +98,26 @@ export async function selectBestHeroImage(
   primaryImageUrl?: string | null,
 ): Promise<HeroImageResult | null> {
   try {
-    // Attempt 1: front-facing exterior zones with completed AI processing
-    const { data: frontImages, error: frontErr } = await supabase
+    // Attempt 0: explicit is_primary wins unconditionally.
+    // If someone set is_primary, that's a deliberate choice — respect it over AI guesses.
+    const { data: primaryRows, error: primaryErr } = await supabase
       .from('vehicle_images')
       .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle')
+      .eq('vehicle_id', vehicleId)
+      .eq('is_primary', true)
+      .not('is_document', 'is', true)
+      .not('is_duplicate', 'is', true)
+      .limit(1);
+
+    if (!primaryErr && primaryRows && primaryRows.length > 0) {
+      return buildHeroResult(primaryRows[0]);
+    }
+
+    // Attempt 1: front-facing exterior zones with completed AI processing
+    // Only trust images where match_status is explicitly 'match' or from trusted sources
+    const { data: frontImages, error: frontErr } = await supabase
+      .from('vehicle_images')
+      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source')
       .eq('vehicle_id', vehicleId)
       .eq('ai_processing_status', 'completed')
       .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
@@ -110,10 +126,15 @@ export async function selectBestHeroImage(
       .limit(20);
 
     if (!frontErr && frontImages && frontImages.length > 0) {
-      const scored = frontImages.map((img: any) => ({
-        ...img,
-        _score: scoreHeroCandidate(img, { frontExterior: true }),
-      }));
+      // Prefer images from trusted sources (bat_import_mirrored, user_upload) over
+      // unverified bulk imports (iphoto, photo_auto_sync, drop-folder) which may
+      // contain photos from different vehicles.
+      const trustedSources = new Set(['bat_import_mirrored', 'bat_import', 'user_upload', 'manual']);
+      const scored = frontImages.map((img: any) => {
+        const base = scoreHeroCandidate(img, { frontExterior: true });
+        const trusted = trustedSources.has(img.source) ? 50 : 0;
+        return { ...img, _score: base + trusted };
+      });
       scored.sort((a: any, b: any) => b._score - a._score);
       return buildHeroResult(scored[0]);
     }
@@ -121,7 +142,7 @@ export async function selectBestHeroImage(
     // Attempt 2: any zone, but still prefer true "money shot" exterior candidates
     const { data: anyImages, error: anyErr } = await supabase
       .from('vehicle_images')
-      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle')
+      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source')
       .eq('vehicle_id', vehicleId)
       .not('photo_quality_score', 'is', null)
       .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
@@ -129,10 +150,12 @@ export async function selectBestHeroImage(
       .limit(40);
 
     if (!anyErr && anyImages && anyImages.length > 0) {
-      const scored = anyImages.map((img: any) => ({
-        ...img,
-        _score: scoreHeroCandidate(img),
-      }));
+      const trustedSources = new Set(['bat_import_mirrored', 'bat_import', 'user_upload', 'manual']);
+      const scored = anyImages.map((img: any) => {
+        const base = scoreHeroCandidate(img);
+        const trusted = trustedSources.has(img.source) ? 50 : 0;
+        return { ...img, _score: base + trusted };
+      });
       scored.sort((a: any, b: any) => b._score - a._score);
       return buildHeroResult(scored[0]);
     }
