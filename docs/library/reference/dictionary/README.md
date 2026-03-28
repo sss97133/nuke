@@ -18,7 +18,15 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Asset Registry** — The `assets` table. Thin universal layer that every domain-specific entity (vehicle, artwork) links to via `asset_id`. Enables cross-domain queries.
 
+**Auction Readiness Score (ARS)** — A 0-100 composite score across six dimensions (identity, photos, documentation, description, market position, condition) that measures how prepared a vehicle is for auction submission. Computed by `compute_auction_readiness()` SQL function. Stored in `auction_readiness` table. Tier transitions tracked in `ars_tier_transitions`. Used by the coaching system to generate specific improvement recommendations. See `auction-readiness-strategy.md`.
+
 **Audit Trail** — The metadata attached to every observation: source_id, agent_tier, confidence_score, extraction_timestamp, raw_source_reference. Every field has a birth certificate.
+
+**Agent Hierarchy** — The three-tier LLM processing system: Haiku ($1/$5 MTok) for routine extraction, Sonnet ($3/$15 MTok) for quality review and edge cases, Opus ($5/$25 MTok) for strategy. Dispatched by `agent-tier-router`. Queue flow: `pending -> haiku -> complete/pending_review -> sonnet -> complete/pending_strategy -> opus`. Replaced the single-model CQP approach. See `supabase/functions/agent-tier-router/index.ts`.
+
+**Agent Tier** — The `agent_tier` column on `vehicle_observations`. Records which LLM model produced an observation: `haiku`, `sonnet`, `opus`, `qwen-local`, `qwen-modal`, `nuke-agent`. Enables cost analysis and quality correlation by model tier.
+
+**Analysis Engine** — The widget-based vehicle intelligence system. Coordinator function sweeps for stale signals every 15 minutes, queues recomputation, and processes analysis queue items. 14 widgets across 6 categories produce per-vehicle signals stored in `analysis_signals`. See `supabase/functions/analysis-engine-coordinator/index.ts`.
 
 ## B
 
@@ -42,6 +50,8 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Collaborative Trace** — A connection between two actors derived from shared involvement with an asset or organization. Not declared ("follow/following") but evidenced by transactions, exhibitions, publications, or co-ownership. Permanent and financial.
 
+**Computation Surface** — A UI surface that computes analysis in real time rather than displaying cached values. The vehicle profile is the primary computation surface. Data flows in from the knowledge graph, is computed on render, and flows out as visible intelligence. There is no cache invalidation problem because there is no cache. See `docs/library/technical/design-book/vehicle-profile-computation-surface.md`.
+
 **Condition** — One of the five dimensional shadows. The conservation/restoration assessment of an asset over time. Spectral, not binary — a 0-100 score derived from observations, not a label.
 
 **Confidence Score** — A 0-1 numeric value attached to every observation indicating how reliable the data is. Derived from: source trust weight, match quality, content substance, and corroboration.
@@ -51,6 +61,8 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 ## D
 
 **Data Point** — Any single piece of information about an asset. A price, a color, a VIN digit, a photo, a comment. Every data point is an observation with a source, confidence, and timestamp.
+
+**Day Card** — The timeline popup for a specific date. Shows all activity, data, and seven-level analysis for that day. Not a separate component — it is the standard popup rendered for a time-scoped data slice. Contains two layers: raw data (images, technician identity, parts, before/after, receipts) and computed analysis (vehicle, job, client, technician, shop, region, market). See `docs/library/technical/design-book/vehicle-profile-computation-surface.md`.
 
 **Decay** — See Half-Life. Data is testimony that degrades over time. A condition report from 2015 is less trustworthy in 2026 than one from 2024.
 
@@ -64,6 +76,10 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 ## E
 
+**Era Detection** — The process of identifying phase transitions in a user's expertise landscape over time. A BaT user who specializes in Mustangs for 5 years then switches to trucks has two distinct eras. Detected by tracking dominant make per quarter and identifying sustained shifts. Each era produces its own stylometric fingerprint. Part of the palimpsest model. See `scripts/user-stylometric-analyzer.mjs`.
+
+**Epistemology of Truth** — The framework for understanding data certainty. Four layers: Claims (what sources say), Consensus (where sources agree), Inspection (physical verification), Scientific Test (bedrock measurement). Citation accuracy is the floor, not the ceiling. Consensus can be wrong. The database is uncertainty being gradually reduced. See `~/.claude/projects/-Users-skylar/memory/epistemology-of-truth.md`.
+
 **Expand-Don't-Navigate** — The core interaction principle of the Design Bible's Second Law. When a user clicks an interactive element, the result expands in place (inline panel, overlay, popover) rather than navigating to a new page. The parent context remains visible. Escape or click-outside collapses the expansion. The user never leaves their current position. This eliminates click anxiety because the action is always reversible and the cognitive cost of exploring is zero — no context is lost, no scroll position is reset, no working memory is discarded. Contrast with traditional web navigation where clicking a link replaces the page.
 
 **Edition** — A set of identical or near-identical artworks produced from the same matrix (print plate, mold, photograph negative, conceptual instructions). The edition is a parent entity; individual copies are child assets with independent provenance.
@@ -72,9 +88,13 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Evidence** — One of the five dimensional shadows. Citations for every claim. Every field in the database traces back to a source document, observation, or human input.
 
-**Extraction** — The process of converting raw input (HTML, image, PDF, text) into structured data that fills a schema. The LLM fills the mold — it doesn't invent the mold.
+**Extraction** — The process of converting raw input (HTML, image, PDF, text) into structured data that fills a schema. The LLM fills the mold -- it doesn't invent the mold.
+
+**Extraction Handbook** — The complete institutional knowledge of the extraction pipeline, at 2,998 lines across 14 chapters and 4 appendices. Documents every extraction method (16), every documented failure (14), every source-specific technical note (11), the prompt evolution arc, and the graduation path. Located at `docs/library/technical/extraction-playbook.md`.
 
 ## F
+
+**Function Word Fingerprint** — The unconscious writing signature derived from function word usage rates (the, of, and, to, etc.). The top 100 English function words are produced unconsciously and are the single most diagnostic feature for authorship attribution (Mosteller & Wallace 1964). Topic-independent: they reveal HOW someone thinks, not WHAT they think about. Stored per user in `bat_user_profiles.metadata.stylometric_profile.function_word_fingerprint`. Computed by `scripts/user-stylometric-analyzer.mjs`.
 
 **Five Dimensional Shadows** — See Dimensional Shadow. Spec, current state, condition, provenance, evidence. Every entity exists across all five.
 
@@ -90,7 +110,11 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Ground Truth** — The current best understanding of reality, established progressively through accumulated observations. Never final — always accumulating. Each new observation makes the truth more true.
 
+**Hapax Legomena** — Words appearing exactly once in a corpus. The ratio of hapax legomena to total unique words measures vocabulary breadth -- high hapax ratio indicates wider vocabulary reach and more unusual word choices. One of the structural stylometric features computed per user.
+
 ## H
+
+**Hammer Price** — The final auction sale price. Predicted by `predict-hammer-price` edge function (active cron). Distinct from sale price which may include buyer's premium.
 
 **Header** — The persistent 40px sticky bar at the top of the application viewport. Contains exactly three zones: identity (NUKE wordmark), command (universal input), and session (user capsule). Height is fixed and unconditional — no variants, no stacking, no contextual expansion. The header never contains navigation links, breadcrumbs, page-specific controls, or toolbar slots. Sub-context (where-am-I information) lives in the content area as inline breadcrumbs, never in the header. The header is the last thing to change and the first thing to render. One header. Same everywhere. See Design Book Ch. 5 (The Header), Discourse 2026-03-21.
 
@@ -116,6 +140,8 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Knowledge Graph** — The materialized relational schema that encodes everything that can be true about assets in a domain. Not a separate graph database — the Postgres tables ARE the graph.
 
+**Layer 0** — The zero-cost foundation of the persona simulation pipeline. Pure structural and lexical analysis of text using math, not LLM calls. Computes stylometric features (sentence length, vocabulary richness, function word frequencies, punctuation signatures, epistemic stance) from raw comment text. See `scripts/user-stylometric-analyzer.mjs`.
+
 ## L
 
 **Library** — Two meanings: (1) This documentation system, organized like a traditional library. (2) The reference data corpus (RPO codes, paint codes, catalogue raisonnés, service manuals) that the extraction pipeline validates against.
@@ -123,6 +149,8 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 ## M
 
 **Machine** — One of 11 Deleuzian assemblages that constitute Nuke's body: eye (vision), mouth (ingestion), gut (processing), skeleton (infrastructure), brain (intelligence), wallet (valuation), nose (discovery), memory (provenance), skin (UI), voice (API), hands (curation). See RHIZOME.md.
+
+**Materialization Layer** — The system layer where knowledge graph data is transformed into visible intelligence. The vehicle profile is the primary materialization layer. Raw observations enter the graph from many sources; the materialization layer reads the graph and computes analysis on render. The profile surface shows summaries; popups (Day Cards) show full-resolution computation. See `docs/library/technical/design-book/vehicle-profile-computation-surface.md`.
 
 **Material Honesty** — The design principle that interface elements should look like what they are. A screen is flat — so no shadows pretend depth. Pixels are square — so no rounded corners pretend softness. A container is a rectangle — so its edges are straight lines. The principle extends from visual treatment to interaction: a button looks clickable, an input looks typeable, a badge looks expandable. Material honesty eliminates cognitive overhead because the user doesn't need to decode what an element does — its visual appearance declares its function. See also: Win95 lineage in Design Book Ch. 1 (Foundations).
 
@@ -148,11 +176,15 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 ## P
 
+**Palimpsest** — A manuscript that has been written on, scraped off, and rewritten, with earlier layers still partially visible. In Nuke, the palimpsest model describes how a user's expertise evolves over time: each era (e.g., 5 years of Porsche, then a switch to trucks) is a layer that remains visible in their writing style even after the topical shift. Style is permanent; topic is temporal. The palimpsest is one of 7 novel ontological contributions identified in the applied ontology research.
+
 **Permanent Interface** — An interface element that solves a problem which hasn't changed and won't change. The scroll bar (content exceeds container), the menu bar (applications have actions), the address bar (users need location awareness), the search box (information exceeds browsability). The test: remove the element; if the user is stuck within seconds, it's permanent. If they adjust within minutes, it was trend. The header is permanent because its function (identity + command + session) hasn't changed. See Contemplation: The Permanent Interface.
 
 **Pipeline Registry** — The `pipeline_registry` table mapping every table.column to its owning edge function. Prevents duplicate tools and data forks. Check before writing to any field.
 
 **Portal** — What a badge becomes when clicked. Every badge in the UI is a portal into the cluster it represents. Year portals, make portals, artist portals, medium portals. Clicking opens, clicking closes.
+
+**Progressive Density** — The principle that a vehicle profile renders at whatever resolution the data supports. Sparse vehicles show minimal facts (year/make/model, maybe a photo). Dense vehicles show full computational analysis (timeline, classified photos, seven-level benchmarks). Bedrock vehicles add scientific measurements. Empty sections never render. No placeholders, no skeleton UI, no "No data available" messages. The profile is honest about what it knows. See `docs/library/technical/design-book/vehicle-profile-computation-surface.md`.
 
 **Provenance** — One of the five dimensional shadows. The complete chain of custody for an asset — who owned it, when, how acquired, how disposed, with citations. Provenance determines authenticity, legality, and a significant portion of value.
 
@@ -168,9 +200,15 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 ## S
 
+**Snapshot** — An archived copy of a web page stored in `listing_page_snapshots`. Created automatically by `archiveFetch()`. Contains raw HTML and/or markdown representation. Snapshots enable re-extraction from stored content without re-fetching. The table holds 440K+ snapshots totaling 79GB. Snapshots are being migrated to Supabase Storage via `migrate-snapshots-to-storage` cron.
+
+**Stylometric Profile** — The quantitative writing fingerprint of a BaT user, computed from their comment history using zero-cost structural analysis. Includes: writing signature (sentence/comment length distributions), vocabulary metrics (Yule's K, TTR, hapax ratio), function word fingerprint (top 20 per-1000-word rates), punctuation signature, opening patterns, self/other reference rates, epistemic stance (hedging vs boosting), taste fingerprint (make distribution), and comment role distribution. Stored as JSONB in `bat_user_profiles.metadata.stylometric_profile`. Methodology grounded in Mosteller-Wallace, Yule, Pennebaker, Hyland, and Stamatatos.
+
 **Schema** — The structured definition of what data to extract from a source. The schema IS the prompt — hand the LLM a schema and raw input, it fills the fields and cites everything. Domain-specific (vehicle schema, artwork schema) but the extraction mechanism is universal.
 
 **Sub-Context** — Positional information ("where am I in the knowledge graph") rendered as the first line of the content area, not as a header appendage. Styled as 8px ALL CAPS breadcrumb labels in `--text-secondary` with `→` separators. Maximum 4 levels deep: `VEHICLES → 1977 K5 BLAZER → SERVICE HISTORY → INVOICE #4471`. Each segment is clickable except the last (current position). Sub-context scrolls with the content — it is not sticky, not a separate bar, not part of the header. The principle: breadcrumbs are a confession of complexity. If the interface needs them, they should live in the content where the complexity lives, not in the chrome above it.
+
+**Seven-Level Analysis** — The contextual analysis framework for any work event on the vehicle profile: (1) Vehicle — build arc position and trajectory, (2) Job — operation benchmarked against national medians, (3) Client — communication and payment patterns, (4) Technician — speed, quality, and specialization match, (5) Shop — throughput, capacity, and quality metrics, (6) Region — local labor rates, parts availability, specialist density, (7) Market/National — national benchmarks and ROI trajectory. Each level adds comparative context that converts experience into measured fact. See `docs/library/technical/design-book/vehicle-profile-computation-surface.md`.
 
 **Signal** — Computed from weighted recent activity against an actor's profile. Signal = Σ(observation_weight × source_trust × recency_decay × anomaly_factor). Signal is what emerges from the graph — not what users declare about themselves.
 
@@ -183,6 +221,8 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 ## T
 
 **Testimony** — What observations actually are. Data is testimony from sources with varying reliability. Testimony has half-lives. A seller's description is testimony. A museum catalog entry is testimony. Both decay, at different rates.
+
+**Timeline Event** — The atomic unit of the vehicle timeline. Everything that happens to a vehicle is a timeline event: factory build, ownership transfers, auction appearances, work performed, parts installed or transferred, photos taken, inspections, title events, accidents, modifications, community mentions. There are no parallel tracking systems. A build log is the timeline filtered to work events. A photo gallery is the timeline filtered to image events. A service history is the timeline filtered to maintenance events. See `docs/library/technical/design-book/vehicle-profile-computation-surface.md`.
 
 **Treemap Pop-Through** — The interaction pattern where clicking a badge explodes into a treemap of its contents, and clicking within that treemap drills deeper. Infinite depth, always reversible.
 
@@ -200,7 +240,11 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Validation Layer** — What magazines are. Not content creators but validators — their editorial selection confirms that an asset, artist, or event matters. A magazine feature is a high-trust observation, not a product.
 
+**Widget** — A self-contained analysis module in the Analysis Engine. Each widget computes a specific intelligence signal for a vehicle (e.g., sell-through probability, rerun decay, completion discount, geographic arbitrage). 14 widgets registered in `analysis_widgets` table across 6 categories. Each produces a signal stored in `analysis_signals` with severity, confidence, and actionable recommendations.
+
 ## W
+
+**Work Session** — A record in the `work_sessions` table representing a single day's work on a vehicle. Contains: session_date, work_type (fabrication, heavy_work, parts_and_work, parts_received, work), duration_minutes, image_count, total_parts_cost, total_labor_cost, total_job_cost, work_description, technician_id, zones_touched, and evidence links. Created by the work photo pipeline (`drop-folder-ingest.mjs`, `activity-linker.mjs`). Work sessions are merged into the vehicle timeline by `VehicleProfileContext.loadTimelineEvents()` as `event_type: 'work_session'` entries. Clicking a work session day on the BarcodeTimeline opens a Day Card popup with full-resolution detail via the `get_daily_work_receipt` RPC. Not a parallel system to timeline events — a data source that feeds into the same timeline.
 
 **Wordmark** — The text "NUKE" rendered in the top-left of the header. Arial, 13px, bold, uppercase, 0.10em letter-spacing. Functions as: (1) brand identity, (2) home navigation (click to go to /), (3) ontological anchor ("you are inside the knowledge graph"). The wordmark IS the logo — no icon, no symbol, no graphic. The simplicity is the identity. NUKE stays as the full word in all contexts; abbreviating to "N1" or similar was considered and rejected because the name is already maximally compressed at four characters.
 
@@ -208,4 +252,6 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 ## Y
 
-**YONO (You Only Nuke Once)** — Local AI model for image classification. EfficientNet-based, ONNX exported. Eliminates cloud inference costs at scale ($0 vs $34K for 34M images). Trained but not yet integrated into the pipeline.
+**YONO (You Only Nuke Once)** — Local AI model for image classification. EfficientNet-based, ONNX exported. Eliminates cloud inference costs at scale ($0 vs $34K for 34M images). Sidecar live on Modal (2 warm containers). Consumer API deployed via `api-v1-vision`. Hierarchical classification: tier-1 family, tier-2 make (58 makes). Zone classifier (41 zones, 72.8% accuracy). Condition analysis via Florence-2 vision. Pipeline globally PAUSED via `NUKE_ANALYSIS_PAUSED` flag.
+
+**Yule's K** — A vocabulary richness measure that is approximately independent of text length (Yule 1944). K = 10^4 * (M2 - N) / N^2. Lower K = richer vocabulary. Typical ranges: literary prose 80-120, academic writing 100-150, forum comments 120-200+, formulaic writing 200+. The primary cross-user vocabulary comparison metric because unlike Type-Token Ratio, it is length-normalized. Computed per user in stylometric profiles.

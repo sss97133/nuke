@@ -77,6 +77,10 @@ export async function fetchHistogram(
   });
 }
 
+export async function fetchCountyData(): Promise<import('./types').CountyMapData> {
+  return mapFetch<import('./types').CountyMapData>({ mode: 'county' });
+}
+
 // Utility kept from old mapUtils — used by MapVehicleDetail
 export function thumbUrl(url: string | null): string | null {
   if (!url) return null;

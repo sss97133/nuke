@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
+import { usePopup } from '../../components/popups/usePopup';
 
 interface BarcodeTimelineProps {}
 
@@ -13,6 +14,16 @@ interface EventDay {
   group?: string;
   groupDay?: number;
   groupTotal?: string;
+  hasWorkSession?: boolean;
+  workMeta?: {
+    work_type: string;
+    image_count: number;
+    duration_minutes: number;
+    total_parts_cost: number;
+    total_labor_cost: number;
+    total_job_cost: number;
+    work_description: string;
+  };
 }
 
 function dateStr(d: Date): string {
@@ -100,7 +111,18 @@ const EVENT_LABELS: Record<string, string> = {
   registration: 'Registered',
   insurance: 'Insurance',
   photo_session: 'Photo Session',
+  work_session: 'Work Session',
+  pending_analysis: 'Pending Analysis',
+  service: 'Service',
   other: 'Activity',
+};
+
+const WORK_TYPE_LABELS: Record<string, string> = {
+  fabrication: 'Fabrication',
+  heavy_work: 'Heavy Work',
+  parts_and_work: 'Parts + Work',
+  parts_received: 'Parts Received',
+  work: 'Work',
 };
 
 const SOURCE_PLATFORM_LABELS: Record<string, string> = {
@@ -127,6 +149,17 @@ function formatEventLabel(ev: any): string {
 
   // System-ingested / extracted data: prefix with "Discovered on"
   const isSystemIngested = sourceType === 'system' || dataSource.startsWith('extract');
+
+  // Work session: show work type from metadata
+  if (eventType === 'work_session') {
+    const workType = ev.metadata?.work_type || ev.category || 'work';
+    const workLabel = WORK_TYPE_LABELS[workType] || workType.replace(/_/g, ' ');
+    const imgCount = ev.metadata?.image_count || 0;
+    const desc = ev.metadata?.work_description;
+    let label = `Work: ${workLabel}`;
+    if (imgCount > 0) label += ` (${imgCount} photos)`;
+    return label;
+  }
 
   // Photo session: show session type if available in metadata
   if (eventType === 'photo_session') {
@@ -177,8 +210,12 @@ const BARCODE_COLORS: Record<number, string> = {
 
 const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
+// Lazy-load DayCard for popup rendering
+const DayCardPopupContent = React.lazy(() => import('./DayCard'));
+
 const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
-  const { vehicle, timelineEvents } = useVehicleProfile();
+  const { vehicle, vehicleId, timelineEvents } = useVehicleProfile();
+  const { openPopup } = usePopup();
   const [expanded, setExpanded] = useState(true);
   const [receiptDate, setReceiptDate] = useState<string | null>(null);
   const [receiptPos, setReceiptPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -221,6 +258,21 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
         k: formatEventLabel(ev),
         v: costStr,
       });
+
+      // Tag work_session days with rich metadata for Day Card popup
+      const eventType = String(ev.event_type || '').trim().toLowerCase();
+      if (eventType === 'work_session' && ev.metadata?.source === 'work_sessions') {
+        map[ds].hasWorkSession = true;
+        map[ds].workMeta = {
+          work_type: ev.metadata.work_type || 'work',
+          image_count: ev.metadata.image_count || 0,
+          duration_minutes: ev.metadata.duration_minutes || 0,
+          total_parts_cost: ev.metadata.total_parts_cost || 0,
+          total_labor_cost: ev.metadata.total_labor_cost || 0,
+          total_job_cost: ev.metadata.total_job_cost || 0,
+          work_description: ev.metadata.work_description || '',
+        };
+      }
 
       // Accumulate cost (only dollar amounts; photo counts don't add to total)
       const existingTotal = map[ds].total === '—' ? 0 : parseFloat(map[ds].total.replace(/[$,]/g, ''));
@@ -421,6 +473,43 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
 
   const receiptEvent = receiptDate ? eventMap[receiptDate] : null;
 
+  // Open full Day Card detail in a popup
+  const openDayCardPopup = useCallback(
+    (date: string) => {
+      const ev = eventMap[date];
+      if (!ev) return;
+      const dateLabel = formatDate(date);
+      openPopup(
+        <React.Suspense fallback={<div style={{ padding: '12px', fontSize: '8px', fontFamily: 'Arial, sans-serif' }}>Loading day detail...</div>}>
+          <DayCardPopupContent
+            session={{
+              date,
+              title: ev.label,
+              work_type: ev.workMeta?.work_type || 'work',
+              image_count: ev.workMeta?.image_count || 0,
+              duration_minutes: ev.workMeta?.duration_minutes || 0,
+              total_parts_cost: ev.workMeta?.total_parts_cost || 0,
+              has_receipts: (ev.workMeta?.total_parts_cost || 0) > 0,
+              work_description: ev.workMeta?.work_description || '',
+              status: 'complete',
+            }}
+            detail={null}
+            isLoading={false}
+            onExpand={() => {}}
+            vehicleId={vehicleId}
+            isPopup={true}
+          />
+        </React.Suspense>,
+        `DAY CARD — ${dateLabel}`,
+        520,
+        false,
+      );
+      // Close the inline receipt when opening popup
+      setReceiptDate(null);
+    },
+    [eventMap, vehicleId, openPopup]
+  );
+
   // If no timeline events at all, hide the section entirely
   if (timelineEvents.length === 0) {
     return null;
@@ -527,6 +616,27 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
                   <span className="receipt__line-value">{item.v}</span>
                 </div>
               ))}
+              {/* Work session summary — duration, photos, parts */}
+              {receiptEvent.hasWorkSession && receiptEvent.workMeta && (
+                <>
+                  <hr className="receipt__divider" />
+                  <div style={{ fontSize: '7px', fontFamily: 'var(--vp-font-mono, Courier New, monospace)', color: '#999', lineHeight: 1.6 }}>
+                    {receiptEvent.workMeta.duration_minutes > 0 && (
+                      <div>{Math.floor(receiptEvent.workMeta.duration_minutes / 60)}h {receiptEvent.workMeta.duration_minutes % 60}m session</div>
+                    )}
+                    {receiptEvent.workMeta.image_count > 0 && (
+                      <div>{receiptEvent.workMeta.image_count} photos</div>
+                    )}
+                    {receiptEvent.workMeta.work_description && (
+                      <div style={{ color: '#bbb', fontFamily: 'Arial, sans-serif', marginTop: '2px' }}>
+                        {receiptEvent.workMeta.work_description.length > 100
+                          ? receiptEvent.workMeta.work_description.slice(0, 100) + '...'
+                          : receiptEvent.workMeta.work_description}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
               <hr className="receipt__divider" />
               <div className="receipt__total">
                 <span>TOTAL</span>
@@ -538,8 +648,16 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
                 </div>
               )}
               <div className="receipt__nav">
-                <a onClick={() => navigateReceipt(-1)}>← PREV DAY</a>
-                <a onClick={() => navigateReceipt(1)}>NEXT DAY →</a>
+                <a onClick={() => navigateReceipt(-1)}>{'\u2190'} PREV DAY</a>
+                {receiptEvent.hasWorkSession && (
+                  <a
+                    onClick={() => openDayCardPopup(receiptDate)}
+                    style={{ fontWeight: 700, color: '#fff' }}
+                  >
+                    OPEN DAY CARD
+                  </a>
+                )}
+                <a onClick={() => navigateReceipt(1)}>NEXT DAY {'\u2192'}</a>
               </div>
             </div>
           )}

@@ -99,7 +99,7 @@ export async function selectBestHeroImage(
 ): Promise<HeroImageResult | null> {
   try {
     // Attempt 0: explicit is_primary wins unconditionally.
-    // If someone set is_primary, that's a deliberate choice — respect it over AI guesses.
+    // With contain mode as default, any orientation works — the full image is always visible.
     const { data: primaryRows, error: primaryErr } = await supabase
       .from('vehicle_images')
       .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle')

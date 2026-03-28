@@ -5,11 +5,14 @@
  * Used by archiveFetch as fallback when Firecrawl is not needed.
  */
 
+import { isLoginPage } from "./batFetcher.ts";
+
 export interface FetchResult {
   html: string | null;
   source: 'direct' | 'proxy' | 'cache';
   error?: string;
   statusCode?: number;
+  authRequired?: boolean;
 }
 
 export interface FetchOptions {
@@ -58,14 +61,71 @@ export async function fetchPage(
       const response = await fetch(url, {
         headers: getHeaders(attempt),
         signal: controller.signal,
-        redirect: 'follow',
+        redirect: 'manual',  // CRITICAL: detect login/auth redirects instead of silently following
       });
 
       clearTimeout(timeoutId);
       lastStatus = response.status;
 
-      if (response.ok) {
+      // Detect redirects — check for login/auth before following
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location') || '';
+        if (location.includes('/login') || location.includes('/account/login') || location.includes('wp-login')) {
+          console.error(`[hybridFetcher] AUTH_REQUIRED: Redirected to login (${response.status} -> ${location.slice(0, 100)})`);
+          return {
+            html: null,
+            source: 'direct',
+            error: `AUTH_REQUIRED: Redirected to login (${response.status})`,
+            statusCode: response.status,
+            authRequired: true,
+          };
+        }
+        // Legitimate redirect — follow it manually (one hop)
+        try {
+          const redirectUrl = location.startsWith('http') ? location : new URL(location, url).href;
+          const redirectResp = await fetch(redirectUrl, {
+            headers: getHeaders(attempt),
+            signal: AbortSignal.timeout(timeout),
+            redirect: 'manual',
+          });
+          lastStatus = redirectResp.status;
+          if (redirectResp.ok) {
+            const html = await redirectResp.text();
+            if (isLoginPage(html)) {
+              console.error(`[hybridFetcher] AUTH_REQUIRED: Redirect target is login page`);
+              return {
+                html: null,
+                source: 'direct',
+                error: 'AUTH_REQUIRED: Redirect target is a login page',
+                statusCode: redirectResp.status,
+                authRequired: true,
+              };
+            }
+            if (html.length > 1000 && !html.includes('Access Denied') && !html.includes('blocked')) {
+              return { html, source: 'direct', statusCode: redirectResp.status };
+            }
+            lastError = 'Blocked by site (after redirect)';
+          } else {
+            lastError = `HTTP ${redirectResp.status} (after redirect)`;
+          }
+        } catch (_) {
+          lastError = `Redirect follow failed (${response.status} -> ${location.slice(0, 100)})`;
+        }
+      } else if (response.ok) {
         const html = await response.text();
+
+        // Check for login page disguised as 200 OK
+        if (isLoginPage(html)) {
+          console.error(`[hybridFetcher] AUTH_REQUIRED: Got login page instead of content (${html.length} bytes)`);
+          return {
+            html: null,
+            source: 'direct',
+            error: 'AUTH_REQUIRED: Got login page instead of content',
+            statusCode: response.status,
+            authRequired: true,
+          };
+        }
+
         if (html.length > 1000 && !html.includes('Access Denied') && !html.includes('blocked')) {
           return { html, source: 'direct', statusCode: response.status };
         }

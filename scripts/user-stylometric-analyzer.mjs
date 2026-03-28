@@ -617,19 +617,20 @@ async function fetchUserCommentCount(username) {
 }
 
 async function analyzeUser(username, opts = {}) {
-  console.log(`\n═══ Analyzing: ${username} ═══\n`);
+  const quiet = opts.quiet || false;
+  if (!quiet) console.log(`\n═══ Analyzing: ${username} ═══\n`);
 
   const allComments = await fetchUserComments(username);
-  console.log(`  Total comments: ${allComments.length}`);
+  if (!quiet) console.log(`  Total comments: ${allComments.length}`);
 
   if (allComments.length < 10) {
-    console.log('  ⚠ Too few comments for reliable analysis');
+    if (!quiet) console.log('  Too few comments for reliable analysis');
     return null;
   }
 
   // Stratified sample
   const sampled = stratifiedSample(allComments, 500);
-  console.log(`  Sampled: ${sampled.length} (stratified by make + time)`);
+  if (!quiet) console.log(`  Sampled: ${sampled.length} (stratified by make + time)`);
 
   // Analyze each comment
   const analyses = sampled
@@ -653,11 +654,11 @@ async function analyzeUser(username, opts = {}) {
   // Era detection
   if (opts.eras) {
     const eras = detectEras(allComments);
-    console.log(`  Detected ${eras.length} era(s):`);
+    if (!quiet) console.log(`  Detected ${eras.length} era(s):`);
 
     profile.eras = [];
     for (const era of eras) {
-      console.log(`    ${era.label} (${era.comments.length} comments)`);
+      if (!quiet) console.log(`    ${era.label} (${era.comments.length} comments)`);
       const eraSampled = stratifiedSample(era.comments, 200);
       const eraAnalyses = eraSampled
         .filter(c => c.comment_text && c.comment_text.length > 10)
@@ -699,7 +700,7 @@ async function analyzeUser(username, opts = {}) {
   return profile;
 }
 
-async function saveProfile(profile) {
+async function saveProfile(profile, quiet = false) {
   // Upsert into author_personas or a new table
   // For now, store as JSONB in bat_user_profiles.metadata
   await pool.query(`
@@ -708,7 +709,7 @@ async function saveProfile(profile) {
         updated_at = now()
     WHERE username = $1
   `, [profile.username, JSON.stringify(profile)]);
-  console.log(`  ✓ Saved to bat_user_profiles.metadata.stylometric_profile`);
+  if (!quiet) console.log(`  Saved to bat_user_profiles.metadata.stylometric_profile`);
 }
 
 // ─── CLI ────────────────────────────────────────────────────────────────────
@@ -720,6 +721,8 @@ const { values: args } = parseArgs({
     save: { type: 'boolean', short: 's', default: false },
     eras: { type: 'boolean', short: 'e', default: false },
     json: { type: 'boolean', default: false },
+    'skip-existing': { type: 'boolean', default: false },
+    quiet: { type: 'boolean', short: 'q', default: false },
   },
   strict: false,
 });
@@ -738,37 +741,57 @@ async function main() {
       }
     } else if (args.top) {
       const limit = parseInt(args.top) || 20;
-      const { rows } = await pool.query(`
-        SELECT username, total_comments
-        FROM bat_user_profiles
-        WHERE total_comments >= 100
-        AND total_comments < 40000
-        AND username NOT IN ('bringatrailer', 'BringATrailer')
-        ORDER BY total_comments DESC
-        LIMIT $1
-      `, [limit]);
+      const skipExisting = args['skip-existing'];
 
-      console.log(`Analyzing top ${rows.length} users by comment count...\n`);
+      let query;
+      if (skipExisting) {
+        query = `
+          SELECT username, total_comments
+          FROM bat_user_profiles
+          WHERE total_comments >= 100
+          AND total_comments < 40000
+          AND username NOT IN ('bringatrailer', 'BringATrailer')
+          AND (metadata->>'stylometric_profile' IS NULL)
+          ORDER BY total_comments DESC
+          LIMIT $1
+        `;
+      } else {
+        query = `
+          SELECT username, total_comments
+          FROM bat_user_profiles
+          WHERE total_comments >= 100
+          AND total_comments < 40000
+          AND username NOT IN ('bringatrailer', 'BringATrailer')
+          ORDER BY total_comments DESC
+          LIMIT $1
+        `;
+      }
 
-      let saved = 0, failed = 0;
+      const { rows } = await pool.query(query, [limit]);
+
+      console.log(`Analyzing ${rows.length} users by comment count${skipExisting ? ' (skipping existing profiles)' : ''}...\n`);
+
+      let saved = 0, failed = 0, skipped = 0;
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         try {
-          const profile = await analyzeUser(row.username, { eras: args.eras });
+          const profile = await analyzeUser(row.username, { eras: args.eras, quiet: args.quiet });
           if (profile) {
-            if (!args.json) printProfile(profile);
-            if (args.save) await saveProfile(profile);
+            if (!args.json && !args.quiet) printProfile(profile);
+            if (args.save) await saveProfile(profile, args.quiet);
             saved++;
+          } else {
+            skipped++;
           }
         } catch (err) {
           console.log(`  ✗ FAILED: ${row.username} — ${err.message}`);
           failed++;
         }
         if ((i + 1) % 50 === 0) {
-          console.log(`\n  ── Progress: ${i + 1}/${rows.length} (${saved} saved, ${failed} failed) ──\n`);
+          console.log(`\n  ── Progress: ${i + 1}/${rows.length} (${saved} saved, ${failed} failed, ${skipped} skipped) ──\n`);
         }
       }
-      console.log(`\n═══ BATCH COMPLETE: ${saved} saved, ${failed} failed out of ${rows.length} ═══\n`);
+      console.log(`\n═══ BATCH COMPLETE: ${saved} saved, ${failed} failed, ${skipped} skipped out of ${rows.length} ═══\n`);
     } else {
       console.log('Usage:');
       console.log('  node scripts/user-stylometric-analyzer.mjs --username 911r');

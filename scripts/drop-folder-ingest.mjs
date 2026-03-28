@@ -79,7 +79,63 @@ const VEHICLES = [
     label: '1972 Chevrolet K10 SWB',
     hints: 'early 70s Chevrolet pickup, square body predecessor'
   },
+  {
+    id: '7bb50537-ceec-40e1-8c4d-b47af60ae1ad',
+    label: '1970 Volkswagen Karmann Ghia',
+    hints: 'Volkswagen Karmann Ghia, small coupe, rounded body, rear engine, Ernie\'s client'
+  },
 ];
+
+// ─── Activity-based vehicle resolution (AirTag co-location) ─────────────────
+// Before vision: check if an AirTag-linked vehicle was at the same GPS at this time
+async function resolveVehicleByActivity(photoTime, lat, lon) {
+  if (!photoTime) return null;
+
+  try {
+    // Find AirTag pings within 30 minutes and 300m of this photo
+    const { data: nearbyPings } = await supabase
+      .from('device_locations')
+      .select('device_id, latitude, longitude, observed_at, tracked_devices!inner(vehicle_id, device_type, display_name)')
+      .gte('observed_at', new Date(new Date(photoTime).getTime() - 30 * 60000).toISOString())
+      .lte('observed_at', new Date(new Date(photoTime).getTime() + 30 * 60000).toISOString());
+
+    if (!nearbyPings?.length) return null;
+
+    // Filter to AirTags with vehicle_ids that were close to this GPS
+    for (const ping of nearbyPings) {
+      if (ping.tracked_devices.device_type !== 'airtag') continue;
+      if (!ping.tracked_devices.vehicle_id) continue;
+
+      const dist = haversine(lat, lon, ping.latitude, ping.longitude);
+      if (dist < 300) {
+        const vehicle = VEHICLES.find(v => v.id === ping.tracked_devices.vehicle_id);
+        if (vehicle) {
+          return { ...vehicle, source: 'airtag_colocation', confidence: 0.95 };
+        }
+      }
+    }
+
+    // Fallback: check phone location to at least match to a known place
+    const phonePings = nearbyPings.filter(p => p.tracked_devices.device_type === 'phone');
+    for (const ping of phonePings) {
+      const dist = haversine(lat, lon, ping.latitude, ping.longitude);
+      if (dist < 200) {
+        return { source: 'phone_colocation', confidence: 0.5, place: 'co-located with phone' };
+      }
+    }
+  } catch (e) {
+    // Activity resolution failed, fall through to vision
+  }
+  return null;
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
 
 // Also match the 1932 Ford Roadster that's at the shop
 const ALL_KNOWN = [
@@ -283,20 +339,31 @@ async function run() {
     const timeSinceLast = lastTimestamp ? (mtime - lastTimestamp) : Infinity;
     const sameSession = timeSinceLast < 30 * 60 * 1000; // 30 min = same session
 
-    // Classify: either reuse last classification (same session) or classify fresh
+    // Classification priority:
+    // 1. Same session as last photo → reuse
+    // 2. AirTag co-location at this time/place → high confidence
+    // 3. Vision classification → fallback
     let classification = null;
     if (sameSession && lastClassification) {
       classification = lastClassification;
     } else {
-      // Need to classify this photo
-      const thumbPath = makeThumbnail(filePath, tmpDir);
-      if (thumbPath) {
-        process.stdout.write(`  Classifying ${filename}...`);
-        classification = await classifyPhoto(thumbPath);
-        if (classification) {
-          process.stdout.write(` → ${classification.label}\n`);
-        } else {
-          process.stdout.write(` → unknown\n`);
+      // Try activity-based resolution first (AirTag co-location)
+      const fileDate = new Date(mtime);
+      const activityMatch = await resolveVehicleByActivity(fileDate, null, null);
+      if (activityMatch?.id) {
+        classification = activityMatch;
+        process.stdout.write(`  ${filename} → ${classification.label} (${classification.source})\n`);
+      } else {
+        // Fall back to vision classification
+        const thumbPath = makeThumbnail(filePath, tmpDir);
+        if (thumbPath) {
+          process.stdout.write(`  Classifying ${filename}...`);
+          classification = await classifyPhoto(thumbPath);
+          if (classification) {
+            process.stdout.write(` → ${classification.label}\n`);
+          } else {
+            process.stdout.write(` → unknown\n`);
+          }
         }
       }
     }

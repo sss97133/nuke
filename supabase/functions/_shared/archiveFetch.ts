@@ -14,7 +14,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { fetchBatPage, type FetchOptions as BatFetchOptions, type FetchResult as BatFetchResult, logFetchCost } from "./batFetcher.ts";
+import { fetchBatPage, type FetchOptions as BatFetchOptions, type FetchResult as BatFetchResult, logFetchCost, isLoginPage } from "./batFetcher.ts";
 import { fetchPage } from "./hybridFetcher.ts";
 import { firecrawlScrape, type FirecrawlScrapeResult } from "./firecrawl.ts";
 
@@ -155,6 +155,9 @@ function isGarbageHtml(html: string, platform: string): boolean {
   if (lower.includes("access denied") && html.length < 5000) return true;
   if (lower.includes("403 forbidden") && html.length < 5000) return true;
 
+  // Login page detection — a login page returned as 200 OK is garbage, not content
+  if (isLoginPage(html)) return true;
+
   // React/Next.js shell with no rendered content (Bonhams, Barrett-Jackson)
   // These shells have __NEXT_DATA__ or __next but no actual lot/vehicle content
   if (platform === "bonhams") {
@@ -274,6 +277,12 @@ export async function archiveFetch(
     result.statusCode = batResult.statusCode ?? null;
     result.error = batResult.error ?? null;
     result.costCents = batResult.costCents;
+
+    // If batFetcher detected auth required, do NOT cache as success
+    if (batResult.authRequired) {
+      console.error(`[archiveFetch] AUTH_REQUIRED from batFetcher for ${url} — not caching`);
+      result.error = batResult.error ?? "AUTH_REQUIRED";
+    }
 
     // Log Firecrawl costs
     if (batResult.costCents > 0) {

@@ -23,7 +23,6 @@ export default function MapLayerPanel({
 }: Props) {
   return (
     <div style={{
-      position: 'absolute', top: 12, right: 12, zIndex: 10,
       background: 'rgba(0,0,0,0.85)', border: '1px solid rgba(255,255,255,0.1)',
       padding: '10px 12px', fontFamily: MAP_FONT, minWidth: 160,
     }}>
@@ -38,6 +37,7 @@ export default function MapLayerPanel({
         <div style={{ display: 'flex', gap: 2 }}>
           <ModeButton label="POINTS" active={mode === 'points'} onClick={() => onModeChange('points')} />
           <ModeButton label="THERMAL" active={mode === 'thermal'} onClick={() => onModeChange('thermal')} />
+          <ModeButton label="COUNTY" active={mode === 'county'} onClick={() => onModeChange('county')} />
         </div>
       </div>
 

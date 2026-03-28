@@ -560,11 +560,7 @@ body {
   flex-direction: column;
 }
 
-.header {
-  background: var(--white);
-  border-bottom: 1px solid var(--border-light);
-  padding: var(--space-4) 0;
-}
+/* .header rule removed — canonical styles are in AppHeader.css */
 
 .main {
   flex: 1;

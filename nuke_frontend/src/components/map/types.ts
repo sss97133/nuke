@@ -66,7 +66,20 @@ export interface MapViewState {
   bearing: number;
 }
 
-export type MapMode = 'points' | 'thermal';
+export type MapMode = 'points' | 'thermal' | 'county';
+
+export interface CountyDatum {
+  fips: string;
+  count: number;
+  value: number;
+  avg: number;
+}
+
+export interface CountyMapData {
+  level: 'county';
+  stats: { totalCount: number; totalValue: number; countyCount: number };
+  counties: CountyDatum[];
+}
 export type ConfidenceTier = 'verified' | 'city' | 'approx';
 
 export function getConfidenceTier(confidence: number): ConfidenceTier {

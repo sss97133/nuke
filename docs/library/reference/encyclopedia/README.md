@@ -625,6 +625,34 @@ The entry point is always the work. Not metadata, not a search result, not a lis
 
 Every step is a click with zero anxiety. The system never front-loads information. It rewards curiosity at the user's pace. Nobody is forced through a funnel.
 
+## Section 11.5: The Vehicle Profile — Computation Surface
+
+The vehicle profile is the **primary materialization layer** — the point where the knowledge graph becomes visible intelligence. It is not a display page. It is a computation surface that analyzes the underlying data in real time on every render.
+
+### Position in the Pipeline
+
+The profile sits at the middle of the data pipeline. Sources (extractors, user input, photos, work tracking, comment analysis) feed observations into the knowledge graph. The profile reads the graph, computes analysis, and renders intelligence for consumers (buyers, sellers, analysts, coaching systems, API/SDK).
+
+There is no caching layer between the graph and the profile. When new data arrives, the next render includes it.
+
+### The Timeline IS the Vehicle
+
+Everything that happens to a vehicle is a timeline event — the atomic unit of the vehicle's existence. Work orders, ownership transfers, auction appearances, photo sessions, title events, modifications, and community mentions are all events on the same timeline. There are no parallel tracking systems. A build log is the timeline filtered to work events. A service history is the timeline filtered to maintenance events.
+
+### The Day Card
+
+Clicking a day on the timeline opens a popup (the Day Card) with two layers: raw data (all images, technician identity, parts, receipts) and seven-level analysis (vehicle build arc, job benchmark, client pattern, technician profile, shop metrics, regional context, national comparison). The seven levels convert experience and intuition into measured fact.
+
+### Progressive Density
+
+The profile renders at whatever resolution the data supports. Sparse vehicles show only what is known — year, make, model, maybe a photo. Dense vehicles show full timelines, classified photo galleries, and benchmarked analysis. Empty sections never render.
+
+### Bills Are Generated Views
+
+Invoices are the same timeline data rendered as a document. One data source, multiple presentations. No separate invoice tables that drift from work orders.
+
+**Canonical document:** `docs/library/technical/design-book/vehicle-profile-computation-surface.md`
+
 ---
 
 # PART III: DOMAIN-SPECIFIC FEATURES

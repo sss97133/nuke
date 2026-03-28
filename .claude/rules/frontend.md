@@ -53,6 +53,14 @@ Rules:
 - Never render a CollapsibleWidget whose body says "No data available"
 - If backend pipeline doesn't exist yet, don't render the widget
 
+## Surgical Edits, Not Rewrites
+- NEVER do a total file replacement on an existing component. Read it first. Understand what it does. Fix the specific issue.
+- A bug fix is 3-10 lines of change, not a 400-line Write tool call.
+- Before creating a new component, check if the functionality already exists in a different component that can be extended.
+- Before creating a new database table, check if the data fits into an existing table (especially: vehicle_timeline, vehicle_observations, vehicle_images, work_orders, work_order_line_items).
+- The vehicle profile is the CONVERGENCE POINT. Do not create parallel display systems. Feed data into the existing structures.
+- Read `docs/library/technical/design-book/vehicle-profile-computation-surface.md` before touching any vehicle profile code.
+
 ## Reference Files
 - Design reference: `/Users/skylar/Downloads/nuke-session-files/`
 - Design book: `docs/library/technical/design-book/`

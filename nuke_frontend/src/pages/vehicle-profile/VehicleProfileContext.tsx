@@ -106,6 +106,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   // ── Hero ──
   const [leadImageUrl, setLeadImageUrl] = useState<string | null>(null);
   const [heroMeta, setHeroMeta] = useState<HeroImageMeta | null>(null);
+  // Once selectBestHeroImage picks a hero, don't let stale closures override it
+  const heroResolvedRef = React.useRef(false);
 
   // ── Auction ──
   const [auctionPulse, setAuctionPulse] = useState<AuctionPulse | null>(null);
@@ -181,10 +183,12 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       setTimelineEvents,
       setAuctionPulse: setAuctionPulse as any,
     });
+    heroResolvedRef.current = false;
     selectBestHeroImage(vehicleId, supabase).then((result) => {
       if (result?.url) {
         setLeadImageUrl(result.url);
         setHeroMeta(result.meta);
+        heroResolvedRef.current = true;
       }
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -199,12 +203,13 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       if (heroResult?.url) {
         setLeadImageUrl(heroResult.url);
         setHeroMeta(heroResult.meta);
+        heroResolvedRef.current = true;
         return;
       }
     } catch {
       // Ignore and fall back to the resolver lead below.
     }
-    if (result.leadUrl) {
+    if (result.leadUrl && !heroResolvedRef.current) {
       setLeadImageUrl(result.leadUrl);
       setHeroMeta(null);
     }
@@ -213,13 +218,60 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   const loadTimelineEvents = useCallback(async () => {
     if (!vehicleId) return;
     try {
-      const { data, error } = await supabase
-        .from('timeline_events')
-        .select('*')
-        .eq('vehicle_id', vehicleId)
-        .order('event_date', { ascending: false })
-        .limit(200);
-      if (!error && data) setTimelineEvents(data);
+      // Load timeline_events and work_sessions in parallel, merge into unified timeline
+      const [tlResult, wsResult] = await Promise.all([
+        supabase
+          .from('timeline_events')
+          .select('*')
+          .eq('vehicle_id', vehicleId)
+          .order('event_date', { ascending: false })
+          .limit(200),
+        supabase
+          .from('work_sessions')
+          .select('id, session_date, title, work_type, image_count, duration_minutes, total_parts_cost, work_description, status, total_labor_cost, total_job_cost')
+          .eq('vehicle_id', vehicleId)
+          .order('session_date', { ascending: false }),
+      ]);
+
+      const events: any[] = [];
+      if (!tlResult.error && tlResult.data) events.push(...tlResult.data);
+
+      // Convert work_sessions to timeline event shape and merge
+      if (!wsResult.error && wsResult.data) {
+        const existingDates = new Set(events.map((e: any) => e.event_date?.slice(0, 10)));
+        for (const ws of wsResult.data) {
+          // Add as a work_session event type so BarcodeTimeline can render it
+          events.push({
+            id: ws.id,
+            vehicle_id: vehicleId,
+            event_date: ws.session_date,
+            event_type: 'work_session',
+            title: ws.title,
+            category: ws.work_type,
+            cost_amount: (ws.total_job_cost || 0) + (ws.total_parts_cost || 0),
+            metadata: {
+              work_type: ws.work_type,
+              image_count: ws.image_count,
+              duration_minutes: ws.duration_minutes,
+              total_parts_cost: ws.total_parts_cost,
+              total_labor_cost: ws.total_labor_cost,
+              total_job_cost: ws.total_job_cost,
+              work_description: ws.work_description,
+              status: ws.status,
+              source: 'work_sessions',
+            },
+          });
+        }
+      }
+
+      // Sort by event_date descending
+      events.sort((a: any, b: any) => {
+        const da = a.event_date || a.session_date || '';
+        const db = b.event_date || b.session_date || '';
+        return db.localeCompare(da);
+      });
+
+      setTimelineEvents(events);
     } catch { /* ignore */ }
   }, [vehicleId]);
 
@@ -631,7 +683,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
               const urls = filterNonPhotoUrls(parsed.filter((u: any) => typeof u === 'string' && u.startsWith('http')));
               if (urls.length > 0) {
                 setFallbackListingImageUrls(urls);
-                if (!leadImageUrl && urls[0]) setLeadImageUrl(urls[0]);
+                if (!leadImageUrl && !heroResolvedRef.current && urls[0]) setLeadImageUrl(urls[0]);
                 return;
               }
             }
@@ -655,7 +707,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
             if (filtered.length > 0) {
               setFallbackListingImageUrls(filtered);
               try { window.localStorage.setItem(cacheKey, JSON.stringify(filtered.slice(0, 250))); } catch { /* ignore */ }
-              if (!leadImageUrl && filtered[0]) setLeadImageUrl(filtered[0]);
+              if (!leadImageUrl && !heroResolvedRef.current && filtered[0]) setLeadImageUrl(filtered[0]);
             }
           } catch { /* ignore */ }
           return;
@@ -673,7 +725,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         if (filtered.length > 0) {
           setFallbackListingImageUrls(filtered);
           try { window.localStorage.setItem(cacheKey, JSON.stringify(filtered.slice(0, 250))); } catch { /* ignore */ }
-          if (!leadImageUrl && filtered[0]) setLeadImageUrl(filtered[0]);
+          if (!leadImageUrl && !heroResolvedRef.current && filtered[0]) setLeadImageUrl(filtered[0]);
         }
       } catch { /* ignore */ }
     })();

@@ -15,6 +15,7 @@ export interface FetchResult {
   costCents: number;  // 0 for direct, ~1 for firecrawl
   error?: string;
   statusCode?: number;
+  authRequired?: boolean;  // True if redirected to login or login page detected
 }
 
 export interface FetchOptions {
@@ -40,6 +41,45 @@ const BROWSER_HEADERS = {
 };
 
 /**
+ * Detect if HTML content is a login page rather than actual content.
+ * Shared across all fetchers to prevent caching login pages as valid content.
+ */
+export function isLoginPage(html: string): boolean {
+  const lower = html.toLowerCase();
+
+  // Generic login form indicators
+  if (lower.includes('id="login-form"')) return true;
+  if (lower.includes('action="/login"') || lower.includes('action="/account/login"')) return true;
+  if (lower.includes('action="/wp-login.php"')) return true;
+  if (lower.includes('name="log"') && lower.includes('name="pwd"')) return true;
+
+  // Login page title indicators
+  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  if (titleMatch) {
+    const title = titleMatch[1].toLowerCase();
+    if (title.includes('log in') || title.includes('login') || title.includes('sign in')) return true;
+  }
+
+  // Platform-specific: BaT login
+  if (lower.includes('bringatrailer.com') && lower.includes('wp-login')) return true;
+
+  // Platform-specific: common SSO/OAuth redirects that render as pages
+  if (lower.includes('id="auth0-lock-container"')) return true;
+  if (lower.includes('accounts.google.com/signin')) return true;
+
+  // Common login page body patterns (multiple signals needed to avoid false positives)
+  const loginSignals = [
+    lower.includes('type="password"'),
+    lower.includes('forgot password') || lower.includes('forgot your password'),
+    lower.includes('sign in to') || lower.includes('log in to'),
+    lower.includes('create an account') || lower.includes('register'),
+  ].filter(Boolean).length;
+  if (loginSignals >= 2) return true;
+
+  return false;
+}
+
+/**
  * Transparent hybrid fetcher for BaT pages
  * Always tries free direct fetch first, falls back to Firecrawl only on rate limits
  */
@@ -54,7 +94,7 @@ export async function fetchBatPage(
     waitForJs = 3000,
   } = options || {};
 
-  // STEP 1: Try direct fetch (FREE)
+  // STEP 1: Try direct fetch (FREE) with redirect: "manual" to detect login redirects
   if (!forceFirecrawl) {
     try {
       const controller = new AbortController();
@@ -63,18 +103,77 @@ export async function fetchBatPage(
       const response = await fetch(url, {
         headers: BROWSER_HEADERS,
         signal: controller.signal,
+        redirect: 'manual',  // CRITICAL: detect login/auth redirects instead of silently following
       });
 
       clearTimeout(timeoutId);
 
-      if (response.ok) {
+      // Detect redirects — usually means rate limit or auth required
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location') || '';
+        if (location.includes('/account/login') || location.includes('/login') || location.includes('wp-login')) {
+          console.error(`[batFetcher] AUTH_REQUIRED: Redirected to login (${response.status} -> ${location.slice(0, 100)})`);
+          return {
+            html: null,
+            source: 'direct',
+            costCents: 0,
+            statusCode: response.status,
+            error: `AUTH_REQUIRED: Redirected to login (${response.status})`,
+            authRequired: true,
+          };
+        }
+        if (location.includes('cloudflare') || location.includes('challenge')) {
+          console.error(`[batFetcher] BLOCKED: Cloudflare challenge redirect (${response.status})`);
+          // Fall through to Firecrawl which may bypass Cloudflare
+        } else {
+          // Legitimate redirect (www -> non-www, http -> https, etc.) — follow it manually
+          console.log(`[batFetcher] Following redirect ${response.status} -> ${location.slice(0, 100)}`);
+          try {
+            const redirectResp = await fetch(location || url, {
+              headers: BROWSER_HEADERS,
+              signal: AbortSignal.timeout(timeout),
+              redirect: 'manual',
+            });
+            if (redirectResp.ok) {
+              const html = await redirectResp.text();
+              if (isLoginPage(html)) {
+                console.error(`[batFetcher] AUTH_REQUIRED: Redirect target is a login page`);
+                return {
+                  html: null,
+                  source: 'direct',
+                  costCents: 0,
+                  statusCode: redirectResp.status,
+                  error: 'AUTH_REQUIRED: Redirect target is a login page',
+                  authRequired: true,
+                };
+              }
+              console.log(`[batFetcher] Direct fetch SUCCESS (after redirect) for ${url} (${html.length} bytes)`);
+              return { html, source: 'direct', costCents: 0, statusCode: redirectResp.status };
+            }
+          } catch (_) {
+            // Redirect follow failed — fall through to Firecrawl
+          }
+        }
+      } else if (response.ok) {
         const html = await response.text();
+
+        // Check if we got a login page disguised as 200 OK
+        if (isLoginPage(html)) {
+          console.error(`[batFetcher] AUTH_REQUIRED: Got login page instead of content (${html.length} bytes)`);
+          return {
+            html: null,
+            source: 'direct',
+            costCents: 0,
+            statusCode: response.status,
+            error: 'AUTH_REQUIRED: Got login page instead of listing',
+            authRequired: true,
+          };
+        }
+
         console.log(`[batFetcher] Direct fetch SUCCESS for ${url} (${html.length} bytes)`);
         return { html, source: 'direct', costCents: 0, statusCode: response.status };
-      }
-
-      // Rate limited - Firecrawl can help
-      if (response.status === 403 || response.status === 429) {
+      } else if (response.status === 403 || response.status === 429) {
+        // Rate limited - Firecrawl can help
         console.log(`[batFetcher] Rate limited (HTTP ${response.status}), will try Firecrawl...`);
         // Fall through to Firecrawl
       } else {
@@ -158,6 +257,17 @@ export async function fetchBatPage(
     const result = await fcResponse.json();
 
     if (result.success && result.data?.html) {
+      // Even Firecrawl can return a login page (e.g. if the site has a hard auth wall)
+      if (isLoginPage(result.data.html)) {
+        console.error(`[batFetcher] AUTH_REQUIRED: Firecrawl returned login page for ${url}`);
+        return {
+          html: null,
+          source: 'firecrawl',
+          costCents: FIRECRAWL_COST_CENTS,
+          error: 'AUTH_REQUIRED: Firecrawl returned login page',
+          authRequired: true,
+        };
+      }
       console.log(`[batFetcher] Firecrawl SUCCESS for ${url} (${result.data.html.length} bytes)`);
       return {
         html: result.data.html,
