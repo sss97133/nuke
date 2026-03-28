@@ -14,6 +14,9 @@
 - [docs] Canonical vehicle profile computation surface doc, dictionary updates (6 terms), frontend rules (surgical edits), encyclopedia update (Section 11.5), MEMORY.md pointer
 - [frontend] Vehicle profile build data surgically integrated into existing timeline. Work sessions merged into timelineEvents (VehicleProfileContext), BarcodeTimeline enhanced with work_session event type, receipt popup shows work detail + OPEN DAY CARD button, DayCard supports popup mode (auto-load via get_daily_work_receipt RPC), BuildLog removed from WorkspaceContent (was parallel system), GenerateBill + WorkOrderProgress moved into BuildStatus panel.
 - [docs] Library gaps filled: vehicle-profile-computation-surface.md section 7 on timeline data merging (work_sessions + timeline_events), dictionary Work Session definition. Gaps found: schematics/vehicle-profile.md missing BuildStatusPanel/DayCard, 04-screens.md component inventory stale.
+- [docs] PROJECT_STATE.md updated to 2026-03-28: current state, completed today (security/frontend/pipeline/FB/build-tracking/stylometrics/library/K2500/vehicle-profile), recently completed, resolved issues, updated next work priorities
+- [docs] vehicle-profile.md schematic updated: work sessions in BarcodeTimeline, DayCard popup via PopupStack, BuildStatusPanel with WorkOrderProgress + GenerateBill, layout diagram updated with build status section
+- [edge-function] Built and deployed send-invoice-email edge function. Sends HTML invoice emails via Resend _shared/email.ts. Accepts structured data (to, subject, invoice_number, customer_name, vehicle_title, invoice_date, total, paid, balance, line_items), builds clean HTML email, sends via Resend, updates generated_invoices.sent_at. Added to TOOLS.md under Work Order Intelligence. Smoke tested successfully.
 ## 2026-03-27
 
 ### [data] Vehicle Realization Plan v2 — table-driven decomposition
