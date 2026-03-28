@@ -1,14 +1,11 @@
 /**
  * ModelPopup — When you click a model badge.
  *
- * Principle: "Show specific things, not summaries."
- *
- * Shows actual recent sales with images, prices, and dates.
- * Shows for-sale count, not meaningless medians.
- * Every vehicle card is clickable into the popup stack.
+ * Single RPC call via popup_model_intel() — one round trip.
+ * Shows actual vehicles, price scatter, sources. No garbage aggregates.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { usePopup } from './usePopup';
 import { VehiclePopup } from './VehiclePopup';
@@ -20,7 +17,17 @@ interface Props {
   searchQuery?: string;
 }
 
-interface RecentSale {
+interface ModelIntel {
+  total: number;
+  for_sale: number;
+  recent_sales: SaleVehicle[];
+  live_now: SaleVehicle[];
+  price_scatter: { y: number; p: number }[];
+  year_range: { min: number; max: number } | null;
+  sources: { label: string; cnt: number }[];
+}
+
+interface SaleVehicle {
   id: string;
   year: number | null;
   make: string | null;
@@ -30,13 +37,6 @@ interface RecentSale {
   sale_date: string | null;
   mileage: number | null;
   nuke_estimate: number | null;
-}
-
-interface ModelData {
-  total: number;
-  forSale: number;
-  recentSales: RecentSale[];
-  liveNow: RecentSale[];
 }
 
 function formatPrice(n: number | null): string {
@@ -51,50 +51,25 @@ const SANS = 'Arial, Helvetica, sans-serif';
 
 export function ModelPopup({ make, model, searchQuery }: Props) {
   const { openPopup } = usePopup();
-  const [data, setData] = useState<ModelData | null>(null);
+  const [data, setData] = useState<ModelIntel | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      // Count total + for sale
-      const [{ count: total }, { count: forSale }] = await Promise.all([
-        supabase.from('vehicles').select('id', { count: 'exact', head: true })
-          .eq('is_public', true).eq('make', make).eq('model', model),
-        supabase.from('vehicles').select('id', { count: 'exact', head: true })
-          .eq('is_public', true).eq('make', make).eq('model', model).eq('is_for_sale', true),
-      ]);
-
-      if (cancelled) return;
-
-      // Recent sales (with images, dates, mileage)
-      const { data: recent } = await supabase
-        .from('vehicles')
-        .select('id, year, make, model, sale_price, primary_image_url, sale_date, mileage, nuke_estimate')
-        .eq('is_public', true).eq('make', make).eq('model', model)
-        .not('sale_price', 'is', null).gt('sale_price', 0)
-        .order('sale_date', { ascending: false, nullsFirst: false })
-        .limit(6);
-
-      // Live now
-      const { data: live } = await supabase
-        .from('vehicles')
-        .select('id, year, make, model, sale_price, primary_image_url, sale_date, mileage, nuke_estimate')
-        .eq('is_public', true).eq('make', make).eq('model', model)
-        .eq('is_for_sale', true)
-        .order('created_at', { ascending: false })
-        .limit(4);
-
-      if (!cancelled) {
-        setData({
-          total: total || 0,
-          forSale: forSale || 0,
-          recentSales: (recent || []) as RecentSale[],
-          liveNow: (live || []) as RecentSale[],
+      try {
+        const { data: result, error } = await supabase.rpc('popup_model_intel', {
+          p_make: make,
+          p_model: model,
         });
-        setLoading(false);
+        if (!cancelled && !error && result) {
+          setData(result as ModelIntel);
+        }
+      } catch {
+        // fallback: nothing
       }
+      if (!cancelled) setLoading(false);
     }
 
     load();
@@ -113,18 +88,16 @@ export function ModelPopup({ make, model, searchQuery }: Props) {
 
   const sq = (searchQuery || '').toLowerCase().trim();
   const filteredSales = sq
-    ? data.recentSales.filter(s =>
+    ? data.recent_sales.filter(s =>
         String(s.year || '').includes(sq) ||
-        (s.model || '').toLowerCase().includes(sq) ||
         formatPrice(s.sale_price).toLowerCase().includes(sq))
-    : data.recentSales;
+    : data.recent_sales;
   const filteredLive = sq
-    ? data.liveNow.filter(s =>
-        String(s.year || '').includes(sq) ||
-        (s.model || '').toLowerCase().includes(sq))
-    : data.liveNow;
+    ? data.live_now.filter(s =>
+        String(s.year || '').includes(sq))
+    : data.live_now;
 
-  const handleVehicleClick = (sale: RecentSale) => {
+  const handleVehicleClick = (sale: SaleVehicle) => {
     supabase.from('vehicles').select('*').eq('id', sale.id).single().then(({ data: fullVehicle }) => {
       if (fullVehicle) {
         openPopup(
@@ -143,10 +116,21 @@ export function ModelPopup({ make, model, searchQuery }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Header stats */}
-      <div style={{ padding: '10px 12px', borderBottom: '1px solid #ccc', display: 'flex', gap: 16 }}>
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid #ccc', display: 'flex', gap: 16, alignItems: 'center' }}>
         <StatCell label="TOTAL" value={data.total.toLocaleString()} />
-        {data.forSale > 0 && <StatCell label="FOR SALE NOW" value={data.forSale.toLocaleString()} highlight />}
+        {data.for_sale > 0 && <StatCell label="FOR SALE NOW" value={data.for_sale.toLocaleString()} highlight />}
+        {data.year_range && (
+          <StatCell label="YEARS" value={`${data.year_range.min}–${data.year_range.max}`} />
+        )}
       </div>
+
+      {/* Price scatter — the "shape" of this model's market */}
+      {data.price_scatter.length >= 5 && (
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
+          <SectionLabel>PRICE TOPOLOGY</SectionLabel>
+          <PriceScatter points={data.price_scatter} />
+        </div>
+      )}
 
       {/* Live now */}
       {filteredLive.length > 0 && (
@@ -154,12 +138,7 @@ export function ModelPopup({ make, model, searchQuery }: Props) {
           <SectionLabel>FOR SALE NOW</SectionLabel>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginTop: 6 }}>
             {filteredLive.map((s) => (
-              <VehicleMiniCard
-                key={s.id}
-                sale={s}
-                onClick={() => handleVehicleClick(s)}
-                showEstimate
-              />
+              <VehicleMiniCard key={s.id} sale={s} onClick={() => handleVehicleClick(s)} showEstimate />
             ))}
           </div>
         </div>
@@ -171,11 +150,30 @@ export function ModelPopup({ make, model, searchQuery }: Props) {
           <SectionLabel>RECENT SALES</SectionLabel>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginTop: 6 }}>
             {filteredSales.map((s) => (
-              <VehicleMiniCard
-                key={s.id}
-                sale={s}
-                onClick={() => handleVehicleClick(s)}
-              />
+              <VehicleMiniCard key={s.id} sale={s} onClick={() => handleVehicleClick(s)} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sources */}
+      {data.sources.length > 0 && (
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
+          <SectionLabel>SOURCES</SectionLabel>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+            {data.sources.map((s) => (
+              <span
+                key={s.label}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  fontFamily: SANS, fontSize: 8, fontWeight: 700,
+                  textTransform: 'uppercase', letterSpacing: '0.10em',
+                  padding: '2px 6px', border: '1px solid #ccc', color: '#333',
+                }}
+              >
+                {s.label}
+                <span style={{ fontFamily: MONO, fontSize: 7, fontWeight: 400, color: '#999' }}>{s.cnt}</span>
+              </span>
             ))}
           </div>
         </div>
@@ -228,11 +226,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function VehicleMiniCard({ sale, onClick, showEstimate }: {
-  sale: {
-    id: string; year: number | null; model: string | null;
-    sale_price: number | null; primary_image_url: string | null;
-    sale_date: string | null; mileage: number | null; nuke_estimate: number | null;
-  };
+  sale: SaleVehicle;
   onClick: () => void;
   showEstimate?: boolean;
 }) {
@@ -271,17 +265,101 @@ function VehicleMiniCard({ sale, onClick, showEstimate }: {
             </span>
           )}
         </div>
-        {sale.mileage && (
+        {sale.mileage != null && sale.mileage > 0 && (
           <div style={{ fontFamily: MONO, fontSize: 7, color: '#999' }}>
             {Math.floor(sale.mileage).toLocaleString()} mi
           </div>
         )}
-        {showEstimate && sale.nuke_estimate && sale.nuke_estimate > 0 && (
+        {showEstimate && sale.nuke_estimate != null && sale.nuke_estimate > 0 && (
           <div style={{ fontFamily: MONO, fontSize: 7, color: '#666' }}>
             est. {formatPrice(sale.nuke_estimate)}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * PriceScatter — Canvas-rendered year vs price dot plot.
+ * Shows the "shape" of a model's market — where the heat is.
+ */
+function PriceScatter({ points }: { points: { y: number; p: number }[] }) {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+  const { minY, maxY, minP, maxP } = useMemo(() => {
+    const years = points.map(d => d.y);
+    const prices = points.map(d => d.p);
+    return {
+      minY: Math.min(...years),
+      maxY: Math.max(...years),
+      minP: 0,
+      maxP: Math.max(...prices),
+    };
+  }, [points]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    ctx.scale(dpr, dpr);
+
+    // Clear
+    ctx.fillStyle = '#f8f8f8';
+    ctx.fillRect(0, 0, w, h);
+
+    const pad = { l: 36, r: 8, t: 6, b: 16 };
+    const pw = w - pad.l - pad.r;
+    const ph = h - pad.t - pad.b;
+    const yearSpan = maxY - minY || 1;
+    const priceSpan = maxP - minP || 1;
+
+    // Y-axis labels
+    ctx.fillStyle = '#999';
+    ctx.font = '7px Arial';
+    ctx.textAlign = 'right';
+    const priceTicks = [0, Math.round(maxP / 2), maxP];
+    for (const tick of priceTicks) {
+      const py = pad.t + ph - (tick / priceSpan) * ph;
+      ctx.fillText(tick >= 1000 ? `$${Math.round(tick / 1000)}K` : `$${tick}`, pad.l - 4, py + 3);
+      ctx.strokeStyle = '#e8e8e8';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(pad.l, py);
+      ctx.lineTo(pad.l + pw, py);
+      ctx.stroke();
+    }
+
+    // X-axis labels
+    ctx.textAlign = 'center';
+    const yearTicks = [minY, Math.round((minY + maxY) / 2), maxY];
+    for (const tick of yearTicks) {
+      const px = pad.l + ((tick - minY) / yearSpan) * pw;
+      ctx.fillText(String(tick), px, h - 2);
+    }
+
+    // Dots
+    for (const pt of points) {
+      const px = pad.l + ((pt.y - minY) / yearSpan) * pw;
+      const py = pad.t + ph - ((pt.p - minP) / priceSpan) * ph;
+      ctx.beginPath();
+      ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(42, 42, 42, 0.5)';
+      ctx.fill();
+    }
+  }, [points, minY, maxY, minP, maxP]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{ width: '100%', height: 90, marginTop: 4, display: 'block' }}
+    />
   );
 }
