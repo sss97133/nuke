@@ -1,11 +1,11 @@
 /**
  * ModelPopup — When you click a model badge.
  *
- * Vehicle count, price range, year range.
- * Recent sales (each clickable -> VehiclePopup).
- * "VIEW IN FEED" button.
+ * Principle: "Show specific things, not summaries."
  *
- * NEVER shows "average price." Uses median, price range, or specific comps.
+ * Shows actual recent sales with images, prices, and dates.
+ * Shows for-sale count, not meaningless medians.
+ * Every vehicle card is clickable into the popup stack.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -28,14 +28,15 @@ interface RecentSale {
   sale_price: number | null;
   primary_image_url: string | null;
   sale_date: string | null;
+  mileage: number | null;
+  nuke_estimate: number | null;
 }
 
 interface ModelData {
   total: number;
-  medianPrice: number | null;
-  priceRange: [number, number] | null;
-  yearRange: [number, number] | null;
+  forSale: number;
   recentSales: RecentSale[];
+  liveNow: RecentSale[];
 }
 
 function formatPrice(n: number | null): string {
@@ -45,9 +46,11 @@ function formatPrice(n: number | null): string {
   return `$${n.toLocaleString()}`;
 }
 
+const MONO = "'Courier New', Courier, monospace";
+const SANS = 'Arial, Helvetica, sans-serif';
+
 export function ModelPopup({ make, model, searchQuery }: Props) {
   const { openPopup } = usePopup();
-  const navigate = useNavigate();
   const [data, setData] = useState<ModelData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -55,58 +58,40 @@ export function ModelPopup({ make, model, searchQuery }: Props) {
     let cancelled = false;
 
     async function load() {
-      // Count
-      const { count } = await supabase
-        .from('vehicles')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_public', true)
-        .eq('make', make)
-        .eq('model', model);
-
-      // Prices + years
-      const { data: priceRows } = await supabase
-        .from('vehicles')
-        .select('sale_price, year')
-        .eq('is_public', true)
-        .eq('make', make)
-        .eq('model', model)
-        .not('sale_price', 'is', null)
-        .gt('sale_price', 0)
-        .limit(300);
+      // Count total + for sale
+      const [{ count: total }, { count: forSale }] = await Promise.all([
+        supabase.from('vehicles').select('id', { count: 'exact', head: true })
+          .eq('is_public', true).eq('make', make).eq('model', model),
+        supabase.from('vehicles').select('id', { count: 'exact', head: true })
+          .eq('is_public', true).eq('make', make).eq('model', model).eq('is_for_sale', true),
+      ]);
 
       if (cancelled) return;
 
-      const prices = (priceRows || []).map((r: any) => r.sale_price as number).sort((a: number, b: number) => a - b);
-      const years = (priceRows || []).map((r: any) => r.year as number).filter((y: number) => y > 1800);
-      const mid = Math.floor(prices.length / 2);
-      const medianPrice = prices.length > 0
-        ? (prices.length % 2 === 0 ? Math.round((prices[mid - 1] + prices[mid]) / 2) : prices[mid])
-        : null;
-      const priceRange: [number, number] | null = prices.length > 0
-        ? [prices[0], prices[prices.length - 1]] : null;
-      const yearRange: [number, number] | null = years.length > 0
-        ? [Math.min(...years), Math.max(...years)] : null;
-
-      // Recent sales
+      // Recent sales (with images, dates, mileage)
       const { data: recent } = await supabase
         .from('vehicles')
-        .select('id, year, make, model, sale_price, primary_image_url, sale_date')
-        .eq('is_public', true)
-        .eq('make', make)
-        .eq('model', model)
-        .not('sale_price', 'is', null)
-        .gt('sale_price', 0)
-        .not('primary_image_url', 'is', null)
+        .select('id, year, make, model, sale_price, primary_image_url, sale_date, mileage, nuke_estimate')
+        .eq('is_public', true).eq('make', make).eq('model', model)
+        .not('sale_price', 'is', null).gt('sale_price', 0)
+        .order('sale_date', { ascending: false, nullsFirst: false })
+        .limit(6);
+
+      // Live now
+      const { data: live } = await supabase
+        .from('vehicles')
+        .select('id, year, make, model, sale_price, primary_image_url, sale_date, mileage, nuke_estimate')
+        .eq('is_public', true).eq('make', make).eq('model', model)
+        .eq('is_for_sale', true)
         .order('created_at', { ascending: false })
         .limit(4);
 
       if (!cancelled) {
         setData({
-          total: count || 0,
-          medianPrice,
-          priceRange,
-          yearRange,
+          total: total || 0,
+          forSale: forSale || 0,
           recentSales: (recent || []) as RecentSale[],
+          liveNow: (live || []) as RecentSale[],
         });
         setLoading(false);
       }
@@ -116,13 +101,10 @@ export function ModelPopup({ make, model, searchQuery }: Props) {
     return () => { cancelled = true; };
   }, [make, model]);
 
-  const mono = "'Courier New', monospace";
-  const sans = 'Arial, sans-serif';
-
   if (loading || !data) {
     return (
       <div style={{ padding: 20, textAlign: 'center' }}>
-        <span style={{ fontFamily: sans, fontSize: 8, fontWeight: 700, textTransform: 'uppercase', color: '#999', letterSpacing: '0.5px' }}>
+        <span style={{ fontFamily: SANS, fontSize: 8, fontWeight: 700, textTransform: 'uppercase', color: '#999', letterSpacing: '0.5px' }}>
           LOADING...
         </span>
       </div>
@@ -134,25 +116,24 @@ export function ModelPopup({ make, model, searchQuery }: Props) {
     ? data.recentSales.filter(s =>
         String(s.year || '').includes(sq) ||
         (s.model || '').toLowerCase().includes(sq) ||
-        (s.make || '').toLowerCase().includes(sq) ||
         formatPrice(s.sale_price).toLowerCase().includes(sq))
     : data.recentSales;
+  const filteredLive = sq
+    ? data.liveNow.filter(s =>
+        String(s.year || '').includes(sq) ||
+        (s.model || '').toLowerCase().includes(sq))
+    : data.liveNow;
 
   const handleVehicleClick = (sale: RecentSale) => {
-    supabase
-      .from('vehicles')
-      .select('*')
-      .eq('id', sale.id)
-      .single()
-      .then(({ data: fullVehicle }) => {
-        if (fullVehicle) {
-          openPopup(
-            <VehiclePopup vehicle={fullVehicle as unknown as FeedVehicle} />,
-            [sale.year, sale.make, sale.model].filter(Boolean).join(' '),
-            420,
-          );
-        }
-      });
+    supabase.from('vehicles').select('*').eq('id', sale.id).single().then(({ data: fullVehicle }) => {
+      if (fullVehicle) {
+        openPopup(
+          <VehiclePopup vehicle={fullVehicle as unknown as FeedVehicle} />,
+          [sale.year, sale.make, sale.model].filter(Boolean).join(' '),
+          480,
+        );
+      }
+    });
   };
 
   const handleOpenTab = () => {
@@ -161,25 +142,28 @@ export function ModelPopup({ make, model, searchQuery }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {/* Aggregates */}
-      <div style={{
-        padding: '10px 12px', borderBottom: '1px solid #ccc',
-        display: 'flex', gap: 16, flexWrap: 'wrap',
-      }}>
-        <StatCell label="VEHICLES" value={data.total.toLocaleString()} />
-        {data.medianPrice && <StatCell label="MEDIAN PRICE" value={formatPrice(data.medianPrice)} />}
-        {data.priceRange && (
-          <StatCell label="PRICE RANGE" value={`${formatPrice(data.priceRange[0])} - ${formatPrice(data.priceRange[1])}`} />
-        )}
-        {data.yearRange && (
-          <StatCell
-            label="YEARS"
-            value={data.yearRange[0] === data.yearRange[1]
-              ? String(data.yearRange[0])
-              : `${data.yearRange[0]}-${data.yearRange[1]}`}
-          />
-        )}
+      {/* Header stats */}
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid #ccc', display: 'flex', gap: 16 }}>
+        <StatCell label="TOTAL" value={data.total.toLocaleString()} />
+        {data.forSale > 0 && <StatCell label="FOR SALE NOW" value={data.forSale.toLocaleString()} highlight />}
       </div>
+
+      {/* Live now */}
+      {filteredLive.length > 0 && (
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
+          <SectionLabel>FOR SALE NOW</SectionLabel>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginTop: 6 }}>
+            {filteredLive.map((s) => (
+              <VehicleMiniCard
+                key={s.id}
+                sale={s}
+                onClick={() => handleVehicleClick(s)}
+                showEstimate
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Recent sales */}
       {filteredSales.length > 0 && (
@@ -187,58 +171,22 @@ export function ModelPopup({ make, model, searchQuery }: Props) {
           <SectionLabel>RECENT SALES</SectionLabel>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginTop: 6 }}>
             {filteredSales.map((s) => (
-              <div
+              <VehicleMiniCard
                 key={s.id}
+                sale={s}
                 onClick={() => handleVehicleClick(s)}
-                style={{
-                  cursor: 'pointer', border: '1px solid #ccc',
-                  background: '#fff', overflow: 'hidden',
-                  transition: 'border-color 150ms ease',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2a2a2a'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#ccc'; }}
-              >
-                <div style={{ width: '100%', paddingTop: '66%', position: 'relative', background: '#e0e0e0' }}>
-                  {s.primary_image_url && (
-                    <img
-                      src={s.primary_image_url}
-                      alt={[s.year, s.make, s.model].filter(Boolean).join(' ')}
-                      loading="lazy"
-                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  )}
-                </div>
-                <div style={{ padding: '3px 5px' }}>
-                  <div style={{
-                    fontFamily: sans, fontSize: 8, fontWeight: 700,
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    color: '#1a1a1a',
-                  }}>
-                    {[s.year, s.model].filter(Boolean).join(' ')}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, color: '#16825d' }}>
-                      {formatPrice(s.sale_price)}
-                    </span>
-                    {s.sale_date && (
-                      <span style={{ fontFamily: mono, fontSize: 7, color: '#999' }}>
-                        {new Date(s.sale_date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
+              />
             ))}
           </div>
         </div>
       )}
 
-      {/* TAB — opens filtered feed in new browser tab */}
+      {/* TAB */}
       <div style={{ padding: '10px 12px', textAlign: 'right' }}>
         <button
           onClick={handleOpenTab}
           style={{
-            fontFamily: sans, fontSize: 9, fontWeight: 800,
+            fontFamily: SANS, fontSize: 9, fontWeight: 800,
             textTransform: 'uppercase', letterSpacing: '0.3px',
             padding: '4px 12px', border: '2px solid #2a2a2a',
             background: '#2a2a2a', color: '#fff',
@@ -258,20 +206,13 @@ export function ModelPopup({ make, model, searchQuery }: Props) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function StatCell({ label, value }: { label: string; value: string }) {
+function StatCell({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <span style={{
-        fontFamily: 'Arial, sans-serif', fontSize: 7, fontWeight: 800,
-        textTransform: 'uppercase', letterSpacing: '0.5px',
-        color: '#999', lineHeight: 1,
-      }}>
+      <span style={{ fontFamily: SANS, fontSize: 7, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#999', lineHeight: 1 }}>
         {label}
       </span>
-      <span style={{
-        fontFamily: "'Courier New', monospace", fontSize: 11, fontWeight: 700,
-        color: '#1a1a1a', lineHeight: 1.2,
-      }}>
+      <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: highlight ? '#0078d4' : '#1a1a1a', lineHeight: 1.2 }}>
         {value}
       </span>
     </div>
@@ -280,12 +221,67 @@ function StatCell({ label, value }: { label: string; value: string }) {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span style={{
-      fontFamily: 'Arial, sans-serif', fontSize: 7, fontWeight: 800,
-      textTransform: 'uppercase', letterSpacing: '0.5px',
-      color: '#999', lineHeight: 1,
-    }}>
+    <span style={{ fontFamily: SANS, fontSize: 7, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#999', lineHeight: 1 }}>
       {children}
     </span>
+  );
+}
+
+function VehicleMiniCard({ sale, onClick, showEstimate }: {
+  sale: {
+    id: string; year: number | null; model: string | null;
+    sale_price: number | null; primary_image_url: string | null;
+    sale_date: string | null; mileage: number | null; nuke_estimate: number | null;
+  };
+  onClick: () => void;
+  showEstimate?: boolean;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        cursor: 'pointer', border: '1px solid #ccc',
+        background: '#fff', overflow: 'hidden',
+        transition: 'border-color 150ms ease',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2a2a2a'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#ccc'; }}
+    >
+      <div style={{ width: '100%', paddingTop: '60%', position: 'relative', background: '#e0e0e0' }}>
+        {sale.primary_image_url && (
+          <img
+            src={sale.primary_image_url}
+            alt={[sale.year, sale.model].filter(Boolean).join(' ')}
+            loading="lazy"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        )}
+      </div>
+      <div style={{ padding: '3px 5px' }}>
+        <div style={{ fontFamily: SANS, fontSize: 8, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#1a1a1a' }}>
+          {[sale.year, sale.model].filter(Boolean).join(' ')}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: '#16825d' }}>
+            {formatPrice(sale.sale_price)}
+          </span>
+          {sale.sale_date && (
+            <span style={{ fontFamily: MONO, fontSize: 7, color: '#999' }}>
+              {new Date(sale.sale_date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}
+            </span>
+          )}
+        </div>
+        {sale.mileage && (
+          <div style={{ fontFamily: MONO, fontSize: 7, color: '#999' }}>
+            {Math.floor(sale.mileage).toLocaleString()} mi
+          </div>
+        )}
+        {showEstimate && sale.nuke_estimate && sale.nuke_estimate > 0 && (
+          <div style={{ fontFamily: MONO, fontSize: 7, color: '#666' }}>
+            est. {formatPrice(sale.nuke_estimate)}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
