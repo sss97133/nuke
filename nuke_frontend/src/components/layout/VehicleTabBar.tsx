@@ -99,7 +99,7 @@ export const VehicleTabBar: React.FC = () => {
               }}
               title={t.title}
             >
-              {t.title}
+              {isActive ? '●' : t.title}
             </button>
             <button
               type="button"
