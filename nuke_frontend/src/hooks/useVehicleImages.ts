@@ -1,7 +1,8 @@
 // Vehicle Image Pipeline Hook
 // Centralized image loading and management for all components
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 
 export interface VehicleImage {
@@ -22,128 +23,99 @@ export interface VehicleImage {
   created_at: string;
 }
 
+const hasWindow = typeof window !== 'undefined';
+const hostKey = hasWindow ? String(window.location?.host || '') : 'server';
+const tableMissingKey = `table_missing_vehicle_images__${hostKey}`;
+
+function isTableMarkedMissing(): boolean {
+  if (!hasWindow) return false;
+  try {
+    return window.localStorage.getItem(tableMissingKey) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markTableMissing(): void {
+  if (!hasWindow) return;
+  try {
+    window.localStorage.setItem(tableMissingKey, '1');
+  } catch {
+    // ignore
+  }
+}
+
+function isValidVehicleId(vehicleId: string | undefined): boolean {
+  return !!vehicleId && vehicleId.length >= 20 && vehicleId.includes('-');
+}
+
+async function fetchVehicleImages(vehicleId: string): Promise<VehicleImage[]> {
+  if (isTableMarkedMissing()) return [];
+
+  const { data, error: fetchError } = await supabase
+    .from('vehicle_images')
+    .select('id, vehicle_id, image_url, file_name, caption, is_primary, category, variants, created_at, taken_at')
+    .eq('vehicle_id', vehicleId)
+    // Legacy rows may have is_document = NULL; treat that as "not a document"
+    .not('is_document', 'is', true)
+    // Quarantine/duplicate rows should never appear in standard galleries
+    .or('is_duplicate.is.null,is_duplicate.eq.false')
+    // Hide AI-detected mismatched/unrelated images
+    .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
+    .order('is_primary', { ascending: false })
+    .order('created_at', { ascending: false });
+    // NO LIMIT - show ALL images from all sources
+
+  if (fetchError) {
+    const status = (fetchError as any)?.status ?? (fetchError as any)?.statusCode;
+    const code = String((fetchError as any)?.code || '').toUpperCase();
+    const msg = String((fetchError as any)?.message || '').toLowerCase();
+    const isMissingColumn =
+      code === '42703' ||
+      (msg.includes('column') && msg.includes('does not exist'));
+
+    const missing =
+      code === '42P01' ||
+      (status === 404 && !isMissingColumn);
+    if (missing) {
+      markTableMissing();
+      return [];
+    }
+    console.error('Supabase error:', fetchError);
+    throw fetchError;
+  }
+
+  return data || [];
+}
+
 export const useVehicleImages = (vehicleId?: string) => {
-  const [images, setImages] = useState<VehicleImage[]>([]);
-  const [primaryImage, setPrimaryImage] = useState<VehicleImage | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const enabled = isValidVehicleId(vehicleId);
 
-  const hasWindow = typeof window !== 'undefined';
-  const hostKey = hasWindow ? String(window.location?.host || '') : 'server';
-  const tableMissingKey = `table_missing_vehicle_images__${hostKey}`;
+  const { data: images = [], isLoading, error: queryError, refetch } = useQuery({
+    queryKey: ['vehicle-images', vehicleId],
+    queryFn: () => fetchVehicleImages(vehicleId!),
+    enabled,
+  });
 
-  const loadImages = async () => {
-    if (!vehicleId) return;
-
-    // Environment guard: if this Supabase project doesn't have `vehicle_images`, treat as no images.
-    if (hasWindow) {
-      try {
-        if (window.localStorage.getItem(tableMissingKey) === '1') {
-          setImages([]);
-          setPrimaryImage(null);
-          setLoading(false);
-          setError(null);
-          return;
-        }
-      } catch {
-        // ignore
-      }
+  const primaryImage = useMemo(() => {
+    if (images.length === 0) return null;
+    let primary = images.find(img => img.is_primary === true);
+    if (!primary) {
+      primary = images.find(img => !img.category?.includes('document')) || images[0];
     }
-    
-    // Skip database query for local storage vehicles (timestamp IDs)
-    if (vehicleId.length < 20 || !vehicleId.includes('-')) {
-      console.log('Skipping database query for local vehicle:', vehicleId);
-      setImages([]);
-      setPrimaryImage(null);
-      setLoading(false);
-      return;
-    }
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('vehicle_images')
-        .select('id, vehicle_id, image_url, file_name, caption, is_primary, category, variants, created_at, taken_at')
-        .eq('vehicle_id', vehicleId)
-        // Legacy rows may have is_document = NULL; treat that as "not a document"
-        .not('is_document', 'is', true)
-        // Quarantine/duplicate rows should never appear in standard galleries
-        .or('is_duplicate.is.null,is_duplicate.eq.false')
-        // Hide AI-detected mismatched/unrelated images
-        .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
-        .order('is_primary', { ascending: false })
-        .order('created_at', { ascending: false });
-        // NO LIMIT - show ALL images from all sources
+    return primary || null;
+  }, [images]);
 
-      if (fetchError) {
-        const status = (fetchError as any)?.status ?? (fetchError as any)?.statusCode;
-        const code = String((fetchError as any)?.code || '').toUpperCase();
-        const msg = String((fetchError as any)?.message || '').toLowerCase();
-        const isMissingColumn =
-          // Postgres "undefined_column" code
-          code === '42703' ||
-          (msg.includes('column') && msg.includes('does not exist'));
-
-        const missing =
-          // Postgres "undefined_table" code
-          code === '42P01' ||
-          // PostgREST returns 404 for missing relations (table/view) in many setups.
-          // Treat that as "table missing" unless we can tell it's a missing-column error.
-          (status === 404 && !isMissingColumn);
-        if (missing) {
-          try {
-            if (hasWindow) window.localStorage.setItem(tableMissingKey, '1');
-          } catch {
-            // ignore
-          }
-          setImages([]);
-          setPrimaryImage(null);
-          setError(null);
-          return;
-        }
-        console.error('Supabase error:', fetchError);
-        throw fetchError;
-      }
-
-      const vehicleImages = data || [];
-      setImages(vehicleImages);
-
-      // Find primary image with enhanced logic
-      let primary = vehicleImages.find(img => img.is_primary === true);
-
-      // If no explicit primary, use first non-document image
-      if (!primary && vehicleImages.length > 0) {
-        primary = vehicleImages.find(img => !img.category?.includes('document')) || vehicleImages[0];
-      }
-
-      setPrimaryImage(primary || null);
-      
-    } catch (err) {
-      console.error('Error loading vehicle images:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load images');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadImages();
-  }, [vehicleId]);
-
-  const refreshImages = () => {
-    loadImages();
-  };
+  const imageUrls = useMemo(() => images.map(img => img.image_url), [images]);
 
   return {
     images,
     primaryImage,
-    loading,
-    error,
-    refreshImages,
-    imageUrls: images.map(img => img.image_url),
-    hasImages: images.length > 0
+    loading: isLoading,
+    error: queryError ? (queryError instanceof Error ? queryError.message : 'Failed to load images') : null,
+    refreshImages: refetch,
+    imageUrls,
+    hasImages: images.length > 0,
   };
 };
 
@@ -162,7 +134,7 @@ export const useVehiclesWithImages = () => {
   const loadVehiclesWithImages = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const { data: auth } = await supabase.auth.getUser();
       const userId = auth?.user?.id || null;
@@ -220,7 +192,7 @@ export const useVehiclesWithImages = () => {
       }));
 
       setVehicles(allVehicles);
-      
+
     } catch (err) {
       console.error('Error loading vehicles with images:', err);
       setError(err instanceof Error ? err.message : 'Failed to load vehicles');

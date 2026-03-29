@@ -18,6 +18,8 @@ import { loadVehicleImpl, selectBestHeroImage, type RpcLoadResult } from './load
 import { loadVehicleImagesImpl } from './loadVehicleImages';
 import { resolveVehicleImages } from './resolveVehicleImages';
 import { resolveCurrencyCode } from '../../utils/currency';
+import { useVehicleIntel } from './hooks/useVehicleIntel';
+import type { VehicleIntel } from './hooks/useVehicleIntel';
 import type { Vehicle, VehiclePermissions, LiveSession, AuctionPulse } from './types';
 import type { HeroImageMeta } from './loadVehicleData';
 
@@ -41,6 +43,10 @@ interface VehicleProfileContextValue {
   timelineEvents: any[];
   totalCommentCount: number;
   observationCount: number;
+
+  // Intelligence
+  vehicleIntel: VehicleIntel | null;
+  vehicleIntelLoading: boolean;
 
   // Hero
   leadImageUrl: string | null;
@@ -152,6 +158,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     canEdit,
   } = useVehiclePermissions(vehicleId || null, session, vehicle);
   const { isAdmin: isAdminUser } = useAdminAccess();
+  const { vehicleIntel, vehicleIntelLoading } = useVehicleIntel(vehicleId);
 
   const userOwnershipClaim = useMemo(() => {
     const uid = session?.user?.id;
@@ -875,6 +882,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     timelineEvents,
     totalCommentCount,
     observationCount,
+    vehicleIntel,
+    vehicleIntelLoading,
     leadImageUrl,
     heroMeta,
     auctionPulse,
@@ -907,6 +916,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   }), [
     vehicleId, vehicle, vehicleImages, fallbackListingImageUrls,
     timelineEvents, totalCommentCount, observationCount,
+    vehicleIntel, vehicleIntelLoading,
     leadImageUrl, heroMeta, auctionPulse, liveSession,
     session, isRowOwner, isVerifiedOwner, hasContributorAccess,
     canEdit, isAdminUser, canTriggerProofAnalysis, userOwnershipClaim,

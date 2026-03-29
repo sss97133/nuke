@@ -128,17 +128,15 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
               }}
               onClick={() => isMobile && setShowGallery(true)}
             >
-              {/* Blurred backdrop in contain mode */}
+              {/* Dark backdrop in contain mode — solid color, not blurred image.
+                  CSS background-image doesn't reliably respect EXIF orientation,
+                  and the blur effect looks bad on portrait images. */}
               {fitMode === 'contain' && (
                 <div
                   style={{
                     position: 'absolute',
-                    inset: '-30px',
-                    backgroundImage: `url(${imgUrl})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat',
-                    filter: 'blur(28px) brightness(0.45)',
+                    inset: 0,
+                    background: '#111',
                   }}
                 />
               )}

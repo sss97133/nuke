@@ -350,22 +350,36 @@ const MakesGrid: React.FC = () => {
   const [filter, setFilter] = useState('');
   const [topModelsMap, setTopModelsMap] = useState<Record<string, TreemapNode[]>>({});
 
-  // Fetch top models for each visible make (batched, top 20 makes)
+  // Fetch top models for top 20 makes in ONE batch RPC call (was 20 individual calls)
   useEffect(() => {
     if (!brands) return;
     let cancelled = false;
-    const topMakes = brands.slice(0, 20);
-    Promise.all(
-      topMakes.map(b =>
-        supabase.rpc('treemap_models_by_brand', { p_make: b.name })
-          .then(({ data }) => ({ make: b.name, models: (data as TreemapNode[] || []).slice(0, 3) }))
-      )
-    ).then(results => {
-      if (cancelled) return;
-      const map: Record<string, TreemapNode[]> = {};
-      results.forEach(r => { map[r.make] = r.models; });
-      setTopModelsMap(map);
-    });
+    const topMakes = brands.slice(0, 20).map(b => b.name);
+    supabase.rpc('treemap_models_batch', { p_makes: topMakes, p_limit: 3 })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data) {
+          // Fallback: individual calls if batch RPC not deployed yet
+          Promise.all(
+            topMakes.map(name =>
+              supabase.rpc('treemap_models_by_brand', { p_make: name })
+                .then(({ data }) => ({ make: name, models: (data as TreemapNode[] || []).slice(0, 3) }))
+            )
+          ).then(results => {
+            if (cancelled) return;
+            const map: Record<string, TreemapNode[]> = {};
+            results.forEach(r => { map[r.make] = r.models; });
+            setTopModelsMap(map);
+          });
+          return;
+        }
+        const map: Record<string, TreemapNode[]> = {};
+        (data as Array<TreemapNode & { brand_name: string }>).forEach(row => {
+          if (!map[row.brand_name]) map[row.brand_name] = [];
+          if (map[row.brand_name].length < 3) map[row.brand_name].push(row);
+        });
+        setTopModelsMap(map);
+      });
     return () => { cancelled = true; };
   }, [brands]);
 

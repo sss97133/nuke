@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useHeaderHeight } from './hooks/useHeaderHeight';
 import { useSession } from './hooks/useSession';
 import { useNotificationBadge } from './hooks/useNotificationBadge';
-import { useAdminStatus } from './hooks/useAdminStatus';
+import { useAdminAccess } from '../../hooks/useAdminAccess';
 import AIDataIngestionSearch from '../search/AIDataIngestionSearch';
 import { UserArea } from './UserArea';
 import { UserDropdown } from './UserDropdown';
@@ -31,7 +31,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const { session, userProfile } = useSession();
   const userId = session?.user?.id;
   const unreadCount = useNotificationBadge(userId);
-  const isAdmin = useAdminStatus(userId);
+  const { isAdmin } = useAdminAccess();
 
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 

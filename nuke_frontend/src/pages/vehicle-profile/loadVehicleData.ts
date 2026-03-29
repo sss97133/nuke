@@ -227,6 +227,17 @@ function buildHeroResult(row: any): HeroImageResult {
   return { url, meta };
 }
 
+export interface RpcLoadResult {
+  /** RPC provided non-truncated images — skip separate loadVehicleImages */
+  images: boolean;
+  /** RPC provided timeline events — skip separate loadTimelineEvents */
+  timeline: boolean;
+  /** Comment count from RPC stats (null if not available) */
+  commentCount: number | null;
+  /** Observation count from RPC stats (null if not available) */
+  observationCount: number | null;
+}
+
 export interface LoadVehicleParams {
   vehicleId: string | undefined;
   session: any;
@@ -257,7 +268,8 @@ export async function loadVehicleImpl({
   setVehicleImages,
   setTimelineEvents,
   setAuctionPulse,
-}: LoadVehicleParams): Promise<void> {
+}: LoadVehicleParams): Promise<RpcLoadResult> {
+  const rpcLoaded: RpcLoadResult = { images: false, timeline: false, commentCount: null, observationCount: null };
   try {
     setLoading(true);
 
@@ -268,7 +280,7 @@ export async function loadVehicleImpl({
     if (!vehicleId || (!isUUID && !isVIN)) {
       console.error('Invalid vehicleId format:', vehicleId);
       navigate('/vehicles');
-      return;
+      return rpcLoaded;
     }
 
     // OPTIMIZED: Try RPC first for fast loading, fallback to direct query if RPC fails
@@ -316,14 +328,14 @@ export async function loadVehicleImpl({
           console.error('[VehicleProfile] Error details:', { code: error.code, message: error.message, details: error.details, hint: error.hint });
           setVehicle(null);
           setLoading(false);
-          return;
+          return rpcLoaded;
         }
 
         if (!data) {
           console.error('[VehicleProfile] Fallback query returned no data (null/undefined)');
           setVehicle(null);
           setLoading(false);
-          return;
+          return rpcLoaded;
         }
 
         vehicleData = data;
@@ -331,7 +343,7 @@ export async function loadVehicleImpl({
         console.error('[VehicleProfile] Fallback query exception:', fallbackError);
         setVehicle(null);
         setLoading(false);
-        return;
+        return rpcLoaded;
       }
     } else {
       vehicleData = rpcData.vehicle;
@@ -345,9 +357,16 @@ export async function loadVehicleImpl({
 
       if (rpcData.images && !rpcImagesTruncated) {
         setVehicleImages(rpcData.images.map((img: any) => img.image_url));
+        rpcLoaded.images = true;
       }
       if (rpcData.timeline_events) {
         setTimelineEvents(rpcData.timeline_events);
+        rpcLoaded.timeline = true;
+      }
+      // Extract counts from RPC stats to avoid separate count queries
+      if (rpcData.stats) {
+        if (typeof rpcData.stats.comment_count === 'number') rpcLoaded.commentCount = rpcData.stats.comment_count;
+        if (typeof rpcData.stats.observation_count === 'number') rpcLoaded.observationCount = rpcData.stats.observation_count;
       }
 
     }
@@ -355,7 +374,7 @@ export async function loadVehicleImpl({
     // For non-authenticated users, only show public vehicles
     if (!session && !vehicleData.is_public) {
       navigate('/login');
-      return;
+      return rpcLoaded;
     }
 
     // Set vehicle state
@@ -594,4 +613,5 @@ export async function loadVehicleImpl({
   } finally {
     setLoading(false);
   }
+  return rpcLoaded;
 }

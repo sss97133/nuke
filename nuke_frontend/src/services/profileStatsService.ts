@@ -25,6 +25,27 @@ export interface UserProfileData {
   comments_of_note: any[];
 }
 
+export interface SellerVehicleRecord {
+  vehicle_id: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  sale_price: number | null;
+  sale_date: string | null;
+  relationship_type: string;
+  comment_count: number | null;
+  nuke_estimate: number | null;
+  estimate_confidence: number | null;
+  comp_method: string | null;
+}
+
+export interface SellerTrackRecord {
+  vehicles_sold: SellerVehicleRecord[];
+  gmv_by_year: Record<string, number>;
+  volume_by_quarter: Array<{ quarter: string; count: number }>;
+  state_distribution: Record<string, number>;
+}
+
 export interface OrganizationProfileData {
   organization: any;
   stats: ProfileStats;
@@ -35,6 +56,7 @@ export interface OrganizationProfileData {
   success_stories: any[];
   services: any[];
   website_mapping: any | null;
+  seller_track_record: SellerTrackRecord | null;
 }
 
 /**
@@ -454,6 +476,127 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     .eq('organization_id', orgId)
     .maybeSingle();
 
+  // Seller track record — per-vehicle breakdown from organization_vehicles
+  let sellerTrackRecord: SellerTrackRecord | null = null;
+  if (vehicleIds.length > 0) {
+    // Fetch org vehicles with joined data
+    const orgVehicleChunks = chunk(vehicleIds, 50);
+    const trackRecordVehicles: SellerVehicleRecord[] = [];
+
+    const trackResults = await Promise.allSettled(
+      orgVehicleChunks.map((ids) =>
+        supabase
+          .from('organization_vehicles')
+          .select(`
+            vehicle_id,
+            relationship_type,
+            vehicle:vehicles(id, year, make, model, sale_price, sale_date, bat_location, state)
+          `)
+          .eq('organization_id', orgId)
+          .in('vehicle_id', ids)
+      )
+    );
+
+    for (const r of trackResults) {
+      if (r.status !== 'fulfilled' || r.value.error) continue;
+      for (const row of r.value.data || []) {
+        const v = (row as any).vehicle;
+        if (!v) continue;
+        trackRecordVehicles.push({
+          vehicle_id: v.id,
+          year: v.year,
+          make: v.make,
+          model: v.model,
+          sale_price: v.sale_price,
+          sale_date: v.sale_date,
+          relationship_type: row.relationship_type || 'sold_by',
+          comment_count: null,
+          nuke_estimate: null,
+          estimate_confidence: null,
+          comp_method: null,
+        });
+      }
+    }
+
+    // Fetch nuke_estimates for these vehicles
+    if (trackRecordVehicles.length > 0) {
+      const estChunks = chunk(trackRecordVehicles.map(v => v.vehicle_id), 50);
+      const estimateMap = new Map<string, { estimated_value: number; confidence_score: number; comp_method: string | null }>();
+
+      const estResults = await Promise.allSettled(
+        estChunks.map((ids) =>
+          supabase
+            .from('nuke_estimates')
+            .select('vehicle_id, estimated_value, confidence_score, comp_method')
+            .in('vehicle_id', ids)
+        )
+      );
+
+      for (const r of estResults) {
+        if (r.status !== 'fulfilled' || r.value.error) continue;
+        for (const row of r.value.data || []) {
+          estimateMap.set(row.vehicle_id, row);
+        }
+      }
+
+      for (const tv of trackRecordVehicles) {
+        const est = estimateMap.get(tv.vehicle_id);
+        if (est) {
+          tv.nuke_estimate = est.estimated_value;
+          tv.estimate_confidence = est.confidence_score;
+          tv.comp_method = est.comp_method;
+        }
+      }
+    }
+
+    // Compute GMV by year from per-vehicle data
+    const gmvByYear: Record<string, number> = {};
+    const volumeMap: Record<string, number> = {};
+    const stateDistribution: Record<string, number> = {};
+
+    for (const r of trackResults) {
+      if (r.status !== 'fulfilled' || r.value.error) continue;
+      for (const row of r.value.data || []) {
+        const v = (row as any).vehicle;
+        if (!v) continue;
+
+        // GMV by year
+        if (v.sale_price && v.sale_date) {
+          const yr = new Date(v.sale_date).getFullYear().toString();
+          gmvByYear[yr] = (gmvByYear[yr] || 0) + Number(v.sale_price);
+        }
+
+        // Volume by quarter
+        if (v.sale_date) {
+          const d = new Date(v.sale_date);
+          const q = `${d.getFullYear()} Q${Math.ceil((d.getMonth() + 1) / 3)}`;
+          volumeMap[q] = (volumeMap[q] || 0) + 1;
+        }
+
+        // State distribution
+        const st = v.state || null;
+        if (st) {
+          stateDistribution[st] = (stateDistribution[st] || 0) + 1;
+        }
+      }
+    }
+
+    const volumeByQuarter = Object.entries(volumeMap)
+      .map(([quarter, count]) => ({ quarter, count }))
+      .sort((a, b) => a.quarter.localeCompare(b.quarter));
+
+    sellerTrackRecord = {
+      vehicles_sold: trackRecordVehicles.sort((a, b) => {
+        const da = a.sale_date ? new Date(a.sale_date).getTime() : 0;
+        const db = b.sale_date ? new Date(b.sale_date).getTime() : 0;
+        return db - da;
+      }),
+      gmv_by_year: gmvByYear,
+      volume_by_quarter: volumeByQuarter,
+      state_distribution: stateDistribution,
+    };
+  }
+
   // Calculate stats
   const stats: ProfileStats = {
     total_listings: organization.total_listings || ((batEvents?.length || 0) + (auctionListings?.length || 0)),
@@ -474,7 +617,81 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     success_stories: successStories || [],
     services: services || [],
     website_mapping: websiteMapping || null,
+    seller_track_record: sellerTrackRecord,
   };
+}
+
+/**
+ * Competitive context for an organization: state rank and volume peers
+ */
+export interface CompetitiveContext {
+  state_rank: number | null;
+  state_total: number | null;
+  state: string | null;
+  volume_peers: Array<{ org_id: string; business_name: string; vehicle_count: number }>;
+}
+
+export async function getOrganizationCompetitiveContext(
+  orgId: string,
+  state: string | null
+): Promise<CompetitiveContext | null> {
+  if (!state) return null;
+
+  // Use SQL-based aggregation via RPC-style query for case-insensitive state matching
+  // Count vehicles per org in this state
+  const { data: stateOrgs, error } = await supabase
+    .from('organization_vehicles')
+    .select('organization_id, vehicle:vehicles!inner(state)')
+    .ilike('vehicle.state', state)
+    .eq('status', 'active');
+
+  if (error || !stateOrgs || stateOrgs.length === 0) {
+    // Fallback: try without inner join filter if PostgREST doesn't support ilike on joins
+    return null;
+  }
+
+  const orgCounts = new Map<string, number>();
+  for (const row of stateOrgs) {
+    const oid = (row as any).organization_id;
+    orgCounts.set(oid, (orgCounts.get(oid) || 0) + 1);
+  }
+
+  // Filter to orgs with 3+ vehicles
+  const qualifiedOrgs = [...orgCounts.entries()]
+    .filter(([, count]) => count >= 3)
+    .sort((a, b) => b[1] - a[1]);
+
+  const myCount = orgCounts.get(orgId) || 0;
+  if (myCount < 3) return null;
+
+  const stateRank = qualifiedOrgs.findIndex(([id]) => id === orgId) + 1;
+  const stateTotal = qualifiedOrgs.length;
+
+  // Find volume peers: orgs with similar total vehicle count (within +/-30%)
+  const peerCandidates = qualifiedOrgs
+    .filter(([id, count]) => id !== orgId && count >= myCount * 0.7 && count <= myCount * 1.3)
+    .slice(0, 5);
+
+  const volumePeers: CompetitiveContext['volume_peers'] = [];
+  if (peerCandidates.length > 0) {
+    const { data: peerOrgs } = await supabase
+      .from('businesses')
+      .select('id, business_name')
+      .in('id', peerCandidates.map(([id]) => id));
+
+    for (const [id, count] of peerCandidates) {
+      const org = peerOrgs?.find((o: any) => o.id === id);
+      if (org) {
+        volumePeers.push({
+          org_id: id,
+          business_name: (org as any).business_name,
+          vehicle_count: count,
+        });
+      }
+    }
+  }
+
+  return { state_rank: stateRank, state_total: stateTotal, state, volume_peers: volumePeers };
 }
 
 /**

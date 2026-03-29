@@ -11,7 +11,7 @@ import { extractImageMetadata } from '../utils/imageMetadata';
 import { DynamicTabBar } from '../components/organization/DynamicTabBar';
 import { OrganizationIntelligenceService, type OrganizationIntelligence, type TabConfig } from '../services/organizationIntelligenceService';
 import VehicleThumbnail from '../components/VehicleThumbnail';
-import { getOrganizationProfileData } from '../services/profileStatsService';
+import { getOrganizationProfileData, getOrganizationCompetitiveContext, type SellerTrackRecord, type CompetitiveContext } from '../services/profileStatsService';
 import { AdminNotificationService } from '../services/adminNotificationService';
 import BroadArrowMetricsDisplay from '../components/organization/BroadArrowMetricsDisplay';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
@@ -338,6 +338,8 @@ export default function OrganizationProfile() {
   const [uploadingImages, setUploadingImages] = useState(false);
   const ownershipUploadId = `org-ownership-${organizationId}`;
   const [comprehensiveData, setComprehensiveData] = useState<any>(null);
+  const [sellerTrackRecord, setSellerTrackRecord] = useState<SellerTrackRecord | null>(null);
+  const [competitiveContext, setCompetitiveContext] = useState<CompetitiveContext | null>(null);
   
   // Grid and sorting controls (similar to CursorHomepage)
   const [cardsPerRow, setCardsPerRow] = useState<number>(() => {
@@ -1033,6 +1035,16 @@ export default function OrganizationProfile() {
         try {
           const comprehensive = await getOrganizationProfileData(organizationId);
           setComprehensiveData(comprehensive);
+          if (comprehensive.seller_track_record) {
+            setSellerTrackRecord(comprehensive.seller_track_record);
+            // Load competitive context using the org state
+            const orgState = org?.state || null;
+            if (orgState) {
+              getOrganizationCompetitiveContext(organizationId, orgState)
+                .then(ctx => { if (ctx) setCompetitiveContext(ctx); })
+                .catch(() => {});
+            }
+          }
         } catch (err) {
           // Failed to load comprehensive profile data - silent
         }
@@ -2190,8 +2202,8 @@ export default function OrganizationProfile() {
       }}>
         {activeTab === 'overview' && (
           <>
-            {/* Key Metrics Bar - only show when at least one stat > 0 or Est. Value present */}
-            {(((organization?.total_vehicles ?? 0) > 0) || ((organization?.total_images ?? 0) > 0) || ((organization?.total_events ?? 0) > 0) || organization?.estimated_value || organization?.current_value) && (
+            {/* Key Metrics Bar - vehicles, images, events (no Est. Value — circular estimates removed) */}
+            {(((organization?.total_vehicles ?? 0) > 0) || ((organization?.total_images ?? 0) > 0) || ((organization?.total_events ?? 0) > 0)) && (
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
@@ -2204,10 +2216,6 @@ export default function OrganizationProfile() {
                 ...((organization?.total_vehicles ?? 0) > 0 ? [{ label: 'Vehicles', value: organization!.total_vehicles! }] : []),
                 ...((organization?.total_images ?? 0) > 0 ? [{ label: 'Images', value: organization!.total_images! }] : []),
                 ...((organization?.total_events ?? 0) > 0 ? [{ label: 'Events', value: organization!.total_events! }] : []),
-                ...(organization.estimated_value || organization.current_value ? [{
-                  label: 'Est. Value',
-                  value: formatUsd(organization.estimated_value || organization.current_value || 0),
-                }] : []),
               ].map((stat, i) => (
                 <div key={i} style={{
                   background: 'var(--white)',
@@ -2223,6 +2231,172 @@ export default function OrganizationProfile() {
                 </div>
               ))}
             </div>
+            )}
+
+            {/* Seller Track Record — per-vehicle table with sale prices */}
+            {sellerTrackRecord && sellerTrackRecord.vehicles_sold.length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                {/* GMV by Year + Volume by Quarter (inline) */}
+                {Object.keys(sellerTrackRecord.gmv_by_year).length > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    gap: '24px',
+                    flexWrap: 'wrap',
+                    padding: '12px 16px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    marginBottom: '8px',
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                        GMV BY YEAR
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text)', fontFamily: 'Courier New, monospace' }}>
+                        {Object.entries(sellerTrackRecord.gmv_by_year)
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([yr, amt]) => `${yr}: $${Number(amt).toLocaleString()}`)
+                          .join('  ·  ')}
+                      </div>
+                    </div>
+                    {sellerTrackRecord.volume_by_quarter.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                          VOLUME BY QUARTER
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text)', fontFamily: 'Courier New, monospace' }}>
+                          {sellerTrackRecord.volume_by_quarter
+                            .slice(-8)
+                            .map(q => `${q.quarter}: ${q.count}`)
+                            .join('  ·  ')}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* State distribution */}
+                {Object.keys(sellerTrackRecord.state_distribution).length > 0 && (
+                  <div style={{
+                    padding: '8px 16px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    marginBottom: '8px',
+                    fontSize: '11px',
+                    color: 'var(--text-muted)',
+                  }}>
+                    <span style={{ fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '8px' }}>
+                      GEOGRAPHY
+                    </span>
+                    {Object.entries(sellerTrackRecord.state_distribution)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([st, count]) => `${st} (${count})`)
+                      .join('  ·  ')}
+                  </div>
+                )}
+
+                {/* Per-vehicle sold table */}
+                <div style={{
+                  border: '1px solid var(--border)',
+                  overflow: 'hidden',
+                }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--surface)', borderBottom: '2px solid var(--border)' }}>
+                        <th style={{ padding: '6px 12px', textAlign: 'left', fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>Vehicle</th>
+                        <th style={{ padding: '6px 12px', textAlign: 'right', fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>Sale Price</th>
+                        <th style={{ padding: '6px 12px', textAlign: 'right', fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>Date</th>
+                        <th style={{ padding: '6px 12px', textAlign: 'center', fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>Role</th>
+                        <th style={{ padding: '6px 12px', textAlign: 'right', fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>Estimate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sellerTrackRecord.vehicles_sold.slice(0, 50).map((v, i) => {
+                        const roleBadge = v.relationship_type === 'owner' ? 'OWNED'
+                          : v.relationship_type === 'consigner' ? 'CONSIGNED'
+                          : v.relationship_type === 'supplier_build' ? 'BUILT'
+                          : v.relationship_type === 'sold_by' ? '' : '';
+                        const roleColor = v.relationship_type === 'owner' ? '#2563eb'
+                          : v.relationship_type === 'consigner' ? '#7c3aed'
+                          : v.relationship_type === 'supplier_build' ? '#059669'
+                          : '#6b7280';
+                        const estimateQuality = v.comp_method === 'self_price_fallback' ? 'low'
+                          : (v.estimate_confidence ?? 0) >= 60 ? 'high'
+                          : (v.estimate_confidence ?? 0) >= 30 ? 'medium' : 'low';
+                        return (
+                          <tr key={v.vehicle_id} style={{
+                            borderBottom: '1px solid var(--border-light)',
+                            cursor: 'pointer',
+                            background: i % 2 === 0 ? 'var(--white)' : 'var(--surface)',
+                          }}
+                          onClick={() => navigate(`/vehicles/${v.vehicle_id}`)}>
+                            <td style={{ padding: '6px 12px', color: 'var(--text)' }}>
+                              {[v.year, v.make, v.model].filter(Boolean).join(' ') || '—'}
+                            </td>
+                            <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'Courier New, monospace', fontWeight: 600, color: 'var(--text)' }}>
+                              {v.sale_price ? `$${Number(v.sale_price).toLocaleString()}` : '—'}
+                            </td>
+                            <td style={{ padding: '6px 12px', textAlign: 'right', color: 'var(--text-muted)' }}>
+                              {v.sale_date ? new Date(v.sale_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
+                            </td>
+                            <td style={{ padding: '6px 12px', textAlign: 'center' }}>
+                              {roleBadge && (
+                                <span style={{
+                                  fontSize: '8px',
+                                  fontWeight: 700,
+                                  color: roleColor,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                  padding: '1px 4px',
+                                  border: `1px solid ${roleColor}`,
+                                }}>
+                                  {roleBadge}
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'Courier New, monospace', color: estimateQuality === 'high' ? 'var(--text)' : 'var(--text-muted)' }}>
+                              {v.nuke_estimate && v.comp_method !== 'self_price_fallback'
+                                ? `$${Number(v.nuke_estimate).toLocaleString()}`
+                                : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {sellerTrackRecord.vehicles_sold.length > 50 && (
+                    <div style={{ padding: '8px 12px', fontSize: '10px', color: 'var(--text-muted)', background: 'var(--surface)', borderTop: '1px solid var(--border-light)' }}>
+                      Showing 50 of {sellerTrackRecord.vehicles_sold.length} vehicles
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Competitive Context */}
+            {competitiveContext && (
+              <div style={{
+                padding: '8px 16px',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                marginBottom: '16px',
+                fontSize: '11px',
+                color: 'var(--text-muted)',
+              }}>
+                <span style={{ fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '8px' }}>
+                  MARKET CONTEXT
+                </span>
+                {competitiveContext.state}: #{competitiveContext.state_rank} of {competitiveContext.state_total} sellers with 3+ vehicles
+                {competitiveContext.volume_peers.length > 0 && (
+                  <span style={{ marginLeft: '12px' }}>
+                    Similar volume: {competitiveContext.volume_peers.map(p => (
+                      <a key={p.org_id} href={`/org/${p.org_id}`} onClick={(e) => { e.preventDefault(); navigate(`/org/${p.org_id}`); }}
+                        style={{ color: 'var(--text)', textDecoration: 'underline', marginRight: '8px' }}>
+                        {p.business_name} ({p.vehicle_count})
+                      </a>
+                    ))}
+                  </span>
+                )}
+              </div>
             )}
 
             {/* Business docs for advisors — only show for owners or when data room has been granted */}

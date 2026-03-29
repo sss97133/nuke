@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { getGridImageUrl } from '../../lib/imageOptimizer';
 import type { StorefrontOrg } from '../StorefrontApp';
 
 interface Props {
@@ -156,7 +157,7 @@ export default function StorefrontInventory({ organization }: Props) {
               >
                 <div style={{ aspectRatio: '16/10', background: 'var(--bg)', overflow: 'hidden' }}>
                   {getImage(v) ? (
-                    <img src={getImage(v)!} alt={formatTitle(v)} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={getGridImageUrl(getImage(v)) || getImage(v)!} alt={formatTitle(v)} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-disabled)', fontSize: 'var(--fs-8, 8px)' }}>
                       No Image
