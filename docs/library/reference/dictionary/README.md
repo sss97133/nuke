@@ -50,6 +50,12 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Collaborative Trace** — A connection between two actors derived from shared involvement with an asset or organization. Not declared ("follow/following") but evidenced by transactions, exhibitions, publications, or co-ownership. Permanent and financial.
 
+**Circular Estimate** — A Nuke Estimate where the computed value equals the vehicle's own sale price, indicating the valuation engine fell back to `self_price_fallback` comp method instead of finding independent comparables. Circular estimates are flagged via `nuke_estimates.is_circular = true` and excluded from deal scores. As of 2026-03-29, self_price_fallback is blocked for sold vehicles — the estimate stays null rather than mirroring reality.
+
+**Comp Method** — The methodology used to derive a Nuke Estimate, stored in `nuke_estimates.comp_method`. Values: `exact` (VIN match), `canonical` (make/model/year exact), `normalized` (fuzzy match), `core_model` (model family), `make_fallback` (make only), `self_price_fallback` (vehicle's own price — blocked for sold vehicles). Higher-precision methods receive confidence bonuses; lower-precision methods widen the confidence interval.
+
+**Competitive Context** — A seller organization's position relative to peers in the same state and nationally. Computed from `organization_vehicles` join counts, ranked by volume. Rendered on the org profile overview tab. See `getOrganizationCompetitiveContext()` in `profileStatsService.ts`.
+
 **Computation Surface** — A UI surface that computes analysis in real time rather than displaying cached values. The vehicle profile is the primary computation surface. Data flows in from the knowledge graph, is computed on render, and flows out as visible intelligence. There is no cache invalidation problem because there is no cache. See `docs/library/technical/design-book/vehicle-profile-computation-surface.md`.
 
 **Condition** — One of the five dimensional shadows. The conservation/restoration assessment of an asset over time. Spectral, not binary — a 0-100 score derived from observations, not a label.
@@ -174,6 +180,10 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Organic** — The principle that connections between actors should emerge naturally from the graph, not from algorithmic recommendation. No feeds, no "you might like," no engagement optimization. The system enables meetings — it doesn't perform them.
 
+**Ownership Classification** — The relationship between a seller and a vehicle at the time of sale. Derived from regex patterns on listing descriptions (BaT, Mecum). Values map to `organization_vehicles.relationship_type`: `owner` (seller acquired and held), `consigner` (seller handles on behalf of original owner), `supplier_build` (seller built or restored the vehicle). "sold_by" is the generic fallback when no signal is found. Classification is a Claims-layer judgment — "the listing says this" — not verified truth. See `extract-bat-core/index.ts` ownership classifier.
+
+**Organization Sandbox** — A provenance container holding an organization's data records that lack verifiable identifiers (VIN, chassis number, accession number). Not a penalty — a trust boundary. Records in the sandbox are incomplete testimony at the Claims layer of the epistemological hierarchy. When another source provides a matching identifier, the record graduates to the main corpus. The sandbox makes each organization's verifiable contribution a measurable, public number. See Encyclopedia Section 18: Entity Resolution. Synonym: Provenance Container.
+
 ## P
 
 **Palimpsest** — A manuscript that has been written on, scraped off, and rewritten, with earlier layers still partially visible. In Nuke, the palimpsest model describes how a user's expertise evolves over time: each era (e.g., 5 years of Porsche, then a switch to trucks) is a layer that remains visible in their writing style even after the topical shift. Style is permanent; topic is temporal. The palimpsest is one of 7 novel ontological contributions identified in the applied ontology research.
@@ -188,9 +198,19 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Provenance** — One of the five dimensional shadows. The complete chain of custody for an asset — who owned it, when, how acquired, how disposed, with citations. Provenance determines authenticity, legality, and a significant portion of value.
 
+**Provenance Container** — Synonym for Organization Sandbox. A holding area for records from a specific data source that lack verifiable identifiers. The container is scoped to the organization that produced the data and is publicly visible. Records graduate when corroborating identifiers arrive from any source.
+
 ## Q
 
 **Quality Score** — A 0-1 assessment of extraction completeness and reliability. Derived from: fields extracted / total fields, weighted by field importance. Below 0.30 triggers review. Below 0.40 triggers escalation to a higher agent tier.
+
+**Question Intelligence** — The system that classifies 1.65M auction comment questions into a 2-level taxonomy (12 L1 categories, 112 L2 subcategories) to reveal what buyers actually want to know. Data flows: `auction_comments.has_question` → regex classification (`analyze-comments-fast`, mode `question_classify`) → LLM fallback (`batch-comment-discovery`, mode `question_classify_llm`) → `mv_question_intelligence` materialized view → `question_gap_analysis()` RPC. Dashboard: `/admin/qi`. The taxonomy was discovered by sampling ~5K questions, classifying via Gemini Flash, consolidating via LLM, and extracting TF-IDF regex patterns. See `scripts/question-taxonomy-discovery.mjs`.
+
+**Question Taxonomy** — The `question_taxonomy` table. 112 entries, each with `id` (format: `l1.l2`), `display_name`, `regex_patterns`, `keywords`, `answerable_from_db`, and `data_fields`. L1 categories: mechanical, provenance, cosmetics, features, logistics, auction_process, vehicle_details, community, legal_and_regulatory, vehicle_history, valuation, general. Populated by the discovery pipeline (`npm run discover:questions`).
+
+**Question Classification** — The process of tagging each question comment with its taxonomy category. Two tiers: Tier 1 regex ($0, ~79% hit rate) via `analyze-comments-fast` mode `question_classify`; Tier 2 Gemini Flash LLM ($0) via `batch-comment-discovery` mode `question_classify_llm`. Results stored on `auction_comments`: `question_primary_l1`, `question_primary_l2`, `question_categories` (JSONB array of top matches), `question_classified_at`, `question_classify_method`.
+
+**Question Data Gap** — A taxonomy category where `answerable_from_db = false` — buyers ask about it but no structured DB field can answer it. Examples: video requests, seller responsiveness, provenance value, bidding strategy. Gaps inform what data to collect next or what features to build.
 
 ## R
 
@@ -215,6 +235,8 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 **Source Trust** — The base reliability weight assigned to an observation source. Museum databases (0.95) > auction houses (0.90) > galleries (0.80) > social media (0.40) > anonymous (0.20). Contextual modifiers apply.
 
 **Spec** — One of the five dimensional shadows. What an entity should be according to definitive sources. Factory build sheet for vehicles. Catalogue raisonné entry for art. The reference standard against which current state is compared.
+
+**Seller Track Record** — Per-vehicle historical data for an organization acting as seller. Includes each vehicle sold with sale price, date, ownership classification, nuke estimate (if non-circular), and estimate confidence. Aggregated into GMV by year, volume by quarter, and state distribution. Rendered on the organization profile overview tab. Computed in `profileStatsService.ts` from `organization_vehicles` + `vehicles` + `nuke_estimates`.
 
 **Strangler Fig** — The migration pattern. The new system grows around the old one, gradually replacing it. Art launches on the new platform, vehicles migrate after the pattern is proven. Neither system stops during the transition.
 

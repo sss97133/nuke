@@ -55,6 +55,94 @@ Every screen in the application. What it shows, how it behaves in every state, w
 
 ---
 
+## Home / Treemap (Logged Out)
+
+**Route:** `/` (when not authenticated)
+**File:** `nuke_frontend/src/pages/HomePage.tsx` — `TreemapHomePage` component
+**Purpose:** Logged-out landing page. Interactive squarified treemap visualization of the entire vehicle database with 4-level continuous zoom.
+**Primary Interaction:** Click cells to drill deeper through hierarchy. Breadcrumb to zoom back out. "ENTER FEED" escape hatch at any drill level.
+**Data Sources:** `vehicles` table via `useTreemapBrands`, `useTreemapModels`, `useTreemapYears`, `useTreemapVehicles` hooks (each issues a Supabase RPC)
+
+### Layout Spec
+
+- Background: `var(--bg)`
+- Full `100vh` flex column, no scroll — the treemap IS the viewport
+- **Header bar:** 44px. NUKE logo with live-pulse indicator, search input (autocomplete dropdown via `universal-search`), FEED button. Background `var(--surface)`, bottom border `2px solid var(--border)`.
+- **Breadcrumb bar:** 32px. Drill stack rendered as clickable path segments (`ALL MAKES / PORSCHE / 911 / 1973`). Right side shows vehicle count + total value in Courier New, plus "ENTER FEED" button when drilled past makes. Background `var(--surface)`, bottom border `2px solid var(--border)`.
+- **Treemap viewport:** Fills all remaining vertical space (`flex: 1, minHeight: 0`). Absolutely positioned cells from `squarify()` algorithm. Background `var(--bg)`.
+- **Footer bar:** 28px. Left: legend text in Courier New describing what area/color encode at the current level. Right: "BROWSE ALL" inverted button + "nuke.ag" link. Background `var(--surface)`, top border `2px solid var(--border)`.
+
+### Screen States
+
+**Loading State — Initial:**
+- Treemap viewport shows "LOADING..." centered in `var(--text-disabled)`, Courier New, 11px, letterspaced
+- Header bar and breadcrumb render immediately (static content)
+
+**Loading State — Transitioning Between Levels:**
+- Semi-transparent overlay (`color-mix(in srgb, var(--bg) 60%, transparent)`) with "LOADING..." over the existing cells
+- Previous level's cells remain visible underneath during fetch
+- Zoom animation plays simultaneously (see Interactions chapter, Treemap Drill)
+
+**Loaded State — Data Present:**
+- Cells fill the viewport via squarified treemap algorithm (Bruls, Huizing, van Wijk 2000)
+- Cell sizing: area proportional to `count` at aggregate levels, proportional to `value` (sale price) at vehicle level
+- Cell coloring at aggregate levels: `priceToColor(median_price)` — HSL heatmap encoding median price
+- Cell coloring at vehicle level: hero photo as full background with bottom gradient overlay
+
+**Loaded State — No Data (Empty):**
+- "NO DATA" centered in Courier New + "GO BACK" button (2px solid border, standard button styling)
+- Only reachable at deep drill levels with no matching vehicles
+
+### Drill Levels (4 levels of continuous zoom)
+
+**Level 1 — Makes (brands):**
+- Cell = one make. Area = vehicle count. Color = HSL heatmap of median price.
+- Text: make name (ALL CAPS, Arial, bold), vehicle count, median price, percentage of total.
+- Font sizes scale with cell area (9px-13px). Small cells show only the name.
+- Footer legend: "AREA = VEHICLE COUNT / COLOR = MEDIAN PRICE"
+
+**Level 2 — Models:**
+- Cell = one model within the selected make. Same sizing/coloring logic.
+- Large cells (>120px wide, >80px tall) show representative images at low opacity (0.18 idle, 0.25 hover) behind text — progressive enhancement.
+- Representative images fetched via `useRepresentativeImages` hook (queries `vehicle_images` for hero photos).
+- Footer legend: "AREA = VEHICLE COUNT / COLOR = MEDIAN PRICE"
+
+**Level 3 — Years:**
+- Cell = one model year. Same sizing/coloring logic.
+- Large cells show representative images (same opacity behavior as models level).
+- Footer legend: "AREA = VEHICLE COUNT / COLOR = MEDIAN PRICE"
+
+**Level 4 — Vehicles:**
+- Cell = one vehicle. Area = sale price. Background = hero photo at full opacity with dark gradient overlay (`linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.25) 40%, transparent 70%)`).
+- Text: listing title (or YMM), sale price, mileage. White text on dark overlay.
+- Click navigates directly to `/vehicle/:id` (no inline expand at this level).
+- Footer legend: "AREA = SALE PRICE / CLICK TO VIEW"
+
+### Component Inventory
+
+- `TreemapHomePage` — top-level layout: header, breadcrumb, viewport, footer
+- `TreemapCell` — individual cell renderer. Handles heatmap coloring, image backgrounds, responsive text sizing, hover states.
+- `TreemapTooltip` — mouse-following tooltip. Shows make/model/year name, vehicle count, median/min/max price, sell-through rate, average bids/watchers. Fixed position at cursor coordinates.
+- `squarify()` — pure function. Implements Bruls-Huizing-van Wijk 2000 squarified treemap algorithm. Input: array of `{ node, area }` + bounding rect. Output: array of `TreemapRect` with `{ node, x, y, w, h }`.
+- `useTreemapBrands()` — fetches make-level aggregates (count, median/min/max price, sold count, auction count, avg bids/watchers)
+- `useTreemapModels(make)` — fetches model-level aggregates for a given make
+- `useTreemapYears(make, model)` — fetches year-level aggregates for a given make+model
+- `useTreemapVehicles(make, model, year)` — fetches individual vehicles with hero image URLs
+- `useRepresentativeImages(items, make)` — fetches one representative hero photo per aggregate item for image-on-cell progressive enhancement
+- `priceToColor(median_price)` — pure function mapping price to HSL heatmap color
+- `fmtNum()`, `fmtMoney()` — formatting utilities (Courier New display values)
+
+### Common Violations
+
+- Adding gradient overlays on aggregate cells (gradients only on vehicle-level hero photos)
+- Animation durations exceeding 180ms on any transition
+- Hardcoding HSL color values instead of using `priceToColor()` heatmap function
+- Using `border-radius` on treemap cells (all cells are sharp rectangles)
+- Adding shimmer/pulse animation to loading skeleton (loading state is static "LOADING..." text)
+- Using Recharts Treemap instead of the custom `squarify()` implementation (Recharts Treemap fails silently in v3)
+
+---
+
 ## Vehicle Profile
 
 **Route:** `/vehicle/:id`
@@ -494,7 +582,8 @@ All behind `/admin/*` route with `RequireAdmin` gate.
 
 | Route | Page File | Screen Name |
 |-------|-----------|-------------|
-| `/` | `HomePage.tsx` | Home / Hub |
+| `/` (logged out) | `HomePage.tsx` → `TreemapHomePage` | Home / Treemap |
+| `/` (logged in) | `HomePage.tsx` | Home / Hub |
 | `/vehicle/:id` | `vehicle-profile/VehicleHeader.tsx` | Vehicle Profile |
 | `/vehicle/add` | `add-vehicle/AddVehicle.tsx` | Add Vehicle |
 | `/vehicle/:id/edit` | `EditVehicle.tsx` | Edit Vehicle |
@@ -545,5 +634,51 @@ Every screen in the application follows these rules:
 8. **Responsive:** Content reflows at 768px breakpoint. Mobile bottom nav appears below 768px.
 
 ---
+
+---
+
+### Question Intelligence (`/admin/qi`)
+
+**Route:** `/admin/question-intelligence` (alias `/admin/qi`)
+**File:** `nuke_frontend/src/pages/admin/QuestionIntelligence.tsx`
+**Purpose:** Reveals what buyers actually want to know by visualizing 1.65M classified auction comment questions across a 112-category taxonomy.
+**Primary Interaction:** Read-only analytics dashboard. Hover treemap cells for detail. Scroll to gap analysis.
+
+**Data Sources:**
+- `mv_question_intelligence` (materialized view, refresh via `refresh_question_intelligence()`)
+- `question_taxonomy` (reference table, 112 entries)
+- `auction_comments` (live classification progress count)
+
+**Layout:**
+1. **Header** — Title + subtitle with category count
+2. **Progress bar** — Shows classification completion (hidden when 100%)
+3. **Stat cards** (5) — Total Classified, Answerable %, Data Gaps, L1 Count, Top Category
+4. **CSS Treemap** — Flexbox-based, L1-grouped, sized by question count, opacity = answerable (solid) vs gap (faded), color = L1 palette
+5. **Legend** — L1 color swatches
+6. **By Category** — Horizontal BarChart (Recharts), L1 distribution
+7. **Two-column split:**
+   - Left: Extraction Priorities (answerable, ranked by count)
+   - Right: Data Gaps (not answerable, ranked by count)
+8. **All Categories table** — Full taxonomy with questions, vehicles, % of total, avg price, answerable status, classification method
+
+**Screen States:**
+- Loading: "Loading question intelligence..." text
+- Error: Red-bordered error message
+- Empty: No taxonomy populated (directs to run `discover:questions`)
+- Populated: Full dashboard
+
+**Component Inventory:**
+- `CSSTreemap` — Custom flexbox treemap (not Recharts Treemap — that component fails silently in v3)
+- `StatCard` — Design-system-compliant stat display
+- `SectionHeader` — ALL CAPS section label with subtitle
+- `GapBar` — Horizontal bar with category name, bar, count, DB/GAP badge, vehicle count
+- Recharts `BarChart` with `Cell` per-bar coloring
+
+**Follow-up surfaces (not yet built):**
+- Per-make/model question profile (what do Porsche buyers ask vs truck buyers?)
+- Per-price-band analysis (do $100K+ buyers ask different questions?)
+- Per-era analysis (pre-70 originality questions vs modern functionality questions)
+- Seller coaching widget (preemptive answers for listing optimization)
+- Listing quality score (coverage of top buyer concerns)
 
 *Every screen is a view into the graph. The layout follows the data. The data IS the design.*
