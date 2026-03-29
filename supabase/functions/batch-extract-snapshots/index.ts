@@ -17,6 +17,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callTier, parseJsonResponse } from "../_shared/agentTiers.ts";
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -434,6 +435,25 @@ Deno.serve(async (req) => {
 
         extracted++;
         fieldsTotal += fieldsUpdated.length;
+
+        // Write observation + field_evidence (fire-and-forget, don't block extraction)
+        if (!dryRun && fieldsUpdated.length > 0) {
+          const obsFields: Record<string, any> = {};
+          for (const f of fieldsUpdated) {
+            if (updatePayload[f] !== undefined) obsFields[f] = updatePayload[f];
+          }
+          writeObservation(supabase, {
+            vehicleId: vehicle.id,
+            source: {
+              platform,
+              url: vehicleUrl || vehicle.bat_auction_url || vehicle.listing_url || vehicle.discovery_url || "",
+            },
+            fields: obsFields,
+            observationKind: "specification",
+            extractionMethod: "snapshot_regex_parse",
+          }).catch((e: any) => console.warn(`[batch-extract] observationWriter error for ${vehicle.id}: ${e?.message}`));
+        }
+
         if (useQueue && !dryRun) {
           await supabase.from("snapshot_extraction_queue")
             .update({ status: "completed", completed_at: new Date().toISOString(), fields_filled: fieldsUpdated.length })

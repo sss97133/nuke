@@ -16,6 +16,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -342,6 +343,20 @@ Return JSON with these fields (only extract what's stated in the listing):
   if (updateErr) {
     return { vehicle_id: vehicleId, status: `update_error: ${updateErr.message}`, fields_updated: [], before: vehicle, after: afterState };
   }
+
+  // Write observation + field_evidence (fire-and-forget)
+  const sourceUrl = vehicle.listing_url || vehicle.bat_auction_url || vehicle.discovery_url || "";
+  const obsFields: Record<string, any> = {};
+  for (const f of fieldsUpdated) {
+    if (updatePayload[f] !== undefined) obsFields[f] = updatePayload[f];
+  }
+  writeObservation(supabase, {
+    vehicleId,
+    source: { platform: "bat", url: sourceUrl },
+    fields: obsFields,
+    observationKind: "specification",
+    extractionMethod: "listing_content_llm",
+  }).catch((e: any) => console.warn(`[enrich] observationWriter error for ${vehicleId}: ${e?.message}`));
 
   // Recompute realization plan now that enriched fields are populated
   try {

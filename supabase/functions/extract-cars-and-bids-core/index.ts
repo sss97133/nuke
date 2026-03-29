@@ -24,6 +24,7 @@ import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { parseLocation } from "../_shared/parseLocation.ts";
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -847,6 +848,21 @@ Deno.serve(async (req) => {
         created = true;
         console.log(`✅ C&B: Created new vehicle: ${vehicleId}`);
       }
+    }
+
+    // Write observation + field_evidence (fire-and-forget)
+    if (vehicleId) {
+      writeObservation(supabase, {
+        vehicleId,
+        source: {
+          platform: "cars-and-bids",
+          url: listingUrlCanonical,
+          trustScore: 0.8,
+        },
+        fields: vehicleData,
+        observationKind: "listing",
+        extractionMethod: "dom_parse",
+      }).catch((e: any) => console.warn(`[C&B] observationWriter error for ${vehicleId}: ${e?.message}`));
     }
 
     // Write location observation
