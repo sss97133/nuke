@@ -3414,43 +3414,7 @@ const ImageGallery = ({
                             />
                           </div>
 
-                          {/* Analysis Badge */}
-                          {(() => {
-                            const metadata = image.ai_scan_metadata;
-                            const hasAnalysis = metadata && (
-                              metadata.appraiser?.primary_label ||
-                              metadata.tier_1_analysis ||
-                              metadata.appraiser ||
-                              image.ai_last_scanned ||
-                              image.angle
-                            );
-                            if (!hasAnalysis) return null;
-                            const angle = image.angle || metadata?.appraiser?.angle || metadata?.appraiser?.primary_label;
-                            const analysisType = metadata?.tier_1_analysis ? 'TIER1' : metadata?.appraiser ? 'AI' : 'SCANNED';
-                            return (
-                              <div style={{
-                                position: 'absolute',
-                                top: 'var(--space-1)',
-                                right: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
-                                backgroundColor: 'var(--success)',
-                                color: 'var(--surface-elevated)', border: '1px solid var(--surface-elevated)',
-                                padding: '2px 6px',
-                                fontSize: '9px',
-                                fontWeight: 'bold',
-                                fontFamily: 'Arial, sans-serif',
-                                zIndex: 10,
-                                cursor: 'help',
-                                maxWidth: '60px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                              }}
-                              title={angle ? `${analysisType}: ${angle}` : `${analysisType} analyzed`}
-                              >
-                                {angle ? angle.substring(0, 6).toUpperCase() : analysisType}
-                              </div>
-                            );
-                          })()}
+                          {/* Analysis badges removed — internal state, not user-facing */}
 
                           {/* Source Badge - Only show if not user (already grouped by source) */}
                           {source.type !== 'user' && (
@@ -3573,43 +3537,7 @@ const ImageGallery = ({
                         />
                       </div>
 
-                      {/* Analysis Badge */}
-                      {(() => {
-                        const metadata = image.ai_scan_metadata;
-                        const hasAnalysis = metadata && (
-                          metadata.appraiser?.primary_label ||
-                          metadata.tier_1_analysis ||
-                          metadata.appraiser ||
-                          image.ai_last_scanned ||
-                          image.angle
-                        );
-                        if (!hasAnalysis) return null;
-                        const angle = image.angle || metadata?.appraiser?.angle || metadata?.appraiser?.primary_label;
-                        const analysisType = metadata?.tier_1_analysis ? 'TIER1' : metadata?.appraiser ? 'AI' : 'SCANNED';
-                        return (
-                          <div style={{
-                            position: 'absolute',
-                            top: 'var(--space-1)',
-                            right: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
-                            backgroundColor: 'var(--success)',
-                            color: 'var(--surface-elevated)', border: '1px solid var(--surface-elevated)',
-                            padding: '2px 6px',
-                            fontSize: '9px',
-                            fontWeight: 'bold',
-                            fontFamily: 'Arial, sans-serif',
-                            zIndex: 10,
-                            cursor: 'help',
-                            maxWidth: '60px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }}
-                          title={angle ? `${analysisType}: ${angle}` : `${analysisType} analyzed`}
-                          >
-                            {angle ? angle.substring(0, 6).toUpperCase() : analysisType}
-                          </div>
-                        );
-                      })()}
+                      {/* Analysis badges removed — internal state, not user-facing */}
 
                       {/* Source Badge */}
                       {(() => {
@@ -3734,46 +3662,7 @@ const ImageGallery = ({
                 />
               </div>
 
-              {/* Analysis Badge - Shows if image has been analyzed */}
-              {(() => {
-                const metadata = image.ai_scan_metadata;
-                const hasAnalysis = metadata && (
-                  metadata.appraiser?.primary_label ||
-                  metadata.tier_1_analysis ||
-                  metadata.appraiser ||
-                  image.ai_last_scanned ||
-                  image.angle
-                );
-                
-                if (!hasAnalysis) return null;
-                
-                const angle = image.angle || metadata?.appraiser?.angle || metadata?.appraiser?.primary_label;
-                const analysisType = metadata?.tier_1_analysis ? 'TIER1' : metadata?.appraiser ? 'AI' : 'SCANNED';
-                
-                return (
-                  <div style={{
-                    position: 'absolute',
-                    top: 'var(--space-1)',
-                    right: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
-                    backgroundColor: 'var(--success)',
-                    color: 'var(--surface-elevated)', border: '1px solid var(--surface-elevated)',
-                    padding: '2px 6px',
-                    fontSize: '9px',
-                    fontWeight: 'bold',
-                    fontFamily: 'Arial, sans-serif',
-                    zIndex: 10,
-                    cursor: 'help',
-                    maxWidth: '60px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                  title={angle ? `${analysisType}: ${angle}` : `${analysisType} analyzed`}
-                  >
-                    {angle ? angle.substring(0, 6).toUpperCase() : analysisType}
-                  </div>
-                );
-              })()}
+              {/* Analysis badges removed — internal state, not user-facing */}
 
               {/* Source Badge - Bottom left - Round stamp for validation */}
               {(() => {
@@ -3953,40 +3842,7 @@ const ImageGallery = ({
                 loading="lazy"
               />
 
-              {/* Analysis Badge */}
-              {(() => {
-                const metadata = image.ai_scan_metadata;
-                const hasAnalysis = metadata && (
-                  metadata.appraiser?.primary_label ||
-                  metadata.tier_1_analysis ||
-                  metadata.appraiser ||
-                  image.ai_last_scanned ||
-                  image.angle
-                );
-                
-                if (!hasAnalysis) return null;
-                
-                const angle = image.angle || metadata?.appraiser?.angle || metadata?.appraiser?.primary_label;
-                
-                return (
-                  <div style={{
-                    position: 'absolute',
-                    top: 'var(--space-1)',
-                    right: 'var(--space-1)',
-                    backgroundColor: 'var(--success)',
-                    color: 'var(--surface-elevated)', border: '1px solid var(--surface-elevated)',
-                    padding: '2px 6px',
-                    fontSize: '9px',
-                    fontWeight: 'bold',
-                    fontFamily: 'Arial, sans-serif',
-                    zIndex: 10
-                  }}
-                  title={angle ? `Analyzed: ${angle}` : 'AI analyzed'}
-                  >
-                    {angle ? angle.substring(0, 8).toUpperCase() : 'AI'}
-                  </div>
-                );
-              })()}
+              {/* Analysis badges removed — internal state, not user-facing */}
 
               {/* Source Badge - Round stamp for validation (masonry view) */}
               {(() => {
