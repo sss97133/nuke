@@ -554,27 +554,45 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
               ))}
             </div>
             <div className="hm-wrap">
-              {heatmapWeeks.map((week, wi) => (
-                <div className="hm-week" key={wi}>
-                  {week.map((day, di) => {
-                    if (!day.inRange) {
-                      return <div className="hm-c empty" key={di} />;
-                    }
-                    const ev = eventMap[day.s];
-                    const level = ev ? ev.level : 0;
-                    const isHighlighted = highlightGroup && ev?.group === highlightGroup;
-                    return (
-                      <div
-                        key={di}
-                        className={`hm-c ${level > 0 ? `l${level}` : ''} ${isHighlighted ? 'hl' : ''}`}
-                        data-date={ev ? day.s : undefined}
-                        title={ev ? `${day.s}: ${ev.label}` : undefined}
-                        onClick={ev ? (e) => onCellClick(day.s, e) : undefined}
-                      />
-                    );
-                  })}
-                </div>
-              ))}
+              {heatmapWeeks.map((week, wi) => {
+                // Detect year boundary: compare first in-range day of this week vs previous week
+                let isYearBoundary = false;
+                if (wi > 0) {
+                  const prevFirst = heatmapWeeks[wi - 1].find(d => d.inRange);
+                  const curFirst = week.find(d => d.inRange);
+                  if (prevFirst && curFirst && prevFirst.d.getFullYear() !== curFirst.d.getFullYear()) {
+                    isYearBoundary = true;
+                  }
+                }
+                return (
+                  <React.Fragment key={wi}>
+                    {isYearBoundary && (
+                      <div className="hm-year-sep" title={String(week.find(d => d.inRange)?.d.getFullYear() || '')}>
+                        <div className="hm-year-sep__line" />
+                      </div>
+                    )}
+                    <div className="hm-week">
+                      {week.map((day, di) => {
+                        if (!day.inRange) {
+                          return <div className="hm-c empty" key={di} />;
+                        }
+                        const ev = eventMap[day.s];
+                        const level = ev ? ev.level : 0;
+                        const isHighlighted = highlightGroup && ev?.group === highlightGroup;
+                        return (
+                          <div
+                            key={di}
+                            className={`hm-c ${level > 0 ? `l${level}` : ''} ${isHighlighted ? 'hl' : ''}`}
+                            data-date={ev ? day.s : undefined}
+                            title={ev ? `${day.s}: ${ev.label}` : undefined}
+                            onClick={ev ? (e) => onCellClick(day.s, e) : undefined}
+                          />
+                        );
+                      })}
+                    </div>
+                  </React.Fragment>
+                );
+              })}
             </div>
             <div className="hm-months">
               {heatmapWeeks.reduce<React.ReactNode[]>((acc, week, wi) => {
@@ -646,16 +664,14 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
                 </div>
               )}
               <div className="receipt__nav">
-                <a onClick={() => navigateReceipt(-1)}>{'\u2190'} PREV DAY</a>
-                {receiptEvent.hasWorkSession && (
-                  <a
-                    onClick={() => openDayCardPopup(receiptDate)}
-                    style={{ fontWeight: 700, color: '#fff' }}
-                  >
-                    OPEN DAY CARD
-                  </a>
-                )}
-                <a onClick={() => navigateReceipt(1)}>NEXT DAY {'\u2192'}</a>
+                <a onClick={() => navigateReceipt(-1)}>{'\u2190'} PREV</a>
+                <a
+                  onClick={() => openDayCardPopup(receiptDate)}
+                  style={{ fontWeight: 700, color: '#fff' }}
+                >
+                  +
+                </a>
+                <a onClick={() => navigateReceipt(1)}>NEXT {'\u2192'}</a>
               </div>
             </div>
           )}

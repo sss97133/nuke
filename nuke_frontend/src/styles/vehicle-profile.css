@@ -509,6 +509,20 @@
 .hm-c.l3 { background: var(--heat-4, #059669); }
 .hm-c.l4 { background: var(--heat-5, #047857); }
 .hm-c.empty { background: transparent; }
+.hm-year-sep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: stretch;
+  width: 2px;
+  margin: 0 1px;
+}
+.hm-year-sep__line {
+  flex: 1;
+  width: 2px;
+  background: var(--vp-pencil, #999);
+  opacity: 0.4;
+}
 .hm-months {
   position: relative;
   height: 12px;

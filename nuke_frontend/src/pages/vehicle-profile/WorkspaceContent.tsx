@@ -21,6 +21,7 @@ const VehicleCommentsCard = React.lazy(() => import('../../components/vehicle/Ve
 const BundleReviewQueue = React.lazy(() => import('../../components/images/BundleReviewQueue'));
 const ImageGallery = React.lazy(() => import('../../components/images/ImageGallery'));
 const VehicleVideoSection = React.lazy(() => import('../../components/vehicle/VehicleVideoSection'));
+const AnalysisSignalsSection = React.lazy(() => import('./AnalysisSignalsSection'));
 const VehicleScoresWidget = React.lazy(() => import('./VehicleScoresWidget'));
 const AuctionReadinessPanel = React.lazy(() => import('./AuctionReadinessPanel'));
 const ColumnDivider = React.lazy(() => import('./ColumnDivider'));
@@ -118,6 +119,8 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
     totalCommentCount,
     isPublic,
     auctionPulse,
+    galleryFilter,
+    setGalleryFilter,
     reloadVehicle,
     reloadImages,
     reloadTimeline,
@@ -188,6 +191,11 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {/* Vehicle Dossier — provenance-rich field panel */}
           <React.Suspense fallback={<div className="widget__label" style={{ padding: '10px 16px' }}>Loading...</div>}>
             <VehicleDossierPanel />
+          </React.Suspense>
+
+          {/* Analysis Signals — computed alerts from analysis engine */}
+          <React.Suspense fallback={null}>
+            <AnalysisSignalsSection vehicleId={vehicle.id} />
           </React.Suspense>
 
           {/* Owner Identity — the throne */}
@@ -325,7 +333,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {/* Engine Bay Analysis */}
           {(vehicle as any)?.origin_metadata?.engine_bay_analysis?.engine_family && (
             <CollapsibleWidget variant="profile" title="Engine Bay Analysis" defaultCollapsed={true}
-              badge={<span className="widget__count">{(vehicle as any).origin_metadata.engine_bay_analysis.engine_family}</span>}
+              badge={<span className="widget__count" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setGalleryFilter({ zone: 'engine_bay' }); }}>{(vehicle as any).origin_metadata.engine_bay_analysis.engine_family}</span>}
             >
               {(() => {
                 const eba = (vehicle as any).origin_metadata.engine_bay_analysis;
@@ -456,8 +464,26 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             </React.Suspense>
           )}
 
+          {/* Active gallery filter chip */}
+          {galleryFilter && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '3px 10px', fontSize: '8px',
+              fontFamily: 'Arial, sans-serif', fontWeight: 700,
+              letterSpacing: '0.5px', textTransform: 'uppercase',
+              background: 'var(--surface)', borderBottom: '1px solid var(--border)',
+              position: 'sticky', top: 0, zIndex: 101,
+            }}>
+              <span style={{ color: 'var(--text-secondary)' }}>FILTER:</span>
+              <span>{galleryFilter.zone || galleryFilter.category || galleryFilter.tag || 'Custom'}</span>
+              <a onClick={() => setGalleryFilter(null)} style={{
+                cursor: 'pointer', color: 'var(--text-disabled)', marginLeft: 'auto',
+              }}>&times; CLEAR</a>
+            </div>
+          )}
+
           {/* Gallery toolbar */}
-          <div className="widget__header gallery-header" style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--vp-bg)', flexShrink: 0, flexWrap: 'wrap' }}>
+          <div className="widget__header gallery-header" style={{ position: 'sticky', top: galleryFilter ? 22 : 0, zIndex: 100, background: 'var(--vp-bg)', flexShrink: 0, flexWrap: 'wrap' }}>
             <div className="widget__header-left">
               <span className="widget__label">Images</span>
               <span className="widget__count">{vehicleImages.length || '—'}</span>
