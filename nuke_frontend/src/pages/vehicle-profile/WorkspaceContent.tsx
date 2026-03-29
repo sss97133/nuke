@@ -485,14 +485,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
 
           {/* Active gallery filter chip */}
           {galleryFilter && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '3px 10px', fontSize: '8px',
-              fontFamily: 'Arial, sans-serif', fontWeight: 700,
-              letterSpacing: '0.5px', textTransform: 'uppercase',
-              background: 'var(--surface)', borderBottom: '1px solid var(--border)',
-              position: 'sticky', top: 0, zIndex: 101,
-            }}>
+            <div className="gallery-filter-chip">
               <span style={{ color: 'var(--text-secondary)' }}>FILTER:</span>
               <span>{galleryFilter.zone || galleryFilter.category || galleryFilter.tag || 'Custom'}</span>
               <a onClick={() => setGalleryFilter(null)} style={{
@@ -502,7 +495,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           )}
 
           {/* Gallery toolbar */}
-          <div className="widget__header gallery-header" style={{ position: 'sticky', top: galleryFilter ? 22 : 0, zIndex: 100, background: 'var(--vp-bg)', flexShrink: 0, flexWrap: 'wrap' }}>
+          <div className="widget__header gallery-header" style={{ flexShrink: 0, flexWrap: 'wrap' }}>
             <div className="widget__header-left">
               <span className="widget__label">Images</span>
               <span className="widget__count">{vehicleImages.length || '—'}</span>

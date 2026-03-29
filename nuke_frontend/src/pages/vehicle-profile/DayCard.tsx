@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import type { WorkSession, DailyReceipt, DayPhoto } from './hooks/useBuildLog';
 
 // ── Helpers ──
@@ -26,11 +26,11 @@ const fmtDuration = (mins: number) => {
 };
 
 const WORK_TYPE_COLORS: Record<string, string> = {
-  fabrication: 'var(--vp-martini-red, #C8102E)',
-  heavy_work: 'var(--vp-gulf-orange, #EE7623)',
-  parts_and_work: 'var(--vp-gulf-blue, #6AADE4)',
-  parts_received: 'var(--vp-jps-gold, #C8A951)',
-  work: 'var(--vp-ink, #1a1a1a)',
+  fabrication: 'var(--error)',
+  heavy_work: 'var(--warning)',
+  parts_and_work: 'var(--info)',
+  parts_received: 'var(--text-secondary)',
+  work: 'var(--text)',
 };
 
 const WORK_TYPE_LABELS: Record<string, string> = {
@@ -40,6 +40,146 @@ const WORK_TYPE_LABELS: Record<string, string> = {
   parts_received: 'PARTS',
   work: 'WORK',
 };
+
+// ── Day Card Context (Seven-Level Analysis — Levels 1-2) ──
+
+interface DayCardContext {
+  sessionNumber: number;
+  totalSessions: number;
+  totalMinutes: number;
+  signals: { widget_slug: string; score: number; label: string; reasons: string[]; evidence: any }[];
+}
+
+function useDayCardContext(vehicleId: string | undefined, sessionDate: string): DayCardContext | null {
+  const [ctx, setCtx] = useState<DayCardContext | null>(null);
+
+  useEffect(() => {
+    if (!vehicleId || vehicleId.length < 20) return;
+    let cancelled = false;
+
+    import('../../lib/supabase').then(({ supabase }) => {
+      supabase.rpc('get_day_card_context', {
+        p_vehicle_id: vehicleId,
+        p_date: sessionDate,
+      }).then(({ data, error }: any) => {
+        if (cancelled || error || !data) return;
+        const d = typeof data === 'string' ? JSON.parse(data) : data;
+        const totalSessions = Number(d.total_sessions) || 0;
+        if (totalSessions === 0) { setCtx(null); return; }
+
+        const signals = Array.isArray(d.signals) ? d.signals : [];
+        setCtx({
+          sessionNumber: Number(d.session_number) || 0,
+          totalSessions,
+          totalMinutes: Number(d.total_minutes) || 0,
+          signals: signals.map((s: any) => ({
+            widget_slug: s.widget_slug || '',
+            score: Number(s.score) || 0,
+            label: s.label || '',
+            reasons: Array.isArray(s.reasons) ? s.reasons : [],
+            evidence: s.evidence,
+          })),
+        });
+      });
+    });
+
+    return () => { cancelled = true; };
+  }, [vehicleId, sessionDate]);
+
+  return ctx;
+}
+
+// ── Narrative computation (template-based, no LLM) ──
+
+const WORK_TYPE_READABLE: Record<string, string> = {
+  fabrication: 'fabrication',
+  heavy_work: 'heavy work',
+  parts_and_work: 'parts and work',
+  parts_received: 'parts received',
+  work: 'work',
+};
+
+function computeNarrative(
+  session: { work_type: string; duration_minutes: number; total_parts_cost: number; image_count: number; work_description: string },
+  detail: DailyReceipt | null,
+  ctx: DayCardContext | null,
+): string | null {
+  const isWorkSession = session.work_type && session.work_type !== '';
+  const hasPhotosOnly = session.image_count > 0 && session.duration_minutes <= 0 && session.total_parts_cost <= 0;
+
+  // No work session data and no photos — nothing to narrate
+  if (!isWorkSession && !hasPhotosOnly) return null;
+
+  // Photo-only session (no work data)
+  if (hasPhotosOnly) {
+    const photoCount = detail?.photo_count || session.image_count;
+    const areas = detail?.photos
+      ?.map((p) => p.area)
+      .filter((a): a is string => !!a && a !== 'general');
+    const uniqueAreas = areas ? [...new Set(areas)] : [];
+    if (uniqueAreas.length > 0) {
+      return `Photo session documenting ${photoCount} images across ${uniqueAreas.slice(0, 3).join(', ')}${uniqueAreas.length > 3 ? ' and more' : ''}.`;
+    }
+    return `Photo session documenting ${photoCount} image${photoCount === 1 ? '' : 's'}.`;
+  }
+
+  // Work session but no context data loaded yet
+  if (!ctx) return null;
+  // Session not found in the vehicle's sessions (shouldn't happen but guard)
+  if (ctx.sessionNumber === 0) return null;
+
+  const parts: string[] = [];
+
+  // Level 1: Build arc position
+  const workLabel = WORK_TYPE_READABLE[session.work_type] || session.work_type.replace(/_/g, ' ');
+
+  // Session X of Y
+  parts.push(`Session ${ctx.sessionNumber} of ${ctx.totalSessions}.`);
+
+  // Duration sentence
+  const durStr = fmtDuration(session.duration_minutes);
+  if (durStr) {
+    parts.push(`${workLabel.charAt(0).toUpperCase() + workLabel.slice(1)} session — ${durStr}.`);
+  }
+
+  // Parts cost
+  if (session.total_parts_cost > 0) {
+    parts.push(`Parts: ${fmt(session.total_parts_cost)}.`);
+  }
+
+  // Labor cost from detail
+  if (detail?.work_session) {
+    const ws = detail.work_session;
+    if (ws.total_labor_cost > 0) {
+      parts.push(`Labor: ${fmt(ws.total_labor_cost)}.`);
+    }
+    if (ws.total_job_cost > 0 && ws.total_job_cost !== ws.total_labor_cost && ws.total_job_cost !== session.total_parts_cost) {
+      parts.push(`Day total: ${fmt(ws.total_job_cost)}.`);
+    }
+  }
+
+  // Total build hours (only show if we have enough sessions to be meaningful — 3+)
+  if (ctx.totalSessions >= 3 && ctx.totalMinutes > 0) {
+    const totalHours = Math.round(ctx.totalMinutes / 60);
+    parts.push(`${totalHours} total hours logged across all sessions.`);
+  }
+
+  // Photos documented
+  if (session.image_count > 0) {
+    parts.push(`${session.image_count} photo${session.image_count === 1 ? '' : 's'} documented.`);
+  }
+
+  // Level 2: Comparison signals (if any exist)
+  for (const sig of ctx.signals) {
+    if (sig.reasons.length > 0) {
+      // Use the first reason as the comparative insight
+      parts.push(sig.reasons[0]);
+    }
+  }
+
+  if (parts.length === 0) return null;
+  return parts.join(' ');
+}
 
 // ── Photo grid grouped by area ──
 
@@ -171,6 +311,13 @@ const DayCard: React.FC<Props> = ({ session, detail, isLoading, onExpand, vehicl
   const activeDetail = popupDetail || detail;
   const activeLoading = popupLoading || isLoading;
 
+  // Seven-level analysis context (Levels 1-2)
+  const dayCardCtx = useDayCardContext(vehicleId, session.date);
+  const narrative = useMemo(
+    () => computeNarrative(session, activeDetail, dayCardCtx),
+    [session, activeDetail, dayCardCtx],
+  );
+
   const dateInfo = useMemo(() => fmtDate(session.date), [session.date]);
   const typeColor = WORK_TYPE_COLORS[session.work_type] || WORK_TYPE_COLORS.work;
   const typeLabel = WORK_TYPE_LABELS[session.work_type] || session.work_type.toUpperCase().replace(/_/g, ' ');
@@ -229,7 +376,7 @@ const DayCard: React.FC<Props> = ({ session, detail, isLoading, onExpand, vehicl
             {dateInfo.weekday}
           </div>
           <div style={{
-            fontSize: '14px',
+            fontSize: '11px',
             fontFamily: 'var(--vp-font-mono)',
             fontWeight: 700,
             color: 'var(--vp-ink)',
@@ -562,6 +709,37 @@ const DayCard: React.FC<Props> = ({ session, detail, isLoading, onExpand, vehicl
                 </div>
               )}
             </>
+          )}
+
+          {/* Seven-Level Analysis Narrative */}
+          {narrative && (
+            <div style={{ marginTop: '8px' }}>
+              <div style={{
+                fontSize: '7px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                color: 'var(--vp-pencil, #888)',
+                marginBottom: '3px',
+                fontFamily: 'var(--vp-font-sans)',
+              }}>
+                ANALYSIS
+              </div>
+              <div style={{
+                borderTop: '1px solid var(--vp-ghost, #ddd)',
+                paddingTop: '4px',
+              }}>
+                <p style={{
+                  fontSize: '9px',
+                  fontFamily: 'Arial, sans-serif',
+                  color: 'var(--text-secondary, var(--vp-pencil, #888))',
+                  lineHeight: 1.6,
+                  margin: 0,
+                }}>
+                  {narrative}
+                </p>
+              </div>
+            </div>
           )}
         </div>
       )}

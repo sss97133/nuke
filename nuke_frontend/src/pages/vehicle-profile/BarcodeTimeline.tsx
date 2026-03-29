@@ -694,7 +694,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
               {receiptEvent.hasWorkSession && receiptEvent.workMeta && (
                 <>
                   <hr className="receipt__divider" />
-                  <div style={{ fontSize: '7px', fontFamily: 'var(--vp-font-mono, Courier New, monospace)', color: '#999', lineHeight: 1.6 }}>
+                  <div style={{ fontSize: '7px', fontFamily: 'var(--vp-font-mono, Courier New, monospace)', color: 'var(--text-disabled)', lineHeight: 1.6 }}>
                     {receiptEvent.workMeta.duration_minutes > 0 && (
                       <div>{Math.floor(receiptEvent.workMeta.duration_minutes / 60)}h {receiptEvent.workMeta.duration_minutes % 60}m session</div>
                     )}
@@ -702,7 +702,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
                       <div>{receiptEvent.workMeta.image_count} photos</div>
                     )}
                     {receiptEvent.workMeta.work_description && (
-                      <div style={{ color: '#bbb', fontFamily: 'Arial, sans-serif', marginTop: '2px' }}>
+                      <div style={{ color: 'var(--text-disabled)', fontFamily: 'Arial, sans-serif', marginTop: '2px' }}>
                         {receiptEvent.workMeta.work_description.length > 100
                           ? receiptEvent.workMeta.work_description.slice(0, 100) + '...'
                           : receiptEvent.workMeta.work_description}
@@ -717,7 +717,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
                 <span>{receiptEvent.total}</span>
               </div>
               {receiptEvent.group && receiptEvent.groupDay && (
-                <div style={{ fontSize: '8px', color: '#bbb', fontFamily: "var(--vp-font-mono)", marginTop: '2px' }}>
+                <div style={{ fontSize: '8px', color: 'var(--text-disabled)', fontFamily: "var(--vp-font-mono)", marginTop: '2px' }}>
                   Day {receiptEvent.groupDay} · Group total: {receiptEvent.groupTotal || '—'}
                 </div>
               )}
@@ -725,7 +725,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
                 <a onClick={() => navigateReceipt(-1)}>{'\u2190'} PREV</a>
                 <a
                   onClick={() => openDayCardPopup(receiptDate)}
-                  style={{ fontWeight: 700, color: '#fff' }}
+                  style={{ fontWeight: 700, color: 'var(--surface-elevated)' }}
                 >
                   +
                 </a>
