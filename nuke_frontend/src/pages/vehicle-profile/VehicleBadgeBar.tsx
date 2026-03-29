@@ -85,7 +85,7 @@ const VehicleBadgeBar: React.FC = () => {
   };
 
   return (
-    <div className="vehicle-sub__badges" style={{ padding: '3px 12px', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', borderBottom: '1px solid var(--vp-ghost, #e0e0e0)' }}>
+    <div className="vehicle-sub__badges" style={{ padding: '4px 12px', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', borderBottom: '1px solid var(--vp-ghost, #e0e0e0)' }}>
       {/* BIDS */}
       {bidCount != null && bidCount > 0 && (
         <span

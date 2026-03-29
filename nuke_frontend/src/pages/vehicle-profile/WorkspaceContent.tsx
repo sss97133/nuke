@@ -49,7 +49,7 @@ const ProfileGallery: React.FC<{
   vehicle: any;
   onImagesUpdated: () => void;
   galleryView?: GalleryViewMode;
-}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, leadImageUrl, vehicle, onImagesUpdated, galleryView = 'CATEGORY' }) => {
+}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, leadImageUrl, vehicle, onImagesUpdated, galleryView = 'GRID' }) => {
   // Build fallback chain: context images → listing images → hero URL → primary_image_url
   let fallback = vehicleImages.length > 0 ? vehicleImages : fallbackListingImageUrls;
   if (fallback.length === 0 && leadImageUrl) {
@@ -125,7 +125,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   } = useVehicleProfile();
   const [galleryCols, setGalleryCols] = useState(3);
   const [leftPct, setLeftPct] = useState(DEFAULT_LEFT_PCT);
-  const [galleryView, setGalleryView] = useState<GalleryViewMode>('CATEGORY');
+  const [galleryView, setGalleryView] = useState<GalleryViewMode>('GRID');
   const { manifestByCategory, manifestStats, snapshots, spendProfile, loading: buildLoading } = useBuildProfile(vehicle?.id);
   const { data: buildStatus } = useBuildStatus(vehicle?.id);
 
