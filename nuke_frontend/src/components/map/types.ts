@@ -80,6 +80,34 @@ export interface CountyMapData {
   stats: { totalCount: number; totalValue: number; countyCount: number };
   counties: CountyDatum[];
 }
+
+export interface StateDatum {
+  code: string;
+  count: number;
+  value: number;
+  avg: number;
+}
+
+export interface StateMapData {
+  level: 'state';
+  stats: { totalCount: number; totalValue: number };
+  states: StateDatum[];
+}
+export interface MakeHeatmapCounty {
+  fips: string;
+  county_name: string;
+  state_fips: string;
+  count: number;
+}
+
+export interface MakeHeatmapData {
+  make: string;
+  total_vehicles: number;
+  county_count: number;
+  counties: MakeHeatmapCounty[];
+  generated_at: string;
+}
+
 export type ConfidenceTier = 'verified' | 'city' | 'approx';
 
 export function getConfidenceTier(confidence: number): ConfidenceTier {

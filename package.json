@@ -86,6 +86,8 @@
     "fb:desc-enrich:retry": "dotenvx run -- node scripts/fb-desc-enrich.mjs --retry-failed --batch 500",
     "fb:sweep": "dotenvx run -- node scripts/fb-marketplace-local-scraper.mjs --all --max-pages 30",
     "fb:sweep-and-enrich": "dotenvx run -- node scripts/fb-sweep-and-enrich.mjs",
+    "fb:taste-enrich": "dotenvx run -- node scripts/fb-marketplace-enricher.mjs --batch 50",
+    "fb:taste-enrich:small": "dotenvx run -- node scripts/fb-marketplace-enricher.mjs --batch 15",
     "env:doctor": "node scripts/tools/env-doctor.cjs",
     "extract-all-orgs": "tsx scripts/extract-all-orgs.ts",
     "extract-inventory": "node scripts/invoke-extract-inventory.js",

@@ -79,6 +79,13 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Calculate quality scores | `calculate-vehicle-scores` or `calculate-profile-completeness` | `vehicles.quality_grade` |
 | Get comps for a vehicle | `api-v1-comps` | Read-only — returns comparables |
 | Get market trends | `api-v1-market-trends` | Read-only |
+| Compute taste affinity for FB listings | `compute_taste_score()` (SQL trigger) | `marketplace_listings.taste_score`, `.enrichment_priority` |
+| View taste model metrics | `SELECT * FROM taste_model_metrics` | Read-only — hit rate, match rate, misses |
+| View taste Smart Folders | `SELECT * FROM taste_smart_folders` | Read-only — intent-matched inventory |
+| View geographic taste coverage | `SELECT * FROM taste_geographic_coverage` | Read-only — metro-level gaps |
+| Backfill bat_seller → organization links | `npm run backfill:bat-seller-to-org` (script) | `organization_vehicles`, `vehicle_events.source_organization_id`, `external_identities` |
+| Backfill ownership classification | `npm run backfill:ownership-classification` (script) | `organization_vehicles.relationship_type` (owner/consigner/supplier_build) |
+| Backfill analysis signals | `npm run ops:signals` (script) | `analysis_signals` — calls `analysis-engine-coordinator` per vehicle |
 | Compute Auction Readiness Score | `compute_auction_readiness()` (SQL) | `auction_readiness.*` |
 | Persist ARS + tier transitions | `persist_auction_readiness()` (SQL) | `auction_readiness`, `ars_tier_transitions` |
 | Generate listing package | `generate-listing-package` | Read-only — returns submission bundle |
@@ -179,6 +186,10 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Commission optimizer | `widget-commission-optimizer` with `{"vehicle_id": "..."}` | Commission structure + margin analysis |
 | Deal readiness | `widget-deal-readiness` with `{"vehicle_id": "..."}` | Checklist-based deal closing readiness |
 | Geographic arbitrage | `widget-geographic-arbitrage` with `{"vehicle_id": "..."}` | Regional price differential analysis |
+| Map data (choropleth/points/histogram) | `map-vehicles` with `mode=state\|county\|points\|histogram` | Supports bbox, zoom, time_start/end, make, year/price filters. Temporal county uses VLO county_fips index. |
+| County detail (vehicles, makes, platforms) | `get_county_detail(p_fips)` RPC | Returns JSONB: top 20 vehicles, make distribution, platform breakdown |
+| Make geographic density | `get_make_heatmap(p_make)` RPC | Returns county-level density for a specific make from mv_make_geographic_density |
+| Nearby vehicles | `find_vehicles_near(p_lat, p_lng, p_radius_miles)` RPC | Spatial search on vehicles.gps_latitude/longitude |
 | **SDK/API: Get all signals** | `api-v1-analysis` GET `?vehicle_id=<uuid>` | Auth required. Returns health + all signals |
 | **SDK/API: Get single signal** | `api-v1-analysis` GET `?vehicle_id=<uuid>&widget=<slug>` | Single widget signal |
 | **SDK/API: Refresh signals** | `api-v1-analysis` POST `{"action":"refresh","vehicle_id":"..."}` | Triggers recompute |
@@ -287,6 +298,17 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 | Get vehicle history | `api-v1-vehicle-history` | Historical data |
 | Get auction data | `api-v1-vehicle-auction` | Auction-specific fields |
 | Get observations for a vehicle | `api-v1-observations` | All source observations |
+
+---
+
+## Observation Ingestion
+
+| Intent | Use This | Notes |
+|--------|----------|-------|
+| Ingest a single observation | `ingest-observation` | Unified intake: dedup, vehicle resolution, confidence scoring. All extractors write through here. |
+| Ingest observations in bulk | `ingest-observation-batch` | Wraps `ingest-observation` for batch processing. Max 200 per request. Options: `gap_fill` (backfill vehicles table), `write_evidence` (field_evidence rows). |
+| Write observation + gap-fill + evidence (from code) | `import { writeObservation } from "../_shared/observationWriter.ts"` | Shared module for edge functions. Wraps observation + Tetris gap-fill + field_evidence in one call. |
+| Migrate legacy data to observations | `migrate-to-observations` | Ports existing auction_comments, vehicle_events, etc. to vehicle_observations |
 
 ---
 

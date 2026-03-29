@@ -1,9 +1,13 @@
 /**
- * FB Marketplace Enricher v1.0
+ * FB Marketplace Enricher v1.1
  *
  * Fetches individual FB Marketplace listing pages using Playwright (headless Chrome)
  * from a residential IP, extracts descriptions and additional detail, then updates
  * both marketplace_listings and the linked vehicles record.
+ *
+ * v1.1: Taste-prioritized enrichment. Orders by taste_score DESC so listings
+ * matching user's taste fingerprint get enriched first. Taste scores computed
+ * from 826 Facebook saved items (43x lift at 80+ band).
  *
  * Why this exists:
  *   FB's GraphQL search endpoint stopped returning redacted_description in late Feb 2026.
@@ -207,13 +211,16 @@ async function main() {
   console.log(`\nFB Marketplace Enricher v1.0`);
   console.log(`Batch: ${BATCH_SIZE} | Dry run: ${DRY_RUN}\n`);
 
-  // Get listings that need descriptions
+  // Get listings that need descriptions — prioritize by enrichment_priority
+  // Per library signal formula: S = taste_score × freshness_decay
+  // High enrichment_priority = high taste affinity × recent listing
   let query = supabase
     .from("marketplace_listings")
-    .select("facebook_id, url, vehicle_id, title")
+    .select("facebook_id, url, vehicle_id, title, taste_score, enrichment_priority")
     .is("description", null)
     .eq("status", "active")
     .not("vehicle_id", "is", null)
+    .order("enrichment_priority", { ascending: false, nullsFirst: false })
     .order("scraped_at", { ascending: false });
 
   if (SINGLE_ID) {
@@ -260,7 +267,9 @@ async function main() {
     stats.processed++;
     const url = listing.url.endsWith("/") ? listing.url : listing.url + "/";
 
-    process.stdout.write(`  [${stats.processed}/${listings.length}] ${listing.title?.slice(0, 50) || listing.facebook_id}...`);
+    const ep = Math.round(listing.enrichment_priority || 0);
+    const tasteLabel = ep >= 60 ? '🔥' : ep >= 40 ? '🟡' : ep >= 20 ? '·' : ' ';
+    process.stdout.write(`  [${stats.processed}/${listings.length}] ${tasteLabel}${ep} ${listing.title?.slice(0, 50) || listing.facebook_id}...`);
 
     const page = await context.newPage();
     try {
@@ -342,6 +351,19 @@ async function main() {
   console.log(`  Enriched:  ${stats.enriched}`);
   console.log(`  Failed:    ${stats.failed}`);
   console.log(`  Fields:    ${stats.fields}`);
+
+  // Log taste model metrics
+  const { data: tasteMetrics } = await supabase
+    .from('taste_model_metrics')
+    .select('*')
+    .maybeSingle();
+  if (tasteMetrics) {
+    console.log(`\n─── Taste Model ───`);
+    console.log(`  Match rate:      ${tasteMetrics.match_rate_pct}%`);
+    console.log(`  Pre-scrape rate: ${tasteMetrics.pre_scrape_rate_pct}%`);
+    console.log(`  Pre-enrich rate: ${tasteMetrics.pre_enrich_rate_pct}%`);
+    console.log(`  Misses:          ${tasteMetrics.misses}`);
+  }
 }
 
 main().catch((err) => {
