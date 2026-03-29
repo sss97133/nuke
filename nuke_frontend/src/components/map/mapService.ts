@@ -77,8 +77,36 @@ export async function fetchHistogram(
   });
 }
 
-export async function fetchCountyData(): Promise<import('./types').CountyMapData> {
-  return mapFetch<import('./types').CountyMapData>({ mode: 'county' });
+export async function fetchCountyData(
+  timeStart?: string,
+  timeEnd?: string,
+): Promise<import('./types').CountyMapData> {
+  // NOTE: The backend RPC (get_vehicle_map_data) uses a materialized view and does NOT
+  // support time_start/time_end filtering in county mode yet. Params are passed through
+  // but will be ignored until a temporal county query path is added to the edge function.
+  return mapFetch<import('./types').CountyMapData>({
+    mode: 'county',
+    time_start: timeStart,
+    time_end: timeEnd,
+  });
+}
+
+export async function fetchStateData(
+  timeStart?: string,
+  timeEnd?: string,
+): Promise<import('./types').StateMapData> {
+  // NOTE: Same materialized view limitation as fetchCountyData above.
+  return mapFetch<import('./types').StateMapData>({
+    mode: 'state',
+    time_start: timeStart,
+    time_end: timeEnd,
+  });
+}
+
+export async function fetchMakeHeatmap(make: string): Promise<import('./types').MakeHeatmapData> {
+  const { data, error } = await supabase.rpc('get_make_heatmap', { p_make: make });
+  if (error) throw new Error(`get_make_heatmap: ${error.message}`);
+  return data as import('./types').MakeHeatmapData;
 }
 
 // Utility kept from old mapUtils — used by MapVehicleDetail

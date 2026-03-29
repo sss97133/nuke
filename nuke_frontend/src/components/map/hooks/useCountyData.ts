@@ -3,7 +3,7 @@ import { fetchCountyData } from '../mapService';
 import { loadCountyBoundaries, prepareCountyData, type CountyLayerData } from '../layers/countyLayer';
 import type { CountyMapData } from '../types';
 
-export function useCountyData(enabled: boolean) {
+export function useCountyData(enabled: boolean, timeStart?: string, timeEnd?: string) {
   const [layerData, setLayerData] = useState<CountyLayerData | null>(null);
   const [stats, setStats] = useState<CountyMapData['stats'] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -16,7 +16,7 @@ export function useCountyData(enabled: boolean) {
     setLoading(true);
     setError(null);
 
-    Promise.all([loadCountyBoundaries(), fetchCountyData()])
+    Promise.all([loadCountyBoundaries(), fetchCountyData(timeStart, timeEnd)])
       .then(([geojson, data]) => {
         if (cancelled) return;
         const prepared = prepareCountyData(geojson, data.counties);
@@ -31,7 +31,7 @@ export function useCountyData(enabled: boolean) {
       });
 
     return () => { cancelled = true; };
-  }, [enabled]);
+  }, [enabled, timeStart, timeEnd]);
 
   return { layerData, stats, loading, error };
 }

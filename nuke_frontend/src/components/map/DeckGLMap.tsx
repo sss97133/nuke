@@ -1,4 +1,5 @@
 import React from 'react';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import DeckGL from '@deck.gl/react';
 import { Map as MapLibre } from 'react-map-gl/maplibre';
 import type { MapViewState, MapMode } from './types';

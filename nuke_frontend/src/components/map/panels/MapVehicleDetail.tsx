@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { getPlatformDisplayName } from '../../../services/platformNomenclature';
+import { getConfidenceTier, getConfidenceLabel } from '../types';
 import { thumbUrl } from '../mapService';
 
 const MAP_FONT = 'Arial, Helvetica, sans-serif';
@@ -53,9 +54,33 @@ interface VehicleData {
   images: { id: string; image_url: string }[];
 }
 
+interface VLORecord {
+  id: string;
+  source_platform: string | null;
+  source_type: string | null;
+  confidence: number | null;
+  precision: string | null;
+  location_text_raw: string | null;
+  city: string | null;
+  region_code: string | null;
+  county_name: string | null;
+  observed_at: string | null;
+}
+
+interface ComparableVehicle {
+  id: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  sale_price: number | null;
+  primary_image_url: string | null;
+}
+
 export default function MapVehicleDetail({ vehicleId, onBack, onNavigate }: Props) {
   const [vehicle, setVehicle] = useState<VehicleData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [vloRecords, setVloRecords] = useState<VLORecord[]>([]);
+  const [comparables, setComparables] = useState<ComparableVehicle[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +104,30 @@ export default function MapVehicleDetail({ vehicleId, onBack, onNavigate }: Prop
 
       if (!cancelled && v) {
         setVehicle({ ...v, images } as VehicleData);
+
+        // Fetch VLO records for location provenance
+        const { data: vlos } = await supabase
+          .from('vehicle_location_observations')
+          .select('id, source_platform, source_type, confidence, precision, location_text_raw, city, region_code, county_name, observed_at')
+          .eq('vehicle_id', vehicleId)
+          .order('confidence', { ascending: false })
+          .limit(5);
+        if (!cancelled && vlos) setVloRecords(vlos);
+
+        // Fetch comparables (same make, +/-5 years, with price)
+        if (v.make && v.year) {
+          const { data: comps } = await supabase
+            .from('vehicles')
+            .select('id, year, make, model, sale_price, primary_image_url')
+            .eq('make', v.make)
+            .gte('year', v.year - 5)
+            .lte('year', v.year + 5)
+            .not('sale_price', 'is', null)
+            .neq('id', vehicleId)
+            .order('sale_price')
+            .limit(50);
+          if (!cancelled && comps) setComparables(comps);
+        }
       }
       setLoading(false);
     }
@@ -131,6 +180,19 @@ export default function MapVehicleDetail({ vehicleId, onBack, onNavigate }: Prop
     if (label === 'Unknown') return null;
     return label;
   }, [vehicle.listing_source, vehicle.discovery_source, vehicle.auction_source, vehicle.listing_url, vehicle.discovery_url]);
+
+  // Price context — only when >= 3 comparables with prices
+  const priceContext = useMemo(() => {
+    if (comparables.length < 3 || !price) return null;
+    const prices = comparables.map(c => c.sale_price!).sort((a, b) => a - b);
+    const min = prices[0];
+    const max = prices[prices.length - 1];
+    const rank = prices.filter(p => p <= price).length;
+    return { count: prices.length, min, max, rank };
+  }, [comparables, price]);
+
+  // Best VLO for provenance display
+  const bestVlo = vloRecords.length > 0 ? vloRecords[0] : null;
 
   return (
     <div style={{ fontFamily: MAP_FONT, fontSize: 11 }}>
@@ -228,6 +290,94 @@ export default function MapVehicleDetail({ vehicleId, onBack, onNavigate }: Prop
           </div>
         )}
 
+        {/* Location provenance — epistemological layer */}
+        {bestVlo && (
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 12 }}>
+            <div style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: 6 }}>
+              LOCATION PROVENANCE
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* Primary VLO */}
+              <div style={{ fontSize: 10, color: 'var(--text)' }}>
+                {bestVlo.location_text_raw || bestVlo.city || 'Unknown location'}
+                {bestVlo.region_code ? `, ${bestVlo.region_code}` : ''}
+                {bestVlo.county_name ? ` (${bestVlo.county_name} Co.)` : ''}
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' as const }}>
+                {bestVlo.source_platform && (
+                  <span style={{ fontSize: 8, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)', textTransform: 'uppercase' as const }}>
+                    {getPlatformDisplayName(bestVlo.source_platform)}
+                  </span>
+                )}
+                {bestVlo.confidence != null && (
+                  <span style={{
+                    fontSize: 7, fontWeight: 700, padding: '1px 4px', border: '1px solid var(--border)',
+                    color: bestVlo.confidence >= 0.85 ? 'var(--success, #16825d)' : bestVlo.confidence >= 0.7 ? 'var(--warning, #b05a00)' : 'var(--text-secondary)',
+                    textTransform: 'uppercase' as const, letterSpacing: '0.3px',
+                  }}>
+                    {getConfidenceLabel(getConfidenceTier(bestVlo.confidence))}
+                  </span>
+                )}
+                {bestVlo.precision && (
+                  <span style={{ fontSize: 7, fontFamily: 'Courier New, monospace', color: 'var(--text-disabled)' }}>
+                    {bestVlo.precision}
+                  </span>
+                )}
+              </div>
+              {/* Additional VLOs */}
+              {vloRecords.length > 1 && (
+                <div style={{ fontSize: 8, color: 'var(--text-disabled)', marginTop: 2 }}>
+                  {vloRecords.length} location observations from {new Set(vloRecords.map(v => v.source_platform).filter(Boolean)).size} source{new Set(vloRecords.map(v => v.source_platform).filter(Boolean)).size !== 1 ? 's' : ''}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Regional context — similar vehicles nearby */}
+        {comparables.length > 0 && (
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 12 }}>
+            <div style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: 4 }}>
+              SIMILAR VEHICLES IN DB
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text)' }}>
+              {comparables.length} similar {vehicle.make} ({vehicle.year! - 5}–{vehicle.year! + 5}) in database
+            </div>
+          </div>
+        )}
+
+        {/* Price context — only >= 3 comparables */}
+        {priceContext && (
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 12 }}>
+            <div style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: 4 }}>
+              PRICE CONTEXT
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text)', marginBottom: 4 }}>
+              {title} at {fmtPrice(price!)} — {priceContext.count} comparable{priceContext.count !== 1 ? 's' : ''} priced {fmtPrice(priceContext.min)}–{fmtPrice(priceContext.max)}
+            </div>
+            {/* Price bar visualization */}
+            <div style={{ position: 'relative', height: 6, background: 'var(--bg-secondary, #1a1a1a)', border: '1px solid var(--border)', marginBottom: 4 }}>
+              {/* Range fill */}
+              <div style={{
+                position: 'absolute', top: 0, bottom: 0,
+                left: '0%', right: '0%',
+                background: 'var(--border)',
+              }} />
+              {/* This vehicle's position */}
+              <div style={{
+                position: 'absolute', top: -1, bottom: -1,
+                left: `${Math.min(99, Math.max(1, ((price! - priceContext.min) / (priceContext.max - priceContext.min || 1)) * 100))}%`,
+                width: 2, background: 'var(--success, #16825d)',
+              }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, fontFamily: 'Courier New, monospace', color: 'var(--text-disabled)' }}>
+              <span>{fmtPrice(priceContext.min)}</span>
+              <span>#{priceContext.rank} of {priceContext.count}</span>
+              <span>{fmtPrice(priceContext.max)}</span>
+            </div>
+          </div>
+        )}
+
         {/* Description */}
         {vehicle.description && (
           <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: '1.4', maxHeight: 100, overflow: 'hidden', marginBottom: 12 }}>
@@ -246,12 +396,6 @@ export default function MapVehicleDetail({ vehicleId, onBack, onNavigate }: Prop
           </div>
         )}
 
-        {/* Action buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <ActionButton label="FOLLOW" onClick={() => {}} />
-          <ActionButton label="BUY" onClick={() => {}} />
-          <ActionButton label="ADD TO COLLECTION" onClick={() => {}} />
-        </div>
       </div>
     </div>
   );
