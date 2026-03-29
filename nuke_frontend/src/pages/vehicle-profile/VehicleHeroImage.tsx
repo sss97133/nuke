@@ -99,8 +99,11 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
     );
   }
 
-  const renderUrl = getSupabaseRenderUrl(src, 1600, 90);
-  const imgUrl = renderUrl || src;
+  // Skip Supabase render endpoint for hero — it strips EXIF orientation,
+  // causing landscape photos to display as portrait. Browsers handle EXIF
+  // orientation natively (image-orientation: from-image is default in all
+  // modern browsers). Use original URL for correct orientation.
+  const imgUrl = src;
 
   // Build metadata parts (only render fields that exist)
   const metaParts: string[] = [];
@@ -142,7 +145,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
 
               {/* Image — fixed frame, toggle between contain and cover */}
               <img
-                src={renderUrl || src}
+                src={imgUrl}
                 alt=""
                 style={{
                   position: 'absolute',
@@ -151,11 +154,6 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                   height: '100%',
                   objectFit: fitMode,
                   objectPosition: 'center',
-                }}
-                onError={(e) => {
-                  if (renderUrl && (e.target as HTMLImageElement).src !== src) {
-                    (e.target as HTMLImageElement).src = src;
-                  }
                 }}
               />
 
