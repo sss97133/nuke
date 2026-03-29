@@ -86,6 +86,41 @@ const SOURCE_PATTERNS: Array<{
   },
 ];
 
+/**
+ * Extract a human-readable title from a URL slug.
+ * Works for Craigslist, Facebook Marketplace, and similar classifieds
+ * where the URL path contains the listing title as a slug.
+ * e.g. /d/joshua-tree-1976-chevy-k5-blazer-4x4/123.html → "joshua tree 1976 chevy k5 blazer 4x4"
+ */
+function extractTitleFromUrlSlug(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    const path = urlObj.pathname;
+
+    // Craigslist: /{region}.craigslist.org/{category}/d/{slug}/{id}.html
+    const clMatch = path.match(/\/d\/([\w-]+)\/\d+\.html$/);
+    if (clMatch) {
+      return clMatch[1].replace(/-/g, " ");
+    }
+
+    // Facebook Marketplace: /marketplace/item/{id}/ — no slug, skip
+    // Generic: try last path segment if it has dashes (looks like a slug)
+    const segments = path.split("/").filter(Boolean);
+    for (let i = segments.length - 1; i >= 0; i--) {
+      const seg = segments[i];
+      // Skip numeric-only segments (IDs) and file extensions
+      if (/^\d+$/.test(seg) || /\.\w{2,4}$/.test(seg)) continue;
+      // Must have dashes (slugified) and contain a 4-digit year
+      if (seg.includes("-") && /\b(19|20)\d{2}\b/.test(seg)) {
+        return seg.replace(/-/g, " ");
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function detectSource(url: string): SourceMatch {
   for (const { platform, pattern, extractId } of SOURCE_PATTERNS) {
     const match = url.match(pattern);
@@ -580,8 +615,8 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichedDat
     hagerty: "extract-hagerty-listing",
   };
 
-  const extractorName = extractors[platform];
-  if (!extractorName) return null;
+  // Use dedicated extractor if available, otherwise fall back to generic AI extraction
+  const extractorName = extractors[platform] || "extract-vehicle-data-ai";
 
   try {
     const resp = await fetch(`${supabaseUrl}/functions/v1/${extractorName}`, {
@@ -695,11 +730,16 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         if (loc.city && loc.state) input.location = `${loc.city}, ${loc.state}`;
       }
     } else if (input.url) {
-      parsed = {
-        year: input.year || null,
-        make: input.make || null,
-        model: input.model || null,
-      };
+      // Try parsing vehicle info from URL slug (works for Craigslist, classifieds)
+      const slugTitle = extractTitleFromUrlSlug(input.url);
+      if (slugTitle) {
+        parsed = parseVehicleTitle(slugTitle);
+        if (!input.price) input.price = parsePrice(slugTitle);
+      }
+      // Fall back to explicit fields if slug parsing didn't find anything
+      if (!parsed.year) parsed.year = input.year || null;
+      if (!parsed.make) parsed.make = input.make || null;
+      if (!parsed.model) parsed.model = input.model || null;
     }
 
     // Duplicate check: same user + same source URL = return existing discovery
@@ -1203,9 +1243,7 @@ Deno.serve(async (req: Request) => {
   // Single mode
   const result = await ingestOne(body as IngestInput, userId);
 
-  const httpStatus = result.status === "error" ? 500
-    : result.status === "rejected" ? 422
-    : 200;
+  const httpStatus = result.status === "error" ? 500 : 200;
 
   return new Response(JSON.stringify(result), {
     status: httpStatus,

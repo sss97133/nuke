@@ -702,8 +702,13 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
   // Step 1: Base price from comparables
   let { basePrice, compCount, method: compMethod } = await getBasePrice(supabase, vehicle);
   if (basePrice <= 0) {
-    // Fallback to vehicle's own price data if no comps found
-    const fallbackPrice = vehicle.sale_price || vehicle.asking_price || vehicle.current_value;
+    // No independent comps found. If vehicle already sold, skip — using its own
+    // sale_price as the "estimate" is circular and meaningless.
+    if (vehicle.sale_price && vehicle.sale_price > 0) {
+      return { error: "no_independent_comps", vehicleId };
+    }
+    // If asking_price exists but no sale_price, allow as low-confidence base
+    const fallbackPrice = vehicle.asking_price || vehicle.current_value;
     if (fallbackPrice && fallbackPrice > 0) {
       basePrice = fallbackPrice;
       compCount = 0;
@@ -788,9 +793,16 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
   // self_price_fallback gets no bonus (already in base 30)
   confidence = Math.min(Math.round(confidence), 100);
 
-  // Step 4: Deal score
+  // Cap confidence for self_price_fallback (no independent data)
+  if (compMethod === "self_price_fallback") {
+    confidence = Math.min(confidence, 25);
+  }
+
+  // Step 4: Deal score — null for self_price_fallback (no independent baseline)
   const askingPrice = vehicle.asking_price || vehicle.current_value;
-  const { dealScore, dealScoreLabel } = computeDealScore(estimatedValue, askingPrice, vehicle.created_at);
+  const { dealScore: rawDealScore, dealScoreLabel: rawDealScoreLabel } = computeDealScore(estimatedValue, askingPrice, vehicle.created_at);
+  const dealScore = compMethod === "self_price_fallback" ? null : rawDealScore;
+  const dealScoreLabel = compMethod === "self_price_fallback" ? null : rawDealScoreLabel;
 
   // Step 5: Heat score
   const { heatScore, heatScoreLabel } = await computeHeatScore(supabase, vehicle, dealScore);
@@ -813,6 +825,8 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
     input_count: inputCount,
     calculated_at: new Date().toISOString(),
     is_stale: false,
+    comp_method: compMethod,
+    is_circular: false,
   };
 
   // Upsert to nuke_estimates

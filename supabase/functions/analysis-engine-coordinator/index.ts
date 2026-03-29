@@ -257,6 +257,165 @@ function interpretInlineSqlResult(
       return { score, reasons, confidence: regions.length >= 5 ? 0.7 : 0.4, recommendations };
     }
 
+    case "data-quality": {
+      const fieldsFilled = data?.fields_filled ?? 0;
+      const fieldsTotal = data?.fields_total ?? 16;
+      const fillPct = data?.field_fill_pct ?? 0;
+      const imageCount = data?.image_count ?? 0;
+      const hasDescription = data?.has_description ?? false;
+      const hasVin = data?.has_vin ?? false;
+      const hasPrice = data?.has_price ?? false;
+
+      const score = Math.round(fillPct);
+      const reasons: string[] = [`${fieldsFilled}/${fieldsTotal} fields populated (${fillPct}%)`];
+      if (imageCount === 0) reasons.push("No images uploaded");
+      else reasons.push(`${imageCount} images`);
+      if (!hasDescription) reasons.push("Missing description");
+      if (!hasVin) reasons.push("Missing VIN");
+      if (!hasPrice) reasons.push("Missing sale price");
+
+      let severity: string | undefined;
+      if (score <= 20) severity = "critical";
+      else if (score <= 40) severity = "warning";
+      else if (score <= 65) severity = "info";
+      else severity = "ok";
+
+      const label = `Data Quality: ${score >= 75 ? "Strong" : score >= 50 ? "Adequate" : score >= 30 ? "Sparse" : "Minimal"}`;
+      const recommendations: any[] = [];
+      if (!hasVin) recommendations.push({ action: "Add VIN to vehicle record", priority: 1, rationale: "VIN enables decode, identity verification, and history lookup." });
+      if (!hasDescription) recommendations.push({ action: "Add vehicle description", priority: 2, rationale: "Descriptions improve search visibility and buyer confidence." });
+      if (imageCount < 10) recommendations.push({ action: "Upload more photos", priority: 2, rationale: `Only ${imageCount} images — aim for 20+ covering all angles.` });
+      return { score, label, severity, reasons, confidence: 0.95, recommendations };
+    }
+
+    case "photo-coverage": {
+      const imageCount = data?.image_count ?? 0;
+      const categoryBreakdown = data?.category_breakdown ?? {};
+      const distinctCategories = data?.distinct_categories ?? 0;
+      const score = data?.score ?? 0;
+
+      const reasons: string[] = [`${imageCount} total images`];
+      if (distinctCategories > 0) {
+        reasons.push(`${distinctCategories} photo categories covered`);
+      }
+      if (imageCount === 0) reasons.push("No photos — critical gap");
+
+      let severity: string | undefined;
+      if (score <= 10) severity = "critical";
+      else if (score <= 30) severity = "warning";
+      else if (score <= 60) severity = "info";
+      else severity = "ok";
+
+      const label = `Photo Coverage: ${imageCount === 0 ? "None" : imageCount < 5 ? "Minimal" : imageCount < 15 ? "Partial" : imageCount < 30 ? "Good" : "Comprehensive"}`;
+      const recommendations: any[] = [];
+      if (imageCount < 5) recommendations.push({ action: "Upload exterior and interior photos", priority: 1, rationale: "Minimum 5 photos needed for basic coverage." });
+      if (imageCount >= 5 && imageCount < 20) recommendations.push({ action: "Add engine bay, undercarriage, and detail photos", priority: 2, rationale: "20+ photos with full zone coverage builds buyer confidence." });
+      return { score, label, severity, reasons, confidence: 0.95, recommendations };
+    }
+
+    case "identity-confidence": {
+      const hasFullVin = data?.has_full_vin ?? false;
+      const hasYear = data?.has_year ?? false;
+      const hasMake = data?.has_make ?? false;
+      const hasModel = data?.has_model ?? false;
+      const vinConfidence = data?.vin_confidence;
+      const eventCount = data?.event_count ?? 0;
+      const score = data?.score ?? 15;
+
+      const reasons: string[] = [];
+      if (hasFullVin) reasons.push("Full 17-digit VIN present");
+      else if (data?.vin) reasons.push("Partial VIN present");
+      else reasons.push("No VIN on record");
+      if (vinConfidence !== null && vinConfidence !== undefined) reasons.push(`VIN confidence: ${Math.round(vinConfidence * 100)}%`);
+      if (!hasYear || !hasMake || !hasModel) {
+        const missing = [!hasYear && "year", !hasMake && "make", !hasModel && "model"].filter(Boolean);
+        reasons.push(`Missing identity fields: ${missing.join(", ")}`);
+      } else {
+        reasons.push("Year/Make/Model complete");
+      }
+      if (eventCount > 0) reasons.push(`${eventCount} cross-platform events`);
+
+      let severity: string | undefined;
+      if (score <= 25) severity = "critical";
+      else if (score <= 50) severity = "warning";
+      else if (score <= 75) severity = "info";
+      else severity = "ok";
+
+      const label = `Identity: ${score >= 80 ? "Verified" : score >= 60 ? "Partial" : score >= 35 ? "Incomplete" : "Unverified"}`;
+      const recommendations: any[] = [];
+      if (!hasFullVin) recommendations.push({ action: "Add or verify VIN", priority: 1, rationale: "Full VIN is required for decode, history reports, and identity verification." });
+      if (!hasMake || !hasModel) recommendations.push({ action: "Complete year/make/model fields", priority: 1, rationale: "Core identity fields enable market comparison and search." });
+      return { score, label, severity, reasons, confidence: 0.9, recommendations };
+    }
+
+    case "price-position": {
+      const salePrice = data?.sale_price ? Number(data.sale_price) : null;
+      const nukeEstimate = data?.nuke_estimate ? Number(data.nuke_estimate) : null;
+      const divergencePct = data?.divergence_pct ? Number(data.divergence_pct) : null;
+      const priceStatus = data?.price_status ?? "unknown";
+      const score = data?.score ?? 30;
+
+      const reasons: string[] = [];
+      if (priceStatus === "both_available" && divergencePct !== null) {
+        const direction = divergencePct > 0 ? "above" : "below";
+        reasons.push(`Sale price $${salePrice?.toLocaleString()} is ${Math.abs(divergencePct)}% ${direction} estimate $${nukeEstimate?.toLocaleString()}`);
+      } else if (priceStatus === "no_sale_price") {
+        reasons.push("No sale price recorded");
+      } else if (priceStatus === "no_estimate") {
+        reasons.push(`Sale price: $${salePrice?.toLocaleString()} — no Nuke estimate computed yet`);
+      }
+
+      let severity: string | undefined;
+      if (score <= 20) severity = "critical";
+      else if (score <= 40) severity = "warning";
+      else if (score <= 60) severity = "info";
+      else severity = "ok";
+
+      const label = `Price: ${priceStatus === "both_available" ? (Math.abs(divergencePct ?? 0) <= 15 ? "Well-positioned" : "Divergent") : priceStatus === "no_sale_price" ? "No sale data" : "Estimate needed"}`;
+      const recommendations: any[] = [];
+      if (priceStatus === "no_estimate") recommendations.push({ action: "Run valuation computation", priority: 2, rationale: "Nuke estimate enables price positioning analysis." });
+      if (priceStatus === "no_sale_price") recommendations.push({ action: "Record sale price", priority: 2, rationale: "Sale price enables market position analysis." });
+      if (divergencePct !== null && Math.abs(divergencePct) > 30) recommendations.push({ action: "Review pricing — significant divergence detected", priority: 1, rationale: `${Math.abs(divergencePct)}% gap between sale price and estimate warrants investigation.` });
+      return { score, label, severity, reasons, confidence: priceStatus === "both_available" ? 0.85 : 0.5, recommendations };
+    }
+
+    case "build-progress": {
+      const sessionCount = data?.session_count ?? 0;
+      const totalHours = data?.total_hours ?? 0;
+      const totalPartsCost = data?.total_parts_cost ?? 0;
+      const totalLaborCost = data?.total_labor_cost ?? 0;
+      const workOrderCount = data?.work_order_count ?? 0;
+      const estimatedPct = data?.estimated_pct;
+      const daysSinceLastSession = data?.days_since_last_session;
+      const score = data?.score ?? 10;
+
+      const reasons: string[] = [];
+      if (sessionCount === 0 && workOrderCount === 0) {
+        reasons.push("No work sessions or work orders recorded");
+      } else {
+        if (sessionCount > 0) reasons.push(`${sessionCount} work sessions, ${totalHours}h total labor`);
+        if (workOrderCount > 0) reasons.push(`${workOrderCount} work orders`);
+        if (totalPartsCost > 0) reasons.push(`$${Number(totalPartsCost).toLocaleString()} in parts`);
+        if (estimatedPct !== null && estimatedPct !== undefined) reasons.push(`Estimated ${Math.round(estimatedPct)}% complete`);
+        if (daysSinceLastSession !== null && daysSinceLastSession !== undefined) {
+          if (daysSinceLastSession > 60) reasons.push(`Stalled — ${daysSinceLastSession} days since last session`);
+          else if (daysSinceLastSession > 14) reasons.push(`${daysSinceLastSession} days since last session`);
+        }
+      }
+
+      let severity: string | undefined;
+      if (score <= 15) severity = "critical";
+      else if (score <= 35) severity = "warning";
+      else if (score <= 60) severity = "info";
+      else severity = "ok";
+
+      const label = `Build: ${sessionCount === 0 && workOrderCount === 0 ? "No work tracked" : estimatedPct !== null && estimatedPct >= 90 ? "Near complete" : estimatedPct !== null ? `${Math.round(estimatedPct)}% estimated` : "In progress"}`;
+      const recommendations: any[] = [];
+      if (sessionCount === 0 && workOrderCount === 0) recommendations.push({ action: "Log work sessions to track build progress", priority: 2, rationale: "Work tracking enables progress monitoring and cost analysis." });
+      if (daysSinceLastSession !== null && daysSinceLastSession > 30) recommendations.push({ action: "Schedule next work session", priority: 2, rationale: `Build has been inactive for ${daysSinceLastSession} days.` });
+      return { score, label, severity, reasons, confidence: sessionCount > 0 ? 0.8 : 0.5, recommendations };
+    }
+
     default:
       return { score: data?.score ?? null, reasons: data?.reasons ?? [], confidence: data?.confidence };
   }

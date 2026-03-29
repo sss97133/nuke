@@ -12,6 +12,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -540,6 +541,16 @@ Deno.serve(async (req) => {
           console.error(`[discover-desc] Condition extraction failed for ${vehicle.id}: ${condErr.message}`);
           conditionResult.errors = 1;
         }
+
+        // Write observation for the discovered specification data (fire-and-forget)
+        writeObservation(supabase, {
+          vehicleId: vehicle.id,
+          source: { platform: "ai-description-extraction", url: "" },
+          fields: discovered,
+          observationKind: "specification",
+          extractionMethod: `description_discovery_${discModel}`,
+          agentModel: discModel,
+        }).catch((e: any) => console.warn(`[discover-desc] observationWriter error for ${vehicle.id}: ${e?.message}`));
 
         // Recompute realization plan with new condition data
         try {

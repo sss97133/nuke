@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
 
 /**
  * feed-query — Server-side feed endpoint.
@@ -10,16 +11,30 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  * putting live inventory at the top of the feed.
  */
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// ---------------------------------------------------------------------------
+// Module-level cache: dealer org IDs (avoids re-querying every request)
+// ---------------------------------------------------------------------------
+let cachedDealerIds: string[] | null = null;
+let cachedDealerIdsAt = 0;
+const DEALER_CACHE_TTL = 5 * 60 * 1000; // 5 min
 
-function json(data: unknown, status = 200) {
+async function getDealerOrgIds(supabaseClient: any): Promise<string[]> {
+  if (cachedDealerIds && Date.now() - cachedDealerIdsAt < DEALER_CACHE_TTL) {
+    return cachedDealerIds;
+  }
+  const { data } = await supabaseClient
+    .from("organizations")
+    .select("id")
+    .eq("business_type", "dealer");
+  cachedDealerIds = (data ?? []).map((o: any) => o.id);
+  cachedDealerIdsAt = Date.now();
+  return cachedDealerIds;
+}
+
+function json(data: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json", ...extraHeaders },
   });
 }
 
@@ -209,12 +224,7 @@ Deno.serve(async (req) => {
     // When user is actively searching or sets include_dealers=true, show all.
     const showDealers = body.include_dealers === true || isSearching;
     if (!showDealers) {
-      // Fetch actual dealer org IDs (business_type = 'dealer'), then exclude them
-      const { data: dealerOrgs } = await supabase
-        .from("organizations")
-        .select("id")
-        .eq("business_type", "dealer");
-      const dealerIds = (dealerOrgs ?? []).map((o: any) => o.id);
+      const dealerIds = await getDealerOrgIds(supabase);
       if (dealerIds.length > 0) {
         query = query.not(
           "origin_organization_id",
@@ -424,7 +434,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Pass 3: For vehicles STILL missing, use vehicles.primary_image_url
+    // Pass 3: Last resort — vehicles with primary_image_url but NO vehicle_images rows at all.
+    // The RPC only queries vehicle_images, so this catches orphaned legacy URLs.
+    // Skipped when Pass 2 already resolved everything (common case).
     const stillMissingIds = vehicleIds.filter((id: string) => !thumbMap.has(id));
     if (stillMissingIds.length > 0) {
       const { data: vehicleRows } = await supabase
@@ -598,12 +610,35 @@ Deno.serve(async (req) => {
       // Stats are best-effort
     }
 
+    // Cache-Control: public for default feed, private for filtered/search requests
+    const isFiltered = !!(
+      isSearching ||
+      body.cursor ||
+      body.makes?.length ||
+      body.models?.length ||
+      body.body_styles?.length ||
+      body.price_min != null ||
+      body.price_max != null ||
+      body.for_sale ||
+      body.sold_only ||
+      body.hide_sold ||
+      body.added_today ||
+      body.is_4x4 ||
+      body.zip ||
+      body.user_state ||
+      body.included_sources?.length ||
+      body.excluded_sources?.length
+    );
+    const cacheControl = isFiltered
+      ? "private, max-age=30"
+      : "public, max-age=60, s-maxage=300";
+
     return json({
       items: filteredFeedItems,
       next_cursor,
       total_estimate: stats.total_vehicles,
       stats,
-    });
+    }, 200, { "Cache-Control": cacheControl });
   } catch (e: any) {
     console.error("[feed-query] Unhandled error:", e);
     return json({ error: e.message }, 500);

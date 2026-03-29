@@ -2111,6 +2111,73 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Resolve seller_username → organization via bat_seller_monitors
+    if (vehicleId && essentials.seller_username) {
+      try {
+        const { data: monitor } = await supabase
+          .from("bat_seller_monitors")
+          .select("organization_id")
+          .ilike("seller_username", essentials.seller_username)
+          .maybeSingle();
+
+        if (monitor?.organization_id) {
+          // Upsert external_identity
+          const { data: ei } = await supabase
+            .from("external_identities")
+            .upsert(
+              { platform: "bat", handle: essentials.seller_username, first_seen_at: new Date().toISOString() },
+              { onConflict: "platform,handle", ignoreDuplicates: false }
+            )
+            .select("id")
+            .maybeSingle();
+
+          const eiId = ei?.id;
+
+          // Classify ownership from description
+          const desc = (essentials.description || "").toLowerCase();
+          let relType = "sold_by";
+          if (/acquired by the sell(er|ing dealer)|purchased by the sell(er|ing dealer)|sell(er|ing dealer)('s| has) owned|in the sell(er|ing dealer)('s| has) possession|bought by the sell(er|ing dealer)/.test(desc)) {
+            relType = "owner";
+          } else if (/on behalf of|consign(ed|ment)|offered on consignment/.test(desc)) {
+            relType = "consigner";
+          } else if (/built by the sell(er|ing dealer)|restored by the sell(er|ing dealer)|sell(er|ing dealer)('s| has) (built|restored)/.test(desc)) {
+            relType = "supplier_build";
+          }
+
+          // Link org ↔ vehicle
+          await supabase
+            .from("organization_vehicles")
+            .upsert(
+              { organization_id: monitor.organization_id, vehicle_id: vehicleId, relationship_type: relType, status: "active", auto_tagged: true },
+              { onConflict: "organization_id,vehicle_id,relationship_type", ignoreDuplicates: true }
+            );
+
+          // Wire vehicle_events
+          await supabase
+            .from("vehicle_events")
+            .update({
+              source_organization_id: monitor.organization_id,
+              ...(eiId ? { seller_external_identity_id: eiId } : {}),
+            })
+            .eq("vehicle_id", vehicleId)
+            .eq("source_platform", "bat")
+            .is("source_organization_id", null);
+
+          // Store ownership classification in event metadata for audit
+          if (relType !== "sold_by") {
+            await supabase
+              .from("vehicle_events")
+              .update({ metadata: { ownership_classification: relType } })
+              .eq("vehicle_id", vehicleId)
+              .eq("source_platform", "bat")
+              .eq("source_organization_id", monitor.organization_id);
+          }
+        }
+      } catch (e: any) {
+        console.warn(`seller→org resolution failed (non-fatal): ${e?.message || String(e)}`);
+      }
+    }
+
     // auction_events (multi-auction history per vehicle)
     if (vehicleId) {
       const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
