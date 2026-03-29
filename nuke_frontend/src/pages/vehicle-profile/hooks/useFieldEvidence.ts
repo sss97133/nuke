@@ -33,6 +33,8 @@ export interface FieldEvidenceRow {
   created_at: string;
 }
 
+export type ConflictType = 'genuine' | 'refinement' | 'synonym' | 'variance';
+
 export interface FieldEvidenceGroup {
   /** The primary (winning) value for this field — highest confidence */
   primary: FieldEvidenceRow;
@@ -44,9 +46,55 @@ export interface FieldEvidenceGroup {
   totalSources: number;
   /** Are there conflicting values? */
   hasConflict: boolean;
+  /** What kind of conflict (if any) */
+  conflictType?: ConflictType;
 }
 
 export type FieldEvidenceMap = Record<string, FieldEvidenceGroup>;
+
+/* ------------------------------------------------------------------ */
+/*  Conflict classification — refinement vs synonym vs genuine         */
+/* ------------------------------------------------------------------ */
+
+/** Normalize for comparison: strip punctuation, whitespace, case */
+function norm(s: string): string {
+  return s.toLowerCase().replace(/[-\/\s_.()]+/g, '').trim();
+}
+
+function classifyConflict(
+  field: string,
+  primary: string,
+  others: string[],
+): ConflictType {
+  const pNorm = norm(primary);
+
+  // Synonym: values normalize to the same string
+  // e.g. "C/K Pickup" vs "C-K Pickup", "4WD" vs "4-WD"
+  if (others.every(v => norm(v) === pNorm)) return 'synonym';
+
+  // Refinement: one value contains the other (more specific)
+  // e.g. "Carburetor" vs "Carburetor (Edelbrock 4bbl)", "Blue" vs "Metallic Blue"
+  if (others.every(v => {
+    const vNorm = norm(v);
+    return pNorm.includes(vNorm) || vNorm.includes(pNorm);
+  })) return 'refinement';
+
+  // Variance: numeric fields within tolerance
+  const numericFields = ['mileage', 'odometer', 'horsepower', 'displacement', 'sale_price', 'asking_price'];
+  if (numericFields.some(nf => field.toLowerCase().includes(nf))) {
+    const nums = [primary, ...others]
+      .map(v => parseFloat(v.replace(/[^0-9.]/g, '')))
+      .filter(n => !isNaN(n));
+    if (nums.length >= 2) {
+      const range = Math.max(...nums) - Math.min(...nums);
+      const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+      // Within 5% of mean = measurement variance
+      if (mean > 0 && range / mean < 0.05) return 'variance';
+    }
+  }
+
+  return 'genuine';
+}
 
 /* ------------------------------------------------------------------ */
 /*  Trust hierarchy weights — used to break ties within same confidence */
@@ -166,12 +214,20 @@ export function useFieldEvidence(vehicleId: string | undefined) {
           rows.map((r) => (r.field_value || '').toLowerCase().trim())
         );
 
+        const hasConflict = distinctValues.size > 1;
+        let conflictType: ConflictType | undefined;
+        if (hasConflict) {
+          const others = [...distinctValues].filter(v => v !== primaryValue);
+          conflictType = classifyConflict(fieldName, primaryValue, others);
+        }
+
         map[fieldName] = {
           primary,
           sources: rows,
           agreementCount,
           totalSources: rows.length,
-          hasConflict: distinctValues.size > 1,
+          hasConflict,
+          conflictType,
         };
       }
 

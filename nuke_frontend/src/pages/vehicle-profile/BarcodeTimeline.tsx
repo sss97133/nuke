@@ -544,9 +544,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
 
         {/* Expanded heatmap — full timeline from vehicle year to present */}
         <div className="barcode-heatmap" ref={heatmapRef}>
-          <div className="timeline-section__header">
-            Activity Timeline · {yearRange}
-          </div>
+          {/* Label removed — barcode already communicates the range */}
           <div className="timeline-heatmap">
             <div className="hm-day-labels">
               {['', 'MON', '', 'WED', '', 'FRI', ''].map((name, i) => (
