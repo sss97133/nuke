@@ -1,7 +1,7 @@
 import React from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { BadgePortal } from '../../components/badges/BadgePortal';
-import { Badge } from '../../components/ui/badge';
+import { OdometerBadge } from '../../components/vehicle/OdometerBadge';
 
 /** Capitalize first letter of each word for display (e.g. "K5 JIMMY" -> "K5 Jimmy") */
 function toTitleCase(s: string): string {
@@ -24,12 +24,14 @@ function formatMileage(value: number | string | null | undefined): string {
 }
 
 function resolveLocation(vehicle: any): string | null {
+  const city  = vehicle?.city  ?? vehicle?.seller_city  ?? vehicle?.sellerCity ?? vehicle?.location;
   const state = vehicle?.state ?? vehicle?.seller_state ?? vehicle?.sellerState;
   const zip   = vehicle?.zip   ?? vehicle?.seller_zip   ?? vehicle?.sellerZip;
-  if (state && zip) return `${zip} ${state}`;
-  if (state) return state;
-  if (zip)   return String(zip);
-  return null;
+  const parts: string[] = [];
+  if (city) parts.push(String(city));
+  if (state) parts.push(String(state));
+  if (zip) parts.push(String(zip));
+  return parts.length > 0 ? parts.join(', ') : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -57,14 +59,17 @@ const VehicleSubHeader: React.FC = () => {
   const year      = vehicle.year   ?? vehicle.model_year   ?? '';
   const make      = vehicle.make   ?? vehicle.make_name    ?? '';
   const model     = vehicle.model  ?? vehicle.model_name   ?? '';
-  const trim      = vehicle.trim   ?? vehicle.trim_name    ?? '';
-  const titleParts = [year, make, model, trim].filter(Boolean);
+  const rawTrim   = vehicle.trim   ?? vehicle.trim_name    ?? '';
+  // Suppress trim badge when it's already contained in the model string (e.g. "K2500 Sierra Classic" already includes "Sierra Classic")
+  const trim      = rawTrim && model && String(model).toLowerCase().includes(String(rawTrim).toLowerCase()) ? '' : rawTrim;
+  const titleParts = [year, make, model, rawTrim].filter(Boolean);
   const titleStr  = titleParts.map((p) => (typeof p === 'number' ? String(p) : toTitleCase(String(p)))).join(' ');
 
   const mileage      = vehicle.mileage    ?? vehicle.odometer   ?? vehicle.miles;
   const bodyStyle    = (vehicle as any).body_style ?? (vehicle as any).bodyStyle ?? '';
   const transmission = (vehicle as any).transmission ?? '';
   const drivetrain   = (vehicle as any).drivetrain ?? (vehicle as any).drive_type ?? '';
+  const engineSize   = (vehicle as any).engine_size ?? (vehicle as any).displacement ?? '';
   const location     = resolveLocation(vehicle);
 
   // --- Styles ---
@@ -82,7 +87,7 @@ const VehicleSubHeader: React.FC = () => {
 
   const leftStyle: React.CSSProperties = {
     display:    'flex',
-    alignItems: 'baseline',
+    alignItems: 'center',
     gap:        8,
     flexShrink: 0,
     minWidth:   0,
@@ -164,10 +169,9 @@ const VehicleSubHeader: React.FC = () => {
         )}
 
         {mileage != null && mileage !== '' && (
-          <Badge
-            dimension="mileage"
-            value={formatMileage(mileage)}
-            size="sm"
+          <OdometerBadge
+            mileage={typeof mileage === 'number' ? mileage : parseFloat(String(mileage).replace(/[^0-9.]/g, ''))}
+            year={year ? Number(year) : null}
           />
         )}
       </div>
@@ -175,46 +179,22 @@ const VehicleSubHeader: React.FC = () => {
       {/* Divider */}
       <div style={dividerStyle} />
 
-      {/* Dimension badges only -- auction/engagement data lives in the banner below */}
+      {/* Dimension badges — every badge is clickable per design spec */}
       <div className="vp-sub-header__badges" style={badgesWrapStyle}>
-        {/* Body style */}
         {bodyStyle && (
-          <Badge
-            dimension="body"
-            value={toTitleCase(String(bodyStyle))}
-            size="sm"
-          />
+          <BadgePortal dimension="body" value={bodyStyle} label={toTitleCase(String(bodyStyle))} variant="dimension" />
         )}
-
-        {/* Transmission */}
+        {engineSize && (
+          <BadgePortal dimension="engine" value={engineSize} label={String(engineSize)} variant="dimension" />
+        )}
         {transmission && (
-          <Badge
-            dimension="trans"
-            value={toTitleCase(String(transmission))}
-            size="sm"
-          />
+          <BadgePortal dimension="trans" value={transmission} label={toTitleCase(String(transmission))} variant="dimension" />
         )}
-
-        {/* Drivetrain */}
         {drivetrain && (
-          <Badge
-            dimension="drive"
-            value={toTitleCase(String(drivetrain))}
-            size="sm"
-          />
+          <BadgePortal dimension="drive" value={drivetrain} label={toTitleCase(String(drivetrain))} variant="dimension" />
         )}
-
-        {/* Location — uses dimension badge styling for consistency */}
         {location && (
-          <Badge
-            dimension="source"
-            value={location}
-            size="sm"
-            style={{
-              fontFamily: 'var(--font-mono, "Courier New", Courier, monospace)',
-              color: 'var(--text-secondary, #888)',
-            }}
-          />
+          <BadgePortal dimension="source" value={location} label={location} variant="dimension" />
         )}
       </div>
     </div>
