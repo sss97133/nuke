@@ -3,10 +3,10 @@ import { useAnalysisSignals, type AnalysisSignal } from './hooks/useAnalysisSign
 import { usePopup } from '../../components/popups/usePopup';
 
 const SEVERITY_BORDER: Record<string, string> = {
-  critical: 'var(--error, #ef4444)',
-  warning: 'var(--warning, #f59e0b)',
-  info: 'var(--info, #3b82f6)',
-  ok: 'var(--text-disabled, #999)',
+  critical: 'var(--error, #d13438)',
+  warning: 'var(--warning, #b05a00)',
+  info: 'var(--info, #0ea5e9)',
+  ok: 'var(--text-disabled)',
 };
 
 const SignalDetailPopup: React.FC<{ signal: AnalysisSignal }> = ({ signal }) => (

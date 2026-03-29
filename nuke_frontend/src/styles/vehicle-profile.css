@@ -538,6 +538,56 @@
   white-space: nowrap;
 }
 
+/* Timeline filter pills — same pattern as gallery-btn */
+.timeline-filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.timeline-filter-pill {
+  font-family: var(--vp-font-sans);
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 4px;
+  border: 1px solid var(--vp-ghost);
+  background: transparent;
+  color: var(--vp-pencil);
+  cursor: pointer;
+  transition: background var(--vp-speed) var(--vp-ease), color var(--vp-speed) var(--vp-ease), border-color var(--vp-speed) var(--vp-ease);
+}
+.timeline-filter-pill:hover { background: var(--surface-hover); color: var(--vp-ink); }
+.timeline-filter-pill--active { background: var(--vp-ink); color: var(--vp-surface); border-color: var(--vp-ink); }
+
+/* Gallery filter chip — sticky above gallery toolbar inside right column */
+.gallery-filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 8px;
+  font-family: Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 101;
+}
+.gallery-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--vp-bg);
+}
+.gallery-filter-chip + .gallery-header {
+  top: 24px; /* filter chip height */
+}
+
 /* Receipt popup */
 .receipt {
   position: fixed;

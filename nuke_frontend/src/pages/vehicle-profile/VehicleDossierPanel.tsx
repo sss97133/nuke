@@ -413,7 +413,7 @@ const FieldRow: React.FC<{
           minHeight: '28px',
           cursor: group && group.sources.length > 0 ? 'pointer' : 'default',
           background: isOpen ? 'var(--surface-hover)' : (hovered && !isOpen ? 'var(--bg)' : 'transparent'),
-          transition: 'background 0.1s',
+          transition: 'background 180ms cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
         {/* Label */}
@@ -477,7 +477,7 @@ const FieldRow: React.FC<{
           color: 'var(--text-disabled)',
           textAlign: 'center',
           userSelect: 'none',
-          transition: 'transform 0.15s',
+          transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1)',
           transform: isOpen ? 'rotate(90deg)' : 'none',
         }}>
           {group && group.sources.length > 0 ? '\u25B6' : ''}
@@ -883,7 +883,7 @@ const VehicleDossierPanel: React.FC = () => {
                 height: '100%',
                 width: `${Math.round((layerDistribution.bedrock / layerDistribution.total) * 100)}%`,
                 background: 'var(--vp-brg, #006747)',
-                transition: 'width 0.3s',
+                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
               }}
             />
           )}
@@ -894,7 +894,7 @@ const VehicleDossierPanel: React.FC = () => {
                 height: '100%',
                 width: `${Math.round((layerDistribution.inspection / layerDistribution.total) * 100)}%`,
                 background: 'var(--success, #10b981)',
-                transition: 'width 0.3s',
+                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
               }}
             />
           )}
@@ -905,7 +905,7 @@ const VehicleDossierPanel: React.FC = () => {
                 height: '100%',
                 width: `${Math.round((layerDistribution.consensus / layerDistribution.total) * 100)}%`,
                 background: 'var(--info, #3b82f6)',
-                transition: 'width 0.3s',
+                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
               }}
             />
           )}
@@ -916,7 +916,7 @@ const VehicleDossierPanel: React.FC = () => {
                 height: '100%',
                 width: `${Math.round((layerDistribution.claims / layerDistribution.total) * 100)}%`,
                 background: 'var(--text-disabled)',
-                transition: 'width 0.3s',
+                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
               }}
             />
           )}
@@ -975,7 +975,7 @@ const VehicleDossierPanel: React.FC = () => {
                 height: '100%',
                 width: `${Math.min(100, Math.max(0, (v as any).data_quality_score))}%`,
                 background: (v as any).data_quality_score >= 70 ? 'var(--success)' : (v as any).data_quality_score >= 40 ? 'var(--warning)' : 'var(--error)',
-                transition: 'width 0.3s',
+                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
               }} />
             </div>
           </div>
