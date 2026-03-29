@@ -90,7 +90,7 @@ const S = {
 
   badge: {
     fontFamily: 'Arial, Helvetica, sans-serif',
-    fontSize: '9px',
+    fontSize: '8px',
     fontWeight: 700,
     letterSpacing: '0.04em',
     textTransform: 'uppercase' as const,
@@ -98,6 +98,10 @@ const S = {
     border: '1px solid #999',
     background: 'var(--bg)',
     color: 'var(--text)',
+    maxWidth: '100px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
   } as React.CSSProperties,
 
   conflictBadge: {
