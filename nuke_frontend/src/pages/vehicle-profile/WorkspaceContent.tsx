@@ -13,6 +13,7 @@ import WiringQueryContextBar from '../../components/wiring/WiringQueryContextBar
 const PartsQuoteGenerator = React.lazy(() => import('../../components/PartsQuoteGenerator').then(m => ({ default: m.PartsQuoteGenerator })));
 const VehicleROISummaryCard = React.lazy(() => import('../../components/vehicle/VehicleROISummaryCard'));
 const NukeEstimatePanel = React.lazy(() => import('../../components/vehicle/NukeEstimatePanel'));
+const BuyerQuestionPreview = React.lazy(() => import('../../components/vehicle/BuyerQuestionPreview'));
 const VehiclePricingValueCard = React.lazy(() => import('../../components/vehicle/VehiclePricingValueCard').then(m => ({ default: m.VehiclePricingValueCard })));
 const ExternalListingCard = React.lazy(() => import('../../components/vehicle/ExternalListingCard'));
 const VehicleReferenceLibrary = React.lazy(() => import('../../components/vehicle/VehicleReferenceLibrary'));
@@ -22,6 +23,7 @@ const BundleReviewQueue = React.lazy(() => import('../../components/images/Bundl
 const ImageGallery = React.lazy(() => import('../../components/images/ImageGallery'));
 const VehicleVideoSection = React.lazy(() => import('../../components/vehicle/VehicleVideoSection'));
 const AnalysisSignalsSection = React.lazy(() => import('./AnalysisSignalsSection'));
+const VehicleIntelligencePanel = React.lazy(() => import('./VehicleIntelligencePanel'));
 const VehicleScoresWidget = React.lazy(() => import('./VehicleScoresWidget'));
 const AuctionReadinessPanel = React.lazy(() => import('./AuctionReadinessPanel'));
 const ColumnDivider = React.lazy(() => import('./ColumnDivider'));
@@ -50,7 +52,8 @@ const ProfileGallery: React.FC<{
   vehicle: any;
   onImagesUpdated: () => void;
   galleryView?: GalleryViewMode;
-}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, leadImageUrl, vehicle, onImagesUpdated, galleryView = 'GRID' }) => {
+  galleryFilter?: import('./VehicleProfileContext').GalleryFilter | null;
+}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, leadImageUrl, vehicle, onImagesUpdated, galleryView = 'GRID', galleryFilter }) => {
   // Build fallback chain: context images → listing images → hero URL → primary_image_url
   let fallback = vehicleImages.length > 0 ? vehicleImages : fallbackListingImageUrls;
   if (fallback.length === 0 && leadImageUrl) {
@@ -69,6 +72,7 @@ const ProfileGallery: React.FC<{
       fallbackSourceUrl={vehicle?.discovery_url || vehicle?.bat_auction_url || vehicle?.listing_url || undefined}
       onImagesUpdated={onImagesUpdated}
       galleryView={galleryView}
+      galleryFilter={galleryFilter}
     />
   </React.Suspense>
   );
@@ -117,6 +121,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
     fallbackListingImageUrls,
     leadImageUrl,
     totalCommentCount,
+    observationCount,
     isPublic,
     auctionPulse,
     galleryFilter,
@@ -198,6 +203,11 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             <AnalysisSignalsSection vehicleId={vehicle.id} />
           </React.Suspense>
 
+          {/* Intelligence — community + description + apparitions */}
+          <React.Suspense fallback={null}>
+            <VehicleIntelligencePanel />
+          </React.Suspense>
+
           {/* Owner Identity — the throne */}
           {buildStatus?.dealJacket?.contact && (
             <React.Suspense fallback={null}>
@@ -227,6 +237,13 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             </CollapsibleWidget>
           )}
 
+          {/* Buyer Questions — what buyers will ask about this vehicle */}
+          <React.Suspense fallback={null}>
+            <CollapsibleWidget variant="profile" title="Buyer Questions" defaultCollapsed={true}>
+              <BuyerQuestionPreview vehicleId={vehicle.id} make={vehicle.make} />
+            </CollapsibleWidget>
+          </React.Suspense>
+
           {/* Listing Details — highlights, equipment, modifications, flaws, service history */}
           <React.Suspense fallback={null}>
             <VehicleListingDetailsCard vehicle={vehicle} />
@@ -247,11 +264,13 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           )}
 
           {/* Observation History — all observations for this vehicle, chronological */}
-          <CollapsibleWidget variant="profile" title="Observation History" defaultCollapsed={true}>
-            <React.Suspense fallback={<div className="widget__label" style={{ padding: '10px 16px' }}>Loading observations...</div>}>
-              <ObservationTimeline />
-            </React.Suspense>
-          </CollapsibleWidget>
+          {observationCount > 0 && (
+            <CollapsibleWidget variant="profile" title="Observation History" defaultCollapsed={true}>
+              <React.Suspense fallback={<div className="widget__label" style={{ padding: '10px 16px' }}>Loading observations...</div>}>
+                <ObservationTimeline />
+              </React.Suspense>
+            </CollapsibleWidget>
+          )}
 
           {/* Pricing & Value — self-guarding: returns null when no price data */}
           <VehiclePricingValueCard
@@ -495,7 +514,10 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
                     key={view}
                     type="button"
                     className={`gallery-btn ${view === galleryView ? 'gallery-btn--active' : ''}`}
-                    onClick={() => setGalleryView(view)}
+                    onClick={() => {
+                      setGalleryView(view);
+                      if (galleryFilter) setGalleryFilter(null);
+                    }}
                   >
                     {view}
                   </button>
@@ -525,6 +547,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             vehicle={vehicle}
             onImagesUpdated={() => { reloadVehicle(); reloadTimeline(); reloadImages(); }}
             galleryView={galleryView}
+            galleryFilter={galleryFilter}
           />
 
           {/* Vehicle Scores */}

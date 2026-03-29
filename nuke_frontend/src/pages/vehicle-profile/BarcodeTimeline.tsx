@@ -213,10 +213,35 @@ const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SE
 // Lazy-load DayCard for popup rendering
 const DayCardPopupContent = React.lazy(() => import('./DayCard'));
 
+// ---------------------------------------------------------------------------
+// Timeline filter definitions — client-side only, no new queries
+// ---------------------------------------------------------------------------
+
+const TIMELINE_FILTERS: { key: string; label: string; match: (ev: any) => boolean }[] = [
+  { key: 'all', label: 'ALL', match: () => true },
+  { key: 'work', label: 'WORK', match: (ev) => {
+    const t = String(ev.event_type || '').toLowerCase();
+    return t === 'work_session' || t === 'repair' || t === 'modification' || t === 'maintenance' || t === 'service';
+  }},
+  { key: 'photos', label: 'PHOTOS', match: (ev) => {
+    const t = String(ev.event_type || '').toLowerCase();
+    return t === 'photo_session' || (ev.metadata?.image_count > 0);
+  }},
+  { key: 'sales', label: 'SALES', match: (ev) => {
+    const t = String(ev.event_type || '').toLowerCase();
+    return t.startsWith('auction_') || t === 'sale' || t === 'purchase';
+  }},
+  { key: 'discovery', label: 'DISCOVERY', match: (ev) => {
+    const t = String(ev.event_type || '').toLowerCase();
+    return t === 'vehicle_added' || t === 'mileage_reading' || t === 'registration';
+  }},
+];
+
 const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
-  const { vehicle, vehicleId, timelineEvents } = useVehicleProfile();
+  const { vehicle, vehicleId, timelineEvents, setGalleryFilter } = useVehicleProfile();
   const { openPopup } = usePopup();
   const [expanded, setExpanded] = useState(true);
+  const [activeFilter, setActiveFilter] = useState('all');
   const [receiptDate, setReceiptDate] = useState<string | null>(null);
   const [receiptPos, setReceiptPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [tooltipContent, setTooltipContent] = useState<string | null>(null);
@@ -225,13 +250,26 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
   const heatmapRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
 
-  // Build event data map from timelineEvents
-  const { eventMap, startDate, endDate, weeks, sortedDates } = useMemo(() => {
-    const map: Record<string, EventDay> = {};
-    const currentYear = new Date().getFullYear();
-    const vehicleYear = (vehicle as any).year || currentYear;
+  // Filter counts — always computed from the full set so pills show totals before clicking
+  const filterCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const f of TIMELINE_FILTERS) {
+      counts[f.key] = f.key === 'all' ? timelineEvents.length : timelineEvents.filter(f.match).length;
+    }
+    return counts;
+  }, [timelineEvents]);
 
-    for (const ev of timelineEvents) {
+  // Filtered events for heatmap — client-side only
+  const filteredEvents = useMemo(() => {
+    const filter = TIMELINE_FILTERS.find(f => f.key === activeFilter);
+    if (!filter || activeFilter === 'all') return timelineEvents;
+    return timelineEvents.filter(filter.match);
+  }, [timelineEvents, activeFilter]);
+
+  // Helper: build an EventDay map from a list of events
+  const buildEventMap = useCallback((events: any[]) => {
+    const map: Record<string, EventDay> = {};
+    for (const ev of events) {
       const d = ev.event_date || ev.created_at;
       const ds = toDateOnly(d);
       if (!ds) continue;
@@ -246,18 +284,9 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       })();
 
       if (!map[ds]) {
-        map[ds] = {
-          date: ds,
-          label,
-          level: 1,
-          items: [],
-          total: '—',
-        };
+        map[ds] = { date: ds, label, level: 1, items: [], total: '—' };
       }
-      map[ds].items.push({
-        k: formatEventLabel(ev),
-        v: costStr,
-      });
+      map[ds].items.push({ k: formatEventLabel(ev), v: costStr });
 
       // Tag work_session days with rich metadata for Day Card popup
       const eventType = String(ev.event_type || '').trim().toLowerCase();
@@ -287,12 +316,23 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       else if (itemCount >= 2) map[ds].level = 2;
       else map[ds].level = 1;
     }
-
-    // Merge adjacent-day sessions spanning midnight
     mergeAdjacentSessions(map);
+    return map;
+  }, []);
 
-    // Date range
-    const allYears = Object.keys(map).map((d) => new Date(d + 'T00:00:00').getFullYear());
+  // eventMap from FILTERED events (heatmap); weeks from ALL events (barcode strip always shows everything)
+  const { eventMap, startDate, endDate, weeks, sortedDates } = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const vehicleYear = (vehicle as any).year || currentYear;
+
+    // Build map from ALL events first for barcode weeks + date range
+    const allMap = buildEventMap(timelineEvents);
+
+    // Build the filtered map for heatmap rendering
+    const map = activeFilter === 'all' ? allMap : buildEventMap(filteredEvents);
+
+    // Date range uses ALL events so the heatmap grid stays stable across filters
+    const allYears = Object.keys(allMap).map((d) => new Date(d + 'T00:00:00').getFullYear());
     const minYear = Math.min(vehicleYear, ...allYears, currentYear - 3);
     const maxYear = Math.max(currentYear, ...allYears);
 
@@ -300,7 +340,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     start.setDate(start.getDate() - start.getDay()); // align to Sunday
     const end = new Date(maxYear, 11, 31);
 
-    // Build weeks for barcode
+    // Build weeks for barcode from ALL events (collapsed strip always shows everything)
     const wks: { start: Date; level: number; events: { date: string; label: string }[] }[] = [];
     const cur = new Date(start);
     while (cur <= end) {
@@ -309,9 +349,9 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       for (let i = 0; i < 7; i++) {
         const d = new Date(cur);
         const s = dateStr(d);
-        if (map[s]) {
-          if (map[s].level > maxLevel) maxLevel = map[s].level;
-          weekEvents.push({ date: s, label: map[s].label });
+        if (allMap[s]) {
+          if (allMap[s].level > maxLevel) maxLevel = allMap[s].level;
+          weekEvents.push({ date: s, label: allMap[s].label });
         }
         cur.setDate(cur.getDate() + 1);
       }
@@ -327,7 +367,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       weeks: wks,
       sortedDates: sorted,
     };
-  }, [vehicle, timelineEvents]);
+  }, [vehicle, timelineEvents, filteredEvents, activeFilter, buildEventMap]);
 
   // Heatmap weeks for expanded view
   const heatmapWeeks = useMemo(() => {
@@ -361,10 +401,11 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       if (prev) {
         setReceiptDate(null);
         setHighlightGroup(null);
+        setGalleryFilter(null);
       }
       return !prev;
     });
-  }, []);
+  }, [setGalleryFilter]);
 
   // Auto-scroll heatmap to right (most recent events) when expanded
   useEffect(() => {
@@ -388,6 +429,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
         setExpanded(false);
         setReceiptDate(null);
         setHighlightGroup(null);
+        setGalleryFilter(null);
       }
     };
     // Defer so the expand click's own scroll doesn't immediately collapse
@@ -407,6 +449,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
         setExpanded(false);
         setReceiptDate(null);
         setHighlightGroup(null);
+        setGalleryFilter(null);
       }
     };
     document.addEventListener('keydown', handler);
@@ -450,8 +493,10 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       } else {
         setHighlightGroup(null);
       }
+      // Emit gallery filter for this day's photos
+      setGalleryFilter({ dateRange: [ds, ds] });
     },
-    [eventMap]
+    [eventMap, setGalleryFilter]
   );
 
   // Receipt navigation
@@ -462,13 +507,15 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       if (idx === -1) return;
       const nextIdx = idx + dir;
       if (nextIdx >= 0 && nextIdx < sortedDates.length) {
-        setReceiptDate(sortedDates[nextIdx]);
-        const nextEv = eventMap[sortedDates[nextIdx]];
+        const nextDate = sortedDates[nextIdx];
+        setReceiptDate(nextDate);
+        const nextEv = eventMap[nextDate];
         if (nextEv?.group) setHighlightGroup(nextEv.group);
         else setHighlightGroup(null);
+        setGalleryFilter({ dateRange: [nextDate, nextDate] });
       }
     },
-    [receiptDate, sortedDates, eventMap]
+    [receiptDate, sortedDates, eventMap, setGalleryFilter]
   );
 
   const receiptEvent = receiptDate ? eventMap[receiptDate] : null;
@@ -544,7 +591,18 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
 
         {/* Expanded heatmap — full timeline from vehicle year to present */}
         <div className="barcode-heatmap" ref={heatmapRef}>
-          {/* Label removed — barcode already communicates the range */}
+          {/* Filter pills — one data source, filtered views */}
+          <div className="timeline-filter-pills">
+            {TIMELINE_FILTERS.map((f) => (
+              <button
+                key={f.key}
+                className={`timeline-filter-pill${activeFilter === f.key ? ' timeline-filter-pill--active' : ''}`}
+                onClick={() => setActiveFilter(f.key)}
+              >
+                {f.label} ({filterCounts[f.key] ?? 0})
+              </button>
+            ))}
+          </div>
           <div className="timeline-heatmap">
             <div className="hm-day-labels">
               {['', 'MON', '', 'WED', '', 'FRI', ''].map((name, i) => (
