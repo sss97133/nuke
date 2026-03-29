@@ -10,6 +10,7 @@
  */
 import React from 'react';
 import { CollapsibleWidget } from '../ui/CollapsibleWidget';
+import { useVehicleProfile } from '../../pages/vehicle-profile/VehicleProfileContext';
 
 interface VehicleListingDetailsCardProps {
   vehicle: {
@@ -75,7 +76,7 @@ function parseList(val: string[] | string | null | undefined): string[] {
   return [];
 }
 
-const SectionList: React.FC<{ label: string; items: string[]; variant?: 'default' | 'warning' }> = ({ label, items, variant = 'default' }) => {
+const SectionList: React.FC<{ label: string; items: string[]; variant?: 'default' | 'warning'; onItemClick?: (item: string) => void }> = ({ label, items, variant = 'default', onItemClick }) => {
   if (items.length === 0) return null;
   const labelColor = variant === 'warning' ? 'var(--warning, #d97706)' : 'var(--text-secondary)';
   return (
@@ -116,7 +117,14 @@ const SectionList: React.FC<{ label: string; items: string[]; variant?: 'default
             }}>
               {variant === 'warning' ? '!' : '-'}
             </span>
-            {item}
+            {onItemClick ? (
+              <span
+                style={{ cursor: 'pointer', textDecoration: 'underline dotted' }}
+                onClick={() => onItemClick(item)}
+              >
+                {item}
+              </span>
+            ) : item}
           </li>
         ))}
       </ul>
@@ -125,6 +133,8 @@ const SectionList: React.FC<{ label: string; items: string[]; variant?: 'default
 };
 
 export const VehicleListingDetailsCard: React.FC<VehicleListingDetailsCardProps> = ({ vehicle }) => {
+  const { setGalleryFilter } = useVehicleProfile();
+
   const highlights = parseList(vehicle.highlights);
   const equipment = parseList(vehicle.equipment);
   const modifications = parseList(vehicle.modifications);
@@ -137,6 +147,8 @@ export const VehicleListingDetailsCard: React.FC<VehicleListingDetailsCardProps>
 
   if (totalItems === 0) return null;
 
+  const handleModClick = (item: string) => setGalleryFilter({ tag: item });
+
   return (
     <CollapsibleWidget
       variant="profile"
@@ -147,7 +159,7 @@ export const VehicleListingDetailsCard: React.FC<VehicleListingDetailsCardProps>
       <div style={{ padding: '0' }}>
         <SectionList label="Highlights" items={highlights} />
         <SectionList label="Equipment" items={equipment} />
-        <SectionList label="Modifications" items={modifications} />
+        <SectionList label="Modifications" items={modifications} onItemClick={handleModClick} />
         <SectionList label="Known Flaws" items={knownFlaws} variant="warning" />
         <SectionList label="Recent Service History" items={serviceHistory} />
         {titleStatus && (

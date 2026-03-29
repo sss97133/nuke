@@ -136,8 +136,173 @@ function fmtVal(field: string, val: any): string {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Epistemological layer computation (P15)                             */
+/* ------------------------------------------------------------------ */
+
+type EpistemologicalLayer = 'claim' | 'consensus' | 'inspection' | 'bedrock';
+
+const LAYER_COLORS: Record<EpistemologicalLayer, string> = {
+  claim: 'transparent',
+  consensus: 'var(--info, #3b82f6)',
+  inspection: 'var(--success, #10b981)',
+  bedrock: 'var(--vp-brg, #006747)',
+};
+
+function computeEpistemologicalLayer(group: FieldEvidenceGroup | undefined): EpistemologicalLayer {
+  if (!group || group.sources.length === 0) return 'claim';
+
+  const sourceTypes = group.sources.map(s => s.source_type.toLowerCase());
+
+  // Scientific test: has physical measurement source
+  if (sourceTypes.some(s => s.includes('dyno') || s.includes('measurement') || s.includes('inspection_report'))) {
+    return 'bedrock';
+  }
+
+  // Inspection: has photo-verified evidence
+  if (sourceTypes.some(s => s.includes('photo_verified') || s.includes('vin_plate_photo'))) {
+    return 'inspection';
+  }
+
+  // Consensus: 2+ independent source TYPES agree on the value
+  const distinctSourceTypes = new Set(sourceTypes.map(s => {
+    if (s.includes('vin') || s.includes('nhtsa')) return 'vin';
+    if (s.includes('bat')) return 'bat';
+    if (s.includes('ai') || s.includes('vision')) return 'ai';
+    if (s.includes('user')) return 'user';
+    if (s.includes('enrich')) return 'enrich';
+    return s;
+  }));
+
+  // Check that distinct source types agree on value
+  if (distinctSourceTypes.size >= 2) {
+    const values = group.sources.map(s => (s.field_value || '').toLowerCase().trim());
+    const primaryVal = values[0];
+    const agreeing = values.filter(v => v === primaryVal || v.includes(primaryVal) || primaryVal.includes(v));
+    if (agreeing.length >= 2) return 'consensus';
+  }
+
+  return 'claim';
+}
+
+/** Build a human-readable tooltip explaining why a field has its epistemological layer */
+function buildLayerTooltip(layer: EpistemologicalLayer, group: FieldEvidenceGroup | undefined): string {
+  if (!group || group.sources.length === 0) return 'Claim: no evidence sources';
+  const sourceTypes = group.sources.map(s => s.source_type.toLowerCase());
+
+  if (layer === 'bedrock') {
+    const measurement = sourceTypes.find(s => s.includes('dyno') || s.includes('measurement') || s.includes('inspection_report'));
+    return `Scientific test: ${(measurement || 'measurement').replace(/_/g, ' ')} data`;
+  }
+
+  if (layer === 'inspection') {
+    return 'Inspection: photo-verified evidence on file';
+  }
+
+  if (layer === 'consensus') {
+    const typeLabels: Record<string, string> = {
+      vin: 'VIN decode', bat: 'BaT listing', ai: 'AI extraction',
+      user: 'user input', enrich: 'enrichment',
+    };
+    const mapped = new Set(sourceTypes.map(s => {
+      if (s.includes('vin') || s.includes('nhtsa')) return 'vin';
+      if (s.includes('bat')) return 'bat';
+      if (s.includes('ai') || s.includes('vision')) return 'ai';
+      if (s.includes('user')) return 'user';
+      if (s.includes('enrich')) return 'enrich';
+      return s;
+    }));
+    const labels = [...mapped].map(k => typeLabels[k] || k).slice(0, 3);
+    return `Consensus: ${labels.join(' + ')} agree`;
+  }
+
+  // claim — single source
+  const typeLabels: Record<string, string> = {
+    vin: 'VIN decode', bat: 'BaT listing', ai: 'AI extraction',
+    user: 'user input', enrich: 'enrichment',
+  };
+  const st = sourceTypes[0];
+  const label = st.includes('vin') || st.includes('nhtsa') ? typeLabels.vin :
+    st.includes('bat') ? typeLabels.bat :
+    st.includes('ai') || st.includes('vision') ? typeLabels.ai :
+    st.includes('user') ? typeLabels.user :
+    st.includes('enrich') ? typeLabels.enrich :
+    st.replace(/_/g, ' ');
+  return `Claim: ${label} (single source)`;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Modification detection                                             */
 /* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/*  Powerplant field deduplication (P12)                               */
+/*  Token-based overlap detection — cosmetic only, no data mutation.   */
+/*  Only hides fields whose tokens are fully contained in a higher-    */
+/*  priority field. Skips hiding when provenance quality differs.      */
+/* ------------------------------------------------------------------ */
+
+function deduplicatePowerplant(
+  fields: { field: string; value: string }[],
+  evidence: FieldEvidenceMap,
+): Set<string> {
+  const priority = ['engine_type', 'engine_size', 'fuel_system_type', 'fuel_type'];
+  const seenTokens = new Set<string>();
+  const hide = new Set<string>();
+
+  /** Check if two fields have meaningfully different provenance quality.
+   *  If the candidate-to-hide has a higher-trust source type than the
+   *  field that would subsume it, we keep both visible — the provenance
+   *  difference is meaningful even if surface values overlap. */
+  function hasHigherProvenanceQuality(candidateField: string, subsumingField: string): boolean {
+    const candidateGroup = evidence[candidateField];
+    const subsumingGroup = evidence[subsumingField];
+    if (!candidateGroup || !subsumingGroup) return false;
+    // Compare primary source types
+    const candidateSrc = candidateGroup.primary.source_type.toLowerCase();
+    const subsumingSrc = subsumingGroup.primary.source_type.toLowerCase();
+    // VIN/NHTSA is the gold standard — if the candidate comes from VIN and the
+    // subsuming field doesn't, the provenance difference is meaningful
+    const isVin = (s: string) => s.includes('vin') || s.includes('nhtsa');
+    if (isVin(candidateSrc) && !isVin(subsumingSrc)) return true;
+    return false;
+  }
+
+  // Special rule: fuel_type is hidden if fuel_system_type exists and is non-empty
+  // ("Gasoline" is implied by "Carburetor")
+  const fuelSystem = fields.find(f => f.field === 'fuel_system_type');
+  const fuelType = fields.find(f => f.field === 'fuel_type');
+  if (fuelSystem && fuelType && fuelSystem.value && fuelType.value) {
+    if (!hasHigherProvenanceQuality('fuel_type', 'fuel_system_type')) {
+      hide.add('fuel_type');
+    }
+  }
+
+  for (const fieldName of priority) {
+    const entry = fields.find(f => f.field === fieldName);
+    if (!entry || hide.has(fieldName)) continue;
+    const tokens = entry.value.toLowerCase().split(/[\s,/()-]+/).filter(t => t.length > 1);
+
+    // If ALL tokens in this field already appeared in a higher-priority field, hide it
+    const newTokens = tokens.filter(t => !seenTokens.has(t));
+    if (newTokens.length === 0 && tokens.length > 0) {
+      // Find which higher-priority field subsumed this one
+      const subsumingField = priority.find(p => {
+        if (p === fieldName) return false;
+        const pEntry = fields.find(f => f.field === p);
+        if (!pEntry || hide.has(p)) return false;
+        const pTokens = pEntry.value.toLowerCase().split(/[\s,/()-]+/).filter(t => t.length > 1);
+        return tokens.every(t => pTokens.includes(t));
+      });
+      // Only hide if provenance quality is not higher on the candidate
+      if (!subsumingField || !hasHigherProvenanceQuality(fieldName, subsumingField)) {
+        hide.add(fieldName);
+      }
+    }
+    tokens.forEach(t => seenTokens.add(t));
+  }
+
+  return hide;
+}
 
 function detectModifications(evidence: FieldEvidenceMap): Set<string> {
   const mods = new Set<string>();
@@ -206,8 +371,14 @@ const FieldRow: React.FC<{
   isMod: boolean;
   isOpen: boolean;
   onToggle: () => void;
-}> = ({ field, label, displayValue, group, isMod, isOpen, onToggle }) => {
+  onValueClick?: () => void;
+}> = ({ field, label, displayValue, group, isMod, isOpen, onToggle, onValueClick }) => {
   const [hovered, setHovered] = useState(false);
+
+  // Compute epistemological layer (P15)
+  const layer = useMemo(() => computeEpistemologicalLayer(group), [group]);
+  const layerTooltip = useMemo(() => buildLayerTooltip(layer, group), [layer, group]);
+
   // Deduplicated source badges
   const sourceBadges = useMemo(() => {
     if (!group) return [];
@@ -220,7 +391,15 @@ const FieldRow: React.FC<{
   }, [group]);
 
   return (
-    <div style={{ borderBottom: '1px solid var(--border)' }} data-field={field}>
+    <div
+      style={{
+        borderBottom: '1px solid var(--border)',
+        borderLeft: layer !== 'claim' ? `3px solid ${LAYER_COLORS[layer]}` : 'none',
+        paddingLeft: layer !== 'claim' ? '0px' : '0px',
+      }}
+      data-field={field}
+      title={layer !== 'claim' ? layerTooltip : undefined}
+    >
       <div
         onClick={group && group.sources.length > 0 ? onToggle : undefined}
         onMouseEnter={() => setHovered(true)}
@@ -230,7 +409,7 @@ const FieldRow: React.FC<{
           display: 'grid',
           gridTemplateColumns: '120px 1fr auto 20px',
           alignItems: 'center',
-          padding: '4px 10px',
+          padding: layer !== 'claim' ? '4px 10px 4px 7px' : '4px 10px',
           minHeight: '28px',
           cursor: group && group.sources.length > 0 ? 'pointer' : 'default',
           background: isOpen ? 'var(--surface-hover)' : (hovered && !isOpen ? 'var(--bg)' : 'transparent'),
@@ -251,13 +430,18 @@ const FieldRow: React.FC<{
         </span>
 
         {/* Value */}
-        <span style={{
-          fontFamily: field === 'vin' ? "'Courier New', Courier, monospace" : 'Arial, Helvetica, sans-serif',
-          fontSize: '10px',
-          color: 'var(--text)',
-          padding: '0 8px',
-          letterSpacing: field === 'vin' ? '1px' : 'normal',
-        }}>
+        <span
+          style={{
+            fontFamily: field === 'vin' ? "'Courier New', Courier, monospace" : 'Arial, Helvetica, sans-serif',
+            fontSize: '10px',
+            color: 'var(--text)',
+            padding: '0 8px',
+            letterSpacing: field === 'vin' ? '1px' : 'normal',
+            cursor: onValueClick ? 'pointer' : undefined,
+            textDecoration: onValueClick ? 'underline dotted' : undefined,
+          }}
+          onClick={onValueClick ? (e) => { e.stopPropagation(); onValueClick(); } : undefined}
+        >
           {displayValue || '\u2014'}
         </span>
 
@@ -319,7 +503,7 @@ const FieldRow: React.FC<{
 /* ------------------------------------------------------------------ */
 
 const VehicleDossierPanel: React.FC = () => {
-  const { vehicle, canEdit, isVerifiedOwner, isMobile } = useVehicleProfile();
+  const { vehicle, canEdit, isVerifiedOwner, isMobile, setGalleryFilter } = useVehicleProfile();
   const navigate = useNavigate();
   const { evidence, loading } = useFieldEvidence(vehicle?.id);
 
@@ -336,6 +520,7 @@ const VehicleDossierPanel: React.FC = () => {
 
   const [openDrawers, setOpenDrawers] = useState<Set<string>>(new Set());
   const [initialized, setInitialized] = useState(false);
+  const [powerplantExpanded, setPowerplantExpanded] = useState(false);
 
   // Initialize auto-expanded drawers once evidence loads
   React.useEffect(() => {
@@ -369,6 +554,24 @@ const VehicleDossierPanel: React.FC = () => {
   const isMultiSource = multiSourceCount >= 5 && coverage >= 0.5;
   const verificationLabel = isMultiSource ? 'MULTI-SOURCE VERIFIED' : coverage >= 0.5 ? 'PARTIAL VERIFICATION' : 'UNVERIFIED';
   const verificationClass = isMultiSource ? 'verified' : 'partial';
+
+  // Epistemological layer distribution (P15)
+  const layerDistribution = useMemo(() => {
+    let bedrock = 0, inspection = 0, consensus = 0, claims = 0, empty = 0;
+    for (const f of FIELD_ORDER) {
+      const group = evidence[f];
+      if (!group || group.sources.length === 0) {
+        empty++;
+        continue;
+      }
+      const layer = computeEpistemologicalLayer(group);
+      if (layer === 'bedrock') bedrock++;
+      else if (layer === 'inspection') inspection++;
+      else if (layer === 'consensus') consensus++;
+      else claims++;
+    }
+    return { bedrock, inspection, consensus, claims, empty, total: FIELD_ORDER.length };
+  }, [evidence]);
 
   // Identity badges
   const badges = useMemo(() => {
@@ -519,6 +722,23 @@ const VehicleDossierPanel: React.FC = () => {
             return !!fmtVal(field, pv);
           });
           if (visibleFields.length === 0) return null;
+
+          // P12: Powerplant deduplication — compute hidden fields
+          let hiddenFields = new Set<string>();
+          if (fg.label === 'POWERPLANT' && !powerplantExpanded) {
+            const fieldEntries = visibleFields.map(field => {
+              const group = evidence[field] || evidence[field.replace(/[\s-]/g, '_').toLowerCase()];
+              let pv = v[field];
+              if ((pv == null || pv === '') && group && group.sources.length > 0) {
+                pv = group.primary.field_value;
+              }
+              return { field, value: fmtVal(field, pv) };
+            });
+            hiddenFields = deduplicatePowerplant(fieldEntries, evidence);
+          }
+          const shownFields = visibleFields.filter(f => !hiddenFields.has(f));
+          const collapsedCount = hiddenFields.size;
+
           return (
             <React.Fragment key={fg.label}>
               {gi > 0 && (
@@ -535,7 +755,7 @@ const VehicleDossierPanel: React.FC = () => {
                   {fg.label}
                 </div>
               )}
-              {visibleFields.map(field => {
+              {shownFields.map(field => {
                 const normalized = field.replace(/[\s-]/g, '_').toLowerCase();
                 const group = evidence[field] || (normalized !== field ? evidence[normalized] : undefined);
                 let pv = v[field];
@@ -544,6 +764,12 @@ const VehicleDossierPanel: React.FC = () => {
                 }
                 const displayValue = fmtVal(field, pv);
                 if (!displayValue) return null;
+                // Color/interior_color fields emit gallery filter on value click
+                const colorFilterClick = field === 'color'
+                  ? () => setGalleryFilter({ category: 'exterior' })
+                  : field === 'interior_color'
+                    ? () => setGalleryFilter({ category: 'interior' })
+                    : undefined;
                 return (
                   <FieldRow
                     key={field}
@@ -554,9 +780,27 @@ const VehicleDossierPanel: React.FC = () => {
                     isMod={modFields.has(field)}
                     isOpen={openDrawers.has(field)}
                     onToggle={() => toggleDrawer(field)}
+                    onValueClick={colorFilterClick}
                   />
                 );
               })}
+              {/* P12: Collapsed fields indicator for POWERPLANT */}
+              {fg.label === 'POWERPLANT' && collapsedCount > 0 && (
+                <div
+                  onClick={() => setPowerplantExpanded(true)}
+                  style={{
+                    fontFamily: 'Arial, Helvetica, sans-serif',
+                    fontSize: '7px',
+                    color: 'var(--text-disabled)',
+                    padding: '2px 10px 3px',
+                    cursor: 'pointer',
+                    letterSpacing: '0.3px',
+                    borderBottom: '1px solid var(--border)',
+                  }}
+                >
+                  {collapsedCount} related field{collapsedCount > 1 ? 's' : ''} collapsed
+                </div>
+              )}
             </React.Fragment>
           );
         })}
@@ -607,7 +851,7 @@ const VehicleDossierPanel: React.FC = () => {
         })()}
       </div>
 
-      {/* Verification Summary */}
+      {/* Provenance Coverage with epistemological layer distribution (P15) */}
       <div style={{
         background: 'var(--surface-elevated)',
         border: '2px solid var(--accent)',
@@ -624,19 +868,60 @@ const VehicleDossierPanel: React.FC = () => {
         }}>
           PROVENANCE COVERAGE
         </div>
+        {/* Segmented layer distribution bar */}
         <div style={{
           width: '100%',
           height: '6px',
           background: 'var(--border)',
           marginBottom: '4px',
+          display: 'flex',
         }}>
-          <div style={{
-            height: '100%',
-            width: `${Math.round(coverage * 100)}%`,
-            background: 'var(--success)',
-            transition: 'width 0.3s',
-          }} />
+          {layerDistribution.bedrock > 0 && (
+            <div
+              title={`${layerDistribution.bedrock} scientifically tested`}
+              style={{
+                height: '100%',
+                width: `${Math.round((layerDistribution.bedrock / layerDistribution.total) * 100)}%`,
+                background: 'var(--vp-brg, #006747)',
+                transition: 'width 0.3s',
+              }}
+            />
+          )}
+          {layerDistribution.inspection > 0 && (
+            <div
+              title={`${layerDistribution.inspection} physically inspected`}
+              style={{
+                height: '100%',
+                width: `${Math.round((layerDistribution.inspection / layerDistribution.total) * 100)}%`,
+                background: 'var(--success, #10b981)',
+                transition: 'width 0.3s',
+              }}
+            />
+          )}
+          {layerDistribution.consensus > 0 && (
+            <div
+              title={`${layerDistribution.consensus} multi-source consensus`}
+              style={{
+                height: '100%',
+                width: `${Math.round((layerDistribution.consensus / layerDistribution.total) * 100)}%`,
+                background: 'var(--info, #3b82f6)',
+                transition: 'width 0.3s',
+              }}
+            />
+          )}
+          {layerDistribution.claims > 0 && (
+            <div
+              title={`${layerDistribution.claims} single-source claims`}
+              style={{
+                height: '100%',
+                width: `${Math.round((layerDistribution.claims / layerDistribution.total) * 100)}%`,
+                background: 'var(--text-disabled)',
+                transition: 'width 0.3s',
+              }}
+            />
+          )}
         </div>
+        {/* Layer distribution summary text */}
         <div style={{
           fontFamily: 'Arial, Helvetica, sans-serif',
           fontSize: '8px',
@@ -644,7 +929,13 @@ const VehicleDossierPanel: React.FC = () => {
           letterSpacing: '0.5px',
           color: 'var(--text-secondary)',
         }}>
-          {withEvidence}/{FIELD_ORDER.length} FIELDS WITH PROVENANCE
+          {[
+            layerDistribution.bedrock > 0 ? `${layerDistribution.bedrock} BEDROCK` : null,
+            layerDistribution.inspection > 0 ? `${layerDistribution.inspection} INSPECTED` : null,
+            layerDistribution.consensus > 0 ? `${layerDistribution.consensus} CONSENSUS` : null,
+            `${layerDistribution.claims} CLAIMS`,
+            `${layerDistribution.empty} EMPTY`,
+          ].filter(Boolean).join(' \u00B7 ')}
         </div>
       </div>
 

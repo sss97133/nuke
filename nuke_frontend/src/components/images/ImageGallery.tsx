@@ -10,6 +10,7 @@ import { SensitiveImageOverlay } from './SensitiveImageOverlay';
 import ImageZoneSection, { groupImagesByZone } from './ImageZoneSection';
 import { ImageSetService } from '../../services/imageSetService';
 import { OnboardingSlideshow } from '../onboarding/OnboardingSlideshow';
+import type { GalleryFilter } from '../../pages/vehicle-profile/VehicleProfileContext';
 
 /** Profile toolbar mode: maps to viewMode + groupBySource + chronologicalMode */
 export type GalleryViewMode = 'ZONES' | 'GRID' | 'FULL' | 'INFO' | 'SESSIONS' | 'CATEGORY' | 'CHRONO' | 'SOURCE';
@@ -35,6 +36,8 @@ interface ImageGalleryProps {
  * CATEGORY/CHRONO/SOURCE → grid with the corresponding grouping/sort mode forced on.
    */
   galleryView?: GalleryViewMode;
+  /** Cross-column gallery filter from vehicle profile context. */
+  galleryFilter?: GalleryFilter | null;
   // NEW: Image Set features (optional - defaults maintain existing behavior)
   selectMode?: boolean;
   selectedImages?: Set<string>;
@@ -265,14 +268,15 @@ function galleryViewToViewMode(galleryView: GalleryViewMode): 'zones' | 'grid' |
   }
 }
 
-const ImageGallery = ({ 
-  vehicleId, 
-  onImagesUpdated, 
+const ImageGallery = ({
+  vehicleId,
+  onImagesUpdated,
   showUpload = true,
   fallbackImageUrls = [],
   fallbackLabel = 'Listing images',
   fallbackSourceUrl,
   galleryView,
+  galleryFilter,
   // NEW: Optional image set props
   selectMode = false,
   selectedImages,
@@ -383,6 +387,45 @@ const ImageGallery = ({
     const t = window.setTimeout(() => setRecentUploadIds([]), 15_000);
     return () => window.clearTimeout(t);
   }, [recentUploadIds]);
+
+  // When galleryFilter changes, re-page displayedImages from the filtered set
+  useEffect(() => {
+    if (allImages.length === 0) return;
+    const filtered = galleryFilter
+      ? allImages.filter((img: any) => {
+          if (galleryFilter.zone) {
+            const zone = String(img.vehicle_zone || '').toLowerCase().trim();
+            if (zone !== galleryFilter.zone.toLowerCase().trim()) return false;
+          }
+          if (galleryFilter.category) {
+            const cat = String(img.category || '').toLowerCase().trim();
+            const analysisCat = String(img.analysis_category || '').toLowerCase().trim();
+            const target = galleryFilter.category.toLowerCase().trim();
+            if (cat !== target && analysisCat !== target) return false;
+          }
+          if (galleryFilter.tag) {
+            const tags: string[] = Array.isArray(img.tags) ? img.tags : [];
+            const target = galleryFilter.tag.toLowerCase().trim();
+            const match = tags.some((t: string) => String(t).toLowerCase().trim() === target);
+            if (!match) {
+              const caption = String(img.caption || '').toLowerCase();
+              const aiMeta = JSON.stringify(img.ai_scan_metadata || {}).toLowerCase();
+              if (!caption.includes(target) && !aiMeta.includes(target)) return false;
+            }
+          }
+          if (galleryFilter.dateRange) {
+            const [start, end] = galleryFilter.dateRange;
+            const imgDate = String(img.taken_at || img.created_at || '').slice(0, 10);
+            if (!imgDate || imgDate < start || imgDate > end) return false;
+          }
+          return true;
+        })
+      : allImages;
+    const sorted = sortRows(filtered, sortBy);
+    setDisplayedImages(sorted.slice(0, Math.max(imagesPerPage, 50)));
+    if (sorted.length > 0) setShowImages(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [galleryFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1242,8 +1285,42 @@ const ImageGallery = ({
     });
   };
 
+  // Apply cross-column gallery filter BEFORE sorting/grouping
+  const galleryFilteredImages = useMemo(() => {
+    if (!galleryFilter) return allImages;
+    return allImages.filter((img: any) => {
+      if (galleryFilter.zone) {
+        const zone = String(img.vehicle_zone || '').toLowerCase().trim();
+        if (zone !== galleryFilter.zone.toLowerCase().trim()) return false;
+      }
+      if (galleryFilter.category) {
+        const cat = String(img.category || '').toLowerCase().trim();
+        const analysisCat = String(img.analysis_category || '').toLowerCase().trim();
+        const target = galleryFilter.category.toLowerCase().trim();
+        if (cat !== target && analysisCat !== target) return false;
+      }
+      if (galleryFilter.tag) {
+        const tags: string[] = Array.isArray(img.tags) ? img.tags : [];
+        const target = galleryFilter.tag.toLowerCase().trim();
+        const match = tags.some((t: string) => String(t).toLowerCase().trim() === target);
+        if (!match) {
+          // Also check caption and ai_scan_metadata for tag-like matches
+          const caption = String(img.caption || '').toLowerCase();
+          const aiMeta = JSON.stringify(img.ai_scan_metadata || {}).toLowerCase();
+          if (!caption.includes(target) && !aiMeta.includes(target)) return false;
+        }
+      }
+      if (galleryFilter.dateRange) {
+        const [start, end] = galleryFilter.dateRange;
+        const imgDate = String(img.taken_at || img.created_at || '').slice(0, 10);
+        if (!imgDate || imgDate < start || imgDate > end) return false;
+      }
+      return true;
+    });
+  }, [allImages, galleryFilter]);
+
   const getSortedImages = () => {
-    let sorted = sortRows(allImages, sortBy);
+    let sorted = sortRows(galleryFilteredImages, sortBy);
     
     // Apply grouping by source if enabled
     if (groupBySource) {
@@ -1528,7 +1605,7 @@ const ImageGallery = ({
 
   // Define loadMoreImages BEFORE the useEffect that uses it
   const loadMoreImages = useCallback(() => {
-    if (loadingMore || displayedImages.length >= allImages.length) return;
+    if (loadingMore || displayedImages.length >= galleryFilteredImages.length) return;
     
     if (!infiniteScrollEnabled) {
       // First click - enable infinite scroll
@@ -1569,26 +1646,26 @@ const ImageGallery = ({
       });
       setLoadingMore(false);
     }, 300); // Small delay for smooth UX
-  }, [loadingMore, displayedImages.length, allImages.length, infiniteScrollEnabled, sortBy, allImages, imagesPerPage]);
+  }, [loadingMore, displayedImages.length, galleryFilteredImages.length, infiniteScrollEnabled, sortBy, galleryFilteredImages, imagesPerPage]);
 
   // Infinite scroll observer
   useEffect(() => {
     if (!infiniteScrollEnabled || !sentinelRef.current || !showImages) return;
-    if (displayedImages.length >= allImages.length) return; // All images already loaded
-    
+    if (displayedImages.length >= galleryFilteredImages.length) return; // All images already loaded
+
     const observer = new IntersectionObserver(
       (entries) => {
         const first = entries[0];
-        if (first.isIntersecting && !loadingMore && displayedImages.length < allImages.length) {
+        if (first.isIntersecting && !loadingMore && displayedImages.length < galleryFilteredImages.length) {
           loadMoreImages();
         }
       },
       { threshold: 0.1, rootMargin: '100px' }
     );
-    
+
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [infiniteScrollEnabled, loadingMore, displayedImages.length, allImages.length, showImages, loadMoreImages]);
+  }, [infiniteScrollEnabled, loadingMore, displayedImages.length, galleryFilteredImages.length, showImages, loadMoreImages]);
 
   // Check authentication and permissions
   useEffect(() => {
@@ -2419,6 +2496,22 @@ const ImageGallery = ({
 
   if (error) {
     return <div className="text-center p-8 text-red-500">{error}</div>;
+  }
+
+  // If gallery filter is active and produces 0 results, show a message
+  if (galleryFilter && galleryFilteredImages.length === 0 && allImages.length > 0) {
+    return (
+      <div style={{
+        padding: '16px',
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '10px',
+        color: 'var(--text-secondary)',
+        textAlign: 'center',
+        letterSpacing: '0.3px',
+      }}>
+        No images match this filter
+      </div>
+    );
   }
 
   // If no images, show upload UI (always visible to encourage uploads)

@@ -4,9 +4,9 @@ import { usePopup } from '../../components/popups/usePopup';
 
 const SEVERITY_BORDER: Record<string, string> = {
   critical: 'var(--error, #ef4444)',
-  high: 'var(--warning, #f59e0b)',
-  medium: 'var(--info, #3b82f6)',
-  low: 'var(--text-disabled, #999)',
+  warning: 'var(--warning, #f59e0b)',
+  info: 'var(--info, #3b82f6)',
+  ok: 'var(--text-disabled, #999)',
 };
 
 const SignalDetailPopup: React.FC<{ signal: AnalysisSignal }> = ({ signal }) => (
