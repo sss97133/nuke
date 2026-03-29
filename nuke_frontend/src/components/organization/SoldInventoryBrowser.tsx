@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { optimizeImageUrl } from '../../lib/imageOptimizer';
 
 interface SoldVehicle {
   id: string;
@@ -154,7 +155,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
         imageCountByVehicle.set(vid, (imageCountByVehicle.get(vid) || 0) + 1);
         if (!primaryImageByVehicle.has(vid)) {
           const url = img.thumbnail_url || img.medium_url || img.image_url;
-          if (url) primaryImageByVehicle.set(vid, url);
+          if (url) primaryImageByVehicle.set(vid, optimizeImageUrl(url, 'small') || url);
         }
       });
 

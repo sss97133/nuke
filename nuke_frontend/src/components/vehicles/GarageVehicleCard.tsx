@@ -17,6 +17,7 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { optimizeImageUrl as sharedOptimizeImageUrl } from '../../lib/imageOptimizer';
 import type { GarageVehicle, RelationshipType, ViewMode } from '../../hooks/useVehiclesDashboard';
 
 // ---------------------------------------------------------------------------
@@ -71,11 +72,7 @@ function truncateVin(vin: string | null): string {
 }
 
 function optimizeImageUrl(url: string): string {
-  if (url.includes('/storage/v1/object/public/')) {
-    return url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') +
-      '?width=632&height=356&quality=85&resize=cover';
-  }
-  return url;
+  return sharedOptimizeImageUrl(url, 'small') || url;
 }
 
 function relationshipAccent(rel: RelationshipType): { bg: string; border: string; color: string } {

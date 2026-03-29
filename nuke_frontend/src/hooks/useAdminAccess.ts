@@ -1,49 +1,29 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from './useAuth';
-import { AdminNotificationService } from '../services/adminNotificationService';
+import { supabase } from '../lib/supabase';
 
 type AdminAccessState = {
   loading: boolean;
   isAdmin: boolean;
-  refresh: () => Promise<void>;
+  refresh: () => void;
 };
 
 export function useAdminAccess(): AdminAccessState {
-  const { user, loading: authLoading } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [adminLoading, setAdminLoading] = useState(true);
-
-  const refresh = useCallback(async () => {
-    if (!user) {
-      setIsAdmin(false);
-      setAdminLoading(false);
-      return;
-    }
-
-    setAdminLoading(true);
-    try {
-      const ok = await AdminNotificationService.isCurrentUserAdmin();
-      setIsAdmin(ok);
-    } finally {
-      setAdminLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (authLoading) return;
-    refresh();
-  }, [authLoading, refresh]);
-
-  return {
-    loading: authLoading || adminLoading,
-    isAdmin,
-    refresh,
-  };
+  const { user } = useAuth();
+  const { data: isAdmin = false, isLoading, refetch } = useQuery({
+    queryKey: ['admin-status', user?.id],
+    queryFn: async () => {
+      if (!user) return false;
+      const { data } = await supabase
+        .from('admin_users')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      return !!data;
+    },
+    enabled: !!user,
+    staleTime: 10 * 60 * 1000, // 10 min
+  });
+  return { isAdmin, loading: isLoading, refresh: refetch };
 }
-
-
-
-
-
-
-

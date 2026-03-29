@@ -35,7 +35,6 @@ interface MarketSegment {
   vehicle_count: number;
   market_cap_usd: number | null;
   change_7d_pct: number | null;
-  fund_symbol: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -122,7 +121,7 @@ function MarketSegmentsStrip({ segments, loading }: { segments: MarketSegment[];
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <span style={{ fontFamily: 'Arial, sans-serif', fontSize: 11, fontWeight: 900 }}>
-                {seg.fund_symbol ?? seg.slug.toUpperCase()}
+                {seg.slug.toUpperCase()}
               </span>
               {pct && (
                 <span
@@ -216,7 +215,7 @@ export default function MarketDashboard() {
   useEffect(() => {
     supabase
       .from('market_segments_index')
-      .select('segment_id, slug, name, vehicle_count, market_cap_usd, change_7d_pct, fund_symbol')
+      .select('segment_id, slug, name, vehicle_count, market_cap_usd, change_7d_pct')
       .order('market_cap_usd', { ascending: false, nullsFirst: false })
       .limit(8)
       .then(({ data }) => {

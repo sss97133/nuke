@@ -1,7 +1,52 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { ingestVehicle } from '../services/aiDataIngestion';
 import type { SearchResult, SearchResultType } from '../types/search';
+
+/* ─── URL detection ─── */
+const URL_RE = /^https?:\/\//i;
+const WWW_RE = /^www\./i;
+const BARE_DOMAIN_RE = /^[a-z0-9.-]+\.[a-z]{2,}(?:[/?#].*)?$/i;
+function looksLikeUrl(q: string): boolean {
+  const t = q.trim();
+  return URL_RE.test(t) || WWW_RE.test(t) || (BARE_DOMAIN_RE.test(t) && !/\s/.test(t));
+}
+
+const PLATFORM_PATTERNS: Array<{ pattern: RegExp; label: string; short: string }> = [
+  { pattern: /bringatrailer\.com/i, label: 'Bring a Trailer', short: 'BAT' },
+  { pattern: /carsandbids\.com/i, label: 'Cars & Bids', short: 'C&B' },
+  { pattern: /mecum\.com/i, label: 'Mecum Auctions', short: 'MECUM' },
+  { pattern: /barrett-jackson\.com/i, label: 'Barrett-Jackson', short: 'BJ' },
+  { pattern: /rmsothebys\.com/i, label: "RM Sotheby's", short: 'RM' },
+  { pattern: /bonhams\.com/i, label: 'Bonhams', short: 'BONHAMS' },
+  { pattern: /pcarmarket\.com/i, label: 'PCarMarket', short: 'PCAR' },
+  { pattern: /hagerty\.com/i, label: 'Hagerty', short: 'HAGERTY' },
+  { pattern: /hemmings\.com/i, label: 'Hemmings', short: 'HEMMINGS' },
+  { pattern: /collectingcars\.com/i, label: 'Collecting Cars', short: 'CC' },
+  { pattern: /ebay\.com/i, label: 'eBay', short: 'EBAY' },
+  { pattern: /facebook\.com\/marketplace/i, label: 'Facebook Marketplace', short: 'FBMP' },
+  { pattern: /craigslist\.org/i, label: 'Craigslist', short: 'CL' },
+  { pattern: /classiccars\.com/i, label: 'ClassicCars.com', short: 'CC' },
+  { pattern: /autotrader\.com/i, label: 'AutoTrader', short: 'AT' },
+];
+
+function detectPlatform(url: string): { label: string; short: string } | null {
+  for (const p of PLATFORM_PATTERNS) {
+    if (p.pattern.test(url)) return { label: p.label, short: p.short };
+  }
+  return null;
+}
+
+export interface UrlExtraction {
+  status: 'detecting' | 'extracting' | 'success' | 'error';
+  url: string;
+  platform: { label: string; short: string } | null;
+  vehicleId?: string;
+  vehicleName?: string;
+  isNew?: boolean;
+  error?: string;
+}
 
 export interface SearchMeta {
   total_count: number;
@@ -94,6 +139,10 @@ export function useSearchPage() {
   // Browse stats for context (fetched alongside results)
   const [browseStats, setBrowseStats] = useState<BrowseStats | null>(null);
 
+  // URL extraction state
+  const [urlExtraction, setUrlExtraction] = useState<UrlExtraction | null>(null);
+  const urlExtractionRef = useRef<string | null>(null);
+
   // Detect make from query or URL params for browse_stats
   const detectedMake = useMemo(() => {
     if (urlMake) return urlMake;
@@ -116,6 +165,8 @@ export function useSearchPage() {
       setSearchMeta(null);
       setBrowseStats(null);
       setLoading(false);
+      setUrlExtraction(null);
+      urlExtractionRef.current = null;
       return;
     }
 
@@ -135,6 +186,58 @@ export function useSearchPage() {
       return;
     }
 
+    // URL detection — skip search, go straight to ingestion
+    if (looksLikeUrl(q)) {
+      const url = URL_RE.test(q) ? q : `https://${q}`;
+
+      // Prevent duplicate extraction for same URL
+      if (urlExtractionRef.current === url) return;
+      urlExtractionRef.current = url;
+
+      const platform = detectPlatform(url);
+      setResults([]);
+      setSearchSummary('');
+      setSearchMeta(null);
+      setBrowseStats(null);
+      setLoading(false);
+      setUrlExtraction({ status: 'extracting', url, platform });
+
+      // Fire extraction immediately — no fake delays
+      (async () => {
+        try {
+          const result = await ingestVehicle({ url, enrich: true });
+
+          if (result.status === 'error' || result.status === 'rejected') {
+            const errorMsg = result.status === 'rejected'
+              ? `Quality too low (${result.issues?.join(', ') || 'insufficient data'})`
+              : (result.error || 'Extraction failed');
+            setUrlExtraction(prev => prev ? { ...prev, status: 'error', error: errorMsg } : null);
+            return;
+          }
+
+          // Got a vehicle — go straight to profile, no lingering
+          if (result.vehicle_id) {
+            navigate(`/vehicle/${result.vehicle_id}`, { replace: true });
+            return;
+          }
+
+          // No vehicle_id returned — show error
+          setUrlExtraction(prev => prev ? {
+            ...prev,
+            status: 'error',
+            error: 'No vehicle data found at this URL',
+          } : null);
+        } catch (err: any) {
+          setUrlExtraction(prev => prev ? { ...prev, status: 'error', error: err.message || 'Extraction failed' } : null);
+        }
+      })();
+
+      return;
+    }
+
+    // Not a URL — clear extraction state and do normal search
+    setUrlExtraction(null);
+    urlExtractionRef.current = null;
     setLoading(true);
     setResultFilter('all');
 
@@ -249,5 +352,6 @@ export function useSearchPage() {
     loadingMore,
     browseStats,
     detectedMake,
+    urlExtraction,
   };
 }

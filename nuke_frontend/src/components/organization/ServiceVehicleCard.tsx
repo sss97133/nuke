@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { optimizeImageUrl } from '../../lib/imageOptimizer';
 
 interface Receipt {
   id: string;
@@ -98,7 +99,7 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
           width: '100%',
           height: '200px',
           backgroundImage: primaryImageUrl
-            ? `url(${primaryImageUrl})`
+            ? `url(${optimizeImageUrl(primaryImageUrl, 'small') || primaryImageUrl})`
             : 'var(--surface)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',

@@ -42,6 +42,9 @@ const SOURCE_LABELS: Record<string, string> = {
   technician: 'TECH',
   forum: 'FORUM',
   historian: 'HISTORIAN',
+  ai_extraction: 'AI',
+  ai_vision: 'AI',
+  manual: 'USER',
 };
 
 function getSourceLabel(sourceType: string): string {
@@ -125,7 +128,7 @@ const S = {
 
   row: {
     display: 'grid',
-    gridTemplateColumns: '50px 1fr 44px 1fr 60px',
+    gridTemplateColumns: '60px 1fr 44px 1fr 60px',
     alignItems: 'center',
     gap: '6px',
     padding: '3px 0',

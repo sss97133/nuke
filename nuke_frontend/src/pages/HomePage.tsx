@@ -22,6 +22,11 @@ interface TreemapNode {
   auction_count?: number;
   avg_bids?: number;
   avg_watchers?: number;
+  imageUrl?: string;
+  id?: string;
+  isVehicle?: boolean;
+  listingTitle?: string;
+  mileage?: number;
 }
 
 interface TreemapRect {
@@ -36,6 +41,7 @@ interface DrillLevel {
   label: string;
   make?: string;
   model?: string;
+  year?: number;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -204,6 +210,76 @@ function useTreemapYears(make: string | null, model: string | null) {
   return { data, loading };
 }
 
+function useTreemapVehicles(make: string | null, model: string | null, year?: number | null) {
+  const [data, setData] = useState<TreemapNode[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!make || !model) { setData(null); return; }
+    let cancelled = false;
+    setLoading(true);
+    let query = supabase
+      .from('vehicles')
+      .select('id, year, make, model, listing_title, bat_listing_title, sale_price, sold_price, primary_image_url, mileage')
+      .ilike('make', make)
+      .ilike('model', model)
+      .or('sale_price.gt.0,sold_price.gt.0')
+      .is('deleted_at', null)
+      .order('sale_price', { ascending: false })
+      .limit(200);
+    if (year) query = query.eq('year', year);
+    query.then(({ data: result, error }) => {
+      if (cancelled) return;
+      if (result && !error) {
+        setData(result.map((v: any) => ({
+          name: [v.year, v.make, v.model].filter(Boolean).join(' '),
+          count: 1,
+          value: v.sale_price || v.sold_price || 0,
+          median_price: v.sale_price || v.sold_price,
+          imageUrl: v.primary_image_url || undefined,
+          id: v.id,
+          isVehicle: true,
+          listingTitle: v.listing_title || v.bat_listing_title || undefined,
+          mileage: v.mileage || undefined,
+        })));
+      }
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [make, model, year]);
+  return { data, loading };
+}
+
+function useRepresentativeImages(items: TreemapNode[] | null, make?: string | null) {
+  const [images, setImages] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (!items || !make || items.length === 0) { setImages(new Map()); return; }
+    let cancelled = false;
+    supabase
+      .from('vehicles')
+      .select('model, year, primary_image_url')
+      .ilike('make', make)
+      .not('primary_image_url', 'is', null)
+      .or('sale_price.gt.0,sold_price.gt.0')
+      .is('deleted_at', null)
+      .order('sale_price', { ascending: false, nullsFirst: false })
+      .limit(500)
+      .then(({ data: result, error }) => {
+        if (cancelled || !result || error) return;
+        const map = new Map<string, string>();
+        for (const row of result as any[]) {
+          // Key by model name or year depending on what we need
+          const modelKey = String(row.model || '').toLowerCase();
+          const yearKey = String(row.year || '');
+          if (!map.has(modelKey) && row.primary_image_url) map.set(modelKey, row.primary_image_url);
+          if (!map.has(yearKey) && row.primary_image_url) map.set(yearKey, row.primary_image_url);
+        }
+        setImages(map);
+      });
+    return () => { cancelled = true; };
+  }, [items?.length, make]);
+  return images;
+}
+
 // ────────────────────────────────────────────────────────────
 // FORMAT HELPERS
 // ────────────────────────────────────────────────────────────
@@ -217,30 +293,18 @@ const fmtMoney = (n: number) => {
 };
 
 // ────────────────────────────────────────────────────────────
-// COLOR SCALE — median price maps to a green-to-amber heatmap
-// inspired by Finviz: low price = muted, high price = saturated
+// COLOR SCALE — median price maps to heat-0..heat-6 tokens
+// Tokens defined in unified-design-system.css; dark mode remaps automatically.
 // ────────────────────────────────────────────────────────────
 
-function priceToColor(medianPrice: number | undefined, count: number): string {
-  if (!medianPrice || medianPrice <= 0) {
-    // fallback: use count to create subtle variation
-    const t = Math.min(count / 500, 1);
-    const lightness = 92 - t * 12;
-    return `hsl(0, 0%, ${lightness}%)`;
-  }
-  // Map log(price) to a hue scale:
-  // $5K = cool green (140), $50K = teal (170), $200K = blue (210), $1M+ = indigo (250)
-  const logP = Math.log10(Math.max(medianPrice, 1000));
-  // logP range: ~3.0 ($1K) to ~6.7 ($5M+)
-  const t = Math.max(0, Math.min(1, (logP - 3.5) / 3.2)); // 0..1 across price range
-  // Hue: green(140) -> teal(180) -> blue(210) -> indigo(250)
-  const hue = 140 + t * 110;
-  // Saturation: higher for more data
-  const countFactor = Math.min(count / 100, 1);
-  const saturation = 20 + countFactor * 30;
-  // Lightness: bright for low price, darker for high
-  const lightness = 88 - t * 20;
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+function priceToColor(medianPrice: number | undefined): string {
+  if (!medianPrice || medianPrice <= 0) return 'var(--heat-0)';
+  if (medianPrice < 10_000)  return 'var(--heat-1)';
+  if (medianPrice < 25_000)  return 'var(--heat-2)';
+  if (medianPrice < 50_000)  return 'var(--heat-3)';
+  if (medianPrice < 100_000) return 'var(--heat-4)';
+  if (medianPrice < 250_000) return 'var(--heat-5)';
+  return 'var(--heat-6)';
 }
 
 // ────────────────────────────────────────────────────────────
@@ -249,34 +313,47 @@ function priceToColor(medianPrice: number | undefined, count: number): string {
 
 interface CellProps {
   rect: TreemapRect;
-  onClick: () => void;
+  onClick: (e?: React.MouseEvent) => void;
   totalCount: number;
   showValue?: boolean;
   isYear?: boolean;
+  repImage?: string;
 }
 
-function TreemapCell({ rect, onClick, totalCount, showValue, isYear }: CellProps) {
+function TreemapCell({ rect, onClick, totalCount, showValue, isYear, repImage }: CellProps) {
   const { node, x, y, w, h } = rect;
   const [hovered, setHovered] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   const pct = totalCount > 0 ? ((node.count / totalCount) * 100) : 0;
-  const bg = priceToColor(node.median_price, node.count);
+  const bg = priceToColor(node.median_price);
+  const isVehicle = !!node.isVehicle;
+  const hasImage = isVehicle ? !!node.imageUrl : !!repImage;
+  const imageUrl = isVehicle ? node.imageUrl : repImage;
+  const isLarge = w > 120 && h > 80;
+
+  // Vehicle cells: show image as full background
+  // Aggregate cells: show faded rep image on large cells only
+  const showImage = hasImage && (isVehicle || isLarge);
 
   // Decide what text fits
   const canShowName = w > 28 && h > 16;
-  const canShowCount = w > 40 && h > 30;
-  const canShowPrice = w > 60 && h > 44;
-  const canShowPct = w > 50 && h > 56;
-  const isLarge = w > 120 && h > 80;
+  const canShowCount = w > 40 && h > 30 && !isVehicle;
+  const canShowPrice = w > 60 && (isVehicle ? h > 28 : h > 44);
+  const canShowPct = w > 50 && h > 56 && !isVehicle;
+  const canShowMileage = isVehicle && w > 80 && h > 44 && node.mileage;
 
   // Font size scales with cell area
   const area = w * h;
   const nameFontSize = area > 40000 ? 13 : area > 15000 ? 11 : area > 5000 ? 10 : 9;
   const dataFontSize = area > 40000 ? 11 : area > 15000 ? 10 : 9;
 
+  const textColor = 'var(--text)';
+  const textSecondary = 'var(--text-secondary)';
+
   return (
     <div
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      onClick={(e) => { e.stopPropagation(); onClick(e); }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -286,76 +363,140 @@ function TreemapCell({ rect, onClick, totalCount, showValue, isYear }: CellProps
         width: w,
         height: h,
         boxSizing: 'border-box',
-        border: `2px solid ${hovered ? 'var(--text)' : 'var(--border)'}`,
-        background: hovered ? `color-mix(in srgb, ${bg} 85%, var(--text) 15%)` : bg,
+        border: `2px solid ${hovered ? 'var(--border-focus)' : 'var(--border)'}`,
+        background: hovered && !showImage ? 'var(--surface-hover)' : bg,
         cursor: 'pointer',
         overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-end',
+        transition: 'border-color 180ms cubic-bezier(0.16, 1, 0.3, 1), background 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+        userSelect: 'none',
+      }}
+    >
+      {/* Background image for vehicle cells */}
+      {showImage && imageUrl && (
+        <img
+          src={imageUrl}
+          alt=""
+          onLoad={() => setImgLoaded(true)}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            opacity: isVehicle
+              ? (imgLoaded ? (hovered ? 0.85 : 1) : 0)
+              : (imgLoaded ? (hovered ? 0.25 : 0.18) : 0),
+            transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {/* Text content — solid dark band at bottom for vehicle cells (V-06: no gradients) */}
+      <div style={{
+        position: 'relative',
+        zIndex: 1,
         padding: 4,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        transition: 'border-color 120ms ease-out, background 120ms ease-out',
-        userSelect: 'none',
-      }}
-    >
-      {canShowName && (
-        <div
-          style={{
-            fontSize: nameFontSize,
-            fontWeight: 700,
-            letterSpacing: isLarge ? '-0.02em' : '0.04em',
-            textTransform: 'uppercase' as const,
-            color: 'var(--text)',
-            lineHeight: 1.15,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: isLarge ? 'normal' : 'nowrap',
-            fontFamily: 'Arial, sans-serif',
-            wordBreak: isLarge ? 'break-word' : undefined,
-          }}
-        >
-          {node.name}
-        </div>
-      )}
-
-      <div style={{ marginTop: 'auto' }}>
-        {canShowCount && (
+        flex: isVehicle && showImage ? undefined : 1,
+        marginTop: isVehicle && showImage ? 'auto' : undefined,
+        background: isVehicle && showImage ? 'var(--surface-glass)' : undefined,
+      }}>
+        {canShowName && !isVehicle && (
           <div
             style={{
-              fontSize: dataFontSize,
-              fontFamily: "'Courier New', monospace",
-              color: 'var(--text-secondary)',
-              lineHeight: 1.3,
-            }}
-          >
-            {fmtNum(node.count)} {isYear ? '' : 'vehicles'}
-          </div>
-        )}
-        {canShowPrice && node.median_price && (
-          <div
-            style={{
-              fontSize: dataFontSize,
-              fontFamily: "'Courier New', monospace",
+              fontSize: nameFontSize,
               fontWeight: 700,
-              color: 'var(--text)',
-              lineHeight: 1.3,
+              letterSpacing: isLarge ? '-0.02em' : '0.04em',
+              textTransform: 'uppercase' as const,
+              color: textColor,
+              lineHeight: 1.15,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: isLarge ? 'normal' : 'nowrap',
+              fontFamily: 'Arial, sans-serif',
+              wordBreak: isLarge ? 'break-word' : undefined,
             }}
           >
-            {fmtMoney(node.median_price)} med
+            {node.name}
           </div>
         )}
-        {canShowPct && pct >= 0.1 && (
-          <div
-            style={{
-              fontSize: 8,
-              fontFamily: "'Courier New', monospace",
-              color: 'var(--text-secondary)',
-              lineHeight: 1.3,
-            }}
-          >
-            {pct.toFixed(1)}%
-          </div>
-        )}
+
+        <div style={{ marginTop: 'auto' }}>
+          {/* Vehicle cell: title + price at bottom */}
+          {isVehicle && canShowName && (
+            <div
+              style={{
+                fontSize: nameFontSize,
+                fontWeight: 700,
+                letterSpacing: '-0.01em',
+                color: textColor,
+                lineHeight: 1.2,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: area > 15000 ? 'normal' : 'nowrap',
+                fontFamily: 'Arial, sans-serif',
+                textTransform: 'uppercase',
+              }}
+            >
+              {node.listingTitle || node.name}
+            </div>
+          )}
+          {canShowCount && (
+            <div
+              style={{
+                fontSize: dataFontSize,
+                fontFamily: "'Courier New', monospace",
+                color: textSecondary,
+                lineHeight: 1.3,
+              }}
+            >
+              {fmtNum(node.count)} {isYear ? '' : 'vehicles'}
+            </div>
+          )}
+          {canShowPrice && node.median_price && (
+            <div
+              style={{
+                fontSize: isVehicle ? nameFontSize : dataFontSize,
+                fontFamily: "'Courier New', monospace",
+                fontWeight: 700,
+                color: textColor,
+                lineHeight: 1.3,
+              }}
+            >
+              {fmtMoney(node.median_price)}{!isVehicle && ' med'}
+            </div>
+          )}
+          {canShowMileage && (
+            <div
+              style={{
+                fontSize: 9,
+                fontFamily: "'Courier New', monospace",
+                color: textSecondary,
+                lineHeight: 1.3,
+              }}
+            >
+              {fmtNum(node.mileage!)} mi
+            </div>
+          )}
+          {canShowPct && pct >= 0.1 && (
+            <div
+              style={{
+                fontSize: 8,
+                fontFamily: "'Courier New', monospace",
+                color: textSecondary,
+                lineHeight: 1.3,
+              }}
+            >
+              {pct.toFixed(1)}%
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -374,31 +515,54 @@ interface TooltipData {
 }
 
 function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
-  const pct = totalCount > 0 ? ((node.count / totalCount) * 100).toFixed(1) : '0.0';
-  const sellThrough = node.auction_count && node.auction_count > 0
-    ? Math.round(((node.sold_count || 0) / node.auction_count) * 100) + '%'
-    : null;
+  const isVehicle = level === 'vehicles' || !!node.isVehicle;
 
   // Keep tooltip on screen
   const adjustedX = typeof window !== 'undefined' && x > window.innerWidth - 240 ? x - 220 : x + 12;
   const adjustedY = typeof window !== 'undefined' && y > window.innerHeight - 200 ? y - 160 : y + 12;
 
+  const containerStyle: React.CSSProperties = {
+    position: 'fixed',
+    left: adjustedX,
+    top: adjustedY,
+    background: 'var(--surface-elevated, #fff)',
+    border: '2px solid var(--text)',
+    padding: '12px 16px',
+    pointerEvents: 'none',
+    zIndex: 10000,
+    minWidth: 180,
+    maxWidth: 260,
+    fontFamily: 'Arial, sans-serif',
+  };
+
+  if (isVehicle) {
+    return (
+      <div style={containerStyle}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: 4 }}>
+          {node.listingTitle || node.name}
+        </div>
+        <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Courier New', monospace", color: 'var(--text)', marginBottom: 4 }}>
+          {node.median_price ? fmtMoney(node.median_price) : fmtMoney(node.value)}
+        </div>
+        {node.mileage ? (
+          <div style={{ fontSize: 10, fontFamily: "'Courier New', monospace", color: 'var(--text-secondary)', marginBottom: 6 }}>
+            {fmtNum(node.mileage)} mi
+          </div>
+        ) : null}
+        <div style={{ fontSize: 8, textTransform: 'uppercase', color: 'var(--text-disabled)', letterSpacing: '0.04em' }}>
+          CLICK TO VIEW PROFILE
+        </div>
+      </div>
+    );
+  }
+
+  const pct = totalCount > 0 ? ((node.count / totalCount) * 100).toFixed(1) : '0.0';
+  const sellThrough = node.auction_count && node.auction_count > 0
+    ? Math.round(((node.sold_count || 0) / node.auction_count) * 100) + '%'
+    : null;
+
   return (
-    <div
-      style={{
-        position: 'fixed',
-        left: adjustedX,
-        top: adjustedY,
-        background: 'var(--surface-elevated, #fff)',
-        border: '2px solid var(--text)',
-        padding: '10px 14px',
-        pointerEvents: 'none',
-        zIndex: 10000,
-        minWidth: 180,
-        maxWidth: 260,
-        fontFamily: 'Arial, sans-serif',
-      }}
-    >
+    <div style={containerStyle}>
       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
         {node.name}
       </div>
@@ -505,24 +669,112 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
   const [drillStack, setDrillStack] = useState<DrillLevel[]>([{ label: 'ALL MAKES' }]);
   const currentLevel = drillStack[drillStack.length - 1];
 
+  // Prefetch cache: hover-triggered data loaded before click
+  const prefetchCache = useRef<Map<string, TreemapNode[]>>(new Map());
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Data hooks
   const { data: brandsData, loading: brandsLoading } = useTreemapBrands();
   const { data: modelsData, loading: modelsLoading } = useTreemapModels(currentLevel.make && !currentLevel.model ? currentLevel.make : null);
   const { data: yearsData, loading: yearsLoading } = useTreemapYears(
-    currentLevel.model ? currentLevel.make ?? null : null,
-    currentLevel.model ?? null
+    currentLevel.model && !currentLevel.year ? currentLevel.make ?? null : null,
+    currentLevel.model && !currentLevel.year ? currentLevel.model ?? null : null
   );
+  // Vehicle-level data: fetched when we have make+model and either a year or coming from years level
+  const vehicleMake = currentLevel.year ? currentLevel.make ?? null : null;
+  const vehicleModel = currentLevel.year ? currentLevel.model ?? null : null;
+  const vehicleYear = currentLevel.year ?? null;
+  const { data: vehiclesData, loading: vehiclesLoading } = useTreemapVehicles(vehicleMake, vehicleModel, vehicleYear);
 
   // Determine active data and level type
+  const levelType: 'brands' | 'models' | 'years' | 'vehicles' =
+    currentLevel.year ? 'vehicles' :
+    currentLevel.model ? 'years' :
+    currentLevel.make ? 'models' : 'brands';
+
   const activeData = useMemo(() => {
-    if (currentLevel.model && yearsData) return yearsData;
-    if (currentLevel.make && modelsData) return modelsData;
+    // Check prefetch cache before hook data — eliminates loading flash on drill-in
+    if (levelType === 'vehicles' && currentLevel.make && currentLevel.model && currentLevel.year) {
+      const cached = prefetchCache.current.get(`${currentLevel.make}/${currentLevel.model}/${currentLevel.year}`);
+      if (cached) return cached;
+    }
+    if (levelType === 'years' && currentLevel.make && currentLevel.model) {
+      const cached = prefetchCache.current.get(`${currentLevel.make}/${currentLevel.model}`);
+      if (cached) return cached;
+    }
+    if (levelType === 'vehicles' && vehiclesData) return vehiclesData;
+    if (levelType === 'years' && yearsData) return yearsData;
+    if (levelType === 'models' && modelsData) return modelsData;
     if (brandsData) return brandsData;
     return null;
-  }, [currentLevel, brandsData, modelsData, yearsData]);
+    // drillStack triggers recompute when navigating so ref cache is checked
+  }, [levelType, brandsData, modelsData, yearsData, vehiclesData, currentLevel, drillStack]);
 
-  const levelType = currentLevel.model ? 'years' : currentLevel.make ? 'models' : 'brands';
-  const isLoading = brandsLoading || modelsLoading || yearsLoading;
+  const isLoading = brandsLoading || modelsLoading || yearsLoading || vehiclesLoading;
+
+  // ── Prefetch: fire supabase queries on 200ms hover debounce ──
+  const prefetchYears = useCallback((make: string, model: string) => {
+    const key = `${make}/${model}`;
+    if (prefetchCache.current.has(key)) return;
+    supabase.rpc('treemap_years', { p_source: null, p_make: make, p_model: model }).then(({ data: result, error }) => {
+      if (result && !error) prefetchCache.current.set(key, result as TreemapNode[]);
+    });
+  }, []);
+
+  const prefetchVehicles = useCallback((make: string, model: string, year: number) => {
+    const key = `${make}/${model}/${year}`;
+    if (prefetchCache.current.has(key)) return;
+    supabase
+      .from('vehicles')
+      .select('id, year, make, model, listing_title, bat_listing_title, sale_price, sold_price, primary_image_url, mileage')
+      .ilike('make', make)
+      .ilike('model', model)
+      .eq('year', year)
+      .or('sale_price.gt.0,sold_price.gt.0')
+      .is('deleted_at', null)
+      .order('sale_price', { ascending: false })
+      .limit(200)
+      .then(({ data: result, error }) => {
+        if (result && !error) {
+          prefetchCache.current.set(key, result.map((v: any) => ({
+            name: [v.year, v.make, v.model].filter(Boolean).join(' '),
+            count: 1,
+            value: v.sale_price || v.sold_price || 0,
+            median_price: v.sale_price || v.sold_price,
+            imageUrl: v.primary_image_url || undefined,
+            id: v.id,
+            isVehicle: true,
+            listingTitle: v.listing_title || v.bat_listing_title || undefined,
+            mileage: v.mileage || undefined,
+          })));
+        }
+      });
+  }, []);
+
+  const handleCellMouseEnter = useCallback((node: TreemapNode) => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      if (levelType === 'models' && currentLevel.make) {
+        prefetchYears(currentLevel.make, node.name);
+      } else if (levelType === 'years' && currentLevel.make && currentLevel.model) {
+        const year = parseInt(node.name, 10);
+        if (Number.isFinite(year)) prefetchVehicles(currentLevel.make, currentLevel.model, year);
+      }
+    }, 200);
+  }, [levelType, currentLevel, prefetchYears, prefetchVehicles]);
+
+  const handleCellMouseLeave = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  }, []);
+
+  // Representative images for aggregate cells (models/years levels)
+  const repImages = useRepresentativeImages(
+    levelType === 'models' ? modelsData : levelType === 'years' ? yearsData : null,
+    currentLevel.make
+  );
 
   // Container sizing
   const containerRef = useRef<HTMLDivElement>(null);
@@ -559,36 +811,35 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
   // Tooltip
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
 
-  // Drill down — makes drill into models, models + years navigate to feed
-  const drillInto = useCallback((node: TreemapNode) => {
+  // Drill down — continuous zoom: makes → models → years → vehicles → profile
+  const [clickOrigin, setClickOrigin] = useState<{ x: number; y: number } | null>(null);
+  const drillInto = useCallback((node: TreemapNode, e?: React.MouseEvent) => {
+    if (e) {
+      const container = containerRef.current;
+      if (container) {
+        const cr = container.getBoundingClientRect();
+        setClickOrigin({ x: e.clientX - cr.left, y: e.clientY - cr.top });
+      }
+    }
     if (levelType === 'brands') {
       recordInterest('make', node.name);
       setDrillStack(prev => [...prev, { label: node.name, make: node.name }]);
     } else if (levelType === 'models') {
       recordInterest('model', node.name);
-      // Navigate to feed filtered by make + model
-      const params = new URLSearchParams();
-      params.set('tab', 'feed');
-      if (currentLevel.make) params.set('make', currentLevel.make);
-      params.set('model', node.name);
-      navigate(`/?${params.toString()}`);
+      setDrillStack(prev => [...prev, { label: node.name, make: currentLevel.make, model: node.name }]);
     } else if (levelType === 'years') {
-      // Navigate to feed filtered by make + model + year
-      const params = new URLSearchParams();
-      params.set('tab', 'feed');
-      if (currentLevel.make) params.set('make', currentLevel.make);
-      if (currentLevel.model) params.set('model', currentLevel.model);
       const year = parseInt(node.name, 10);
       if (Number.isFinite(year)) {
-        params.set('year_min', String(year));
-        params.set('year_max', String(year));
+        setDrillStack(prev => [...prev, { label: String(year), make: currentLevel.make, model: currentLevel.model, year }]);
       }
-      navigate(`/?${params.toString()}`);
+    } else if (levelType === 'vehicles' && node.id) {
+      navigate(`/vehicle/${node.id}`);
     }
   }, [levelType, currentLevel, navigate, recordInterest]);
 
   // Navigate back
   const goBack = useCallback((toIndex: number) => {
+    prefetchCache.current.clear();
     setDrillStack(prev => prev.slice(0, toIndex + 1));
   }, []);
 
@@ -625,17 +876,21 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
     return `$${p.toLocaleString()}`;
   };
 
-  // Transition animation state
+  // Transition animation state — zoom in/out
   const [transitioning, setTransitioning] = useState(false);
+  const [zoomDir, setZoomDir] = useState<'in' | 'out'>('in');
   const prevLevelRef = useRef(levelType);
+  const prevStackLen = useRef(drillStack.length);
   useEffect(() => {
     if (prevLevelRef.current !== levelType) {
+      setZoomDir(drillStack.length > prevStackLen.current ? 'in' : 'out');
       setTransitioning(true);
-      const t = setTimeout(() => setTransitioning(false), 200);
+      const t = setTimeout(() => setTransitioning(false), 180);
       prevLevelRef.current = levelType;
+      prevStackLen.current = drillStack.length;
       return () => clearTimeout(t);
     }
-  }, [levelType]);
+  }, [levelType, drillStack.length]);
 
   return (
     <div
@@ -656,7 +911,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
           alignItems: 'center',
           gap: 12,
           padding: '0 16px',
-          height: 44,
+          height: 48,
           borderBottom: '2px solid var(--border)',
           background: 'var(--surface)',
           flexShrink: 0,
@@ -701,7 +956,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
               aria-label="Search vehicles"
               style={{
                 flex: 1,
-                padding: '6px 12px',
+                padding: '8px 12px',
                 fontSize: 11,
                 fontFamily: 'Arial, sans-serif',
                 border: 'none',
@@ -714,7 +969,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
             <button
               type="submit"
               style={{
-                padding: '6px 16px',
+                padding: '8px 16px',
                 fontSize: 9,
                 fontWeight: 700,
                 letterSpacing: '0.12em',
@@ -768,7 +1023,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
         <button
           onClick={onBrowse}
           style={{
-            padding: '6px 16px',
+            padding: '8px 16px',
             fontSize: 9,
             fontWeight: 700,
             letterSpacing: '0.12em',
@@ -848,6 +1103,10 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
                 params.set('tab', 'feed');
                 params.set('make', currentLevel.make!);
                 if (currentLevel.model) params.set('model', currentLevel.model);
+                if (currentLevel.year) {
+                  params.set('year_min', String(currentLevel.year));
+                  params.set('year_max', String(currentLevel.year));
+                }
                 navigate(`/?${params.toString()}`);
               }}
               style={{
@@ -860,15 +1119,15 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
                 background: 'transparent',
                 color: 'var(--text-secondary)',
                 cursor: 'pointer',
-                padding: '2px 10px',
+                padding: '4px 12px',
                 whiteSpace: 'nowrap',
               }}
             >
-              ENTER FEED
+
             </button>
           )}
           <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-disabled)' }}>
-            {levelType === 'brands' ? 'MAKES' : levelType === 'models' ? 'MODELS' : 'YEARS'}
+            {levelType === 'brands' ? 'MAKES' : levelType === 'models' ? 'MODELS' : levelType === 'years' ? 'YEARS' : 'VEHICLES'}
           </span>
         </div>
       </div>
@@ -909,35 +1168,48 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
 
         <div
           style={{
-            opacity: transitioning ? 0.3 : 1,
-            transition: 'opacity 150ms ease-out',
+            opacity: transitioning ? 0 : 1,
+            transform: transitioning
+              ? (zoomDir === 'in' ? 'scale(1.06)' : 'scale(0.94)')
+              : 'scale(1)',
+            transformOrigin: clickOrigin
+              ? `${clickOrigin.x}px ${clickOrigin.y}px`
+              : 'center center',
+            transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1)',
             width: '100%',
             height: '100%',
             position: 'relative',
           }}
         >
-          {rects.map((rect, i) => (
-            <div
-              key={rect.node.name + '-' + i}
-              onMouseMove={(e) => {
-                setTooltip({
-                  node: rect.node,
-                  x: e.clientX,
-                  y: e.clientY,
-                  totalCount,
-                  level: levelType,
-                });
-              }}
-              onMouseLeave={() => setTooltip(null)}
-            >
-              <TreemapCell
-                rect={rect}
-                onClick={() => drillInto(rect.node)}
-                totalCount={totalCount}
-                isYear={levelType === 'years'}
-              />
-            </div>
-          ))}
+          {rects.map((rect, i) => {
+            const repImg = !rect.node.isVehicle
+              ? repImages.get(rect.node.name.toLowerCase()) || repImages.get(rect.node.name)
+              : undefined;
+            return (
+              <div
+                key={(rect.node.id || rect.node.name) + '-' + i}
+                onMouseMove={(e) => {
+                  setTooltip({
+                    node: rect.node,
+                    x: e.clientX,
+                    y: e.clientY,
+                    totalCount,
+                    level: levelType,
+                  });
+                }}
+                onMouseEnter={() => handleCellMouseEnter(rect.node)}
+                onMouseLeave={() => { setTooltip(null); handleCellMouseLeave(); }}
+              >
+                <TreemapCell
+                  rect={rect}
+                  onClick={(ev?: any) => drillInto(rect.node, ev)}
+                  totalCount={totalCount}
+                  isYear={levelType === 'years'}
+                  repImage={repImg}
+                />
+              </div>
+            );
+          })}
         </div>
 
         {/* Empty state */}
@@ -983,7 +1255,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
         }}
       >
         <span style={{ fontSize: 8, fontFamily: "'Courier New', monospace", color: 'var(--text-disabled)' }}>
-          AREA = VEHICLE COUNT / COLOR = MEDIAN PRICE
+          {levelType === 'vehicles' ? 'AREA = SALE PRICE / CLICK TO VIEW' : 'AREA = VEHICLE COUNT / COLOR = MEDIAN PRICE'}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button

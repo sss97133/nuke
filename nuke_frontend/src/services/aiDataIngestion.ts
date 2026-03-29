@@ -711,13 +711,15 @@ export interface IngestInput {
 }
 
 export interface IngestResult {
-  status: 'created' | 'matched' | 'duplicate' | 'error';
+  status: 'created' | 'matched' | 'duplicate' | 'rejected' | 'error';
   vehicle_id?: string;
   discovery_id?: string;
   is_new_vehicle?: boolean;
   source?: string;
   external_id?: string;
   error?: string;
+  quality_score?: number;
+  issues?: string[];
 }
 
 export async function ingestVehicle(input: IngestInput): Promise<IngestResult> {

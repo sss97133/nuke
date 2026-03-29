@@ -49,6 +49,7 @@ const UserMetrics = React.lazy(() => import('../../../pages/admin/UserMetrics'))
 const SourcesDashboard = React.lazy(() => import('../../../pages/admin/SourcesDashboard'));
 const AdminPulse = React.lazy(() => import('../../../pages/admin/AdminPulse'));
 const DataPulse = React.lazy(() => import('../../../pages/admin/DataPulse'));
+const QuestionIntelligence = React.lazy(() => import('../../../pages/admin/QuestionIntelligence'));
 
 const LazyFallback = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'var(--text-disabled)', fontSize: '12px' }}>
@@ -119,6 +120,8 @@ const AdminModuleRoutes = () => {
           <Route path="data-quality" element={<DataQualityDashboard />} />
           <Route path="transfers" element={<TransfersDashboard />} />
           <Route path="user-metrics" element={<UserMetrics />} />
+          <Route path="question-intelligence" element={<QuestionIntelligence />} />
+          <Route path="qi" element={<QuestionIntelligence />} />
         </Route>
         </Route> {/* RequireAdmin */}
       </Routes>

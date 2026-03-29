@@ -196,6 +196,38 @@ const VehicleSubHeader: React.FC = () => {
         {location && (
           <BadgePortal dimension="source" value={location} label={location} variant="dimension" />
         )}
+        {/* THIN badge — sparse vehicle indicator */}
+        {(() => {
+          const v = vehicle as any;
+          const specFields = [
+            v?.mileage ?? v?.odometer ?? v?.miles,
+            v?.engine ?? v?.engine_size ?? v?.displacement,
+            v?.transmission,
+            v?.drivetrain ?? v?.drive_type,
+            v?.body_style ?? v?.bodyStyle,
+            v?.vin,
+            v?.exterior_color ?? v?.color,
+            v?.interior_color,
+            v?.fuel_type,
+            v?.sale_price ?? v?.sold_price ?? v?.price,
+            v?.description,
+            v?.city ?? v?.seller_city ?? v?.location,
+          ];
+          const populated = specFields.filter((f) => f != null && String(f).trim() !== '').length;
+          return populated < 5 ? (
+            <span style={{
+              fontFamily: 'Arial, sans-serif',
+              fontSize: 7,
+              fontWeight: 800,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.3px',
+              color: '#999',
+              padding: '1px 4px',
+              border: '2px solid #ccc',
+              marginLeft: 4,
+            }}>THIN</span>
+          ) : null;
+        })()}
       </div>
     </div>
   );

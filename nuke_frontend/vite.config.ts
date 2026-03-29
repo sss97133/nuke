@@ -21,35 +21,38 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // Function-based manualChunks avoids TDZ issues from static config
           if (id.includes('node_modules')) {
-            // IMPORTANT: @react-three/fiber MUST stay in vendor (same chunk as React).
-            // @react-three/fiber depends on use-sync-external-store, zustand, scheduler, etc.
-            // which are all React-ecosystem packages. If @react-three/fiber lands in the 'three'
-            // chunk, we get a circular ESM dependency: vendor.js → three.js → vendor.js, leaving
-            // React module wrappers undefined at evaluation time and causing a blank page.
-            // Solution: put @react-three/* in vendor with React; only bare three.js goes in 'three'.
+            // THREE.JS — @react-three/* goes here (only used by wiring page, lazy-loaded).
+            // Dependency is one-way: three→vendor (for React). No circular dep.
+            // Keeping @react-three in vendor was causing three.js (888 KB) + maps (1.9 MB)
+            // to load on EVERY page as transitive vendor dependencies.
+            if (id.includes('@react-three') || id.includes('/tunnel-rat/')) return 'three';
+            if (id.includes('three')) return 'three';
+
+            // MAPS — @deck.gl/react and react-map-gl go here (only used by map tab, lazy-loaded).
+            // Dependency is one-way: maps→vendor (for React). No circular dep.
             if (
-              id.includes('@react-three') ||
+              id.includes('@deck.gl/react') ||
+              id.includes('react-map-gl') ||
+              id.includes('leaflet') ||
+              id.includes('maplibre-gl') ||
+              id.includes('deck.gl') ||
+              id.includes('@deck.gl/')
+            ) return 'maps';
+
+            // React ecosystem — stays in vendor (always needed)
+            if (
               id.includes('use-sync-external-store') ||
               id.includes('/zustand/') ||
-              id.includes('/tunnel-rat/') ||
-              // @deck.gl/react and react-map-gl import React — must stay in vendor
-              // to avoid createContext undefined errors. Only non-React GL libs go in 'maps'.
-              id.includes('@deck.gl/react') ||
-              id.includes('react-map-gl')
+              id.includes('react-dom') ||
+              id.includes('/react/')
             ) return 'vendor';
-            // recharts + d3 are only used on a few pages (VehicleProfile, BidMarketDashboard,
-            // ContractStation, admin analytics) — keep them out of vendor so pages that
-            // don't use charts don't pay the ~200 kB download cost.
+
+            // Charts — lazy-loaded, only a few pages use recharts
             if (id.includes('recharts') || id.includes('d3-')) return 'charts';
-            if (id.includes('react-dom') || id.includes('/react/')) return 'vendor';
             if (id.includes('@supabase/')) return 'supabase';
             if (id.includes('pdfjs-dist')) return 'pdf';
-            if (id.includes('three')) return 'three';
-            if (id.includes('exceljs')) return 'exceljs';
             if (id.includes('tesseract')) return 'tesseract';
-            if (id.includes('leaflet') || id.includes('maplibre-gl') || id.includes('deck.gl') || id.includes('@deck.gl/')) return 'maps';
           }
         },
       },

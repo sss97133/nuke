@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import type { FeedItem } from './types';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
 import ImageLightbox from '../image/ImageLightbox';
+import { getGridImageUrl } from '../../lib/imageOptimizer';
 import '../../styles/unified-design-system.css';
 import { computePrimaryPrice, computeDelta, formatCurrency, computeReadinessScore } from '../../services/priceSignalService';
 
@@ -231,7 +232,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
         >
           {!imageError ? (
             <img
-              src={images[currentImageIdx]}
+              src={getGridImageUrl(images[currentImageIdx]) || images[currentImageIdx]}
               alt={item.title}
               onError={handleImageError}
               loading="lazy"
