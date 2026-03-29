@@ -25,6 +25,14 @@ const FIELD_ORDER = [
   'color', 'interior_color', 'mileage', 'body_style', 'sale_price', 'trim',
 ] as const;
 
+const FIELD_GROUPS: { label: string; fields: readonly string[] }[] = [
+  { label: 'IDENTITY', fields: ['vin', 'year', 'make', 'model', 'trim'] },
+  { label: 'POWERPLANT', fields: ['engine_type', 'engine_size', 'fuel_type', 'fuel_system_type'] },
+  { label: 'DRIVETRAIN', fields: ['transmission', 'drivetrain'] },
+  { label: 'APPEARANCE', fields: ['color', 'interior_color', 'body_style'] },
+  { label: 'METRICS', fields: ['mileage', 'sale_price'] },
+];
+
 const FIELD_LABELS: Record<string, string> = {
   vin: 'VIN', year: 'YEAR', make: 'MAKE', model: 'MODEL',
   engine_type: 'ENGINE TYPE', engine_size: 'ENGINE SIZE',
@@ -501,31 +509,55 @@ const VehicleDossierPanel: React.FC = () => {
           VEHICLE INFORMATION
         </div>
 
-        {FIELD_ORDER.map(field => {
-          // Evidence lookup with normalization fallback
-          const normalized = field.replace(/[\s-]/g, '_').toLowerCase();
-          const group = evidence[field] || (normalized !== field ? evidence[normalized] : undefined);
-          // Primary value: prefer vehicle table, then highest-confidence evidence
-          let pv = v[field];
-          if ((pv == null || pv === '') && group && group.sources.length > 0) {
-            pv = group.primary.field_value;
-          }
-          const displayValue = fmtVal(field, pv);
-
-          // Hide empty rows — don't show "—" for missing data
-          if (!displayValue) return null;
-
+        {FIELD_GROUPS.map((fg, gi) => {
+          // Collect visible fields for this group
+          const visibleFields = fg.fields.filter(field => {
+            let pv = v[field];
+            if ((pv == null || pv === '') && evidence[field]?.sources?.length > 0) {
+              pv = evidence[field].primary.field_value;
+            }
+            return !!fmtVal(field, pv);
+          });
+          if (visibleFields.length === 0) return null;
           return (
-            <FieldRow
-              key={field}
-              field={field}
-              label={FIELD_LABELS[field] || field.toUpperCase().replace(/_/g, ' ')}
-              displayValue={displayValue}
-              group={group}
-              isMod={modFields.has(field)}
-              isOpen={openDrawers.has(field)}
-              onToggle={() => toggleDrawer(field)}
-            />
+            <React.Fragment key={fg.label}>
+              {gi > 0 && (
+                <div style={{
+                  fontFamily: 'Arial, Helvetica, sans-serif',
+                  fontSize: '8px',
+                  fontWeight: 700,
+                  letterSpacing: '1px',
+                  textTransform: 'uppercase',
+                  padding: '4px 10px',
+                  color: 'var(--text-disabled)',
+                  borderBottom: '1px solid var(--border)',
+                }}>
+                  {fg.label}
+                </div>
+              )}
+              {visibleFields.map(field => {
+                const normalized = field.replace(/[\s-]/g, '_').toLowerCase();
+                const group = evidence[field] || (normalized !== field ? evidence[normalized] : undefined);
+                let pv = v[field];
+                if ((pv == null || pv === '') && group && group.sources.length > 0) {
+                  pv = group.primary.field_value;
+                }
+                const displayValue = fmtVal(field, pv);
+                if (!displayValue) return null;
+                return (
+                  <FieldRow
+                    key={field}
+                    field={field}
+                    label={FIELD_LABELS[field] || field.toUpperCase().replace(/_/g, ' ')}
+                    displayValue={displayValue}
+                    group={group}
+                    isMod={modFields.has(field)}
+                    isOpen={openDrawers.has(field)}
+                    onToggle={() => toggleDrawer(field)}
+                  />
+                );
+              })}
+            </React.Fragment>
           );
         })}
 

@@ -13,9 +13,8 @@ import { readCachedSession } from '../../utils/cachedSession';
 import { useVehiclePermissions } from '../../hooks/useVehiclePermissions';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
 import { useViewHistory } from '../../hooks/useViewHistory';
-import { AdminNotificationService } from '../../services/adminNotificationService';
 import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
-import { loadVehicleImpl, selectBestHeroImage } from './loadVehicleData';
+import { loadVehicleImpl, selectBestHeroImage, type RpcLoadResult } from './loadVehicleData';
 import { loadVehicleImagesImpl } from './loadVehicleImages';
 import { resolveVehicleImages } from './resolveVehicleImages';
 import { resolveCurrencyCode } from '../../utils/currency';
@@ -25,6 +24,13 @@ import type { HeroImageMeta } from './loadVehicleData';
 // ---------------------------------------------------------------------------
 // Context shape
 // ---------------------------------------------------------------------------
+
+export interface GalleryFilter {
+  zone?: string;
+  category?: string;
+  tag?: string;
+  dateRange?: [string, string];
+}
 
 interface VehicleProfileContextValue {
   // Core data
@@ -66,6 +72,9 @@ interface VehicleProfileContextValue {
   isPublic: boolean;
   vehicleHeaderHeight: number;
 
+  // Cross-column gallery filter
+  galleryFilter: GalleryFilter | null;
+
   // Actions
   reloadVehicle: () => void;
   reloadImages: () => void;
@@ -73,6 +82,7 @@ interface VehicleProfileContextValue {
   reloadLinkedOrgs: () => void;
   setIsPublic: (v: boolean) => void;
   setVehicleHeaderHeight: (h: number) => void;
+  setGalleryFilter: (f: GalleryFilter | null) => void;
 }
 
 const VehicleProfileContext = createContext<VehicleProfileContextValue | null>(null);
@@ -120,7 +130,6 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   // ── Auth ──
   const [session, setSession] = useState<any>(() => readCachedSession());
   const [authChecked, setAuthChecked] = useState(() => readCachedSession() !== null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [ownershipVerifications, setOwnershipVerifications] = useState<any[]>([]);
 
   // ── UI ──
@@ -128,9 +137,12 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   const [isMobile, setIsMobile] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
   const [vehicleHeaderHeight, setVehicleHeaderHeight] = useState(88);
+  const [galleryFilter, setGalleryFilter] = useState<GalleryFilter | null>(null);
 
   // ── Refs ──
   const ranBatSyncRef = useRef<string | null>(null);
+  /** Tracks what the RPC provided to skip redundant queries */
+  const rpcLoadedRef = useRef<RpcLoadResult>({ images: false, timeline: false, commentCount: null, observationCount: null });
 
   // ── Permissions ──
   const {
@@ -166,9 +178,10 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
 
   // ── Data fetching ──
 
-  const loadVehicle = useCallback(() => {
+  const loadVehicle = useCallback(async () => {
     if (!vehicleId) return;
-    loadVehicleImpl({
+    rpcLoadedRef.current = { images: false, timeline: false, commentCount: null, observationCount: null };
+    const rpcResult = await loadVehicleImpl({
       vehicleId,
       session,
       leadImageUrl,
@@ -183,6 +196,14 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       setTimelineEvents,
       setAuctionPulse: setAuctionPulse as any,
     });
+    rpcLoadedRef.current = rpcResult;
+    // Use RPC stats for counts if available
+    if (rpcResult.commentCount !== null) setTotalCommentCount(rpcResult.commentCount);
+    if (rpcResult.observationCount !== null) setObservationCount(rpcResult.observationCount);
+    // If RPC didn't provide timeline, load it separately
+    if (!rpcResult.timeline) {
+      loadTimelineEvents();
+    }
     heroResolvedRef.current = false;
     selectBestHeroImage(vehicleId, supabase).then((result) => {
       if (result?.url) {
@@ -389,10 +410,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       const { data: { session: s } } = await supabase.auth.getSession();
       setSession(s);
       setAuthChecked(true);
-      if (s?.user) {
-        const admin = await AdminNotificationService.isCurrentUserAdmin();
-        setIsAdmin(admin);
-      }
+      // Admin status is handled by useAdminAccess() hook via React Query — no separate call needed
     };
     checkAuth();
   }, []);
@@ -414,24 +432,35 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
 
   useEffect(() => {
     if (!vehicleId || !authChecked) return;
-    loadVehicle();
-    loadTimelineEvents();
+    loadVehicle(); // loadTimelineEvents is now called inside loadVehicle (conditional on RPC)
     loadOwnershipVerifications();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicleId, authChecked]);
 
   useEffect(() => {
     if (!vehicle?.id) return;
-    loadVehicleImages();
-    loadTotalCommentCount();
-    loadLiveSession();
+    // Only load images if RPC didn't already provide them (saves ~1 query + hero selection)
+    if (!rpcLoadedRef.current.images) {
+      loadVehicleImages();
+    }
+    // Only load comment count if RPC didn't provide it
+    if (rpcLoadedRef.current.commentCount === null) {
+      loadTotalCommentCount();
+    }
     loadResponsible();
-    loadLinkedOrgs();
-    supabase
-      .from('vehicle_observations')
-      .select('id', { count: 'exact', head: true })
-      .eq('vehicle_id', vehicle.id)
-      .then(({ count }) => { if (count !== null) setObservationCount(count); });
+    // Defer non-critical queries — these aren't needed for initial render
+    const deferTimer = setTimeout(() => {
+      loadLiveSession();
+      loadLinkedOrgs();
+      if (rpcLoadedRef.current.observationCount === null) {
+        supabase
+          .from('vehicle_observations')
+          .select('id', { count: 'exact', head: true })
+          .eq('vehicle_id', vehicle!.id)
+          .then(({ count }: { count: number | null }) => { if (count !== null) setObservationCount(count); });
+      }
+    }, 500); // 500ms defer for non-critical data
+    return () => clearTimeout(deferTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle?.id]);
 
@@ -866,12 +895,14 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     isMobile,
     isPublic,
     vehicleHeaderHeight,
+    galleryFilter,
     reloadVehicle: loadVehicle,
     reloadImages: loadVehicleImages,
     reloadTimeline: loadTimelineEvents,
     reloadLinkedOrgs: loadLinkedOrgs,
     setIsPublic,
     setVehicleHeaderHeight,
+    setGalleryFilter,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [
     vehicleId, vehicle, vehicleImages, fallbackListingImageUrls,
@@ -880,7 +911,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     session, isRowOwner, isVerifiedOwner, hasContributorAccess,
     canEdit, isAdminUser, canTriggerProofAnalysis, userOwnershipClaim,
     responsibleName, linkedOrganizations, auctionCurrency,
-    loading, isMobile, isPublic, vehicleHeaderHeight,
+    loading, isMobile, isPublic, vehicleHeaderHeight, galleryFilter,
     loadVehicle, loadVehicleImages, loadTimelineEvents, loadLinkedOrgs,
   ]);
 
