@@ -72,6 +72,98 @@ Gallery and technical views use standard `<Link>` navigation (these are compact 
 
 ---
 
+## Treemap Drill
+
+The logged-out treemap homepage uses continuous zoom to navigate 4 levels of vehicle hierarchy. Each drill action replaces the entire treemap viewport with the next level's data, animated as a scale+fade transition from the click origin.
+
+```
+MAKES                MODELS               YEARS                VEHICLES
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│ PORSCHE     │     │ 911         │     │ 1973        │     │ ░░░░░░░░░░░ │
+│ ┌───┐┌────┐ │     │ ┌───┐┌────┐ │     │ ┌───┐┌────┐ │     │ ░ hero img ░ │
+│ │BMW││FORD│ │ ──→ │ │944││718 │ │ ──→ │ │'74 ││'72 │ │ ──→ │ ░░░░░░░░░░░ │
+│ └───┘└────┘ │     │ └───┘└────┘ │     │ └───┘└────┘ │     │  1973 911S  │
+│   TOYOTA    │     │   CAYENNE   │     │    1970     │     │   $185,000  │
+└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+    click cell          click cell          click cell          click cell
+                                                                  │
+                                                                  ▼
+                                                          /vehicle/:id
+```
+
+**Drill In (click cell at levels 1-3):**
+1. Record click origin coordinates relative to treemap container
+2. Set `transitioning: true` — current cells fade out and scale up
+3. Push new `DrillLevel` onto the `drillStack` (triggers data fetch for next level)
+4. When new data arrives, cells render at full opacity and `scale(1)`
+5. Breadcrumb bar appends new segment
+
+**Drill In (click cell at level 4 — vehicles):**
+- Navigates directly to `/vehicle/:id` via `react-router` — no treemap transition, standard route change (instant, no animation per Route Change spec)
+
+**Drill Out (click breadcrumb segment):**
+1. Truncate `drillStack` to the clicked index
+2. Set `transitioning: true` — current cells fade out and scale down
+3. Previous level's data loads (or is already cached)
+4. New cells render at full opacity and `scale(1)`
+
+**"ENTER FEED" (button in breadcrumb bar, visible when drilled past makes):**
+- Constructs URL params from current drill state (make, model, year_min, year_max)
+- Navigates to `/?tab=feed&make=...&model=...` — standard route change, no treemap animation
+
+**"BROWSE ALL" (button in footer bar):**
+- Switches from `TreemapHomePage` to authenticated hub view — standard route change
+
+### Treemap Drill Animation Spec
+
+**Drill In — scale + fade:**
+
+| Property | From | To | Duration | Easing |
+|----------|------|----|----------|--------|
+| `opacity` | `0` (entering) | `1` | 180ms | `cubic-bezier(0.16, 1, 0.3, 1)` |
+| `transform` | `scale(1.06)` | `scale(1)` | 180ms | `cubic-bezier(0.16, 1, 0.3, 1)` |
+| `transform-origin` | click coordinates (`${x}px ${y}px`) | — | — | — |
+
+The outgoing cells fade to `opacity: 0` and scale to `1.06` (zoom into the clicked cell). The incoming cells appear at `opacity: 1, scale(1)` after the 180ms transition completes and new data renders.
+
+**Drill Out — reverse scale + fade:**
+
+| Property | From | To | Duration | Easing |
+|----------|------|----|----------|--------|
+| `opacity` | `0` (entering) | `1` | 180ms | `cubic-bezier(0.16, 1, 0.3, 1)` |
+| `transform` | `scale(0.94)` | `scale(1)` | 180ms | `cubic-bezier(0.16, 1, 0.3, 1)` |
+| `transform-origin` | `center center` | — | — | — |
+
+The outgoing cells fade to `opacity: 0` and scale to `0.94` (zoom out). The incoming cells appear at `opacity: 1, scale(1)`.
+
+**Image Fade-In (progressive enhancement on model/year cells):**
+
+| Property | From | To | Duration | Easing |
+|----------|------|----|----------|--------|
+| `opacity` | `0` (before `onLoad`) | `0.18` (idle) / `0.25` (hover) | 180ms | `cubic-bezier(0.16, 1, 0.3, 1)` |
+
+Representative images on aggregate cells load asynchronously. They fade in from `opacity: 0` to their target opacity when the `<img>` fires `onLoad`. Vehicle-level cells use full-opacity images (`1.0` idle, `0.85` hover).
+
+**Cell Hover:**
+
+| Property | From | To | Duration | Easing |
+|----------|------|----|----------|--------|
+| `border-color` | `var(--border)` | `var(--border-focus)` | 180ms | `cubic-bezier(0.16, 1, 0.3, 1)` |
+| `background` | heatmap color | `var(--surface-hover)` | 180ms | `cubic-bezier(0.16, 1, 0.3, 1)` |
+
+Vehicle cells with hero images: border changes to `var(--surface-elevated)` on hover instead of `--border-focus`. Background does not change (image remains).
+
+### Keyboard
+
+| Key | Context | Action |
+|-----|---------|--------|
+| Enter | Search input focused | Submit search query |
+| Escape | Search dropdown open | Close dropdown |
+
+Treemap cells are click-only (no keyboard focus/tab navigation). The search input and breadcrumb buttons are in the standard tab order.
+
+---
+
 ## Empty State Actions
 
 Every empty state must offer at least one next action. The interface never says "nothing here" without saying "but here's where to go."

@@ -1,9 +1,9 @@
 # PAPER: Trust Scoring Methodology
 
 **Author:** System Architecture
-**Date:** 2026-03-20
+**Date:** 2026-03-20, extended 2026-03-29
 **Status:** Living Document
-**References:** Engineering Manual Ch.4, Theoreticals: observation-half-life-model.md, Contemplations: testimony-and-half-lives.md
+**References:** Engineering Manual Ch.4, Dynamic Trust Model (theoreticals/dynamic-trust-model.md)
 
 ---
 

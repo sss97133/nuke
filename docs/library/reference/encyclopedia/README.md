@@ -983,6 +983,49 @@ interface ResolutionResult {
 
 The 60% fuzzy match that currently auto-merges is dead. Confidence below 0.80 never auto-matches. Ever.
 
+### Organization Sandbox (Provenance Container)
+
+Every data source is an organization entity in the system. When entity resolution runs, the outcome depends on whether the source's data includes verifiable identifiers (VIN, chassis number, catalogue raisonné number, accession number). Records with identifiers pass through to the main corpus as first-class citizens. Records without identifiers stay in the source organization's **sandbox** — a provenance container at the Claims layer of the epistemological hierarchy.
+
+The sandbox is NOT a penalty. It is a trust boundary. The data is not bad — it is incomplete testimony waiting for corroboration. When another source provides a matching identifier (e.g., Mecum confirms a VIN for a lot that ConceptCarz only had as year/make/model), the record graduates from the sandbox to the main corpus. The sandbox is an entity resolution intake queue dressed as an organization profile.
+
+**Graduation mechanics:**
+
+1. Record enters sandbox because resolution confidence is below threshold (no unique identifier, metadata-only match at <0.80).
+2. Record sits in sandbox, visible under the organization's profile, tagged as "unverified claim."
+3. A new observation arrives from any source with a verifiable identifier that matches the sandbox record's metadata.
+4. Entity resolution runs again — this time the identifier pushes confidence above threshold.
+5. Record graduates: linked to the canonical entity, provenance chain updated, sandbox count decrements.
+
+**Public accountability:**
+
+Any organization's sandbox is visible, showing what they claim versus what is verified. Users see the comparison: "ConceptCarz claims 289K auction appearances. 18K have verifiable VINs (in main corpus). 271K are unverified claims (in sandbox)." This is the epistemology of truth made visible — a source's verifiable contribution is a measurable, public number.
+
+The sandbox turns every data source into a transparent actor in the provenance graph. Organizations that produce verifiable data earn reputation through graduation rates. Organizations that produce unverifiable claims accumulate sandbox inventory. Neither is inherently wrong — an encyclopedia of concept cars may never produce VINs, and that is fine. The sandbox simply makes the epistemological status explicit.
+
+### Seller → Organization Resolution
+
+Every BaT listing has a `seller_username`. The `bat_seller_monitors` table maps known seller usernames to `businesses` organization records. When a vehicle is extracted, the seller username is looked up in `bat_seller_monitors`; if a match is found, the vehicle is linked to the organization via `organization_vehicles` and the `vehicle_events.source_organization_id` is set.
+
+This wiring enables organization profiles to show real per-vehicle data: what they sold, when, for how much, and in what capacity (owner, consigner, builder). Without this wiring, organization profiles show nothing — the `source_organization_id` was null on all 167K BaT vehicle_events until 2026-03-29.
+
+### Ownership Classification
+
+Organizations sell vehicles with varying degrees of responsibility. The ownership classifier is a regex-based function in `extract-bat-core/index.ts` that reads the BaT listing description and determines what role the seller played:
+
+- **Owner**: "acquired by the selling dealer", "purchased by the seller" → `relationship_type = 'owner'`
+- **Consigner**: "on behalf of", "consigned from" → `relationship_type = 'consigner'`
+- **Builder**: "built by the selling dealer", "restored by the seller" → `relationship_type = 'supplier_build'`
+- **Unknown**: no signal in description → `relationship_type = 'sold_by'` (generic)
+
+This is a Claims-layer judgment. The description is testimony. "Acquired by the selling dealer" is what BaT staff wrote based on what the seller told them. It is not verified. But it is the best signal available without physical inspection or title chain analysis.
+
+### Valuation Circularity Fix
+
+The Nuke Estimate engine uses a comp selection cascade: VIN match → canonical Y/M/M → normalized → core model → make fallback. When no comps are found, it previously fell back to the vehicle's own `sale_price` — producing a circular estimate that reflected reality rather than predicting it.
+
+As of 2026-03-29, `self_price_fallback` is blocked for sold vehicles. If the vehicle already sold and no independent comps exist, the estimate stays null. If only `asking_price` exists (unsold vehicle), it may be used as a low-confidence base (confidence capped at 25, deal_score nulled). The `nuke_estimates.comp_method` column records how each estimate was derived. The `is_circular` flag marks the 43,502 legacy estimates that were mirrors of sale price.
+
 ---
 
 ## Section 19: One Intake, One Gesture
@@ -1270,6 +1313,24 @@ From 13,758 prompts, five activate all 11 machines simultaneously:
 5. "API Endpoints, SDK Publishing, Documentation... 938K vehicles, 507K valuations, 11M+ auction comments, 30M+ images — but most is locked behind internal functions"
 
 If you read nothing else, read these 5. They are the product spec: photos in → intelligence applied → data structured → value estimated → API out → human steering.
+
+---
+
+## Appendix F: Question Intelligence — The Demand Signal
+
+The observation system captures what happened. The question intelligence system captures what people WANTED to know but couldn't find. 1.65M questions from 12.2M auction comments, classified into a 112-category taxonomy.
+
+**The insight:** The questions ARE the schema. Buyers collectively define what data matters by asking for it. 27% of questions are mechanical (engine, brakes, AC). 16% are provenance (history, ownership, title). The taxonomy reveals both what we should extract next (categories where `answerable_from_db = true` but fill rates are low) and what features to build (categories where `answerable_from_db = false` — video hosting, seller response tracking, bidding strategy tools).
+
+**Pipeline:** `has_question` flag (regex `?` detection) → stratified sampling (5K questions, 20 price/era cells) → LLM taxonomy discovery (Gemini Flash) → consolidation → TF-IDF regex pattern extraction → bulk classification (regex Tier 1, ~79% hit rate, $0) → LLM fallback (Gemini Flash Tier 2, $0) → `mv_question_intelligence` materialized view → `question_gap_analysis()` RPC.
+
+**Key tables:** `question_taxonomy` (112 entries), `auction_comments` (5 classification columns), `mv_question_intelligence` (aggregated view), `comment_discoveries.question_profile` (per-vehicle question profile).
+
+**Axes of analysis (available now):** L1/L2 category, answerable vs gap, question count, vehicle count, avg sale price, classification method.
+
+**Axes not yet sliced (next iteration):** per-make/model, per-price-band, per-era, per-source-platform, question-vs-sale-outcome correlation, seller-response-rate-vs-price correlation.
+
+**Dashboard:** `/admin/qi` — CSS treemap + bar charts + gap analysis + full category table.
 
 ---
 
