@@ -571,6 +571,454 @@ The deduplication logic:
 
 ---
 
+## The Write Layer: From Observation to Vehicles Table
+
+The observation model records evidence. The vehicles table materializes truth. The write layer is the bridge between them — a set of rules that determine when an observation should update a vehicle column, when it should merely confirm an existing value, and when it should be quarantined as a conflict.
+
+### The Tetris Write Layer (batUpsertWithProvenance)
+
+The Tetris metaphor: data fields fall like Tetris pieces. Each piece either fills a gap (lands in an empty slot), confirms what is already there (stacks neatly), or conflicts with what exists (gets quarantined, not forced in).
+
+The module `_shared/batUpsertWithProvenance.ts` implements three actions for every field write:
+
+| Action | Condition | What Happens |
+|--------|-----------|--------------|
+| **Gap Fill** | Vehicle column is NULL | Write the value, set `*_source` column, write extraction_metadata receipt |
+| **Confirmation** | Vehicle column matches proposed value | Write verification receipt only (no overwrite) |
+| **Conflict** | Vehicle column differs from proposed value | Write to bat_quarantine, write extraction_metadata receipt with status "conflicting" |
+
+This prevents data regression — a lower-trust source cannot silently overwrite a higher-trust value. Every write is auditable through `extraction_metadata` receipts.
+
+#### Source Column Tracking
+
+For key vehicle fields, a parallel `*_source` column tracks which extractor version wrote the value:
+
+| Field | Source Column |
+|-------|-------------|
+| `make` | `make_source` |
+| `model` | `model_source` |
+| `year` | `year_source` |
+| `vin` | `vin_source` |
+| `mileage` | `mileage_source` |
+| `color` | `color_source` |
+| `transmission` | `transmission_source` |
+| `engine_size` | `engine_source` |
+| `description` | `description_source` |
+| `trim` | `trim_source` |
+
+#### extraction_metadata: The Receipt Table
+
+Every field write generates a receipt in `extraction_metadata` (745,881 rows):
+
+| Validation Status | Count | Meaning |
+|-------------------|-------|---------|
+| `unvalidated` | 574,463 | Written but not cross-checked |
+| `valid` | 130,029 | Confirmed by a second independent source |
+| `conflicting` | 41,388 | Contradicted by another source |
+| `low_confidence` | 1 | Below confidence threshold |
+
+#### The Quarantine Table
+
+When the Tetris layer detects a conflict, the proposed value goes to `bat_quarantine` (43,168 rows) instead of overwriting the existing value. The most quarantined fields reveal where sources disagree most:
+
+| Field | Quarantined | Typical Conflict |
+|-------|-------------|------------------|
+| `transmission` | 13,433 | "Automatic" vs "4-speed automatic" (specificity mismatch) |
+| `sale_status` | 12,692 | Timing: extracted before auction ended vs after |
+| `listing_location` | 3,385 | Different location formats ("CA" vs "Los Angeles, CA") |
+| `color` | 2,485 | "Silver" vs "Silver Metallic" vs "Silber" |
+| `interior_color` | 1,858 | Same normalization issues as exterior |
+| `mileage` | 935 | Different sources, different moments (mileage changes) |
+| `sale_price` | 711 | Hammer price vs total with premium |
+
+Quarantine is not a failure — it is the system working correctly. Conflicts represent genuine disagreements in the data that require human or algorithmic resolution. The quarantine table is a work queue, not an error log.
+
+### The observationWriter Bridge Module
+
+The `_shared/observationWriter.ts` module (465 lines) bridges the observation system and the legacy write path. It was built to allow extractors to adopt the observation model incrementally — they can call a single function that writes to both systems simultaneously.
+
+#### API
+
+```typescript
+import { writeObservation, writeObservationBatch } from "../_shared/observationWriter.ts";
+
+// Single observation + gap-fill + evidence
+const result = await writeObservation(supabase, {
+  vehicleId: "uuid",
+  source: {
+    platform: "bat",          // observation_sources.slug
+    url: "https://...",       // source URL
+    trustScore: 0.85,         // override source base_trust_score
+    sourceIdentifier: "lot-123", // platform-specific ID
+  },
+  fields: {                   // extracted key-value pairs
+    year: 1967,
+    make: "Porsche",
+    model: "911S",
+    mileage: 42000,
+  },
+  observationKind: "listing", // observation_kind enum
+  extractionMethod: "dom_parse", // how the data was extracted
+  observedAt: "2024-01-15T10:30:00Z", // when the observation was made
+  agentModel: "grok-3-mini",  // LLM provenance (optional)
+});
+
+// Returns:
+{
+  observationId: "uuid",      // ID in vehicle_observations
+  duplicate: false,           // true if content_hash matched existing
+  gapFilled: ["mileage"],     // fields that were NULL and are now filled
+  confirmed: ["year", "make", "model"], // fields that matched existing
+  conflicted: [],             // fields that disagreed (quarantined)
+  evidenceIds: ["uuid", ...], // IDs in field_evidence
+  errors: [],                 // any subsystem errors (non-fatal)
+}
+```
+
+#### Three Parallel Operations
+
+Each `writeObservation` call executes three independent operations in parallel:
+
+1. **Observation Row** — Resolves the source from `observation_sources`, computes content hash for dedup, writes to `vehicle_observations` with computed confidence
+2. **Gap Fill** — Filters out computed fields (from `pipeline_registry`), fetches existing vehicle, runs Tetris logic via `batchUpsertWithProvenance`, applies gap-fill update to `vehicles`
+3. **Field Evidence** — Writes individual `field_evidence` rows for each extracted field with source confidence and extraction context
+
+Each operation catches its own errors independently. An observation write failure does not block gap-fill, and vice versa. This isolation is critical for production reliability — the system degrades gracefully rather than failing completely.
+
+#### Computed Field Protection
+
+The module queries `pipeline_registry` to identify fields that are computed by other pipelines (23 fields including `nuke_estimate`, `heat_score`, `completion_percentage`, etc.). These fields are automatically excluded from gap-fill, even if the extractor passes them in the `fields` object. This prevents extractors from overwriting values that are computed by dedicated analysis pipelines.
+
+The computed field set is cached in memory for the lifetime of the edge function invocation, so the pipeline_registry lookup happens at most once per request.
+
+#### Source Cache
+
+Source lookups (`observation_sources` by slug) are also cached in memory. Since most batch operations use a single source, this avoids repeated database roundtrips.
+
+#### Batch API
+
+```typescript
+const batchResult = await writeObservationBatch(supabase, [
+  { vehicleId: "uuid-1", source: {...}, fields: {...}, ... },
+  { vehicleId: "uuid-2", source: {...}, fields: {...}, ... },
+]);
+
+// Returns:
+{
+  results: WriteResult[],
+  totals: {
+    observations: 45,
+    duplicates: 3,
+    gapFills: 120,
+    confirmations: 340,
+    conflicts: 5,
+    evidenceRows: 450,
+    errors: 2,
+  }
+}
+```
+
+Batch operations process sequentially to avoid overwhelming the database. Each individual `writeObservation` already parallelizes its three sub-operations, so the effective throughput is high without requiring connection pooling coordination.
+
+---
+
+## The Batch Ingest Pipeline
+
+### ingest-observation-batch Edge Function
+
+For high-volume ingestion, the `ingest-observation-batch` endpoint accepts up to 200 observations per request. Each observation uses the same schema as `ingest-observation`.
+
+```
+POST /functions/v1/ingest-observation-batch
+{
+  "observations": [
+    { "source_slug": "bat", "kind": "listing", "observed_at": "...", ... },
+    { "source_slug": "bat", "kind": "comment", "observed_at": "...", ... },
+    ...
+  ],
+  "options": {
+    "stop_on_error": false,    // continue on individual failures (default)
+    "gap_fill": true,          // also gap-fill vehicles table
+    "write_evidence": true     // also write field_evidence rows
+  }
+}
+```
+
+The batch endpoint delegates each observation to `ingest-observation` via internal HTTP. This preserves the full vehicle resolution, source validation, dedup, and confidence scoring pipeline. The tradeoff is latency (sequential HTTP calls) vs. consistency (no duplicated logic).
+
+When `gap_fill` or `write_evidence` options are enabled, the batch endpoint additionally calls `writeObservation` for each successfully ingested observation that has a resolved `vehicle_id` and `structured_data`. This means a single batch call can:
+1. Write observation rows (via `ingest-observation`)
+2. Gap-fill the vehicles table (via `observationWriter` Tetris layer)
+3. Write field_evidence provenance (via `observationWriter`)
+
+Response format:
+```json
+{
+  "success": true,
+  "total": 50,
+  "ingested": 45,
+  "duplicates": 3,
+  "failed": 2,
+  "results": [
+    { "index": 0, "success": true, "observation_id": "uuid", "vehicle_id": "uuid", "duplicate": false },
+    { "index": 1, "success": true, "observation_id": "uuid", "duplicate": true },
+    { "index": 2, "success": false, "error": "Unknown source: xyz" },
+    ...
+  ]
+}
+```
+
+---
+
+## The Retroactive Adoption Pattern
+
+Adopting the observation model across an existing codebase of 30+ extractors cannot happen in a single migration. The observationWriter module enables a "fire-and-forget" adoption pattern: existing extractors keep their legacy write paths, and observation writes are added alongside them.
+
+### Pattern: Fire-and-Forget Observation
+
+```typescript
+import { writeObservation } from "../_shared/observationWriter.ts";
+
+// Existing legacy write (preserved for backward compatibility)
+await supabase.from("vehicles").update(updatePayload).eq("id", vehicleId);
+
+// New observation write (fire-and-forget — errors don't block the extractor)
+writeObservation(supabase, {
+  vehicleId,
+  source: { platform: "bat", url: sourceUrl },
+  fields: extractedFields,
+  observationKind: "specification",
+  extractionMethod: "snapshot_regex_parse",
+}).catch((e) => console.warn(`observationWriter error: ${e?.message}`));
+```
+
+The `.catch()` on the promise ensures that observation system failures never break the existing extraction pipeline. The observation write is purely additive — it creates provenance records without altering the existing data flow.
+
+### Retrofitted Extractors (as of March 2026)
+
+| Extractor | Observation Kind | Extraction Method | Notes |
+|-----------|-----------------|-------------------|-------|
+| `batch-extract-snapshots` | `specification` | `snapshot_regex_parse` | Multi-platform (BaT, Mecum, Barrett-Jackson, C&B, Bonhams) |
+| `enrich-listing-content` | `specification` | `listing_content_llm` | LLM-extracted content fields (highlights, equipment, modifications) |
+| `extract-cars-and-bids-core` | `listing` | `dom_parse` | Full listing data including description sections |
+| `discover-description-data` | `specification` | `description_discovery_{model}` | LLM-discovered fields from descriptions. Also uses `ingest-observation` for condition data |
+
+The target is 30/30 extractors using the observation system. Progress is tracked by counting extractors that import `observationWriter.ts` or call `ingest-observation` directly.
+
+### Migration Sequence
+
+The full migration from legacy writes to observation-first writes follows this sequence:
+
+1. **Phase 1: Additive** (current) — Add `writeObservation` calls alongside existing `vehicles` table writes. Both paths execute. The observation system accumulates provenance while the legacy path continues working.
+
+2. **Phase 2: Observation-Primary** — The observation system becomes the source of truth. Gap-fill via `writeObservation` replaces direct `vehicles` table updates. The `vehicles` table is materialized from observations rather than written to directly.
+
+3. **Phase 3: Legacy Removal** — Direct `vehicles` writes are removed from extractors. All data flows through `ingest-observation` or `writeObservation`. The `vehicles` table columns are computed views over `vehicle_observations` and `field_evidence`.
+
+Phase 1 is safe to execute in parallel across all extractors because `writeObservation` is purely additive and its failures are isolated. Phase 2 requires careful coordination because it changes the source of truth. Phase 3 is a cleanup step.
+
+---
+
+## Temporal Decay and Freshness
+
+Observations are testimony at a point in time. A mileage reading from 2020 is less reliable in 2026 than a mileage reading from 2025. The observation model tracks temporal relevance through several mechanisms.
+
+### observed_at vs ingested_at
+
+Every observation has two timestamps:
+- `observed_at` — when the observation was actually made (the date of the listing, the date of the comment, the date of the service record)
+- `ingested_at` — when the system processed it
+
+These are often different. A BaT listing from 2019 might be ingested in 2026 when the `migrate-to-observations` function processes legacy data. The `observed_at` timestamp is the epistemically relevant one — it tells us when the claim was true (or at least, when the source made the claim).
+
+### Data Freshness at Discovery
+
+The `data_freshness_at_discovery` interval column records how old the observation data was when the system first encountered it. A listing scraped 3 hours after posting has high freshness. The same listing found via the Wayback Machine 5 years later has low freshness.
+
+Freshness matters because:
+- Mileage changes over time (a car driven 10K miles/year)
+- Prices change (market fluctuations)
+- Condition changes (wear, rust, restoration)
+- Ownership changes (title transfers)
+
+### Temporal Relevance in Conflict Resolution
+
+When two observations conflict, temporal recency is a tiebreaker (after confidence). A 2024 condition report that says "excellent" is more relevant than a 2019 condition report that says "good" — the car may have been restored in between.
+
+However, temporal recency is not always correct. A 2024 eBay listing (trust 0.5) claiming "matching numbers" is less reliable than a 2019 Porsche Certificate of Authenticity (trust 0.98) saying otherwise. Trust score takes priority; time breaks ties within the same trust tier.
+
+### The Supersession Chain and Temporal Ordering
+
+When the same source updates its claim (a listing is edited, a price changes), the old observation is superseded rather than deleted. The `lineage_chain` preserves the full temporal sequence:
+
+```
+observation_v1 (Jan 15, mileage: 42000)
+    └── superseded_by → observation_v2 (Jan 20, mileage: 42150)
+        └── superseded_by → observation_v3 (Feb 1, mileage: 42300)
+```
+
+This chain reveals information that a single snapshot cannot: the car was driven ~300 miles in two weeks during January. The supersession chain is not just version control — it is a signal.
+
+### Decay Functions (Not Yet Implemented)
+
+The system is designed for but does not yet implement formal decay functions. The planned approach:
+
+- **Linear decay**: For fields that change gradually (mileage, condition). Confidence decreases proportionally with age.
+- **Step decay**: For fields that change at discrete events (ownership, title status). Confidence drops at known transfer events.
+- **No decay**: For immutable fields (VIN, year, factory specifications). A VIN from 1970 is as valid in 2026.
+
+The `confidence_factors` JSONB column on `vehicle_observations` is designed to hold temporal decay metadata when implemented.
+
+---
+
+## Extraction Method Taxonomy
+
+The `extraction_method` column on `vehicle_observations` records HOW data was extracted. This is critical for understanding the epistemic quality of observations — a regex match against structured HTML is fundamentally different from an LLM interpretation of free text.
+
+### Current Methods in Production
+
+| Method | Count | Description | Typical Confidence |
+|--------|-------|-------------|-------------------|
+| `vehicle_events_migration` | 309,929 | Synthetic observations from legacy `vehicle_events` data | Medium (inherited) |
+| `backfill-from-vehicles` | 189,701 | Synthetic observations from legacy `vehicles` columns | Medium (inherited) |
+| `backfill-sale-results` | 130,376 | Synthetic observations for sale outcomes | Medium (inherited) |
+| `llm_extraction` | 81,379 | LLM-based extraction from text content | Medium |
+| `description_condition_v1` | 77,953 | Condition extraction from listing descriptions | Medium |
+| `contradiction_detection` | 485 | Multi-source contradiction analysis | High |
+| `multi_model_consensus` | 482 | Multiple LLMs agree on the same extraction | High |
+| `vision_condition_v1` | 11 | Computer vision condition assessment | Medium |
+| `claude_opus_grouped_vision` | 3 | Opus-tier vision analysis of photo groups | High |
+| `osxphotos_analysis` | 1 | Local photo library metadata extraction | High |
+| `gmail_newsletter_mining` | 1 | Email newsletter content extraction | Medium |
+
+### Method Categories
+
+Methods fall into epistemic categories:
+
+**Deterministic** (highest reliability):
+- `snapshot_regex_parse` — Regex against structured HTML fields
+- `dom_parse` — DOM element extraction from known page structure
+- `json_ld_parse` — Structured data from JSON-LD schema markup
+
+**Statistical** (high reliability):
+- `multi_model_consensus` — Multiple independent LLMs agree
+- `contradiction_detection` — Cross-source validation
+
+**LLM** (moderate reliability):
+- `llm_extraction` — Single LLM extraction from text
+- `listing_content_llm` — LLM extraction of listing-specific content
+- `description_discovery_{model}` — Open-ended LLM discovery
+
+**Synthetic** (inherited reliability):
+- `vehicle_events_migration` — Legacy data ported to observations
+- `backfill-from-vehicles` — Existing vehicle columns wrapped as observations
+- `backfill-sale-results` — Sale data wrapped as observations
+
+**Vision** (emerging):
+- `vision_condition_v1` — Computer vision condition assessment
+- `claude_opus_grouped_vision` — Multi-image analysis
+
+### Method and Confidence
+
+The extraction method influences the confidence score computation. Deterministic methods receive a small confidence boost because their error mode is structural (wrong HTML → no data) rather than interpretive (LLM → plausible but wrong data). The system trusts a regex that finds nothing over an LLM that invents something.
+
+---
+
+## Pipeline Statistics (March 2026)
+
+### Scale
+
+| Metric | Count |
+|--------|-------|
+| Total observations | 5,703,953 |
+| Distinct vehicles with observations | 449,747 |
+| Total vehicles in system | 508,608 |
+| Observation coverage | 88.4% of vehicles |
+| Total field_evidence rows | 3,290,472 |
+| Registered sources | 160 |
+| extraction_metadata receipts | 745,881 |
+| Quarantined conflicts | 43,168 |
+
+### Observation Volume by Kind
+
+| Kind | Count | % of Total |
+|------|-------|-----------|
+| `media` | 4,197,356 | 73.6% |
+| `listing` | 585,728 | 10.3% |
+| `comment` | 425,987 | 7.5% |
+| `bid` | 179,983 | 3.2% |
+| `sale_result` | 130,379 | 2.3% |
+| `condition` | 89,613 | 1.6% |
+| `work_record` | 43,935 | 0.8% |
+| `specification` | 37,924 | 0.7% |
+| `provenance` | 11,051 | 0.2% |
+| `ownership` | 54 | <0.01% |
+| `valuation` | 2 | <0.01% |
+
+Media observations dominate because each listing photo generates an individual observation. The epistemically richer observation kinds (specification, condition, provenance) are the frontier for growth.
+
+### Confidence Distribution
+
+| Level | Count | % |
+|-------|-------|---|
+| `high` | 5,494,455 | 96.3% |
+| `medium` | 183,248 | 3.2% |
+| `verified` | 26,263 | 0.5% |
+| `low` | 0 | 0% |
+| `inferred` | 0 | 0% |
+
+The heavy skew toward `high` confidence reflects that most observations come from auction platforms (BaT, Mecum, Barrett-Jackson) which have base trust scores of 0.75-0.85. The `verified` tier requires independent corroboration — only 0.5% of observations have been cross-checked against a second source.
+
+### Field Evidence Coverage
+
+The 20 most-evidenced vehicle fields:
+
+| Field | Evidence Rows | Status: Accepted | Status: Pending |
+|-------|--------------|-------------------|-----------------|
+| `model` | 358,638 | 96.5% accepted | 3.5% pending |
+| `make` | 356,152 | 96.5% | 3.5% |
+| `year` | 350,257 | 96.5% | 3.5% |
+| `sale_price` | 293,982 | 96.3% | 3.7% |
+| `body_style` | 264,895 | 96.4% | 3.6% |
+| `transmission` | 259,830 | 96.4% | 3.6% |
+| `color` | 247,301 | 96.4% | 3.6% |
+| `interior_color` | 239,053 | 96.4% | 3.6% |
+| `engine_size` | 219,546 | 96.4% | 3.6% |
+| `mileage` | 212,395 | 96.4% | 3.6% |
+| `vin` | 209,243 | 96.4% | 3.6% |
+| `drivetrain` | 169,726 | 96.3% | 3.7% |
+
+The overall field_evidence status breakdown: 3,172,999 accepted (96.4%), 117,472 pending (3.6%), 1 rejected. The low rejection rate reflects that field_evidence is written alongside gap-fill operations — by the time evidence is written, the value has already been assessed by the Tetris layer.
+
+---
+
+## The Entity Resolution Interface
+
+The observation model and entity resolution system intersect at vehicle matching. When an observation arrives without a `vehicle_id`, the `ingest-observation` function attempts to resolve it:
+
+### Resolution Cascade
+
+1. **VIN match** (confidence 0.99) — Normalize VIN, exact match against `vehicles.vin`
+2. **Canonical URL match** (confidence 0.95) — Normalize URL, match canonical listing ID against `vehicles.listing_url` and `discovery_url`
+3. **Event URL match** (confidence 0.95) — Exact URL match in `vehicle_events.source_url`
+4. **Normalized event URL** (confidence 0.90) — Normalized URL match in `vehicle_events`
+5. **Year/Make fuzzy match** (confidence 0.60) — If only one vehicle matches year+make. Multiple matches are left unresolved.
+
+The `vehicle_match_confidence` and `vehicle_match_signals` columns record which resolution tier was used and what signals drove it. Observations with confidence below 0.60 are stored without a `vehicle_id` for later manual resolution.
+
+### Unresolved Observations
+
+Observations that cannot be matched to a vehicle are not discarded. They are stored with `vehicle_id = NULL` and can be resolved later when:
+- The vehicle is created (a new listing is extracted)
+- A VIN becomes available (from a subsequent extraction pass)
+- Manual curation assigns the observation to a vehicle
+
+---
+
 ## Summary
 
 The observation model transforms the platform from a vehicle listing database into an evidence accumulation system. No data point enters without provenance. No claim stands without a source. No source is trusted absolutely. The convergence of independent observations, weighted by source trust and temporal relevance, produces the materialized truth in the `vehicles` table — a truth that improves with every new observation ingested.
+
+The write layer (Tetris + observationWriter) ensures that truth materialization is safe: gap-fills never regress, conflicts are quarantined, and every write is auditable. The batch ingest pipeline scales observation intake to hundreds per request. The retroactive adoption pattern allows extractors to join the observation system incrementally without breaking their existing functionality.
+
+At 5.7 million observations across 449,747 vehicles from 160 sources, the observation model is the largest vehicle evidence database in the collector car space. Its value compounds: each new observation makes existing observations more valuable through corroboration, contradiction detection, and temporal sequencing.
