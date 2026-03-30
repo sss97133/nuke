@@ -274,7 +274,7 @@ const ObservationTimeline: React.FC = () => {
         padding: '16px',
       }}>
         <div style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontFamily: 'Arial, sans-serif',
           fontSize: '9px',
           fontWeight: 700,
           letterSpacing: '1px',
@@ -284,7 +284,7 @@ const ObservationTimeline: React.FC = () => {
           OBSERVATION HISTORY
         </div>
         <div style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontFamily: 'Arial, sans-serif',
           fontSize: '9px',
           color: 'var(--text-disabled)',
           textTransform: 'uppercase',
@@ -293,7 +293,7 @@ const ObservationTimeline: React.FC = () => {
           NO OBSERVATIONS RECORDED YET
         </div>
         <div style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontFamily: 'Arial, sans-serif',
           fontSize: '9px',
           color: 'var(--text-secondary)',
           marginTop: '4px',
@@ -319,7 +319,7 @@ const ObservationTimeline: React.FC = () => {
         borderBottom: '1px solid var(--border)',
       }}>
         <span style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontFamily: 'Arial, sans-serif',
           fontSize: '9px',
           fontWeight: 700,
           letterSpacing: '1px',
@@ -351,7 +351,7 @@ const ObservationTimeline: React.FC = () => {
             type="button"
             onClick={() => setActiveFilter(null)}
             style={{
-              fontFamily: 'Arial, Helvetica, sans-serif',
+              fontFamily: 'Arial, sans-serif',
               fontSize: '8px',
               fontWeight: 700,
               letterSpacing: '0.08em',
@@ -374,7 +374,7 @@ const ObservationTimeline: React.FC = () => {
                 type="button"
                 onClick={() => setActiveFilter(isActive ? null : kind)}
                 style={{
-                  fontFamily: 'Arial, Helvetica, sans-serif',
+                  fontFamily: 'Arial, sans-serif',
                   fontSize: '8px',
                   fontWeight: 700,
                   letterSpacing: '0.08em',
@@ -397,7 +397,7 @@ const ObservationTimeline: React.FC = () => {
       {loading && (
         <div style={{
           padding: '12px 10px',
-          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontFamily: 'Arial, sans-serif',
           fontSize: '8px',
           fontWeight: 700,
           textTransform: 'uppercase',
@@ -452,7 +452,7 @@ const ObservationTimeline: React.FC = () => {
             <div style={{ minWidth: 0 }}>
               {/* Source + summary */}
               <div style={{
-                fontFamily: 'Arial, Helvetica, sans-serif',
+                fontFamily: 'Arial, sans-serif',
                 fontSize: '9px',
                 color: 'var(--text)',
                 lineHeight: 1.4,
@@ -523,7 +523,7 @@ const ObservationTimeline: React.FC = () => {
               )}
               {(dateDisplay || ago) && (
                 <span style={{
-                  fontFamily: 'Arial, Helvetica, sans-serif',
+                  fontFamily: 'Arial, sans-serif',
                   fontSize: '7px',
                   color: 'var(--text-disabled)',
                   whiteSpace: 'nowrap',
@@ -549,7 +549,7 @@ const ObservationTimeline: React.FC = () => {
             type="button"
             onClick={() => setShowAll(!showAll)}
             style={{
-              fontFamily: 'Arial, Helvetica, sans-serif',
+              fontFamily: 'Arial, sans-serif',
               fontSize: '8px',
               fontWeight: 700,
               letterSpacing: '0.08em',

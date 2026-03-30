@@ -83,7 +83,7 @@ const S = {
   } as React.CSSProperties,
 
   label: {
-    fontFamily: 'Arial, Helvetica, sans-serif',
+    fontFamily: 'Arial, sans-serif',
     fontSize: '9px',
     fontWeight: 700,
     letterSpacing: '0.08em',
@@ -92,7 +92,7 @@ const S = {
   } as React.CSSProperties,
 
   badge: {
-    fontFamily: 'Arial, Helvetica, sans-serif',
+    fontFamily: 'Arial, sans-serif',
     fontSize: '8px',
     fontWeight: 700,
     letterSpacing: '0.04em',
@@ -108,7 +108,7 @@ const S = {
   } as React.CSSProperties,
 
   conflictBadge: {
-    fontFamily: 'Arial, Helvetica, sans-serif',
+    fontFamily: 'Arial, sans-serif',
     fontSize: '8px',
     fontWeight: 700,
     letterSpacing: '0.04em',
@@ -164,7 +164,7 @@ const S = {
   }) as React.CSSProperties,
 
   confLabel: {
-    fontFamily: 'Arial, Helvetica, sans-serif',
+    fontFamily: 'Arial, sans-serif',
     fontSize: '8px',
     fontWeight: 700,
     color: 'var(--text-disabled)',
@@ -174,14 +174,14 @@ const S = {
   } as React.CSSProperties,
 
   timestamp: {
-    fontFamily: 'Arial, Helvetica, sans-serif',
+    fontFamily: 'Arial, sans-serif',
     fontSize: '8px',
     color: 'var(--border)',
     flexShrink: 0,
   } as React.CSSProperties,
 
   chevron: {
-    fontFamily: 'Arial, Helvetica, sans-serif',
+    fontFamily: 'Arial, sans-serif',
     fontSize: '9px',
     color: 'var(--text-disabled)',
     flexShrink: 0,
@@ -317,7 +317,7 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
               <span
                 className="dossier-evidence-context"
                 style={{
-                  fontFamily: 'Arial, Helvetica, sans-serif',
+                  fontFamily: 'Arial, sans-serif',
                   fontSize: '8px',
                   color: 'var(--text-disabled)',
                   overflow: 'hidden',
@@ -395,7 +395,7 @@ export const SourceBadge: React.FC<SourceBadgeProps> = ({ group, onClick }) => {
       </span>
       {totalSources > 1 && (
         <span style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontFamily: 'Arial, sans-serif',
           fontSize: '8px',
           color: 'var(--text-disabled)',
         }}>

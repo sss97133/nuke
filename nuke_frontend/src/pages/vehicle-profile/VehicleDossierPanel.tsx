@@ -418,7 +418,7 @@ const FieldRow: React.FC<{
       >
         {/* Label */}
         <span style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontFamily: 'Arial, sans-serif',
           fontSize: '9px',
           fontWeight: 700,
           letterSpacing: '0.5px',
@@ -432,7 +432,7 @@ const FieldRow: React.FC<{
         {/* Value */}
         <span
           style={{
-            fontFamily: field === 'vin' ? "'Courier New', Courier, monospace" : 'Arial, Helvetica, sans-serif',
+            fontFamily: field === 'vin' ? "'Courier New', Courier, monospace" : 'Arial, sans-serif',
             fontSize: '10px',
             color: 'var(--text)',
             padding: '0 8px',
@@ -472,7 +472,7 @@ const FieldRow: React.FC<{
 
         {/* Expand icon */}
         <span style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontFamily: 'Arial, sans-serif',
           fontSize: '8px',
           color: 'var(--text-disabled)',
           textAlign: 'center',
@@ -631,7 +631,7 @@ const VehicleDossierPanel: React.FC = () => {
               marginTop: '4px',
             }}>
               <span style={{
-                fontFamily: 'Arial, Helvetica, sans-serif',
+                fontFamily: 'Arial, sans-serif',
                 fontSize: '9px',
                 fontWeight: 700,
                 letterSpacing: '0.5px',
@@ -700,7 +700,7 @@ const VehicleDossierPanel: React.FC = () => {
         marginBottom: '8px',
       }}>
         <div style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontFamily: 'Arial, sans-serif',
           fontSize: '9px',
           fontWeight: 700,
           letterSpacing: '1px',
@@ -743,7 +743,7 @@ const VehicleDossierPanel: React.FC = () => {
             <React.Fragment key={fg.label}>
               {gi > 0 && (
                 <div style={{
-                  fontFamily: 'Arial, Helvetica, sans-serif',
+                  fontFamily: 'Arial, sans-serif',
                   fontSize: '8px',
                   fontWeight: 700,
                   letterSpacing: '1px',
@@ -789,7 +789,7 @@ const VehicleDossierPanel: React.FC = () => {
                 <div
                   onClick={() => setPowerplantExpanded(true)}
                   style={{
-                    fontFamily: 'Arial, Helvetica, sans-serif',
+                    fontFamily: 'Arial, sans-serif',
                     fontSize: '7px',
                     color: 'var(--text-disabled)',
                     padding: '2px 10px 3px',
@@ -815,7 +815,7 @@ const VehicleDossierPanel: React.FC = () => {
           return (
             <>
               <div style={{
-                fontFamily: 'Arial, Helvetica, sans-serif',
+                fontFamily: 'Arial, sans-serif',
                 fontSize: '9px',
                 fontWeight: 700,
                 letterSpacing: '1px',
@@ -859,7 +859,7 @@ const VehicleDossierPanel: React.FC = () => {
         marginBottom: '8px',
       }}>
         <div style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontFamily: 'Arial, sans-serif',
           fontSize: '9px',
           fontWeight: 700,
           letterSpacing: '1px',
@@ -923,7 +923,7 @@ const VehicleDossierPanel: React.FC = () => {
         </div>
         {/* Layer distribution summary text */}
         <div style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontFamily: 'Arial, sans-serif',
           fontSize: '8px',
           textTransform: 'uppercase',
           letterSpacing: '0.5px',
@@ -948,7 +948,7 @@ const VehicleDossierPanel: React.FC = () => {
           marginBottom: '8px',
         }}>
           <div style={{
-            fontFamily: 'Arial, Helvetica, sans-serif',
+            fontFamily: 'Arial, sans-serif',
             fontSize: '9px',
             fontWeight: 700,
             letterSpacing: '1px',
@@ -1027,7 +1027,7 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
       marginBottom: '8px',
     }}>
       <div style={{
-        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontFamily: 'Arial, sans-serif',
         fontSize: '9px',
         fontWeight: 700,
         letterSpacing: '1px',
@@ -1045,7 +1045,7 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
           {Math.round(score.condition_score)}
         </span>
         <span style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontFamily: 'Arial, sans-serif',
           fontSize: '9px',
           color: 'var(--text-secondary)',
           textTransform: 'uppercase',
@@ -1062,7 +1062,7 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
           {domains.map(d => (
             <React.Fragment key={d.label}>
               <span style={{
-                fontFamily: 'Arial, Helvetica, sans-serif',
+                fontFamily: 'Arial, sans-serif',
                 fontWeight: 700,
                 letterSpacing: '0.5px',
                 textTransform: 'uppercase',

@@ -39,7 +39,7 @@ function resolveLocation(vehicle: any): string | null {
 // ---------------------------------------------------------------------------
 
 const TOKEN = {
-  fontBody: 'Arial, Helvetica, sans-serif' as const,
+  fontBody: 'Arial, sans-serif' as const,
   ink:      'var(--text, var(--ink, #1a1a1a))',
   surface:  'var(--surface, #ffffff)',
   borderPrimary: '2px solid var(--border, #1a1a1a)',

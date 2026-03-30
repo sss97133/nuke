@@ -69,7 +69,7 @@ const AnalysisSignalsSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) 
       marginBottom: '8px',
     }}>
       <div style={{
-        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontFamily: 'Arial, sans-serif',
         fontSize: '9px',
         fontWeight: 700,
         letterSpacing: '1px',
