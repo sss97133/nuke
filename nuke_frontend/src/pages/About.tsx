@@ -38,7 +38,7 @@ const About: React.FC = () => {
               Every vehicle profile processes information through three distinct layers to ensure accuracy and context:
             </p>
             
-            <div style={{ fontFamily: "'Courier New', monospace", fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: "'Courier New', monospace", fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '2px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`┌──────────────────────────────────────────────────────────────────────────┐
 │                  THREE-LAYER DATA ARCHITECTURE                           │
 └──────────────────────────────────────────────────────────────────────────┘
@@ -88,7 +88,7 @@ Components:
             
             <div style={{ display: 'grid', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
               {/* VHX Token */}
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-4)', background: 'var(--grey-50)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-4)', background: 'var(--grey-50)' }}>
                 <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
                   VHX (Vehicle History Exchange)
                 </h3>
@@ -104,7 +104,7 @@ Components:
               </div>
               
               {/* PVR Token */}
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-4)', background: 'var(--grey-50)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-4)', background: 'var(--grey-50)' }}>
                 <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
                   PVR (Provenance Verification Record)
                 </h3>
@@ -120,7 +120,7 @@ Components:
               </div>
               
               {/* NUK Token */}
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-4)', background: 'var(--grey-50)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-4)', background: 'var(--grey-50)' }}>
                 <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
                   NUK (Governance Token)
                 </h3>
@@ -146,7 +146,7 @@ Components:
               Nuke employs a sophisticated knowledge work architecture to process, validate, and enrich vehicle data:
             </p>
             
-            <div style={{ fontFamily: "'Courier New', monospace", fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '1px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontFamily: "'Courier New', monospace", fontSize: '11px', background: 'var(--grey-100)', padding: 'var(--space-3)', border: '2px solid var(--border-light)', marginBottom: 'var(--space-4)', whiteSpace: 'pre-wrap' }}>
 {`KNOWLEDGE WORK PIPELINE
 
 [INPUT SOURCES]
@@ -195,19 +195,19 @@ Components:
             </p>
             
             <div style={{ display: 'grid', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-3)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-3)' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>Smart Invoice Processing</h4>
                 <p style={{ fontSize: '13px', lineHeight: '1.7' }}>AI-powered receipt and invoice scanning that automatically extracts parts, labor, and costs, building a comprehensive financial history.</p>
               </div>
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-3)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-3)' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>Parts Catalog Integration</h4>
                 <p style={{ fontSize: '13px', lineHeight: '1.7' }}>Structured parts inventory with OEM numbers, condition tracking, and installation records linked to specific service events.</p>
               </div>
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-3)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-3)' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>Skill Verification System</h4>
                 <p style={{ fontSize: '13px', lineHeight: '1.7' }}>Professional credentials validated through work history, allowing specialists to build verified portfolios of their expertise.</p>
               </div>
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-3)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-3)' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>Studio Documentation</h4>
                 <p style={{ fontSize: '13px', lineHeight: '1.7' }}>Professional photography workflows with standardized angle sets, lighting metadata, and condition documentation protocols.</p>
               </div>
@@ -261,25 +261,25 @@ Components:
             </h2>
             
             <div style={{ display: 'grid', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-4)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-4)' }}>
                 <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>Tier 1: Free</h3>
                 <p style={{ fontSize: '13px', lineHeight: '1.7', color: 'var(--text-secondary)' }}>Basic vehicle profiles, limited history, standard search</p>
               </div>
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-4)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-4)' }}>
                 <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>Tier 2: Enthusiast ($9.99/mo)</h3>
                 <p style={{ fontSize: '13px', lineHeight: '1.7', color: 'var(--text-secondary)' }}>Unlimited profiles, AI extraction, advanced search, basic analytics</p>
               </div>
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-4)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-4)' }}>
                 <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>Tier 3: Professional ($49.99/mo)</h3>
                 <p style={{ fontSize: '13px', lineHeight: '1.7', color: 'var(--text-secondary)' }}>Full workspace tools, bulk processing, API access, team collaboration</p>
               </div>
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-4)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-4)' }}>
                 <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>Tier 4: Enterprise (Custom)</h3>
                 <p style={{ fontSize: '13px', lineHeight: '1.7', color: 'var(--text-secondary)' }}>White-label solutions, data licensing, custom integrations, dedicated support</p>
               </div>
             </div>
             
-            <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-4)', background: 'var(--grey-50)' }}>
+            <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-4)', background: 'var(--grey-50)' }}>
               <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>Marketplace Revenue</h3>
               <p style={{ fontSize: '13px', lineHeight: '1.7' }}>Transaction fees (2.5% buyer, 1% seller) plus premium listing fees and featured placement.</p>
             </div>
@@ -345,7 +345,7 @@ Components:
             </h2>
             
             <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
-              <div style={{ border: '1px solid var(--success)', padding: 'var(--space-3)', background: 'var(--success-bg)' }}>
+              <div style={{ border: '2px solid var(--success)', padding: 'var(--space-3)', background: 'var(--success-bg)' }}>
                 <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: 'var(--space-1)', color: 'var(--success)' }}>Phase 1: Foundation (Complete)</h3>
                 <ul style={{ fontSize: '12px', lineHeight: '1.6', marginLeft: 'var(--space-4)' }}>
                   <li>Core vehicle profile system</li>
@@ -354,7 +354,7 @@ Components:
                   <li>Basic marketplace functionality</li>
                 </ul>
               </div>
-              <div style={{ border: '1px solid var(--warning)', padding: 'var(--space-3)', background: 'var(--warning-bg)' }}>
+              <div style={{ border: '2px solid var(--warning)', padding: 'var(--space-3)', background: 'var(--warning-bg)' }}>
                 <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: 'var(--space-1)', color: 'var(--warning-dark)' }}>Phase 2: Intelligence (In Progress)</h3>
                 <ul style={{ fontSize: '12px', lineHeight: '1.6', marginLeft: 'var(--space-4)' }}>
                   <li>Advanced image matching and deduplication</li>
@@ -363,7 +363,7 @@ Components:
                   <li>Professional workspace tools</li>
                 </ul>
               </div>
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-3)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-3)' }}>
                 <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>Phase 3: Network (Planned)</h3>
                 <ul style={{ fontSize: '12px', lineHeight: '1.6', marginLeft: 'var(--space-4)' }}>
                   <li>Token launch and governance system</li>
@@ -372,7 +372,7 @@ Components:
                   <li>Mobile applications (iOS/Android)</li>
                 </ul>
               </div>
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-3)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-3)' }}>
                 <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>Phase 4: Scale (Future)</h3>
                 <ul style={{ fontSize: '12px', lineHeight: '1.6', marginLeft: 'var(--space-4)' }}>
                   <li>International expansion</li>
@@ -413,7 +413,7 @@ Components:
             </p>
             
             <div style={{ display: 'grid', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-3)', background: 'var(--grey-50)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-3)', background: 'var(--grey-50)' }}>
                 <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>Data Quality Contributions</h3>
                 <ul style={{ fontSize: '12px', lineHeight: '1.6', marginLeft: 'var(--space-4)' }}>
                   <li><strong>+50 pts</strong>: Adding verified VIN with documentation</li>
@@ -424,7 +424,7 @@ Components:
                 </ul>
               </div>
               
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-3)', background: 'var(--grey-50)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-3)', background: 'var(--grey-50)' }}>
                 <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>Community Engagement</h3>
                 <ul style={{ fontSize: '12px', lineHeight: '1.6', marginLeft: 'var(--space-4)' }}>
                   <li><strong>+25 pts</strong>: Successful referral (new user creates profile)</li>
@@ -434,7 +434,7 @@ Components:
                 </ul>
               </div>
               
-              <div style={{ border: '1px solid var(--border-light)', padding: 'var(--space-3)', background: 'var(--grey-50)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 'var(--space-3)', background: 'var(--grey-50)' }}>
                 <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>Professional Contributions</h3>
                 <ul style={{ fontSize: '12px', lineHeight: '1.6', marginLeft: 'var(--space-4)' }}>
                   <li><strong>+100 pts</strong>: Verified expert appraisal submission</li>

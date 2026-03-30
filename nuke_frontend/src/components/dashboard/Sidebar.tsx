@@ -88,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div
       style={{
         width: '200px',
-        borderRight: '1px solid var(--border)',
+        borderRight: '2px solid var(--border)',
         background: 'var(--surface)',
         height: '100%',
         overflowY: 'auto',

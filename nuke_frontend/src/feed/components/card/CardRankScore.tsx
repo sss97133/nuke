@@ -132,7 +132,7 @@ const tooltipStyle: CSSProperties = {
   left: 0,
   marginTop: '2px',
   background: 'rgba(0, 0, 0, 0.92)',
-  border: '1px solid rgba(255, 255, 255, 0.15)',
+  border: '2px solid rgba(255, 255, 255, 0.15)',
   padding: '4px 6px',
   zIndex: 100,
   minWidth: '120px',

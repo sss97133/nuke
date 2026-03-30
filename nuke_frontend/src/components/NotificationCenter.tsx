@@ -113,11 +113,11 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
     <div className="notification-center">
       {notifications.map((notification) => (
         <div 
-          key={notification.id} 
-          style={{ 
-            padding: '8px', 
-            marginBottom: '8px', 
-            border: '1px solid var(--border)',
+          key={notification.id}
+          style={{
+            padding: '8px',
+            marginBottom: '8px',
+            border: '2px solid var(--border)',
             backgroundColor: (!notification.read && !notification.is_read) ? 'var(--bg-secondary)' : 'var(--surface)',
             fontSize: '12px'
           }}

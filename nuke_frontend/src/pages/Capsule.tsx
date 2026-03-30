@@ -113,7 +113,7 @@ const Capsule: React.FC = () => {
           <div style={{
             width: '200px',
             flexShrink: 0,
-            borderRight: '1px solid var(--border)',
+            borderRight: '2px solid var(--border)',
             paddingRight: 'var(--space-4)'
           }}>
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

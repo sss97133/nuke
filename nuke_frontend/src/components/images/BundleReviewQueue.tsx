@@ -306,7 +306,7 @@ export default function BundleReviewQueue({ vehicleId, onComplete }: BundleRevie
   if (events.length === 0) return null;
 
   return (
-    <div className="card" style={{ marginBottom: '16px', border: '1px solid color-mix(in srgb, var(--warning) 20%, transparent)', background: 'var(--warning-dim)' }}>
+    <div className="card" style={{ marginBottom: '16px', border: '2px solid color-mix(in srgb, var(--warning) 20%, transparent)', background: 'var(--warning-dim)' }}>
       {/* Header */}
       <div
         className="card-header"

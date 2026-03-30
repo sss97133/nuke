@@ -83,7 +83,7 @@ function NoImageBlock({ data, viewMode }: { data: CardImageProps['noImageData'];
       justifyContent: 'center', alignItems: 'center',
       gap: '6px', padding: '12px',
       background: 'var(--surface)',
-      border: '1px solid var(--border)',
+      border: '2px solid var(--border)',
     }}>
       {/* Vehicle name */}
       <div style={{
@@ -185,7 +185,7 @@ export function CardImage({
         ...ASPECT[viewMode],
         background: 'var(--surface-hover)',
         overflow: viewMode === 'technical' ? 'visible' : 'hidden',
-        border: viewMode !== 'grid' ? '1px solid var(--border)' : undefined,
+        border: viewMode !== 'grid' ? '2px solid var(--border)' : undefined,
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}

@@ -104,7 +104,7 @@ export function HeartbeatModelBar({ models, onModelClick }: {
                     fontFamily: 'Arial, sans-serif',
                     fontSize: 10,
                     padding: '4px 8px',
-                    border: '1px solid var(--border)',
+                    border: '2px solid var(--border)',
                     background: 'var(--surface)',
                     color: 'var(--text)',
                   }}>

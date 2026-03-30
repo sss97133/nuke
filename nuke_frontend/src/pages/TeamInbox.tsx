@@ -375,7 +375,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
           width: 360,
           minWidth: 360,
           maxWidth: 360,
-          borderRight: '1px solid var(--border)',
+          borderRight: '2px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -723,7 +723,7 @@ function EmailsTab({ alertsOnly = false }: { alertsOnly?: boolean }) {
               )}
 
               {selected.attachments && selected.attachments.length > 0 && (
-                <div style={{ marginTop: 20, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                <div style={{ marginTop: 20, padding: '10px 14px', background: 'var(--surface)', border: '2px solid var(--border)' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 6, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Attachments ({selected.attachments.length})
                   </div>
@@ -881,7 +881,7 @@ function ComposeMessageModal({ onClose, onSent }: { onClose: () => void; onSent:
     }}>
       <div style={{
         background: 'var(--surface)',
-        border: '1px solid var(--border)', padding: 24,
+        border: '2px solid var(--border)', padding: 24,
         width: '100%',
         maxWidth: 500, }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -1059,7 +1059,7 @@ function MessagesTab() {
         width: 360,
         minWidth: 360,
         maxWidth: 360,
-        borderRight: '1px solid var(--border)',
+        borderRight: '2px solid var(--border)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -1428,7 +1428,7 @@ export default function TeamInbox() {
             width: 220,
             minWidth: 220,
             maxWidth: 220,
-            borderRight: '1px solid var(--border)',
+            borderRight: '2px solid var(--border)',
             display: 'flex',
             flexDirection: 'column',
             background: 'var(--surface)',
@@ -1543,7 +1543,7 @@ export default function TeamInbox() {
           right: 0,
           height: 56,
           background: 'var(--surface)',
-          borderTop: '1px solid var(--border)',
+          borderTop: '2px solid var(--border)',
           zIndex: 100,
           alignItems: 'stretch',
           justifyContent: 'space-around',

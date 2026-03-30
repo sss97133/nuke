@@ -724,7 +724,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       <div 
         style={{
           background: 'var(--surface)',
-          border: '1px solid var(--border)', minWidth: '700px',
+          border: '2px solid var(--border)', minWidth: '700px',
           maxWidth: '900px',
           fontFamily: 'Arial, sans-serif'}}
         onClick={(e) => e.stopPropagation()}
@@ -912,7 +912,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                     <div
                       key={a.url}
                       style={{
-                        border: '1px solid var(--border)', background: 'var(--bg)',
+                        border: '2px solid var(--border)', background: 'var(--bg)',
                         padding: '8px 10px',
                       }}
                     >
@@ -1163,7 +1163,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                   marginBottom: '8px',
                   padding: '6px 10px',
                   background: 'var(--surface)',
-                  border: '1px solid var(--border)', display: 'flex',
+                  border: '2px solid var(--border)', display: 'flex',
                   alignItems: 'center',
                   gap: '8px'
                 }}>
@@ -1256,7 +1256,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                       padding: '6px',
                       marginBottom: '4px',
                       background: 'var(--surface)',
-                      border: '1px solid var(--border)',
+                      border: '2px solid var(--border)',
                       fontSize: '9px'
                     }}>
                       <div style={{ fontWeight: 'bold' }}>{getSourceLabel(e.source_type)}</div>
@@ -1281,7 +1281,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             <div style={{
               padding: '12px',
               background: 'var(--warning-dim)',
-              border: '1px solid var(--warning)', marginBottom: '16px'
+              border: '2px solid var(--warning)', marginBottom: '16px'
             }}>
               <div style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--warning)', marginBottom: '4px' }}>
                 NO EVIDENCE FOUND

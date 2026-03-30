@@ -207,7 +207,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
       className="content-card"
       style={{
         background: 'var(--surface)',
-        border: '1px solid var(--border)', overflow: 'hidden',
+        border: '2px solid var(--border)', overflow: 'hidden',
         cursor: 'pointer'
       }}
       onClick={handleCardClick}
@@ -278,7 +278,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
             </div>
           </div>
           {showUserPopover && (
-            <div style={{ position: 'absolute', top: '18px', left: 0, zIndex: 20, background: 'var(--surface)', border: '1px solid var(--border)', padding: '6px', width: '220px' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ position: 'absolute', top: '18px', left: 0, zIndex: 20, background: 'var(--surface)', border: '2px solid var(--border)', padding: '6px', width: '220px' }} onClick={(e) => e.stopPropagation()}>
               <div className="text text-bold" style={{ fontSize: '11px', marginBottom: '4px' }}>{item.user_name || 'User'}</div>
               <div className="text text-muted" style={{ fontSize: '9px' }}>User profile</div>
             </div>

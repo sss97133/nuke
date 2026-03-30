@@ -203,7 +203,7 @@ export function FeedFilterSidebar({
         style={{
           width: '32px',
           flexShrink: 0,
-          borderRight: '1px solid var(--border)',
+          borderRight: '2px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -238,7 +238,7 @@ export function FeedFilterSidebar({
       style={{
         width: '220px',
         flexShrink: 0,
-        borderRight: '1px solid var(--border)',
+        borderRight: '2px solid var(--border)',
         padding: '0 10px',
         overflowY: 'auto',
         background: 'var(--surface)',

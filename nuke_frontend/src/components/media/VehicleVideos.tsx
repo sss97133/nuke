@@ -195,7 +195,7 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
               right: 0,
               marginTop: '8px',
               background: 'var(--surface)',
-              border: '1px solid var(--border-light)', minWidth: '200px',
+              border: '2px solid var(--border-light)', minWidth: '200px',
               zIndex: 1000
             }}>
               {/* Upload option */}
@@ -305,7 +305,7 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
               <div
                 key={video.id}
                 style={{
-                  border: '1px solid var(--border-light)', overflow: 'hidden',
+                  border: '2px solid var(--border-light)', overflow: 'hidden',
                   background: 'var(--surface)'
                 }}
               >

@@ -586,7 +586,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
   return (
     <div style={{
       background: 'var(--bg)',
-      border: '1px solid var(--border)',
+      border: '2px solid var(--border)',
       padding: '0px',
       margin: '0',
       fontFamily: 'Arial, sans-serif'

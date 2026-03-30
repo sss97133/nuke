@@ -122,7 +122,7 @@ class ErrorBoundary extends Component<Props, State> {
         <div style={{
           padding: '24px',
           margin: '16px',
-          border: '1px solid var(--error)',
+          border: '2px solid var(--error)',
           backgroundColor: 'var(--error-dim)', fontFamily: 'Arial, sans-serif',
           fontSize: '12px'
         }}>
