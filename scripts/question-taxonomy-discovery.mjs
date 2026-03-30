@@ -51,33 +51,63 @@ const perCell = Math.ceil(sampleSize / 20); // 5 price bands x 4 era bands = 20 
 async function stepSample() {
   console.log(`\n[1A] Pulling stratified sample (~${sampleSize} questions)...`);
 
-  // Strategy: pull a large random sample first (cheap with TABLESAMPLE),
-  // join to vehicles, then stratify in memory.
-  // TABLESAMPLE SYSTEM is block-level (fast), we oversample 5x and trim.
-  const oversample = sampleSize * 5;
+  // Strategy: pull random question IDs first (cheap), then batch-join to vehicles.
+  // random() < threshold avoids ORDER BY random() which requires full sort.
+  const oversample = Math.min(sampleSize * 5, 50000);
+  const threshold = Math.min(0.05, oversample / 1650000 * 2); // 2x oversample
 
-  // Step 1: Get a large random sample of question comment IDs using TABLESAMPLE
-  // TABLESAMPLE SYSTEM(pct) picks random blocks. We need ~75K from 1.65M = ~5%
-  const samplePct = Math.min(10, Math.max(1, Math.ceil(oversample / 1650000 * 100)));
+  console.log(`  Sampling questions (random < ${threshold.toFixed(4)}, targeting ~${oversample})...`);
 
-  console.log(`  Sampling ${samplePct}% of auction_comments (targeting ~${oversample} questions)...`);
+  // Step 1: Get random question IDs via direct psql (avoids RPC timeout issues on 12M rows)
+  const { execSync } = await import('child_process');
+  const pgCmd = `PGPASSWORD="${process.env.SUPABASE_DB_PASSWORD || 'RbzKq32A0uhqvJMQ'}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -F '|' -c "SELECT id, vehicle_id, comment_text, is_seller FROM auction_comments WHERE has_question = true AND random() < ${threshold} LIMIT ${oversample}"`;
 
-  const { data: rawSample, error: sampleErr } = await supabase.rpc('execute_sql', {
-    query: `
-      SELECT ac.id, ac.comment_text, ac.word_count, ac.is_seller,
-        v.year, v.make, v.model,
-        COALESCE(v.sale_price, v.winning_bid, v.high_bid, v.bat_sold_price) AS sale_price
-      FROM auction_comments ac TABLESAMPLE SYSTEM(${samplePct})
-      JOIN vehicles v ON v.id = ac.vehicle_id
-      WHERE ac.has_question = true
-        AND length(ac.comment_text) > 20
-        AND v.year IS NOT NULL
-        AND COALESCE(v.sale_price, v.winning_bid, v.high_bid, v.bat_sold_price) IS NOT NULL
-      LIMIT ${oversample}
-    `,
-  });
+  let rawOutput;
+  try {
+    rawOutput = execSync(pgCmd, { maxBuffer: 100 * 1024 * 1024, timeout: 120000 }).toString();
+  } catch (e) {
+    throw new Error(`psql sample failed: ${e.message?.slice(0, 200)}`);
+  }
 
-  if (sampleErr) throw new Error(`Sample query failed: ${JSON.stringify(sampleErr)}`);
+  const idRows = rawOutput.trim().split('\n').filter(Boolean).map(line => {
+    const [id, vehicle_id, comment_text, is_seller] = line.split('|');
+    return { id, vehicle_id, comment_text, is_seller: is_seller === 't' };
+  }).filter(r => r.comment_text && r.comment_text.length > 20 && r.vehicle_id);
+  const questionPool = Array.isArray(idRows) ? idRows : [];
+  console.log(`  Got ${questionPool.length} question IDs`);
+
+  // Step 2: Get vehicle info for sampled questions (batch by vehicle_id)
+  const vehicleIds = [...new Set(questionPool.map(q => q.vehicle_id))];
+  const vehicleMap = new Map();
+
+  // Batch in chunks of 200 vehicle IDs
+  for (let i = 0; i < vehicleIds.length; i += 200) {
+    const chunk = vehicleIds.slice(i, i + 200);
+    const idList = chunk.map(id => `'${id}'`).join(',');
+    const { data: vRows } = await supabase.rpc('execute_sql', {
+      query: `
+        SELECT id, year, make, model,
+          COALESCE(sale_price, winning_bid, high_bid, bat_sold_price) AS sale_price
+        FROM vehicles
+        WHERE id IN (${idList})
+          AND year IS NOT NULL
+          AND COALESCE(sale_price, winning_bid, high_bid, bat_sold_price) IS NOT NULL
+      `,
+    });
+    for (const v of (vRows || [])) {
+      vehicleMap.set(v.id, v);
+    }
+  }
+
+  // Step 3: Merge
+  const rawSample = questionPool
+    .filter(q => vehicleMap.has(q.vehicle_id))
+    .map(q => {
+      const v = vehicleMap.get(q.vehicle_id);
+      return { ...q, year: v.year, make: v.make, model: v.model, sale_price: v.sale_price };
+    });
+
+  console.log(`  Merged ${rawSample.length} questions with vehicle data (${vehicleMap.size} vehicles)`);
 
   const pool = Array.isArray(rawSample) ? rawSample : [];
   console.log(`  Got ${pool.length} questions from TABLESAMPLE`);

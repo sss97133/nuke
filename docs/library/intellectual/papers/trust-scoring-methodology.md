@@ -33,20 +33,52 @@ Every observation source has a `base_trust_score` in the `observation_sources` t
 
 | Category | Trust Range | Rationale |
 |----------|------------|-----------|
-| `registry` (0.90-0.95) | Institutional, verified, no sales incentive | VIN decode = federal database. Build sheet = factory record. These sources have no reason to lie and institutional processes to prevent errors. |
-| `documentation` (0.80-0.90) | Physical documents with verification | Titles, service records, window stickers. Physical documents are harder to forge than digital claims. Trust varies by document type. |
-| `auction` (0.75-0.90) | Curated, moderated, reputation-dependent | BaT (0.90): heavy curation, seller verification, public comment scrutiny. Mecum (0.75): less curation, higher volume. Auction houses stake their reputation on accuracy. |
-| `dealer` (0.65-0.75) | Professional but sales-incentivized | Dealers have expertise but also inventory to move. Descriptions are professional but optimistic. Hagerty (0.70) vs random dealer (0.65). |
-| `owner` (0.55-0.65) | First-hand knowledge but subjective | Owners know their vehicles intimately but have emotional attachment and may overstate condition. Trust increases with documentation provided. |
-| `marketplace` (0.45-0.55) | Unmoderated, anonymous, high-volume | eBay (0.55): seller ratings provide some accountability. Craigslist (0.50): fully anonymous. Facebook (0.45): real names but no vehicle verification. |
-| `forum` (0.40-0.50) | Expert community but unverified | Rennlist (0.50): deep expertise, known experts. Random forum (0.40): anyone can post. Trust is in the community's self-policing. |
-| `social_media` (0.30-0.40) | Entertainment-oriented, no verification | Instagram, YouTube. Content is for engagement, not accuracy. Specs may be aspirational, not actual. |
+| `owner` (0.70-1.00) | First-hand knowledge, direct evidence | iMessage threads with buyers (1.00), iPhoto GPS-tagged work photos (1.00), email receipts (0.95). Owner-contributed data from Claude Extension (0.80). When the owner IS the system operator, trust is maximal. General owner input (0.70) is lower because unverified external owners have subjective bias. |
+| `registry` (0.65-0.98) | Institutional, verified, no sales incentive | Ferrari Classiche, Porsche CoA, Galen Govier at 0.98 (manufacturer authentication programs). NHTSA, state DMVs, NMVTIS at 0.95 (government databases). Marque registries (356 Registry, Hemi Registry) at 0.88-0.90. Community registries (Hemmings, ConceptCarz) at 0.70-0.75. The range is wide because "registry" spans government databases to enthusiast wikis. |
+| `shop` (0.60-0.90) | Professional builders with trackable output | Elite builders (Gunther Werks, ICON 4x4, Ringbrothers) at 0.85-0.90 — their reputation IS their product. Mid-tier shops at 0.60. Trust reflects build quality reputation, not just expertise. |
+| `auction` (0.40-0.90) | Curated, moderated, reputation-dependent | RM Sotheby's, Gooding, Bonhams at 0.90 (white-glove, expert-catalogued). BaT, Broad Arrow at 0.85 (curated online). Cars & Bids, PCarMarket at 0.80. Mecum, Barrett-Jackson at 0.75 (high volume, less per-lot curation). Small/regional auctions (ATM, Bid Garage) at 0.40-0.60. |
+| `documentation` (0.70) | Physical documents with verification | Deal Jacket OCR pipeline at 0.70. Currently only one source in this category — the pipeline that ingests scanned titles, receipts, and service records. Trust is moderate because OCR can misread and documents can be incomplete. |
+| `aggregator` (0.65-0.70) | Secondary data compilations | JamesEdition (0.70), Carfax competitor analysis (0.70), Classic.com (0.65). These compile data from primary sources, introducing a layer of potential transcription error. |
+| `dealer` (0.60-0.75) | Professional but sales-incentivized | Grand Prix Classics, Legendary Motorcar at 0.70-0.75 (specialist dealers, reputation-bound). Gateway Classic Cars, Streetside Classics at 0.65 (franchise dealers, volume operations). Trust tracks with specialization — a marque specialist who stakes reputation on accuracy vs a volume dealer who processes hundreds of listings monthly. |
+| `internal` (0.40-0.80) | System-generated observations | Part Number OCR (0.80), photo pipeline AI vision (0.70), AI description extraction (0.65), taste model (0.65), nuke vision (0.65), system inference (0.50), external agent (0.40). Internal sources are ranked by their validation chain — OCR from clear part stamps is more reliable than AI inference from noisy images. |
+| `marketplace` (0.10-0.80) | Unmoderated to lightly moderated | Classic Driver (0.80 — professional listings). Hagerty Marketplace, ClassicCars.com (0.65-0.70). Facebook Marketplace (0.60), Craigslist (0.40). OldCars.com (0.10 — stale aggregation). The range is enormous because "marketplace" spans professional dealer platforms to anonymous classified ads. |
+| `forum` (0.50-0.70) | Expert community but unverified | Forum build threads (0.70 — first-person accounts with photos). Rennlist, Pelican Parts (0.60 — active moderation, known experts). Model-specific forums (0.50 — anyone can post). |
+| `social_media` (0.25-0.50) | Entertainment-oriented, no verification | YouTube (0.50 — long-form content allows detail). Petrolicious (0.50). Facebook Groups (0.45). Instagram (0.40). Reddit (0.40). TikTok (0.25 — minimal detail, maximum entertainment bias). |
+
+### Production Reality (as of 2026-03-29)
+
+**160 distinct sources** are registered in `observation_sources` across 12 categories:
+
+| Category | Sources | Avg Trust | Min | Max |
+|----------|---------|-----------|-----|-----|
+| owner | 6 | 0.90 | 0.70 | 1.00 |
+| registry | 36 | 0.89 | 0.65 | 0.98 |
+| shop | 11 | 0.83 | 0.60 | 0.90 |
+| museum | 1 | 0.80 | 0.80 | 0.80 |
+| auction | 27 | 0.73 | 0.40 | 0.90 |
+| documentation | 1 | 0.70 | 0.70 | 0.70 |
+| aggregator | 3 | 0.68 | 0.65 | 0.70 |
+| dealer | 16 | 0.65 | 0.60 | 0.75 |
+| internal | 9 | 0.63 | 0.40 | 0.80 |
+| marketplace | 27 | 0.61 | 0.10 | 0.80 |
+| forum | 12 | 0.55 | 0.50 | 0.70 |
+| social_media | 11 | 0.39 | 0.25 | 0.50 |
+
+Note: The original hierarchy (registry > documentation > auction > dealer > owner > marketplace > forum > social) is **not the actual implementation**. In production, `owner` has the highest average trust (0.90) because iMessage and iPhoto sources get 1.00 — the system operator's own data is treated as ground truth. The `registry` category also has a wider range than originally specified because it includes everything from Ferrari Classiche (0.98) to community wikis (0.65).
+
+### Where the Hierarchy Diverges from Theory
+
+1. **Owner trust is NOT 0.55-0.65.** The original theory treated owners as subjective witnesses. In practice, owner sources include iMessage threads (the system operator's direct communications), GPS-tagged work photos, and email receipts — all of which are primary evidence, not testimony. The split: system operator's own data (1.00) vs external owner claims (0.70).
+
+2. **The `internal` category didn't exist in the original theory.** AI vision models, OCR pipelines, and inference engines are sources too. Their trust ranges from 0.40 (experimental external agents) to 0.80 (high-precision OCR from clear part stamps). This category will become increasingly important as more data is AI-generated.
+
+3. **Marketplace has a 0.10-0.80 range.** The original theory grouped all marketplaces at 0.45-0.55. In production, Classic Driver (0.80) is a professional European marketplace closer in quality to an auction house, while OldCars.com (0.10) is essentially stale aggregation barely worth indexing.
 
 ### Why These Specific Numbers?
 
-The numbers were set heuristically, not empirically calibrated. The ranking (registry > documentation > auction > dealer > owner > marketplace > forum > social) reflects common sense about data reliability. The specific values (0.90 vs 0.85) are less important than the ordering.
+The numbers were set heuristically, not empirically calibrated. The ranking reflects the incentive structure and verification process of each source. The specific values matter less than the ordering — but in practice, the ordering itself has proven more nuanced than the original 8-tier hierarchy suggested.
 
-**Calibration would require:** A labeled dataset of observations where we know the ground truth. For example, 1,000 vehicles where we have verified VIN data AND seller claims, so we can measure how often each source type is correct. This dataset doesn't exist yet.
+**Calibration would require:** A labeled dataset of observations where we know the ground truth. For example, 1,000 vehicles where we have verified VIN data AND seller claims, so we can measure how often each source type is correct. With 3.29M field_evidence rows across 370K vehicles and 265 distinct fields, the system is approaching the scale where empirical calibration becomes feasible — but the ground-truth labeling has not been done.
 
 ---
 
