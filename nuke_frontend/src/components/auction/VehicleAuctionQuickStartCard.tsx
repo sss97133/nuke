@@ -454,7 +454,7 @@ export default function VehicleAuctionQuickStartCard(props: {
             ) : null}
 
             {readinessIssues && readinessIssues.length > 0 ? (
-              <div style={{ border: '1px solid var(--border-light)', padding: 10, background: 'var(--grey-50)' }}>
+              <div style={{ border: '2px solid var(--border-light)', padding: 10, background: 'var(--grey-50)' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: 6 }}>Readiness issues</div>
                 <ul style={{ margin: 0, paddingLeft: 18, fontSize: '12px' }}>
                   {readinessIssues.slice(0, 6).map((i, idx) => (

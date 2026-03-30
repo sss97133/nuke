@@ -752,7 +752,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
       <div style={{
         width: sidebarCollapsed ? '40px' : '200px',
         minWidth: sidebarCollapsed ? '40px' : '200px',
-        borderRight: '1px solid var(--border-light)',
+        borderRight: '2px solid var(--border-light)',
         background: 'var(--white)',
         overflow: 'hidden',
         flexShrink: 0,
@@ -1209,7 +1209,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                 style={{
                   padding: '8px',
                   marginBottom: '8px',
-                  border: '1px solid var(--border-light)',
+                  border: '2px solid var(--border-light)',
                   background: 'var(--grey-50)'
                 }}
               >
@@ -1357,7 +1357,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                 padding: '80px 20px',
                 textAlign: 'center',
                 background: 'var(--white)',
-                border: '1px solid var(--border-light)',
+                border: '2px solid var(--border-light)',
               }}>
                 <div className="text font-bold" style={{ fontSize: '16px', marginBottom: '8px' }}>
                   {activeFilter ? 'No photos match filter' : hideOrganized ? 'All photos organized!' : 'No photos yet'}
@@ -1415,7 +1415,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
         {/* BOTTOM TOOLBAR */}
         <div style={{
           background: 'var(--white)',
-          borderTop: '1px solid var(--border-light)',
+          borderTop: '2px solid var(--border-light)',
           padding: '8px 12px',
           display: 'flex',
           gap: '8px',

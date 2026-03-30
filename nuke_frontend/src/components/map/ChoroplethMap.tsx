@@ -735,7 +735,7 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
       {proximityPin && proximityResults !== null && !showRadiusSelector && (
         <div style={{
           position: 'absolute', top: 0, right: 0, bottom: 0, width: 320,
-          background: '#111', borderLeft: '1px solid rgba(6, 182, 212, 0.2)',
+          background: '#111', borderLeft: '2px solid rgba(6, 182, 212, 0.2)',
           overflowY: 'auto', zIndex: 1200, fontFamily: MAP_FONT,
         }}>
           <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid rgba(6, 182, 212, 0.15)' }}>
@@ -823,7 +823,7 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
       {/* County detail sidebar */}
       {selectedRegion && (
         <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 320,
-          background: '#111', borderLeft: '1px solid rgba(255,255,255,0.1)',
+          background: '#111', borderLeft: '2px solid rgba(255,255,255,0.1)',
           overflowY: 'auto', zIndex: 1200, fontFamily: MAP_FONT }}>
           <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

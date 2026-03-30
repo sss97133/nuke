@@ -476,7 +476,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
               key={vehicle.id}
               onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
               style={{
-                border: '1px solid var(--border)', overflow: 'hidden',
+                border: '2px solid var(--border)', overflow: 'hidden',
                 background: 'var(--white)',
                 cursor: 'pointer',
                 transition: 'transform 0.12s'
@@ -581,7 +581,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
               key={vehicle.id}
               onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
               style={{
-                border: '1px solid var(--border)', overflow: 'hidden',
+                border: '2px solid var(--border)', overflow: 'hidden',
                 background: 'var(--white)',
                 cursor: 'pointer'
               }}
@@ -686,7 +686,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                   borderCollapse: 'collapse',
                   fontSize: '11px',
                   background: 'var(--white)',
-                  border: '1px solid var(--border)'
+                  border: '2px solid var(--border)'
                 }}>
                   <thead>
                     <tr style={{ background: 'var(--grey-100)', borderBottom: '2px solid var(--border)' }}>

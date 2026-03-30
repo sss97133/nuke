@@ -32,7 +32,7 @@ const s = {
   sidebar: {
     width: '200px',
     flexShrink: 0,
-    borderRight: '1px solid var(--border-light)',
+    borderRight: '2px solid var(--border-light)',
     padding: 'var(--space-4) var(--space-3)',
     position: 'sticky' as const,
     top: '60px',
@@ -94,7 +94,7 @@ const s = {
   },
   code: {
     background: 'var(--grey-100)',
-    border: '1px solid var(--border-light)',
+    border: '2px solid var(--border-light)',
     padding: 'var(--space-3)',
     fontFamily: "'Courier New', monospace",
     fontSize: '11px',
@@ -146,7 +146,7 @@ const s = {
   },
   note: {
     background: 'var(--grey-50)',
-    border: '1px solid var(--border-light)',
+    border: '2px solid var(--border-light)',
     borderLeft: '3px solid var(--text-muted)',
     padding: 'var(--space-3)',
     marginBottom: 'var(--space-3)',
@@ -214,7 +214,7 @@ function CodeBlock({ code, title }: { code: string; title?: string }) {
           fontSize: '9px',
           color: 'var(--text-muted)',
           background: 'var(--grey-200)',
-          border: '1px solid var(--border-light)',
+          border: '2px solid var(--border-light)',
           borderBottom: 'none',
           padding: '3px var(--space-3)',
           fontFamily: "'Courier New', monospace",

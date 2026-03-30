@@ -159,7 +159,7 @@ export default function NukeMap() {
       {/* Sidebar (deck.gl modes) */}
       {sidebar.current && (
         <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 340,
-          background: 'var(--bg, #111)', borderLeft: '1px solid var(--border, #333)',
+          background: 'var(--bg, #111)', borderLeft: '2px solid var(--border, #333)',
           overflowY: 'auto', zIndex: 1020 }}>
           {sidebar.current.type === 'event-pin' && (
             <EventPinDetail event={sidebar.current.data as unknown as MapEventPoint}

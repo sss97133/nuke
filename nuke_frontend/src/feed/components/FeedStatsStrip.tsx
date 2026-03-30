@@ -127,7 +127,7 @@ export function FeedStatsStrip({
     return (
       <div style={{
         height: '36px',
-        borderBottom: '1px solid var(--border)',
+        borderBottom: '2px solid var(--border)',
         background: 'var(--surface)',
       }} />
     );
@@ -150,7 +150,7 @@ export function FeedStatsStrip({
         gap: '8px',
         padding: '0 12px',
         height: '36px',
-        borderBottom: '1px solid var(--border)',
+        borderBottom: '2px solid var(--border)',
         background: 'var(--surface)',
         overflowX: 'auto',
       }}
