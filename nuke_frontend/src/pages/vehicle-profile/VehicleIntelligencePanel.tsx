@@ -54,7 +54,7 @@ const MONO: React.CSSProperties = {
 
 const BADGE: React.CSSProperties = {
   display: 'inline-block',
-  padding: '1px 5px',
+  padding: '0 4px',
   border: '2px solid var(--vp-ink)',
   fontFamily: 'var(--vp-font-mono)',
   fontSize: '8px',
@@ -62,7 +62,6 @@ const BADGE: React.CSSProperties = {
   letterSpacing: '0.08em',
   textTransform: 'uppercase' as const,
   marginRight: '4px',
-  marginBottom: '2px',
 };
 
 // ---------------------------------------------------------------------------
@@ -80,7 +79,7 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
 
   const sentimentColor = (() => {
     const s = (ci.overall_sentiment || '').toLowerCase();
-    if (s.includes('positive') || s.includes('enthusiastic')) return '#004225';
+    if (s.includes('positive') || s.includes('enthusiastic')) return 'var(--vp-brg, #004225)';
     if (s.includes('negative') || s.includes('critical')) return '#8a0020';
     return 'var(--vp-ink)';
   })();
@@ -88,7 +87,7 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
   return (
     <CollapsibleWidget variant="profile" title="Community Intelligence" defaultCollapsed={false}
       badge={
-        <span className="widget__count" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <span className="widget__count" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {ci.overall_sentiment && (
             <span style={{ ...BADGE, color: sentimentColor, borderColor: sentimentColor }}>
               {truncate(ci.overall_sentiment, 16)}
@@ -104,10 +103,10 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
         {/* Key Quotes */}
         {quotes.length > 0 && (
           <div style={{ marginBottom: '8px' }}>
-            <div style={{ ...LABEL, marginBottom: '3px' }}>KEY QUOTES</div>
+            <div style={{ ...LABEL, marginBottom: '4px' }}>KEY QUOTES</div>
             {quotes.map((q, i) => (
               <div key={i} style={{
-                borderLeft: '2px solid #ccc',
+                borderLeft: '2px solid var(--vp-ghost, #ddd)',
                 paddingLeft: '8px',
                 marginBottom: '4px',
                 fontStyle: 'italic',
@@ -122,7 +121,7 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
         {/* Expert Insights */}
         {insights.length > 0 && (
           <div style={{ marginBottom: '8px' }}>
-            <div style={{ ...LABEL, marginBottom: '3px' }}>EXPERT INSIGHTS</div>
+            <div style={{ ...LABEL, marginBottom: '4px' }}>EXPERT INSIGHTS</div>
             {insights.map((ins, i) => (
               <div key={i} style={{ marginBottom: '2px' }}>
                 {truncate(ins, 140)}
@@ -134,7 +133,7 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
         {/* Concerns */}
         {concerns.length > 0 && (
           <div style={{ marginBottom: '8px' }}>
-            <div style={{ ...LABEL, marginBottom: '3px' }}>CONCERNS RAISED</div>
+            <div style={{ ...LABEL, marginBottom: '4px' }}>CONCERNS RAISED</div>
             {concerns.map((c, i) => (
               <div key={i} style={{ color: '#8a0020', marginBottom: '2px' }}>
                 {truncate(c, 120)}
@@ -174,7 +173,7 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
       <div style={{ fontFamily: 'var(--vp-font-sans)', fontSize: '9px', lineHeight: '1.5' }}>
         {/* Condition Note */}
         {di.condition_note && (
-          <div style={{ marginBottom: '6px' }}>
+          <div style={{ marginBottom: '8px' }}>
             {truncate(di.condition_note, 200)}
           </div>
         )}
@@ -183,7 +182,7 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
           {di.title_status && <span style={BADGE}>{di.title_status}</span>}
           {di.matching_numbers != null && (
-            <span style={{ ...BADGE, color: di.matching_numbers ? '#004225' : '#8a0020' }}>
+            <span style={{ ...BADGE, color: di.matching_numbers ? 'var(--vp-brg, #004225)' : '#8a0020' }}>
               {di.matching_numbers ? 'MATCHING #S' : 'NON-MATCHING'}
             </span>
           )}
@@ -194,9 +193,9 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
         {/* Red Flags */}
         {flags.length > 0 && (
           <div style={{ marginBottom: '8px' }}>
-            <div style={{ ...LABEL, marginBottom: '3px' }}>RED FLAGS</div>
+            <div style={{ ...LABEL, marginBottom: '4px' }}>RED FLAGS</div>
             {flags.map((rf, i) => (
-              <div key={i} style={{ color: '#8a0020', marginBottom: '2px', display: 'flex', gap: '6px', alignItems: 'baseline' }}>
+              <div key={i} style={{ color: '#8a0020', marginBottom: '2px', display: 'flex', gap: '8px', alignItems: 'baseline' }}>
                 <span style={{ ...BADGE, color: '#8a0020', borderColor: '#8a0020', flexShrink: 0 }}>{rf.sev}</span>
                 <span>{truncate(rf.f, 100)}</span>
               </div>
@@ -207,7 +206,7 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
         {/* Modifications */}
         {mods.length > 0 && (
           <div style={{ marginBottom: '8px' }}>
-            <div style={{ ...LABEL, marginBottom: '3px' }}>MODIFICATIONS ({mods.length})</div>
+            <div style={{ ...LABEL, marginBottom: '4px' }}>MODIFICATIONS ({mods.length})</div>
             <div style={MONO}>{mods.slice(0, 5).join(' / ')}</div>
           </div>
         )}
@@ -215,7 +214,7 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
         {/* Documentation */}
         {docs.length > 0 && (
           <div>
-            <div style={{ ...LABEL, marginBottom: '3px' }}>DOCUMENTATION</div>
+            <div style={{ ...LABEL, marginBottom: '4px' }}>DOCUMENTATION</div>
             <div style={MONO}>{docs.slice(0, 4).join(' / ')}</div>
           </div>
         )}
@@ -240,10 +239,10 @@ const ApparitionSection: React.FC<{ apparitions: Apparition[] }> = ({ apparition
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th style={{ ...LABEL, textAlign: 'left', paddingBottom: '3px', width: '80px' }}>PLATFORM</th>
-              <th style={{ ...LABEL, textAlign: 'left', paddingBottom: '3px', width: '50px' }}>TYPE</th>
-              <th style={{ ...LABEL, textAlign: 'right', paddingBottom: '3px' }}>PRICE</th>
-              <th style={{ ...LABEL, textAlign: 'right', paddingBottom: '3px' }}>DATE</th>
+              <th style={{ ...LABEL, textAlign: 'left', paddingBottom: '4px', width: '80px' }}>PLATFORM</th>
+              <th style={{ ...LABEL, textAlign: 'left', paddingBottom: '4px', width: '50px' }}>TYPE</th>
+              <th style={{ ...LABEL, textAlign: 'right', paddingBottom: '4px' }}>PRICE</th>
+              <th style={{ ...LABEL, textAlign: 'right', paddingBottom: '4px' }}>DATE</th>
             </tr>
           </thead>
           <tbody>
