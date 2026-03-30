@@ -82,7 +82,7 @@ const SectionList: React.FC<{ label: string; items: string[]; variant?: 'default
   return (
     <div style={{ marginBottom: '12px' }}>
       <div style={{
-        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontFamily: 'Arial, sans-serif',
         fontSize: '8px',
         fontWeight: 700,
         letterSpacing: '0.08em',
@@ -101,7 +101,7 @@ const SectionList: React.FC<{ label: string; items: string[]; variant?: 'default
       }}>
         {items.map((item, i) => (
           <li key={i} style={{
-            fontFamily: 'Arial, Helvetica, sans-serif',
+            fontFamily: 'Arial, sans-serif',
             fontSize: '10px',
             lineHeight: 1.6,
             color: 'var(--text)',
@@ -165,7 +165,7 @@ export const VehicleListingDetailsCard: React.FC<VehicleListingDetailsCardProps>
         {titleStatus && (
           <div style={{ marginBottom: '4px' }}>
             <div style={{
-              fontFamily: 'Arial, Helvetica, sans-serif',
+              fontFamily: 'Arial, sans-serif',
               fontSize: '8px',
               fontWeight: 700,
               letterSpacing: '0.08em',
@@ -178,7 +178,7 @@ export const VehicleListingDetailsCard: React.FC<VehicleListingDetailsCardProps>
               TITLE STATUS
             </div>
             <div style={{
-              fontFamily: 'Arial, Helvetica, sans-serif',
+              fontFamily: 'Arial, sans-serif',
               fontSize: '10px',
               color: 'var(--text)',
             }}>
