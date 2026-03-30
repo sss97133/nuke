@@ -1,24 +1,26 @@
 # ALMANAC: Platform Statistics
 
-**Snapshot date:** 2026-03-29 (evening)
+**Snapshot date:** 2026-03-30 (sprint W1 close)
 **Methodology:** Direct database queries against production (`pg_stat_user_tables` for estimates, exact counts for core tables)
-**Previous snapshot:** 2026-03-29 (morning)
+**Previous snapshot:** 2026-03-29 (evening)
 
 ---
 
 ## Core Entity Counts
 
-| Entity | Count | Method | Change vs morning |
+| Entity | Count | Method | Change vs evening |
 |--------|------:|--------|-------------------|
-| Vehicles (all rows) | 828,379 | exact count | +1,778 |
-| Vehicles (public, `is_public=true`) | 504,336 | exact count | +56 |
-| Vehicle images | ~36,271,576 | `pg_stat_user_tables` | +296K |
-| Vehicle observations | 5,668,076 | exact count | +357K |
-| Auction comments | ~12,772,719 | `pg_stat_user_tables` | +159K |
-| Timeline events | 987,249 | exact count | NEW |
-| Comment discoveries | 126,408 | exact count | NEW |
-| Description discoveries | 31,394 | exact count | NEW |
-| Listing page snapshots | ~514,295 | `pg_stat_user_tables` | +8.7K |
+| Vehicles (all rows) | 828,790 | exact count | +411 |
+| Vehicles (public, `is_public=true`) | 504,746 | exact count | +410 |
+| Vehicle images | ~36,552,245 | `pg_stat_user_tables` | +281K |
+| Vehicle observations | 5,841,887 | exact count | +174K |
+| Field evidence rows | 3,290,472 | exact count | NEW (sprint W1) |
+| Auction comments | ~12,904,273 | `pg_stat_user_tables` | +132K |
+| Timeline events | 992,567 | `pg_stat_user_tables` | +5.3K |
+| ARS scored vehicles | 324,063 | exact count | NEW (sprint W1) |
+| Comment discoveries | 132,801 | `pg_stat_user_tables` | +6.4K |
+| Description discoveries | 31,394 | `pg_stat_user_tables` | steady |
+| Listing page snapshots | ~527,445 | `pg_stat_user_tables` | +13.2K |
 
 ---
 
@@ -26,35 +28,36 @@
 
 12 fields measured: mileage, engine_type, transmission, drivetrain, body_style, vin, color, interior_color, fuel_type, sale_price, description, location.
 
-| Density | Count | % of All | Definition |
-|---------|------:|---------|------------|
-| Sparse (0-4 fields) | 523,902 | 63.2% | Skeleton records — identity only |
-| Moderate (5-9 fields) | 119,447 | 14.4% | Partial spec coverage |
-| Dense (10-12 fields) | 185,031 | 22.3% | Near-complete specification |
+| Density | Count | % of All | Definition | Change |
+|---------|------:|---------|------------|--------|
+| Sparse (0-4 fields) | 514,909 | 62.1% | Skeleton records — identity only | -1.1pp |
+| Moderate (5-9 fields) | 127,753 | 15.4% | Partial spec coverage | +1.0pp |
+| Dense (10-12 fields) | 186,128 | 22.5% | Near-complete specification | +0.2pp |
 
-**Interpretation:** Roughly 1 in 5 vehicles has dense field coverage. The sparse majority reflects bulk-imported records (ConceptCarz archived, Mecum without descriptions, FB Marketplace stubs) that have identity but little spec data. The enrichment pipeline targets this gap.
+**Interpretation:** Roughly 1 in 5 vehicles has dense field coverage. The moderate tier grew by 1pp this sprint as ClassicCars.com enrichment and provenance backfill added partial spec data to previously sparse records. The sparse majority reflects bulk-imported records (ConceptCarz archived, Mecum without descriptions, FB Marketplace stubs) that have identity but little spec data. The enrichment pipeline targets this gap.
 
 ---
 
 ## Data Completeness (Public Vehicles)
 
-Based on exact query against `vehicles WHERE is_public = true` (504,336 total):
+Based on exact query against `vehicles WHERE is_public = true` (504,746 total):
 
-| Field | Count | % Coverage | Gap |
-|-------|------:|----------:|-----|
-| Description (`IS NOT NULL`) | 273,327 | 54.2% | 231,009 missing |
-| Sale price (`IS NOT NULL`) | 297,245 | 58.9% | 207,091 missing |
-| VIN (length >= 11) | 197,095 | 39.1% | 307,241 missing |
-| Nuke estimate (`IS NOT NULL`) | ~282K (est.) | ~56% | Post-quarantine |
+| Field | Count | % Coverage | Gap | Sprint delta |
+|-------|------:|----------:|-----|-------------|
+| Description (`IS NOT NULL`) | 286,136 | 56.7% | 218,610 missing | +2.5pp |
+| Sale price (`IS NOT NULL`) | 309,689 | 61.4% | 195,057 missing | +2.5pp |
+| VIN (length >= 11) | 203,158 | 40.2% | 301,588 missing | +1.1pp |
+| Nuke estimate (`IS NOT NULL`) | 305,851 | 60.6% | 198,895 missing | +4.6pp |
 
 ### Coverage Trajectory
 
-| Metric | 2026-03-20 | 2026-03-28 | 2026-03-29 | Direction |
+| Metric | 2026-03-20 | 2026-03-29 | 2026-03-30 (W1 close) | Direction |
 |--------|----------:|----------:|----------:|-----------|
-| Vehicle count (public) | ~304,754 | 735,124 | 504,336 | Quarantine removed dead weight |
-| Description coverage | ~91% of 292K | 37.2% of 735K | 54.2% of 504K | Recovery (quarantine) |
-| VIN coverage | ~76% of 292K | 26.6% of 735K | 39.1% of 504K | Recovery (quarantine) |
-| Price coverage | -- | 41.5% | 58.9% | Recovery (quarantine) |
+| Vehicle count (public) | ~304,754 | 504,336 | 504,746 | Stable post-quarantine |
+| Description coverage | ~91% of 292K | 54.2% | 56.7% | Climbing (+2.5pp this sprint) |
+| VIN coverage | ~76% of 292K | 39.1% | 40.2% | Climbing (+1.1pp this sprint) |
+| Price coverage | -- | 58.9% | 61.4% | Climbing (+2.5pp this sprint) |
+| Valuation coverage | -- | ~56% | 60.6% | Climbing (+4.6pp this sprint) |
 
 ### ConceptCarz Quarantine (2026-03-29)
 
@@ -93,42 +96,47 @@ On 2026-03-29, **273,794 ConceptCarz records without VINs** (length < 11) were q
 
 ---
 
-## Pipeline Activity (2026-03-29)
+## Pipeline Activity (2026-03-30, sprint W1 close)
 
-| Metric | Value |
-|--------|-------|
-| Comment discoveries (AI-analyzed comments) | 126,408 |
-| Description discoveries (AI-extracted fields) | 31,394 |
-| Vehicle observations (unified event store) | 5,668,076 |
-| Timeline events (lifecycle events) | 987,249 |
-| Vehicle location observations (geocoded) | ~358,947 |
-| VLOs at city/gps/address precision | ~340,722 (94.9%) |
-| Counties with data | 2,174 |
+| Metric | Value | Sprint delta |
+|--------|-------|-------------|
+| Comment discoveries (AI-analyzed comments) | 132,801 | +6.4K |
+| Description discoveries (AI-extracted fields) | 31,394 | steady |
+| Vehicle observations (unified event store) | 5,841,887 | +174K |
+| Observation sources (registered) | 160 | steady |
+| Field evidence rows | 3,290,472 | NEW (sprint W1) |
+| Vehicles with field evidence | 370,465 (44.7%) | NEW (sprint W1) |
+| Avg evidence per covered vehicle | 9.3 fields | NEW (sprint W1) |
+| ARS scored vehicles | 324,063 (39.1%) | NEW (sprint W1) |
+| Timeline events (lifecycle events) | 992,567 | +5.3K |
+| Vehicle location observations (geocoded) | ~358,947 | steady |
+| VLOs at city/gps/address precision | ~340,722 (94.9%) | steady |
+| Counties with data | 2,174 | steady |
 
 ---
 
 ## Data Quality Indicators
 
-| Indicator | Value | Health |
-|-----------|-------|--------|
-| Public vehicles with description | 54.2% | Moderate (post-quarantine) |
-| Public vehicles with sale price | 58.9% | Moderate (post-quarantine) |
-| Public vehicles with VIN (11+ chars) | 39.1% | Sparse (post-quarantine) |
-| Public vehicles with nuke_estimate | ~56% | Moderate (244K tainted estimates cleared) |
-| Unknown platform_source | ~5.4% (27K) | Improved from ~30% (quarantine removed bulk) |
-| Dense field coverage (10+/12 fields) | 22.3% | Moderate (all vehicles) |
+| Indicator | Value | Health | Sprint delta |
+|-----------|-------|--------|-------------|
+| Public vehicles with description | 56.7% | Moderate | +2.5pp |
+| Public vehicles with sale price | 61.4% | Moderate | +2.5pp |
+| Public vehicles with VIN (11+ chars) | 40.2% | Sparse | +1.1pp |
+| Public vehicles with nuke_estimate | 60.6% | Moderate | +4.6pp |
+| Field evidence vehicle coverage | 44.7% | Moderate | NEW |
+| Unknown platform_source | ~5.4% (27K) | Improved from ~30% | steady |
+| Dense field coverage (10+/12 fields) | 22.5% | Moderate (all vehicles) | +0.2pp |
 
 ---
 
 ## Infrastructure Stats
 
-| Metric | Value |
-|--------|-------|
-| Edge functions (active) | ~50 (down from 464 pre-triage) |
-| Database tables | ~1,013 (483 empty) |
-| Active cron jobs | ~25 |
-| Migrations applied | 810+ |
-| Database size | ~156 GB |
+| Metric | Value | Sprint delta |
+|--------|-------|-------------|
+| Edge functions (on disk) | 298 | Down from 403 at sprint start |
+| Database tables | 716 (113 empty) | Down from ~1,013 (483 empty) |
+| Active cron jobs | 131 | steady |
+| Database size | 89 GB | Down from ~156 GB (quarantine + cleanup) |
 
 ---
 
