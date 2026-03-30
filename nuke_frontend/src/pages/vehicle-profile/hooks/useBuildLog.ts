@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
 
 // ── Types ──
@@ -111,38 +112,25 @@ export interface DailyReceipt {
 // ── Hook ──
 
 export function useBuildLog(vehicleId: string | undefined) {
-  const [workDates, setWorkDates] = useState<WorkDatesResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Use React Query for initial workDates fetch
+  const { data: workDates, isLoading: loading, error: queryError } = useQuery({
+    queryKey: ['build-log', vehicleId],
+    queryFn: async () => {
+      if (!vehicleId) return null;
+      const { data, error: rpcError } = await supabase.rpc('get_vehicle_work_dates', {
+        p_vehicle_id: vehicleId,
+      });
+      if (rpcError) throw rpcError;
+      return (data as WorkDatesResponse) ?? null;
+    },
+    enabled: !!vehicleId && vehicleId.length >= 20,
+    staleTime: 10 * 60 * 1000, // 10 min
+  });
 
-  // Cache for day details
+  // Cache for day details — stays as local state (loaded on demand by user click)
   const [dayDetails, setDayDetails] = useState<Record<string, DailyReceipt>>({});
   const [loadingDays, setLoadingDays] = useState<Set<string>>(new Set());
   const loadedRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (!vehicleId || vehicleId.length < 20) return;
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    (async () => {
-      try {
-        const { data, error: rpcError } = await supabase.rpc('get_vehicle_work_dates', {
-          p_vehicle_id: vehicleId,
-        });
-        if (cancelled) return;
-        if (rpcError) throw rpcError;
-        setWorkDates(data as WorkDatesResponse);
-      } catch (err: any) {
-        if (!cancelled) setError(err.message || 'Failed to load work dates');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [vehicleId]);
 
   const loadDayDetail = useCallback(async (date: string) => {
     if (!vehicleId || loadedRef.current.has(date)) return;
@@ -169,9 +157,9 @@ export function useBuildLog(vehicleId: string | undefined) {
   }, [vehicleId]);
 
   return {
-    workDates,
+    workDates: workDates ?? null,
     loading,
-    error,
+    error: queryError?.message ?? null,
     dayDetails,
     loadingDays,
     loadDayDetail,

@@ -80,7 +80,7 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
   const sentimentColor = (() => {
     const s = (ci.overall_sentiment || '').toLowerCase();
     if (s.includes('positive') || s.includes('enthusiastic')) return 'var(--vp-brg, #004225)';
-    if (s.includes('negative') || s.includes('critical')) return '#8a0020';
+    if (s.includes('negative') || s.includes('critical')) return 'var(--vp-danger)';
     return 'var(--vp-ink)';
   })();
 
@@ -135,7 +135,7 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
           <div style={{ marginBottom: '8px' }}>
             <div style={{ ...LABEL, marginBottom: '4px' }}>CONCERNS RAISED</div>
             {concerns.map((c, i) => (
-              <div key={i} style={{ color: '#8a0020', marginBottom: '2px' }}>
+              <div key={i} style={{ color: 'var(--vp-danger)', marginBottom: '2px' }}>
                 {truncate(c, 120)}
               </div>
             ))}
@@ -182,7 +182,7 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
           {di.title_status && <span style={BADGE}>{di.title_status}</span>}
           {di.matching_numbers != null && (
-            <span style={{ ...BADGE, color: di.matching_numbers ? 'var(--vp-brg, #004225)' : '#8a0020' }}>
+            <span style={{ ...BADGE, color: di.matching_numbers ? 'var(--vp-brg, #004225)' : 'var(--vp-danger)' }}>
               {di.matching_numbers ? 'MATCHING #S' : 'NON-MATCHING'}
             </span>
           )}
@@ -195,8 +195,8 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
           <div style={{ marginBottom: '8px' }}>
             <div style={{ ...LABEL, marginBottom: '4px' }}>RED FLAGS</div>
             {flags.map((rf, i) => (
-              <div key={i} style={{ color: '#8a0020', marginBottom: '2px', display: 'flex', gap: '8px', alignItems: 'baseline' }}>
-                <span style={{ ...BADGE, color: '#8a0020', borderColor: '#8a0020', flexShrink: 0 }}>{rf.sev}</span>
+              <div key={i} style={{ color: 'var(--vp-danger)', marginBottom: '2px', display: 'flex', gap: '8px', alignItems: 'baseline' }}>
+                <span style={{ ...BADGE, color: 'var(--vp-danger)', borderColor: 'var(--vp-danger)', flexShrink: 0 }}>{rf.sev}</span>
                 <span>{truncate(rf.f, 100)}</span>
               </div>
             ))}
@@ -256,7 +256,7 @@ const ApparitionSection: React.FC<{ apparitions: Apparition[] }> = ({ apparition
                   ) : truncate(a.platform, 14)}
                 </td>
                 <td style={{ padding: '2px 0' }}>{a.event_type || '\u2014'}</td>
-                <td style={{ padding: '2px 0', textAlign: 'right', color: a.price ? '#16825d' : 'inherit' }}>
+                <td style={{ padding: '2px 0', textAlign: 'right', color: a.price ? 'var(--vp-sold)' : 'inherit' }}>
                   {formatPrice(a.price)}
                 </td>
                 <td style={{ padding: '2px 0', textAlign: 'right' }}>{formatDate(a.event_date)}</td>
