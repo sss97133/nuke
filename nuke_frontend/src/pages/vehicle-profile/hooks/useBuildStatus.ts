@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 
 export interface WorkOrderReceipt {
@@ -62,92 +63,77 @@ export interface BuildStatusData {
 }
 
 export function useBuildStatus(vehicleId: string | undefined) {
-  const [workOrders, setWorkOrders] = useState<WorkOrderReceipt[]>([]);
-  const [dealJacket, setDealJacket] = useState<DealJacket | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: rawData, isLoading, error } = useQuery({
+    queryKey: ['build-status', vehicleId],
+    queryFn: async () => {
+      if (!vehicleId) return null;
 
-  useEffect(() => {
-    if (!vehicleId || vehicleId.length < 20) return;
+      const [receiptsRes, dealRes] = await Promise.all([
+        supabase
+          .from('work_order_receipt_unified')
+          .select('*')
+          .eq('vehicle_id', vehicleId)
+          .order('work_order_created'),
+        supabase
+          .from('deal_jackets')
+          .select('sale_price_inc_doc, deposit_amount, payment_amount, sold_date, deal_contacts!deal_jackets_sold_to_id_fkey(full_name, email, phone_mobile, address, city, state, zip, profile_image_url)')
+          .eq('vehicle_id', vehicleId)
+          .maybeSingle(),
+      ]);
 
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
+      if (receiptsRes.error) throw new Error(receiptsRes.error.message);
+      if (dealRes.error) throw new Error(dealRes.error.message);
 
-    async function load() {
-      try {
-        const [receiptsRes, dealRes] = await Promise.all([
-          supabase
-            .from('work_order_receipt_unified')
-            .select('*')
-            .eq('vehicle_id', vehicleId!)
-            .order('work_order_created'),
-          supabase
-            .from('deal_jackets')
-            .select('sale_price_inc_doc, deposit_amount, payment_amount, sold_date, deal_contacts!deal_jackets_sold_to_id_fkey(full_name, email, phone_mobile, address, city, state, zip, profile_image_url)')
-            .eq('vehicle_id', vehicleId!)
-            .maybeSingle(),
-        ]);
+      // Parse numeric strings from the view
+      const workOrders = (receiptsRes.data || []).map((r: any) => ({
+        ...r,
+        parts_total: Number(r.parts_total) || 0,
+        parts_count: Number(r.parts_count) || 0,
+        comped_parts_value: Number(r.comped_parts_value) || 0,
+        comped_parts_count: Number(r.comped_parts_count) || 0,
+        labor_total: Number(r.labor_total) || 0,
+        labor_count: Number(r.labor_count) || 0,
+        labor_hours: Number(r.labor_hours) || 0,
+        comped_labor_value: Number(r.comped_labor_value) || 0,
+        comped_labor_count: Number(r.comped_labor_count) || 0,
+        payments_total: Number(r.payments_total) || 0,
+        payment_count: Number(r.payment_count) || 0,
+        invoice_total: Number(r.invoice_total) || 0,
+        balance_due: Number(r.balance_due) || 0,
+        total_comped_value: Number(r.total_comped_value) || 0,
+      })) as WorkOrderReceipt[];
 
-        if (cancelled) return;
-
-        if (receiptsRes.error) throw new Error(receiptsRes.error.message);
-        if (dealRes.error) throw new Error(dealRes.error.message);
-
-        // Parse numeric strings from the view
-        const parsed = (receiptsRes.data || []).map((r: any) => ({
-          ...r,
-          parts_total: Number(r.parts_total) || 0,
-          parts_count: Number(r.parts_count) || 0,
-          comped_parts_value: Number(r.comped_parts_value) || 0,
-          comped_parts_count: Number(r.comped_parts_count) || 0,
-          labor_total: Number(r.labor_total) || 0,
-          labor_count: Number(r.labor_count) || 0,
-          labor_hours: Number(r.labor_hours) || 0,
-          comped_labor_value: Number(r.comped_labor_value) || 0,
-          comped_labor_count: Number(r.comped_labor_count) || 0,
-          payments_total: Number(r.payments_total) || 0,
-          payment_count: Number(r.payment_count) || 0,
-          invoice_total: Number(r.invoice_total) || 0,
-          balance_due: Number(r.balance_due) || 0,
-          total_comped_value: Number(r.total_comped_value) || 0,
-        })) as WorkOrderReceipt[];
-
-        setWorkOrders(parsed);
-
-        // Flatten nested deal_contacts join
-        if (dealRes.data) {
-          const d = dealRes.data as any;
-          const contact = d.deal_contacts;
-          setDealJacket({
-            sale_price_inc_doc: d.sale_price_inc_doc != null ? Number(d.sale_price_inc_doc) : null,
-            deposit_amount: d.deposit_amount != null ? Number(d.deposit_amount) : null,
-            payment_amount: d.payment_amount != null ? Number(d.payment_amount) : null,
-            sold_date: d.sold_date,
-            contact: contact ? {
-              full_name: contact.full_name,
-              email: contact.email,
-              phone_mobile: contact.phone_mobile,
-              address: contact.address,
-              city: contact.city,
-              state: contact.state,
-              zip: contact.zip,
-              profile_image_url: contact.profile_image_url,
-            } : null,
-          });
-        } else {
-          setDealJacket(null);
-        }
-      } catch (err: any) {
-        if (!cancelled) setError(err.message);
-      } finally {
-        if (!cancelled) setLoading(false);
+      // Flatten nested deal_contacts join
+      let dealJacket: DealJacket | null = null;
+      if (dealRes.data) {
+        const d = dealRes.data as any;
+        const contact = d.deal_contacts;
+        dealJacket = {
+          sale_price_inc_doc: d.sale_price_inc_doc != null ? Number(d.sale_price_inc_doc) : null,
+          deposit_amount: d.deposit_amount != null ? Number(d.deposit_amount) : null,
+          payment_amount: d.payment_amount != null ? Number(d.payment_amount) : null,
+          sold_date: d.sold_date,
+          contact: contact ? {
+            full_name: contact.full_name,
+            email: contact.email,
+            phone_mobile: contact.phone_mobile,
+            address: contact.address,
+            city: contact.city,
+            state: contact.state,
+            zip: contact.zip,
+            profile_image_url: contact.profile_image_url,
+          } : null,
+        };
       }
-    }
 
-    load();
-    return () => { cancelled = true; };
-  }, [vehicleId]);
+      return { workOrders, dealJacket };
+    },
+    enabled: !!vehicleId && vehicleId.length >= 20,
+    staleTime: 10 * 60 * 1000, // 10 min
+  });
+
+  const workOrders = rawData?.workOrders ?? [];
+  const dealJacket = rawData?.dealJacket ?? null;
 
   const totals = useMemo<BuildStatusTotals>(() => {
     const invoice = workOrders.reduce((s, w) => s + w.invoice_total, 0);
@@ -161,7 +147,7 @@ export function useBuildStatus(vehicleId: string | undefined) {
 
   return {
     data: hasData ? { workOrders, dealJacket, totals, hasData } as BuildStatusData : null,
-    loading,
-    error,
+    loading: isLoading,
+    error: error?.message ?? null,
   };
 }

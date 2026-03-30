@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
 
 // Types extracted from VehiclePopup.tsx — the canonical intel shape
@@ -66,33 +66,24 @@ export interface CompSale {
 }
 
 export function useVehicleIntel(vehicleId: string | undefined) {
-  const [vehicleIntel, setVehicleIntel] = useState<VehicleIntel | null>(null);
-  const [vehicleIntelLoading, setVehicleIntelLoading] = useState(false);
-  const [vehicleIntelError, setVehicleIntelError] = useState<string | null>(null);
-
-  const fetchIntel = useCallback(async () => {
-    if (!vehicleId) return;
-    setVehicleIntelLoading(true);
-    setVehicleIntelError(null);
-    try {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['vehicle-intel', vehicleId],
+    queryFn: async () => {
+      if (!vehicleId) return null;
       const { data, error } = await supabase.rpc('popup_vehicle_intel', {
         p_vehicle_id: vehicleId,
       });
-      if (error) {
-        setVehicleIntelError(error.message);
-      } else if (data) {
-        setVehicleIntel(data as VehicleIntel);
-      }
-    } catch (err: any) {
-      setVehicleIntelError(err?.message || 'Failed to load intelligence');
-    } finally {
-      setVehicleIntelLoading(false);
-    }
-  }, [vehicleId]);
+      if (error) throw error;
+      return (data as VehicleIntel) ?? null;
+    },
+    enabled: !!vehicleId,
+    staleTime: 5 * 60 * 1000, // 5 min — intel changes slowly
+  });
 
-  useEffect(() => {
-    fetchIntel();
-  }, [fetchIntel]);
-
-  return { vehicleIntel, vehicleIntelLoading, vehicleIntelError, refetchIntel: fetchIntel };
+  return {
+    vehicleIntel: data ?? null,
+    vehicleIntelLoading: isLoading,
+    vehicleIntelError: error?.message ?? null,
+    refetchIntel: refetch,
+  };
 }

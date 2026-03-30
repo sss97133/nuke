@@ -7,7 +7,7 @@
  *
  * Part of the Provenance UI shipped in the provenance-ui branch.
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
 
 /** Track vehicles already backfilled this session to avoid repeat RPC calls */
@@ -169,134 +169,126 @@ function trustWeight(sourceType: string): number {
 /*  Hook                                                               */
 /* ------------------------------------------------------------------ */
 
-export function useFieldEvidence(vehicleId: string | undefined) {
-  const [evidence, setEvidence] = useState<FieldEvidenceMap>({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidenceMap> {
+  const { data, error: queryError } = await supabase
+    .from('field_evidence')
+    .select('id, vehicle_id, field_name, proposed_value, source_type, source_confidence, extraction_context, extracted_at, status, created_at')
+    .eq('vehicle_id', vehicleId)
+    .order('source_confidence', { ascending: false });
 
-  const fetchEvidence = useCallback(async () => {
-    if (!vehicleId) return;
-    setLoading(true);
-    setError(null);
+  if (queryError) {
+    console.warn('[useFieldEvidence] query error:', queryError.message);
+    throw queryError;
+  }
 
-    try {
-      const { data, error: queryError } = await supabase
-        .from('field_evidence')
-        .select('id, vehicle_id, field_name, proposed_value, source_type, source_confidence, extraction_context, extracted_at, status, created_at')
-        .eq('vehicle_id', vehicleId)
-        .order('source_confidence', { ascending: false });
+  let rows = data ?? [];
 
-      if (queryError) {
-        console.warn('[useFieldEvidence] query error:', queryError.message);
-        setError(queryError.message);
-        setEvidence({});
-        return;
-      }
-
-      if (!data || data.length < 3) {
-        // Sparse or no evidence — trigger on-demand backfill
-        if (vehicleId && !backfilledVehicles.has(vehicleId)) {
-          backfilledVehicles.add(vehicleId);
-          try {
-            const { data: inserted } = await supabase.rpc('ensure_field_evidence', { p_vehicle_id: vehicleId });
-            if (inserted && inserted > 0) {
-              // Re-fetch after backfill populated new rows
-              const { data: refreshed } = await supabase
-                .from('field_evidence')
-                .select('id, vehicle_id, field_name, proposed_value, source_type, source_confidence, extraction_context, extracted_at, status, created_at')
-                .eq('vehicle_id', vehicleId)
-                .order('source_confidence', { ascending: false });
-              if (refreshed && refreshed.length > 0) {
-                // Replace data reference and continue to mapping below
-                (data as any[]).length = 0;
-                (data as any[]).push(...refreshed);
-              }
-            }
-          } catch (backfillErr) {
-            console.warn('[useFieldEvidence] backfill error (non-fatal):', backfillErr);
+  if (rows.length < 3) {
+    // Sparse or no evidence — trigger on-demand backfill
+    if (!backfilledVehicles.has(vehicleId)) {
+      backfilledVehicles.add(vehicleId);
+      try {
+        const { data: inserted } = await supabase.rpc('ensure_field_evidence', { p_vehicle_id: vehicleId });
+        if (inserted && inserted > 0) {
+          // Re-fetch after backfill populated new rows
+          const { data: refreshed } = await supabase
+            .from('field_evidence')
+            .select('id, vehicle_id, field_name, proposed_value, source_type, source_confidence, extraction_context, extracted_at, status, created_at')
+            .eq('vehicle_id', vehicleId)
+            .order('source_confidence', { ascending: false });
+          if (refreshed && refreshed.length > 0) {
+            rows = refreshed;
           }
         }
-        if (!data || data.length === 0) {
-          setEvidence({});
-          return;
-        }
+      } catch (backfillErr) {
+        console.warn('[useFieldEvidence] backfill error (non-fatal):', backfillErr);
       }
-
-      // Map DB columns to UI interface
-      const mapped: FieldEvidenceRow[] = (data as any[]).map((r) => ({
-        id: r.id,
-        vehicle_id: r.vehicle_id,
-        field_name: r.field_name,
-        field_value: r.proposed_value ?? '',
-        source_type: r.source_type,
-        confidence: (r.source_confidence ?? 0) / 100, // 0-100 int → 0-1 float
-        extraction_context: r.extraction_context ?? null,
-        extracted_at: r.extracted_at ?? null,
-        status: r.status ?? null,
-        created_at: r.created_at,
-      }));
-
-      // Filter out rejected evidence — don't include in conflict analysis or display
-      const active = mapped.filter(r => r.status !== 'rejected');
-
-      // Group by field_name
-      const grouped: Record<string, FieldEvidenceRow[]> = {};
-      for (const row of active) {
-        if (!grouped[row.field_name]) grouped[row.field_name] = [];
-        grouped[row.field_name].push(row);
-      }
-
-      // Build FieldEvidenceMap
-      const map: FieldEvidenceMap = {};
-      for (const [fieldName, rows] of Object.entries(grouped)) {
-        // Sort: confidence desc, then trust weight desc, then newest first
-        rows.sort((a, b) => {
-          if (b.confidence !== a.confidence) return b.confidence - a.confidence;
-          const tw = trustWeight(b.source_type) - trustWeight(a.source_type);
-          if (tw !== 0) return tw;
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
-
-        const primary = rows[0];
-        const primaryValue = (primary.field_value || '').toLowerCase().trim();
-        const agreementCount = rows.filter(
-          (r) => (r.field_value || '').toLowerCase().trim() === primaryValue
-        ).length;
-
-        const distinctValues = new Set(
-          rows.map((r) => (r.field_value || '').toLowerCase().trim())
-        );
-
-        const hasConflict = distinctValues.size > 1;
-        let conflictType: ConflictType | undefined;
-        if (hasConflict) {
-          const others = [...distinctValues].filter(v => v !== primaryValue);
-          conflictType = classifyConflict(fieldName, primaryValue, others);
-        }
-
-        map[fieldName] = {
-          primary,
-          sources: rows,
-          agreementCount,
-          totalSources: rows.length,
-          hasConflict,
-          conflictType,
-        };
-      }
-
-      setEvidence(map);
-    } catch (err: any) {
-      console.error('[useFieldEvidence] unexpected error:', err);
-      setError(err?.message || 'Unknown error');
-      setEvidence({});
-    } finally {
-      setLoading(false);
     }
-  }, [vehicleId]);
+    if (rows.length === 0) {
+      return {};
+    }
+  }
 
-  useEffect(() => {
-    fetchEvidence();
-  }, [fetchEvidence]);
+  // Map DB columns to UI interface
+  const mapped: FieldEvidenceRow[] = (rows as any[]).map((r) => ({
+    id: r.id,
+    vehicle_id: r.vehicle_id,
+    field_name: r.field_name,
+    field_value: r.proposed_value ?? '',
+    source_type: r.source_type,
+    confidence: (r.source_confidence ?? 0) / 100, // 0-100 int -> 0-1 float
+    extraction_context: r.extraction_context ?? null,
+    extracted_at: r.extracted_at ?? null,
+    status: r.status ?? null,
+    created_at: r.created_at,
+  }));
 
-  return { evidence, loading, error, refetch: fetchEvidence };
+  // Filter out rejected evidence — don't include in conflict analysis or display
+  const active = mapped.filter(r => r.status !== 'rejected');
+
+  // Group by field_name
+  const grouped: Record<string, FieldEvidenceRow[]> = {};
+  for (const row of active) {
+    if (!grouped[row.field_name]) grouped[row.field_name] = [];
+    grouped[row.field_name].push(row);
+  }
+
+  // Build FieldEvidenceMap
+  const map: FieldEvidenceMap = {};
+  for (const [fieldName, fieldRows] of Object.entries(grouped)) {
+    // Sort: confidence desc, then trust weight desc, then newest first
+    fieldRows.sort((a, b) => {
+      if (b.confidence !== a.confidence) return b.confidence - a.confidence;
+      const tw = trustWeight(b.source_type) - trustWeight(a.source_type);
+      if (tw !== 0) return tw;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    const primary = fieldRows[0];
+    const primaryValue = (primary.field_value || '').toLowerCase().trim();
+    const agreementCount = fieldRows.filter(
+      (r) => (r.field_value || '').toLowerCase().trim() === primaryValue
+    ).length;
+
+    const distinctValues = new Set(
+      fieldRows.map((r) => (r.field_value || '').toLowerCase().trim())
+    );
+
+    const hasConflict = distinctValues.size > 1;
+    let conflictType: ConflictType | undefined;
+    if (hasConflict) {
+      const others = [...distinctValues].filter(v => v !== primaryValue);
+      conflictType = classifyConflict(fieldName, primaryValue, others);
+    }
+
+    map[fieldName] = {
+      primary,
+      sources: fieldRows,
+      agreementCount,
+      totalSources: fieldRows.length,
+      hasConflict,
+      conflictType,
+    };
+  }
+
+  return map;
+}
+
+export function useFieldEvidence(vehicleId: string | undefined) {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['field-evidence', vehicleId],
+    queryFn: async () => {
+      if (!vehicleId) return {};
+      return fetchAndProcessEvidence(vehicleId);
+    },
+    enabled: !!vehicleId,
+    staleTime: 5 * 60 * 1000, // 5 min
+  });
+
+  return {
+    evidence: data ?? {},
+    loading: isLoading,
+    error: error?.message ?? null,
+    refetch,
+  };
 }

@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 
 export interface ManifestDevice {
@@ -49,55 +50,43 @@ export interface SpendProfile {
 }
 
 export function useBuildProfile(vehicleId: string | undefined) {
-  const [manifest, setManifest] = useState<ManifestDevice[]>([]);
-  const [snapshots, setSnapshots] = useState<BuildSnapshot[]>([]);
-  const [spendProfile, setSpendProfile] = useState<SpendProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: rawData, isLoading, error } = useQuery({
+    queryKey: ['build-profile', vehicleId],
+    queryFn: async () => {
+      if (!vehicleId) return null;
 
-  useEffect(() => {
-    if (!vehicleId || vehicleId.length < 20) return;
+      // Parallel fetch all three data sources
+      const [manifestRes, snapshotRes, spendRes] = await Promise.all([
+        supabase
+          .from('vehicle_build_manifest')
+          .select('id, device_name, device_category, manufacturer, supplier, price, price_source, purchased, status, invoice_ref, location_zone, pct_complete')
+          .eq('vehicle_id', vehicleId)
+          .order('device_category')
+          .order('device_name'),
+        supabase
+          .from('build_activity_snapshots')
+          .select('month, total_spend, vehicle_part_spend, tool_spend, vendor_count, top_vendors, photo_count, spending_intensity, photo_density, activity_score')
+          .eq('vehicle_id', vehicleId)
+          .order('month'),
+        supabase.rpc('compute_build_spend_profile', { p_vehicle_id: vehicleId }),
+      ]);
 
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
+      if (manifestRes.error) throw new Error(manifestRes.error.message);
+      if (snapshotRes.error) throw new Error(snapshotRes.error.message);
 
-    async function load() {
-      try {
-        // Parallel fetch all three data sources
-        const [manifestRes, snapshotRes, spendRes] = await Promise.all([
-          supabase
-            .from('vehicle_build_manifest')
-            .select('id, device_name, device_category, manufacturer, supplier, price, price_source, purchased, status, invoice_ref, location_zone, pct_complete')
-            .eq('vehicle_id', vehicleId!)
-            .order('device_category')
-            .order('device_name'),
-          supabase
-            .from('build_activity_snapshots')
-            .select('month, total_spend, vehicle_part_spend, tool_spend, vendor_count, top_vendors, photo_count, spending_intensity, photo_density, activity_score')
-            .eq('vehicle_id', vehicleId!)
-            .order('month'),
-          supabase.rpc('compute_build_spend_profile', { p_vehicle_id: vehicleId }),
-        ]);
+      return {
+        manifest: (manifestRes.data || []) as ManifestDevice[],
+        snapshots: (snapshotRes.data || []) as BuildSnapshot[],
+        spendProfile: (spendRes.data as SpendProfile | null),
+      };
+    },
+    enabled: !!vehicleId && vehicleId.length >= 20,
+    staleTime: 10 * 60 * 1000, // 10 min
+  });
 
-        if (cancelled) return;
-
-        if (manifestRes.error) throw new Error(manifestRes.error.message);
-        if (snapshotRes.error) throw new Error(snapshotRes.error.message);
-
-        setManifest((manifestRes.data || []) as ManifestDevice[]);
-        setSnapshots((snapshotRes.data || []) as BuildSnapshot[]);
-        setSpendProfile(spendRes.data as SpendProfile | null);
-      } catch (err: any) {
-        if (!cancelled) setError(err.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
-    return () => { cancelled = true; };
-  }, [vehicleId]);
+  const manifest = rawData?.manifest ?? [];
+  const snapshots = rawData?.snapshots ?? [];
+  const spendProfile = rawData?.spendProfile ?? null;
 
   // Group manifest by category
   const manifestByCategory = useMemo(() => {
@@ -124,7 +113,7 @@ export function useBuildProfile(vehicleId: string | undefined) {
     manifestStats,
     snapshots,
     spendProfile,
-    loading,
-    error,
+    loading: isLoading,
+    error: error?.message ?? null,
   };
 }

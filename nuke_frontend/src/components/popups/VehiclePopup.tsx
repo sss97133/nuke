@@ -180,12 +180,12 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
             {vehicle.model && <> <ClickableText onClick={handleModelClick}>{vehicle.model}</ClickableText></>}
             {vehicle.series && <span style={{ fontWeight: 400, color: '#666' }}> {vehicle.series}</span>}
           </span>
-          <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: price.isSold ? '#16825d' : '#1a1a1a', flexShrink: 0, whiteSpace: 'nowrap' }}>
+          <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: price.isSold ? 'var(--vp-sold, #16825d)' : '#1a1a1a', flexShrink: 0, whiteSpace: 'nowrap' }}>
             {price.formatted}
           </span>
         </div>
         {price.isSold && price.showSoldBadge && (
-          <span style={{ fontFamily: SANS, fontSize: 7, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#16825d' }}>SOLD</span>
+          <span style={{ fontFamily: SANS, fontSize: 7, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--vp-sold, #16825d)' }}>SOLD</span>
         )}
         {vehicle.is_for_sale && !price.isSold && (
           <span style={{ fontFamily: SANS, fontSize: 7, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#0078d4' }}>FOR SALE</span>
@@ -204,7 +204,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
                 </span>
                 {price.amount && price.amount > 0 && (() => {
                   const diff = Math.round(((price.amount - scores.nuke_estimate!) / scores.nuke_estimate!) * 100);
-                  const color = diff > 5 ? '#8a0020' : diff < -5 ? '#004225' : '#666';
+                  const color = diff > 5 ? 'var(--vp-danger, #8a0020)' : diff < -5 ? 'var(--vp-brg, #004225)' : '#666';
                   return (
                     <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color }}>
                       {diff > 0 ? '+' : ''}{diff}%
@@ -220,7 +220,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
           {scores.heat_score != null && scores.heat_score > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <Label>HEAT</Label>
-              <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: scores.heat_score > 70 ? '#8a0020' : scores.heat_score > 40 ? '#b05a00' : '#666' }}>
+              <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: scores.heat_score > 70 ? 'var(--vp-danger, #8a0020)' : scores.heat_score > 40 ? '#b05a00' : '#666' }}>
                 {scores.heat_score}
               </span>
             </div>
@@ -228,7 +228,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
           {scores.deal_score != null && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <Label>DEAL</Label>
-              <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: scores.deal_score > 70 ? '#004225' : scores.deal_score < 30 ? '#8a0020' : '#666' }}>
+              <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: scores.deal_score > 70 ? 'var(--vp-brg, #004225)' : scores.deal_score < 30 ? 'var(--vp-danger, #8a0020)' : '#666' }}>
                 {scores.deal_score}
               </span>
             </div>
@@ -300,7 +300,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
               {ci.community_concerns.slice(0, 3).map((c, i) => {
                 const text = typeof c === 'string' ? c : c.concern;
                 return (
-                  <div key={i} style={{ fontFamily: SANS, fontSize: 9, color: '#8a0020', lineHeight: 1.4, marginBottom: 1 }}>
+                  <div key={i} style={{ fontFamily: SANS, fontSize: 9, color: 'var(--vp-danger, #8a0020)', lineHeight: 1.4, marginBottom: 1 }}>
                     {text}
                   </div>
                 );
@@ -333,9 +333,9 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
 
           {/* Quick badges */}
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4, marginBottom: 4 }}>
-            {di.title_status && <IntelBadge label={`TITLE: ${di.title_status}`} color="#004225" />}
-            {di.matching_numbers === true && <IntelBadge label="MATCHING NUMBERS" color="#004225" />}
-            {di.matching_numbers === false && <IntelBadge label="NOT MATCHING" color="#8a0020" />}
+            {di.title_status && <IntelBadge label={`TITLE: ${di.title_status}`} color="var(--vp-brg, #004225)" />}
+            {di.matching_numbers === true && <IntelBadge label="MATCHING NUMBERS" color="var(--vp-brg, #004225)" />}
+            {di.matching_numbers === false && <IntelBadge label="NOT MATCHING" color="var(--vp-danger, #8a0020)" />}
             {di.condition && <IntelBadge label={di.condition.toUpperCase()} color="#1a1a1a" />}
             {di.owner_count != null && <IntelBadge label={`${di.owner_count} OWNER${di.owner_count !== 1 ? 'S' : ''}`} color="#666" />}
           </div>
@@ -345,7 +345,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
             <div style={{ marginBottom: 4 }}>
               <SubLabel>RED FLAGS</SubLabel>
               {(di.red_flags || []).slice(0, 3).map((f, i) => (
-                <div key={i} style={{ fontFamily: SANS, fontSize: 9, color: '#8a0020', lineHeight: 1.3, marginBottom: 1 }}>
+                <div key={i} style={{ fontFamily: SANS, fontSize: 9, color: 'var(--vp-danger, #8a0020)', lineHeight: 1.3, marginBottom: 1 }}>
                   <span style={{ fontFamily: MONO, fontSize: 7, fontWeight: 700, marginRight: 4, textTransform: 'uppercase' }}>
                     {f.sev || 'FLAG'}
                   </span>
@@ -408,7 +408,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
                   )}
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: '#16825d' }}>{formatPrice(c.sale_price)}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: 'var(--vp-sold, #16825d)' }}>{formatPrice(c.sale_price)}</span>
                   {c.sale_date && (
                     <div style={{ fontFamily: MONO, fontSize: 7, color: '#999' }}>
                       {new Date(c.sale_date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}
@@ -435,7 +435,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
                   {a.event_type || ''}
                 </span>
                 {a.price && a.price > 0 && (
-                  <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: '#16825d' }}>{formatPrice(a.price)}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: 'var(--vp-sold, #16825d)' }}>{formatPrice(a.price)}</span>
                 )}
                 {a.event_date && (
                   <span style={{ fontFamily: MONO, fontSize: 7, color: '#999', marginLeft: 'auto' }}>
@@ -553,7 +553,7 @@ function ClickableText({ children, onClick }: { children: React.ReactNode; onCli
 }
 
 function SentimentBadge({ sentiment, score }: { sentiment: string; score: number | null }) {
-  const color = sentiment === 'positive' ? '#004225' : sentiment === 'negative' ? '#8a0020' : '#666';
+  const color = sentiment === 'positive' ? 'var(--vp-brg, #004225)' : sentiment === 'negative' ? 'var(--vp-danger, #8a0020)' : '#666';
   return (
     <span style={{
       fontFamily: SANS, fontSize: 7, fontWeight: 800,
@@ -566,7 +566,7 @@ function SentimentBadge({ sentiment, score }: { sentiment: string; score: number
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
-  const color = value === 'high' || value === 'rising' ? '#004225' : value === 'low' || value === 'falling' ? '#8a0020' : '#666';
+  const color = value === 'high' || value === 'rising' ? 'var(--vp-brg, #004225)' : value === 'low' || value === 'falling' ? 'var(--vp-danger, #8a0020)' : '#666';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       <span style={{ fontFamily: SANS, fontSize: 6, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.3px', color: '#999' }}>{label}</span>
