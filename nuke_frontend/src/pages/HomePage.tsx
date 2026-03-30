@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { useVehiclesDashboard } from '../hooks/useVehiclesDashboard';
 import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlideshow';
 import { useInterests } from '../hooks/useInterests';
+import { optimizeImageUrl } from '../lib/imageOptimizer';
 
 // ────────────────────────────────────────────────────────────
 // TYPES
@@ -377,8 +378,9 @@ function TreemapCell({ rect, onClick, totalCount, showValue, isYear, repImage }:
       {/* Background image for vehicle cells */}
       {showImage && imageUrl && (
         <img
-          src={imageUrl}
+          src={optimizeImageUrl(imageUrl, 'small') || imageUrl}
           alt=""
+          loading="lazy"
           onLoad={() => setImgLoaded(true)}
           style={{
             position: 'absolute',
@@ -1123,7 +1125,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
                 whiteSpace: 'nowrap',
               }}
             >
-
+              ENTER FEED
             </button>
           )}
           <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-disabled)' }}>
@@ -1317,9 +1319,8 @@ function TabSkeleton() {
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12, fontFamily: 'Arial, sans-serif' }}>
       {[1, 2, 3].map((i) => (
-        <div key={i} style={{ height: 80, background: 'var(--surface)', border: '2px solid var(--border)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+        <div key={i} style={{ height: 80, background: 'var(--surface)', border: '2px solid var(--border)' }} />
       ))}
-      <style>{`@keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }`}</style>
     </div>
   );
 }
