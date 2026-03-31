@@ -497,25 +497,47 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
       )
     );
 
+    // Relationship type priority: specific roles beat generic
+    const REL_PRIORITY: Record<string, number> = {
+      owner: 1, consigner: 2, supplier_build: 3, purchased_from: 4,
+      buyer: 5, sold_by: 10, work_location: 11, service_provider: 12,
+    };
+
+    // Collect all org-vehicle rows, then dedupe by vehicle_id (keep best relationship)
+    const rawRows: Array<{ vehicle_id: string; relationship_type: string; vehicle: any }> = [];
     for (const r of trackResults) {
       if (r.status !== 'fulfilled' || r.value.error) continue;
       for (const row of r.value.data || []) {
         const v = (row as any).vehicle;
         if (!v) continue;
-        trackRecordVehicles.push({
-          vehicle_id: v.id,
-          year: v.year,
-          make: v.make,
-          model: v.model,
-          sale_price: v.sale_price,
-          sale_date: v.sale_date,
-          relationship_type: row.relationship_type || 'sold_by',
-          comment_count: null,
-          nuke_estimate: null,
-          estimate_confidence: null,
-          comp_method: null,
-        });
+        rawRows.push({ vehicle_id: v.id, relationship_type: row.relationship_type || 'sold_by', vehicle: v });
       }
+    }
+
+    // Deduplicate: one row per vehicle, keeping the most specific relationship_type
+    const bestByVehicle = new Map<string, typeof rawRows[0]>();
+    for (const row of rawRows) {
+      const existing = bestByVehicle.get(row.vehicle_id);
+      if (!existing || (REL_PRIORITY[row.relationship_type] ?? 99) < (REL_PRIORITY[existing.relationship_type] ?? 99)) {
+        bestByVehicle.set(row.vehicle_id, row);
+      }
+    }
+
+    for (const row of bestByVehicle.values()) {
+      const v = row.vehicle;
+      trackRecordVehicles.push({
+        vehicle_id: v.id,
+        year: v.year,
+        make: v.make,
+        model: v.model,
+        sale_price: v.sale_price,
+        sale_date: v.sale_date,
+        relationship_type: row.relationship_type,
+        comment_count: null,
+        nuke_estimate: null,
+        estimate_confidence: null,
+        comp_method: null,
+      });
     }
 
     // Fetch nuke_estimates for these vehicles
@@ -549,35 +571,51 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
       }
     }
 
-    // Compute GMV by year from per-vehicle data
+    // State name normalization (full name → 2-letter abbreviation)
+    const STATE_ABBR: Record<string, string> = {
+      alabama:'AL',alaska:'AK',arizona:'AZ',arkansas:'AR',california:'CA',colorado:'CO',
+      connecticut:'CT',delaware:'DE',florida:'FL',georgia:'GA',hawaii:'HI',idaho:'ID',
+      illinois:'IL',indiana:'IN',iowa:'IA',kansas:'KS',kentucky:'KY',louisiana:'LA',
+      maine:'ME',maryland:'MD',massachusetts:'MA',michigan:'MI',minnesota:'MN',
+      mississippi:'MS',missouri:'MO',montana:'MT',nebraska:'NE',nevada:'NV',
+      'new hampshire':'NH','new jersey':'NJ','new mexico':'NM','new york':'NY',
+      'north carolina':'NC','north dakota':'ND',ohio:'OH',oklahoma:'OK',oregon:'OR',
+      pennsylvania:'PA','rhode island':'RI','south carolina':'SC','south dakota':'SD',
+      tennessee:'TN',texas:'TX',utah:'UT',vermont:'VT',virginia:'VA',washington:'WA',
+      'west virginia':'WV',wisconsin:'WI',wyoming:'WY',
+    };
+    function normalizeState(s: string | null): string | null {
+      if (!s) return null;
+      const t = s.trim();
+      if (t.length === 2) return t.toUpperCase();
+      return STATE_ABBR[t.toLowerCase()] || t;
+    }
+
+    // Compute GMV by year, volume by quarter, state distribution from deduped vehicles
     const gmvByYear: Record<string, number> = {};
     const volumeMap: Record<string, number> = {};
     const stateDistribution: Record<string, number> = {};
 
-    for (const r of trackResults) {
-      if (r.status !== 'fulfilled' || r.value.error) continue;
-      for (const row of r.value.data || []) {
-        const v = (row as any).vehicle;
-        if (!v) continue;
+    for (const row of bestByVehicle.values()) {
+      const v = row.vehicle;
 
-        // GMV by year
-        if (v.sale_price && v.sale_date) {
-          const yr = new Date(v.sale_date).getFullYear().toString();
-          gmvByYear[yr] = (gmvByYear[yr] || 0) + Number(v.sale_price);
-        }
+      // GMV by year
+      if (v.sale_price && v.sale_date) {
+        const yr = new Date(v.sale_date).getFullYear().toString();
+        gmvByYear[yr] = (gmvByYear[yr] || 0) + Number(v.sale_price);
+      }
 
-        // Volume by quarter
-        if (v.sale_date) {
-          const d = new Date(v.sale_date);
-          const q = `${d.getFullYear()} Q${Math.ceil((d.getMonth() + 1) / 3)}`;
-          volumeMap[q] = (volumeMap[q] || 0) + 1;
-        }
+      // Volume by quarter
+      if (v.sale_date) {
+        const d = new Date(v.sale_date);
+        const q = `${d.getFullYear()} Q${Math.ceil((d.getMonth() + 1) / 3)}`;
+        volumeMap[q] = (volumeMap[q] || 0) + 1;
+      }
 
-        // State distribution
-        const st = v.state || null;
-        if (st) {
-          stateDistribution[st] = (stateDistribution[st] || 0) + 1;
-        }
+      // State distribution (normalized)
+      const st = normalizeState(v.state);
+      if (st) {
+        stateDistribution[st] = (stateDistribution[st] || 0) + 1;
       }
     }
 

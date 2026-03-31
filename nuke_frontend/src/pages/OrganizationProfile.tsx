@@ -2254,7 +2254,7 @@ export default function OrganizationProfile() {
                       <div style={{ fontSize: '12px', color: 'var(--text)', fontFamily: 'Courier New, monospace' }}>
                         {Object.entries(sellerTrackRecord.gmv_by_year)
                           .sort(([a], [b]) => a.localeCompare(b))
-                          .map(([yr, amt]) => `${yr}: $${Number(amt).toLocaleString()}`)
+                          .map(([yr, amt]) => `${yr}: $${Math.round(Number(amt)).toLocaleString()}`)
                           .join('  ·  ')}
                       </div>
                     </div>
@@ -2319,9 +2319,17 @@ export default function OrganizationProfile() {
                           : v.relationship_type === 'consigner' ? '#7c3aed'
                           : v.relationship_type === 'supplier_build' ? '#059669'
                           : '#6b7280';
-                        const estimateQuality = v.comp_method === 'self_price_fallback' ? 'low'
+                        // Hide estimates that are clearly wrong: circular, very low confidence,
+                        // or wildly divergent from sale price (>3x off = wrong comp pool)
+                        const isCircular = v.comp_method === 'self_price_fallback';
+                        const isTooLowConfidence = (v.estimate_confidence ?? 0) < 30;
+                        const ratio = (v.sale_price && v.nuke_estimate && v.sale_price > 0)
+                          ? Math.max(v.nuke_estimate / v.sale_price, v.sale_price / v.nuke_estimate) : 1;
+                        const isWildlyOff = ratio > 3;
+                        const hideEstimate = isCircular || isTooLowConfidence || isWildlyOff;
+                        const estimateQuality = hideEstimate ? 'low'
                           : (v.estimate_confidence ?? 0) >= 60 ? 'high'
-                          : (v.estimate_confidence ?? 0) >= 30 ? 'medium' : 'low';
+                          : 'medium';
                         return (
                           <tr key={v.vehicle_id} style={{
                             borderBottom: '1px solid var(--border-light)',
@@ -2333,7 +2341,7 @@ export default function OrganizationProfile() {
                               {[v.year, v.make, v.model].filter(Boolean).join(' ') || '—'}
                             </td>
                             <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'Courier New, monospace', fontWeight: 600, color: 'var(--text)' }}>
-                              {v.sale_price ? `$${Number(v.sale_price).toLocaleString()}` : '—'}
+                              {v.sale_price ? `$${Math.round(Number(v.sale_price)).toLocaleString()}` : '—'}
                             </td>
                             <td style={{ padding: '6px 12px', textAlign: 'right', color: 'var(--text-muted)' }}>
                               {v.sale_date ? new Date(v.sale_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
@@ -2354,8 +2362,8 @@ export default function OrganizationProfile() {
                               )}
                             </td>
                             <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'Courier New, monospace', color: estimateQuality === 'high' ? 'var(--text)' : 'var(--text-muted)' }}>
-                              {v.nuke_estimate && v.comp_method !== 'self_price_fallback'
-                                ? `$${Number(v.nuke_estimate).toLocaleString()}`
+                              {v.nuke_estimate && !hideEstimate
+                                ? `$${Math.round(Number(v.nuke_estimate)).toLocaleString()}`
                                 : '—'}
                             </td>
                           </tr>
