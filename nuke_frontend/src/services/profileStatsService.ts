@@ -477,42 +477,46 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     .maybeSingle();
 
   // Seller track record — per-vehicle breakdown from organization_vehicles
+  // Query directly (not from vehicleIds which caps at 1000) with seller-relevant types
   let sellerTrackRecord: SellerTrackRecord | null = null;
-  if (vehicleIds.length > 0) {
-    // Fetch org vehicles with joined data
-    const orgVehicleChunks = chunk(vehicleIds, 50);
-    const trackRecordVehicles: SellerVehicleRecord[] = [];
+  {
+    const SELLER_TYPES = ['owner', 'consigner', 'supplier_build', 'purchased_from', 'sold_by'];
 
-    const trackResults = await Promise.allSettled(
-      orgVehicleChunks.map((ids) =>
-        supabase
-          .from('organization_vehicles')
-          .select(`
-            vehicle_id,
-            relationship_type,
-            vehicle:vehicles(id, year, make, model, sale_price, sale_date, bat_location, state)
-          `)
-          .eq('organization_id', orgId)
-          .in('vehicle_id', ids)
-      )
-    );
+    // Fetch org-vehicle links with joined vehicle data, serial batches to avoid rate limits
+    const trackRecordVehicles: SellerVehicleRecord[] = [];
+    const rawRows: Array<{ vehicle_id: string; relationship_type: string; vehicle: any }> = [];
+    let offset = 0;
+    const PAGE = 500;
+
+    while (offset < 5000) { // Safety cap
+      const { data: batch, error: batchErr } = await supabase
+        .from('organization_vehicles')
+        .select(`
+          vehicle_id,
+          relationship_type,
+          vehicle:vehicles(id, year, make, model, sale_price, sale_date, bat_location, state)
+        `)
+        .eq('organization_id', orgId)
+        .in('relationship_type', SELLER_TYPES)
+        .range(offset, offset + PAGE - 1);
+
+      if (batchErr || !batch || batch.length === 0) break;
+
+      for (const row of batch) {
+        const v = (row as any).vehicle;
+        if (!v) continue;
+        rawRows.push({ vehicle_id: v.id, relationship_type: row.relationship_type || 'sold_by', vehicle: v });
+      }
+
+      if (batch.length < PAGE) break;
+      offset += PAGE;
+    }
 
     // Relationship type priority: specific roles beat generic
     const REL_PRIORITY: Record<string, number> = {
       owner: 1, consigner: 2, supplier_build: 3, purchased_from: 4,
       buyer: 5, sold_by: 10, work_location: 11, service_provider: 12,
     };
-
-    // Collect all org-vehicle rows, then dedupe by vehicle_id (keep best relationship)
-    const rawRows: Array<{ vehicle_id: string; relationship_type: string; vehicle: any }> = [];
-    for (const r of trackResults) {
-      if (r.status !== 'fulfilled' || r.value.error) continue;
-      for (const row of r.value.data || []) {
-        const v = (row as any).vehicle;
-        if (!v) continue;
-        rawRows.push({ vehicle_id: v.id, relationship_type: row.relationship_type || 'sold_by', vehicle: v });
-      }
-    }
 
     // Deduplicate: one row per vehicle, keeping the most specific relationship_type
     const bestByVehicle = new Map<string, typeof rawRows[0]>();
@@ -540,23 +544,18 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
       });
     }
 
-    // Fetch nuke_estimates for these vehicles
+    // Fetch nuke_estimates for these vehicles (serial batches to avoid rate limits)
     if (trackRecordVehicles.length > 0) {
-      const estChunks = chunk(trackRecordVehicles.map(v => v.vehicle_id), 50);
+      const allVids = trackRecordVehicles.map(v => v.vehicle_id);
       const estimateMap = new Map<string, { estimated_value: number; confidence_score: number; comp_method: string | null }>();
+      const estChunks = chunk(allVids, 200);
 
-      const estResults = await Promise.allSettled(
-        estChunks.map((ids) =>
-          supabase
-            .from('nuke_estimates')
-            .select('vehicle_id, estimated_value, confidence_score, comp_method')
-            .in('vehicle_id', ids)
-        )
-      );
-
-      for (const r of estResults) {
-        if (r.status !== 'fulfilled' || r.value.error) continue;
-        for (const row of r.value.data || []) {
+      for (const ids of estChunks) {
+        const { data: estBatch } = await supabase
+          .from('nuke_estimates')
+          .select('vehicle_id, estimated_value, confidence_score, comp_method')
+          .in('vehicle_id', ids);
+        for (const row of estBatch || []) {
           estimateMap.set(row.vehicle_id, row);
         }
       }
