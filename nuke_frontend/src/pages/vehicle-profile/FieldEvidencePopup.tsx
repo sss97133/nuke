@@ -67,37 +67,42 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   // Fetch images tagged with this field's zone/category
   useEffect(() => {
     let cancelled = false;
-    const fieldToZone: Record<string, string[]> = {
-      engine_type: ['engine_bay', 'engine'],
-      engine_size: ['engine_bay', 'engine'],
-      fuel_system_type: ['engine_bay'],
-      vin: ['vin', 'vin_plate', 'door_jamb', 'dash'],
-      color: ['exterior', 'front_three_quarter', 'rear_three_quarter', 'side'],
-      interior_color: ['interior', 'dashboard', 'seats'],
-      transmission: ['engine_bay', 'undercarriage'],
-      drivetrain: ['undercarriage', 'axle'],
-      mileage: ['odometer', 'instrument_cluster', 'dashboard'],
-      body_style: ['exterior', 'front', 'rear', 'side'],
+    // Zone prefixes that match actual DB values like mech_engine_bay, int_dashboard, ext_front_driver
+    const fieldToZonePrefix: Record<string, string[]> = {
+      engine_type: ['mech_engine'],
+      engine_size: ['mech_engine'],
+      fuel_system_type: ['mech_engine'],
+      vin: ['detail_badge', 'detail_vin'],
+      color: ['ext_'],
+      interior_color: ['int_'],
+      transmission: ['mech_engine', 'mech_transmission'],
+      drivetrain: ['ext_undercarriage', 'mech_'],
+      mileage: ['int_dashboard', 'detail_badge'],
+      body_style: ['ext_front', 'ext_rear', 'ext_driver', 'ext_passenger'],
+      horsepower: ['mech_engine'],
+      torque: ['mech_engine'],
     };
 
-    const zones = fieldToZone[field] || [];
-    if (zones.length === 0) {
+    const prefixes = fieldToZonePrefix[field] || [];
+    if (prefixes.length === 0) {
       setImagesLoading(false);
       return;
     }
 
+    // Use ilike with OR for prefix matching
+    const orFilter = prefixes.map(p => `vehicle_zone.ilike.${p}%`).join(',');
     supabase
       .from('vehicle_images')
-      .select('id, url, vehicle_zone, category, caption')
+      .select('id, image_url, thumbnail_url, vehicle_zone, category, caption')
       .eq('vehicle_id', vehicleId)
-      .in('vehicle_zone', zones)
-      .order('sort_order', { ascending: true })
+      .or(orFilter)
+      .order('display_order', { ascending: true })
       .limit(12)
       .then(({ data }) => {
         if (!cancelled && data) {
           setImages(data.map(d => ({
             id: d.id,
-            url: d.url,
+            url: d.image_url,
             zone: d.vehicle_zone,
             category: d.category,
             caption: d.caption,
