@@ -11,9 +11,12 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useVehicleProfile } from './VehicleProfileContext';
+import { usePopup } from '../../components/popups/usePopup';
 import { supabase } from '../../lib/supabase';
 import { useFieldEvidence, type FieldEvidenceMap, type FieldEvidenceGroup } from './hooks/useFieldEvidence';
 import FieldProvenanceDrawer, { SourceBadge } from './FieldProvenanceDrawer';
+
+const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -503,8 +506,9 @@ const FieldRow: React.FC<{
 /* ------------------------------------------------------------------ */
 
 const VehicleDossierPanel: React.FC = () => {
-  const { vehicle, canEdit, isVerifiedOwner, isMobile, setGalleryFilter } = useVehicleProfile();
+  const { vehicle, vehicleId, canEdit, isVerifiedOwner, isMobile, setGalleryFilter } = useVehicleProfile();
   const navigate = useNavigate();
+  const { openPopup } = usePopup();
   const { evidence, loading } = useFieldEvidence(vehicle?.id);
 
   // Auto-expand fields with multi-source evidence
@@ -764,23 +768,41 @@ const VehicleDossierPanel: React.FC = () => {
                 }
                 const displayValue = fmtVal(field, pv);
                 if (!displayValue) return null;
-                // Color/interior_color fields emit gallery filter on value click
-                const colorFilterClick = field === 'color'
-                  ? () => setGalleryFilter({ category: 'exterior' })
-                  : field === 'interior_color'
-                    ? () => setGalleryFilter({ category: 'interior' })
-                    : undefined;
+                const fieldLabel = FIELD_LABELS[field] || field.toUpperCase().replace(/_/g, ' ');
+                // Every field value opens its evidence popup — click-through chain
+                const handleValueClick = () => {
+                  // Color fields also set gallery filter
+                  if (field === 'color') setGalleryFilter({ category: 'exterior' });
+                  if (field === 'interior_color') setGalleryFilter({ category: 'interior' });
+                  // Open evidence popup for all fields
+                  const vinDecode = field === 'vin' ? (v.origin_metadata?.vin_decode || v.vin_decode || null) : null;
+                  openPopup(
+                    <React.Suspense fallback={<div style={{ padding: '12px', fontSize: '8px' }}>Loading evidence...</div>}>
+                      <FieldEvidencePopup
+                        field={field}
+                        label={fieldLabel}
+                        value={displayValue}
+                        vehicleId={vehicle.id}
+                        evidence={group}
+                        vinDecode={vinDecode}
+                      />
+                    </React.Suspense>,
+                    `${fieldLabel} — ${displayValue}`,
+                    480,
+                    false,
+                  );
+                };
                 return (
                   <FieldRow
                     key={field}
                     field={field}
-                    label={FIELD_LABELS[field] || field.toUpperCase().replace(/_/g, ' ')}
+                    label={fieldLabel}
                     displayValue={displayValue}
                     group={group}
                     isMod={modFields.has(field)}
                     isOpen={openDrawers.has(field)}
                     onToggle={() => toggleDrawer(field)}
-                    onValueClick={colorFilterClick}
+                    onValueClick={handleValueClick}
                   />
                 );
               })}
@@ -843,6 +865,20 @@ const VehicleDossierPanel: React.FC = () => {
                     isMod={modFields.has(key)}
                     isOpen={openDrawers.has(key)}
                     onToggle={() => toggleDrawer(key)}
+                    onValueClick={() => openPopup(
+                      <React.Suspense fallback={<div style={{ padding: '12px', fontSize: '8px' }}>Loading evidence...</div>}>
+                        <FieldEvidencePopup
+                          field={key}
+                          label={label}
+                          value={displayValue}
+                          vehicleId={vehicle.id}
+                          evidence={group}
+                        />
+                      </React.Suspense>,
+                      `${label} — ${displayValue}`,
+                      480,
+                      false,
+                    )}
                   />
                 );
               })}
