@@ -340,7 +340,8 @@ export default function OrganizationProfile() {
   const [comprehensiveData, setComprehensiveData] = useState<any>(null);
   const [sellerTrackRecord, setSellerTrackRecord] = useState<SellerTrackRecord | null>(null);
   const [competitiveContext, setCompetitiveContext] = useState<CompetitiveContext | null>(null);
-  
+  const [auctionHeatmapEvents, setAuctionHeatmapEvents] = useState<Array<{ event_date: string; event_type: string; cost_amount?: number }>>([]);
+
   // Grid and sorting controls (similar to CursorHomepage)
   const [cardsPerRow, setCardsPerRow] = useState<number>(() => {
     try {
@@ -1037,6 +1038,15 @@ export default function OrganizationProfile() {
           setComprehensiveData(comprehensive);
           if (comprehensive.seller_track_record) {
             setSellerTrackRecord(comprehensive.seller_track_record);
+            // Build heatmap events from sold vehicles (sale dates as auction events)
+            const heatEvents = comprehensive.seller_track_record.vehicles_sold
+              .filter((v: any) => v.sale_date)
+              .map((v: any) => ({
+                event_date: v.sale_date,
+                event_type: 'auction_sale',
+                cost_amount: v.sale_price ? Number(v.sale_price) : undefined,
+              }));
+            setAuctionHeatmapEvents(heatEvents);
             // Load competitive context using the org state
             const orgState = org?.state || null;
             if (orgState) {
@@ -2233,64 +2243,99 @@ export default function OrganizationProfile() {
             </div>
             )}
 
-            {/* Seller Track Record — per-vehicle table with sale prices */}
+            {/* Seller Track Record — GMV bars, volume, geography, vehicle table */}
             {sellerTrackRecord && sellerTrackRecord.vehicles_sold.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
-                {/* GMV by Year + Volume by Quarter (inline) */}
-                {Object.keys(sellerTrackRecord.gmv_by_year).length > 0 && (
+                {/* GMV by Year — horizontal bar chart */}
+                {Object.keys(sellerTrackRecord.gmv_by_year).length > 0 && (() => {
+                  const gmvEntries = Object.entries(sellerTrackRecord.gmv_by_year)
+                    .sort(([a], [b]) => a.localeCompare(b));
+                  const maxGmv = Math.max(...gmvEntries.map(([, v]) => Number(v)));
+                  const totalGmv = gmvEntries.reduce((s, [, v]) => s + Number(v), 0);
+                  const totalSold = sellerTrackRecord.vehicles_sold.filter(v => v.sale_price).length;
+                  return (
+                    <div style={{
+                      padding: '12px 16px',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      marginBottom: '8px',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
+                        <div style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          GROSS MERCHANDISE VALUE
+                        </div>
+                        <div style={{ fontSize: '11px', fontFamily: 'Courier New, monospace', color: 'var(--text)' }}>
+                          ${Math.round(totalGmv).toLocaleString()} · {totalSold} sold
+                        </div>
+                      </div>
+                      {gmvEntries.map(([yr, amt]) => {
+                        const pct = maxGmv > 0 ? (Number(amt) / maxGmv) * 100 : 0;
+                        const volForYear = sellerTrackRecord.volume_by_quarter
+                          .filter(q => q.quarter.startsWith(yr))
+                          .reduce((s, q) => s + q.count, 0);
+                        return (
+                          <div key={yr} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                            <span style={{ fontSize: '9px', fontFamily: 'Courier New, monospace', color: 'var(--text-muted)', width: '32px', textAlign: 'right', flexShrink: 0 }}>
+                              {yr}
+                            </span>
+                            <div style={{ flex: 1, height: '14px', background: 'var(--bg)' }}>
+                              <div style={{
+                                width: `${Math.max(pct, 1)}%`,
+                                height: '100%',
+                                background: 'var(--text)',
+                                opacity: 0.7,
+                                transition: 'width 0.3s ease',
+                              }} />
+                            </div>
+                            <span style={{ fontSize: '9px', fontFamily: 'Courier New, monospace', color: 'var(--text)', width: '80px', textAlign: 'right', flexShrink: 0 }}>
+                              ${Math.round(Number(amt) / 1000).toLocaleString()}K
+                            </span>
+                            <span style={{ fontSize: '8px', color: 'var(--text-muted)', width: '24px', textAlign: 'right', flexShrink: 0 }}>
+                              {volForYear || ''}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                {/* Geography + Volume inline */}
+                {(Object.keys(sellerTrackRecord.state_distribution).length > 0 || sellerTrackRecord.volume_by_quarter.length > 0) && (
                   <div style={{
-                    display: 'flex',
-                    gap: '24px',
-                    flexWrap: 'wrap',
-                    padding: '12px 16px',
-                    background: 'var(--surface)',
+                    display: 'grid',
+                    gridTemplateColumns: Object.keys(sellerTrackRecord.state_distribution).length > 0 && sellerTrackRecord.volume_by_quarter.length > 0 ? '1fr 1fr' : '1fr',
+                    gap: '1px',
+                    background: 'var(--border)',
                     border: '1px solid var(--border)',
                     marginBottom: '8px',
                   }}>
-                    <div>
-                      <div style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-                        GMV BY YEAR
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text)', fontFamily: 'Courier New, monospace' }}>
-                        {Object.entries(sellerTrackRecord.gmv_by_year)
-                          .sort(([a], [b]) => a.localeCompare(b))
-                          .map(([yr, amt]) => `${yr}: $${Math.round(Number(amt)).toLocaleString()}`)
-                          .join('  ·  ')}
-                      </div>
-                    </div>
-                    {sellerTrackRecord.volume_by_quarter.length > 0 && (
-                      <div>
+                    {Object.keys(sellerTrackRecord.state_distribution).length > 0 && (
+                      <div style={{ padding: '8px 16px', background: 'var(--surface)' }}>
                         <div style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-                          VOLUME BY QUARTER
+                          GEOGRAPHY
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text)', fontFamily: 'Courier New, monospace' }}>
-                          {sellerTrackRecord.volume_by_quarter
-                            .slice(-8)
-                            .map(q => `${q.quarter}: ${q.count}`)
+                        <div style={{ fontSize: '11px', color: 'var(--text)', fontFamily: 'Courier New, monospace', lineHeight: 1.6 }}>
+                          {Object.entries(sellerTrackRecord.state_distribution)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([st, count]) => `${st} ${count}`)
                             .join('  ·  ')}
                         </div>
                       </div>
                     )}
-                  </div>
-                )}
-
-                {/* State distribution */}
-                {Object.keys(sellerTrackRecord.state_distribution).length > 0 && (
-                  <div style={{
-                    padding: '8px 16px',
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    marginBottom: '8px',
-                    fontSize: '11px',
-                    color: 'var(--text-muted)',
-                  }}>
-                    <span style={{ fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '8px' }}>
-                      GEOGRAPHY
-                    </span>
-                    {Object.entries(sellerTrackRecord.state_distribution)
-                      .sort(([, a], [, b]) => b - a)
-                      .map(([st, count]) => `${st} (${count})`)
-                      .join('  ·  ')}
+                    {sellerTrackRecord.volume_by_quarter.length > 0 && (
+                      <div style={{ padding: '8px 16px', background: 'var(--surface)' }}>
+                        <div style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                          RECENT VOLUME
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text)', fontFamily: 'Courier New, monospace', lineHeight: 1.6 }}>
+                          {sellerTrackRecord.volume_by_quarter
+                            .slice(-8)
+                            .map(q => `${q.quarter.replace(/^\d{4}\s/, "'"+ q.quarter.slice(2,4) + " ")}: ${q.count}`)
+                            .join('  ·  ')}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -2482,7 +2527,7 @@ export default function OrganizationProfile() {
 
             {/* Activity Heatmap */}
             <div style={{ marginBottom: '16px' }}>
-              <OrganizationTimelineHeatmap organizationId={organizationId!} />
+              <OrganizationTimelineHeatmap organizationId={organizationId!} externalEvents={auctionHeatmapEvents} />
             </div>
 
             {/* Live Auctions - Separate section at top */}

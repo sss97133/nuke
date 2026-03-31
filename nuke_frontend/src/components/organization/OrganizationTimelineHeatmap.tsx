@@ -24,9 +24,11 @@ interface TimelineEvent {
 
 interface OrganizationTimelineHeatmapProps {
   organizationId: string;
+  /** Extra events to merge into the heatmap (e.g. vehicle_events for dealers) */
+  externalEvents?: Array<{ event_date: string; event_type: string; cost_amount?: number }>;
 }
 
-export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapProps> = ({ organizationId }) => {
+export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapProps> = ({ organizationId, externalEvents }) => {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<any>(null);
   const [selectedDayCommits, setSelectedDayCommits] = useState<{ date: string; events: TimelineEvent[] } | null>(null);
@@ -89,10 +91,27 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
     return new Date().toISOString().split('T')[0];
   };
 
-  // Group events by date with activity metrics (query already filtered to rangeStart..rangeEnd)
+  // Merge external events (auction/listing events for dealers)
+  const allEvents = [...events];
+  if (externalEvents?.length) {
+    for (const ext of externalEvents) {
+      const date = toDateOnly(ext.event_date);
+      if (date >= rangeStart && date <= rangeEnd) {
+        allEvents.push({
+          id: `ext-${date}-${ext.event_type}`,
+          business_id: organizationId,
+          event_type: ext.event_type,
+          event_date: ext.event_date,
+          cost_amount: ext.cost_amount,
+        });
+      }
+    }
+  }
+
+  // Group events by date with activity metrics
   const daily = new Map<string, { events: TimelineEvent[]; count: number; hours: number; value: number; types: Set<string> }>();
 
-  for (const event of events) {
+  for (const event of allEvents) {
     const date = toDateOnly(event.event_date);
     if (date < rangeStart || date > rangeEnd) continue;
 
@@ -108,9 +127,9 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
   }
 
   // Calculate stats
-  const totalEvents = events.length;
-  const totalHours = events.reduce((sum, e) => sum + (e.labor_hours || 0), 0);
-  const totalValue = events.reduce((sum, e) => sum + (e.cost_amount || 0), 0);
+  const totalEvents = allEvents.length;
+  const totalHours = allEvents.reduce((sum, e) => sum + (e.labor_hours || 0), 0);
+  const totalValue = allEvents.reduce((sum, e) => sum + (e.cost_amount || 0), 0);
   const activeDays = daily.size;
   const contributionTypes = [...new Set(events.map(e => e.event_type))];
 
