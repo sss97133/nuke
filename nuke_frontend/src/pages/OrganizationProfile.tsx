@@ -2525,10 +2525,12 @@ export default function OrganizationProfile() {
               </div>
             )}
 
-            {/* Activity Heatmap */}
-            <div style={{ marginBottom: '16px' }}>
-              <OrganizationTimelineHeatmap organizationId={organizationId!} externalEvents={auctionHeatmapEvents} />
-            </div>
+            {/* Activity Heatmap — only render when there's data to show */}
+            {auctionHeatmapEvents.length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                <OrganizationTimelineHeatmap organizationId={organizationId!} externalEvents={auctionHeatmapEvents} />
+              </div>
+            )}
 
             {/* Live Auctions - Separate section at top */}
             {(() => {
