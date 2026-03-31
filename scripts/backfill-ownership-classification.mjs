@@ -26,14 +26,21 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function classifyOwnership(description) {
   if (!description) return null;
   const desc = description.toLowerCase();
-  if (/acquired by the sell(er|ing dealer)|purchased by the sell(er|ing dealer)|sell(er|ing dealer)('s| has) owned|in the sell(er|ing dealer)('s| has) possession|bought by the sell(er|ing dealer)/.test(desc)) {
+  // OWNER: selling dealer acquired/purchased/possesses the vehicle
+  if (/sell(er|ing dealer).s (acquisition|purchase|possession|care|ownership|collection|inventory)|acquired by the sell(er|ing dealer)|purchased by the sell(er|ing dealer)|bought by the sell(er|ing dealer)|the sell(er|ing dealer) (acquired|purchased|bought|obtained)|prior to the sell(er|ing dealer)|before the sell(er|ing dealer)|(miles|kilometers) (were |have been )?(added|driven) by the sell(er|ing dealer)|sell(er|ing dealer) in \d{4}/.test(desc)) {
     return 'owner';
   }
+  // CONSIGNER: explicit consignment language
   if (/on behalf of|consign(ed|ment)|offered on consignment/.test(desc)) {
     return 'consigner';
   }
+  // CONSIGNER: "current owner" distinct from selling dealer
+  if (/current owner/.test(desc) && !/sell(er|ing dealer).s (acquisition|purchase|possession)|acquired by the sell(er|ing dealer)|the sell(er|ing dealer) (acquired|purchased)/.test(desc)) {
+    return 'consigner';
+  }
+  // BUILT: seller built or restored
   if (/built by the sell(er|ing dealer)|restored by the sell(er|ing dealer)|sell(er|ing dealer)('s| has) (built|restored)/.test(desc)) {
-    return 'built_by';
+    return 'supplier_build';
   }
   return null;
 }

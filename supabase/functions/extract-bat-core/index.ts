@@ -19,6 +19,7 @@ import { parseLocation } from "../_shared/parseLocation.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } from "../_shared/batUpsertWithProvenance.ts";
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 // Extractor versioning - update on each significant change
 const EXTRACTOR_VERSION = 'extract-bat-core:3.0.0';
@@ -1749,6 +1750,31 @@ Deno.serve(async (req) => {
       updatedIds.push(vehicleId);
     }
 
+    // Fire-and-forget observation write
+    if (vehicleId) {
+      const obsFields: Record<string, any> = {};
+      if (identity.year) obsFields.year = identity.year;
+      if (identity.make) obsFields.make = identity.make;
+      if (identity.model) obsFields.model = identity.model;
+      if (essentials.vin) obsFields.vin = essentials.vin;
+      if (essentials.sale_price) obsFields.sale_price = essentials.sale_price;
+      if (essentials.high_bid) obsFields.high_bid = essentials.high_bid;
+      if (essentials.mileage) obsFields.mileage = essentials.mileage;
+      if (bestExteriorColor) obsFields.color = bestExteriorColor;
+      if (bestInteriorColor) obsFields.interior_color = bestInteriorColor;
+      if (essentials.transmission) obsFields.transmission = essentials.transmission;
+      if (essentials.engine) obsFields.engine_size = essentials.engine;
+      if (essentials.drivetrain) obsFields.drivetrain = essentials.drivetrain;
+      if (bestBodyStyle) obsFields.body_style = bestBodyStyle;
+      writeObservation(supabase, {
+        vehicleId,
+        source: { platform: "bat", url: listingUrlCanonical, trustScore: 0.85 },
+        fields: obsFields,
+        observationKind: essentials.sale_price ? "sale_result" : "listing",
+        extractionMethod: "html_match",
+      }).catch((e: any) => console.warn(`[BAT] observationWriter error for ${vehicleId}: ${e?.message}`));
+    }
+
     // Write location observation
     if (vehicleId && parsedLocation.clean) {
       try {
@@ -2133,13 +2159,18 @@ Deno.serve(async (req) => {
 
           const eiId = ei?.id;
 
-          // Classify ownership from description
+          // Classify ownership from description (v2 — expanded patterns)
           const desc = (essentials.description || "").toLowerCase();
           let relType = "sold_by";
-          if (/acquired by the sell(er|ing dealer)|purchased by the sell(er|ing dealer)|sell(er|ing dealer)('s| has) owned|in the sell(er|ing dealer)('s| has) possession|bought by the sell(er|ing dealer)/.test(desc)) {
+          // OWNER: selling dealer acquired/purchased/possesses the vehicle
+          if (/sell(er|ing dealer).s (acquisition|purchase|possession|care|ownership|collection|inventory)|acquired by the sell(er|ing dealer)|purchased by the sell(er|ing dealer)|bought by the sell(er|ing dealer)|the sell(er|ing dealer) (acquired|purchased|bought|obtained)|prior to the sell(er|ing dealer)|before the sell(er|ing dealer)|(miles|kilometers) (were |have been )?(added|driven) by the sell(er|ing dealer)|sell(er|ing dealer) in \d{4}/.test(desc)) {
             relType = "owner";
+          // CONSIGNER: "current owner" distinct from selling dealer, OR explicit consignment
           } else if (/on behalf of|consign(ed|ment)|offered on consignment/.test(desc)) {
             relType = "consigner";
+          } else if (/current owner/.test(desc) && !/sell(er|ing dealer).s (acquisition|purchase|possession)|acquired by the sell(er|ing dealer)|the sell(er|ing dealer) (acquired|purchased)/.test(desc)) {
+            relType = "consigner";
+          // BUILT: seller built or restored
           } else if (/built by the sell(er|ing dealer)|restored by the sell(er|ing dealer)|sell(er|ing dealer)('s| has) (built|restored)/.test(desc)) {
             relType = "supplier_build";
           }
