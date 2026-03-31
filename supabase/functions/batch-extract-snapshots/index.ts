@@ -675,8 +675,12 @@ async function parseWithAI(content: string, url: string, platform: string): Prom
 // 1. BARRETT-JACKSON PARSER — Next.js RSC data extraction
 // ============================================================
 
-function parseBarrettJacksonHtml(html: string): Record<string, any> {
+function parseBarrettJacksonHtml(rawHtml: string): Record<string, any> {
   const result: Record<string, any> = {};
+
+  // BJ uses Next.js RSC with double-escaped JSON in self.__next_f.push() calls.
+  // The data arrives as \\"key\\":\\"value\\" — unescape so regexes can match "key":"value".
+  const html = rawHtml.replace(/\\\\"/g, '"').replace(/\\"/g, '"');
 
   // Strategy 1: Full RSC data (newer snapshots ~2024+)
   // Barrett-Jackson embeds vehicle data in self.__next_f.push() calls
@@ -781,6 +785,23 @@ function parseBarrettJacksonHtml(html: string): Record<string, any> {
     if (hp2?.[1]) {
       const price = parseInt(hp2[1]);
       if (price > 0) result.sale_price = price;
+    }
+  }
+
+  // Price from "price":"$$99,000.00" format (RSC data)
+  if (!result.sale_price) {
+    const priceStrMatch = html.match(/"price"\s*:\s*"\$?\$?([\d,]+(?:\.\d{2})?)"/);
+    if (priceStrMatch?.[1]) {
+      const price = parseInt(priceStrMatch[1].replace(/[,\.]\d{2}$/, '').replace(/,/g, ''));
+      if (price > 0) result.sale_price = price;
+    }
+  }
+
+  // Description from "full_description" in RSC data
+  if (!result.description) {
+    const descMatch = html.match(/"full_description"\s*:\s*"([^"]{40,})"/);
+    if (descMatch?.[1]) {
+      result.description = descMatch[1].replace(/\\n/g, '\n').replace(/\\t/g, ' ').slice(0, 2000);
     }
   }
 
