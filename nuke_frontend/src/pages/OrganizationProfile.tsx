@@ -2212,8 +2212,8 @@ export default function OrganizationProfile() {
       }}>
         {activeTab === 'overview' && (
           <>
-            {/* Key Metrics Bar - vehicles, images, events (no Est. Value — circular estimates removed) */}
-            {(((organization?.total_vehicles ?? 0) > 0) || ((organization?.total_images ?? 0) > 0) || ((organization?.total_events ?? 0) > 0)) && (
+            {/* Key Metrics Bar — only show when seller track record hasn't loaded yet (it supersedes this) */}
+            {!sellerTrackRecord && (((organization?.total_vehicles ?? 0) > 0) || ((organization?.total_images ?? 0) > 0) || ((organization?.total_events ?? 0) > 0)) && (
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
@@ -2291,7 +2291,7 @@ export default function OrganizationProfile() {
                               ${Math.round(Number(amt) / 1000).toLocaleString()}K
                             </span>
                             <span style={{ fontSize: '8px', color: 'var(--text-muted)', width: '24px', textAlign: 'right', flexShrink: 0 }}>
-                              {volForYear || ''}
+                              {volForYear > 0 ? volForYear : ''}
                             </span>
                           </div>
                         );
