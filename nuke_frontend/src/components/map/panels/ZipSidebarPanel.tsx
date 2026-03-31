@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { CollapsibleWidget } from '../../ui/CollapsibleWidget';
+import { optimizeImageUrl } from '../../../lib/imageOptimizer';
 import MiniLineChart from '../../charts/MiniLineChart';
 
 const MAP_FONT = 'Arial, Helvetica, sans-serif';
@@ -207,7 +208,7 @@ export default function ZipSidebarPanel({ zip, onClose, onNavigate }: Props) {
                       }}
                     >
                       {v.primary_image_url && (
-                        <img src={v.primary_image_url} alt="" style={{ width: 36, height: 27, objectFit: 'cover' }}
+                        <img src={optimizeImageUrl(v.primary_image_url, 'micro') || v.primary_image_url} alt="" loading="lazy" style={{ width: 36, height: 27, objectFit: 'cover' }}
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>

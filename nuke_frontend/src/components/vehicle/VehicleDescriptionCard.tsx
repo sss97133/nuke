@@ -274,6 +274,9 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
 
   const isEmpty = !description || description.trim().length === 0;
 
+  // Progressive density: hide entirely when no description and user can't edit
+  if (isEmpty && !isEditable) return null;
+
   return (
     <CollapsibleWidget
       variant="profile"

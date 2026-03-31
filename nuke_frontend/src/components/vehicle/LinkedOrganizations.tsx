@@ -132,18 +132,7 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
     }
   };
 
-  if (loading) {
-    return (
-      <div className="card">
-        <div className="card-header">
-          <h3 className="text-lg font-semibold">Linked Organizations</h3>
-        </div>
-        <div className="card-body">
-          <div className="text-center text-gray-500">Loading...</div>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   if (organizations.length === 0) {
     console.log('[LinkedOrganizations] No organizations found, hiding component');

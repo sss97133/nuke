@@ -81,13 +81,7 @@ const Capsule: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <div className="text text-muted">Loading...</div>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   if (!session) {
     return null; // Will redirect

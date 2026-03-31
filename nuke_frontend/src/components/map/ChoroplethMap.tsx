@@ -12,6 +12,7 @@ import {
   countyColor, zoomToLevel,
 } from './shared';
 import MapTimeline from './controls/MapTimeline';
+import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import type { HistogramBucket } from './types';
 
 // ─── Draggable panel ───────────────────────────────────────────────────────────
@@ -275,7 +276,7 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
       });
       marker.bindPopup(`
         <div style="font-family:Arial;font-size:11px;min-width:160px">
-          ${r.primary_image_url ? `<img src="${r.primary_image_url}" style="width:100%;height:80px;object-fit:cover;margin-bottom:4px" />` : ''}
+          ${r.primary_image_url ? `<img src="${optimizeImageUrl(r.primary_image_url, 'small') || r.primary_image_url}" loading="lazy" style="width:100%;height:80px;object-fit:cover;margin-bottom:4px" />` : ''}
           <div style="font-weight:700">${label}</div>
           <div style="color:#888;font-size:10px">${price ? '$' + price.toLocaleString() : 'NO PRICE'}</div>
           <div style="color:#06b6d4;font-size:9px;margin-top:2px">${r.distance.toFixed(1)} mi away</div>
@@ -342,7 +343,7 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
 
         marker.bindPopup(`
           <div style="font-family:Arial;font-size:11px;min-width:160px">
-            ${v.primary_image_url ? `<img src="${v.primary_image_url}" style="width:100%;height:80px;object-fit:cover;margin-bottom:4px" />` : ''}
+            ${v.primary_image_url ? `<img src="${optimizeImageUrl(v.primary_image_url, 'small') || v.primary_image_url}" loading="lazy" style="width:100%;height:80px;object-fit:cover;margin-bottom:4px" />` : ''}
             <div style="font-weight:700">${label}</div>
             <div style="color:#888;font-size:10px">${price ? '$' + price.toLocaleString() : 'NO PRICE'}</div>
             <div style="color:#888;font-size:9px;margin-top:2px">${obs.location_text_raw || ''} &middot; ${obs.source_platform || ''}</div>
@@ -786,7 +787,7 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
                 padding: '6px 12px', display: 'flex', gap: 8, alignItems: 'center',
                 borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer',
               }}>
-                {v.primary_image_url && <img src={v.primary_image_url} alt="" style={{ width: 48, height: 32, objectFit: 'cover', flexShrink: 0 }} />}
+                {v.primary_image_url && <img src={optimizeImageUrl(v.primary_image_url, 'micro') || v.primary_image_url} alt="" loading="lazy" style={{ width: 48, height: 32, objectFit: 'cover', flexShrink: 0 }} />}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {v.year} {v.make?.toUpperCase()} {v.model?.toUpperCase()}
@@ -895,7 +896,7 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
               <div key={v.id} onClick={() => window.open(`/vehicle/${v.id}`, '_blank')} style={{
                 padding: '6px 12px', display: 'flex', gap: 8, alignItems: 'center',
                 borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer' }}>
-                {v.primary_image_url && <img src={v.primary_image_url} alt="" style={{ width: 48, height: 32, objectFit: 'cover', flexShrink: 0 }} />}
+                {v.primary_image_url && <img src={optimizeImageUrl(v.primary_image_url, 'micro') || v.primary_image_url} alt="" loading="lazy" style={{ width: 48, height: 32, objectFit: 'cover', flexShrink: 0 }} />}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {v.year} {v.make?.toUpperCase()} {v.model?.toUpperCase()}

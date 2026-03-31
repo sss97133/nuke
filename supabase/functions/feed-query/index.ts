@@ -12,14 +12,15 @@ import { corsHeaders } from "../_shared/cors.ts";
  */
 
 // ---------------------------------------------------------------------------
-// Module-level cache: dealer org IDs (avoids re-querying every request)
+// Module-level caches (avoids re-querying every request, survives warm invocations)
 // ---------------------------------------------------------------------------
+const CACHE_TTL = 5 * 60 * 1000; // 5 min
+
 let cachedDealerIds: string[] | null = null;
 let cachedDealerIdsAt = 0;
-const DEALER_CACHE_TTL = 5 * 60 * 1000; // 5 min
 
 async function getDealerOrgIds(supabaseClient: any): Promise<string[]> {
-  if (cachedDealerIds && Date.now() - cachedDealerIdsAt < DEALER_CACHE_TTL) {
+  if (cachedDealerIds && Date.now() - cachedDealerIdsAt < CACHE_TTL) {
     return cachedDealerIds;
   }
   const { data } = await supabaseClient
@@ -30,6 +31,24 @@ async function getDealerOrgIds(supabaseClient: any): Promise<string[]> {
   cachedDealerIdsAt = Date.now();
   return cachedDealerIds;
 }
+
+let cachedNonAutoMakes: string[] | null = null;
+let cachedNonAutoMakesAt = 0;
+
+async function getNonAutoMakes(supabaseClient: any): Promise<string[]> {
+  if (cachedNonAutoMakes && Date.now() - cachedNonAutoMakesAt < CACHE_TTL) {
+    return cachedNonAutoMakes;
+  }
+  const { data } = await supabaseClient
+    .from("non_auto_makes_excluded")
+    .select("make");
+  cachedNonAutoMakes = (data ?? []).map((r: any) => r.make as string);
+  cachedNonAutoMakesAt = Date.now();
+  return cachedNonAutoMakes;
+}
+
+// Warm-up flag: prime the DB connection pool on first cold-start request
+let connectionWarmed = false;
 
 function json(data: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(data), {
@@ -104,6 +123,13 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
+    // Warm up the DB connection pool on first invocation (cold start).
+    // A lightweight query primes the connection before the heavy feed query.
+    if (!connectionWarmed) {
+      await supabase.from("non_auto_makes_excluded").select("make").limit(1);
+      connectionWarmed = true;
+    }
+
     const body: FeedRequest =
       req.method === "POST" ? await req.json().catch(() => ({})) : {};
 
@@ -160,63 +186,25 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Block known non-auto makes (case-insensitive via RPC)
-    // This catches null-type vehicles that slipped past classification.
-    // When user is searching, we still block — if they want motorcycles
-    // they can use include_non_auto=true.
+    // Block known non-auto makes using DB lookup table (non_auto_makes_excluded).
+    // The table stores UPPER-cased canonical makes. We generate both UPPER and
+    // Title-case variants so PostgREST's case-sensitive NOT IN catches both.
+    // This replaces a 130-entry inline array that bloated the query string and
+    // caused cold-start statement timeouts (15s limit on anon role).
     if (body.include_non_auto !== true) {
-      // PostgREST .not().in() is case-sensitive, so we use uppercased make
-      // column (MV uses COALESCE(canonical_name, make) which may be mixed case).
-      // Block all known case variants:
-      const NON_AUTO_MAKES = [
-        // Motorcycles
-        "YAMAHA", "HARLEY-DAVIDSON", "KAWASAKI", "SUZUKI", "DUCATI", "KTM",
-        "TRIUMPH", "INDIAN", "HUSQVARNA", "APRILIA", "MOTO GUZZI", "MV AGUSTA",
-        "NORTON", "BSA", "ROYAL ENFIELD", "BUELL", "ZERO MOTORCYCLES",
-        // Motorcycles — mixed case variants in DB
-        "Yamaha", "Harley-Davidson", "Harley-Davidson–Branded", "Harley",
-        "Kawasaki", "Suzuki", "Ducati", "KTm", "Triumph", "Indian",
-        "Husqvarna", "Aprilia", "Norton", "Buell",
-        "yamaha", "harley-davidson", "kawasaki", "suzuki", "ducati",
-        "triumph", "indian",
-        // Off-road / ATV / UTV
-        "POLARIS", "ARCTIC CAT", "CAN-AM", "ARCTIC",
-        "Polaris", "Arctic Cat", "Can-Am", "Arctic",
-        // Marine / Boats
-        "SEA-DOO", "SEA RAY", "BAYLINER", "BOSTON WHALER", "GRUMMAN",
-        "GLASTRON", "SKEETER", "TRACKER", "LUND", "RANGER BOATS",
-        "MASTERCRAFT", "MALIBU BOATS", "CORRECT CRAFT", "CHAPARRAL",
-        "Sea-Doo", "Sea Ray", "Bayliner", "Boston Whaler", "Grumman",
-        "Glastron", "Skeeter", "Tracker", "Seadoo", "Sea",
-        // RVs / Campers / Trailers
-        "FLEETWOOD", "WINNEBAGO", "AIRSTREAM", "COACHMEN", "JAYCO",
-        "KEYSTONE", "FOREST RIVER", "THOR", "NEWMAR", "TIFFIN",
-        "HOLIDAY RAMBLER", "MONACO", "FLAGSTAFF", "COLEMAN", "STARCRAFT",
-        "FEATHERLITE", "SUNDOWNER",
-        "Fleetwood", "Winnebago", "Airstream", "Coachmen", "Jayco",
-        "Keystone", "Forest River", "Thor", "Newmar", "Tiffin",
-        "Flagstaff", "Coleman", "Starcraft", "Featherlite",
-        // Farm equipment / Heavy equipment
-        "JOHN DEERE", "KUBOTA", "CATERPILLAR", "BOBCAT", "CASE IH",
-        "NEW HOLLAND", "MASSEY FERGUSON", "FARMALL", "ALLIS-CHALMERS",
-        "OLIVER", "MINNEAPOLIS-MOLINE",
-        "John Deere", "Kubota", "Caterpillar", "Bobcat", "Farmall",
-        "Allis-Chalmers", "Oliver",
-        // Medium & heavy duty trucks
-        "FREIGHTLINER", "PETERBILT", "KENWORTH", "MACK", "HINO",
-        "WESTERN STAR", "AUTOCAR", "CRANE CARRIER",
-        "Freightliner", "Peterbilt", "Kenworth", "Mack", "Hino",
-        "Western Star",
-        // Aircraft
-        "CESSNA", "PIPER", "BEECHCRAFT", "MOONEY", "CIRRUS",
-        "Cessna", "Piper", "Beechcraft", "Mooney", "Cirrus",
-        // Golf carts / utility
-        "EZGO", "CLUB CAR", "CUSHMAN", "GEM",
-        "Ezgo", "Club Car", "Cushman", "Club",
-        // Snowmobiles
-        "SKI-DOO", "Ski-Doo", "Skidoo",
-      ];
-      query = query.not("make", "in", `(${NON_AUTO_MAKES.join(",")})`);
+      const canonicalMakes = await getNonAutoMakes(supabase);
+      if (canonicalMakes.length > 0) {
+        // Generate case variants: UPPER + Title Case (covers 99%+ of DB values)
+        const toTitle = (s: string) =>
+          s.toLowerCase().replace(/(^|[\s-])\w/g, (c) => c.toUpperCase());
+        const allVariants = new Set<string>();
+        for (const m of canonicalMakes) {
+          allVariants.add(m);                  // UPPER: "YAMAHA"
+          allVariants.add(toTitle(m));          // Title: "Yamaha"
+          allVariants.add(m.toLowerCase());     // lower: "yamaha"
+        }
+        query = query.not("make", "in", `(${[...allVariants].join(",")})`);
+      }
     }
 
     // Dealer penalty: hide actual dealer listings from default feed.
@@ -369,15 +357,56 @@ Deno.serve(async (req) => {
     // Limit + 1 to detect hasMore
     query = query.limit(limit + 1);
 
-    // ----- Execute main query -----
+    // ----- Execute main query (with timeout fallback) -----
+    let rows: any[];
     const { data: rawRows, error: queryError } = await query;
 
     if (queryError) {
-      console.error("[feed-query] Query error:", queryError);
-      return json({ error: queryError.message }, 500);
-    }
+      // If the main query timed out, try a simpler fallback (no make exclusion,
+      // just vehicle_type filter + basic sort). This ensures the feed always loads.
+      const isTimeout = queryError.message?.includes("timeout") ||
+        queryError.message?.includes("canceling statement") ||
+        queryError.code === "57014";
 
-    const rows = rawRows ?? [];
+      if (isTimeout) {
+        console.warn("[feed-query] Main query timed out, using fallback");
+        const { data: fallbackRows, error: fallbackError } = await supabase
+          .from(feedView)
+          .select(`
+            vehicle_id, year, make, model, series, trim,
+            transmission, drivetrain, body_style, canonical_body_style,
+            mileage, vin, is_for_sale, sale_status, sale_date,
+            created_at, updated_at,
+            discovery_url, discovery_source, profile_origin, origin_organization_id,
+            city, state, listing_location,
+            canonical_vehicle_type, has_photos,
+            display_price, price_source, is_sold,
+            asking_price, sale_price, current_value,
+            nuke_estimate, nuke_estimate_low, nuke_estimate_high, nuke_estimate_confidence,
+            price_tier, deal_score, deal_score_label,
+            heat_score, heat_score_label,
+            is_record_price, segment_record_price, feed_rank_score
+          `)
+          .or(
+            "canonical_vehicle_type.in.(CAR,TRUCK,SUV,VAN,MINIVAN)," +
+            "canonical_vehicle_type.is.null"
+          )
+          .eq("has_photos", true)
+          .order("feed_rank_score", { ascending: false })
+          .limit(limit + 1);
+
+        if (fallbackError) {
+          console.error("[feed-query] Fallback also failed:", fallbackError);
+          return json({ error: fallbackError.message }, 500);
+        }
+        rows = fallbackRows ?? [];
+      } else {
+        console.error("[feed-query] Query error:", queryError);
+        return json({ error: queryError.message }, 500);
+      }
+    } else {
+      rows = rawRows ?? [];
+    }
     const hasMore = rows.length > limit;
     const items = hasMore ? rows.slice(0, limit) : rows;
 

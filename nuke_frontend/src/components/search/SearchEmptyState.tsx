@@ -50,13 +50,7 @@ interface Props {
 export const SearchEmptyState: React.FC<Props> = ({
   recentVehicles, notableSales, topMakes, totalCount, loading,
 }) => {
-  if (loading) {
-    return (
-      <div style={{ padding: '48px 0', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
-        Loading...
-      </div>
-    );
-  }
+  if (loading) return null;
 
   return (
     <div style={{ padding: '0 0 48px' }}>

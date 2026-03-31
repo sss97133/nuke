@@ -1429,10 +1429,7 @@ const VehiclesInner: React.FC = () => {
   return (
     <>
       {loading ? (
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading vehicles...</p>
-        </div>
+        <div style={{ height: '100vh', background: 'var(--bg)' }} />
       ) : (
         <div className="fade-in vehicle-library-layout">
           <aside

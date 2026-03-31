@@ -738,13 +738,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
     };
   }, []);
 
-  if (loading) {
-    return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <div className="text text-muted">Loading...</div>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>

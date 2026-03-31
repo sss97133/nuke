@@ -390,7 +390,7 @@ export default function MapVehicleDetail({ vehicleId, onBack, onNavigate }: Prop
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2, marginBottom: 12 }}>
             {vehicle.images.slice(0, 8).map(img => (
               <div key={img.id} style={{ aspectRatio: '1', overflow: 'hidden' }}>
-                <img src={thumbUrl(img.image_url) || img.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                <img src={thumbUrl(img.image_url) || img.image_url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               </div>
             ))}
           </div>

@@ -881,20 +881,7 @@ const VehicleTimeline: React.FC<{
     }
   };
 
-  if (loading) {
-    return (
-      <div className="card">
-        <div className="card-body">
-          <div className="text-center">
-            <div className="spinner-border" role="status">
-              <span className="sr-only">Loading...</span>
-            </div>
-            <p className="mt-2">Loading timeline events...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   if (error) {
     return (

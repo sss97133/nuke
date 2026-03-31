@@ -63,7 +63,7 @@ const ProfileGallery: React.FC<{
     fallback = [vehicle.primary_image_url];
   }
   return (
-  <React.Suspense fallback={<div className="widget__label" style={{ padding: '10px 16px' }}>Loading gallery...</div>}>
+  <React.Suspense fallback={null}>
     <ImageGallery
       vehicleId={vehicleId}
       showUpload={false}
@@ -194,7 +194,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           )}
 
           {/* Vehicle Dossier — provenance-rich field panel */}
-          <React.Suspense fallback={<div className="widget__label" style={{ padding: '10px 16px' }}>Loading...</div>}>
+          <React.Suspense fallback={null}>
             <VehicleDossierPanel />
           </React.Suspense>
 
@@ -252,7 +252,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {/* Comparable Sales */}
           {vehicle.year && vehicle.make && vehicle.model && (
             <CollapsibleWidget variant="profile" title="Comparable Sales" defaultCollapsed={true}>
-              <React.Suspense fallback={<div className="widget__label" style={{ padding: '10px 16px' }}>Loading comps...</div>}>
+              <React.Suspense fallback={null}>
                 <SimilarSalesSection
                   vehicleId={vehicle.id}
                   vehicleYear={vehicle.year}
@@ -266,7 +266,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {/* Observation History — all observations for this vehicle, chronological */}
           {observationCount > 0 && (
             <CollapsibleWidget variant="profile" title="Observation History" defaultCollapsed={true}>
-              <React.Suspense fallback={<div className="widget__label" style={{ padding: '10px 16px' }}>Loading observations...</div>}>
+              <React.Suspense fallback={null}>
                 <ObservationTimeline />
               </React.Suspense>
             </CollapsibleWidget>
@@ -389,9 +389,10 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             <NukeEstimatePanel vehicleId={vehicle.id} vehicle={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} canCompute={isRowOwner || isVerifiedOwner || hasContributorAccess} />
           </React.Suspense>
 
-          <CollapsibleWidget variant="profile" title="Auction History" defaultCollapsed={true}>
+          {/* Auction History — ExternalListingCard self-guards: returns null when no listings */}
+          <React.Suspense fallback={null}>
             <ExternalListingCard vehicleId={vehicle.id} />
-          </CollapsibleWidget>
+          </React.Suspense>
 
           {/* Owner-only tools */}
           {(isRowOwner || isVerifiedOwner) && (
@@ -553,10 +554,10 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             <AuctionReadinessPanel />
           </React.Suspense>
 
-          {/* Videos */}
-          <CollapsibleWidget variant="profile" title="Videos" defaultCollapsed={true}>
+          {/* Videos — VehicleVideoSection self-guards: returns null when no videos */}
+          <React.Suspense fallback={null}>
             <VehicleVideoSection vehicleId={vehicle.id} defaultCollapsed={false} />
-          </CollapsibleWidget>
+          </React.Suspense>
         </div>
       </div>
     </div>

@@ -407,9 +407,8 @@ export default function Dashboard() {
       {/* Simple List - No Categories */}
       {isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '8px' }}>
-          <style>{`@keyframes dash-pulse { 0%,100%{opacity:.7} 50%{opacity:.3} }`}</style>
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} style={{ height: 56, background: 'var(--surface)', border: '1px solid var(--border)', animation: 'dash-pulse 1.5s ease-in-out infinite' }} />
+            <div key={i} style={{ height: 56, background: 'var(--surface)', border: '1px solid var(--border)' }} />
           ))}
         </div>
       ) : allItems.length === 0 ? (

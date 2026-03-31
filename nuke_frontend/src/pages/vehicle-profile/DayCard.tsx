@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import type { WorkSession, DailyReceipt, DayPhoto } from './hooks/useBuildLog';
+import { optimizeImageUrl } from '../../lib/imageOptimizer';
 
 // ── Helpers ──
 
@@ -220,7 +221,7 @@ const PhotoAreaGroup: React.FC<{
             onClick={() => setExpandedPhoto(expandedPhoto === photo.id ? null : photo.id)}
           >
             <img
-              src={photo.thumbnail_url || photo.image_url}
+              src={optimizeImageUrl(photo.thumbnail_url || photo.image_url, 'thumbnail') || photo.thumbnail_url || photo.image_url}
               alt={photo.caption || photo.file_name || 'Work photo'}
               loading="lazy"
               style={{

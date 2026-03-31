@@ -138,15 +138,7 @@ export default function VehicleMemePanel({
   const visibleMemes = expanded ? imageMemes : imageMemes.slice(0, 6);
   const hasMore = imageMemes.length > 6;
 
-  if (loading) {
-    return (
-      <div className="card">
-        <div className="card-body">
-          Loading...
-        </div>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   if (imageMemes.length === 0) {
     return null;

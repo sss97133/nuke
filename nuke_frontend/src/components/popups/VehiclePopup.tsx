@@ -18,6 +18,7 @@ import type { FeedVehicle } from '../../feed/types/feed';
 import { resolveVehiclePrice } from '../../feed/utils/feedPriceResolution';
 import { supabase } from '../../lib/supabase';
 import { usePopup } from './usePopup';
+import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import { useViewHistory } from '../../hooks/useViewHistory';
 import { useInterests } from '../../hooks/useInterests';
 import { MakePopup } from './MakePopup';
@@ -167,7 +168,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
       {/* Hero image */}
       {vehicle.thumbnail_url && (
         <div style={{ width: '100%', height: 220, overflow: 'hidden', background: '#e0e0e0' }}>
-          <img src={vehicle.thumbnail_url} alt={title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          <img src={optimizeImageUrl(vehicle.thumbnail_url, 'medium') || vehicle.thumbnail_url} alt={title} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
         </div>
       )}
 
@@ -397,7 +398,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
               >
                 {c.thumbnail && (
-                  <img src={c.thumbnail} alt="" loading="lazy" style={{ width: 40, height: 27, objectFit: 'cover', flexShrink: 0, border: '1px solid #e0e0e0' }} />
+                  <img src={optimizeImageUrl(c.thumbnail, 'micro') || c.thumbnail} alt="" loading="lazy" style={{ width: 40, height: 27, objectFit: 'cover', flexShrink: 0, border: '1px solid #e0e0e0' }} />
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ fontFamily: SANS, fontSize: 9, fontWeight: 700, color: '#1a1a1a', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

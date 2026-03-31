@@ -246,7 +246,7 @@ export function FeedLayout({
                     fontFamily: 'Arial, sans-serif', color: 'var(--text-disabled)',
                   }}
                 >
-                  {isFetchingNextPage ? 'Loading...' : ''}
+                  {''}
                 </div>
               );
             }
@@ -334,7 +334,7 @@ export function FeedLayout({
                   color: 'var(--text-disabled)', textTransform: 'uppercase',
                 }}
               >
-                {isFetchingNextPage ? 'Loading...' : ''}
+                {''}
               </div>
             ) : viewMode === 'grid' ? (
               <div style={{

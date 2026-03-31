@@ -1,7 +1,7 @@
-import React, { useContext, useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import React, { useContext } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { PopupStackContext } from '../../components/popups/PopupStack';
+import { useAuctionCommentStats } from '../../hooks/useAuctionComments';
 import { CommentsPopup } from '../../components/popups/CommentsPopup';
 import { BidsPopup } from '../../components/popups/BidsPopup';
 import { WatchersPopup } from '../../components/popups/WatchersPopup';
@@ -25,14 +25,8 @@ const VehicleBadgeBar: React.FC = () => {
 
   // Engagement stats — prefer live count from auction_comments over stale snapshots
   const bidCount = auctionPulse?.bid_count || v.bid_count;
-  const [liveCommentCount, setLiveCommentCount] = useState<number | null>(null);
-  useEffect(() => {
-    if (!v?.id) return;
-    supabase.from('auction_comments').select('id', { count: 'exact', head: true })
-      .eq('vehicle_id', v.id)
-      .then(({ count }) => { if (count != null && count > 0) setLiveCommentCount(count); });
-  }, [v?.id]);
-  const commentCount = liveCommentCount || auctionPulse?.comment_count || v.comment_count;
+  const { data: commentStats } = useAuctionCommentStats(v?.id);
+  const commentCount = commentStats?.commentCount || auctionPulse?.comment_count || v.comment_count;
   const watcherCount = auctionPulse?.watcher_count || v.bat_watchers;
   const dqScore = v.data_quality_score;
   const highBid = v.high_bid || auctionPulse?.current_bid;

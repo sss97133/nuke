@@ -527,7 +527,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       if (!ev) return;
       const dateLabel = formatDate(date);
       openPopup(
-        <React.Suspense fallback={<div style={{ padding: '12px', fontSize: '8px', fontFamily: 'Arial, sans-serif' }}>Loading day detail...</div>}>
+        <React.Suspense fallback={null}>
           <DayCardPopupContent
             session={{
               date,

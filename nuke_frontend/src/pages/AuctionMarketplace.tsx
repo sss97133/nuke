@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { getVehicleIdentityParts } from '../utils/vehicleIdentity';
 import { formatCurrencyFromCents, resolveCurrencyCode } from '../utils/currency';
 import '../styles/unified-design-system.css';
+import { optimizeImageUrl } from '../lib/imageOptimizer';
 
 const AUCTION_PLATFORMS = [
   'bat', 'cars_and_bids', 'collecting_cars', 'broad_arrow',
@@ -777,7 +778,7 @@ function AuctionCard({ auction, now }: { auction: LiveAuction; now: number }) {
       <div style={{ position: 'relative', paddingBottom: '66.66%', background: 'var(--surface-hover)', overflow: 'hidden' }}>
         {imageUrl ? (
           <img
-            src={imageUrl}
+            src={optimizeImageUrl(imageUrl, 'small') || imageUrl}
             alt={title}
             loading="lazy"
             style={{

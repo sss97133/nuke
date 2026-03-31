@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
-import { supabase } from '../../lib/supabase';
+import { useAuctionCommentStats } from '../../hooks/useAuctionComments';
 import OrphanedVehicleBanner from '../../components/vehicle/OrphanedVehicleBanner';
 
 const LiveAuctionBanner = React.lazy(() => import('../../components/auction/LiveAuctionBanner'));
@@ -15,14 +15,8 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
   onMergeComplete,
 }) => {
   const { vehicle, session, permissions, auctionPulse, auctionCurrency, isVerifiedOwner } = useVehicleProfile();
-  // Fetch live comment count instead of stale auctionPulse.comment_count
-  const [liveCommentCount, setLiveCommentCount] = useState<number | null>(null);
-  useEffect(() => {
-    if (!vehicle?.id) return;
-    supabase.from('auction_comments').select('id', { count: 'exact', head: true })
-      .eq('vehicle_id', vehicle.id)
-      .then(({ count }) => { if (count != null && count > 0) setLiveCommentCount(count); });
-  }, [vehicle?.id]);
+  const { data: commentStats } = useAuctionCommentStats(vehicle?.id);
+  const liveCommentCount = commentStats?.commentCount ?? null;
   if (!vehicle) return null;
 
   return (
@@ -94,7 +88,7 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
 
       {/* Merge Proposals Panel - Only visible to verified owners */}
       {isVerifiedOwner && (
-        <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading merge proposals...</div>}>
+        <React.Suspense fallback={null}>
           <MergeProposalsPanel
             vehicleId={vehicle.id}
             onMergeComplete={onMergeComplete}

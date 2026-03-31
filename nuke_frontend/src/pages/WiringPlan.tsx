@@ -206,7 +206,7 @@ export default function WiringPlan() {
   const recommendations = Array.isArray(result?.recommendations) ? result?.recommendations : [];
 
   if (loading) {
-    return <div style={{ padding: '20px', color: 'var(--text-muted)' }}>Loading...</div>;
+    return null;
   }
 
   return (
@@ -272,7 +272,7 @@ export default function WiringPlan() {
 
       {/* Builder view */}
       {designId && viewMode === 'builder' && (
-        <Suspense fallback={<div style={{ padding: '20px', color: 'var(--text-muted)' }}>Loading harness builder...</div>}>
+        <Suspense fallback={null}>
           <HarnessBuilder designId={designId} vehicleId={vehicleId!} vehicleType={vehicleType} />
         </Suspense>
       )}

@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { optimizeImageUrl } from '../lib/imageOptimizer';
 
 interface VehicleThumbnailProps {
   vehicleId: string;
@@ -140,9 +141,7 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
   if (loading) {
     return (
       <div className={className} style={containerStyle}>
-        <div style={{ fontSize: size === 'small' ? '12px' : '14px', color: 'var(--text-secondary)' }}>
-          Loading...
-        </div>
+        <div style={{ background: 'var(--surface)', width: '100%', height: '100%' }} />
       </div>
     );
   }
@@ -161,8 +160,9 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
     return (
       <div className={className} style={containerStyle} onClick={onClick}>
         <img
-          src={imageUrl}
+          src={optimizeImageUrl(imageUrl, 'small') || imageUrl}
           alt={vehicleName}
+          loading="lazy"
           style={{
             position: 'absolute',
             inset: 0,

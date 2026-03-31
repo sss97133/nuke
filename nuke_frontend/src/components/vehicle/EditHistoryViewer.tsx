@@ -57,7 +57,7 @@ export const EditHistoryViewer: React.FC<EditHistoryViewerProps> = ({ vehicleId 
 
       {showHistory && (
         <div className="card-body">
-          {loading && <div className="text text-small text-muted">Loading...</div>}
+          {loading && null}
           
           {!loading && history.length === 0 && (
             <div className="text text-small text-muted">No edit history yet</div>

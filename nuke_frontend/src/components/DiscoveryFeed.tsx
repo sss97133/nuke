@@ -347,12 +347,7 @@ const DiscoveryFeed = ({ viewMode: propViewMode = 'gallery', denseMode = false, 
   // If using one of the original view modes, render the enhanced content
   if (propViewMode === 'gallery' || propViewMode === 'compact') {
     if (loading && items.length === 0) {
-      return (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div className="spinner"></div>
-          <p className="text text-muted">Loading content...</p>
-        </div>
-      );
+      return null;
     }
 
     return (
@@ -384,12 +379,7 @@ const DiscoveryFeed = ({ viewMode: propViewMode = 'gallery', denseMode = false, 
           ))}
         </div>
 
-        {loading && items.length > 0 && (
-          <div style={{ textAlign: 'center', padding: '20px' }}>
-            <div className="spinner"></div>
-            <p className="text text-muted">Loading more content...</p>
-          </div>
-        )}
+        {loading && items.length > 0 && null}
 
         {!hasMore && items.length > 0 && (
           <div style={{ textAlign: 'center', padding: '40px' }}>
