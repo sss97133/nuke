@@ -357,6 +357,11 @@ Deno.serve(async (req) => {
               updatePayload[dbField] = newVal;
               fieldsUpdated.push(dbField);
             }
+          } else if (dbField === "description" && typeof newVal === "string" && typeof existing === "string"
+            && newVal.length > existing.length * 1.5 && newVal.length > 500) {
+            // Replace short/truncated descriptions with significantly longer ones
+            updatePayload[dbField] = newVal;
+            fieldsUpdated.push(dbField);
           } else if (dbField === "trim" && typeof existing === "string" && existing.length > 60) {
             updatePayload[dbField] = newVal;
             fieldsUpdated.push(dbField);
@@ -1343,7 +1348,28 @@ function parseBatHtml(html: string): Record<string, any> {
     }
   }
 
-  // --- Post excerpt for description ---
+  // --- Full listing description (listing-post-content has the complete multi-paragraph text) ---
+  if (!result.description) {
+    // BaT full description: <div class="listing-post-content"> contains <p> tags with the full text
+    const fullContentMatch = html.match(/<div[^>]*class=["'][^"']*listing-post-content[^"']*["'][^>]*>([\s\S]*?)<\/div>\s*(?:<\/div>|<div[^>]*class=["'][^"']*listing)/i);
+    if (fullContentMatch?.[1]) {
+      // Extract all <p> tag contents
+      const paragraphs: string[] = [];
+      const pRe = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+      let pm: RegExpExecArray | null;
+      while ((pm = pRe.exec(fullContentMatch[1])) !== null) {
+        const text = pm[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        if (text.length > 10) paragraphs.push(text);
+      }
+      if (paragraphs.length > 0) {
+        const fullText = paragraphs.join("\n\n");
+        if (fullText.length > 40 && !fullText.startsWith("Bring a Trailer")) {
+          result.description = fullText.slice(0, 4000);
+        }
+      }
+    }
+  }
+  // Fallback: post-excerpt or post-content (shorter but better than nothing)
   if (!result.description) {
     const excerptMatch =
       html.match(/<div[^>]*class=["'][^"']*post-excerpt[^"']*["'][^>]*>([\s\S]*?)<\/div>/i) ||
@@ -1351,7 +1377,7 @@ function parseBatHtml(html: string): Record<string, any> {
     if (excerptMatch?.[1]) {
       const text = excerptMatch[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
       if (text.length > 40 && !text.includes("for sale on BaT")) {
-        result.description = text.slice(0, 2000);
+        result.description = text.slice(0, 4000);
       }
     }
   }
