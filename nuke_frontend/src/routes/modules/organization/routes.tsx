@@ -9,9 +9,7 @@ const CreateOrganization = React.lazy(() => import('../../../pages/CreateOrganiz
 const Dashboard = React.lazy(() => import('../../../pages/Dashboard'));
 
 const LazyFallback = () => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'var(--text-disabled)', fontSize: '12px' }}>
-    loading...
-  </div>
+  <div style={{ height: '100vh', background: 'var(--bg)' }} />
 );
 
 const OrganizationModuleRoutes = () => {

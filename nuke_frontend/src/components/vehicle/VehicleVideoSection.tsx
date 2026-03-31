@@ -252,20 +252,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
     fetchVideos();
   }, [vehicleId]);
 
-  if (loading) {
-    return (
-      <div className="card">
-        <div className="card-header" style={{ cursor: 'pointer' }}>
-          VIDEO MOMENTS
-        </div>
-        <div className="card-body">
-          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
-            Loading...
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   if (videos.length === 0) {
     return null; // Don't show section if no videos

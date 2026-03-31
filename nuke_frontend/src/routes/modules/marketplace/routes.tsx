@@ -14,9 +14,7 @@ const ContractStation = React.lazy(() => import('../../../pages/ContractStation'
 const MarketMap = React.lazy(() => import('../../../components/market/MarketMap'));
 
 const LazyFallback = () => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'var(--text-disabled)', fontSize: '12px' }}>
-    loading...
-  </div>
+  <div style={{ height: '100vh', background: 'var(--bg)' }} />
 );
 
 const MarketplaceModuleRoutes = () => {

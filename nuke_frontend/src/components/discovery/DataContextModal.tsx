@@ -253,11 +253,8 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
           padding: '16px'
         }}>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '32px' }}>
-              <div className="loading-spinner" style={{ margin: '0 auto' }}></div>
-              <div className="text-muted" style={{ marginTop: '8px', fontSize: '11px' }}>
-                Loading comparable vehicles...
-              </div>
+            <div style={{ padding: '32px' }}>
+              <div style={{ height: 40, background: 'var(--surface)' }} />
             </div>
           ) : vehicles.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px' }}>

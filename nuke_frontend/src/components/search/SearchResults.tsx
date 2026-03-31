@@ -216,11 +216,7 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
     return (
       <div style={{ padding: '0' }}>
         <style>{`
-          .sk { background: var(--border); animation: skeleton-shimmer 1.5s infinite; }
-          @keyframes skeleton-shimmer {
-            0%, 100% { opacity: 0.4; }
-            50% { opacity: 0.8; }
-          }
+          .sk { background: var(--border); }
         `}</style>
         {/* Fake summary bar */}
         <div style={{ background: 'var(--bg)', border: '2px solid var(--border)', padding: '10px 14px', marginBottom: '12px', display: 'flex', gap: '12px', alignItems: 'center' }}>

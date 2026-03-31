@@ -660,13 +660,6 @@ export interface WorkMemorySectionProps {
   permissions: VehiclePermissions;
 }
 
-export interface ImageGalleryV2Props {
-  vehicleId: string;
-  vehicleYMM?: { year?: number; make?: string; model?: string };
-  onImagesUpdated?: () => void;
-  showUpload?: boolean;
-}
-
 export interface FinancialProductsProps {
   vehicleId: string;
   vehicleName?: string;
@@ -696,12 +689,6 @@ export interface VehicleBasicInfoProps extends VehicleBaseProps {
 
 export interface VehicleTimelineSectionProps extends VehicleBaseProps {
   onAddEventClick?: () => void;
-}
-
-export interface VehicleImageGalleryProps extends VehicleBaseProps {
-  showMap: boolean;
-  onToggleMap: () => void;
-  onImageUpdate: () => void;
 }
 
 export interface VehicleCommentsSectionProps {

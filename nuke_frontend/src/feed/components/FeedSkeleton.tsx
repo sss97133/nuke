@@ -11,7 +11,6 @@ export interface FeedSkeletonProps {
 
 const shimmer: CSSProperties = {
   background: 'var(--surface-hover)',
-  animation: 'nuke-skeleton-pulse 1.5s ease-in-out infinite',
 };
 
 export function FeedSkeleton({ cardsPerRow = 6, rows = 3 }: FeedSkeletonProps) {
@@ -19,12 +18,7 @@ export function FeedSkeleton({ cardsPerRow = 6, rows = 3 }: FeedSkeletonProps) {
 
   return (
     <>
-      <style>{`
-        @keyframes nuke-skeleton-pulse {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 0.8; }
-        }
-      `}</style>
+      {/* skeleton pulse animation removed */}
       <div
         style={{
           display: 'grid',

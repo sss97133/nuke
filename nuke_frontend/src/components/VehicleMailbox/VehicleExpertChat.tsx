@@ -995,7 +995,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
               </div>
             }
           >
-            <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-secondary)' }}>Loading 3D model...</div>}>
+            <Suspense fallback={null}>
               <ModelHarnessAnnotator vehicleId={vehicleId} defaultImportUrl={activeModelSignedUrl} autoImportOnLoad={true} />
             </Suspense>
           </ErrorBoundary>

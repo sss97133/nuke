@@ -556,8 +556,8 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
     );
   }
 
-  // No Empty Shells: if no factory books and no profile docs and not logged in, hide entirely
-  if (books.length === 0 && linkedDocs.length === 0 && !userId) return null;
+  // No Empty Shells: if no factory books and no profile docs, hide entirely (regardless of login state)
+  if (books.length === 0 && linkedDocs.length === 0) return null;
 
   return (
     <>
@@ -792,9 +792,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                   </div>
                   <div className="card-body">
 
-                  {loadingUserDocs ? (
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Loading...</div>
-                  ) : (
+                  {loadingUserDocs ? null : (
                     <>
                       {linkedDocs.length === 0 && suggestedDocs.length === 0 ? (
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>

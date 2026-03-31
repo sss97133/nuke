@@ -55,9 +55,7 @@ const BuildTimelineChart: React.FC<Props> = ({ snapshots }) => {
   const handleMouseEnter = useCallback((i: number) => setHoveredIdx(i), []);
   const handleMouseLeave = useCallback(() => setHoveredIdx(null), []);
 
-  if (activeSnapshots.length === 0) {
-    return <div style={{ fontSize: '9px', color: 'var(--vp-pencil)', padding: '8px' }}>No timeline data available.</div>;
-  }
+  if (activeSnapshots.length === 0) return null;
 
   return (
     <div style={{ fontFamily: 'var(--vp-font-sans)', fontSize: '9px' }}>

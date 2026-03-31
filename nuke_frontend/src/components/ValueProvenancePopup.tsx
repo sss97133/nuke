@@ -612,10 +612,9 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         border: '2px solid var(--border)',
         padding: '20px',
         zIndex: 10000,
-        minWidth: '400px'
-      }}>
-        Loading...
-      </div>
+        minWidth: '400px',
+        height: '100px',
+      }} />
     );
   }
 

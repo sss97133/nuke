@@ -73,18 +73,7 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{
-        ...getSizeStyles(),
-        background: 'var(--bg)', display: 'inline-flex',
-        alignItems: 'center',
-        color: 'var(--text-disabled)'
-      }}>
-        Loading...
-      </div>
-    );
-  }
+  if (loading) return null;
 
   if (!userRating) {
     return (

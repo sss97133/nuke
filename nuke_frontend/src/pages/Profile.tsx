@@ -346,15 +346,7 @@ const Profile: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="container">
-        <div className="main">
-          <div className="card">
-            <div className="card-body text-center">
-              <h2 className="text font-bold" style={{ fontSize: '11px' }}>Loading...</h2>
-            </div>
-          </div>
-        </div>
-      </div>
+      <div style={{ height: '100vh', background: 'var(--bg)' }} />
     );
   }
 

@@ -187,32 +187,8 @@ export function SimilarSalesSection({
     );
   }
 
-  if (sales.length === 0) {
-    return (
-      <div style={{ padding: '16px 10px', textAlign: 'center' }}>
-        <div style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
-          fontSize: '9px',
-          fontWeight: 700,
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-          color: 'var(--text-disabled)',
-          marginBottom: '4px',
-        }}>
-          NO COMPARABLE SALES FOUND
-        </div>
-        <div style={{
-          fontFamily: 'Arial, Helvetica, sans-serif',
-          fontSize: '9px',
-          color: 'var(--text-secondary)',
-          lineHeight: '1.5',
-        }}>
-          No sold {vehicleYear ?? ''} {vehicleMake ?? ''} {vehicleModel ?? ''} (+/-2 years) in our database yet.
-          More comps are added daily as auctions close.
-        </div>
-      </div>
-    );
-  }
+  // Progressive density: don't render at all when no comparable sales exist
+  if (sales.length === 0) return null;
 
   return (
     <div style={{ padding: '10px' }}>

@@ -156,17 +156,8 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
   // No Empty Shells: if done loading/computing and no estimate, hide for non-owners
   if (!loading && !computing && !estimate && !canCompute) return null;
 
-  if (loading) {
-    return (
-      <div className="card">
-        <div className="card-header">NUKE ESTIMATE</div>
-        <div className="card-body" style={{ padding: '12px' }}>
-          <div style={{ height: 28, background: 'var(--border)', marginBottom: 8, width: '50%', opacity: 0.5 }} />
-          <div style={{ height: 14, background: 'var(--border)', width: '70%', opacity: 0.4 }} />
-        </div>
-      </div>
-    );
-  }
+  // Progressive density: return null when loading (no skeleton bars)
+  if (loading) return null;
 
   return (
     <div className="card">
@@ -196,7 +187,6 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{
                     width: '8px', height: '8px', background: 'var(--success)',
-                    animation: 'pulse 1.5s ease-in-out infinite',
                   }} />
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     Computing estimate...
@@ -211,23 +201,12 @@ const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicl
                       }}>
                         <div style={{
                           width: `${30 + i * 15}%`, height: '100%',
-                          background: 'var(--border)', animation: `shimmer 1.5s ease-in-out infinite`,
-                          animationDelay: `${i * 0.2}s`,
+                          background: 'var(--border)',
                         }} />
                       </div>
                     </div>
                   ))}
                 </div>
-                <style>{`
-                  @keyframes shimmer {
-                    0%, 100% { opacity: 0.3; }
-                    50% { opacity: 0.8; }
-                  }
-                  @keyframes pulse {
-                    0%, 100% { opacity: 0.4; transform: scale(0.8); }
-                    50% { opacity: 1; transform: scale(1); }
-                  }
-                `}</style>
               </>
             ) : (
               <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>

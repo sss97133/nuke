@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { supabase } from '../../lib/supabase';
 import { usePopup } from '../../components/popups/usePopup';
+import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import { VehiclePopup } from '../../components/popups/VehiclePopup';
 import type { InterestEntry } from '../../hooks/useInterests';
 import type { FeedVehicle } from '../types/feed';
@@ -290,7 +291,7 @@ export function FreshFindsStrip({
             >
               {v.primary_image_url ? (
                 <img
-                  src={v.primary_image_url}
+                  src={optimizeImageUrl(v.primary_image_url, 'thumbnail') || v.primary_image_url}
                   alt={name}
                   style={thumbStyle}
                   loading="lazy"

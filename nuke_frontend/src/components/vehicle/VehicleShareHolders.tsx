@@ -123,18 +123,7 @@ export default function VehicleShareHolders({ vehicleId, vehicleValue = 0, compa
     return null;
   }
 
-  if (loading) {
-    return (
-      <div style={{
-        padding: '16px',
-        fontSize: '12px',
-        color: 'var(--text-secondary)',
-        textAlign: 'center'
-      }}>
-        Loading...
-      </div>
-    );
-  }
+  if (loading) return null;
 
   // Compact view for cards
   if (compact) {

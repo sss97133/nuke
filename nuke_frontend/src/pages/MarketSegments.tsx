@@ -148,15 +148,14 @@ export default function MarketSegments() {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
-        <style>{`@keyframes seg-pulse { 0%,100%{opacity:.6} 50%{opacity:.3} }`}</style>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <div style={{ height: 28, background: 'var(--surface)', marginBottom: 24, width: 220, animation: 'seg-pulse 1.5s ease-in-out infinite' }} />
+          <div style={{ height: 28, background: 'var(--surface)', marginBottom: 24, width: 220 }} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} style={{ border: '2px solid var(--border)', padding: 16, background: 'var(--surface)' }}>
-                <div style={{ height: 14, background: 'var(--border)', marginBottom: 10, width: '60%', animation: 'seg-pulse 1.5s ease-in-out infinite' }} />
-                <div style={{ height: 24, background: 'var(--border)', marginBottom: 8, width: '40%', animation: 'seg-pulse 1.5s ease-in-out infinite' }} />
-                <div style={{ height: 10, background: 'var(--border)', width: '75%', animation: 'seg-pulse 1.5s ease-in-out infinite' }} />
+                <div style={{ height: 14, background: 'var(--border)', marginBottom: 10, width: '60%' }} />
+                <div style={{ height: 24, background: 'var(--border)', marginBottom: 8, width: '40%' }} />
+                <div style={{ height: 10, background: 'var(--border)', width: '75%' }} />
               </div>
             ))}
           </div>

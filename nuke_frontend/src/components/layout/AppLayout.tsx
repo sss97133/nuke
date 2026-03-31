@@ -140,21 +140,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
         >
           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', letterSpacing: 1 }}>NUKE</span>
         </div>
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'column',
-            gap: 12,
-          }}
-        >
-          <div className="loading-spinner" />
-          <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'Arial, sans-serif' }}>
-            Loading...
-          </span>
-        </div>
+        <div style={{ flex: 1, background: 'var(--bg)' }} />
       </div>
     );
   }

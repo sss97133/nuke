@@ -160,9 +160,7 @@ const BuildStatusPanel: React.FC<Props> = ({ workOrders, totals, isOwnerView }) 
                 borderBottom: '2px solid var(--vp-border)',
                 padding: '6px 8px',
               }}>
-                {isLoading && (
-                  <div style={{ fontSize: '8px', color: 'var(--vp-pencil)', padding: '4px 0' }}>Loading...</div>
-                )}
+                {isLoading && null}
                 {detail && (
                   <>
                     {/* Parts */}

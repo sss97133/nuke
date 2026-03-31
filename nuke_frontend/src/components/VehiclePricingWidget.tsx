@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { AnalysisConfigSelector } from './analysis/AnalysisConfigSelector';
 import { supabase } from '../lib/supabase';
+import { optimizeImageUrl } from '../lib/imageOptimizer';
 import { VehicleValuationService } from '../services/vehicleValuationService';
 import type { VehicleValuation } from '../services/vehicleValuationService';
 import { BuyCreditsButton } from './credits/BuyCreditsButton';
@@ -799,9 +800,10 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                           onClick={() => window.open(img.url, '_blank')}
                           title={img.tags.join(', ')}
                         >
-                          <img 
-                            src={img.url} 
+                          <img
+                            src={optimizeImageUrl(img.url, 'thumbnail') || img.url}
                             alt={part.name}
+                            loading="lazy"
                             style={{
                               width: '100%',
                               height: '100%',
@@ -1203,8 +1205,9 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                       onClick={() => window.open(img.url, '_blank')}
                     >
                       <img
-                        src={img.url}
+                        src={optimizeImageUrl(img.url, 'small') || img.url}
                         alt={`${selectedPart.name} validation ${idx + 1}`}
+                        loading="lazy"
                         style={{
                           width: '100%',
                           height: '120px',

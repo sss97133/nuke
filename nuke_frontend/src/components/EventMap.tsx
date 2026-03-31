@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { optimizeImageUrl } from '../lib/imageOptimizer';
 
 // Lightweight Leaflet loader via CDN to avoid adding npm deps right now
 const ensureLeaflet = (): Promise<typeof window & { L: any }> => {
@@ -261,14 +262,14 @@ const EventMap: React.FC<EventMapProps> = ({ vehicleId, showLifeOnly = false }) 
             const m = L.marker([lat, lon]).addTo(map);
             const dateStr = ev.event_date ? new Date(ev.event_date).toLocaleDateString() : '';
             const title = ev.title || ev.event_type || 'Event';
-            const img = Array.isArray(ev.image_urls) && ev.image_urls[0] ? `<div style="margin-top:6px;"><img src="${ev.image_urls[0]}" style="width:120px;height:90px;object-fit:cover;border:1px solid var(--border);" /></div>` : '';
+            const img = Array.isArray(ev.image_urls) && ev.image_urls[0] ? `<div style="margin-top:6px;"><img src="${optimizeImageUrl(ev.image_urls[0], 'small') || ev.image_urls[0]}" loading="lazy" style="width:120px;height:90px;object-fit:cover;border:1px solid var(--border);" /></div>` : '';
             m.bindPopup(`<div style="font-family:Arial,sans-serif;font-size:12px;max-width:180px;"><div style="font-weight:600;">${title}</div><div>${dateStr}</div>${img}</div>`);
             markers.push(m);
           });
           // Render photo markers (smaller icon)
           photoPoints.forEach((p) => {
             const m = L.circleMarker([p.lat, p.lon], { radius: 5, color: 'var(--info)', fillColor: 'var(--info)', fillOpacity: 0.85 }).addTo(map);
-            const img = `<div style="margin-top:6px;"><img src="${p.url}" style="width:140px;height:100px;object-fit:cover;border:1px solid var(--border);" /></div>`;
+            const img = `<div style="margin-top:6px;"><img src="${optimizeImageUrl(p.url, 'small') || p.url}" loading="lazy" style="width:140px;height:100px;object-fit:cover;border:1px solid var(--border);" /></div>`;
             m.bindPopup(`<div style="font-family:Arial,sans-serif;font-size:12px;max-width:200px;"><div style="font-weight:600;">Photo</div>${img}</div>`);
             markers.push(m);
           });

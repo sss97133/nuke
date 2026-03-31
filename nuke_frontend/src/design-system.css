@@ -1609,19 +1609,14 @@ body {
   gap: var(--space-3);
 }
 
+/* DEPRECATED: .loading-spinner removed — use static skeleton fills instead */
 .loading-spinner {
   width: 24px;
   height: 24px;
-  border: 2px solid var(--border-light);
-  border-top: 2px solid var(--text);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+  background: var(--surface);
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+.skeleton-fill { background: var(--surface); }
 
 /* Utilities */
 .text-center { text-align: center; }
@@ -1735,14 +1730,11 @@ body {
   margin-bottom: var(--space-2);
 }
 
-/* Spinner - Classic Style */
+/* DEPRECATED: .spinner removed — use static skeleton fills instead */
 .spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid var(--border-light);
-  border-top: 2px solid var(--text);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+  background: var(--surface);
   margin: 0 auto;
 }
 
@@ -2398,10 +2390,7 @@ body {
   margin: 0 auto var(--space-2);
   width: 20px;
   height: 20px;
-  border: 2px solid var(--border-light);
-  border-top: 2px solid var(--primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+  background: var(--surface);
 }
 
 @keyframes spin {

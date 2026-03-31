@@ -402,20 +402,9 @@ export function PhotoGrid({
       {/* Sentinel for IntersectionObserver — always rendered so IO can observe it */}
       <div ref={sentinelRef} style={{ height: 1, width: '100%' }} />
 
-      {/* Loading indicator */}
+      {/* Loading spacer */}
       {isFetchingNextPage && (
-        <div style={{
-          height: '40px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '9px',
-          fontFamily: 'Arial, sans-serif',
-          color: 'var(--text-disabled)',
-          textTransform: 'uppercase',
-        }}>
-          Loading...
-        </div>
+        <div style={{ height: '40px' }} />
       )}
     </div>
   );

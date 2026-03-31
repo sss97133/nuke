@@ -10,6 +10,7 @@ import { useToast } from '../../hooks/useToast';
 import VehicleCritiqueMode from './VehicleCritiqueMode';
 import { SmartInvoiceUploader } from '../SmartInvoiceUploader';
 import '../../styles/unified-design-system.css';
+import { optimizeImageUrl } from '../../lib/imageOptimizer';
 
 /* ─── Platform detection for URL intent ─── */
 const PLATFORM_PATTERNS: Array<{ pattern: RegExp; label: string; short: string }> = [
@@ -2092,8 +2093,9 @@ export default function AIDataIngestionSearch() {
           alignItems: 'center'
         }}>
           <img
-            src={imagePreview}
+            src={optimizeImageUrl(imagePreview, 'thumbnail') || imagePreview}
             alt="Preview"
+            loading="lazy"
             style={{
               width: '60px',
               height: '60px',

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { VehicleInquiryModal } from '../../components/organization/VehicleInquiryModal';
+import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import type { StorefrontOrg } from '../StorefrontApp';
 
 interface Props {
@@ -152,7 +153,7 @@ export default function StorefrontVehicleDetail({ organization }: Props) {
               overflow: 'hidden',
               marginBottom: 8,
             }}>
-              <img src={heroImage} alt={title} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              <img src={optimizeImageUrl(heroImage, 'large') || heroImage} alt={title} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
           )}
 
@@ -172,7 +173,7 @@ export default function StorefrontVehicleDetail({ organization }: Props) {
                     cursor: 'pointer',
                   }}
                 >
-                  <img src={img.image_url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={optimizeImageUrl(img.image_url, 'thumbnail') || img.image_url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               ))}
             </div>

@@ -168,10 +168,7 @@ const VehicleProfileInner: React.FC = () => {
 
   if (ctx.loading) {
     return (
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading vehicle...</p>
-        </div>
+        <div style={{ height: '100vh', background: 'var(--bg)' }} />
     );
   }
 
@@ -197,7 +194,7 @@ const VehicleProfileInner: React.FC = () => {
       <div className="vehicle-profile-page">
         {/* Vehicle Sub-Header with Price — sticky, z-900 per V3 spec */}
         <div ref={vehicleHeaderRef} className="vehicle-profile-sub-header" style={{ position: 'sticky', top: 'var(--header-height, 40px)', zIndex: 900, background: 'var(--surface)', borderBottom: '2px solid var(--border)' }}>
-          <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading header...</div>}>
+          <React.Suspense fallback={null}>
             <VehicleHeader
               onClaimClick={() => setShowOwnershipClaim(true)}
             />
@@ -223,7 +220,7 @@ const VehicleProfileInner: React.FC = () => {
 
         {/* Hero Image Section */}
         <div id="vehicle-hero" className="hero" style={{ scrollMarginTop: 'calc(var(--header-height, 40px) + 88px)' }}>
-          <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading hero image...</div>}>
+          <React.Suspense fallback={null}>
             <VehicleHeroImage
               overlayNode={<VehicleMemeOverlay lastEvent={lastMemeDrop} />}
             />
@@ -250,7 +247,7 @@ const VehicleProfileInner: React.FC = () => {
 
         {/* Main Content */}
         <div style={{ marginTop: '8px' }}>
-          <React.Suspense fallback={<div style={{ padding: '10px 16px', textAlign: 'center', color: 'var(--text-disabled)', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Loading...</div>}>
+          <React.Suspense fallback={null}>
             {vehicle ? (
               <WorkspaceContent
                 valuationIntel={valuationIntel}
@@ -350,7 +347,7 @@ const VehicleProfileInner: React.FC = () => {
               </button>
             </div>
             <div style={{ padding: '16px' }}>
-              <React.Suspense fallback={<div style={{ padding: '12px', color: 'var(--text-muted)' }}>Loading...</div>}>
+              <React.Suspense fallback={null}>
                 <VehicleOwnershipPanel
                   vehicle={vehicle}
                   session={session}

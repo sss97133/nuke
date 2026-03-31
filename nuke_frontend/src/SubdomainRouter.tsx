@@ -117,17 +117,7 @@ export default function SubdomainRouter() {
     return (
       <ErrorBoundary>
         <React.Suspense fallback={
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100vh',
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '12px',
-            color: 'var(--text-disabled)',
-          }}>
-            loading storefront...
-          </div>
+          <div style={{ height: '100vh', background: 'var(--bg)' }} />
         }>
           <StorefrontApp organization={state.org} />
         </React.Suspense>

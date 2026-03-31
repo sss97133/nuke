@@ -270,17 +270,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="vehicle-section">
-        <h3 className="section-title">Comments</h3>
-        <div className="comments-loading">
-          <div className="spinner"></div>
-          <p className="text-muted">Loading comments...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   // Detect BAT URLs in comment text
   const detectBATUrl = (text: string): string | null => {
@@ -1059,11 +1049,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
       </div>
 
       {/* Comments List */}
-      {loading ? (
-        <div className="comments-loading" style={{ padding: '20px', textAlign: 'center' }}>
-          <div className="spinner"></div>
-        </div>
-      ) : comments.length > 0 ? (
+      {loading ? null : comments.length > 0 ? (
         <div className="comments-list" style={{ paddingTop: '8px' }}>
           {comments.map((comment) => (
             <div key={`${comment.target_type}-${comment.id}`} className="comment-item">

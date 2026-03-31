@@ -2345,7 +2345,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       width={280}
                     >
                       {popoverLoading ? (
-                        <div style={{ color: 'var(--text-muted)' }}>Loading...</div>
+                        <div style={{ height: 28, background: 'var(--surface)' }} />
                       ) : popoverData ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

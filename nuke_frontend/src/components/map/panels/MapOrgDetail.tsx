@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import MiniLineChart from '../../charts/MiniLineChart';
+import { optimizeImageUrl } from '../../../lib/imageOptimizer';
 
 const MAP_FONT = 'Arial, Helvetica, sans-serif';
 
@@ -237,7 +238,7 @@ export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
                     }}
                   >
                     {v.primary_image_url && (
-                      <img src={v.primary_image_url} alt="" style={{ width: 40, height: 30, objectFit: 'cover' }}
+                      <img src={optimizeImageUrl(v.primary_image_url, 'micro') || v.primary_image_url} alt="" loading="lazy" style={{ width: 40, height: 30, objectFit: 'cover' }}
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
