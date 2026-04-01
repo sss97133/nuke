@@ -24,6 +24,7 @@ import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
  */
 
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -706,6 +707,23 @@ Deno.serve(async (req) => {
 
       if (result.error) {
         return okJson({ success: false, error: result.error }, 500);
+      }
+
+      // Fire-and-forget observation write
+      if (result.vehicleId) {
+        const obsFields: Record<string, any> = {};
+        if (extracted.year) obsFields.year = extracted.year;
+        if (extracted.make) obsFields.make = extracted.make;
+        if (extracted.model) obsFields.model = extracted.model;
+        if (extracted.vin) obsFields.vin = extracted.vin;
+        if (extracted.sold_price) obsFields.sale_price = extracted.sold_price;
+        writeObservation(supabase, {
+          vehicleId: result.vehicleId,
+          source: { platform: "bat", url: extracted.url || url, trustScore: 0.65 },
+          fields: obsFields,
+          observationKind: extracted.sold_price ? "sale_result" : "listing",
+          extractionMethod: "html_parse",
+        }).catch((e: any) => console.warn(`[GAA] observationWriter error for ${result.vehicleId}: ${e?.message}`));
       }
 
       // Save images

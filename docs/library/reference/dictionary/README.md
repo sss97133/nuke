@@ -20,6 +20,10 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Auction Readiness Score (ARS)** — A 0-100 composite score across six dimensions (identity, photos, documentation, description, market position, condition) that measures how prepared a vehicle is for auction submission. Computed by `compute_auction_readiness()` SQL function. Stored in `auction_readiness` table. Tier transitions tracked in `ars_tier_transitions`. Used by the coaching system to generate specific improvement recommendations. See `auction-readiness-strategy.md`.
 
+**Apparition** — A single appearance of a vehicle on a marketplace or auction platform. A vehicle that has appeared on BaT, then Craigslist, then BaT again has three apparitions. Stored as `vehicle_observations` with kind = 'listing' or 'sale_result'. The pattern of apparitions — frequency, price trajectory, platform migration, outcomes — is itself a signal. See Intelligence Surface: HistoryPatternCard.
+
+**Apparition Timeline** — The chronological rendering of a vehicle's market appearances across all platforms. Shows each apparition as a dot on a horizontal timeline with price, platform, and outcome (sold/no sale/withdrawn/active). Price trajectory is color-coded. One of five signal cards on the Vehicle Briefing. Not a separate data system — reads from `vehicle_observations` filtered by kind. See `docs/library/technical/design-book/11-intelligence-surface.md`.
+
 **Audit Trail** — The metadata attached to every observation: source_id, agent_tier, confidence_score, extraction_timestamp, raw_source_reference. Every field has a birth certificate.
 
 **Agent Hierarchy** — The three-tier LLM processing system: Haiku ($1/$5 MTok) for routine extraction, Sonnet ($3/$15 MTok) for quality review and edge cases, Opus ($5/$25 MTok) for strategy. Dispatched by `agent-tier-router`. Queue flow: `pending -> haiku -> complete/pending_review -> sonnet -> complete/pending_strategy -> opus`. Replaced the single-model CQP approach. See `supabase/functions/agent-tier-router/index.ts`.
@@ -28,9 +32,19 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Analysis Engine** — The widget-based vehicle intelligence system. Coordinator function sweeps for stale signals every 15 minutes, queues recomputation, and processes analysis queue items. 14 widgets across 6 categories produce per-vehicle signals stored in `analysis_signals`. See `supabase/functions/analysis-engine-coordinator/index.ts`.
 
+**Archivist** — One of three user modes (not personas — modes). The Archivist wants to see every field, every source, every confidence score. They want the full depth of the digital twin rendered without simplification. They operate in List View. Their need is auditability. The Intelligence Surface serves Archivists through the Evidence Layer (L2) — expandable full-provenance evidence under every signal card. See Contemplation: The Three Users and the Finder.
+
 ## B
 
 **Badge** — A clickable data token in the UI. "1991", "GMC", "V3500", "Basquiat", "1982", "Acrylic" — each is a badge. Badges are portals, not labels. Clicking a badge explodes into the cluster it belongs to.
+
+**Briefing** — The user-facing intelligence summary rendered at the top of a vehicle profile. Inverts the query model: instead of the user asking questions, the system presents the most relevant computed intelligence unprompted. Structured as a pyramid: L0 headline (one sentence, highest-severity signal), L1 signal cards (3-5 dimension-specific insights), L2 evidence layer (expandable full-provenance backing for each signal). The briefing is a computation surface — it reads from the knowledge graph and computes on render. See Discourse: The Knowing System, Design Book Ch. 11.
+
+**Briefing Headline** — The L0 (Layer 0) component of the Vehicle Briefing. One sentence communicating the single most important thing about a vehicle right now. Generated from the highest-severity active analysis signal. Color-coded by severity (red/amber/blue/green/grey). The headline serves the Browser user mode — the person scrolling who needs one reason to stop or keep going.
+
+**Briefing Model** — The information delivery paradigm where the system observes, analyzes, and presents rather than waiting to be queried. Contrast with the Query Model (user asks → system answers). In the briefing model: system observes → system analyzes → system presents → user decides. Inspired by intelligence analysis and military briefings. The user's job is not to formulate questions but to absorb the briefing and make a decision. See Discourse: The Knowing System, Section II.
+
+**Browser** — One of three user modes (not personas — modes). The Browser opens the feed, scrolls through vehicles, clicks what catches their eye, checks the price, goes back, scrolls more. They want beautiful cards, good images, quick summaries. Their need is pleasure and discovery. The Intelligence Surface serves Browsers through the Briefing Headline (L0) and signal card summaries (L1). See Contemplation: The Three Users and the Finder.
 
 **Black Zone** — A period or location where an asset disappears from the provenance record. Freeports, undocumented storage, provenance gaps. Black zones are data — the absence of records is itself informative.
 
@@ -64,7 +78,15 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Content Hash** — SHA256 hash of an observation's content. Used for deduplication. If two observations produce the same hash, the second is a duplicate.
 
+**Coaching Flow** — The seller/owner-facing intelligence workflow that transforms ARS from a score into actionable steps. Maps ARS dimension gaps to specific actions (upload photos, add documents, review description) with estimated point gain and sale price impact. Visible only to vehicle owners and contributors. Implements the "Savant Janitor" mode: the user doesn't understand ARS methodology — they just see "take these 5 photos" and do it. See Design Book Ch. 11: CoachingTab.
+
+**Community Pulse** — One of five signal cards on the Vehicle Briefing. Shows sentiment score, top discussion themes, and notable expert comments from auction comment analysis. Renders only when `comment_discoveries` exist for the vehicle. Sources: `comment_discoveries` (sentiment, themes), `bat_user_profiles` (expertise identification). See Design Book Ch. 11: CommunityPulseCard.
+
 ## D
+
+**Density Badge** — A compact 5-level visual indicator (●○○○○ through ●●●●●) showing how much the system knows about a vehicle. Appears on every vehicle card in browse/search results. Computed from observation count, source diversity, VIN confirmation, work history presence, and photo coverage. Creates pull: vehicles with deep profiles look rich, motivating owners of thin-profile vehicles to contribute data. The badge answers the meta-question: "How much should I trust what I'm seeing?" See Design Book Ch. 11: DensityBadge.
+
+**Density Level** — The 1-5 integer encoding data depth about a vehicle. Level 1 (Sparse): basic identity only. Level 2 (Thin): some history. Level 3 (Moderate): well-documented. Level 4 (Dense): comprehensive. Level 5 (Bedrock): fully verified with scientific measurements. Stored as `vehicles.density_level`, updated by trigger on observation changes.
 
 **Data Point** — Any single piece of information about an asset. A price, a color, a VIN digit, a photo, a comment. Every data point is an observation with a source, confidence, and timestamp.
 
@@ -77,6 +99,8 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 **Digital Twin** — The complete data representation of a physical asset. At sufficient density, the database doesn't describe the asset — it IS the asset. The five dimensional shadows (spec, current state, condition, provenance, evidence) constitute the twin.
 
 **Dimensional Shadow** — One of five perspectives on any entity: spec (what it should be), current state (what it is now), condition (assessment over time), provenance (chain of custody), evidence (citations for every claim).
+
+**Discrepancy Alert** — A risk signal surfaced by the Intelligence Surface when observations from different sources conflict about the same data point. Example: "Mileage discrepancy: listing says 67K, last title transfer showed 72K." Rendered as the RiskSignalsCard on the Vehicle Briefing with amber severity. Each alert is expandable to show the specific conflicting data points with full provenance (source, timestamp, trust score). Discrepancies are signals, not errors — they may have innocent explanations ("odometer was replaced") but warrant buyer attention. See Design Book Ch. 11: RiskSignalsCard.
 
 **Discrepancy** — A conflict between observations from different sources about the same data point. "Seller says matching numbers, photo shows replacement block." Discrepancies are flagged and scored by severity (trust delta × value impact).
 
@@ -91,6 +115,8 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 **Edition** — A set of identical or near-identical artworks produced from the same matrix (print plate, mold, photograph negative, conceptual instructions). The edition is a parent entity; individual copies are child assets with independent provenance.
 
 **Entity Resolution** — The process of determining whether a new observation refers to an existing asset or a new one. Uses unique identifiers (VIN, catalogue raisonné number), URL matching, image similarity, and metadata intersection. Never auto-matches below 0.80 confidence.
+
+**Evidence Layer** — The L2 (Layer 2) component of the Intelligence Surface. When a signal card is expanded, the evidence layer renders the full provenance chain backing the signal: comparable sales with photos, conflicting data points with sources, sentiment distributions, observation timelines. Follows the expand-don't-navigate principle: evidence appears below the card, pushing content down, with no page navigation. The existence of the evidence layer is what makes L0/L1 summaries trustworthy — a system that summarizes without showing its work is a black box; a system that summarizes and lets you audit the summary is an intelligence platform.
 
 **Evidence** — One of the five dimensional shadows. Citations for every claim. Every field in the database traces back to a source document, observation, or human input.
 
@@ -130,7 +156,15 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Handler** — An org_staff member who manages logistics, installation, or crating of assets. In art, handlers have significant hidden power — they know where things are and who's moving what.
 
+**Flywheel** — The virtuous cycle created by the Intelligence Surface: user sees briefing → sees gaps → contributes data (photos, documents, corrections) → vehicle gets denser → richer briefing → user trusts system more → contributes more. The coaching flow is the strongest driver: "upload undercarriage photos → +23 points" converts ARS gaps into user action. The density badge amplifies the flywheel by creating social pressure: no owner wants their vehicle to look poorly documented next to a competitor's well-documented one.
+
 ## I
+
+**Intelligence Layer** — The abstraction level at which intelligence is presented to users. Four layers: L0 (headline — one sentence, highest severity), L1 (signal cards — 3-5 dimensional insights), L2 (evidence — full provenance chain), L3 (raw graph — complete observation timeline). Most users interact at L0-L1. The Archivist reaches L2-L3 through progressive expansion. Each layer is progressively denser but serves a different user mode (Browser→L0, general user→L1, Archivist→L2-L3). See Design Book Ch. 11.
+
+**Intelligence Surface** — The collective name for the user-facing intelligence components added to the vehicle profile, browse experience, and segment dashboard. The system that makes Nuke's data depth serve vanilla users who don't know the schema. Comprises: Vehicle Briefing (profile), Smart Search + Market Pulse (browse), Seller Coaching (owner view), Segment Dashboard (market view), Density Badges (cross-surface). See Discourse: The Knowing System, Design Book Ch. 11, Engineering Manual: Intelligence Surface Build Guide.
+
+**Interestingness Signal** — A computed score indicating how unusual, story-rich, or attention-worthy a vehicle is, independent of price or condition. Factors: rarity (option combination frequency), story density (provenance chain length), community engagement (comment count, expert attention), anomaly (unusual specs or history), price anomaly (significant deviation from segment). Used to power the "Discover" feed for casual browsers. NEEDS BUILD as of 2026-03-31.
 
 **Information Density** — The amount of meaningful data per pixel of screen space. Nuke optimizes for high information density: 8-11px font sizes, 4px spacing grid, zero decorative elements (no rounded corners, no shadows, no gradients). The Bloomberg Terminal is the density benchmark — financial terminals solved the problem of presenting large structured datasets to professional users decades ago. High density is not clutter; clutter is decorative waste. High density is meaningful data with structural clarity.
 
@@ -148,13 +182,21 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Layer 0** — The zero-cost foundation of the persona simulation pipeline. Pure structural and lexical analysis of text using math, not LLM calls. Computes stylometric features (sentence length, vocabulary richness, function word frequencies, punctuation signatures, epistemic stance) from raw comment text. See `scripts/user-stylometric-analyzer.mjs`.
 
+**Knowing System** — The design philosophy where the system does the knowing and the user does the deciding. No user learns the schema. The system determines what information is relevant, what patterns are significant, and what the user needs to know. The user's job is to absorb the briefing and make a decision. The boundary is permanent: the system presents information, not recommendations. It says "this truck is priced 18% below comps" (information), not "you should buy this" (recommendation). Crossing the boundary into decision-making would require liability and data quality that no system achieves. See Discourse: The Knowing System.
+
 ## L
+
+**Listing Preview** — A coaching component that generates a platform-appropriate listing description from all known vehicle data. Assembled by AI from structured data (specs, observations, work history, photos analyzed). Gaps are surfaced inline as `[MISSING: ...]` tags — not errors but calls to action. Users can edit the generated text before copying. Platform selector adjusts tone and format (BaT, C&B, Hemmings, Craigslist). Located on the CoachingTab of the vehicle profile (owner view only). See Design Book Ch. 11: ListingPreview.
 
 **Library** — Two meanings: (1) This documentation system, organized like a traditional library. (2) The reference data corpus (RPO codes, paint codes, catalogue raisonnés, service manuals) that the extraction pipeline validates against.
 
 ## M
 
 **Machine** — One of 11 Deleuzian assemblages that constitute Nuke's body: eye (vision), mouth (ingestion), gut (processing), skeleton (infrastructure), brain (intelligence), wallet (valuation), nose (discovery), memory (provenance), skin (UI), voice (API), hands (curation). See RHIZOME.md.
+
+**Market Position Card** — One of five signal cards on the Vehicle Briefing. Shows the vehicle's price relative to comparable sales: asking price, comparable range (min-max), median comparable, and number of sales in the comparison set. Expandable to a full CompGrid showing each comparable with photo, price, date, platform, and similarity score. Renders when `nuke_estimate` exists or `price_comparables` has >=3 rows. See Design Book Ch. 11.
+
+**Market Pulse** — A compact section on the browse page showing real-time market activity: trending segments (by bid velocity and price momentum), notable sales (deviations from estimate), and active inventory counts. Each item is clickable for drill-down. Data source: `market_snapshots`, `market_segment_stats`, recent `auction_events`. See Design Book Ch. 11.
 
 **Materialization Layer** — The system layer where knowledge graph data is transformed into visible intelligence. The vehicle profile is the primary materialization layer. Raw observations enter the graph from many sources; the materialization layer reads the graph and computes analysis on render. The profile surface shows summaries; popups (Day Cards) show full-resolution computation. See `docs/library/technical/design-book/vehicle-profile-computation-surface.md`.
 
@@ -200,7 +242,11 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Provenance Container** — Synonym for Organization Sandbox. A holding area for records from a specific data source that lack verifiable identifiers. The container is scoped to the organization that produced the data and is publicly visible. Records graduate when corroborating identifiers arrive from any source.
 
+**Photo Coaching** — A coaching component that shows the 41-zone image angle spectrum with coverage status for a specific vehicle. Each zone (front 3/4, undercarriage, engine bay detail, odometer, etc.) is marked as covered or needed. "NEEDED" zones link directly to the photo upload interface with the zone pre-selected. Addresses the use case "What photos do I need?" without the seller needing to know platform-specific requirements. See Design Book Ch. 11: PhotoCoaching.
+
 ## Q
+
+**Query Model** — The dominant paradigm for data access where the user formulates a question and the system returns an answer. SQL is the purest expression. Every search box is a simplified query interface. The query model fails when users don't know what questions to ask, when the most valuable information is non-obvious, or when answers require synthesizing data across many dimensions. The Briefing Model inverts this: the system presents rather than waits to be asked. See Discourse: The Knowing System, Section II.
 
 **Quality Score** — A 0-1 assessment of extraction completeness and reliability. Derived from: fields extracted / total fields, weighted by field importance. Below 0.30 triggers review. Below 0.40 triggers escalation to a higher agent tier.
 
@@ -217,6 +263,14 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 **Rhizome** — Deleuzian concept. A network with no center, no hierarchy, no beginning or end. Nuke's architecture is rhizomatic — every concept connects to every other. The observation system is the purest expression. See RHIZOME.md.
 
 **Resolution** — See Entity Resolution.
+
+**Savant Janitor** — One of three user modes (not personas — modes). The Savant Janitor has 400 photos on their phone, receipts in the glovebox, and doesn't want to organize anything. They want to dump everything into the system and have it sort itself. Their need is a drain — an endpoint that accepts everything and classifies it. The Coaching Flow serves Savant Janitors by telling them exactly what to do next without requiring them to understand the system's structure. See Contemplation: The Three Users and the Finder.
+
+**Segment Dashboard** — A market-level intelligence surface for a vehicle segment (all K5 Blazers, all C10s). Route: `/market/:make/:model`. Shows: price trend chart, recent sales with photos, active listings, segment statistics (avg DOM, sell-through rate, common configurations, price by condition tier). The segment dashboard is where enthusiasts track markets, buyers do deep comp research, and sellers time their listings. See Design Book Ch. 11: SegmentDashboard.
+
+**Signal Card** — A self-contained intelligence unit on the Vehicle Briefing (L1 layer). Each card presents one dimension of analysis with a title, key metric, supporting detail, and expandable evidence. Five types: MarketPositionCard, TrustAssessmentCard, RiskSignalsCard, CommunityPulseCard, HistoryPatternCard. Each self-guards against missing data — if the card has nothing to show, it doesn't render. Cards expand in-place (expand-don't-navigate) to reveal their evidence layer (L2). See Design Book Ch. 11.
+
+**Smart Search** — The natural-language-to-structured-query search interface. Accepts human language ("red trucks under 30k from the seventies") and decomposes it into structured filters using client-side regex pattern matching (no API call). Extracted filters appear as removable pills below the search bar. What remains after extraction becomes the text search query. The user doesn't need to know that `body_style: truck` is a filter — they type naturally and the system translates. See Design Book Ch. 11: SmartSearchBar.
 
 ## S
 
@@ -242,6 +296,8 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 ## T
 
+**Trust Assessment Card** — One of five signal cards on the Vehicle Briefing. Shows documentation depth: total observation count, source diversity, VIN confirmation status, and three sub-dimensions (Identity: STRONG/MODERATE/THIN, Provenance: same, Condition: same). The trust card always renders if the vehicle exists — even a sparse vehicle shows "limited data." Expandable to source list with observation counts and trust scores. The trust card is how the system communicates its own uncertainty — honest about what it knows and doesn't know. See Design Book Ch. 11.
+
 **Testimony** — What observations actually are. Data is testimony from sources with varying reliability. Testimony has half-lives. A seller's description is testimony. A museum catalog entry is testimony. Both decay, at different rates.
 
 **Timeline Event** — The atomic unit of the vehicle timeline. Everything that happens to a vehicle is a timeline event: factory build, ownership transfers, auction appearances, work performed, parts installed or transferred, photos taken, inspections, title events, accidents, modifications, community mentions. There are no parallel tracking systems. A build log is the timeline filtered to work events. A photo gallery is the timeline filtered to image events. A service history is the timeline filtered to maintenance events. See `docs/library/technical/design-book/vehicle-profile-computation-surface.md`.
@@ -258,7 +314,13 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Universal Matcher** — See Entity Resolution. One function, shared by all extractors, all domains.
 
+**Use Case Atlas** — The canonical catalog of all hypothesized user interactions with the Nuke platform. 47 use cases across 11 archetypes (Buyer pre/post, Seller, Enthusiast, Builder, Mechanic, Dealer, Casual Browser, Appraiser, Journalist, Post-Sale). Each use case specifies: situation, need, data source, surface, intelligence layer, infrastructure status, and priority. Key finding: 64% of use cases have PARTIAL infrastructure (data exists, UI doesn't surface it). The gap is overwhelmingly a surface area gap, not a data gap. See `docs/library/intellectual/papers/use-case-atlas.md`.
+
 ## V
+
+**Value Badge** — A subtle badge on vehicle cards in browse results indicating deal quality relative to the system's estimate. Levels: GOOD DEAL (10-20% below estimate), GREAT DEAL (20%+ below), ABOVE MARKET (10%+ above), no badge (within ±10% or no estimate). Green for good/great deals, amber for above market. Source: `nuke_estimate` vs. current listing price. See Design Book Ch. 11: ValueBadge.
+
+**Vehicle Briefing** — The master intelligence component on the vehicle profile page. Positioned below the hero image, above the sub-header. Contains the BriefingHeadline (L0) and up to 5 SignalCards (L1), each expandable to an evidence layer (L2). Self-guards: renders nothing if no intelligence data is available (progressive density). Implements the Briefing Model — the system presents rather than waiting to be queried. The single highest-leverage feature for making data depth serve vanilla users. See Design Book Ch. 11, Engineering Manual: Intelligence Surface Build Guide, Discourse: The Knowing System.
 
 **Validation Layer** — What magazines are. Not content creators but validators — their editorial selection confirms that an asset, artist, or event matters. A magazine feature is a high-trust observation, not a product.
 

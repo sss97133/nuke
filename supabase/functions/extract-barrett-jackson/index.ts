@@ -28,6 +28,7 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";
 
@@ -1005,6 +1006,22 @@ async function saveVehicle(
     if (insertErr) throw new Error(`Vehicle insert failed: ${insertErr.message} (${insertErr.code})`);
     vehicleId = inserted.id;
     isNew = true;
+  }
+
+  // Fire-and-forget observation write
+  {
+    const obsFields: Record<string, any> = {};
+    const obsSkip = new Set(["discovery_url", "discovery_source", "source", "listing_source", "profile_origin", "status", "is_public", "origin_metadata", "extractor_version", "image_urls"]);
+    for (const [k, v] of Object.entries(cleanData)) {
+      if (v != null && !obsSkip.has(k)) obsFields[k] = v;
+    }
+    writeObservation(supabase, {
+      vehicleId,
+      source: { platform: "barrett-jackson", url: vehicle.url || "", trustScore: 0.75 },
+      fields: obsFields,
+      observationKind: vehicle.sale_price ? "sale_result" : "listing",
+      extractionMethod: "html_parse",
+    }).catch((e: any) => console.warn(`[BJ] observationWriter error for ${vehicleId}: ${e?.message}`));
   }
 
   // Save images (non-fatal)

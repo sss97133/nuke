@@ -22,6 +22,7 @@ import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/r
 import { qualityGate } from '../_shared/extractionQualityGate.ts';
 import { cleanVehicleFields, stripHtmlTags } from '../_shared/pollutionDetector.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 const EXTRACTOR_VERSION = '2.1.0';
 
@@ -759,6 +760,26 @@ async function saveToDatabase(
     } else {
       vehicleId = newVehicle?.id;
     }
+  }
+
+  // Fire-and-forget observation write
+  if (vehicleId) {
+    const obsFields: Record<string, any> = {};
+    if (extracted.year) obsFields.year = extracted.year;
+    if (extracted.make) obsFields.make = extracted.make;
+    if (extracted.model) obsFields.model = extracted.model;
+    if (extracted.vin) obsFields.vin = extracted.vin;
+    if (extracted.sale_price) obsFields.sale_price = extracted.sale_price;
+    if (extracted.mileage) obsFields.mileage = extracted.mileage;
+    if (extracted.engine_size) obsFields.engine_size = extracted.engine_size;
+    if (extracted.transmission) obsFields.transmission = extracted.transmission;
+    writeObservation(supabase, {
+      vehicleId,
+      source: { platform: "gooding", url: extracted.url, trustScore: 0.9 },
+      fields: obsFields,
+      observationKind: extracted.sale_price ? "sale_result" : "listing",
+      extractionMethod: "gatsby_json_parse",
+    }).catch((e: any) => console.warn(`[GOODING] observationWriter error for ${vehicleId}: ${e?.message}`));
   }
 
   // Update/insert vehicle_events

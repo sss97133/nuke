@@ -84,23 +84,44 @@ The numbers were set heuristically, not empirically calibrated. The ranking refl
 
 ## Contextual Confidence Adjustment
 
-The base trust score is adjusted per-observation based on contextual signals:
+The base trust score is adjusted per-observation based on contextual signals. This is computed in `ingest-observation/index.ts` at ingestion time and stored permanently on the observation row.
 
+### The Implementation (exact code from ingest-observation/index.ts:260-275)
+
+```typescript
+const confidenceFactors: Record<string, number> = {};
+if (vehicleMatchConfidence >= 0.95) confidenceFactors.vehicle_match = 0.1;
+if (input.source_url) confidenceFactors.has_source_url = 0.05;
+if (input.content_text && input.content_text.length > 100)
+  confidenceFactors.substantial_content = 0.05;
+
+const confidenceScore = Math.min(1.0,
+  (source.base_trust_score || 0.5) +
+  Object.values(confidenceFactors).reduce((a, b) => a + b, 0)
+);
+
+let confidenceLevel = "medium";
+if (confidenceScore >= 0.95) confidenceLevel = "verified";
+else if (confidenceScore >= 0.85) confidenceLevel = "high";
+else if (confidenceScore < 0.4) confidenceLevel = "low";
 ```
-final_confidence = min(1.0, base_trust_score + contextual_bonuses)
-```
+
+Three values are stored on each `vehicle_observations` row:
+- `confidence_score` (numeric) — the computed 0.0-1.0 value
+- `confidence` (text) — the categorical level: verified/high/medium/low
+- `confidence_factors` (jsonb) — which bonuses applied, for auditability
 
 ### Contextual Bonuses
 
-| Signal | Bonus | Rationale |
-|--------|-------|-----------|
-| Vehicle match confidence >= 0.95 | +0.10 | We're confident this observation is about the right vehicle |
-| Has source URL | +0.05 | Traceable to original source |
-| Substantial content (>100 chars) | +0.05 | More content = more to verify against |
+| Signal | Bonus | Stored As | Rationale |
+|--------|-------|-----------|-----------|
+| Vehicle match confidence >= 0.95 | +0.10 | `confidence_factors.vehicle_match` | We're confident this observation is about the right vehicle |
+| Has source URL | +0.05 | `confidence_factors.has_source_url` | Traceable to original source |
+| Substantial content (>100 chars) | +0.05 | `confidence_factors.substantial_content` | More content = more to verify against |
+
+Maximum possible bonus: +0.20 (all three signals). A source with base trust 0.80 can reach 1.00 if all bonuses apply. A source with base trust 0.75 + all bonuses = 0.95 (the verified threshold).
 
 ### Confidence Levels
-
-The numeric score maps to a categorical level:
 
 | Score Range | Level | Meaning |
 |-------------|-------|---------|
@@ -108,6 +129,23 @@ The numeric score maps to a categorical level:
 | 0.85-0.94 | `high` | Strong single source (curated auction, official document) |
 | 0.40-0.84 | `medium` | Standard observation, usable but not definitive |
 | < 0.40 | `low` | Unreliable source, use only as supporting evidence |
+
+### Production Distribution (as of 2026-03-29)
+
+| Level | Count | Avg Score | Notes |
+|-------|-------|-----------|-------|
+| verified | 26,263 | 0.960 | Registry sources + owner data with all bonuses |
+| high | 5,494,442 | 0.855 | The vast majority — auction house listings dominate |
+| medium | 183,248 | 0.692 | Marketplace, forum, social sources |
+| low | 0 | — | No observations currently fall below 0.40 |
+
+The distribution is heavily right-skewed: 96.3% of all 5.7M observations are "high" confidence. This is because the dominant data sources (BaT, Mecum, Barrett-Jackson, Cars & Bids) are all auction platforms with base trust >= 0.75, and most observations include a source URL (+0.05) and substantial content (+0.05), pushing them above the 0.85 threshold.
+
+**The "low" bucket is empty.** No source currently has base trust below 0.25, and even TikTok (0.25) with all bonuses reaches 0.45 (medium). The "low" tier would only activate if per-entity trust reduction were implemented (see Dynamic Trust Model).
+
+### Implication: The 4-Level System Compresses Useful Variation
+
+A Gooding & Company expert-catalogued lot description (base 0.90 + 0.20 bonuses = 1.00) and a Mecum one-line listing (base 0.75 + 0.10 bonuses = 0.85) both land in "high." The categorical system loses this distinction. Any future system that needs finer resolution should use the numeric `confidence_score`, not the categorical `confidence` level.
 
 ---
 
@@ -148,9 +186,24 @@ The condition claims from that listing are now low-confidence. But the VIN from 
 
 ### Current Implementation Status
 
-**Decay is designed but not implemented in production.** The `observation_half_life_model.md` theoretical describes the full system. The `ingest-observation` function stores `observed_at` timestamps, which enables retroactive decay computation. But no function currently applies decay when querying observation data.
+**Decay is designed but not implemented in production.** The `ingest-observation` function stores `observed_at` timestamps on every observation, which enables retroactive decay computation. But no function currently applies decay when querying observation data.
 
-**Why not yet:** Decay requires a materialized view of the "best current value" for each vehicle field, computed from all observations weighted by decayed trust. This is the target architecture (Engineering Manual Ch.4: "Materialized vehicle profiles") but is not yet built.
+**The infrastructure is ready.** Every `vehicle_observations` row has an `observed_at` timestamp (when the observation was originally made, not ingested). The `confidence_score` is stored at ingestion time without decay. To apply decay at query time:
+
+```sql
+-- Example: compute age-decayed trust for mileage observations
+SELECT
+  vo.id,
+  vo.confidence_score as raw_trust,
+  vo.confidence_score * power(0.5,
+    EXTRACT(EPOCH FROM (now() - vo.observed_at)) / (180 * 86400.0)  -- 6-month half-life
+  ) as decayed_trust
+FROM vehicle_observations vo
+WHERE vo.kind = 'specification'
+  AND vo.structured_data->>'mileage' IS NOT NULL;
+```
+
+**Why not yet:** Decay requires a materialized view of the "best current value" for each vehicle field, computed from all observations weighted by decayed trust. This is the target architecture but is not yet built. The `field_evidence` table (3.29M rows) is the closest thing to a materialized profile, but it uses extractor-assigned confidence, not observation-model trust.
 
 ---
 
@@ -204,7 +257,41 @@ The current model only has positive trust scores. There's no mechanism for "this
 
 A claim "matching numbers" backed by a photo of the engine stamp with readable casting numbers is far more trustworthy than the same claim without evidence. But the trust model treats text observations and photo observations independently — it doesn't know that the photo supports the claim.
 
-**Proposed:** Evidence linking. The field_evidence table was designed for this — linking specific claims to specific source materials. At 146K rows, it's partially populated but not integrated into trust scoring.
+**Partially implemented:** The `field_evidence` table links specific field values to specific source materials. As of 2026-03-29: **3.29M rows** across **370K vehicles** covering **265 distinct fields**. This is no longer "partially populated" — it is the system's largest provenance store. But it is still not integrated into trust scoring; field_evidence rows do not carry confidence weights or contribute to observation confidence.
+
+---
+
+## The field_evidence System
+
+The `field_evidence` table is the bridge between the observation system (which stores raw observations) and the vehicle profile (which presents the "best current value" per field). Each row records: this field, on this vehicle, has this value, from this source, with this evidence.
+
+### Scale
+
+| Metric | Value |
+|--------|-------|
+| Total rows | 3,290,472 |
+| Vehicles covered | 370,465 |
+| Distinct fields tracked | 265 |
+
+### How Confidence Is Set on field_evidence
+
+Field evidence rows are created by extractors (primarily `enrich-bulk`, `bat-snapshot-parser`, `extract-*` functions) when they parse structured data from source material. The confidence on a field_evidence row is set by the extractor, not by the trust model. There are three patterns:
+
+1. **Hardcoded by extractor.** Most extractors set a fixed confidence per field type: VIN = "high", color from description = "medium", mileage from title = "low". This is heuristic.
+
+2. **Inherited from source.** Some extractors look up the source's `base_trust_score` and pass it through. The `ingest-observation` pathway does this.
+
+3. **Not set at all.** Many older field_evidence rows have NULL confidence. These were created before the trust model existed.
+
+### Gap: field_evidence Is Not Connected to observation_sources
+
+The fundamental gap: `field_evidence` rows reference a `source_type` (text string like "bat", "mecum") but do NOT have a foreign key to `observation_sources`. The trust score lookup that happens in `ingest-observation` does NOT happen when field_evidence rows are created directly by extractors. This means:
+
+- 5.7M observations have trust-scored confidence (from `ingest-observation`)
+- 3.29M field_evidence rows have extractor-assigned confidence (independent of the trust model)
+- The two systems do not cross-reference
+
+**To close this gap:** Field evidence creation should look up the source's `base_trust_score` from `observation_sources` and use it as the floor for confidence assignment. Alternatively, field_evidence rows should reference the `vehicle_observations.id` that produced them, inheriting the observation's confidence.
 
 ---
 
@@ -220,9 +307,25 @@ A claim "matching numbers" backed by a photo of the engine stamp with readable c
 
 ---
 
+## Theory vs Implementation Gap Summary
+
+| Aspect | Theory (this paper) | Implementation | Gap |
+|--------|-------------------|----------------|-----|
+| Source hierarchy | 8 categories, clean ordering | 12 categories, 160 sources, overlapping ranges | Categories expanded; `owner` now top, `internal` new |
+| Confidence computation | `base_trust + bonuses` | Exact match — implemented in `ingest-observation` | None (theory = code) |
+| Temporal decay | Exponential half-life per observation type | `observed_at` stored; decay NOT computed | Designed, not implemented |
+| Contradiction resolution | Trust-weighted voting | Last-write-wins in `vehicles` table | Fully unimplemented |
+| field_evidence confidence | Should inherit from observation trust | Extractor-assigned, independent of trust model | Two parallel confidence systems |
+| Per-entity trust | Dynamic trust from corroboration tracking | Static `base_trust_score` per source | Fully unimplemented (see Dynamic Trust Model) |
+| Photo evidence linking | Claims + photos = higher trust | `field_evidence` has 3.29M rows but no trust integration | Data exists, scoring does not |
+
+---
+
 ## For the Next Agent
 
-1. **Do not change base_trust_score values** in observation_sources without documenting why in a DISCOURSE.
-2. **The hierarchy order matters more than the specific numbers.** Registry > Documentation > Auction > Dealer > Owner > Marketplace > Forum > Social. Any change that violates this ordering needs justification.
-3. **Decay is not implemented.** Don't assume observation trust accounts for age. If you need age-adjusted trust, compute it yourself using the formula above.
-4. **Contradiction resolution is manual.** The vehicles table reflects the most recent extractor's values, not the most trusted. This is a known gap.
+1. **Do not change base_trust_score values** in `observation_sources` without documenting why. The 160 source entries were set based on incentive structure analysis, not arbitrary assignment.
+2. **The actual hierarchy is nuanced.** Owner (0.90 avg) > Registry (0.89) > Shop (0.83) > Auction (0.73) > Aggregator (0.68) > Dealer (0.65) > Internal (0.63) > Marketplace (0.61) > Forum (0.55) > Social (0.39). Within categories, ranges overlap significantly.
+3. **Decay is not implemented.** Don't assume observation trust accounts for age. If you need age-adjusted trust, compute it yourself: `trust * power(0.5, age_days / (half_life_days))`.
+4. **Contradiction resolution is manual.** The `vehicles` table reflects the most recent extractor's values, not the most trusted. This is a known gap.
+5. **field_evidence and vehicle_observations are parallel systems.** 3.29M field_evidence rows use extractor-assigned confidence. 5.7M observations use trust-model confidence. They don't cross-reference. Any work to unify them should start by adding an `observation_id` FK to `field_evidence`.
+6. **96.3% of observations are "high" confidence.** The categorical system does not discriminate within the dominant bucket. Use `confidence_score` (numeric) for any analysis that needs resolution.

@@ -1,8 +1,9 @@
 # Dynamic Trust Model: Trust Is Earned, Measured, and Decays
 
 **Status**: Theoretical — the static trust system exists; dynamic trust does not
-**Date**: 2026-03-21
+**Date**: 2026-03-21, extended 2026-03-29
 **Origin**: Founder insight on how quality compounds at every scale
+**Companion**: papers/trust-scoring-methodology.md (the static system this extends)
 
 ---
 
@@ -17,7 +18,8 @@ Trust is not a label. Trust is a measurement. Every entity in the system — sou
 ## Part I: Who Gets a Trust Score
 
 ### Sources (observation_sources)
-Barrett-Jackson, BaT, forums, Instagram. Currently: static `base_trust_score` assigned once.
+Barrett-Jackson, BaT, forums, Instagram. Currently: static `base_trust_score` assigned once. **160 sources** across 12 categories with scores ranging from 0.10 (OldCars.com) to 1.00 (iMessage, iPhoto). See trust-scoring-methodology.md for the full production table.
+
 **Should be**: rolling accuracy rate. If BaT listings consistently produce claims that are corroborated by inspections, BaT's trust goes up. If forum comments are frequently contradicted, forum trust goes down.
 
 ### Organizations
@@ -114,7 +116,42 @@ The institution that rubber-stamps condition reports without careful inspection 
 
 ---
 
-## Part VI: Implementation Path
+## Part VI: What Exists Today That Enables This
+
+Before the implementation path, it is worth taking stock of what the static system has already built that the dynamic model can consume. This is not a greenfield project — significant infrastructure exists.
+
+### Infrastructure Inventory (as of 2026-03-29)
+
+| Component | Status | Scale | Relevance |
+|-----------|--------|-------|-----------|
+| `observation_sources` | Production | 160 sources, 12 categories | The entity that would gain dynamic trust scores |
+| `vehicle_observations` | Production | 5.7M rows | Every row is a claim with `confidence_score`, `observed_at`, `source_id` |
+| `field_evidence` | Production | 3.29M rows, 370K vehicles, 265 fields | Per-field provenance — the corroboration detection surface |
+| `confidence_factors` (jsonb) | Production | On every observation | Audit trail of how trust was computed — essential for debugging dynamic adjustments |
+| `bat_user_profiles` | Production | 520K usernames, 1K+ with stylometric profiles | Individual observer fingerprinting (see user-simulation methodology) |
+| `comment_persona_signals` | Production | 2,787 rows, 40 traits | Per-commenter expertise signals — the raw material for individual trust |
+| `author_personas` | Production | Linked to comment analysis | Commenter identity resolution across platforms |
+| `auction_comments` | Production | 11.5M+ comments | The largest corpus of individual claims — each is a testable assertion |
+
+### What's Missing for Dynamic Trust
+
+1. **Corroboration detection.** No function currently compares observations from different sources on the same vehicle to detect agreement or disagreement. The data is there (5.7M observations, many vehicles have 3-10 sources), but the comparison engine does not exist.
+
+2. **Observer identity resolution.** A BaT commenter named "porsche993guy" who also posts on Rennlist as "993enthusiast" — the system does not know these are the same person. `bat_user_profiles` tracks BaT identities; `author_personas` tracks comment authors; but no cross-platform identity graph links them.
+
+3. **Per-claim attribution.** A description contains 15 claims (year, make, model, engine, transmission, color, mileage, condition of 8 components). The trust model scores the observation as a whole. Dynamic trust requires scoring each claim individually so that when a claim is contradicted, we can attribute the failure to the specific claim type, not the whole source.
+
+4. **Retroactive adjustment.** When an observer's trust changes, all their past observations should be re-weighted. With 5.7M observations, this is a batch job that needs careful scheduling.
+
+### The Corroboration Opportunity
+
+The system already has multi-source coverage for many vehicles. A vehicle sold on BaT (description + 200 comments), previously listed on Craigslist, with VIN decoded by NHTSA, and photos analyzed by the vision pipeline — that is 4+ independent sources producing claims about the same entity. The overlap between these sources IS the corroboration dataset. It just needs to be compared systematically.
+
+Rough scale estimate: 370K vehicles have field_evidence. If 10% have 3+ sources with overlapping field coverage, that is 37K vehicles with corroboration potential — more than enough to bootstrap dynamic trust.
+
+---
+
+## Part VI-B: Implementation Path
 
 ### Phase 1: Observer Tracking Table
 ```sql
@@ -183,3 +220,18 @@ All of these are measurable from production data once sufficient corroboration v
 ---
 
 *This paper extends the static trust model from the observation system into a dynamic, self-calibrating system. The philosophical claim: quality is not declared, it is accumulated. The practical claim: every entity in the system — from a forum commenter to Barrett-Jackson to the trust algorithm itself — should earn its trust through a verifiable track record.*
+
+---
+
+## Appendix: Distance from Theory to Production
+
+| Dynamic Trust Feature | Static System Equivalent | Gap | Effort |
+|----------------------|-------------------------|-----|--------|
+| Per-source rolling accuracy | `base_trust_score` (static) | Need corroboration engine | Medium — compare overlapping field_evidence rows |
+| Per-observer trust | None | Need observer identity + claim tracking | Large — requires cross-platform identity resolution |
+| AI model trust tracking | `agent_tier` field on observations | Need per-model accuracy tracking | Small — observations already tag the model |
+| Retroactive adjustment | None | Need batch re-scoring job | Medium — update `confidence_score` on past observations |
+| Course correction reports | None | Need per-org claim accuracy aggregation | Medium — aggregate from corroboration results |
+| Meta-trust (algorithm calibration) | None | Need sale-price-vs-prediction tracking | Large — requires valuation pipeline maturity |
+
+The static system processes 5.7M observations with source-level trust. The dynamic system would process the same data with entity-level trust that evolves from corroboration evidence. The data volume is sufficient. The infrastructure (sources, observations, field_evidence, personas) is in place. The missing piece is the corroboration detection engine that compares claims across sources and attributes accuracy to specific observers.

@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { normalizeMake, normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
+import { writeObservation } from '../_shared/observationWriter.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -950,6 +951,25 @@ Deno.serve(async (req: Request) => {
         vehicleId = newVehicle.id;
         console.log(`Created new vehicle: ${vehicleId}`);
       }
+    }
+
+    // Fire-and-forget observation write
+    if (vehicleId) {
+      const obsFields: Record<string, any> = {};
+      for (const [k, v] of Object.entries(vehicleData)) {
+        if (v != null && k !== 'origin_metadata' && k !== 'profile_origin' && k !== 'discovery_source'
+            && k !== 'discovery_url' && k !== 'listing_url' && k !== 'listing_source'
+            && k !== 'is_public' && k !== 'status') {
+          obsFields[k] = v;
+        }
+      }
+      writeObservation(supabase, {
+        vehicleId,
+        source: { platform: "pcarmarket", url: listing.url, trustScore: 0.8 },
+        fields: obsFields,
+        observationKind: "listing",
+        extractionMethod: "dom_parse",
+      }).catch((e: any) => console.warn(`[pcarmarket] observationWriter error for ${vehicleId}: ${e?.message}`));
     }
 
     // Step 5: Link to organization (FIXED - removed listing_url, listing_status columns)

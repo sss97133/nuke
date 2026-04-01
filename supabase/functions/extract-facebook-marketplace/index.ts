@@ -15,6 +15,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -243,6 +244,25 @@ async function handleDirect(body: DirectInput) {
       .update(updates)
       .eq("id", existing.id);
 
+    // Fire-and-forget observation write if linked to a vehicle
+    if (vehicleId) {
+      const obsFields: Record<string, any> = {};
+      if (body.parsed_year) obsFields.year = body.parsed_year;
+      if (body.parsed_make) obsFields.make = body.parsed_make;
+      if (body.parsed_model) obsFields.model = body.parsed_model;
+      if (body.price) obsFields.asking_price = body.price;
+      if (body.mileage) obsFields.mileage = body.mileage;
+      if (body.exterior_color) obsFields.color = body.exterior_color;
+      if (body.transmission) obsFields.transmission = body.transmission;
+      writeObservation(supabase, {
+        vehicleId,
+        source: { platform: "facebook_marketplace", url, trustScore: 0.4 },
+        fields: obsFields,
+        observationKind: "listing",
+        extractionMethod: "fb_direct_input",
+      }).catch((e: any) => console.warn(`[fb] observationWriter error for ${vehicleId}: ${e?.message}`));
+    }
+
     return jsonResponse({
       success: true,
       listing_id: existing.id,
@@ -304,6 +324,26 @@ async function handleDirect(body: DirectInput) {
     .maybeSingle();
 
   if (insertError) throw insertError;
+
+  // Fire-and-forget observation write if linked to a vehicle
+  const linkedVehicleId = inserted!.vehicle_id || link.vehicle_id;
+  if (linkedVehicleId) {
+    const obsFields: Record<string, any> = {};
+    if (body.parsed_year) obsFields.year = body.parsed_year;
+    if (body.parsed_make) obsFields.make = body.parsed_make;
+    if (body.parsed_model) obsFields.model = body.parsed_model;
+    if (body.price) obsFields.asking_price = body.price;
+    if (body.mileage) obsFields.mileage = body.mileage;
+    if (body.exterior_color) obsFields.color = body.exterior_color;
+    if (body.transmission) obsFields.transmission = body.transmission;
+    writeObservation(supabase, {
+      vehicleId: linkedVehicleId,
+      source: { platform: "facebook_marketplace", url: normalizeUrl(facebookId), trustScore: 0.4 },
+      fields: obsFields,
+      observationKind: "listing",
+      extractionMethod: "fb_direct_input",
+    }).catch((e: any) => console.warn(`[fb] observationWriter error for ${linkedVehicleId}: ${e?.message}`));
+  }
 
   return jsonResponse({
     success: true,

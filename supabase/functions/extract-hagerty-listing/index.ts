@@ -17,6 +17,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { firecrawlScrape } from '../_shared/firecrawl.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
+import { writeObservation } from '../_shared/observationWriter.ts';
 
 // ============================================================================
 // TYPES
@@ -963,6 +964,29 @@ Deno.serve(async (req) => {
         console.log(`[hagerty] Created vehicle: ${data.id}`);
         extracted.vehicle_id = data.id;
         targetVehicleId = data.id;
+      }
+
+      // Fire-and-forget observation write
+      if (targetVehicleId) {
+        const obsFields: Record<string, any> = {};
+        const fieldMap: Record<string, any> = {
+          year: extracted.year, make: extracted.make, model: extracted.model,
+          vin: extracted.vin, mileage: extracted.mileage, color: extracted.exterior_color,
+          interior_color: extracted.interior_color, transmission: extracted.transmission,
+          engine_type: extracted.engine, drivetrain: extracted.drivetrain,
+          body_style: extracted.body_style, sale_price: extracted.sale_price,
+          high_bid: extracted.current_bid,
+        };
+        for (const [k, v] of Object.entries(fieldMap)) {
+          if (v != null) obsFields[k] = v;
+        }
+        writeObservation(supabase, {
+          vehicleId: targetVehicleId,
+          source: { platform: "hagerty", url: extracted.url, trustScore: 0.75 },
+          fields: obsFields,
+          observationKind: "listing",
+          extractionMethod: "next_data_json_parse",
+        }).catch((e: any) => console.warn(`[hagerty] observationWriter error for ${targetVehicleId}: ${e?.message}`));
       }
 
       // Save images - must satisfy vehicle_images_attribution_check

@@ -15,6 +15,7 @@ import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from "../_shared/resolveVehicleForListing.ts";
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36";
 
@@ -199,6 +200,23 @@ Deno.serve(async (req) => {
       if (insErr) throw new Error(insErr?.message || String(insErr));
       if (!inserted) throw new Error("Vehicle insert returned no data");
       finalVehicleId = inserted.id;
+    }
+
+    // Fire-and-forget observation write
+    {
+      const obsFields: Record<string, any> = {};
+      if (year) obsFields.year = year;
+      if (make) obsFields.make = make;
+      if (model) obsFields.model = model;
+      if (vin) obsFields.vin = vin;
+      if (salePrice) obsFields.sale_price = salePrice;
+      writeObservation(supabase, {
+        vehicleId: finalVehicleId,
+        source: { platform: "barnfinds", url, trustScore: 0.55 },
+        fields: obsFields,
+        observationKind: "listing",
+        extractionMethod: "markdown_parse",
+      }).catch((e: any) => console.warn(`[BARNFINDS] observationWriter error for ${finalVehicleId}: ${e?.message}`));
     }
 
     await supabase.from("vehicle_events").upsert(

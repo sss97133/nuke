@@ -229,6 +229,15 @@ function stripCodeBlocks(text: string): string {
   return text.replace(/```(?:json)?\s*/gi, "").replace(/```\s*/g, "").trim();
 }
 
+// Repair common LLM JSON errors: trailing commas, single-line comments
+function repairJson(text: string): string {
+  // Remove single-line comments (// ...)
+  let fixed = text.replace(/\/\/[^\n]*/g, "");
+  // Remove trailing commas before } or ]
+  fixed = fixed.replace(/,\s*([}\]])/g, "$1");
+  return fixed;
+}
+
 async function discoverWithLLM(
   description: string,
   vehicle: { year: number; make: string; model: string; sale_price: number },
@@ -245,7 +254,13 @@ async function discoverWithLLM(
 
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
-    return { data: JSON.parse(jsonMatch[0]), model };
+    try {
+      return { data: JSON.parse(jsonMatch[0]), model };
+    } catch {
+      // Try repairing common JSON errors
+      const repaired = repairJson(jsonMatch[0]);
+      return { data: JSON.parse(repaired), model };
+    }
   }
 
   return { data: { raw_response: content, parse_failed: true }, model };
@@ -266,8 +281,14 @@ async function extractConditionsWithLLM(
 
   const arrayMatch = content.match(/\[[\s\S]*\]/);
   if (arrayMatch) {
-    const parsed = JSON.parse(arrayMatch[0]);
-    return { conditions: Array.isArray(parsed) ? parsed : [], model };
+    try {
+      const parsed = JSON.parse(arrayMatch[0]);
+      return { conditions: Array.isArray(parsed) ? parsed : [], model };
+    } catch {
+      const repaired = repairJson(arrayMatch[0]);
+      const parsed = JSON.parse(repaired);
+      return { conditions: Array.isArray(parsed) ? parsed : [], model };
+    }
   }
 
   return { conditions: [], model };
@@ -584,21 +605,41 @@ Deno.serve(async (req) => {
           results.errors++;
           const msg = r.status === "rejected" ? r.reason?.message : r.value?.error;
           results.error_details.push(`${chunk[j]?.id}: ${msg}`);
+          // Insert a failure record so this vehicle doesn't block the queue
+          const failVehicle = chunk[j];
+          if (failVehicle?.id) {
+            await supabase.from("description_discoveries").upsert({
+              vehicle_id: failVehicle.id,
+              discovered_at: new Date().toISOString(),
+              raw_extraction: { parse_failed: true, error: msg?.substring(0, 500) },
+              keys_found: 0,
+              total_fields: 0,
+              description_length: failVehicle.description?.length || 0,
+              sale_price: failVehicle.sale_price,
+            }, { onConflict: "vehicle_id" }).then(() => {
+              console.log(`[discover-desc] Marked ${failVehicle.id} as failed — will not retry`);
+            }).catch((e: any) => {
+              console.error(`[discover-desc] Failed to mark ${failVehicle.id}: ${e.message}`);
+            });
+          }
         }
       }
     }
 
-    // Get remaining count
+    // Check if more work exists (fast EXISTS, not expensive count)
     const { data: remData } = await supabase.rpc("execute_sql", {
-      query: `SELECT count(*) AS remaining FROM vehicles v
-              WHERE v.description IS NOT NULL AND length(v.description) >= 100
-              AND v.deleted_at IS NULL
-              AND NOT EXISTS (SELECT 1 FROM description_discoveries dd WHERE dd.vehicle_id = v.id)`
+      query: `SELECT EXISTS(
+                SELECT 1 FROM vehicles v
+                WHERE v.description IS NOT NULL AND length(v.description) >= 100
+                AND v.deleted_at IS NULL
+                AND NOT EXISTS (SELECT 1 FROM description_discoveries dd WHERE dd.vehicle_id = v.id)
+              ) AS has_more`
     });
-    const remaining = Array.isArray(remData) ? Number(remData[0]?.remaining || 0) : 0;
+    const hasMore = Array.isArray(remData) ? (remData[0]?.has_more === true) : false;
+    const remaining = hasMore ? -1 : 0; // -1 = more work exists, exact count too expensive
 
     // Self-continue if requested
-    if (shouldContinue && remaining > 0 && results.discovered > 0) {
+    if (shouldContinue && hasMore && results.discovered > 0) {
       fetch(`${supabaseUrl}/functions/v1/discover-description-data`, {
         method: "POST",
         headers: {
