@@ -123,6 +123,7 @@
     "import:memes": "tsx scripts/import-popular-memes.ts",
     "index:bat-local-partners": "tsx scripts/index-bat-local-partners.ts",
     "ingest:bat": "tsx scripts/bat-seed-and-import.ts",
+    "ingest:vlva": "dotenvx run -- node scripts/vlva-numbers-ingest.mjs",
     "ingest:bat-live-auctions": "tsx scripts/bat-import-live-auctions.ts",
     "ingest:bat-local-partners": "tsx scripts/bat-ingest-local-partners.ts",
     "ingest:classic-auctions": "tsx scripts/classic-import-auctions.ts",
