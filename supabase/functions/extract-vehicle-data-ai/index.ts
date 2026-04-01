@@ -9,6 +9,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { ExtractionLogger, validateVin } from '../_shared/extractionHealth.ts'
 import { getLLMConfig, callLLM, type LLMProvider } from '../_shared/llmProvider.ts'
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
+import { writeObservation } from "../_shared/observationWriter.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -462,6 +463,22 @@ Deno.serve(async (req) => {
             vehicleId = inserted.id
             console.log(`[extract-vehicle-data-ai] Created vehicle: ${vehicleId}`)
           }
+        }
+
+        // Fire-and-forget observation write
+        if (vehicleId) {
+          const obsSkip = new Set(["discovery_url", "discovery_source", "source", "listing_source", "profile_origin", "status", "is_public", "image_urls"]);
+          const obsFields: Record<string, any> = {};
+          for (const [k, v] of Object.entries(normalized)) {
+            if (v != null && !obsSkip.has(k)) obsFields[k] = v;
+          }
+          writeObservation(supabase, {
+            vehicleId,
+            source: { platform: "bat", url, trustScore: 0.65 },
+            fields: obsFields,
+            observationKind: "listing",
+            extractionMethod: "ai_extraction",
+          }).catch((e: any) => console.warn(`[AI-EXTRACT] observationWriter error for ${vehicleId}: ${e?.message}`));
         }
 
         // Save images to vehicle_images (filter junk URLs first)

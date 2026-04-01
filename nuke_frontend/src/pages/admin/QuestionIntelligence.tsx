@@ -24,6 +24,7 @@ import QIL1Detail from './qi/QIL1Detail';
 import QICategoryDetail from './qi/QICategoryDetail';
 import QIFieldDetail from './qi/QIFieldDetail';
 import QIAuthorDetail from './qi/QIAuthorDetail';
+import QIMakeFilter from './qi/QIMakeFilter';
 
 // ─── Chart Colors (design system chart palette) ─────────────────────────
 // Mapped to L1 categories for consistency across all charts
@@ -262,6 +263,7 @@ export default function QuestionIntelligence() {
   const drillL2 = params.get('l2');
   const drillField = params.get('field');
   const drillAuthor = params.get('author');
+  const filterMake = params.get('make');
   const isDrilled = !!(drillL1 || drillL2 || drillField || drillAuthor);
 
   const [rows, setRows] = useState<TaxonomyRow[]>([]);
@@ -271,11 +273,39 @@ export default function QuestionIntelligence() {
 
   const loadData = useCallback(async () => {
     try {
-      // Load materialized view data
-      const { data: qiData, error: qiErr } = await supabase
-        .from('mv_question_intelligence')
-        .select('*')
-        .order('question_count', { ascending: false });
+      let qiData: any[] | null = null;
+      let qiErr: any = null;
+
+      if (filterMake) {
+        // Per-make data from pre-aggregated materialized view
+        const res = await supabase.rpc('question_profile_fast', { p_make: filterMake, p_limit: 100 });
+        qiErr = res.error;
+        // Map to TaxonomyRow shape
+        qiData = (res.data || []).map((r: any) => ({
+          taxonomy_id: `${r.l1_category}.${r.l2_subcategory}`,
+          l1_category: r.l1_category,
+          l2_subcategory: r.l2_subcategory,
+          display_name: r.display_name || `${r.l1_category}.${r.l2_subcategory}`,
+          answerable_from_db: r.answerable_from_db,
+          data_fields: null,
+          question_count: Number(r.question_count),
+          vehicle_count: Number(r.vehicle_count),
+          avg_sale_price: 0,
+          median_sale_price: 0,
+          pct_of_all_questions: Number(r.pct_of_filtered),
+          seller_response_pct: 0,
+          regex_classified: 0,
+          llm_classified: 0,
+        }));
+      } else {
+        // Global data from materialized view
+        const res = await supabase
+          .from('mv_question_intelligence')
+          .select('*')
+          .order('question_count', { ascending: false });
+        qiErr = res.error;
+        qiData = res.data;
+      }
 
       if (qiErr) throw new Error(qiErr.message);
       setRows(qiData || []);
@@ -304,9 +334,10 @@ export default function QuestionIntelligence() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filterMake]);
 
   useEffect(() => {
+    setLoading(true);
     loadData();
     // Only auto-refresh on overview — not when drilled into detail views
     if (!isDrilled) {
@@ -367,11 +398,16 @@ export default function QuestionIntelligence() {
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
         }}>Question Intelligence</div>
-        <div style={{
-          fontSize: 'var(--fs-9)',
-          color: 'var(--text-secondary)',
-          marginTop: '2px',
-        }}>What do buyers actually want to know? — {rows.length} categories from 1.65M questions</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
+          <span style={{
+            fontSize: 'var(--fs-9)',
+            color: 'var(--text-secondary)',
+          }}>{filterMake
+              ? `${filterMake} buyers — ${rows.length} categories, ${fmtK(rows.reduce((s, r) => s + r.question_count, 0))} questions`
+              : `What do buyers actually want to know? — ${rows.length} categories from 1.65M questions`
+            }</span>
+          <QIMakeFilter />
+        </div>
       </div>
 
       {error && (

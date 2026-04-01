@@ -376,6 +376,7 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
         center: [39, -98], zoom: 4,
         zoomControl: false, attributionControl: false,
         zoomSnap: 0, wheelDebounceTime: 40,
+        zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false,
       });
 
       const tile = L.tileLayer(colorway.tileUrl, { maxZoom: 19 }).addTo(map);
@@ -823,94 +824,93 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
 
       {/* County detail sidebar */}
       {selectedRegion && (
-        <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 320,
-          background: '#111', borderLeft: '2px solid rgba(255,255,255,0.1)',
+        <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 360,
+          background: '#0a0a0a', borderLeft: '2px solid rgba(245, 158, 11, 0.15)',
           overflowY: 'auto', zIndex: 1200, fontFamily: MAP_FONT }}>
-          <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div style={{ fontSize: 13, color: 'rgba(245, 158, 11, 1)', fontWeight: 700 }}>
-                  {selectedRegion.name}{selectedRegion.state ? `, ${selectedRegion.state}` : ''}
-                </div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2, textTransform: 'uppercase' }}>
-                  FIPS {selectedRegion.fips}
-                  {makeFilter && (
-                    <span style={{ marginLeft: 6, color: 'rgba(245, 158, 11, 0.7)' }}>
-                      {makeFilter.make.toUpperCase()} ONLY
-                    </span>
-                  )}
-                </div>
+
+          {/* Header */}
+          <div style={{ padding: '14px 12px 10px', background: 'rgba(245, 158, 11, 0.04)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontSize: 15, color: '#fff', fontWeight: 700 }}>
+                {selectedRegion.name}{selectedRegion.state ? `, ${selectedRegion.state}` : ''}
               </div>
-              <button onClick={() => { setSelectedRegion(null); setRegionVehicles(null); }} style={{
-                background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
-                color: 'rgba(255,255,255,0.5)', fontSize: 9, cursor: 'pointer', padding: '2px 6px', fontFamily: MAP_FONT,
-              }}>X</button>
+              <button onClick={() => { setSelectedRegion(null); setRegionVehicles(null); setCountyDetail(null); }} style={{
+                background: 'transparent', border: 'none',
+                color: 'rgba(255,255,255,0.4)', fontSize: 16, cursor: 'pointer', padding: '0 4px', fontFamily: MAP_FONT,
+              }}>&times;</button>
             </div>
-            <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-              <div>
-                <div style={{ fontSize: 16, color: '#fff', fontWeight: 700 }}>
+            {/* Stats row */}
+            <div style={{ display: 'flex', gap: 0 }}>
+              <div style={{ flex: 1, padding: '6px 0', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: 18, color: 'rgba(245, 158, 11, 1)', fontWeight: 700, fontFamily: 'Courier New, monospace' }}>
                   {(countyDetail?.vehicle_count ?? selectedRegion.datum?.count ?? 0).toLocaleString()}
                 </div>
-                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>VEHICLES</div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>VEHICLES</div>
               </div>
-              <div>
-                <div style={{ fontSize: 16, color: '#fff', fontWeight: 700 }}>
-                  ${((countyDetail?.total_value ?? selectedRegion.datum?.value ?? 0) / 1e6).toFixed(1)}M
+              <div style={{ flex: 1, padding: '6px 0 6px 12px' }}>
+                <div style={{ fontSize: 18, color: '#fff', fontWeight: 700, fontFamily: 'Courier New, monospace' }}>
+                  ${((countyDetail?.total_value ?? selectedRegion.datum?.value ?? 0) / 1e6).toFixed(0)}M
                 </div>
-                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>TOTAL</div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>TOTAL VALUE</div>
               </div>
             </div>
           </div>
 
-          {/* Makes + platforms from RPC */}
-          {countyDetail?.makes && countyDetail.makes.length > 0 && (
-            <div style={{ padding: '6px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginBottom: 4 }}>TOP MAKES</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                {countyDetail.makes.map((m: any) => (
-                  <span key={m.make} style={{ fontSize: 7, padding: '1px 4px',
-                    background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)',
-                    color: 'rgba(245, 158, 11, 0.7)' }}>{m.make.toUpperCase()} ({m.count})</span>
-                ))}
-              </div>
-            </div>
-          )}
-          {countyDetail?.platforms && countyDetail.platforms.length > 0 && (
-            <div style={{ padding: '6px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginBottom: 4 }}>SOURCES</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                {countyDetail.platforms.map((p: any) => (
-                  <span key={p.platform} style={{ fontSize: 7, padding: '1px 4px',
-                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                    color: 'rgba(255,255,255,0.5)' }}>{p.platform} ({p.count})</span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div style={{ padding: '8px 0' }}>
-            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', padding: '0 12px', marginBottom: 6 }}>
-              {regionLoading ? 'LOADING VEHICLES...' : `VEHICLES (${regionVehicles?.length ?? 0})`}
-            </div>
-            {regionVehicles?.map((v: any) => (
-              <div key={v.id} onClick={() => window.open(`/vehicle/${v.id}`, '_blank')} style={{
-                padding: '6px 12px', display: 'flex', gap: 8, alignItems: 'center',
-                borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer' }}>
-                {v.primary_image_url && <img src={optimizeImageUrl(v.primary_image_url, 'micro') || v.primary_image_url} alt="" loading="lazy" style={{ width: 48, height: 32, objectFit: 'cover', flexShrink: 0 }} />}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {v.year} {v.make?.toUpperCase()} {v.model?.toUpperCase()}
+          {/* Makes as horizontal bars */}
+          {countyDetail?.makes && countyDetail.makes.length > 0 && (() => {
+            const maxCount = countyDetail.makes[0].count;
+            return (
+              <div style={{ padding: '8px 12px' }}>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>TOP MAKES</div>
+                {countyDetail.makes.slice(0, 6).map((m: any) => (
+                  <div key={m.make} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                    <div style={{ width: 60, fontSize: 8, color: 'rgba(255,255,255,0.6)', textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {m.make.toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, height: 8, background: 'rgba(255,255,255,0.04)' }}>
+                      <div style={{ width: `${(m.count / maxCount) * 100}%`, height: '100%', background: 'rgba(245, 158, 11, 0.6)' }} />
+                    </div>
+                    <div style={{ width: 32, fontSize: 8, color: 'rgba(255,255,255,0.35)', fontFamily: 'Courier New, monospace' }}>
+                      {m.count >= 1000 ? `${(m.count / 1000).toFixed(1)}k` : m.count}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>
-                    {v.sale_price || v.sold_price ? `$${(v.sale_price || v.sold_price).toLocaleString()}` : 'NO PRICE'}
-                    {v.status ? ` · ${v.status}` : ''}
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Vehicle grid */}
+          <div style={{ padding: '4px 12px 12px' }}>
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+              {regionLoading ? 'LOADING...' : `TOP ${regionVehicles?.length ?? 0} BY PRICE`}
+            </div>
+            {regionVehicles?.map((v: any) => {
+              const price = v.effective_price || v.sale_price || v.sold_price;
+              return (
+                <div key={v.id} onClick={() => window.open(`/vehicle/${v.id}`, '_blank')} style={{
+                  marginBottom: 6, cursor: 'pointer', display: 'flex', gap: 8,
+                  padding: '4px', background: 'rgba(255,255,255,0.02)',
+                }}>
+                  {v.primary_image_url ? (
+                    <img src={optimizeImageUrl(v.primary_image_url, 'micro') || v.primary_image_url} alt="" loading="lazy"
+                      style={{ width: 72, height: 48, objectFit: 'cover', flexShrink: 0 }} />
+                  ) : (
+                    <div style={{ width: 72, height: 48, background: 'rgba(255,255,255,0.03)', flexShrink: 0 }} />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {v.year} {v.make?.toUpperCase()} {v.model?.toUpperCase()}
+                    </div>
+                    <div style={{ fontSize: 11, color: price ? 'rgba(245, 158, 11, 0.9)' : 'rgba(255,255,255,0.2)', fontFamily: 'Courier New, monospace', fontWeight: 700 }}>
+                      {price ? `$${price.toLocaleString()}` : '—'}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {regionVehicles?.length === 0 && !regionLoading && (
-              <div style={{ padding: '12px', fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
-                No vehicles found for this county
+              <div style={{ padding: '20px 0', fontSize: 9, color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>
+                NO VEHICLES FOUND
               </div>
             )}
           </div>

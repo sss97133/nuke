@@ -20,6 +20,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 // Direct fetch - BH Auction has no Cloudflare/bot protection
 async function fetchPage(url: string): Promise<{ html: string; success: boolean; error?: string }> {
@@ -762,6 +763,27 @@ Deno.serve(async (req) => {
         }
 
         extracted.vehicle_id = vehicleId;
+
+        // Fire-and-forget observation write
+        if (vehicleId) {
+          const obsFields: Record<string, any> = {};
+          if (extracted.year) obsFields.year = extracted.year;
+          if (extracted.make) obsFields.make = extracted.make;
+          if (extracted.model) obsFields.model = extracted.model;
+          if (extracted.vin || extracted.chassis_number) obsFields.vin = extracted.vin || extracted.chassis_number;
+          if (extracted.sale_price) obsFields.sale_price = extracted.sale_price;
+          if (extracted.mileage) obsFields.mileage = extracted.mileage;
+          if (extracted.engine) obsFields.engine_size = extracted.engine;
+          if (extracted.transmission) obsFields.transmission = extracted.transmission;
+          if (extracted.exterior_color) obsFields.color = extracted.exterior_color;
+          writeObservation(supabase, {
+            vehicleId,
+            source: { platform: "bat", url: extracted.url, trustScore: 0.7 },
+            fields: obsFields,
+            observationKind: extracted.sale_price ? "sale_result" : "listing",
+            extractionMethod: "html_parse",
+          }).catch((e: any) => console.warn(`[BH-AUCTION] observationWriter error for ${vehicleId}: ${e?.message}`));
+        }
 
         // Save images
         if (extracted.image_urls.length > 0 && vehicleId) {

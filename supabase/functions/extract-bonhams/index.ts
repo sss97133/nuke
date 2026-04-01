@@ -24,6 +24,7 @@ import { cleanVehicleFields, stripHtmlTags, containsHtml } from "../_shared/poll
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from "../_shared/resolveVehicleForListing.ts";
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 const EXTRACTOR_VERSION = "bonhams-v3";
 
@@ -1015,6 +1016,22 @@ async function saveVehicle(
 
   if (!targetId) {
     return { vehicleId: null, action: "failed", qualityScore: gateResult.score, issues: ["no_vehicle_id"] };
+  }
+
+  // Fire-and-forget observation write
+  {
+    const obsFields: Record<string, any> = {};
+    const obsSkip = new Set(["discovery_url", "discovery_source", "source", "listing_source", "profile_origin", "status", "is_public", "origin_metadata", "extractor_version"]);
+    for (const [k, v] of Object.entries(vehicleData)) {
+      if (v != null && !obsSkip.has(k)) obsFields[k] = v;
+    }
+    writeObservation(supabase, {
+      vehicleId: targetId,
+      source: { platform: "bonhams", url: extracted.url, trustScore: 0.9 },
+      fields: obsFields,
+      observationKind: extracted.sale_price ? "sale_result" : "listing",
+      extractionMethod: "json_ld_parse",
+    }).catch((e: any) => console.warn(`[BONHAMS] observationWriter error for ${targetId}: ${e?.message}`));
   }
 
   // Save images (non-fatal)

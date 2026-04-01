@@ -351,16 +351,29 @@ async function main() {
   console.log('');
 
   // Connect
-  const client = new Client({
+  let client = new Client({
     host: 'aws-0-us-west-1.pooler.supabase.com', port: 6543,
     user: 'postgres.qkgaybvrernstplzjaam',
     password: process.env.SUPABASE_DB_PASSWORD || 'RbzKq32A0uhqvJMQ',
     database: 'postgres', ssl: { rejectUnauthorized: false },
     statement_timeout: 120000,
   });
-  client.on('error', (e) => { console.error('DB background error:', e.message); });
-  await client.connect();
-  console.log('Connected to DB.');
+  let connected = false;
+  const connectDb = async () => {
+    if (connected) { try { await client.end(); } catch {} }
+    client = new Client({
+      host: 'aws-0-us-west-1.pooler.supabase.com', port: 6543,
+      user: 'postgres.qkgaybvrernstplzjaam',
+      password: process.env.SUPABASE_DB_PASSWORD || 'RbzKq32A0uhqvJMQ',
+      database: 'postgres', ssl: { rejectUnauthorized: false },
+      statement_timeout: 120000,
+    });
+    client.on('error', (e) => { console.error('DB background error:', e.message); });
+    await client.connect();
+    connected = true;
+    console.log('Connected to DB.');
+  };
+  await connectDb();
 
   const sources = SOURCE_FILTER === 'all'
     ? ['classiccars', 'classic-driver']
@@ -405,8 +418,10 @@ async function main() {
       round++;
       const remaining = Math.min(BATCH_SIZE, MAX_TOTAL - totalProcessed);
 
-      // Fetch batch of vehicles needing enrichment
-      const { rows: batch } = await client.query(
+      // Fetch batch of vehicles needing enrichment (with reconnect on failure)
+      let batch;
+      try {
+        const result = await client.query(
         `SELECT v.id, v.listing_url, v.year, v.make, v.model, v.vin, v.description,
                 v.sale_price, v.mileage, v.color, v.interior_color, v.transmission,
                 v.horsepower, v.body_style, v.drivetrain, v.primary_image_url
@@ -419,6 +434,15 @@ async function main() {
          LIMIT $2`,
         [VERSION, remaining]
       );
+        batch = result.rows;
+      } catch (queryErr) {
+        if (queryErr.message.includes('not queryable') || queryErr.message.includes('Connection terminated') || queryErr.message.includes('ETIMEDOUT')) {
+          console.log('    DB connection lost — reconnecting...');
+          await connectDb();
+          continue; // retry this round
+        }
+        throw queryErr;
+      }
 
       if (batch.length === 0) break;
 

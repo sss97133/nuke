@@ -20,6 +20,7 @@ import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { qualityGate } from '../_shared/extractionQualityGate.ts';
 import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { normalizeListingUrl } from '../_shared/urlNormalization.ts';
+import { writeObservation } from '../_shared/observationWriter.ts';
 
 const VERSION = '1.1.0';
 const JAMESEDITION_SOURCE_ID = '77c149de-7866-4a7c-ad24-3423ee6c1f22';
@@ -376,6 +377,22 @@ Deno.serve(async (req: Request) => {
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
         vehicleId = created.id;
+      }
+
+      // Fire-and-forget observation write
+      {
+        const obsFields: Record<string, any> = {};
+        const skipKeys = new Set(['discovery_url', 'discovery_source', 'listing_url', 'listing_source', 'profile_origin', 'status', 'is_public', 'origin_metadata']);
+        for (const [k, v] of Object.entries(vehicleData)) {
+          if (v != null && !skipKeys.has(k)) obsFields[k] = v;
+        }
+        writeObservation(supabase, {
+          vehicleId,
+          source: { platform: 'jamesedition', url: extracted.url || url, trustScore: 0.6 },
+          fields: obsFields,
+          observationKind: 'listing',
+          extractionMethod: 'firecrawl_markdown_parse',
+        }).catch((e: any) => console.warn(`[jamesedition] observationWriter error for ${vehicleId}: ${e?.message}`));
       }
 
       // Save images

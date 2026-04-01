@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -648,6 +649,26 @@ Deno.serve(async (req) => {
             parsed_model: model,
           })
           .eq('id', listing.id);
+
+        // Fire-and-forget observation write
+        if (vehicle?.id) {
+          const obsFields: Record<string, any> = {};
+          if (year) obsFields.year = year;
+          if (make) obsFields.make = make;
+          if (model) obsFields.model = model;
+          if (askingPrice) obsFields.asking_price = askingPrice;
+          if (listing.mileage) obsFields.mileage = listing.mileage;
+          if (listing.exterior_color) obsFields.color = listing.exterior_color;
+          if (listing.interior_color) obsFields.interior_color = listing.interior_color;
+          if (listing.transmission) obsFields.transmission = listing.transmission;
+          writeObservation(supabase, {
+            vehicleId: vehicle.id,
+            source: { platform: "facebook_marketplace", url: listing.url, trustScore: 0.6 },
+            fields: obsFields,
+            observationKind: "listing",
+            extractionMethod: "graphql_scrape",
+          }).catch((e: any) => console.warn(`[FB-IMPORT] observationWriter error for ${vehicle.id}: ${e?.message}`));
+        }
 
         // Download images to Supabase storage (FB CDN URLs expire in 24-48h)
         if (validImages.length > 0) {

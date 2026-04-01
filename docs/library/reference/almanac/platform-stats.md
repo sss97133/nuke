@@ -106,8 +106,11 @@ On 2026-03-29, **273,794 ConceptCarz records without VINs** (length < 11) were q
 | Observation sources (registered) | 160 | steady |
 | Field evidence rows | 3,290,472 | NEW (sprint W1) |
 | Vehicles with field evidence | 370,465 (44.7%) | NEW (sprint W1) |
-| Avg evidence per covered vehicle | 9.3 fields | NEW (sprint W1) |
-| ARS scored vehicles | 324,063 (39.1%) | NEW (sprint W1) |
+| Avg evidence per vehicle (all) | 3.97 fields | NEW (was 0.21 pre-sprint, 19x) |
+| Avg evidence per covered vehicle | 8.9 fields | NEW (sprint W1) |
+| ARS scored vehicles | 324,063 (39.1% of all, 64.2% of public) | NEW (sprint W1) |
+| ARS average composite score | 24.0 / 100 | NEW (sprint W1) |
+| ARS user vehicles | 100% scored | NEW (K10: 69, K2500: 71) |
 | Timeline events (lifecycle events) | 992,567 | +5.3K |
 | Vehicle location observations (geocoded) | ~358,947 | steady |
 | VLOs at city/gps/address precision | ~340,722 (94.9%) | steady |
@@ -126,6 +129,19 @@ On 2026-03-29, **273,794 ConceptCarz records without VINs** (length < 11) were q
 | Field evidence vehicle coverage | 44.7% | Moderate | NEW |
 | Unknown platform_source | ~5.4% (27K) | Improved from ~30% | steady |
 | Dense field coverage (10+/12 fields) | 22.5% | Moderate (all vehicles) | +0.2pp |
+
+---
+
+## Per-Source Enrichment Results (Sprint W1)
+
+Sprint W1 ran targeted enrichment against two major sources. Description coverage measured as `description IS NOT NULL AND length > 50`.
+
+| Source | Vehicle Count | Desc Coverage Pre | Desc Coverage Post | Delta |
+|--------|-------------:|------------------:|-------------------:|-------|
+| ClassicCars.com | 35,266 | ~0.5% | 23.8% | +23.3pp |
+| Classic Driver | 50,521 | ~0.2% | 5.0% | +4.8pp |
+
+ClassicCars.com enrichment is still in progress (target 34.7K). Classic Driver enrichment is complete.
 
 ---
 

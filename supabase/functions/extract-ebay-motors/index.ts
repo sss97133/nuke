@@ -20,6 +20,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { firecrawlScrape } from '../_shared/firecrawl.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { ExtractionLogger, validateVin, parsePrice, parseMileage } from '../_shared/extractionHealth.ts';
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 // ============================================================================
 // TYPES
@@ -915,6 +916,30 @@ Deno.serve(async (req) => {
       }
 
       healthLogger.setVehicleId(vehicle_id);
+
+      // Fire-and-forget observation write
+      if (vehicle_id) {
+        const obsFields: Record<string, any> = {};
+        if (extracted.year) obsFields.year = extracted.year;
+        if (extracted.make) obsFields.make = extracted.make;
+        if (extracted.model) obsFields.model = extracted.model;
+        if (extracted.vin) obsFields.vin = extracted.vin;
+        if (extracted.price) obsFields.sale_price = extracted.price;
+        if (extracted.mileage) obsFields.mileage = extracted.mileage;
+        if (extracted.exterior_color) obsFields.color = extracted.exterior_color;
+        if (extracted.interior_color) obsFields.interior_color = extracted.interior_color;
+        if (extracted.transmission) obsFields.transmission = extracted.transmission;
+        if (extracted.drivetrain) obsFields.drivetrain = extracted.drivetrain;
+        if (extracted.engine) obsFields.engine_size = extracted.engine;
+        if (extracted.body_style) obsFields.body_style = extracted.body_style;
+        writeObservation(supabase, {
+          vehicleId: vehicle_id,
+          source: { platform: "bat", url: extracted.url, trustScore: 0.6 },
+          fields: obsFields,
+          observationKind: "listing",
+          extractionMethod: "firecrawl_json_ld_parse",
+        }).catch((e: any) => console.warn(`[EBAY] observationWriter error for ${vehicle_id}: ${e?.message}`));
+      }
 
       // Save images
       if (extracted.image_urls.length > 0 && vehicle_id) {

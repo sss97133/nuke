@@ -19,6 +19,7 @@ import { VehicleProfileProvider, useVehicleProfile } from './vehicle-profile/Veh
 const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceContent'));
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
 const BarcodeTimeline = React.lazy(() => import('./vehicle-profile/BarcodeTimeline'));
+const VehicleBriefing = React.lazy(() => import('./vehicle-profile/VehicleBriefing'));
 
 
 const VehicleProfileInner: React.FC = () => {
@@ -243,7 +244,10 @@ const VehicleProfileInner: React.FC = () => {
           </React.Suspense>
         )}
 
-        {/* Workspace tab bar removed — all content renders flat */}
+        {/* Vehicle Briefing — L0 headline + L1 stat pills, immediately after hero */}
+        <React.Suspense fallback={null}>
+          <VehicleBriefing />
+        </React.Suspense>
 
         {/* Main Content */}
         <div style={{ marginTop: '8px' }}>

@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { writeObservation } from "../_shared/observationWriter.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -274,6 +275,19 @@ Deno.serve(async (req) => {
       }
     } else {
       console.log('No empty fields to update - vehicle already has complete data')
+    }
+
+    // Fire-and-forget observation write for VIN decode data
+    {
+      const obsFields: Record<string, any> = { ...decoded };
+      if (vin) obsFields.vin = vin;
+      writeObservation(supabase, {
+        vehicleId: vehicle_id,
+        source: { platform: "nhtsa", url: `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/${vin}`, trustScore: 0.95 },
+        fields: obsFields,
+        observationKind: "specification",
+        extractionMethod: "vin_decode",
+      }).catch((e: any) => console.warn(`[VIN-DECODE] observationWriter error for ${vehicle_id}: ${e?.message}`));
     }
 
     return new Response(

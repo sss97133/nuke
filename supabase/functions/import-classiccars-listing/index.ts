@@ -3,6 +3,7 @@
 // 41-zone vehicle_zone system. DEPRECATED: migrate to vehicle_zone.
 // See: nuke_frontend/src/constants/vehicleZones.ts for the canonical zone taxonomy.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { writeObservation } from "../_shared/observationWriter.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -213,6 +214,28 @@ Deno.serve(async (req) => {
           .eq('id', vehicleId)
         console.log(`Updated existing vehicle with new data`)
       }
+    }
+
+    // Fire-and-forget observation write
+    if (vehicleId) {
+      const obsFields: Record<string, any> = {};
+      if (listingData.year) obsFields.year = listingData.year;
+      if (listingData.make) obsFields.make = listingData.make;
+      if (listingData.model) obsFields.model = listingData.model;
+      if (listingData.vin) obsFields.vin = listingData.vin;
+      if (listingData.price) obsFields.sale_price = listingData.price;
+      if (listingData.mileage) obsFields.mileage = listingData.mileage;
+      if (listingData.color || listingData.exterior_color) obsFields.color = listingData.color || listingData.exterior_color;
+      if (listingData.transmission) obsFields.transmission = listingData.transmission;
+      if (listingData.drivetrain) obsFields.drivetrain = listingData.drivetrain;
+      if (listingData.engine) obsFields.engine_size = listingData.engine;
+      writeObservation(supabase, {
+        vehicleId,
+        source: { platform: "classiccars-com", url: listingUrl, trustScore: 0.65 },
+        fields: obsFields,
+        observationKind: "listing",
+        extractionMethod: "ai_extraction",
+      }).catch((e: any) => console.warn(`[CLASSICCARS] observationWriter error for ${vehicleId}: ${e?.message}`))
     }
 
     // Step 3: Download and analyze ALL images - NO LIMITS

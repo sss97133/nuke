@@ -12,22 +12,9 @@ interface Props {
 export default function MapTimeline({ buckets, timeEnd, onScrub, loading }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  if (buckets.length === 0) return null;
-
-  const maxCount = Math.max(...buckets.map(b => b.count), 1);
-
-  // Find the active bucket index based on timeEnd
-  let activeIndex = buckets.length - 1;
-  if (timeEnd) {
-    const endDate = new Date(timeEnd);
-    const endMonth = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}`;
-    const idx = buckets.findIndex(b => b.month >= endMonth);
-    activeIndex = idx >= 0 ? idx : buckets.length - 1;
-  }
-
   const handleBarClick = useCallback((month: string, index: number) => {
     if (index === buckets.length - 1) {
-      onScrub(undefined); // Clear filter when clicking last bar
+      onScrub(undefined);
     } else {
       onScrub(month);
     }
@@ -36,6 +23,18 @@ export default function MapTimeline({ buckets, timeEnd, onScrub, loading }: Prop
   const handleClear = useCallback(() => {
     onScrub(undefined);
   }, [onScrub]);
+
+  if (buckets.length === 0) return null;
+
+  const maxCount = Math.max(...buckets.map(b => b.count), 1);
+
+  let activeIndex = buckets.length - 1;
+  if (timeEnd) {
+    const endDate = new Date(timeEnd);
+    const endMonth = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}`;
+    const idx = buckets.findIndex(b => b.month >= endMonth);
+    activeIndex = idx >= 0 ? idx : buckets.length - 1;
+  }
 
   // Show year labels only at first month of each year
   const getLabel = (month: string, idx: number): string | null => {

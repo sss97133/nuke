@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { extractBatListingWithFirecrawl } from '../_shared/batFirecrawlMapper.ts';
 import { normalizeListingLocation } from '../_shared/normalizeListingLocation.ts';
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -416,6 +417,23 @@ Deno.serve(async (req: Request) => {
           }
 
           if (vehicleId) {
+            // Fire-and-forget observation write
+            {
+              const obsFields: Record<string, any> = {};
+              if (data.year) obsFields.year = data.year;
+              if (data.make) obsFields.make = data.make;
+              if (data.model) obsFields.model = data.model;
+              if (data.vin) obsFields.vin = data.vin;
+              if (data.sale_price) obsFields.sale_price = data.sale_price;
+              writeObservation(supabase, {
+                vehicleId,
+                source: { platform: "bat", url: listingUrl, trustScore: 0.85 },
+                fields: obsFields,
+                observationKind: data.sale_price ? "sale_result" : "listing",
+                extractionMethod: "firecrawl_profile_parse",
+              }).catch((e: any) => console.warn(`[BAT-PROFILE] observationWriter error for ${vehicleId}: ${e?.message}`));
+            }
+
             // Check if this vehicle was newly created or updated
             const { data: vehicle } = await supabase
               .from('vehicles')

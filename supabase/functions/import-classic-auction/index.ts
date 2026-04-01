@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -291,6 +292,21 @@ Deno.serve(async (req) => {
           updated_at: new Date().toISOString(),
         })
         .eq('id', vehicleId);
+    }
+
+    // Fire-and-forget observation write
+    if (vehicleId) {
+      const obsFields: Record<string, any> = {};
+      if (ymm.year) obsFields.year = ymm.year;
+      if (ymm.make) obsFields.make = ymm.make;
+      if (ymm.model) obsFields.model = ymm.model;
+      writeObservation(supabase, {
+        vehicleId,
+        source: { platform: "classic-com", url, trustScore: 0.65 },
+        fields: obsFields,
+        observationKind: "listing",
+        extractionMethod: "firecrawl_parse",
+      }).catch((e: any) => console.warn(`[CLASSIC] observationWriter error for ${vehicleId}: ${e?.message}`));
     }
 
     // Upsert external listing for marketplace

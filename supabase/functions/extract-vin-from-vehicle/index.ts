@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { writeObservation } from "../_shared/observationWriter.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -187,6 +188,15 @@ Deno.serve(async (req) => {
         .catch(() => null)
 
       updatedVin = true
+
+      // Fire-and-forget observation write for VIN extraction
+      writeObservation(supabase, {
+        vehicleId: vehicle_id,
+        source: { platform: "bat", url: vehicle.bat_auction_url || vehicle.discovery_url || "", trustScore: 0.75 },
+        fields: { vin },
+        observationKind: "specification",
+        extractionMethod: "text_regex",
+      }).catch((e: any) => console.warn(`[VIN-EXTRACT] observationWriter error for ${vehicle_id}: ${e?.message}`))
     }
 
     // If we could not find a VIN and user wants outreach automation, create notifications for "historians".

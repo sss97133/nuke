@@ -34,6 +34,7 @@ import { firecrawlScrape } from '../_shared/firecrawl.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
+import { writeObservation } from "../_shared/observationWriter.ts";
 
 // ============================================================================
 // TYPES
@@ -803,6 +804,28 @@ async function saveToDatabase(
     }
     vehicleId = newVehicle!.id;
     console.log(`[broad-arrow] Created vehicle: ${vehicleId}`);
+  }
+
+  // Fire-and-forget observation write
+  if (vehicleId) {
+    const obsFields: Record<string, any> = {};
+    if (extracted.year) obsFields.year = extracted.year;
+    if (extracted.make) obsFields.make = extracted.make;
+    if (extracted.model) obsFields.model = extracted.model;
+    if (extracted.vin) obsFields.vin = extracted.vin;
+    if (extracted.sale_price) obsFields.sale_price = extracted.sale_price;
+    if (extracted.mileage) obsFields.mileage = extracted.mileage;
+    if (extracted.engine) obsFields.engine_size = extracted.engine;
+    if (extracted.transmission) obsFields.transmission = extracted.transmission;
+    if (extracted.exterior_color) obsFields.color = extracted.exterior_color;
+    if (extracted.interior_color) obsFields.interior_color = extracted.interior_color;
+    writeObservation(supabase, {
+      vehicleId,
+      source: { platform: "broad-arrow", url: extracted.url, trustScore: 0.8 },
+      fields: obsFields,
+      observationKind: extracted.sale_price ? "sale_result" : "listing",
+      extractionMethod: "firecrawl_markdown_parse",
+    }).catch((e: any) => console.warn(`[BROAD-ARROW] observationWriter error for ${vehicleId}: ${e?.message}`));
   }
 
   // Upsert vehicle_events record

@@ -21,6 +21,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
+import { writeObservation } from '../_shared/observationWriter.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -285,6 +286,21 @@ async function saveVehicle(
         updated_at: new Date().toISOString(),
       })
       .eq('id', resolvedId);
+
+    // Fire-and-forget observation write
+    const obsFields: Record<string, any> = {};
+    if (vehicle.year) obsFields.year = vehicle.year;
+    if (vehicle.make) obsFields.make = vehicle.make;
+    if (vehicle.model) obsFields.model = vehicle.model;
+    if (vehicle.sold_price) obsFields.sale_price = vehicle.sold_price;
+    writeObservation(supabase, {
+      vehicleId: resolvedId,
+      source: { platform: "rmsothebys", url: vehicle.url, trustScore: 0.85 },
+      fields: obsFields,
+      observationKind: "sale_result",
+      extractionMethod: "rmsothebys_api",
+    }).catch((e: any) => console.warn(`[RMS] observationWriter error for ${resolvedId}: ${e?.message}`));
+
     return { vehicleId: resolvedId, isNew: false };
   }
 
@@ -330,6 +346,23 @@ async function saveVehicle(
   }
 
   const vehicleId = newVehicle.id;
+
+  // Fire-and-forget observation write for new vehicle
+  {
+    const obsFields: Record<string, any> = {};
+    if (vehicle.year) obsFields.year = vehicle.year;
+    if (vehicle.make) obsFields.make = vehicle.make;
+    if (vehicle.model) obsFields.model = vehicle.model;
+    if (vehicle.sold_price) obsFields.sale_price = vehicle.sold_price;
+    if (vehicle.lot_number) obsFields.lot_number = vehicle.lot_number;
+    writeObservation(supabase, {
+      vehicleId,
+      source: { platform: "rmsothebys", url: vehicle.url, trustScore: 0.85 },
+      fields: obsFields,
+      observationKind: vehicle.sold ? "sale_result" : "listing",
+      extractionMethod: "rmsothebys_api",
+    }).catch((e: any) => console.warn(`[RMS] observationWriter error for ${vehicleId}: ${e?.message}`));
+  }
 
   // Save image
   if (vehicle.image_url) {
