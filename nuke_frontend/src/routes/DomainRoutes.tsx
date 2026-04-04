@@ -56,6 +56,7 @@ const Notifications = React.lazy(() => import('../pages/Notifications'));
 const ClaimExternalIdentity = React.lazy(() => import('../pages/ClaimExternalIdentity'));
 const BaTMembers = React.lazy(() => import('../pages/BaTMembers'));
 const InvoiceManager = React.lazy(() => import('../pages/InvoiceManager'));
+const WorkOrderStatement = React.lazy(() => import('../pages/WorkOrderStatement'));
 const ImportDataPage = React.lazy(() => import('../pages/ImportDataPage'));
 const PhotoSyncPage = React.lazy(() => import('../pages/PhotoSyncPage'));
 const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
@@ -163,6 +164,7 @@ export const DomainRoutes = () => {
         <Route path="/tech/upload" element={<TechShareUpload />} />
         <Route path="/restoration" element={<RestorationIntake />} />
         <Route path="/intake" element={<RestorationIntake />} />
+        <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
 
         {/* ── Hub convenience redirects → homepage tabs ─────────────────── */}
         <Route path="/garage" element={<Navigate to="/?tab=garage" replace />} />
