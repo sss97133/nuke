@@ -40,19 +40,19 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
   const invoiceDate = fmtDate(new Date().toISOString());
   const invoiceNum = `INV-${(data.vehicle.model || 'VEH').replace(/\s+/g, '').toUpperCase().slice(0, 6)}-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}`;
 
-  // Collect all billable parts/labor across work orders
+  // Collect all billable and comped parts/labor across work orders
   const allParts: PartRow[] = [];
   const allLabor: LaborRow[] = [];
+  const compedParts: PartRow[] = [];
+  const compedLabor: LaborRow[] = [];
   for (const wo of data.workOrders) {
     for (const p of (data.parts[wo.id] || [])) {
-      if (!p.is_comped && !['cancelled', 'returned', 'wrong_order', 'not_used'].includes(p.status || '')) {
-        allParts.push(p);
-      }
+      if (['cancelled', 'returned', 'wrong_order', 'not_used'].includes(p.status || '')) continue;
+      if (p.is_comped) { compedParts.push(p); } else { allParts.push(p); }
     }
     for (const l of (data.labor[wo.id] || [])) {
-      if (!l.is_comped && !['cancelled', 'not_needed'].includes(l.status || '')) {
-        allLabor.push(l);
-      }
+      if (['cancelled', 'not_needed'].includes(l.status || '')) continue;
+      if (l.is_comped) { compedLabor.push(l); } else { allLabor.push(l); }
     }
   }
 
@@ -225,11 +225,42 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
           </>
         )}
 
-        {/* Goodwill note */}
-        {data.totals.goodwill > 0 && (
-          <div style={INV.goodwillNote}>
-            Goodwill courtesy credit applied: {fmt(data.totals.goodwill)} in parts and labor provided at no charge.
-          </div>
+        {/* Goodwill — itemized courtesy items */}
+        {(compedParts.length > 0 || compedLabor.length > 0) && (
+          <>
+            <div style={{ ...INV.sectionTitle, marginTop: '14px', color: '#8B6914' }}>Courtesy — No Charge</div>
+            <table style={INV.table}>
+              <thead>
+                <tr>
+                  <th style={INV.th}>Description</th>
+                  <th style={{ ...INV.th, width: '60px' }}>Type</th>
+                  <th style={{ ...INV.th, textAlign: 'right', width: '80px' }}>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {compedParts.map(p => (
+                  <tr key={p.id}>
+                    <td style={INV.td}>{p.part_name}{p.comp_reason ? <span style={{ color: '#999', marginLeft: '6px' }}>— {p.comp_reason}</span> : null}</td>
+                    <td style={{ ...INV.td, color: '#888' }}>Part</td>
+                    <td style={{ ...INV.td, textAlign: 'right', color: '#8B6914' }}>{fmt(p.comp_retail_value || p.total_price || (p.unit_price || 0) * (p.quantity || 1))}</td>
+                  </tr>
+                ))}
+                {compedLabor.map(l => (
+                  <tr key={l.id}>
+                    <td style={INV.td}>{l.task_name}{l.comp_reason ? <span style={{ color: '#999', marginLeft: '6px' }}>— {l.comp_reason}</span> : null}</td>
+                    <td style={{ ...INV.td, color: '#888' }}>Labor</td>
+                    <td style={{ ...INV.td, textAlign: 'right', color: '#8B6914' }}>{fmt(l.comp_retail_value || l.total_cost || 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={2} style={{ ...INV.td, textAlign: 'right', fontWeight: 700, borderTop: '2px solid #8B6914', color: '#8B6914' }}>Total Courtesy Value</td>
+                  <td style={{ ...INV.td, textAlign: 'right', fontWeight: 700, borderTop: '2px solid #8B6914', color: '#8B6914' }}>{fmt(data.totals.goodwill)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </>
         )}
 
         {/* Footer */}
