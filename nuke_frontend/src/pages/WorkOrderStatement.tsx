@@ -35,7 +35,9 @@ const fmtDateShort = (d: string) => {
 // INVOICE VIEW — clean auto shop invoice
 // ══════════════════════════════════════════════════════════════
 
-const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void; sending: boolean; sentStatus: string }> = ({ data, onEdit, onSend, sending, sentStatus }) => {
+type InvoiceTheme = 'classic' | 'modern' | 'dealer';
+
+const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void; sending: boolean; sentStatus: string; theme: InvoiceTheme; onThemeChange: (t: InvoiceTheme) => void }> = ({ data, onEdit, onSend, sending, sentStatus, theme, onThemeChange }) => {
   const vehicleTitle = [data.vehicle.year, data.vehicle.make, data.vehicle.model].filter(Boolean).join(' ');
   const invoiceDate = fmtDate(new Date().toISOString());
   const invoiceNum = `INV-${(data.vehicle.model || 'VEH').replace(/\s+/g, '').toUpperCase().slice(0, 6)}-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}`;
@@ -56,81 +58,97 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
     }
   }
 
+  // Theme styles
+  const T = theme === 'classic' ? CLASSIC : theme === 'dealer' ? DEALER : INV;
+
   return (
-    <div style={INV.page}>
-      <div style={INV.paper}>
+    <div style={T.page}>
+      <div style={T.paper}>
+
+        {/* Theme picker — not printed */}
+        <div className="no-print" style={{ display: 'flex', gap: '6px', marginBottom: '12px', justifyContent: 'flex-end' }}>
+          {(['classic', 'modern', 'dealer'] as InvoiceTheme[]).map(t => (
+            <button key={t} onClick={() => onThemeChange(t)} style={{
+              padding: '4px 12px', fontSize: '9px', fontWeight: 600, textTransform: 'uppercase',
+              letterSpacing: '0.06em', cursor: 'pointer', fontFamily: 'Arial',
+              border: theme === t ? '2px solid #1a1a1a' : '1px solid #ccc',
+              background: theme === t ? '#1a1a1a' : 'transparent',
+              color: theme === t ? '#fff' : '#888',
+            }}>{t}</button>
+          ))}
+        </div>
 
         {/* Shop Header */}
-        <div style={INV.shopHeader}>
+        <div style={T.shopHeader}>
           <div>
-            <div style={INV.shopName}>NUKE</div>
-            <div style={INV.shopDetail}>Vehicle Build & Service</div>
-            <div style={INV.shopDetail}>Las Vegas, NV</div>
+            <div style={T.shopName}>NUKE</div>
+            <div style={T.shopDetail}>Vehicle Build & Service</div>
+            <div style={T.shopDetail}>Las Vegas, NV</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={INV.invoiceTitle}>INVOICE</div>
-            <table style={INV.metaTable}>
+            <div style={T.invoiceTitle}>INVOICE</div>
+            <table style={T.metaTable}>
               <tbody>
-                <tr><td style={INV.metaLabel}>Invoice #</td><td style={INV.metaValue}>{invoiceNum}</td></tr>
-                <tr><td style={INV.metaLabel}>Date</td><td style={INV.metaValue}>{invoiceDate}</td></tr>
-                <tr><td style={INV.metaLabel}>Terms</td><td style={INV.metaValue}>Due on Receipt</td></tr>
+                <tr><td style={T.metaLabel}>Invoice #</td><td style={T.metaValue}>{invoiceNum}</td></tr>
+                <tr><td style={T.metaLabel}>Date</td><td style={T.metaValue}>{invoiceDate}</td></tr>
+                <tr><td style={T.metaLabel}>Terms</td><td style={T.metaValue}>Due on Receipt</td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <div style={INV.divider} />
+        <div style={T.divider} />
 
         {/* Bill To / Vehicle */}
-        <div style={INV.infoRow}>
+        <div style={T.infoRow}>
           <div>
-            <div style={INV.infoLabel}>BILL TO</div>
+            <div style={T.infoLabel}>BILL TO</div>
             {data.contact ? (
               <>
-                <div style={INV.infoName}>{data.contact.name}</div>
-                {data.contact.email && <div style={INV.infoLine}>{data.contact.email}</div>}
-                {data.contact.phone && <div style={INV.infoLine}>{data.contact.phone}</div>}
+                <div style={T.infoName}>{data.contact.name}</div>
+                {data.contact.email && <div style={T.infoLine}>{data.contact.email}</div>}
+                {data.contact.phone && <div style={T.infoLine}>{data.contact.phone}</div>}
               </>
             ) : (
-              <div style={INV.infoLine}>—</div>
+              <div style={T.infoLine}>—</div>
             )}
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={INV.infoLabel}>VEHICLE</div>
-            <div style={INV.infoName}>{vehicleTitle}</div>
-            {data.vehicle.vin && <div style={INV.infoLine}>VIN: {data.vehicle.vin}</div>}
+            <div style={T.infoLabel}>VEHICLE</div>
+            <div style={T.infoName}>{vehicleTitle}</div>
+            {data.vehicle.vin && <div style={T.infoLine}>VIN: {data.vehicle.vin}</div>}
           </div>
         </div>
 
-        <div style={INV.divider} />
+        <div style={T.divider} />
 
         {/* Parts */}
         {allParts.length > 0 && (
           <>
-            <div style={INV.sectionTitle}>Parts & Materials</div>
-            <table style={INV.table}>
+            <div style={T.sectionTitle}>Parts & Materials</div>
+            <table style={T.table}>
               <thead>
                 <tr>
-                  <th style={INV.th}>Description</th>
-                  <th style={{ ...INV.th, textAlign: 'center', width: '50px' }}>Qty</th>
-                  <th style={{ ...INV.th, textAlign: 'right', width: '80px' }}>Unit Price</th>
-                  <th style={{ ...INV.th, textAlign: 'right', width: '80px' }}>Amount</th>
+                  <th style={T.th}>Description</th>
+                  <th style={{ ...T.th, textAlign: 'center', width: '50px' }}>Qty</th>
+                  <th style={{ ...T.th, textAlign: 'right', width: '80px' }}>Unit Price</th>
+                  <th style={{ ...T.th, textAlign: 'right', width: '80px' }}>Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {allParts.map(p => (
                   <tr key={p.id}>
-                    <td style={INV.td}>{p.part_name}</td>
-                    <td style={{ ...INV.td, textAlign: 'center' }}>{p.quantity}</td>
-                    <td style={{ ...INV.td, textAlign: 'right' }}>{p.unit_price != null ? fmt(p.unit_price) : '—'}</td>
-                    <td style={{ ...INV.td, textAlign: 'right', fontWeight: 600 }}>{p.total_price != null ? fmt(p.total_price) : '—'}</td>
+                    <td style={T.td}>{p.part_name}</td>
+                    <td style={{ ...T.td, textAlign: 'center' }}>{p.quantity}</td>
+                    <td style={{ ...T.td, textAlign: 'right' }}>{p.unit_price != null ? fmt(p.unit_price) : '—'}</td>
+                    <td style={{ ...T.td, textAlign: 'right', fontWeight: 600 }}>{p.total_price != null ? fmt(p.total_price) : '—'}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={3} style={{ ...INV.td, textAlign: 'right', fontWeight: 700, borderTop: '2px solid #333' }}>Parts Subtotal</td>
-                  <td style={{ ...INV.td, textAlign: 'right', fontWeight: 700, borderTop: '2px solid #333' }}>{fmt(data.totals.parts)}</td>
+                  <td colSpan={3} style={{ ...T.td, textAlign: 'right', fontWeight: 700, borderTop: '2px solid #333' }}>Parts Subtotal</td>
+                  <td style={{ ...T.td, textAlign: 'right', fontWeight: 700, borderTop: '2px solid #333' }}>{fmt(data.totals.parts)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -140,30 +158,30 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
         {/* Labor */}
         {allLabor.length > 0 && (
           <>
-            <div style={{ ...INV.sectionTitle, marginTop: '20px' }}>Labor</div>
-            <table style={INV.table}>
+            <div style={{ ...T.sectionTitle, marginTop: '20px' }}>Labor</div>
+            <table style={T.table}>
               <thead>
                 <tr>
-                  <th style={INV.th}>Description</th>
-                  <th style={{ ...INV.th, textAlign: 'center', width: '50px' }}>Hours</th>
-                  <th style={{ ...INV.th, textAlign: 'right', width: '80px' }}>Rate</th>
-                  <th style={{ ...INV.th, textAlign: 'right', width: '80px' }}>Amount</th>
+                  <th style={T.th}>Description</th>
+                  <th style={{ ...T.th, textAlign: 'center', width: '50px' }}>Hours</th>
+                  <th style={{ ...T.th, textAlign: 'right', width: '80px' }}>Rate</th>
+                  <th style={{ ...T.th, textAlign: 'right', width: '80px' }}>Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {allLabor.map(l => (
                   <tr key={l.id}>
-                    <td style={INV.td}>{l.task_name}</td>
-                    <td style={{ ...INV.td, textAlign: 'center' }}>{l.hours > 0 ? l.hours : '—'}</td>
-                    <td style={{ ...INV.td, textAlign: 'right' }}>{l.hourly_rate != null && l.hourly_rate > 0 ? fmt(l.hourly_rate) + '/hr' : 'Flat'}</td>
-                    <td style={{ ...INV.td, textAlign: 'right', fontWeight: 600 }}>{l.total_cost != null ? fmt(l.total_cost) : '—'}</td>
+                    <td style={T.td}>{l.task_name}</td>
+                    <td style={{ ...T.td, textAlign: 'center' }}>{l.hours > 0 ? l.hours : '—'}</td>
+                    <td style={{ ...T.td, textAlign: 'right' }}>{l.hourly_rate != null && l.hourly_rate > 0 ? fmt(l.hourly_rate) + '/hr' : 'Flat'}</td>
+                    <td style={{ ...T.td, textAlign: 'right', fontWeight: 600 }}>{l.total_cost != null ? fmt(l.total_cost) : '—'}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={3} style={{ ...INV.td, textAlign: 'right', fontWeight: 700, borderTop: '2px solid #333' }}>Labor Subtotal</td>
-                  <td style={{ ...INV.td, textAlign: 'right', fontWeight: 700, borderTop: '2px solid #333' }}>{fmt(data.totals.labor)}</td>
+                  <td colSpan={3} style={{ ...T.td, textAlign: 'right', fontWeight: 700, borderTop: '2px solid #333' }}>Labor Subtotal</td>
+                  <td style={{ ...T.td, textAlign: 'right', fontWeight: 700, borderTop: '2px solid #333' }}>{fmt(data.totals.labor)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -192,32 +210,32 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
           const balance = subtotal - data.totals.payments;
 
           return (
-            <div style={INV.totalsSection}>
-              <div style={INV.totalLine}>
+            <div style={T.totalsSection}>
+              <div style={T.totalLine}>
                 <span>Parts</span>
                 <span>{fmt(partsPreTax)}</span>
               </div>
-              <div style={INV.totalLine}>
+              <div style={T.totalLine}>
                 <span>Labor</span>
                 <span>{fmt(data.totals.labor)}</span>
               </div>
               {partsTax > 0 && (
-                <div style={{ ...INV.totalLine, color: '#888', fontSize: '10px' }}>
+                <div style={{ ...T.totalLine, color: '#888', fontSize: '10px' }}>
                   <span>Sales Tax (8.375%)</span>
                   <span>{fmt(partsTax)}</span>
                 </div>
               )}
-              <div style={{ ...INV.totalLine, borderTop: '1px solid #ccc', paddingTop: '6px', marginTop: '4px' }}>
+              <div style={{ ...T.totalLine, borderTop: '1px solid #ccc', paddingTop: '6px', marginTop: '4px' }}>
                 <span style={{ fontWeight: 700 }}>Subtotal</span>
                 <span style={{ fontWeight: 700 }}>{fmt(subtotal)}</span>
               </div>
               {data.totals.payments > 0 && (
-                <div style={{ ...INV.totalLine, color: '#006847' }}>
+                <div style={{ ...T.totalLine, color: '#006847' }}>
                   <span>Payments Received</span>
                   <span>({fmt(data.totals.payments)})</span>
                 </div>
               )}
-              <div style={INV.balanceDue}>
+              <div style={T.balanceDue}>
                 <span>BALANCE DUE</span>
                 <span>{fmt(balance)}</span>
               </div>
@@ -228,24 +246,24 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
         {/* Payments Received */}
         {data.totals.payments > 0 && (
           <>
-            <div style={{ ...INV.sectionTitle, marginTop: '20px' }}>Payments Received</div>
-            <table style={INV.table}>
+            <div style={{ ...T.sectionTitle, marginTop: '20px' }}>Payments Received</div>
+            <table style={T.table}>
               <thead>
                 <tr>
-                  <th style={INV.th}>Date</th>
-                  <th style={INV.th}>Method</th>
-                  <th style={INV.th}>Memo</th>
-                  <th style={{ ...INV.th, textAlign: 'right', width: '80px' }}>Amount</th>
+                  <th style={T.th}>Date</th>
+                  <th style={T.th}>Method</th>
+                  <th style={T.th}>Memo</th>
+                  <th style={{ ...T.th, textAlign: 'right', width: '80px' }}>Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {data.workOrders.flatMap((wo: any) =>
                   (data.payments[wo.id] || []).filter((pm: PaymentRow) => pm.status === 'completed').map((pm: PaymentRow) => (
                     <tr key={pm.id}>
-                      <td style={INV.td}>{pm.payment_date ? fmtDateShort(pm.payment_date) : '—'}</td>
-                      <td style={{ ...INV.td, textTransform: 'capitalize' }}>{pm.payment_method}</td>
-                      <td style={INV.td}>{pm.memo || '—'}</td>
-                      <td style={{ ...INV.td, textAlign: 'right', fontWeight: 600, color: '#006847' }}>{fmt(pm.amount)}</td>
+                      <td style={T.td}>{pm.payment_date ? fmtDateShort(pm.payment_date) : '—'}</td>
+                      <td style={{ ...T.td, textTransform: 'capitalize' }}>{pm.payment_method}</td>
+                      <td style={T.td}>{pm.memo || '—'}</td>
+                      <td style={{ ...T.td, textAlign: 'right', fontWeight: 600, color: '#006847' }}>{fmt(pm.amount)}</td>
                     </tr>
                   ))
                 )}
@@ -257,35 +275,35 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
         {/* Goodwill — itemized courtesy items */}
         {(compedParts.length > 0 || compedLabor.length > 0) && (
           <>
-            <div style={{ ...INV.sectionTitle, marginTop: '14px', color: '#8B6914' }}>Courtesy — No Charge</div>
-            <table style={INV.table}>
+            <div style={{ ...T.sectionTitle, marginTop: '14px', color: '#8B6914' }}>Courtesy — No Charge</div>
+            <table style={T.table}>
               <thead>
                 <tr>
-                  <th style={INV.th}>Description</th>
-                  <th style={{ ...INV.th, width: '60px' }}>Type</th>
-                  <th style={{ ...INV.th, textAlign: 'right', width: '80px' }}>Value</th>
+                  <th style={T.th}>Description</th>
+                  <th style={{ ...T.th, width: '60px' }}>Type</th>
+                  <th style={{ ...T.th, textAlign: 'right', width: '80px' }}>Value</th>
                 </tr>
               </thead>
               <tbody>
                 {compedParts.map(p => (
                   <tr key={p.id}>
-                    <td style={INV.td}>{p.part_name}{p.comp_reason ? <span style={{ color: '#999', marginLeft: '6px' }}>— {p.comp_reason}</span> : null}</td>
-                    <td style={{ ...INV.td, color: '#888' }}>Part</td>
-                    <td style={{ ...INV.td, textAlign: 'right', color: '#8B6914' }}>{fmt(p.comp_retail_value || p.total_price || (p.unit_price || 0) * (p.quantity || 1))}</td>
+                    <td style={T.td}>{p.part_name}{p.comp_reason ? <span style={{ color: '#999', marginLeft: '6px' }}>— {p.comp_reason}</span> : null}</td>
+                    <td style={{ ...T.td, color: '#888' }}>Part</td>
+                    <td style={{ ...T.td, textAlign: 'right', color: '#8B6914' }}>{fmt(p.comp_retail_value || p.total_price || (p.unit_price || 0) * (p.quantity || 1))}</td>
                   </tr>
                 ))}
                 {compedLabor.map(l => (
                   <tr key={l.id}>
-                    <td style={INV.td}>{l.task_name}{l.comp_reason ? <span style={{ color: '#999', marginLeft: '6px' }}>— {l.comp_reason}</span> : null}</td>
-                    <td style={{ ...INV.td, color: '#888' }}>Labor</td>
-                    <td style={{ ...INV.td, textAlign: 'right', color: '#8B6914' }}>{fmt(l.comp_retail_value || l.total_cost || 0)}</td>
+                    <td style={T.td}>{l.task_name}{l.comp_reason ? <span style={{ color: '#999', marginLeft: '6px' }}>— {l.comp_reason}</span> : null}</td>
+                    <td style={{ ...T.td, color: '#888' }}>Labor</td>
+                    <td style={{ ...T.td, textAlign: 'right', color: '#8B6914' }}>{fmt(l.comp_retail_value || l.total_cost || 0)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={2} style={{ ...INV.td, textAlign: 'right', fontWeight: 700, borderTop: '2px solid #8B6914', color: '#8B6914' }}>Total Courtesy Value</td>
-                  <td style={{ ...INV.td, textAlign: 'right', fontWeight: 700, borderTop: '2px solid #8B6914', color: '#8B6914' }}>{fmt(data.totals.goodwill)}</td>
+                  <td colSpan={2} style={{ ...T.td, textAlign: 'right', fontWeight: 700, borderTop: '2px solid #8B6914', color: '#8B6914' }}>Total Courtesy Value</td>
+                  <td style={{ ...T.td, textAlign: 'right', fontWeight: 700, borderTop: '2px solid #8B6914', color: '#8B6914' }}>{fmt(data.totals.goodwill)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -293,7 +311,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
         )}
 
         {/* Footer */}
-        <div style={INV.footer}>
+        <div style={T.footer}>
           <div>Thank you for your business.</div>
           <div style={{ marginTop: '4px', fontSize: '10px', color: '#999' }}>
             Payment due upon receipt. Questions? Contact us at nuke.ag
@@ -301,15 +319,15 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
         </div>
 
         {/* Action bar — not printed */}
-        <div style={INV.actionBar} className="no-print">
-          <button onClick={onEdit} style={INV.editBtn}>EDIT</button>
-          <button onClick={() => window.print()} style={INV.printBtn}>PRINT</button>
+        <div style={T.actionBar} className="no-print">
+          <button onClick={onEdit} style={T.editBtn}>EDIT</button>
+          <button onClick={() => window.print()} style={T.printBtn}>PRINT</button>
           {data.contact?.email && (
             <button
               onClick={onSend}
               disabled={sending || sentStatus === 'sent'}
               style={{
-                ...INV.sendBtn,
+                ...T.sendBtn,
                 opacity: sending ? 0.6 : 1,
                 background: sentStatus === 'sent' ? '#006847' : '#1a1a1a',
               }}
@@ -548,6 +566,53 @@ const INV = {
     cursor: 'pointer',
     fontFamily: 'Arial, sans-serif',
   } as React.CSSProperties,
+};
+
+
+// ── CLASSIC theme — yellow carbon copy shop invoice ──
+const CLASSIC: typeof INV = {
+  ...INV,
+  page: { ...INV.page, background: '#e8e0d0' },
+  paper: { ...INV.paper, background: '#fffef5', border: '3px double #8B7355', padding: '28px 36px' },
+  shopName: { ...INV.shopName, fontSize: '26px', fontFamily: 'Georgia, serif', fontWeight: 800, letterSpacing: '0.12em' },
+  shopDetail: { ...INV.shopDetail, fontFamily: 'Georgia, serif', fontStyle: 'italic' },
+  invoiceTitle: { ...INV.invoiceTitle, fontFamily: 'Georgia, serif', fontSize: '20px', borderBottom: '2px solid #8B7355', paddingBottom: '4px' },
+  divider: { borderTop: '2px solid #8B7355', margin: '10px 0' },
+  sectionTitle: { ...INV.sectionTitle, color: '#5C4033', fontFamily: 'Georgia, serif', borderBottom: '1px solid #c4b69c', paddingBottom: '2px' },
+  th: { ...INV.th, borderBottom: '2px solid #8B7355', color: '#5C4033', fontFamily: 'Georgia, serif' },
+  td: { ...INV.td, borderBottom: '1px solid #d9cdb5' },
+  totalsSection: { ...INV.totalsSection, background: '#f5f0e0', padding: '10px 14px', border: '1px solid #c4b69c' },
+  balanceDue: { ...INV.balanceDue, borderTop: '3px double #8B7355', color: '#5C4033' },
+  footer: { ...INV.footer, fontFamily: 'Georgia, serif', fontStyle: 'italic', borderTop: '2px solid #8B7355' },
+  goodwillNote: { ...INV.goodwillNote, background: '#f5f0e0', border: '1px solid #c4b69c' },
+  infoLabel: { ...INV.infoLabel, color: '#5C4033', fontFamily: 'Georgia, serif' },
+  metaLabel: { ...INV.metaLabel, color: '#5C4033' },
+};
+
+// ── DEALER theme — dark header, professional service receipt ──
+const DEALER: typeof INV = {
+  ...INV,
+  page: { ...INV.page, background: '#eee' },
+  paper: { ...INV.paper, padding: '0', overflow: 'hidden' },
+  shopHeader: { ...INV.shopHeader, background: '#1a1a1a', color: '#fff', padding: '20px 32px', margin: 0 },
+  shopName: { ...INV.shopName, color: '#fff', fontSize: '24px', letterSpacing: '0.15em' },
+  shopDetail: { ...INV.shopDetail, color: '#aaa' },
+  invoiceTitle: { ...INV.invoiceTitle, color: '#fff', fontSize: '16px' },
+  metaTable: { ...INV.metaTable, color: '#ccc' },
+  metaLabel: { ...INV.metaLabel, color: '#888' },
+  metaValue: { ...INV.metaValue, color: '#fff' },
+  divider: { borderTop: '3px solid #C8102E', margin: '0' },
+  infoRow: { ...INV.infoRow, padding: '16px 32px' },
+  infoLabel: { ...INV.infoLabel, color: '#C8102E' },
+  sectionTitle: { ...INV.sectionTitle, color: '#C8102E', marginLeft: '32px', marginRight: '32px' },
+  table: { ...INV.table, margin: '0 32px', width: 'calc(100% - 64px)' },
+  th: { ...INV.th, borderBottom: '2px solid #C8102E', color: '#666' },
+  td: { ...INV.td, borderBottom: '1px solid #eee' },
+  totalsSection: { ...INV.totalsSection, marginRight: '32px', padding: '12px 16px', background: '#f8f8f8' },
+  balanceDue: { ...INV.balanceDue, borderTop: '3px solid #C8102E', color: '#C8102E' },
+  footer: { ...INV.footer, background: '#1a1a1a', color: '#888', padding: '16px 32px', margin: 0, borderTop: 'none' },
+  goodwillNote: { ...INV.goodwillNote, margin: '12px 32px', background: '#f0f8f0', border: '1px solid #cde0cd' },
+  actionBar: { ...INV.actionBar, padding: '12px 32px' },
 };
 
 
@@ -790,6 +855,7 @@ const WorkOrderStatement: React.FC = () => {
   const [searchParams] = useSearchParams();
   const query = searchParams.get('q') || searchParams.get('vehicle_id') || null;
   const [mode, setMode] = useState<'invoice' | 'edit'>('invoice');
+  const [theme, setTheme] = useState<InvoiceTheme>('classic');
   const [sending, setSending] = useState(false);
   const [sentStatus, setSentStatus] = useState<'idle' | 'sent' | 'error'>('idle');
 
@@ -818,7 +884,7 @@ const WorkOrderStatement: React.FC = () => {
     return <EditView data={data} updateField={updateField} addRow={addRow} deleteRow={deleteRow} toggleComp={toggleComp} onInvoice={() => setMode('invoice')} />;
   }
 
-  return <InvoiceView data={data} onEdit={() => setMode('edit')} onSend={handleSend} sending={sending} sentStatus={sentStatus} />;
+  return <InvoiceView data={data} onEdit={() => setMode('edit')} onSend={handleSend} sending={sending} sentStatus={sentStatus} theme={theme} onThemeChange={setTheme} />;
 };
 
 export default WorkOrderStatement;
