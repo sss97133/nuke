@@ -170,31 +170,60 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
           </>
         )}
 
-        {/* Totals */}
-        <div style={INV.totalsSection}>
-          <div style={INV.totalLine}>
-            <span>Parts</span>
-            <span>{fmt(data.totals.parts)}</span>
-          </div>
-          <div style={INV.totalLine}>
-            <span>Labor</span>
-            <span>{fmt(data.totals.labor)}</span>
-          </div>
-          <div style={{ ...INV.totalLine, borderTop: '1px solid #ccc', paddingTop: '6px', marginTop: '4px' }}>
-            <span style={{ fontWeight: 700 }}>Subtotal</span>
-            <span style={{ fontWeight: 700 }}>{fmt(data.totals.subtotal)}</span>
-          </div>
-          {data.totals.payments > 0 && (
-            <div style={{ ...INV.totalLine, color: '#006847' }}>
-              <span>Payments Received</span>
-              <span>({fmt(data.totals.payments)})</span>
+        {/* Totals — with tax breakout */}
+        {(() => {
+          // Compute pre-tax parts total and tax amount
+          let partsPreTax = 0;
+          let partsTax = 0;
+          for (const p of allParts) {
+            const pretax = (p.unit_price || 0) * (p.quantity || 1);
+            const total = p.total_price || 0;
+            if (p.is_taxable && total > pretax) {
+              partsPreTax += pretax;
+              partsTax += total - pretax;
+            } else {
+              partsPreTax += total;
+            }
+          }
+          partsPreTax = Math.round(partsPreTax * 100) / 100;
+          partsTax = Math.round(partsTax * 100) / 100;
+          const partsWithTax = Math.round((partsPreTax + partsTax) * 100) / 100;
+          const subtotal = partsWithTax + data.totals.labor;
+          const balance = subtotal - data.totals.payments;
+
+          return (
+            <div style={INV.totalsSection}>
+              <div style={INV.totalLine}>
+                <span>Parts</span>
+                <span>{fmt(partsPreTax)}</span>
+              </div>
+              <div style={INV.totalLine}>
+                <span>Labor</span>
+                <span>{fmt(data.totals.labor)}</span>
+              </div>
+              {partsTax > 0 && (
+                <div style={{ ...INV.totalLine, color: '#888', fontSize: '10px' }}>
+                  <span>Sales Tax (8.375%)</span>
+                  <span>{fmt(partsTax)}</span>
+                </div>
+              )}
+              <div style={{ ...INV.totalLine, borderTop: '1px solid #ccc', paddingTop: '6px', marginTop: '4px' }}>
+                <span style={{ fontWeight: 700 }}>Subtotal</span>
+                <span style={{ fontWeight: 700 }}>{fmt(subtotal)}</span>
+              </div>
+              {data.totals.payments > 0 && (
+                <div style={{ ...INV.totalLine, color: '#006847' }}>
+                  <span>Payments Received</span>
+                  <span>({fmt(data.totals.payments)})</span>
+                </div>
+              )}
+              <div style={INV.balanceDue}>
+                <span>BALANCE DUE</span>
+                <span>{fmt(balance)}</span>
+              </div>
             </div>
-          )}
-          <div style={INV.balanceDue}>
-            <span>BALANCE DUE</span>
-            <span>{fmt(data.totals.balance)}</span>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* Payments Received */}
         {data.totals.payments > 0 && (
