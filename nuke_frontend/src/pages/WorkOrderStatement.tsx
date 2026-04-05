@@ -79,7 +79,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
     const RO: React.CSSProperties = { border: '1px solid #7B96B0', fontFamily: 'Arial, Helvetica, sans-serif' };
     const roNum = `${String(Math.abs(data.vehicle.id?.charCodeAt(0) || 0) * 100 + 1001).padStart(7, '0')}`;
     return (
-      <div style={{ minHeight: '100vh', background: '#c8d0d8', padding: '20px', fontSize: '10px', color: '#1a3050' }}>
+      <div className="ro-page" style={{ minHeight: '100vh', background: '#c8d0d8', padding: '20px', fontSize: '10px', color: '#1a3050' }}>
 
         {/* Theme picker */}
         <div className="no-print" style={{ display: 'flex', gap: '6px', marginBottom: '12px', justifyContent: 'center' }}>
@@ -94,7 +94,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
           ))}
         </div>
 
-        <div style={{ maxWidth: '780px', margin: '0 auto', background: '#EDF2F7', padding: '24px 28px', border: '2px solid #7B96B0', position: 'relative' }}>
+        <div className="ro-paper" style={{ maxWidth: '780px', margin: '0 auto', background: '#EDF2F7', padding: '24px 28px', border: '2px solid #7B96B0', position: 'relative' }}>
 
           {/* ── HEADER ── */}
           <div style={{ textAlign: 'center', marginBottom: '8px' }}>
@@ -307,7 +307,21 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
           </div>
         </div>
 
-        <style>{`@media print { .no-print { display: none !important; } body { background: white !important; } @page { margin: 0.3in; size: letter; } }`}</style>
+        <style>{`
+          @media print {
+            .no-print { display: none !important; }
+            @page { margin: 0.3in 0.4in; size: letter; }
+            html, body { background: white !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+            /* Hide site chrome */
+            header, nav, footer, [class*="Header"], [class*="Navigation"], [class*="sidebar"], [class*="Sidebar"] { display: none !important; }
+            /* Strip page wrapper */
+            .ro-page { background: white !important; padding: 0 !important; min-height: auto !important; }
+            /* Strip paper styling — print directly */
+            .ro-paper { max-width: 100% !important; margin: 0 !important; padding: 16px 20px !important; border: none !important; background: white !important; box-shadow: none !important; }
+            /* Preserve form colors */
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          }
+        `}</style>
       </div>
     );
   }
