@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import {
@@ -276,7 +277,16 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '8px' }}>
-            <div style={{ fontSize: '7px', color: '#4a6080', textTransform: 'uppercase' }}>ESTIMATES FOR LABOR ONLY —<br/>MATERIAL ADDITIONAL</div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
+              <QRCodeSVG
+                value={`https://nuke.ag/vehicle/${data.vehicle.id}`}
+                size={52}
+                level="M"
+                fgColor="#1a3050"
+                bgColor="transparent"
+              />
+              <div style={{ fontSize: '7px', color: '#4a6080', textTransform: 'uppercase' }}>ESTIMATES FOR LABOR ONLY —<br/>MATERIAL ADDITIONAL</div>
+            </div>
             <>
               <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
               <div style={{ fontFamily: "'Dancing Script', cursive", fontSize: '26px', color: '#4a6080' }}>Thank You</div>
