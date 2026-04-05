@@ -146,7 +146,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
           </div>
 
           {/* ── LABOR SECTION ── */}
-          <div style={{ ...RO, marginTop: '6px' }}>
+          <div style={{ ...RO, marginTop: '6px', marginLeft: '12px', marginRight: '12px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', background: '#D5DDE5', borderBottom: '1px solid #7B96B0' }}>
               <div style={{ padding: '3px 6px', fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', borderRight: '1px solid #7B96B0' }}>DESCRIPTION</div>
               <div style={{ padding: '3px 6px', fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'right' }}>AMOUNT</div>
@@ -167,7 +167,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
           </div>
 
           {/* ── PARTS + TOTALS side by side ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: '0', marginTop: '6px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: '0', marginTop: '6px', marginLeft: '12px', marginRight: '12px' }}>
 
             {/* Parts left side */}
             <div style={{ ...RO, borderRight: 'none' }}>
@@ -232,7 +232,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
 
           {/* ── COURTESY ITEMS ── */}
           {(compedParts.length > 0 || compedLabor.length > 0) && (
-            <div style={{ marginTop: '8px', ...RO, background: '#f0f4e8' }}>
+            <div style={{ marginTop: '8px', marginLeft: '12px', marginRight: '12px', ...RO, background: '#f0f4e8' }}>
               <div style={{ padding: '3px 6px', fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #7B96B0', color: '#5C6B3C' }}>Courtesy — No Charge</div>
               {[...compedParts.map(p => ({ name: p.part_name, reason: p.comp_reason, value: p.comp_retail_value || p.total_price || 0 })),
                 ...compedLabor.map(l => ({ name: l.task_name, reason: l.comp_reason, value: l.comp_retail_value || l.total_cost || 0 }))
@@ -252,12 +252,12 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
           )}
 
           {/* ── AUTHORIZATION ── */}
-          <div style={{ marginTop: '10px', fontSize: '7px', color: '#4a6080', lineHeight: 1.4, fontStyle: 'italic' }}>
+          <div style={{ marginTop: '10px', marginLeft: '12px', marginRight: '12px', fontSize: '7px', color: '#4a6080', lineHeight: 1.4, fontStyle: 'italic' }}>
             I hereby authorize the above repair work to be done along with the necessary material, and hereby grant you and/or your employees permission to operate the car, truck or vehicle herein described on streets, highways or elsewhere for the purpose of testing and/or inspection. An express mechanic's lien is hereby acknowledged on above car, truck or vehicle to secure the amount of repairs thereto.
           </div>
 
           {/* ── FOOTER ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px', fontSize: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px', marginLeft: '12px', marginRight: '12px', fontSize: '8px' }}>
             <div>
               <div style={{ borderBottom: '1px solid #7B96B0', paddingBottom: '2px', marginBottom: '4px' }}>
                 <span style={{ fontWeight: 700, fontSize: '7px', textTransform: 'uppercase', color: '#4a6080' }}>Work Authorized by</span>
@@ -276,7 +276,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '8px', marginLeft: '12px', marginRight: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
               <QRCodeSVG
                 value={`https://nuke.ag/vehicle/${data.vehicle.id}`}
