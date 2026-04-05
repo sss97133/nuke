@@ -277,7 +277,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '8px' }}>
             <div style={{ fontSize: '7px', color: '#4a6080', textTransform: 'uppercase' }}>ESTIMATES FOR LABOR ONLY —<br/>MATERIAL ADDITIONAL</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '16px', fontStyle: 'italic', color: '#4a6080' }}>Thank You</div>
+            <div style={{ fontFamily: 'Brush Script MT, Segoe Script, cursive', fontSize: '22px', color: '#4a6080' }}>Thank You</div>
           </div>
 
           {/* Action bar */}
