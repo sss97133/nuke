@@ -264,7 +264,8 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          body { background: white !important; }
+          body { background: white !important; margin: 0 !important; padding: 0 !important; }
+          @page { margin: 0.4in 0.5in; size: letter; }
         }
       `}</style>
     </div>
@@ -277,16 +278,16 @@ const INV = {
     background: '#f0f0f0',
     padding: '20px',
     fontFamily: 'Arial, Helvetica, sans-serif',
-    fontSize: '13px',
+    fontSize: '11px',
     color: '#1a1a1a',
-    lineHeight: 1.5,
+    lineHeight: 1.2,
   } as React.CSSProperties,
 
   paper: {
     maxWidth: '800px',
     margin: '0 auto',
     background: '#fff',
-    padding: '40px 48px',
+    padding: '24px 36px',
     boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
   } as React.CSSProperties,
 
@@ -298,7 +299,7 @@ const INV = {
   } as React.CSSProperties,
 
   shopName: {
-    fontSize: '28px',
+    fontSize: '22px',
     fontWeight: 800,
     letterSpacing: '0.08em',
     lineHeight: 1,
@@ -311,7 +312,7 @@ const INV = {
   } as React.CSSProperties,
 
   invoiceTitle: {
-    fontSize: '24px',
+    fontSize: '18px',
     fontWeight: 700,
     color: '#1a1a1a',
     letterSpacing: '0.04em',
@@ -337,7 +338,7 @@ const INV = {
 
   divider: {
     borderTop: '2px solid #1a1a1a',
-    margin: '16px 0',
+    margin: '8px 0',
   } as React.CSSProperties,
 
   infoRow: {
@@ -356,36 +357,36 @@ const INV = {
   } as React.CSSProperties,
 
   infoName: {
-    fontSize: '14px',
+    fontSize: '11px',
     fontWeight: 700,
   } as React.CSSProperties,
 
   infoLine: {
-    fontSize: '12px',
+    fontSize: '10px',
     color: '#555',
   } as React.CSSProperties,
 
   sectionTitle: {
-    fontSize: '11px',
+    fontSize: '9px',
     fontWeight: 700,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.08em',
     color: '#888',
-    marginBottom: '6px',
-    marginTop: '8px',
+    marginBottom: '2px',
+    marginTop: '6px',
   } as React.CSSProperties,
 
   table: {
     width: '100%',
     borderCollapse: 'collapse' as const,
-    fontSize: '12px',
+    fontSize: '10px',
   } as React.CSSProperties,
 
   th: {
     textAlign: 'left' as const,
-    padding: '6px 8px',
+    padding: '2px 6px',
     borderBottom: '2px solid #333',
-    fontSize: '10px',
+    fontSize: '8px',
     fontWeight: 700,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.06em',
@@ -393,37 +394,37 @@ const INV = {
   } as React.CSSProperties,
 
   td: {
-    padding: '5px 8px',
+    padding: '2px 6px',
     borderBottom: '1px solid #e5e5e5',
     verticalAlign: 'top' as const,
   } as React.CSSProperties,
 
   totalsSection: {
-    marginTop: '24px',
+    marginTop: '12px',
     marginLeft: 'auto',
-    width: '280px',
-    fontSize: '13px',
+    width: '250px',
+    fontSize: '11px',
   } as React.CSSProperties,
 
   totalLine: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '3px 0',
+    padding: '1px 0',
   } as React.CSSProperties,
 
   balanceDue: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '10px 0 0',
-    marginTop: '8px',
+    padding: '6px 0 0',
+    marginTop: '4px',
     borderTop: '3px solid #1a1a1a',
-    fontSize: '18px',
+    fontSize: '14px',
     fontWeight: 800,
   } as React.CSSProperties,
 
   goodwillNote: {
-    marginTop: '24px',
-    padding: '10px 14px',
+    marginTop: '12px',
+    padding: '6px 10px',
     background: '#f9f6f0',
     border: '1px solid #e8e0d0',
     fontSize: '11px',
@@ -432,8 +433,8 @@ const INV = {
   } as React.CSSProperties,
 
   footer: {
-    marginTop: '40px',
-    paddingTop: '16px',
+    marginTop: '20px',
+    paddingTop: '8px',
     borderTop: '1px solid #ddd',
     textAlign: 'center' as const,
     fontSize: '12px',
