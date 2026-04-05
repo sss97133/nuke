@@ -61,6 +61,244 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
   // Theme styles
   const T = theme === 'classic' ? CLASSIC : theme === 'dealer' ? DEALER : INV;
 
+  // Compute tax for totals
+  const taxInfo = (() => {
+    let partsPreTax = 0, partsTax = 0;
+    for (const p of allParts) {
+      const pretax = (p.unit_price || 0) * (p.quantity || 1);
+      const total = p.total_price || 0;
+      if (p.is_taxable && total > pretax) { partsPreTax += pretax; partsTax += total - pretax; }
+      else { partsPreTax += total; }
+    }
+    return { partsPreTax: Math.round(partsPreTax * 100) / 100, partsTax: Math.round(partsTax * 100) / 100 };
+  })();
+
+  // ── CLASSIC: true carbon copy repair order form ──
+  if (theme === 'classic') {
+    const RO: React.CSSProperties = { border: '1px solid #7B96B0', fontFamily: 'Arial, Helvetica, sans-serif' };
+    const roNum = `${String(Math.abs(data.vehicle.id?.charCodeAt(0) || 0) * 100 + 1001).padStart(7, '0')}`;
+    return (
+      <div style={{ minHeight: '100vh', background: '#c8d0d8', padding: '20px', fontSize: '10px', color: '#1a3050' }}>
+
+        {/* Theme picker */}
+        <div className="no-print" style={{ display: 'flex', gap: '6px', marginBottom: '12px', justifyContent: 'center' }}>
+          {(['classic', 'modern', 'dealer'] as InvoiceTheme[]).map(t => (
+            <button key={t} onClick={() => onThemeChange(t)} style={{
+              padding: '4px 12px', fontSize: '9px', fontWeight: 600, textTransform: 'uppercase',
+              letterSpacing: '0.06em', cursor: 'pointer', fontFamily: 'Arial',
+              border: theme === t ? '2px solid #1a3050' : '1px solid #999',
+              background: theme === t ? '#1a3050' : 'transparent',
+              color: theme === t ? '#fff' : '#666',
+            }}>{t}</button>
+          ))}
+        </div>
+
+        <div style={{ maxWidth: '780px', margin: '0 auto', background: '#EDF2F7', padding: '24px 28px', border: '2px solid #7B96B0', position: 'relative' }}>
+
+          {/* ── HEADER ── */}
+          <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+            <div style={{ fontSize: '22px', fontWeight: 900, letterSpacing: '0.12em', color: '#1a3050', textTransform: 'uppercase' }}>REPAIR ORDER</div>
+          </div>
+          <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+            <div style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '0.08em' }}>NUKE</div>
+            <div style={{ fontSize: '9px', color: '#4a6080' }}>Vehicle Build & Service</div>
+            <div style={{ fontSize: '9px', color: '#4a6080' }}>Las Vegas, NV</div>
+          </div>
+
+          {/* Order number */}
+          <div style={{ position: 'absolute', top: '24px', right: '28px', fontSize: '16px', fontWeight: 900, fontFamily: 'Courier New', color: '#1a3050' }}>{roNum}</div>
+
+          {/* ── CUSTOMER / VEHICLE INFO GRID ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', ...RO, marginBottom: '2px' }}>
+            <div style={{ padding: '3px 6px', borderRight: '1px solid #7B96B0' }}>
+              <span style={{ fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', color: '#4a6080' }}>NAME </span>
+              <span style={{ fontWeight: 600 }}>{data.contact?.name || '—'}</span>
+            </div>
+            <div style={{ padding: '3px 6px', minWidth: '120px' }}>
+              <span style={{ fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', color: '#4a6080' }}>DATE </span>
+              <span style={{ fontWeight: 600 }}>{fmtDate(new Date().toISOString())}</span>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', ...RO, marginBottom: '2px' }}>
+            <div style={{ padding: '3px 6px', borderRight: '1px solid #7B96B0' }}>
+              <span style={{ fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', color: '#4a6080' }}>ADDRESS </span>
+              <span>{data.contact?.email || '—'}</span>
+            </div>
+            <div style={{ padding: '3px 6px', minWidth: '120px' }}>
+              <span style={{ fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', color: '#4a6080' }}>PH. NO. </span>
+              <span>{data.contact?.phone || '—'}</span>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', ...RO, marginBottom: '2px' }}>
+            <div style={{ padding: '3px 6px', borderRight: '1px solid #7B96B0' }}>
+              <span style={{ fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', color: '#4a6080' }}>MAKE AND MODEL </span>
+              <span style={{ fontWeight: 600 }}>{vehicleTitle}</span>
+            </div>
+            <div style={{ padding: '3px 6px', borderRight: '1px solid #7B96B0' }}>
+              <span style={{ fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', color: '#4a6080' }}>VIN NO. </span>
+              <span style={{ fontFamily: 'Courier New', fontSize: '9px' }}>{data.vehicle.vin || '—'}</span>
+            </div>
+            <div style={{ padding: '3px 6px' }}>
+              <span style={{ fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', color: '#4a6080' }}>ODOMETER </span>
+              <span>—</span>
+            </div>
+          </div>
+
+          {/* ── LABOR SECTION ── */}
+          <div style={{ ...RO, marginTop: '6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', background: '#D5DDE5', borderBottom: '1px solid #7B96B0' }}>
+              <div style={{ padding: '3px 6px', fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', borderRight: '1px solid #7B96B0' }}>DESCRIPTION</div>
+              <div style={{ padding: '3px 6px', fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'right' }}>AMOUNT</div>
+            </div>
+            {allLabor.map(l => (
+              <div key={l.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px', borderBottom: '1px solid #BCC8D4' }}>
+                <div style={{ padding: '2px 6px', borderRight: '1px solid #BCC8D4', fontSize: '9px' }}>{l.task_name}</div>
+                <div style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'Courier New', fontSize: '9px', fontWeight: 600 }}>{l.total_cost != null ? fmt(l.total_cost) : '—'}</div>
+              </div>
+            ))}
+            {/* Empty ruled lines to fill space */}
+            {Array.from({ length: Math.max(0, 3 - allLabor.length) }).map((_, i) => (
+              <div key={`empty-l-${i}`} style={{ display: 'grid', gridTemplateColumns: '1fr 80px', borderBottom: '1px solid #BCC8D4', height: '16px' }}>
+                <div style={{ borderRight: '1px solid #BCC8D4' }} />
+                <div />
+              </div>
+            ))}
+          </div>
+
+          {/* ── PARTS + TOTALS side by side ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: '0', marginTop: '6px' }}>
+
+            {/* Parts left side */}
+            <div style={{ ...RO, borderRight: 'none' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '30px 70px 1fr 70px', background: '#D5DDE5', borderBottom: '1px solid #7B96B0' }}>
+                <div style={{ padding: '3px 4px', fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', borderRight: '1px solid #7B96B0' }}>QTY</div>
+                <div style={{ padding: '3px 4px', fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', borderRight: '1px solid #7B96B0' }}>PART NO.</div>
+                <div style={{ padding: '3px 4px', fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', borderRight: '1px solid #7B96B0' }}>NAME OF PART</div>
+                <div style={{ padding: '3px 4px', fontSize: '7px', fontWeight: 700, textTransform: 'uppercase', textAlign: 'right' }}>SALE AMT.</div>
+              </div>
+              {allParts.map(p => (
+                <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '30px 70px 1fr 70px', borderBottom: '1px solid #BCC8D4' }}>
+                  <div style={{ padding: '1px 4px', borderRight: '1px solid #BCC8D4', fontSize: '9px', textAlign: 'center' }}>{p.quantity}</div>
+                  <div style={{ padding: '1px 4px', borderRight: '1px solid #BCC8D4', fontSize: '8px', fontFamily: 'Courier New', color: '#4a6080' }}>{p.part_number || ''}</div>
+                  <div style={{ padding: '1px 4px', borderRight: '1px solid #BCC8D4', fontSize: '9px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.part_name}</div>
+                  <div style={{ padding: '1px 4px', textAlign: 'right', fontFamily: 'Courier New', fontSize: '9px', fontWeight: 600 }}>{p.total_price != null ? fmt(p.total_price) : ''}</div>
+                </div>
+              ))}
+              {/* TOTAL PARTS row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px', borderTop: '2px solid #7B96B0', background: '#D5DDE5' }}>
+                <div style={{ padding: '3px 6px', fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', textAlign: 'center', borderRight: '1px solid #7B96B0' }}>TOTAL PARTS</div>
+                <div style={{ padding: '3px 4px', textAlign: 'right', fontFamily: 'Courier New', fontSize: '10px', fontWeight: 700 }}>{fmt(data.totals.parts)}</div>
+              </div>
+            </div>
+
+            {/* Totals right side */}
+            <div style={{ ...RO }}>
+              {[
+                { label: 'Total Labor', value: fmt(data.totals.labor) },
+                { label: 'Total Parts', value: fmt(data.totals.parts) },
+                { label: 'Shop/Supplies', value: '—' },
+                { label: 'Other', value: data.totals.goodwill > 0 ? `(${fmt(data.totals.goodwill)})` : '—' },
+              ].map((row, i) => (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px', borderBottom: '1px solid #BCC8D4' }}>
+                  <div style={{ padding: '2px 6px', fontSize: '9px', fontWeight: 500, fontStyle: 'italic', borderRight: '1px solid #BCC8D4' }}>{row.label}</div>
+                  <div style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'Courier New', fontSize: '9px', fontWeight: 600 }}>{row.value}</div>
+                </div>
+              ))}
+              {/* TOTAL */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', borderBottom: '1px solid #7B96B0', background: '#D5DDE5' }}>
+                <div style={{ padding: '3px 6px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', borderRight: '1px solid #7B96B0' }}>TOTAL</div>
+                <div style={{ padding: '3px 6px', textAlign: 'right', fontFamily: 'Courier New', fontSize: '10px', fontWeight: 700 }}>{fmt(taxInfo.partsPreTax + data.totals.labor)}</div>
+              </div>
+              {/* TAX */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', borderBottom: '1px solid #7B96B0' }}>
+                <div style={{ padding: '3px 6px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', borderRight: '1px solid #7B96B0' }}>TAX</div>
+                <div style={{ padding: '3px 6px', textAlign: 'right', fontFamily: 'Courier New', fontSize: '10px', fontWeight: 700 }}>{fmt(taxInfo.partsTax)}</div>
+              </div>
+              {/* Payments */}
+              {data.totals.payments > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', borderBottom: '1px solid #7B96B0' }}>
+                  <div style={{ padding: '3px 6px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: '#006847', borderRight: '1px solid #7B96B0' }}>PAID</div>
+                  <div style={{ padding: '3px 6px', textAlign: 'right', fontFamily: 'Courier New', fontSize: '10px', fontWeight: 700, color: '#006847' }}>({fmt(data.totals.payments)})</div>
+                </div>
+              )}
+              {/* TOTAL AMOUNT */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', background: '#1a3050' }}>
+                <div style={{ padding: '4px 6px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: '#fff', borderRight: '1px solid #7B96B0' }}>TOTAL AMOUNT</div>
+                <div style={{ padding: '4px 6px', textAlign: 'right', fontFamily: 'Courier New', fontSize: '12px', fontWeight: 800, color: '#fff' }}>{fmt(data.totals.balance)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── COURTESY ITEMS ── */}
+          {(compedParts.length > 0 || compedLabor.length > 0) && (
+            <div style={{ marginTop: '8px', ...RO, background: '#f0f4e8' }}>
+              <div style={{ padding: '3px 6px', fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #7B96B0', color: '#5C6B3C' }}>Courtesy — No Charge</div>
+              {[...compedParts.map(p => ({ name: p.part_name, reason: p.comp_reason, value: p.comp_retail_value || p.total_price || 0 })),
+                ...compedLabor.map(l => ({ name: l.task_name, reason: l.comp_reason, value: l.comp_retail_value || l.total_cost || 0 }))
+              ].map((item, i) => (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px', borderBottom: '1px solid #c4ceaf' }}>
+                  <div style={{ padding: '1px 6px', fontSize: '8px', borderRight: '1px solid #c4ceaf' }}>
+                    {item.name}{item.reason ? <span style={{ color: '#888', marginLeft: '4px' }}>— {item.reason}</span> : ''}
+                  </div>
+                  <div style={{ padding: '1px 6px', textAlign: 'right', fontFamily: 'Courier New', fontSize: '8px', color: '#5C6B3C' }}>{fmt(item.value)}</div>
+                </div>
+              ))}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', borderTop: '2px solid #5C6B3C' }}>
+                <div style={{ padding: '2px 6px', fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', textAlign: 'right', borderRight: '1px solid #c4ceaf', color: '#5C6B3C' }}>TOTAL COURTESY</div>
+                <div style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'Courier New', fontSize: '9px', fontWeight: 700, color: '#5C6B3C' }}>{fmt(data.totals.goodwill)}</div>
+              </div>
+            </div>
+          )}
+
+          {/* ── AUTHORIZATION ── */}
+          <div style={{ marginTop: '10px', fontSize: '7px', color: '#4a6080', lineHeight: 1.4, fontStyle: 'italic' }}>
+            I hereby authorize the above repair work to be done along with the necessary material, and hereby grant you and/or your employees permission to operate the car, truck or vehicle herein described on streets, highways or elsewhere for the purpose of testing and/or inspection. An express mechanic's lien is hereby acknowledged on above car, truck or vehicle to secure the amount of repairs thereto.
+          </div>
+
+          {/* ── FOOTER ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px', fontSize: '8px' }}>
+            <div>
+              <div style={{ borderBottom: '1px solid #7B96B0', paddingBottom: '2px', marginBottom: '4px' }}>
+                <span style={{ fontWeight: 700, fontSize: '7px', textTransform: 'uppercase', color: '#4a6080' }}>Work Authorized by</span>
+              </div>
+              <div style={{ borderBottom: '1px solid #7B96B0', paddingBottom: '2px' }}>
+                <span style={{ fontWeight: 700, fontSize: '7px', textTransform: 'uppercase', color: '#4a6080' }}>Delivered to</span>
+              </div>
+            </div>
+            <div>
+              <div style={{ borderBottom: '1px solid #7B96B0', paddingBottom: '2px', marginBottom: '4px' }}>
+                <span style={{ fontWeight: 700, fontSize: '7px', textTransform: 'uppercase', color: '#4a6080' }}>Date Promised</span>
+              </div>
+              <div style={{ borderBottom: '1px solid #7B96B0', paddingBottom: '2px' }}>
+                <span style={{ fontWeight: 700, fontSize: '7px', textTransform: 'uppercase', color: '#4a6080' }}>Date Delivered</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '8px' }}>
+            <div style={{ fontSize: '7px', color: '#4a6080', textTransform: 'uppercase' }}>ESTIMATES FOR LABOR ONLY —<br/>MATERIAL ADDITIONAL</div>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: '16px', fontStyle: 'italic', color: '#4a6080' }}>Thank You</div>
+          </div>
+
+          {/* Action bar */}
+          <div className="no-print" style={{ display: 'flex', gap: '8px', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #7B96B0' }}>
+            <button onClick={onEdit} style={{ padding: '8px 16px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', border: '1px solid #7B96B0', background: 'transparent', color: '#4a6080', cursor: 'pointer', fontFamily: 'Arial' }}>EDIT</button>
+            <button onClick={() => window.print()} style={{ padding: '8px 16px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', border: '2px solid #1a3050', background: 'transparent', color: '#1a3050', cursor: 'pointer', fontFamily: 'Arial' }}>PRINT</button>
+            {data.contact?.email && (
+              <button onClick={onSend} disabled={sending || sentStatus === 'sent'} style={{
+                flex: 1, padding: '8px 16px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase',
+                letterSpacing: '0.08em', border: '2px solid #1a3050', cursor: 'pointer', fontFamily: 'Arial',
+                background: sentStatus === 'sent' ? '#006847' : '#1a3050', color: '#fff', opacity: sending ? 0.6 : 1,
+              }}>{sending ? 'SENDING...' : sentStatus === 'sent' ? 'SENT' : 'SEND TO CUSTOMER'}</button>
+            )}
+          </div>
+        </div>
+
+        <style>{`@media print { .no-print { display: none !important; } body { background: white !important; } @page { margin: 0.3in; size: letter; } }`}</style>
+      </div>
+    );
+  }
+
   return (
     <div style={T.page}>
       <div style={T.paper}>
