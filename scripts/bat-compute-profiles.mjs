@@ -39,6 +39,7 @@ async function main() {
     SELECT bup.username as author_username, bup.total_bids as comment_count
     FROM bat_user_profiles bup
     WHERE bup.total_bids > 0
+      AND bup.total_bids < 5000
     ORDER BY bup.total_bids DESC
     ${LIMIT ? `LIMIT ${LIMIT}` : ''}
   `);
