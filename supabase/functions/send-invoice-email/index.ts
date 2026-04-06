@@ -17,6 +17,21 @@ interface LineItem {
   amount: number;
 }
 
+interface PaymentMethod {
+  method: string;
+  label: string;
+  detail: string;
+  note?: string;
+}
+
+interface ShopInfo {
+  name?: string;
+  email?: string;
+  phone?: string;
+  city?: string;
+  state?: string;
+}
+
 interface InvoicePayload {
   to: string;
   subject: string;
@@ -28,6 +43,8 @@ interface InvoicePayload {
   paid: number;
   balance: number;
   line_items?: LineItem[];
+  payment_methods?: PaymentMethod[];
+  shop?: ShopInfo;
 }
 
 function fmt(n: number): string {
@@ -118,10 +135,36 @@ function buildInvoiceHtml(p: InvoicePayload): string {
           </td>
         </tr>
 
+        ${(p.payment_methods && p.payment_methods.length > 0) ? `
+        <!-- Payment Instructions -->
+        <tr>
+          <td style="padding:12px 24px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f8f8;border:1px solid #e0e0e0;">
+              <tr>
+                <td style="padding:12px 16px;">
+                  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#888;margin-bottom:8px;">Payment Instructions</div>
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      ${p.payment_methods.map((pm) => `
+                        <td style="vertical-align:top;padding:0 8px;">
+                          <div style="font-size:12px;font-weight:700;">${pm.label}</div>
+                          <div style="font-size:12px;font-family:'Courier New',monospace;margin-top:2px;">${pm.detail}</div>
+                          ${pm.note ? `<div style="font-size:10px;color:#888;margin-top:2px;">${pm.note}</div>` : ""}
+                        </td>
+                      `).join("")}
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>` : ""}
+
         <!-- Footer -->
         <tr>
           <td style="padding:12px 24px;border-top:2px solid #1a1a1a;font-size:10px;color:#888;text-align:center;font-family:'Courier New',monospace;">
-            Questions? Reply to this email or contact us at nuke.ag
+            ${p.shop ? `${p.shop.name || "Nuke"} · ${p.shop.city || ""}${p.shop.state ? `, ${p.shop.state}` : ""} · ${p.shop.phone || ""}<br/>` : ""}
+            Payment due upon receipt · Questions? Reply to this email or contact ${p.shop?.email || "support@nuke.ag"}
           </td>
         </tr>
       </table>
