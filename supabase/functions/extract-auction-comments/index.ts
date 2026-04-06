@@ -394,9 +394,14 @@ Deno.serve(async (req) => {
           comment_text: rawText,
           word_count: rawText.split(/\s+/).length,
           has_question: rawText.includes('?'),
-          has_media: Boolean(c?.hasImage || c?.hasVideo),
+          has_media: Boolean(c?.hasImage || c?.hasVideo || (c?.images && c.images.length > 0) || (c?.videos && c.videos.length > 0)),
           bid_amount: bidAmount,
-          comment_likes: typeof c?.commentLikes === 'number' ? c.commentLikes : 0
+          comment_likes: typeof c?.commentLikes === 'number' ? c.commentLikes : 0,
+          // Bid intelligence fields from BAT_VMS.comments JSON
+          bat_author_id: typeof c?.authorId === 'number' ? c.authorId : null,
+          bat_comment_id: typeof c?.id === 'number' ? c.id : null,
+          bat_author_likes: typeof c?.authorLikes === 'number' ? c.authorLikes : null,
+          likers_count: Array.isArray(c?.likers) ? c.likers.length : null,
         })
         
         if (author && author !== 'Unknown') {
@@ -808,7 +813,7 @@ Deno.serve(async (req) => {
             is_winning_bid: false,
             is_final_bid: false,
             source: 'comment',
-            bat_comment_id: null,
+            bat_comment_id: null, // UUID FK — bat_bids uses UUID, BaT integer ID is in auction_comments.bat_comment_id
             auction_event_id: eventId,
             metadata: {
               source_url: String(auctionUrlNorm),
