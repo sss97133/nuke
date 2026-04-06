@@ -282,6 +282,7 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 | Intent | Use This | Notes |
 |--------|----------|-------|
 | Compute wiring overlay (harness spec) | `compute-wiring-overlay` | POST `{ vehicle_id }`. Returns wire list, ECU/PDM/alternator sizing, bulkhead pin assignments, warnings. Upserts to `vehicle_wiring_overlays`. |
+| Generate harness fabrication spec | `generate-harness-spec` | POST `{ vehicle_id, format? }`. format: "full" (JSON+text), "text" (plaintext spec), "wire_schedule" (tables only). Returns 8 tables: wire schedule (pin-to-pin), ECU pin assignment, PDM channels, bulkhead pins, components, trunk routing, power budget, physical reference. The document you hand to a fabricator or Fiverr illustrator. |
 | Generate vehicle-layout diagram (plan view SVG) | `generate-vehicle-diagram` | POST `{ vehicle_id, view?, show_bulkhead?, highlight_zone? }`. Returns `diagram_url` + summary. View: "plan" (top-down truck layout), "engine_bay", "dash", etc. Toggle bulkhead connector in/out — wire lengths auto-recalculate. |
 | Generate connection diagram (WireViz) | `generate-wiring-diagram` | POST `{ vehicle_id, zone?, format? }`. Returns `diagram_url` + summary. Connection-level nodes-and-edges diagram via Kroki.io. Zone optional. Format: "svg" (default) or "png". |
 | Generate wiring BOM | `generate-wiring-bom` | POST `{ vehicle_id }`. Parts list with pricing. |
