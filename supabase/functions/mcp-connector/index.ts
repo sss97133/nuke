@@ -972,6 +972,23 @@ const TOOLS: ToolDef[] = [
       required: ["query"],
     },
   },
+
+  // ── Composite Auction Briefing ───────────────────────────────────────
+  {
+    name: "get_auction_briefing",
+    description:
+      "Get a complete auction briefing for a vehicle in one call. Returns identity, live auction data (bids/views/watchers), " +
+      "Nuke Estimate valuation, seller profile and analytics, comparable sales, market history, comment sentiment, " +
+      "condition scoring from images, and description analysis. Replaces 15+ individual tool calls. " +
+      "Accepts vehicle_id or listing_url (e.g. BaT URL).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vehicle_id: { type: "string", description: "Vehicle UUID" },
+        listing_url: { type: "string", description: "Listing URL (e.g. BaT auction URL) — resolves to vehicle_id automatically" },
+      },
+    },
+  },
 ];
 
 // =============================================================================
@@ -1094,11 +1111,28 @@ async function handleGetPipelineRegistry(args: Record<string, unknown>): Promise
 // ── Search ──────────────────────────────────────────────────────────────────
 
 async function handleSearchVehicles(args: Record<string, unknown>): Promise<ToolResult> {
-  const data = await callEdgeFn("universal-search", {
-    query: args.query,
-    limit: args.limit ?? 10,
-  });
-  return toolOk(data);
+  const supabase = sb();
+  const queryStr = String(args.query || "").trim();
+  const limit = Math.min(Number(args.limit) || 10, 50);
+
+  if (!queryStr) return toolOk({ results: [], count: 0 });
+
+  // Direct DB search — replaces edge-to-edge call that returned 401
+  const tokens = queryStr.split(/\s+/).filter(Boolean);
+  const tsq = tokens.map((t) => t.replace(/[^a-zA-Z0-9]/g, "")).filter(Boolean).join(" & ");
+
+  let query = supabase
+    .from("vehicles")
+    .select("id, year, make, model, trim, sale_price, mileage, primary_image_url, listing_url, nuke_estimate, location, auction_source")
+    .limit(limit);
+
+  if (tsq) {
+    query = query.textSearch("search_vector", tsq, { type: "plain", config: "english" });
+  }
+
+  const { data, error } = await query;
+  if (error) return toolErr(error.message);
+  return toolOk({ results: data || [], count: data?.length ?? 0 });
 }
 
 async function handleSearchVehiclesAdvanced(args: Record<string, unknown>): Promise<ToolResult> {
@@ -1535,10 +1569,14 @@ async function handleQueryVehicleDeep(args: Record<string, unknown>): Promise<To
     response.events = results[idx++]?.data || [];
   }
 
+  let sourceMap: Map<string, any> = new Map();
+  let rawObs: any[] = [];
+
   if (includeObs) {
     const obs = results[idx++]?.data || [];
+    rawObs = obs;
     const sourcesData = results[idx++]?.data || [];
-    const sourceMap = new Map(sourcesData.map((s: any) => [s.id, s]));
+    sourceMap = new Map(sourcesData.map((s: any) => [s.id, s]));
 
     // Enrich observations with source info and flatten structured_data
     const enrichedObs = obs.map((o: any) => {
@@ -1613,8 +1651,10 @@ async function handleQueryVehicleDeep(args: Record<string, unknown>): Promise<To
     };
   }
 
+  let rawImgs: any[] = [];
   if (includeImages) {
     const imgs = results[idx++]?.data || [];
+    rawImgs = imgs;
     const byZone: Record<string, number> = {};
     for (const img of imgs) {
       const zone = img.angle || "unclassified";
@@ -1674,16 +1714,15 @@ async function handleQueryVehicleDeep(args: Record<string, unknown>): Promise<To
 
   // Determine observation sources
   const obsSources = includeObs
-    ? [...new Set((results[1]?.data || []).map((o: any) => {
-        const src = sourceMap?.get?.(o.source_id);
+    ? [...new Set(rawObs.map((o: any) => {
+        const src = sourceMap.get(o.source_id);
         return src?.slug || "unknown";
       }))]
     : [];
 
   // Count AI-analyzed images
   const analyzedImgCount = includeImages
-    ? (results[includeEvents ? (includeObs ? 4 : 2) : (includeObs ? 3 : 1)]?.data || [])
-        .filter((i: any) => i.ai_processing_status === "completed").length
+    ? rawImgs.filter((i: any) => i.ai_processing_status === "completed").length
     : 0;
 
   response._data_guidance = {
@@ -1853,7 +1892,7 @@ async function handleQueryMarketHistory(args: Record<string, unknown>): Promise<
       if (args.model) vQuery = vQuery.ilike("model", `%${args.model}%`);
       if (args.year_from) vQuery = vQuery.gte("year", args.year_from);
       if (args.year_to) vQuery = vQuery.lte("year", args.year_to);
-      const { data: vehicleIds } = await vQuery.limit(500);
+      const { data: vehicleIds } = await vQuery.limit(100);  // PostgREST URL length limit
       if (vehicleIds?.length) {
         query = query.in("vehicle_id", vehicleIds.map((v: any) => v.id));
       } else {
@@ -2938,6 +2977,271 @@ async function handleExecuteSql(args: Record<string, unknown>): Promise<ToolResu
 }
 
 // =============================================================================
+// AUCTION BRIEFING — Composite One-Call Tool
+// =============================================================================
+
+async function handleGetAuctionBriefing(args: Record<string, unknown>): Promise<ToolResult> {
+  const vehicleId = args.vehicle_id as string | undefined;
+  const listingUrl = args.listing_url as string | undefined;
+
+  if (!vehicleId && !listingUrl) {
+    return toolErr("Provide vehicle_id or listing_url");
+  }
+
+  const supabase = getSupabase();
+
+  // Resolve vehicle_id from listing_url if needed
+  let vid = vehicleId;
+  let listingData: any = null;
+
+  if (!vid && listingUrl) {
+    const { data: bl } = await supabase
+      .from("bat_listings")
+      .select("vehicle_id")
+      .eq("bat_listing_url", listingUrl)
+      .single();
+    if (!bl?.vehicle_id) {
+      // Try vehicle_events
+      const { data: ve } = await supabase
+        .from("vehicle_events")
+        .select("vehicle_id")
+        .eq("source_url", listingUrl)
+        .limit(1)
+        .single();
+      vid = ve?.vehicle_id;
+    } else {
+      vid = bl.vehicle_id;
+    }
+    if (!vid) return toolErr("No vehicle found for this listing URL");
+  }
+
+  // Run all queries in parallel
+  const [
+    vehicleRes,
+    listingsRes,
+    sellerRes,
+    compsRes,
+    eventsRes,
+    imagesRes,
+    commentDiscRes,
+    descDiscRes,
+    obsRes,
+    valuationRes,
+  ] = await Promise.all([
+    // 1. Vehicle identity + specs + valuation
+    supabase.from("vehicles").select("*").eq("id", vid).single(),
+
+    // 2. BaT listings for this vehicle (active first)
+    supabase.from("bat_listings")
+      .select("bat_listing_url, bat_listing_title, listing_status, sale_price, final_bid, reserve_price, starting_bid, bid_count, view_count, comment_count, seller_username, buyer_username, auction_start_date, auction_end_date, raw_data")
+      .eq("vehicle_id", vid)
+      .order("auction_end_date", { ascending: false })
+      .limit(5),
+
+    // 3. Seller profile (will resolve after we get listings)
+    Promise.resolve(null), // placeholder — resolved below
+
+    // 4. Comparable sales — resolved after vehicle data is available (placeholder)
+    Promise.resolve({ data: null }),
+
+    // 5. Market history (all events for this vehicle)
+    supabase.from("vehicle_events")
+      .select("source_platform, event_type, source_url, sale_price, asking_price, auction_end_date, created_at")
+      .eq("vehicle_id", vid)
+      .order("created_at", { ascending: false })
+      .limit(20),
+
+    // 6. Images summary (condition scores)
+    supabase.from("vehicle_images")
+      .select("url, angle, condition_score, photo_quality_score, damage_flags, modification_flags, ai_processing_status")
+      .eq("vehicle_id", vid)
+      .order("condition_score", { ascending: false, nullsFirst: false })
+      .limit(20),
+
+    // 7. Comment discoveries (sentiment)
+    supabase.from("comment_discoveries")
+      .select("overall_sentiment, sentiment_score, total_fields, raw_extraction, comment_count, data_quality_score")
+      .eq("vehicle_id", vid)
+      .order("discovered_at", { ascending: false })
+      .limit(1),
+
+    // 8. Description discoveries
+    supabase.from("description_discoveries")
+      .select("total_fields, raw_extraction, keys_found, description_length")
+      .eq("vehicle_id", vid)
+      .order("discovered_at", { ascending: false })
+      .limit(1),
+
+    // 9. Recent observations (top 20)
+    supabase.from("vehicle_observations")
+      .select("kind, content_text, structured_data, confidence_score, observed_at, source_id")
+      .eq("vehicle_id", vid)
+      .order("observed_at", { ascending: false })
+      .limit(20),
+
+    // 10. Cached valuation
+    supabase.from("vehicle_valuations")
+      .select("estimated_value, confidence, value_range_low, value_range_high, deal_score, heat_score, price_tier, methodology")
+      .eq("vehicle_id", vid)
+      .order("computed_at", { ascending: false })
+      .limit(1),
+  ]);
+
+  const vehicle = vehicleRes.data;
+  if (!vehicle) return toolErr("Vehicle not found");
+
+  const listings = listingsRes.data || [];
+  const activeListing = listings.find((l: any) => l.listing_status === "active") || listings[0];
+
+  // Second parallel pass: comps (need make/model from vehicle) + seller profile
+  const [compsResult, sellerResult] = await Promise.all([
+    vehicle.make
+      ? supabase.rpc("find_bat_comps", {
+          p_make: vehicle.make,
+          p_model: vehicle.model || null,
+          p_year: vehicle.year || null,
+          p_year_range: 3,
+          p_limit: 10,
+        }).then((r: any) => r.error ? { data: [] } : r)
+      : Promise.resolve({ data: [] }),
+    activeListing?.seller_username
+      ? supabase
+          .from("bat_user_profiles")
+          .select("username, total_comments, total_bids, total_wins, win_rate, expertise_score, avg_bid_amount, preferred_categories, bidding_strategy, avg_sentiment, community_trust_score, bot_likelihood")
+          .eq("username", activeListing.seller_username)
+          .single()
+      : Promise.resolve({ data: null }),
+  ]);
+  const sellerProfile = sellerResult.data;
+
+  // Compute bid velocity for active listings
+  let bidVelocity = null;
+  if (activeListing?.listing_status === "active" && activeListing.bid_count && activeListing.auction_start_date) {
+    const hoursElapsed = (Date.now() - new Date(activeListing.auction_start_date).getTime()) / 3600000;
+    if (hoursElapsed > 0) {
+      bidVelocity = Math.round((activeListing.bid_count / hoursElapsed) * 100) / 100;
+    }
+  }
+
+  // Aggregate image condition data
+  const imgs = imagesRes.data || [];
+  const analyzedImgs = imgs.filter((i: any) => i.ai_processing_status === "completed");
+  const avgCondition = analyzedImgs.length > 0
+    ? Math.round(analyzedImgs.reduce((s: number, i: any) => s + (i.condition_score || 0), 0) / analyzedImgs.length * 10) / 10
+    : null;
+  const damageFlags = [...new Set(analyzedImgs.flatMap((i: any) => i.damage_flags || []))];
+  const modFlags = [...new Set(analyzedImgs.flatMap((i: any) => i.modification_flags || []))];
+
+  // Build comparable sales summary
+  const comps = compsResult?.data || [];
+
+  // Build briefing
+  const briefing = {
+    identity: {
+      id: vehicle.id,
+      vin: vehicle.vin,
+      year: vehicle.year,
+      make: vehicle.make,
+      model: vehicle.model,
+      trim: vehicle.trim,
+      body_style: vehicle.body_style,
+      engine: vehicle.engine_type,
+      transmission: vehicle.transmission,
+      drivetrain: vehicle.drivetrain,
+      mileage: vehicle.mileage,
+      exterior_color: vehicle.color,
+      interior_color: vehicle.interior_color,
+      location: vehicle.location || [vehicle.city, vehicle.state].filter(Boolean).join(", "),
+    },
+
+    auction: activeListing ? {
+      url: activeListing.bat_listing_url,
+      title: activeListing.bat_listing_title,
+      status: activeListing.listing_status,
+      current_bid: activeListing.final_bid,
+      reserve_price: activeListing.reserve_price,
+      starting_bid: activeListing.starting_bid,
+      bid_count: activeListing.bid_count,
+      view_count: activeListing.view_count,
+      comment_count: activeListing.comment_count,
+      bid_velocity_per_hour: bidVelocity,
+      auction_start: activeListing.auction_start_date,
+      auction_end: activeListing.auction_end_date,
+      sale_price: activeListing.sale_price,
+    } : null,
+
+    valuation: {
+      nuke_estimate: vehicle.nuke_estimate,
+      confidence: vehicle.nuke_estimate_confidence,
+      deal_score: vehicle.deal_score,
+      heat_score: vehicle.heat_score,
+      price_tier: vehicle.price_tier,
+      cached_valuation: valuationRes.data?.[0] || null,
+    },
+
+    seller: sellerProfile ? {
+      username: sellerProfile.username,
+      total_sales: sellerProfile.total_wins,
+      total_bids: sellerProfile.total_bids,
+      win_rate: sellerProfile.win_rate,
+      expertise_score: sellerProfile.expertise_score,
+      avg_bid_amount: sellerProfile.avg_bid_amount,
+      strategy: sellerProfile.bidding_strategy,
+      sentiment: sellerProfile.avg_sentiment,
+      trust_score: sellerProfile.community_trust_score,
+      bot_likelihood: sellerProfile.bot_likelihood,
+      preferred_categories: sellerProfile.preferred_categories,
+    } : null,
+
+    comps: Array.isArray(comps) ? comps.slice(0, 10).map((c: any) => ({
+      year: c.v_year, make: c.v_make, model: c.v_model,
+      sale_price: c.sale_price, engine: c.v_engine_size,
+      sale_date: c.sale_date, url: c.bat_listing_url,
+      bid_count: c.bid_count,
+    })) : [],
+
+    market_history: (eventsRes.data || []).map((e: any) => ({
+      platform: e.source_platform,
+      type: e.event_type,
+      url: e.source_url,
+      price: e.sale_price || e.asking_price,
+      date: e.auction_end_date || e.created_at,
+    })),
+
+    sentiment: {
+      comment_discovery: commentDiscRes.data?.[0] || null,
+      description_discovery: descDiscRes.data?.[0] || null,
+      recent_observations: (obsRes.data || []).slice(0, 5).map((o: any) => ({
+        kind: o.kind,
+        text: o.content_text?.slice(0, 200),
+        confidence: o.confidence_score,
+        date: o.observed_at,
+      })),
+    },
+
+    condition: {
+      avg_condition_score: avgCondition,
+      analyzed_images: analyzedImgs.length,
+      total_images: vehicle.image_count,
+      damage_flags: damageFlags,
+      modification_flags: modFlags,
+      image_samples: imgs.slice(0, 5).map((i: any) => ({
+        url: i.url, zone: i.angle, condition: i.condition_score, quality: i.photo_quality_score,
+      })),
+    },
+
+    description: vehicle.description || null,
+    highlights: vehicle.highlights || null,
+    known_flaws: vehicle.known_flaws || null,
+    modifications: vehicle.modifications || null,
+  };
+
+  return {
+    content: [{ type: "text", text: JSON.stringify(briefing, null, 2) }],
+  };
+}
+
+// =============================================================================
 // TOOL DISPATCH
 // =============================================================================
 
@@ -2977,6 +3281,7 @@ const TOOL_HANDLERS: Record<string, (args: Record<string, unknown>) => Promise<T
   prepare_listing: handlePrepareListing,
   ingest_photos: handleIngestPhotos,
   execute_sql: handleExecuteSql,
+  get_auction_briefing: handleGetAuctionBriefing,
 };
 
 // =============================================================================

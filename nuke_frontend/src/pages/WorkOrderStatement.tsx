@@ -15,6 +15,7 @@ import {
   type PartRow,
   type LaborRow,
   type PaymentRow,
+  type ShopInfo,
 } from './vehicle-profile/hooks/useWorkOrderStatement';
 
 // ── Helpers ──
@@ -101,10 +102,11 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
             <div style={{ fontSize: '22px', fontWeight: 900, letterSpacing: '0.12em', color: '#1a3050', textTransform: 'uppercase' }}>REPAIR ORDER</div>
           </div>
           <div style={{ textAlign: 'center', marginBottom: '12px' }}>
-            <div style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '0.08em' }}>NUKE</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '0.08em' }}>{data.shop?.name?.toUpperCase() || 'NUKE'}</div>
             <div style={{ fontSize: '9px', color: '#4a6080' }}>Vehicle Build & Service</div>
-            <div style={{ fontSize: '9px', color: '#4a6080' }}>Las Vegas, NV</div>
-            <div style={{ fontSize: '9px', color: '#4a6080' }}>support@nuke.ag &middot; nuke.ag</div>
+            <div style={{ fontSize: '9px', color: '#4a6080' }}>{[data.shop?.city, data.shop?.state?.toUpperCase()].filter(Boolean).join(', ') || 'Las Vegas, NV'}</div>
+            {data.shop?.email && <div style={{ fontSize: '9px', color: '#4a6080' }}>{data.shop.email}{data.shop.website ? ` · ${data.shop.website.replace(/^https?:\/\/(www\.)?/, '')}` : ''}</div>}
+            {data.shop?.phone && <div style={{ fontSize: '9px', color: '#4a6080' }}>{data.shop.phone}</div>}
           </div>
 
           {/* Order number */}
@@ -278,26 +280,20 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
           </div>
 
           {/* Payment Instructions */}
-          <div style={{ margin: '10px 0', padding: '8px 10px', border: '1px solid #7B96B0', background: '#e8edf3' }}>
-            <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#1a3050', marginBottom: '6px' }}>Payment Instructions</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', fontSize: '9px', color: '#1a3050', lineHeight: 1.5 }}>
-              <div>
-                <div style={{ fontWeight: 700, marginBottom: '2px' }}>Zelle</div>
-                <div>shkylar@gmail.com</div>
-                <div style={{ fontSize: '7px', color: '#4a6080' }}>Reference: {roNum}</div>
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, marginBottom: '2px' }}>Wire Transfer</div>
-                <div>Contact support@nuke.ag</div>
-                <div style={{ fontSize: '7px', color: '#4a6080' }}>for wire instructions</div>
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, marginBottom: '2px' }}>Cash</div>
-                <div>Accepted in person</div>
-                <div style={{ fontSize: '7px', color: '#4a6080' }}>by appointment</div>
+          {data.shop?.payment_methods && data.shop.payment_methods.length > 0 && (
+            <div style={{ margin: '10px 0', padding: '8px 10px', border: '1px solid #7B96B0', background: '#e8edf3' }}>
+              <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#1a3050', marginBottom: '6px' }}>Payment Instructions</div>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${data.shop.payment_methods.length}, 1fr)`, gap: '10px', fontSize: '9px', color: '#1a3050', lineHeight: 1.5 }}>
+                {data.shop.payment_methods.map((pm, i) => (
+                  <div key={i}>
+                    <div style={{ fontWeight: 700, marginBottom: '2px' }}>{pm.label}</div>
+                    <div>{pm.detail}</div>
+                    {pm.note && <div style={{ fontSize: '7px', color: '#4a6080' }}>{pm.note}</div>}
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '8px', marginLeft: '12px', marginRight: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
@@ -308,7 +304,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
                 fgColor="#1a3050"
                 bgColor="transparent"
               />
-              <div style={{ fontSize: '7px', color: '#4a6080', textTransform: 'uppercase' }}>Payment due upon receipt<br/>Questions? Contact support@nuke.ag</div>
+              <div style={{ fontSize: '7px', color: '#4a6080', textTransform: 'uppercase' }}>Payment due upon receipt<br/>Questions? Contact {data.shop?.email || 'support@nuke.ag'}</div>
             </div>
             <>
               <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
@@ -369,11 +365,11 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
         {/* Shop Header */}
         <div style={T.shopHeader}>
           <div>
-            <div style={T.shopName}>NUKE</div>
+            <div style={T.shopName}>{data.shop?.name?.toUpperCase() || 'NUKE'}</div>
             <div style={T.shopDetail}>Vehicle Build & Service</div>
-            <div style={T.shopDetail}>Las Vegas, NV</div>
-            <div style={T.shopDetail}>support@nuke.ag</div>
-            <div style={T.shopDetail}>nuke.ag</div>
+            <div style={T.shopDetail}>{[data.shop?.city, data.shop?.state?.toUpperCase()].filter(Boolean).join(', ') || 'Las Vegas, NV'}</div>
+            {data.shop?.email && <div style={T.shopDetail}>{data.shop.email}</div>}
+            {data.shop?.phone && <div style={T.shopDetail}>{data.shop.phone}</div>}
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={T.invoiceTitle}>INVOICE</div>
@@ -601,32 +597,26 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
         )}
 
         {/* Payment Instructions */}
-        <div style={{ marginTop: '24px', padding: '16px', border: '2px solid #1a1a1a', background: '#fafafa' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '10px' }}>Payment Instructions</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', fontSize: '10px', lineHeight: 1.5 }}>
-            <div>
-              <div style={{ fontWeight: 700, marginBottom: '4px' }}>Zelle</div>
-              <div>shkylar@gmail.com</div>
-              <div style={{ color: '#888', marginTop: '2px' }}>Reference: {invoiceNum}</div>
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, marginBottom: '4px' }}>Wire Transfer</div>
-              <div>Contact support@nuke.ag</div>
-              <div>for wire instructions</div>
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, marginBottom: '4px' }}>Cash</div>
-              <div>Accepted in person</div>
-              <div>by appointment</div>
+        {data.shop?.payment_methods && data.shop.payment_methods.length > 0 && (
+          <div style={{ marginTop: '24px', padding: '16px', border: '2px solid #1a1a1a', background: '#fafafa' }}>
+            <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '10px' }}>Payment Instructions</div>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${data.shop.payment_methods.length}, 1fr)`, gap: '16px', fontSize: '10px', lineHeight: 1.5 }}>
+              {data.shop.payment_methods.map((pm, i) => (
+                <div key={i}>
+                  <div style={{ fontWeight: 700, marginBottom: '4px' }}>{pm.label}</div>
+                  <div>{pm.detail}</div>
+                  {pm.note && <div style={{ color: '#888', marginTop: '2px' }}>{pm.note}</div>}
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        )}
 
         {/* Footer */}
         <div style={T.footer}>
           <div>Thank you for your business.</div>
           <div style={{ marginTop: '4px', fontSize: '10px', color: '#999' }}>
-            Payment due upon receipt. Questions? Contact support@nuke.ag
+            Payment due upon receipt. Questions? Contact {data.shop?.email || 'nuke.ag'}
           </div>
         </div>
 
@@ -1182,7 +1172,7 @@ const WorkOrderStatement: React.FC = () => {
       const invoiceDate = new Date().toISOString().split('T')[0];
       const invoiceNumber = `INV-${(data.vehicle.model || 'VEH').replace(/\s+/g, '').toUpperCase().slice(0, 6)}-${invoiceDate.replace(/-/g, '').slice(4)}`;
       await supabase.from('generated_invoices').upsert({ work_order_id: data.workOrders[0]?.id, invoice_number: invoiceNumber, invoice_date: invoiceDate, due_date: invoiceDate, subtotal: data.totals.subtotal, tax_amount: 0, tax_rate: 0, total_amount: data.totals.subtotal, amount_paid: data.totals.payments, amount_due: data.totals.balance, payment_status: data.totals.balance > 0 ? 'partial' : 'paid', status: 'sent', sent_at: new Date().toISOString() }, { onConflict: 'work_order_id' });
-      const { error: sendError } = await supabase.functions.invoke('send-invoice-email', { body: { to: data.contact.email, subject: `Invoice: ${vehicleTitle} — ${fmt(data.totals.balance)} Balance Due`, customer_name: data.contact.name, vehicle_title: vehicleTitle, invoice_number: invoiceNumber, invoice_date: invoiceDate, total: data.totals.subtotal, paid: data.totals.payments, balance: data.totals.balance, line_items: data.workOrders.map((wo: any) => ({ description: wo.title, amount: wo.parts_total + wo.labor_total })) } });
+      const { error: sendError } = await supabase.functions.invoke('send-invoice-email', { body: { to: data.contact.email, subject: `Invoice: ${vehicleTitle} — ${fmt(data.totals.balance)} Balance Due`, customer_name: data.contact.name, vehicle_title: vehicleTitle, invoice_number: invoiceNumber, invoice_date: invoiceDate, total: data.totals.subtotal, paid: data.totals.payments, balance: data.totals.balance, line_items: data.workOrders.map((wo: any) => ({ description: wo.title, amount: wo.parts_total + wo.labor_total })), payment_methods: data.shop?.payment_methods || [], shop: data.shop ? { name: data.shop.name, email: data.shop.email, phone: data.shop.phone, city: data.shop.city, state: data.shop.state } : undefined } });
       if (sendError) throw sendError;
       setSentStatus('sent');
     } catch { setSentStatus('error'); } finally { setSending(false); }

@@ -108,9 +108,25 @@ export interface StatementTotals {
   goodwill: number;
 }
 
+export interface ShopInfo {
+  name: string | null;
+  legal_name: string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  logo_url: string | null;
+  tax_rate: number | null;
+  payment_methods: Array<{ method: string; label: string; detail: string; note?: string }> | null;
+}
+
 export interface StatementData {
   vehicle: StatementVehicle;
   contact: StatementContact | null;
+  shop: ShopInfo | null;
   workOrders: WorkOrderSummary[];
   parts: Record<string, PartRow[]>;
   labor: Record<string, LaborRow[]>;
@@ -140,6 +156,7 @@ export function useWorkOrderStatement(query: string | null) {
 
       const vehicle = rpcData.vehicle as StatementVehicle;
       const contact = rpcData.contact as StatementContact | null;
+      const shop = (rpcData.shop as ShopInfo | null) || null;
       const woArray = (rpcData.work_orders || []) as any[];
       const woIds = woArray.map((wo: any) => wo.id);
 
@@ -155,6 +172,7 @@ export function useWorkOrderStatement(query: string | null) {
         supabase.from('work_order_labor')
           .select('*')
           .in('work_order_id', woIds)
+          .neq('status', 'cancelled')
           .order('created_at'),
         supabase.from('work_order_payments')
           .select('*')
@@ -220,7 +238,7 @@ export function useWorkOrderStatement(query: string | null) {
         balance_due: Number(wo.balance_due) || 0,
       }));
 
-      return { vehicle, contact, workOrders, parts, labor, payments, totals: calcTotals(parts, labor, payments) };
+      return { vehicle, contact, shop, workOrders, parts, labor, payments, totals: calcTotals(parts, labor, payments) };
     },
     enabled: !!query,
     staleTime: 5 * 60 * 1000,

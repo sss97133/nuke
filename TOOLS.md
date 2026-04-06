@@ -92,6 +92,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | MCP: Get ARS | `mcp-connector` → `get_auction_readiness` | Calls `persist_auction_readiness()` |
 | MCP: Get coaching plan | `mcp-connector` → `get_coaching_plan` | Read-only from `auction_readiness` |
 | MCP: Prepare listing | `mcp-connector` → `prepare_listing` | Read-only preview |
+| MCP: Auction briefing | `mcp-connector` → `get_auction_briefing` | One-call composite: identity, auction data, valuation, seller profile, comps, market history, sentiment, condition. Accepts vehicle_id or listing_url. |
 
 ---
 
@@ -282,7 +283,9 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 | Intent | Use This | Notes |
 |--------|----------|-------|
 | Compute wiring overlay (harness spec) | `compute-wiring-overlay` | POST `{ vehicle_id }`. Returns wire list, ECU/PDM/alternator sizing, bulkhead pin assignments, warnings. Upserts to `vehicle_wiring_overlays`. |
-| Generate harness fabrication spec | `generate-harness-spec` | POST `{ vehicle_id, format? }`. format: "full" (JSON+text), "text" (plaintext spec), "wire_schedule" (tables only). Returns 8 tables: wire schedule (pin-to-pin), ECU pin assignment, PDM channels, bulkhead pins, components, trunk routing, power budget, physical reference. The document you hand to a fabricator or Fiverr illustrator. |
+| Generate harness fabrication spec | `generate-harness-spec` | POST `{ vehicle_id, format? }`. Formats: "full" (JSON+text), "text" (plaintext spec), "csv" (wire schedule for Excel), "workstation" (live build progress + blockers), "wire_schedule" (tables only). The document you hand to a fabricator or Fiverr illustrator. |
+| Harness build workstation view | `SELECT * FROM harness_workstation` | Live builder spreadsheet — every device with zone, integration decision (KEEP/REPLACE/NEW/SPLICE), wire progress (not_started→wire_cut→terminated→installed→tested→verified), blockers, and notes. Pull this up every time you work on the harness. |
+| Update wire build progress | `UPDATE vehicle_build_manifest SET wire_status = 'terminated' WHERE device_name = '...'` | Track physical build progress per device. |
 | Generate vehicle-layout diagram (plan view SVG) | `generate-vehicle-diagram` | POST `{ vehicle_id, view?, show_bulkhead?, highlight_zone? }`. Returns `diagram_url` + summary. View: "plan" (top-down truck layout), "engine_bay", "dash", etc. Toggle bulkhead connector in/out — wire lengths auto-recalculate. |
 | Generate connection diagram (WireViz) | `generate-wiring-diagram` | POST `{ vehicle_id, zone?, format? }`. Returns `diagram_url` + summary. Connection-level nodes-and-edges diagram via Kroki.io. Zone optional. Format: "svg" (default) or "png". |
 | Generate wiring BOM | `generate-wiring-bom` | POST `{ vehicle_id }`. Parts list with pricing. |
