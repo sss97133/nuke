@@ -91,27 +91,32 @@ function extractAuctionEndDate(html) {
   return m ? new Date(m[1]) : null;
 }
 
+const { Pool } = pg;
+
+const pool = new Pool({
+  host: 'aws-0-us-west-1.pooler.supabase.com',
+  port: 6543,
+  user: 'postgres.qkgaybvrernstplzjaam',
+  password: process.env.SUPABASE_DB_PASSWORD || 'RbzKq32A0uhqvJMQ',
+  database: 'postgres',
+  ssl: { rejectUnauthorized: false },
+  statement_timeout: 60000,
+  max: 2,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
+pool.on('error', () => {}); // prevent crash on idle client error
+
 async function main() {
   console.log(`BaT Bid Intelligence Backfill${DRY_RUN ? ' [DRY RUN]' : ''}`);
   console.log(`Batch size: ${BATCH_SIZE}, Sleep: ${SLEEP_MS}ms`);
   if (LIMIT) console.log(`Limit: ${LIMIT} snapshots`);
   if (OFFSET) console.log(`Offset: ${OFFSET}`);
 
-  const db = new Client({
-    host: 'aws-0-us-west-1.pooler.supabase.com',
-    port: 6543,
-    user: `postgres.qkgaybvrernstplzjaam`,
-    password: process.env.SUPABASE_DB_PASSWORD || 'RbzKq32A0uhqvJMQ',
-    database: 'postgres',
-    ssl: { rejectUnauthorized: false },
-    statement_timeout: 60000,
-  });
-
-  await db.connect();
-  console.log('Connected to database');
+  console.log('Connected to database (pool)');
 
   // Fast estimate of available snapshots (exact count is too slow on 241K rows)
-  const { rows: [{ estimate }] } = await db.query(
+  const { rows: [{ estimate }] } = await pool.query(
     `SELECT reltuples::bigint AS estimate FROM pg_class WHERE relname = 'listing_page_snapshots'`
   );
   const totalCount = estimate || 241000;
@@ -134,35 +139,31 @@ async function main() {
     // Fetch batch using keyset pagination (fast at any offset)
     let snapshots;
     try {
-      if (!lastFetchedAt) {
-        // First batch
-        ({ rows: snapshots } = await db.query(
-          `SELECT id, listing_url, html, html_storage_path, fetched_at
+      // Fetch IDs only first (fast), then load HTML per-snapshot
+      if (!lastId) {
+        ({ rows: snapshots } = await pool.query(
+          `SELECT id, listing_url, fetched_at
            FROM listing_page_snapshots
-           WHERE platform = 'bat' AND success = true
-           AND html IS NOT NULL
-           ORDER BY fetched_at DESC, id DESC
-           LIMIT $1`,
-          [batchLimit]
+           WHERE platform = 'bat' AND success = true AND html IS NOT NULL
+           ORDER BY id
+           LIMIT $1`, [batchLimit]
         ));
       } else {
-        // Subsequent batches — keyset pagination
-        ({ rows: snapshots } = await db.query(
-          `SELECT id, listing_url, html, html_storage_path, fetched_at
+        ({ rows: snapshots } = await pool.query(
+          `SELECT id, listing_url, fetched_at
            FROM listing_page_snapshots
-           WHERE platform = 'bat' AND success = true
-           AND html IS NOT NULL
-           AND (fetched_at, id) < ($2, $3)
-           ORDER BY fetched_at DESC, id DESC
-           LIMIT $1`,
-          [batchLimit, lastFetchedAt, lastId]
+           WHERE platform = 'bat' AND success = true AND html IS NOT NULL
+           AND id > $2
+           ORDER BY id
+           LIMIT $1`, [batchLimit, lastId]
         ));
       }
     } catch (fetchErr) {
       console.error(`Batch fetch error: ${fetchErr.message}`);
       errors++;
-      if (errors > 20) break;
-      await new Promise(r => setTimeout(r, 2000));
+      if (errors > 50) break;
+      // Pool auto-reconnects, just wait
+      await new Promise(r => setTimeout(r, 3000));
       continue;
     }
 
@@ -171,12 +172,19 @@ async function main() {
     for (const snap of snapshots) {
       processed++;
       try {
+      const t0 = Date.now();
+      // Skip if already processed
+      const { rows: [done] } = await pool.query(
+        `SELECT 1 FROM bat_bid_backfill_progress WHERE snapshot_id = $1`, [snap.id]
+      );
+      if (done) continue;
 
-      // Get HTML content
-      let html = snap.html;
-      if (!html && snap.html_storage_path) {
-        html = await downloadHtml(snap.html_storage_path);
-      }
+      // Load HTML for this snapshot (not fetched in batch query to keep it fast)
+      const { rows: [htmlRow] } = await pool.query(
+        `SELECT html FROM listing_page_snapshots WHERE id = $1`, [snap.id]
+      );
+      let html = htmlRow?.html;
+      if (!html) continue; // shouldn't happen but safety
       if (!html || html.length < 1000) {
         continue;
       }
@@ -272,7 +280,7 @@ async function main() {
       let vehicleId = null;
 
       // Try vehicles table directly (guaranteed valid FK)
-      const { rows: vRows } = await db.query(
+      const { rows: vRows } = await pool.query(
         `SELECT id FROM vehicles WHERE bat_auction_url = ANY($1) OR discovery_url = ANY($1) LIMIT 1`,
         [urlVariants]
       );
@@ -280,7 +288,7 @@ async function main() {
 
       // Fallback: vehicle_events (validate FK)
       if (!vehicleId) {
-        const { rows: veRows } = await db.query(
+        const { rows: veRows } = await pool.query(
           `SELECT ve.vehicle_id FROM vehicle_events ve
            INNER JOIN vehicles v ON v.id = ve.vehicle_id
            WHERE ve.source_url = ANY($1) AND ve.vehicle_id IS NOT NULL LIMIT 1`,
@@ -291,7 +299,7 @@ async function main() {
 
       // Fallback: bat_listings (validate FK — many have stale vehicle_ids)
       if (!vehicleId) {
-        const { rows: blRows } = await db.query(
+        const { rows: blRows } = await pool.query(
           `SELECT bl.vehicle_id FROM bat_listings bl
            INNER JOIN vehicles v ON v.id = bl.vehicle_id
            WHERE bl.bat_listing_url = ANY($1) AND bl.vehicle_id IS NOT NULL LIMIT 1`,
@@ -347,7 +355,7 @@ async function main() {
               author_total_likes = COALESCE(EXCLUDED.author_total_likes, auction_comments.author_total_likes)
           `;
 
-          await db.query(sql, params);
+          await pool.query(sql, params);
           upserted += rows.length;
         } catch (e) {
           errors++;
@@ -358,7 +366,7 @@ async function main() {
         if (sellerUsername) {
           sellersFound++;
           try {
-            await db.query(
+            await pool.query(
               `UPDATE bat_listings SET
                 seller_username = COALESCE(seller_username, $1),
                 last_updated_at = NOW()
@@ -367,6 +375,14 @@ async function main() {
             );
           } catch { /* non-fatal */ }
         }
+      }
+
+      if (processed <= 20) console.log(`  snap ${processed} (${snap.listing_url.slice(-40)}): ${rows.length} rows, ${Date.now()-t0}ms`);
+      // Mark snapshot as processed
+      if (!DRY_RUN) {
+        try {
+          await pool.query(`INSERT INTO bat_bid_backfill_progress (snapshot_id) VALUES ($1) ON CONFLICT DO NOTHING`, [snap.id]);
+        } catch { /* non-fatal */ }
       }
 
       // Progress logging
@@ -378,14 +394,14 @@ async function main() {
       }
       } catch (snapErr) {
         errors++;
-        if (errors <= 10) console.error(`Snapshot error (${snap.listing_url}): ${snapErr.message}`);
+        if (errors <= 20) console.error(`Snapshot error (${snap.listing_url}): ${snapErr.message}`);
+        // Reconnect if connection died
+        // Pool auto-reconnects on next query
       }
     }
 
-    // Update keyset cursor
-    const lastSnap = snapshots[snapshots.length - 1];
-    lastFetchedAt = lastSnap.fetched_at;
-    lastId = lastSnap.id;
+    // Update cursor
+    lastId = snapshots[snapshots.length - 1].id;
 
     // Sleep between batches
     await new Promise(r => setTimeout(r, SLEEP_MS));
@@ -399,7 +415,7 @@ async function main() {
   console.log(`Upserted: ${upserted}`);
   console.log(`Errors: ${errors}`);
 
-  await db.end();
+  await pool.end();
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
