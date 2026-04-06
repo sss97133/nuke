@@ -123,28 +123,54 @@ async function main() {
   let sellersFound = 0;
   let upserted = 0;
   let errors = 0;
-  let offset = OFFSET;
+  let lastFetchedAt = null; // keyset pagination cursor
+  let lastId = null;
 
   while (true) {
     if (LIMIT && processed >= LIMIT) break;
 
     const batchLimit = LIMIT ? Math.min(BATCH_SIZE, LIMIT - processed) : BATCH_SIZE;
 
-    // Fetch batch of snapshots — prefer those with inline HTML (faster), then storage
-    const { rows: snapshots } = await db.query(
-      `SELECT id, listing_url, html, html_storage_path, fetched_at
-       FROM listing_page_snapshots
-       WHERE platform = 'bat' AND success = true
-       AND (html IS NOT NULL OR html_storage_path IS NOT NULL)
-       ORDER BY fetched_at DESC
-       LIMIT $1 OFFSET $2`,
-      [batchLimit, offset]
-    );
+    // Fetch batch using keyset pagination (fast at any offset)
+    let snapshots;
+    try {
+      if (!lastFetchedAt) {
+        // First batch
+        ({ rows: snapshots } = await db.query(
+          `SELECT id, listing_url, html, html_storage_path, fetched_at
+           FROM listing_page_snapshots
+           WHERE platform = 'bat' AND success = true
+           AND html IS NOT NULL
+           ORDER BY fetched_at DESC, id DESC
+           LIMIT $1`,
+          [batchLimit]
+        ));
+      } else {
+        // Subsequent batches — keyset pagination
+        ({ rows: snapshots } = await db.query(
+          `SELECT id, listing_url, html, html_storage_path, fetched_at
+           FROM listing_page_snapshots
+           WHERE platform = 'bat' AND success = true
+           AND html IS NOT NULL
+           AND (fetched_at, id) < ($2, $3)
+           ORDER BY fetched_at DESC, id DESC
+           LIMIT $1`,
+          [batchLimit, lastFetchedAt, lastId]
+        ));
+      }
+    } catch (fetchErr) {
+      console.error(`Batch fetch error: ${fetchErr.message}`);
+      errors++;
+      if (errors > 20) break;
+      await new Promise(r => setTimeout(r, 2000));
+      continue;
+    }
 
     if (snapshots.length === 0) break;
 
     for (const snap of snapshots) {
       processed++;
+      try {
 
       // Get HTML content
       let html = snap.html;
@@ -344,15 +370,22 @@ async function main() {
       }
 
       // Progress logging
-      if (processed % 500 === 0) {
+      if (processed % 100 === 0 || processed <= 10) {
         console.log(
           `[${processed}/${totalCount}] comments: ${commentsFound}, bids: ${bidsFound}, ` +
           `sellers: ${sellersFound}, upserted: ${upserted}, errors: ${errors}`
         );
       }
+      } catch (snapErr) {
+        errors++;
+        if (errors <= 10) console.error(`Snapshot error (${snap.listing_url}): ${snapErr.message}`);
+      }
     }
 
-    offset += snapshots.length;
+    // Update keyset cursor
+    const lastSnap = snapshots[snapshots.length - 1];
+    lastFetchedAt = lastSnap.fetched_at;
+    lastId = lastSnap.id;
 
     // Sleep between batches
     await new Promise(r => setTimeout(r, SLEEP_MS));
