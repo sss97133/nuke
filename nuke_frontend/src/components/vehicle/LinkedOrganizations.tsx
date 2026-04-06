@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
 import { MapPin, Wrench, DollarSign, Truck, ShoppingCart } from 'lucide-react';
+import { useLinkedOrganizations } from '../../hooks/useLinkedOrganizations';
 
 interface LinkedOrganizationsProps {
   vehicleId: string;
@@ -58,88 +58,17 @@ const RELATIONSHIP_LABELS: Record<string, string> = {
   consigner: 'Consignment'
 };
 
-const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({ 
-  vehicleId, 
+const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
+  vehicleId,
   vehicleName,
   userId,
   initialOrganizations,
   onAddRelationship
 }) => {
-  const [organizations, setOrganizations] = useState<LinkedOrg[]>(initialOrganizations ?? []);
-  const [loading, setLoading] = useState(initialOrganizations === undefined);
-
-  useEffect(() => {
-    if (initialOrganizations !== undefined) {
-      setOrganizations(initialOrganizations);
-      setLoading(false);
-      return;
-    }
-    loadOrganizations();
-  }, [vehicleId, initialOrganizations]);
-
-  const loadOrganizations = async () => {
-    try {
-      console.log('[LinkedOrganizations] Loading for vehicle:', vehicleId);
-      
-      const { data, error } = await supabase
-        .from('organization_vehicles')
-        .select(`
-          id,
-          organization_id,
-          relationship_type,
-          auto_tagged,
-          gps_match_confidence,
-          status,
-          businesses!inner (
-            id,
-            business_name,
-            business_type,
-            city,
-            state,
-            logo_url
-          )
-        `)
-        .eq('vehicle_id', vehicleId)
-        .in('status', ['active', 'sold', 'pending', 'past', 'archived']);
-
-      if (error) {
-        console.error('[LinkedOrganizations] Query error:', error);
-        throw error;
-      }
-      
-      console.log('[LinkedOrganizations] Found', data?.length || 0, 'organizations');
-
-      const enriched = (data || []).map((ov: any) => ({
-        id: ov.id,
-        organization_id: ov.organization_id,
-        relationship_type: ov.relationship_type,
-        auto_tagged: ov.auto_tagged,
-        gps_match_confidence: ov.gps_match_confidence,
-        status: ov.status,
-        business_name: ov.businesses.business_name,
-        business_type: ov.businesses.business_type,
-        city: ov.businesses.city,
-        state: ov.businesses.state,
-        logo_url: ov.businesses.logo_url
-      }));
-
-      setOrganizations(enriched);
-      console.log('[LinkedOrganizations] Rendered', enriched.length, 'org cards');
-    } catch (error) {
-      console.error('[LinkedOrganizations] Failed to load:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: organizations = [], isLoading: loading } = useLinkedOrganizations(vehicleId, initialOrganizations);
 
   if (loading) return null;
-
-  if (organizations.length === 0) {
-    console.log('[LinkedOrganizations] No organizations found, hiding component');
-    return null; // Don't show card if no organizations
-  }
-  
-  console.log('[LinkedOrganizations] Rendering card with', organizations.length, 'organizations');
+  if (organizations.length === 0) return null;
 
   return (
     <div className="card">

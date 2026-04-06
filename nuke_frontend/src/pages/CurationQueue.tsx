@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { readCachedSession } from '../utils/cachedSession';
 import { Check, X, Pencil, SkipForward, ArrowLeft, CheckCircle } from 'lucide-react';
@@ -179,12 +179,13 @@ export default function CurationQueue() {
             <p className="text-gray-600 mb-4">
               No items need your review right now.
             </p>
-            <button
-              onClick={() => navigate('/dashboard')}
+            <Link
+              to="/dashboard"
               className="btn btn-primary"
+              style={{ textDecoration: 'none', color: 'inherit' }}
             >
               Back to Dashboard
-            </button>
+            </Link>
           </div>
         </div>
       </div>
@@ -200,13 +201,14 @@ export default function CurationQueue() {
       <div className="bg-white border-b border-gray-200 p-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-2">
-            <button
-              onClick={() => navigate('/dashboard')}
+            <Link
+              to="/dashboard"
               className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+              style={{ textDecoration: 'none' }}
             >
               <ArrowLeft className="w-4 h-4" />
               Back
-            </button>
+            </Link>
             <div className="text-sm font-medium">
               {currentIndex + 1} of {queue.length}
             </div>
@@ -237,12 +239,13 @@ export default function CurationQueue() {
               )}
               <div>
                 <h3 className="text-xl font-bold mb-1">{currentItem.vehicle_name}</h3>
-                <button
-                  onClick={() => navigate(`/vehicle/${currentItem.vehicle_id}`)}
+                <Link
+                  to={`/vehicle/${currentItem.vehicle_id}`}
                   className="text-sm text-blue-600 hover:underline"
+                  style={{ textDecoration: 'none' }}
                 >
                   View Full Profile →
-                </button>
+                </Link>
               </div>
             </div>
 

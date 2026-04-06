@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4450 1004" width="4450" height="1004">
+<defs>
+  <style>
+    .grid { stroke: #E0E0E0; stroke-width: 0.25; }
+    .zone { stroke: #999; stroke-width: 0.7; stroke-dasharray: 8,4; fill: none; }
+    .wire { stroke: #000; stroke-width: 0.9; fill: none; }
+    .wire-sig { stroke: #000; stroke-width: 0.6; fill: none; }
+    .wire-shld { stroke: #000; stroke-width: 0.6; fill: none; stroke-dasharray: 2,1.5; }
+    .dot { fill: #000; }
+    .comp { fill: white; stroke: #000; stroke-width: 1.2; }
+    .lbl { font-family: 'Courier New', monospace; font-size: 11px; }
+    .lbl-sm { font-family: 'Courier New', monospace; font-size: 9px; fill: #444; }
+    .hdr { font-family: Arial, sans-serif; font-weight: bold; }
+    .note { font-family: Arial, sans-serif; font-size: 9px; fill: #888; }
+  </style>
+</defs>
+<rect width="4450" height="1004" fill="white"/>
+<g id="grid" opacity="0.6">
+<line x1="50" y1="40" x2="50" y2="904" class="grid"/>
+<line x1="195" y1="40" x2="195" y2="904" class="grid"/>
+<line x1="340" y1="40" x2="340" y2="904" class="grid"/>
+<line x1="485" y1="40" x2="485" y2="904" class="grid"/>
+<line x1="630" y1="40" x2="630" y2="904" class="grid"/>
+<line x1="775" y1="40" x2="775" y2="904" class="grid"/>
+<line x1="920" y1="40" x2="920" y2="904" class="grid"/>
+<line x1="1065" y1="40" x2="1065" y2="904" class="grid"/>
+<line x1="1210" y1="40" x2="1210" y2="904" class="grid"/>
+<line x1="1355" y1="40" x2="1355" y2="904" class="grid"/>
+<line x1="1500" y1="40" x2="1500" y2="904" class="grid"/>
+<line x1="1645" y1="40" x2="1645" y2="904" class="grid"/>
+<line x1="1790" y1="40" x2="1790" y2="904" class="grid"/>
+<line x1="1935" y1="40" x2="1935" y2="904" class="grid"/>
+<line x1="2080" y1="40" x2="2080" y2="904" class="grid"/>
+<line x1="2225" y1="40" x2="2225" y2="904" class="grid"/>
+<line x1="2370" y1="40" x2="2370" y2="904" class="grid"/>
+<line x1="2515" y1="40" x2="2515" y2="904" class="grid"/>
+<line x1="2660" y1="40" x2="2660" y2="904" class="grid"/>
+<line x1="2805" y1="40" x2="2805" y2="904" class="grid"/>
+<line x1="2950" y1="40" x2="2950" y2="904" class="grid"/>
+<line x1="3095" y1="40" x2="3095" y2="904" class="grid"/>
+<line x1="3240" y1="40" x2="3240" y2="904" class="grid"/>
+<line x1="3385" y1="40" x2="3385" y2="904" class="grid"/>
+<line x1="3530" y1="40" x2="3530" y2="904" class="grid"/>
+<line x1="3675" y1="40" x2="3675" y2="904" class="grid"/>
+<line x1="3820" y1="40" x2="3820" y2="904" class="grid"/>
+<line x1="3965" y1="40" x2="3965" y2="904" class="grid"/>
+<line x1="4110" y1="40" x2="4110" y2="904" class="grid"/>
+<line x1="4255" y1="40" x2="4255" y2="904" class="grid"/>
+<line x1="4400" y1="40" x2="4400" y2="904" class="grid"/>
+<line x1="50" y1="40" x2="4400" y2="40" class="grid"/>
+<line x1="50" y1="112" x2="4400" y2="112" class="grid"/>
+<line x1="50" y1="184" x2="4400" y2="184" class="grid"/>
+<line x1="50" y1="256" x2="4400" y2="256" class="grid"/>
+<line x1="50" y1="328" x2="4400" y2="328" class="grid"/>
+<line x1="50" y1="400" x2="4400" y2="400" class="grid"/>
+<line x1="50" y1="472" x2="4400" y2="472" class="grid"/>
+<line x1="50" y1="544" x2="4400" y2="544" class="grid"/>
+<line x1="50" y1="616" x2="4400" y2="616" class="grid"/>
+<line x1="50" y1="688" x2="4400" y2="688" class="grid"/>
+<line x1="50" y1="760" x2="4400" y2="760" class="grid"/>
+<line x1="50" y1="832" x2="4400" y2="832" class="grid"/>
+<line x1="50" y1="904" x2="4400" y2="904" class="grid"/>
+<text x="122" y="30" text-anchor="middle" class="note">1</text>
+<text x="122" y="920" text-anchor="middle" class="note">1</text>
+<text x="267" y="30" text-anchor="middle" class="note">2</text>
+<text x="267" y="920" text-anchor="middle" class="note">2</text>
+<text x="412" y="30" text-anchor="middle" class="note">3</text>
+<text x="412" y="920" text-anchor="middle" class="note">3</text>
+<text x="557" y="30" text-anchor="middle" class="note">4</text>
+<text x="557" y="920" text-anchor="middle" class="note">4</text>
+<text x="702" y="30" text-anchor="middle" class="note">5</text>
+<text x="702" y="920" text-anchor="middle" class="note">5</text>
+<text x="847" y="30" text-anchor="middle" class="note">6</text>
+<text x="847" y="920" text-anchor="middle" class="note">6</text>
+<text x="992" y="30" text-anchor="middle" class="note">7</text>
+<text x="992" y="920" text-anchor="middle" class="note">7</text>
+<text x="1137" y="30" text-anchor="middle" class="note">8</text>
+<text x="1137" y="920" text-anchor="middle" class="note">8</text>
+<text x="1282" y="30" text-anchor="middle" class="note">9</text>
+<text x="1282" y="920" text-anchor="middle" class="note">9</text>
+<text x="1427" y="30" text-anchor="middle" class="note">10</text>
+<text x="1427" y="920" text-anchor="middle" class="note">10</text>
+<text x="1572" y="30" text-anchor="middle" class="note">11</text>
+<text x="1572" y="920" text-anchor="middle" class="note">11</text>
+<text x="1717" y="30" text-anchor="middle" class="note">12</text>
+<text x="1717" y="920" text-anchor="middle" class="note">12</text>
+<text x="1862" y="30" text-anchor="middle" class="note">13</text>
+<text x="1862" y="920" text-anchor="middle" class="note">13</text>
+<text x="2007" y="30" text-anchor="middle" class="note">14</text>
+<text x="2007" y="920" text-anchor="middle" class="note">14</text>
+<text x="2152" y="30" text-anchor="middle" class="note">15</text>
+<text x="2152" y="920" text-anchor="middle" class="note">15</text>
+<text x="2297" y="30" text-anchor="middle" class="note">16</text>
+<text x="2297" y="920" text-anchor="middle" class="note">16</text>
+<text x="2442" y="30" text-anchor="middle" class="note">17</text>
+<text x="2442" y="920" text-anchor="middle" class="note">17</text>
+<text x="2587" y="30" text-anchor="middle" class="note">18</text>
+<text x="2587" y="920" text-anchor="middle" class="note">18</text>
+<text x="2732" y="30" text-anchor="middle" class="note">19</text>
+<text x="2732" y="920" text-anchor="middle" class="note">19</text>
+<text x="2877" y="30" text-anchor="middle" class="note">20</text>
+<text x="2877" y="920" text-anchor="middle" class="note">20</text>
+<text x="3022" y="30" text-anchor="middle" class="note">21</text>
+<text x="3022" y="920" text-anchor="middle" class="note">21</text>
+<text x="3167" y="30" text-anchor="middle" class="note">22</text>
+<text x="3167" y="920" text-anchor="middle" class="note">22</text>
+<text x="3312" y="30" text-anchor="middle" class="note">23</text>
+<text x="3312" y="920" text-anchor="middle" class="note">23</text>
+<text x="3457" y="30" text-anchor="middle" class="note">24</text>
+<text x="3457" y="920" text-anchor="middle" class="note">24</text>
+<text x="3602" y="30" text-anchor="middle" class="note">25</text>
+<text x="3602" y="920" text-anchor="middle" class="note">25</text>
+<text x="3747" y="30" text-anchor="middle" class="note">26</text>
+<text x="3747" y="920" text-anchor="middle" class="note">26</text>
+<text x="3892" y="30" text-anchor="middle" class="note">27</text>
+<text x="3892" y="920" text-anchor="middle" class="note">27</text>
+<text x="4037" y="30" text-anchor="middle" class="note">28</text>
+<text x="4037" y="920" text-anchor="middle" class="note">28</text>
+<text x="4182" y="30" text-anchor="middle" class="note">29</text>
+<text x="4182" y="920" text-anchor="middle" class="note">29</text>
+<text x="4327" y="30" text-anchor="middle" class="note">30</text>
+<text x="4327" y="920" text-anchor="middle" class="note">30</text>
+<text x="32" y="80" text-anchor="middle" class="note">A</text>
+<text x="4418" y="80" text-anchor="middle" class="note">A</text>
+<text x="32" y="152" text-anchor="middle" class="note">B</text>
+<text x="4418" y="152" text-anchor="middle" class="note">B</text>
+<text x="32" y="224" text-anchor="middle" class="note">C</text>
+<text x="4418" y="224" text-anchor="middle" class="note">C</text>
+<text x="32" y="296" text-anchor="middle" class="note">D</text>
+<text x="4418" y="296" text-anchor="middle" class="note">D</text>
+<text x="32" y="368" text-anchor="middle" class="note">E</text>
+<text x="4418" y="368" text-anchor="middle" class="note">E</text>
+<text x="32" y="440" text-anchor="middle" class="note">F</text>
+<text x="4418" y="440" text-anchor="middle" class="note">F</text>
+<text x="32" y="512" text-anchor="middle" class="note">G</text>
+<text x="4418" y="512" text-anchor="middle" class="note">G</text>
+<text x="32" y="584" text-anchor="middle" class="note">H</text>
+<text x="4418" y="584" text-anchor="middle" class="note">H</text>
+<text x="32" y="656" text-anchor="middle" class="note">I</text>
+<text x="4418" y="656" text-anchor="middle" class="note">I</text>
+<text x="32" y="728" text-anchor="middle" class="note">J</text>
+<text x="4418" y="728" text-anchor="middle" class="note">J</text>
+<text x="32" y="800" text-anchor="middle" class="note">K</text>
+<text x="4418" y="800" text-anchor="middle" class="note">K</text>
+<text x="32" y="872" text-anchor="middle" class="note">L</text>
+<text x="4418" y="872" text-anchor="middle" class="note">L</text>
+</g>
+<g id="zones">
+<rect x="55" y="45" width="865" height="854" class="zone"/>
+<text x="487" y="65" text-anchor="middle" class="hdr" font-size="14">M130 ECU</text>
+<line x1="1427" y1="40" x2="1427" y2="904" class="zone"/>
+<text x="1427" y="934" text-anchor="middle" class="hdr" font-size="10" fill="#888">FIREWALL</text>
+<rect x="1500" y="45" width="2895" height="854" class="zone"/>
+<text x="2947" y="889" text-anchor="middle" class="hdr" font-size="12" fill="#999">ENGINE — LS3 6.2L V8</text>
+</g>
+<g id="wiring">
+<rect x="372" y="206" width="80" height="28" rx="2" fill="#F5F5F5" stroke="#000" stroke-width="1"/>
+<text x="412" y="219" text-anchor="middle" class="lbl" font-weight="bold">A03</text>
+<text x="412" y="232" text-anchor="middle" class="lbl-sm">IGN1</text>
+<line x1="454" y1="220" x2="3437" y2="220" class="wire"/>
+<circle cx="454" cy="220" r="2.5" class="dot"/>
+<circle cx="3437" cy="220" r="2.5" class="dot"/>
+<text x="1727" y="214" class="lbl">IGN1  20AWG  WHT</text>
+<text x="1727" y="236" class="lbl-sm">4.6 FT  TXL</text>
+<rect x="3588" y="204" width="28" height="32" class="comp"/>
+<line x1="3602" y1="210" x2="3602" y2="230" stroke="black" stroke-width="1"/>
+<polygon points="3597,226 3607,226 3602,234" fill="black"/>
+<text x="3624" y="218" class="hdr" font-size="11">IGNITION COIL 1</text>
+<text x="3624" y="232" class="lbl-sm">D510C  12611424</text>
+<text x="4037" y="224" class="lbl-sm">C25</text>
+<rect x="372" y="278" width="80" height="28" rx="2" fill="#F5F5F5" stroke="#000" stroke-width="1"/>
+<text x="412" y="291" text-anchor="middle" class="lbl" font-weight="bold">A06</text>
+<text x="412" y="304" text-anchor="middle" class="lbl-sm">IGN2</text>
+<line x1="454" y1="292" x2="3437" y2="292" class="wire"/>
+<circle cx="454" cy="292" r="2.5" class="dot"/>
+<circle cx="3437" cy="292" r="2.5" class="dot"/>
+<text x="1727" y="286" class="lbl">IGN2  20AWG  WHT/RED</text>
+<text x="1727" y="308" class="lbl-sm">4.6 FT  TXL</text>
+<rect x="3588" y="276" width="28" height="32" class="comp"/>
+<line x1="3602" y1="282" x2="3602" y2="302" stroke="black" stroke-width="1"/>
+<polygon points="3597,298 3607,298 3602,306" fill="black"/>
+<text x="3624" y="290" class="hdr" font-size="11">IGNITION COIL 2</text>
+<text x="3624" y="304" class="lbl-sm">D510C  12611424</text>
+<text x="4037" y="296" class="lbl-sm">D25</text>
+<rect x="372" y="350" width="80" height="28" rx="2" fill="#F5F5F5" stroke="#000" stroke-width="1"/>
+<text x="412" y="363" text-anchor="middle" class="lbl" font-weight="bold">A04</text>
+<text x="412" y="376" text-anchor="middle" class="lbl-sm">IGN3</text>
+<line x1="454" y1="364" x2="3437" y2="364" class="wire"/>
+<circle cx="454" cy="364" r="2.5" class="dot"/>
+<circle cx="3437" cy="364" r="2.5" class="dot"/>
+<text x="1727" y="358" class="lbl">IGN3  20AWG  WHT/BLK</text>
+<text x="1727" y="380" class="lbl-sm">4.6 FT  TXL</text>
+<rect x="3588" y="348" width="28" height="32" class="comp"/>
+<line x1="3602" y1="354" x2="3602" y2="374" stroke="black" stroke-width="1"/>
+<polygon points="3597,370 3607,370 3602,378" fill="black"/>
+<text x="3624" y="362" class="hdr" font-size="11">IGNITION COIL 3</text>
+<text x="3624" y="376" class="lbl-sm">D510C  12611424</text>
+<text x="4037" y="368" class="lbl-sm">E25</text>
+<rect x="372" y="422" width="80" height="28" rx="2" fill="#F5F5F5" stroke="#000" stroke-width="1"/>
+<text x="412" y="435" text-anchor="middle" class="lbl" font-weight="bold">A07</text>
+<text x="412" y="448" text-anchor="middle" class="lbl-sm">IGN4</text>
+<line x1="454" y1="436" x2="3437" y2="436" class="wire"/>
+<circle cx="454" cy="436" r="2.5" class="dot"/>
+<circle cx="3437" cy="436" r="2.5" class="dot"/>
+<text x="1727" y="430" class="lbl">IGN4  20AWG  WHT/BLU</text>
+<text x="1727" y="452" class="lbl-sm">4.6 FT  TXL</text>
+<rect x="3588" y="420" width="28" height="32" class="comp"/>
+<line x1="3602" y1="426" x2="3602" y2="446" stroke="black" stroke-width="1"/>
+<polygon points="3597,442 3607,442 3602,450" fill="black"/>
+<text x="3624" y="434" class="hdr" font-size="11">IGNITION COIL 4</text>
+<text x="3624" y="448" class="lbl-sm">D510C  12611424</text>
+<text x="4037" y="440" class="lbl-sm">F25</text>
+<rect x="372" y="494" width="80" height="28" rx="2" fill="#F5F5F5" stroke="#000" stroke-width="1"/>
+<text x="412" y="507" text-anchor="middle" class="lbl" font-weight="bold">A05</text>
+<text x="412" y="520" text-anchor="middle" class="lbl-sm">IGN5</text>
+<line x1="454" y1="508" x2="3437" y2="508" class="wire"/>
+<circle cx="454" cy="508" r="2.5" class="dot"/>
+<circle cx="3437" cy="508" r="2.5" class="dot"/>
+<text x="1727" y="502" class="lbl">IGN5  20AWG  WHT/WHT</text>
+<text x="1727" y="524" class="lbl-sm">4.6 FT  TXL</text>
+<rect x="3588" y="492" width="28" height="32" class="comp"/>
+<line x1="3602" y1="498" x2="3602" y2="518" stroke="black" stroke-width="1"/>
+<polygon points="3597,514 3607,514 3602,522" fill="black"/>
+<text x="3624" y="506" class="hdr" font-size="11">IGNITION COIL 5</text>
+<text x="3624" y="520" class="lbl-sm">D510C  12611424</text>
+<text x="4037" y="512" class="lbl-sm">G25</text>
+<rect x="372" y="566" width="80" height="28" rx="2" fill="#F5F5F5" stroke="#000" stroke-width="1"/>
+<text x="412" y="579" text-anchor="middle" class="lbl" font-weight="bold">A08</text>
+<text x="412" y="592" text-anchor="middle" class="lbl-sm">IGN6</text>
+<line x1="454" y1="580" x2="3437" y2="580" class="wire"/>
+<circle cx="454" cy="580" r="2.5" class="dot"/>
+<circle cx="3437" cy="580" r="2.5" class="dot"/>
+<text x="1727" y="574" class="lbl">IGN6  20AWG  WHT/YEL</text>
+<text x="1727" y="596" class="lbl-sm">4.6 FT  TXL</text>
+<rect x="3588" y="564" width="28" height="32" class="comp"/>
+<line x1="3602" y1="570" x2="3602" y2="590" stroke="black" stroke-width="1"/>
+<polygon points="3597,586 3607,586 3602,594" fill="black"/>
+<text x="3624" y="578" class="hdr" font-size="11">IGNITION COIL 6</text>
+<text x="3624" y="592" class="lbl-sm">D510C  12611424</text>
+<text x="4037" y="584" class="lbl-sm">H25</text>
+<rect x="372" y="638" width="80" height="28" rx="2" fill="#F5F5F5" stroke="#000" stroke-width="1"/>
+<text x="412" y="651" text-anchor="middle" class="lbl" font-weight="bold">A12</text>
+<text x="412" y="664" text-anchor="middle" class="lbl-sm">IGN7</text>
+<line x1="454" y1="652" x2="3437" y2="652" class="wire"/>
+<circle cx="454" cy="652" r="2.5" class="dot"/>
+<circle cx="3437" cy="652" r="2.5" class="dot"/>
+<text x="1727" y="646" class="lbl">IGN7  20AWG  WHT/VIO</text>
+<text x="1727" y="668" class="lbl-sm">4.6 FT  TXL</text>
+<rect x="3588" y="636" width="28" height="32" class="comp"/>
+<line x1="3602" y1="642" x2="3602" y2="662" stroke="black" stroke-width="1"/>
+<polygon points="3597,658 3607,658 3602,666" fill="black"/>
+<text x="3624" y="650" class="hdr" font-size="11">IGNITION COIL 7</text>
+<text x="3624" y="664" class="lbl-sm">D510C  12611424</text>
+<text x="4037" y="656" class="lbl-sm">I25</text>
+<rect x="372" y="710" width="80" height="28" rx="2" fill="#F5F5F5" stroke="#000" stroke-width="1"/>
+<text x="412" y="723" text-anchor="middle" class="lbl" font-weight="bold">A13</text>
+<text x="412" y="736" text-anchor="middle" class="lbl-sm">IGN8</text>
+<line x1="454" y1="724" x2="3437" y2="724" class="wire"/>
+<circle cx="454" cy="724" r="2.5" class="dot"/>
+<circle cx="3437" cy="724" r="2.5" class="dot"/>
+<text x="1727" y="718" class="lbl">IGN8  20AWG  WHT/ORG</text>
+<text x="1727" y="740" class="lbl-sm">4.6 FT  TXL</text>
+<rect x="3588" y="708" width="28" height="32" class="comp"/>
+<line x1="3602" y1="714" x2="3602" y2="734" stroke="black" stroke-width="1"/>
+<polygon points="3597,730 3607,730 3602,738" fill="black"/>
+<text x="3624" y="722" class="hdr" font-size="11">IGNITION COIL 8</text>
+<text x="3624" y="736" class="lbl-sm">D510C  12611424</text>
+<text x="4037" y="728" class="lbl-sm">J25</text>
+</g>
+<g id="titleblock">
+<rect x="4020" y="929" width="380" height="72" fill="white" stroke="black" stroke-width="1.5"/>
+<line x1="4020" y1="949" x2="4400" y2="949" stroke="black" stroke-width="0.5"/>
+<line x1="4020" y1="969" x2="4400" y2="969" stroke="black" stroke-width="0.5"/>
+<line x1="4020" y1="985" x2="4400" y2="985" stroke="black" stroke-width="0.5"/>
+<text x="4210" y="944" text-anchor="middle" class="hdr" font-size="13">NUKE LTD — BOULDER CITY NV</text>
+<text x="4210" y="963" text-anchor="middle" class="hdr" font-size="11">1977 K5 BLAZER — LS3 / MOTEC M130</text>
+<text x="4210" y="981" text-anchor="middle" class="lbl" font-size="10">SECTION 2  IGNITION COILS</text>
+<text x="4210" y="996" text-anchor="middle" class="lbl-sm">PAGE 1 OF 3  |  VIN CCL187Z210370  |  2026-04-04</text>
+</g>
+<g id="legend">
+<rect x="60" y="934" width="260" height="62" fill="white" stroke="black" stroke-width="1"/>
+<text x="68" y="948" class="hdr" font-size="9">WIRE TYPES</text>
+<line x1="68" y1="960" x2="120" y2="960" class="wire"/>
+<text x="128" y="964" class="lbl-sm">POWER / LOW-SIDE DRIVE</text>
+<line x1="68" y1="974" x2="120" y2="974" class="wire-sig"/>
+<text x="128" y="978" class="lbl-sm">SIGNAL (5V / TEMP / ANALOG)</text>
+<line x1="68" y1="988" x2="120" y2="988" class="wire-shld"/>
+<text x="128" y="992" class="lbl-sm">SHIELDED 2-CONDUCTOR</text>
+</g>
+</svg>

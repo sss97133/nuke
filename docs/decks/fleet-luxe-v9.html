@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fleet Luxe — St Barths</title>
+<!--
+  Fleet Luxe v9 — Rebuilt from Nuke source of truth
+
+  Brand data sourced from:
+    organizations.brand_design_language (scraped + validated)
+    org_assets (logo variants, banners, favicons)
+
+  Composition rules: docs/library/technical/design-book/13-multi-brand-composition.md
+  Document tokens: docs/library/technical/design-book/12-documents.md
+
+  Deck manifest:
+    agency: lagence-stbarth
+    presenter: nuke
+    brands:
+      - ford-bronco (primary, weight: 1.5)
+      - fouquets-stbarth (secondary, weight: 1.0)
+      - lofficiel-stbarth (secondary, weight: 1.0)
+      - fbm-automobiles (secondary, weight: 1.0)
+      - lagence-stbarth (secondary, weight: 1.0)
+-->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* ── LAYER 0: NUKE UTILITY TOKENS (from 12-documents.md) ── */
+  :root {
+    /* Document grid */
+    --doc-grid-base: 8px;
+    --doc-slide-width: 1920px;
+    --doc-slide-height: 1080px;
+    --doc-slide-padding: 80px;
+
+    /* Nuke palette (from organizations.brand_design_language WHERE slug='nuke') */
+    --nuke-marsh: #4a6741;
+    --nuke-sand: #c9a96e;
+    --nuke-charcoal: #1a1a2e;
+    --nuke-bone: #f0efe9;
+
+    /* Layer 0 document palette — no personality */
+    --doc-bg: #f8f7f4;
+    --doc-bg-alt: #ebe6e0;
+    --doc-text: #1a1a2e;
+    --doc-text-secondary: #4a4a4a;
+    --doc-text-muted: #777777;
+    --doc-border: rgba(0,0,0,0.08);
+    --doc-accent: var(--nuke-marsh);
+
+    /* Brand colors (from organizations.brand_design_language) */
+    /* ford-bronco: primary=#003478 secondary=#FFFFFF accent=#00274C */
+    --brand-ford-primary: #003478;
+    --brand-ford-accent: #00274C;
+
+    /* fouquets-stbarth: primary=#FFFFFF secondary=#CDA73C accent=#AD1B2D */
+    --brand-fouquets-gold: #CDA73C;
+    --brand-fouquets-red: #AD1B2D;
+    --brand-fouquets-bg: #f1eeea;
+
+    /* fbm-automobiles: primary=#2EA3F2 secondary=#E5322C accent=#006799 */
+    --brand-fbm-blue: #2EA3F2;
+    --brand-fbm-red: #E5322C;
+
+    /* lofficiel-stbarth: primary=#ffffff secondary=#636363 */
+    /* lagence-stbarth: primary=#1a1a2e accent=#c4a265 */
+    --brand-lagence-gold: #c4a265;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--doc-bg);
+    color: var(--doc-text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── SLIDE BASE (from 12-documents.md) ── */
+  .slide {
+    min-height: 100vh;
+    padding: var(--doc-slide-padding);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    border-bottom: 1px solid var(--doc-border);
+  }
+  .slide-num {
+    position: absolute;
+    top: 40px;
+    right: 80px;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--doc-text-muted);
+  }
+  .slide-mark {
+    position: absolute;
+    top: 40px;
+    left: 80px;
+    font-size: 11px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--doc-text-muted);
+    font-weight: 500;
+  }
+
+  /* ── FORCED PALETTES (from 12-documents.md — explicit, not system-preference) ── */
+  .dark {
+    background: var(--nuke-charcoal) !important;
+    color: #e8e4de !important;
+  }
+  .dark h2, .dark h3, .dark h4 { color: #e8e4de; }
+  .dark p, .dark li, .dark td { color: #bbb5aa; }
+  .dark th, .dark .slide-num, .dark .slide-mark { color: #888; }
+  .dark .card { background: #222233; border-color: rgba(255,255,255,0.06); }
+  .dark .card h4 { color: #e8e4de; }
+  .dark .card p { color: #bbb5aa; }
+  .dark .node { background: #222233; color: #bbb5aa; }
+  .dark .node.active { background: var(--nuke-marsh); color: #fff; }
+
+  .light {
+    background: var(--doc-bg) !important;
+    color: var(--doc-text) !important;
+  }
+  .light h2, .light h3, .light h4 { color: var(--doc-text); }
+  .light p, .light li, .light td { color: var(--doc-text-secondary); }
+  .light th, .light .slide-num, .light .slide-mark { color: var(--doc-text-muted); }
+  .light .card { background: var(--doc-bg-alt); border: 1px solid rgba(0,0,0,0.04); }
+
+  .marsh {
+    background: var(--nuke-marsh) !important;
+    color: #fff !important;
+  }
+  .marsh h2, .marsh h3, .marsh h4, .marsh p, .marsh li { color: #fff; }
+  .marsh .slide-num, .marsh .slide-mark { color: rgba(255,255,255,0.5); }
+  .marsh .card { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.08); }
+  .marsh .card h4, .marsh .card p { color: #fff; }
+  .marsh .sub { color: rgba(255,255,255,0.6); }
+
+  /* ── COVER ── */
+  .cover { text-align: center; align-items: center; }
+  .cover h1 { font-size: 72px; font-weight: 300; letter-spacing: -2px; margin-bottom: 8px; }
+  .cover h1 span { font-weight: 600; }
+
+  /* ── BRAND ROW (from 13-multi-brand-composition.md) ──
+       Layout: center-aligned, equal gap (32px per spec)
+       Sizing: base_height × brand_weight
+       Position: contextual (cover vs footer) */
+  .brand-row {
+    display: flex;
+    gap: 32px;
+    justify-content: center;
+    align-items: center;
+    margin-top: 48px;
+  }
+  /* Base height: 48px at 1920×1080 per ch13 spec.
+     Scaled to viewport: ~22px for web preview.
+     Primary (1.5×): 33px. Secondary (1.0×): 22px. */
+  .brand-row img { height: 22px; object-fit: contain; }
+  .brand-row .brand-primary { height: 33px; } /* ford-bronco: weight 1.5 */
+  .brand-row .brand-secondary { height: 22px; }
+
+  /* Invert for dark backgrounds per ch13 conflict resolution */
+  .dark .brand-row img.needs-invert { filter: invert(1); }
+  .marsh .brand-row img.needs-invert { filter: brightness(0) invert(1); }
+
+  /* ── TYPOGRAPHY (from 12-documents.md scale) ── */
+  h2 { font-size: 40px; font-weight: 300; letter-spacing: -1px; margin-bottom: 32px; line-height: 1.2; }
+  h2 strong { font-weight: 600; }
+  h3 { font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: var(--nuke-marsh); margin-bottom: 20px; font-weight: 500; }
+  p { font-size: 17px; line-height: 1.7; color: var(--doc-text-secondary); max-width: 700px; margin-bottom: 20px; }
+
+  /* ── GRID ── */
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: 32px; }
+  .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 32px; margin-top: 32px; }
+  .g4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 24px; margin-top: 32px; }
+  .g5 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 20px; margin-top: 32px; }
+
+  /* ── CARD ── */
+  .card {
+    padding: 32px;
+    background: var(--doc-bg-alt);
+    border: 1px solid var(--doc-border);
+    border-radius: 2px;
+  }
+  .card h4 { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+  .card p { font-size: 14px; line-height: 1.6; margin-bottom: 0; max-width: none; }
+  .card .role { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--nuke-marsh); margin-top: 16px; }
+  .card img.card-logo { height: 28px; margin-bottom: 16px; object-fit: contain; }
+
+  /* ── BRAND ACCENT STRIPE (from 13-multi-brand-composition.md) ──
+       4px bar at top of brand-owned slides */
+  .brand-accent-ford { border-top: 4px solid var(--brand-ford-primary); }
+  .brand-accent-fouquets { border-top: 4px solid var(--brand-fouquets-gold); }
+  .brand-accent-fbm { border-top: 4px solid var(--brand-fbm-blue); }
+
+  /* ── STAT ── */
+  .stat-row { display: flex; gap: 64px; margin: 32px 0; }
+  .stat .num { font-size: 48px; font-weight: 300; color: var(--nuke-marsh); }
+  .stat .label { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--doc-text-muted); margin-top: 6px; }
+
+  /* ── FLOW ── */
+  .flow { display: flex; align-items: center; gap: 16px; margin: 16px 0; flex-wrap: wrap; }
+  .node { padding: 12px 20px; background: var(--doc-bg-alt); font-size: 13px; font-weight: 500; white-space: nowrap; border: 1px solid var(--doc-border); }
+  .node.active { background: var(--nuke-marsh); color: #fff; border-color: var(--nuke-marsh); }
+  .arrow { font-size: 18px; color: var(--nuke-sand); }
+
+  /* ── COMPARISON ── */
+  .comparison { display: grid; grid-template-columns: 1fr 40px 1fr; gap: 0; align-items: start; margin-top: 32px; }
+  .comparison .vs { text-align: center; padding-top: 32px; font-size: 12px; color: var(--doc-text-muted); letter-spacing: 2px; }
+
+  /* ── LIST ── */
+  ul { list-style: none; margin-top: 12px; }
+  ul li { font-size: 15px; line-height: 1.8; color: var(--doc-text-secondary); padding-left: 18px; position: relative; }
+  ul li::before { content: ''; position: absolute; left: 0; top: 11px; width: 5px; height: 5px; background: var(--nuke-marsh); border-radius: 50%; }
+  ul li strong { color: var(--doc-text); font-weight: 600; }
+  .dark ul li strong { color: #e8e4de; }
+
+  /* ── TIMELINE ── */
+  .timeline { margin-top: 24px; }
+  .phase { display: grid; grid-template-columns: 100px 1fr; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--doc-border); }
+  .phase-label { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--nuke-marsh); font-weight: 500; padding-top: 3px; }
+  .phase h4 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .phase p { font-size: 14px; margin-bottom: 0; }
+
+  /* ── TABLE ── */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 24px; }
+  th { padding: 10px 14px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 10px; color: var(--doc-text-muted); text-align: left; border-bottom: 1px solid var(--doc-border); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--doc-border); }
+  tr.total td { font-weight: 600; color: var(--doc-text); border-top: 2px solid var(--nuke-marsh); }
+  .dark tr.total td { color: #fff; }
+
+  /* ── L'Agence text logo fallback (no logo asset uploaded yet) ── */
+  .logo-text-lagence {
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--nuke-marsh);
+  }
+  .dark .logo-text-lagence, .marsh .logo-text-lagence { color: rgba(255,255,255,0.8); }
+
+  @media print { .slide { page-break-after: always; } }
+</style>
+</head>
+<body>
+
+<!-- 00: COVER (neutral — no brand owns this slide) -->
+<div class="slide cover dark">
+  <h1>Fleet <span>Luxe</span></h1>
+  <div style="font-size:14px;letter-spacing:6px;text-transform:uppercase;color:var(--nuke-sand);margin-top:8px;">St Barths</div>
+  <img src="https://build.ford.com/dig/Ford/Bronco/2026/HD-TILE[INTBCK]/Image%5B%7CFord%7CBronco%7C2026%7C1%7C1.%7C~000VW.~12X00.~A4DAB.~AACT5.~ABEGW.~AC--K.~BHEAB.~BPLAD.~CA%23WL.~D2YHA.~D3KHY.~DR--E.~EN-WQ.~FHIAE.~FMLAT.~HKCBA.~PN4LY.~SE%23JE.~TR-ET.~YZDFK%5D/EXT/5/vehicle.png?imwidth=900" alt="Heritage Edition Bronco" style="width:540px;margin:40px auto 0;">
+  <!-- Brand row: logos from org_assets, sized per ch13 weight rules -->
+  <div class="brand-row">
+    <!-- lofficiel-stbarth: org_assets.logo_svg -->
+    <img src="https://lofficielstbarth.com/images/logo-lofficiel-amtd.svg" alt="L'Officiel St Barth" class="brand-secondary" data-source="org_assets:lofficiel-stbarth:logo_svg">
+    <!-- fouquets-stbarth: org_assets.logo (white SVG, needs-invert on light) -->
+    <img src="https://a.storyblok.com/f/287000/189x62/d986c0daf7/logo-fouquet-s-saint-barth-white.svg" alt="Fouquet's" class="brand-secondary" style="height:28px;" data-source="org_assets:fouquets-stbarth:logo">
+    <!-- ford-bronco: org_assets.logo (primary brand, 1.5× weight) -->
+    <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Ford_logo_flat.svg" alt="Ford" class="brand-primary needs-invert" data-source="org_assets:ford-bronco:logo">
+  </div>
+</div>
+
+<!-- 01: THE PROBLEM (neutral slide) -->
+<div class="slide light">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">01</span>
+  <h3>The Problem</h3>
+  <h2>A $3,000 per night hotel.<br><strong>A $15,000 rental car.</strong></h2>
+  <p>Every luxury destination has the same gap. The hotel curates every detail — the linens, the fragrance, the playlist — but not the vehicle. In St. Barths, guests drive Suzuki Jimnys and dented Mokes. The vehicle is the one piece of the luxury promise nobody owns.</p>
+  <div class="comparison">
+    <div class="card">
+      <h4>The guest experience</h4>
+      <ul>
+        <li>$3,000/night villa at Fouquet's</li>
+        <li>Private chef, butler service</li>
+        <li>Helicopter from St. Maarten</li>
+        <li>Curated wine, art, music</li>
+      </ul>
+    </div>
+    <div class="vs">vs</div>
+    <div class="card">
+      <h4>The guest vehicle</h4>
+      <ul>
+        <li>Suzuki Jimny from airport counter</li>
+        <li>Dented Moke, no AC</li>
+        <li>Random brand, no curation</li>
+        <li>Zero content value</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- 02: THE SOLUTION (neutral slide) -->
+<div class="slide dark">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">02</span>
+  <h3>The Solution</h3>
+  <h2>Curated vehicle fleets<br>for <strong>luxury destinations.</strong></h2>
+  <p>Fleet Luxe sources, imports, registers, insures, maintains, and rotates vehicles — so the hotel delivers a complete experience from arrival to departure.</p>
+  <div class="g3">
+    <div class="card"><h4>Source</h4><p>Work directly with automakers' brand teams to place vehicles as lifestyle activations — not dealer inventory.</p></div>
+    <div class="card"><h4>Operate</h4><p>Import, register, insure, maintain. The hotel never touches paperwork. Fleet rotates seasonally.</p></div>
+    <div class="card"><h4>Amplify</h4><p>Every placement is content. Media partners document the vehicles in-situ. The automaker, hotel, and publication all win.</p></div>
+  </div>
+</div>
+
+<!-- 03: WHY BRONCO (brand-owned: ford-bronco — accent stripe per ch13) -->
+<div class="slide light brand-accent-ford">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">03</span>
+  <h3>First Activation</h3>
+  <div style="display:flex;gap:48px;align-items:flex-start;">
+    <div style="flex:1;">
+      <h2>Heritage Edition.<br><strong>Made for St. Barths.</strong></h2>
+      <p>Ford is repositioning Bronco as feminine, fashion-forward, luxury. They've placed custom Broncos in the Hamptons with alice + olivia. They've never touched the Caribbean.</p>
+      <div class="stat-row">
+        <div class="stat"><div class="num">70%</div><div class="label">Buyers are male</div></div>
+        <div class="stat"><div class="num">0</div><div class="label">Caribbean activations</div></div>
+      </div>
+      <p>1966 design cues. Marsh Gray and Desert Sand colorways. Retro heritage graphics. 126 Heritage Editions sitting in US dealer inventory right now — Nuke's data layer tracks every unit, every color, every dealer. No lead gets lost.</p>
+    </div>
+    <div style="flex:0 0 380px;">
+      <img src="https://build.ford.com/dig/Ford/Bronco/2026/HD-TILE[INTBCK]/Image%5B%7CFord%7CBronco%7C2026%7C1%7C1.%7C~000VW.~12X00.~A4DAB.~AACT5.~ABEGW.~AC--K.~BHEAB.~BPLAD.~CA%23WL.~D2YHA.~D3KHY.~DR--E.~EN-WQ.~FHIAE.~FMLAT.~HKCBA.~PN4LY.~SE%23JE.~TR-ET.~YZDFK%5D/EXT/5/vehicle.png?imwidth=640" style="width:100%;">
+      <p style="font-size:10px;letter-spacing:2px;text-transform:uppercase;text-align:center;margin-top:4px;color:var(--nuke-marsh);">Marsh Gray</p>
+      <img src="https://build.ford.com/dig/Ford/Bronco/2026/HD-TILE[INTBCK]/Image%5B%7CFord%7CBronco%7C2026%7C1%7C1.%7C~000VW.~12X00.~A4DAB.~AACT5.~ABEGW.~AC--K.~BHEAB.~BPLAD.~CA%23WL.~D2YHA.~D3KHY.~DR--E.~EN-WQ.~FMLAT.~HKCBA.~PN4BZ.~SE%23JE.~TR-ET.~YZDFK%5D/EXT/5/vehicle.png?imwidth=640" style="width:100%;margin-top:8px;">
+      <p style="font-size:10px;letter-spacing:2px;text-transform:uppercase;text-align:center;margin-top:4px;color:var(--nuke-marsh);">Desert Sand</p>
+    </div>
+  </div>
+</div>
+
+<!-- 04: THE PLACEMENT (marsh — neutral, no brand accent) -->
+<div class="slide marsh">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">04</span>
+  <h3>The Placement</h3>
+  <h2>Four Heritage Edition Broncos.<br>Fouquet's. L'Officiel. FBM.</h2>
+  <p>Three Marsh Gray. One Desert Sand. Positioned at Fouquet's Saint-Barth. Documented by L'Officiel St Barth. Managed by FBM at the airport. A 2026 Ford Heritage fleet on a UNESCO-recognized beach, every day.</p>
+</div>
+
+<!-- 05: STRATEGIC COLLABORATION (neutral slide — multi-brand) -->
+<div class="slide light">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">05</span>
+  <h3>Strategic Collaboration</h3>
+  <h2>Five partners. <strong>One experience.</strong></h2>
+  <!-- Per ch13: on neutral slides with multiple brands, no accent color — all use Layer 0 palette -->
+  <div class="g5">
+    <div class="card" style="text-align:center;">
+      <!-- fbm-automobiles: org_assets.banner (white logo on dark bg) -->
+      <img src="https://fbm-autos.com/wp-content/uploads/2022/06/cropped-LOGO-blanc_Plan-de-travail-1.jpg" class="card-logo" style="border-radius:2px;" data-source="org_assets:fbm-automobiles:banner">
+      <h4>FBM</h4>
+      <p>Technical hub. Imports, registers, insures, services, displays. Airport-front showroom. Sells to hotel. The operational backbone.</p>
+      <div class="role">Operations &amp; Service</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <!-- fouquets-stbarth: org_assets.logo (white SVG) — inverted for light bg -->
+      <img src="https://a.storyblok.com/f/287000/189x62/d986c0daf7/logo-fouquet-s-saint-barth-white.svg" class="card-logo" style="filter:invert(1);" data-source="org_assets:fouquets-stbarth:logo">
+      <h4>Fouquet's</h4>
+      <p>The venue. Heritage Broncos as house fleet for guest arrivals. Brand differentiation vs Eden Rock, Cheval Blanc.</p>
+      <div class="role">Hospitality &amp; Placement</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <!-- lofficiel-stbarth: org_assets.logo_svg -->
+      <img src="https://lofficielstbarth.com/images/logo-lofficiel-amtd.svg" class="card-logo" data-source="org_assets:lofficiel-stbarth:logo_svg">
+      <h4>L'Officiel</h4>
+      <p>Luxury verification filter. Editorial content, social amplification. First automotive brand partner. Makes sure Ford knows.</p>
+      <div class="role">Media &amp; Verification</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <!-- ford-bronco: using well-known Ford flat logo -->
+      <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Ford_logo_flat.svg" class="card-logo" data-source="org_assets:ford-bronco">
+      <h4>Ford</h4>
+      <p>Provides Heritage Edition Broncos. Brand activation budget. Marketing co-op. Gets Caribbean luxury they've never had.</p>
+      <div class="role">Product &amp; Brand</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <!-- lagence-stbarth: NO logo asset yet — text fallback per ch13 conflict resolution -->
+      <div class="logo-text-lagence" data-source="text-fallback:lagence-stbarth:logo_missing">L'Agence</div>
+      <h4>L'Agence St Barth</h4>
+      <p>Corporate concierge layer. PR, curation, client relationships. Ensures every touchpoint meets luxury standard.</p>
+      <div class="role">PR &amp; Concierge</div>
+    </div>
+  </div>
+</div>
+
+<!-- 06: HOW IT WORKS (neutral) -->
+<div class="slide dark">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">06</span>
+  <h3>The Ecosystem</h3>
+  <h2>Each partner plays a <strong>defined role.</strong></h2>
+  <div class="g2">
+    <div>
+      <h4 style="margin-bottom:16px;">The exchange</h4>
+      <div class="flow">
+        <div class="node active">Ford</div>
+        <div class="arrow">&rarr;</div>
+        <div class="node">vehicles</div>
+        <div class="arrow">&rarr;</div>
+        <div class="node active">FBM</div>
+      </div>
+      <div class="flow">
+        <div class="node active">FBM</div>
+        <div class="arrow">&rarr;</div>
+        <div class="node">fleet service</div>
+        <div class="arrow">&rarr;</div>
+        <div class="node active">Fouquet's</div>
+      </div>
+      <div class="flow">
+        <div class="node active">L'Officiel</div>
+        <div class="arrow">&rarr;</div>
+        <div class="node">content</div>
+        <div class="arrow">&rarr;</div>
+        <div class="node active">Ford + Hotel</div>
+      </div>
+      <div class="flow">
+        <div class="node active">L'Agence</div>
+        <div class="arrow">&rarr;</div>
+        <div class="node">client experience</div>
+        <div class="arrow">&rarr;</div>
+        <div class="node active">Guest</div>
+      </div>
+    </div>
+    <div>
+      <h4 style="margin-bottom:16px;">The feedback loop</h4>
+      <ul>
+        <li>Guest arrives at Fouquet's, Heritage Edition waiting at villa</li>
+        <li>Guest drives Shell Beach, Gustavia, Saline — a UNESCO landscape</li>
+        <li>L'Officiel captures it — editorial, social, stories</li>
+        <li>Ford sees their 2026 Heritage fleet in daily use on the most exclusive island in the Caribbean</li>
+        <li>Ford reposts. Other hotels inquire. Next season: more vehicles.</li>
+        <li>L'Agence ensures the client relationship stays flawless through every touchpoint</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- 07: FBM DEEP DIVE (brand-owned: fbm-automobiles) -->
+<div class="slide light brand-accent-fbm">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">07</span>
+  <h3>FBM Automobiles</h3>
+  <h2>The <strong>hub.</strong></h2>
+  <div class="g2">
+    <div>
+      <p>FBM sits directly in front of Remy de Haenen Airport — every visitor to St. Barths walks past it. Full-service garage and dealership since 1994. This is the operational backbone of Fleet Luxe.</p>
+      <ul>
+        <li><strong>Import &amp; customs</strong> — handles octroi de mer, carte grise, compliance</li>
+        <li><strong>Service center</strong> — maintenance, bodywork, painting, diagnostics</li>
+        <li><strong>Insurance</strong> — sources local fleet policies</li>
+        <li><strong>Display</strong> — vintage + new Broncos on permanent airport-front showroom</li>
+        <li><strong>Sales</strong> — FBM is the dealer that sells the vehicle to the hotel</li>
+        <li><strong>Security blanket</strong> — if anything goes wrong, FBM is 5 minutes away</li>
+      </ul>
+    </div>
+    <div>
+      <div class="card" style="background:var(--nuke-marsh);border:none;color:#fff;text-align:center;padding:48px 32px;">
+        <!-- fbm-automobiles: org_assets.banner -->
+        <img src="https://fbm-autos.com/wp-content/uploads/2022/06/cropped-LOGO-blanc_Plan-de-travail-1.jpg" style="height:48px;margin-bottom:24px;border-radius:2px;" data-source="org_assets:fbm-automobiles:banner">
+        <h4 style="color:#fff;">Airport Frontage</h4>
+        <p style="color:rgba(255,255,255,0.8);">First thing every visitor sees. Not a rental counter — a showroom. Vintage Broncos alongside Heritage Editions. The island's automotive identity starts here.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 08: COMPETITION (neutral) -->
+<div class="slide dark">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">08</span>
+  <h3>Competitive Landscape</h3>
+  <h2>What St. Barths drives today<br><strong>vs. what it should.</strong></h2>
+  <div class="comparison">
+    <div class="card">
+      <h4>Today: Mokes &amp; Suzukis</h4>
+      <ul>
+        <li>No brand story</li>
+        <li>No aesthetic curation</li>
+        <li>Commodity rental product</li>
+        <li>Distributed by SOGUAVA (Guadeloupe)</li>
+        <li>Same vehicle at every hotel</li>
+        <li>Zero content value</li>
+      </ul>
+    </div>
+    <div class="vs">vs</div>
+    <div class="card" style="background:var(--nuke-marsh);border-color:var(--nuke-marsh);">
+      <h4 style="color:#fff;">Fleet Luxe: Heritage Broncos</h4>
+      <ul>
+        <li style="color:rgba(255,255,255,0.85);">1966 design meets 2026 engineering</li>
+        <li style="color:rgba(255,255,255,0.85);">Colorways matched to property aesthetic</li>
+        <li style="color:rgba(255,255,255,0.85);">Vintage + new on display at FBM</li>
+        <li style="color:rgba(255,255,255,0.85);">Direct from Ford brand team</li>
+        <li style="color:rgba(255,255,255,0.85);">Exclusive to partner hotels</li>
+        <li style="color:rgba(255,255,255,0.85);">Every vehicle is content</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- 09: GUEST JOURNEY (neutral) -->
+<div class="slide light">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">09</span>
+  <h3>Guest Journey</h3>
+  <h2>From landing to <strong>Instagram.</strong></h2>
+  <div class="flow"><div class="node">Guest lands at SBH</div><div class="arrow">&rarr;</div><div class="node active">Sees Broncos at FBM</div><div class="arrow">&rarr;</div><div class="node">Arrives at Fouquet's</div><div class="arrow">&rarr;</div><div class="node active">Heritage Edition at villa</div></div>
+  <div class="flow"><div class="node">Drives Shell Beach</div><div class="arrow">&rarr;</div><div class="node">L'Officiel captures it</div><div class="arrow">&rarr;</div><div class="node active">Posts it. Ford sees it.</div><div class="arrow">&rarr;</div><div class="node">Next guest wants one</div></div>
+  <div class="flow" style="margin-top:24px;"><div class="node">L'Agence</div><div class="arrow">&rarr;</div><div class="node active">Ensures every touchpoint is flawless</div><div class="arrow">&rarr;</div><div class="node">Guest becomes evangelist</div></div>
+</div>
+
+<!-- 10: SUPPLY CHAIN (neutral) -->
+<div class="slide dark">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">10</span>
+  <h3>Supply Chain</h3>
+  <h2>From Dearborn to <strong>Gustavia.</strong></h2>
+  <div class="flow" style="margin:24px 0;"><div class="node">Ford Motor Co</div><div class="arrow">&rarr;</div><div class="node">US Dealer</div><div class="arrow">&rarr;</div><div class="node active">East Coast Port</div><div class="arrow">&rarr;</div><div class="node">SBH Customs</div><div class="arrow">&rarr;</div><div class="node active">FBM</div><div class="arrow">&rarr;</div><div class="node">Fouquet's</div></div>
+  <div class="g2" style="margin-top:24px;">
+    <div>
+      <h4 style="margin-bottom:12px;">Players</h4>
+      <ul>
+        <li><strong>Ford Brand Team</strong> — authorize activation, co-op budget</li>
+        <li><strong>US Dealer</strong> — 126 Heritage Editions in stock nationally</li>
+        <li><strong>Freight Forwarder</strong> — Savannah/Charleston to Gustavia</li>
+        <li><strong>SBH Collectivite</strong> — 8% octroi de mer on CIF</li>
+        <li><strong>FBM</strong> — receives, registers, maintains, sells to hotel</li>
+        <li><strong>Fouquet's</strong> — hotel placement, guest access</li>
+        <li><strong>L'Officiel</strong> — media, content, luxury verification</li>
+        <li><strong>L'Agence</strong> — PR, concierge, client relationships</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="margin-bottom:12px;">Bottlenecks</h4>
+      <ul>
+        <li><strong>SOGUAVA</strong> — current Ford distributor, also sells Suzuki. May need to bypass.</li>
+        <li><strong>Export tax structure</strong> — no GA form for international buyers. VLVA (NV dealer) available as fallback.</li>
+        <li><strong>Carte grise</strong> — SBH registration is opaque. FBM handles locally.</li>
+        <li><strong>Ford franchise law</strong> — must go through a dealer. Brand team can influence which one.</li>
+        <li><strong>Seasonal timing</strong> — high season Nov-Apr. Vehicles arrive by October.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- 11: ECONOMICS (neutral) -->
+<div class="slide light">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">11</span>
+  <h3>Economics</h3>
+  <h2>What it <strong>costs.</strong></h2>
+  <table>
+    <thead><tr><th>Line Item</th><th>Per Vehicle</th><th>x4</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Vehicle (MSRP)</td><td>~$59,500</td><td>~$238,000</td><td>Target: invoice ~$55K/unit</td></tr>
+      <tr><td>US Sales Tax</td><td>$0</td><td>$0</td><td>Export sale or ST-4 dealer-to-dealer</td></tr>
+      <tr><td>Shipping</td><td>~$3,000</td><td>~$12,000</td><td>RORO from Savannah/Charleston</td></tr>
+      <tr><td>Export Filing</td><td>~$200</td><td>~$800</td><td>AES/EEI, customs broker</td></tr>
+      <tr><td>Octroi de Mer (8%)</td><td>~$5,000</td><td>~$20,000</td><td>CIF value, paid at Gustavia</td></tr>
+      <tr><td>Registration</td><td>~$500</td><td>~$2,000</td><td>FBM handles carte grise</td></tr>
+      <tr class="total"><td>Total Landed</td><td>~$68,000</td><td>~$273,000</td><td>~$250K at invoice pricing</td></tr>
+    </tbody>
+  </table>
+  <div class="g2" style="margin-top:32px;">
+    <div class="card"><h4>Option A: Client Funds</h4><p>Client pays ~$250-273K. FBM manages fleet. Simple.</p></div>
+    <div class="card"><h4>Option B: Ford Co-Op</h4><p>Ford provides at cost via brand activation budget. Client pays shipping + duties only (~$35K).</p></div>
+  </div>
+</div>
+
+<!-- 12: DOCUMENTATION (neutral) -->
+<div class="slide dark">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">12</span>
+  <h3>Documentation</h3>
+  <h2>What we need to <strong>close.</strong></h2>
+  <div class="g2">
+    <div>
+      <h4 style="margin-bottom:12px;">US Side</h4>
+      <div class="timeline">
+        <div class="phase"><div class="phase-label">Dealer</div><div><h4>MSO</h4><p>Manufacturer's Statement of Origin. Untitled vehicles, export-bound.</p></div></div>
+        <div class="phase"><div class="phase-label">Tax</div><div><h4>ST-4 or Export Affidavit</h4><p>VLVA route uses ST-4. Direct export needs dealer affidavit.</p></div></div>
+        <div class="phase"><div class="phase-label">Export</div><div><h4>EEI / AES Filing</h4><p>72-hour advance notice to CBP. Customs broker handles.</p></div></div>
+        <div class="phase"><div class="phase-label">Shipping</div><div><h4>Bill of Lading</h4><p>RORO or container. Savannah/Charleston to Gustavia.</p></div></div>
+      </div>
+    </div>
+    <div>
+      <h4 style="margin-bottom:12px;">SBH Side</h4>
+      <div class="timeline">
+        <div class="phase"><div class="phase-label">Customs</div><div><h4>Octroi de Mer</h4><p>8% on CIF. Paid to Collectivite at Gustavia port.</p></div></div>
+        <div class="phase"><div class="phase-label">Registration</div><div><h4>Carte Grise</h4><p>FBM handles. Requires customs receipt, ownership proof, insurance.</p></div></div>
+        <div class="phase"><div class="phase-label">Insurance</div><div><h4>Local Fleet Policy</h4><p>Mandatory. FBM sources through local insurer.</p></div></div>
+        <div class="phase"><div class="phase-label">Compliance</div><div><h4>Controle Technique</h4><p>French inspection. New vehicles typically exempt initially.</p></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 13: ACQUISITION PATHS (marsh — neutral) -->
+<div class="slide marsh">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">13</span>
+  <h3>Acquisition Strategy</h3>
+  <h2>Three paths. <strong>Same destination.</strong></h2>
+  <div class="g3">
+    <div class="card"><h4>Path A: Ford Brand Placement</h4><p>Ford provides vehicles through activation budget. Dealer instructed by corporate. Zero friction.</p><div class="sub" style="margin-top:12px;font-size:12px;">Best case. Requires brand team buy-in.</div></div>
+    <div class="card"><h4>Path B: Direct Purchase</h4><p>Buy from a cooperative US dealer. Export sale, no registration. Dealer-trades to assemble colors. ~$220-238K.</p><div class="sub" style="margin-top:12px;font-size:12px;">Most likely. Needs dealer who'll do export.</div></div>
+    <div class="card"><h4>Path C: VLVA Intermediary</h4><p>VLVA (NV dealer, DLR000053625) buys via GA Form ST-4. Resells to FBM. Proven paperwork.</p><div class="sub" style="margin-top:12px;font-size:12px;">Fallback. Adds NV tax risk on resale.</div></div>
+  </div>
+</div>
+
+<!-- 14: SCALE (neutral) -->
+<div class="slide dark">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">14</span>
+  <h3>Scale</h3>
+  <h2>St. Barths is the <strong>proof of concept.</strong></h2>
+  <div class="g4">
+    <div class="card"><h4>Caribbean</h4><p>St. Barths, Turks & Caicos, Anguilla, Mustique</p></div>
+    <div class="card"><h4>Mediterranean</h4><p>Mykonos, Sardinia, Ibiza, Amalfi</p></div>
+    <div class="card"><h4>Mountain</h4><p>Aspen, Courchevel, Verbier, Niseko</p></div>
+    <div class="card"><h4>Desert</h4><p>Marrakech, Dubai, Scottsdale, Tulum</p></div>
+  </div>
+</div>
+
+<!-- 15: VISUAL REFERENCES (brand-owned: fouquets-stbarth) -->
+<div class="slide light brand-accent-fouquets">
+  <span class="slide-mark">Fleet Luxe</span>
+  <span class="slide-num">15</span>
+  <h3>Visual References</h3>
+  <h2>The <strong>setting.</strong></h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+    <div style="position:relative;"><img src="https://www.hotelsofstbarth.org/images/medias/pictures/H%C3%B4tel%20Barri%C3%A8re%20Le%20Carl%20Gustaf%20St%20Barth_7.jpg" style="width:100%;height:220px;object-fit:cover;display:block;"><div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.5);padding:3px 6px;">Fouquet's</div></div>
+    <div style="position:relative;"><img src="https://www.hotelsofstbarth.org/images/medias/pictures/H%C3%B4tel%20Barri%C3%A8re%20Le%20Carl%20Gustaf%20St%20Barth_3.jpg" style="width:100%;height:220px;object-fit:cover;display:block;"><div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.5);padding:3px 6px;">Shell Beach</div></div>
+    <div style="position:relative;"><img src="https://www.hotelsofstbarth.org/images/medias/pictures/H%C3%B4tel%20Barri%C3%A8re%20Le%20Carl%20Gustaf%20St%20Barth_2.jpg" style="width:100%;height:220px;object-fit:cover;display:block;"><div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.5);padding:3px 6px;">Gustavia</div></div>
+    <div style="position:relative;"><img src="https://www.hotelsofstbarth.org/images/medias/pictures/H%C3%B4tel%20Barri%C3%A8re%20Le%20Carl%20Gustaf%20St%20Barth.jpg" style="width:100%;height:220px;object-fit:cover;display:block;"><div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.5);padding:3px 6px;">Property</div></div>
+    <div style="position:relative;"><img src="https://www.hotelsofstbarth.org/images/medias/pictures/H%C3%B4tel%20Barri%C3%A8re%20Le%20Carl%20Gustaf%20St%20Barth_5.jpg" style="width:100%;height:220px;object-fit:cover;display:block;"><div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.5);padding:3px 6px;">Villa</div></div>
+    <div style="position:relative;"><img src="https://www.hotelsofstbarth.org/images/medias/pictures/H%C3%B4tel%20Barri%C3%A8re%20Le%20Carl%20Gustaf%20St%20Barth_1.jpg" style="width:100%;height:220px;object-fit:cover;display:block;"><div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.5);padding:3px 6px;">Terrace</div></div>
+  </div>
+  <p style="margin-top:16px;font-size:12px;color:var(--doc-text-muted);">Additional: SBH airport approach, Gustavia roundabout, FBM frontage, Shell Beach sunset — sourced by L'Agence St Barth</p>
+</div>
+
+<!-- 16: CLOSE (marsh — neutral closing slide with brand row) -->
+<div class="slide cover marsh">
+  <div style="font-size:12px;letter-spacing:5px;text-transform:uppercase;margin-bottom:32px;color:rgba(255,255,255,0.5);">Fleet Luxe</div>
+  <h1 style="color:#fff;">The vehicle is<br><span>the experience.</span></h1>
+  <p style="color:rgba(255,255,255,0.7);margin-top:16px;max-width:500px;">Four Broncos. One island. The beginning of a network.</p>
+  <!-- Brand row: logos from org_assets, white variants for marsh bg -->
+  <div class="brand-row" style="margin-top:48px;">
+    <!-- lofficiel-stbarth: SVG (already light colored for dark bg) -->
+    <img src="https://lofficielstbarth.com/images/logo-lofficiel-amtd.svg" alt="L'Officiel" class="brand-secondary" data-source="org_assets:lofficiel-stbarth:logo_svg">
+    <!-- fouquets-stbarth: white SVG logo (native for dark bg) -->
+    <img src="https://a.storyblok.com/f/287000/189x62/d986c0daf7/logo-fouquet-s-saint-barth-white.svg" alt="Fouquet's" class="brand-secondary" style="height:28px;" data-source="org_assets:fouquets-stbarth:logo">
+    <!-- ford: flat logo inverted to white -->
+    <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Ford_logo_flat.svg" alt="Ford" class="brand-primary needs-invert" data-source="org_assets:ford-bronco">
+  </div>
+</div>
+
+</body>
+</html>

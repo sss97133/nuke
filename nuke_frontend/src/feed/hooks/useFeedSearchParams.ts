@@ -93,7 +93,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
           sortDirection: legacySortDir,
           searchText: legacySearch,
           viewMode: 'grid',
-          cardsPerRow: 6,
+          cardsPerRow: 3,
           imageFit: 'auto',
         };
 
@@ -143,7 +143,7 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
       filters.zipCode !== '' ||
       filters.showPending !== d.showPending ||
       searchText !== '' ||
-      (sortBy !== 'popular' && sortBy !== 'newest') ||
+      (sortBy !== 'newest' && sortBy !== 'popular') ||
       sortDirection !== 'desc'
     );
   }, [filters, searchText, sortBy, sortDirection]);
@@ -234,11 +234,11 @@ export function useFeedSearchParams(): FeedSearchParamsResult {
   const resetAll = useCallback(() => {
     pushState({
       filters: DEFAULT_FILTERS,
-      sortBy: 'popular',
+      sortBy: 'newest',
       sortDirection: 'desc',
       searchText: '',
       viewMode: 'grid',
-      cardsPerRow: 6,
+      cardsPerRow: 3,
       imageFit: 'auto',
     });
   }, [pushState]);

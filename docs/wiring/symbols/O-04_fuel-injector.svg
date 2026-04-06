@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <title>O-04 Fuel Injector</title>
+  <desc>Fuel injector symbol. Solenoid body with nozzle tip at one end, 2 terminals. Used for fuel injectors x8 (EV6/USCAR connector, peak-and-hold drive from M130). 4mm x 8mm per spec.</desc>
+
+  <!-- Top terminal lead (power in) -->
+  <line x1="20" y1="2" x2="20" y2="6" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Solenoid body rectangle -->
+  <rect x="12" y="6" width="16" height="18" rx="1" ry="1" fill="white" stroke="black" stroke-width="1.5"/>
+
+  <!-- Coil windings inside solenoid -->
+  <path d="M15,10 Q20,8 25,10 M15,13 Q20,11 25,13 M15,16 Q20,14 25,16 M15,19 Q20,17 25,19" fill="none" stroke="black" stroke-width="0.8"/>
+
+  <!-- Nozzle tip (triangular narrowing to spray point) -->
+  <polygon points="16,24 24,24 22,30 18,30" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/>
+
+  <!-- Spray tip point -->
+  <line x1="18" y1="30" x2="20" y2="34" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="22" y1="30" x2="20" y2="34" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Spray indicator lines -->
+  <line x1="17" y1="35" x2="15" y2="38" stroke="black" stroke-width="0.8" stroke-linecap="round"/>
+  <line x1="20" y1="35" x2="20" y2="38" stroke="black" stroke-width="0.8" stroke-linecap="round"/>
+  <line x1="23" y1="35" x2="25" y2="38" stroke="black" stroke-width="0.8" stroke-linecap="round"/>
+</svg>

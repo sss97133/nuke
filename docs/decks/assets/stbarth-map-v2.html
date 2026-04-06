@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saint-Barth Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Inter', sans-serif; }
+  #map { width: 100%; height: 100%; background: #1a1a2e; }
+
+  .beach-label {
+    color: #4ECDC4;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    opacity: 0.70;
+    white-space: nowrap;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7);
+    pointer-events: none;
+  }
+
+  .partner-logo {
+    opacity: 0.65;
+    transition: opacity 0.4s ease, transform 0.3s ease;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8));
+    cursor: pointer;
+  }
+  .partner-logo:hover {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+
+  .partner-text {
+    font-weight: 700;
+    letter-spacing: 1px;
+    opacity: 0.65;
+    transition: opacity 0.4s ease, transform 0.3s ease;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8));
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .partner-text:hover {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+
+  .restaurant-dot {
+    width: 4px;
+    height: 4px;
+    background: #E85D75;
+    border-radius: 50%;
+    opacity: 0.75;
+  }
+
+  .rental-dot {
+    width: 5px;
+    height: 5px;
+    background: #E74C3C;
+    border-radius: 50%;
+    border: 1px solid rgba(231,76,60,0.4);
+    opacity: 0.80;
+  }
+
+  .competitor-label {
+    font-weight: 700;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0;
+    white-space: nowrap;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    transition: opacity 1.5s ease, transform 1.5s ease;
+    pointer-events: none;
+  }
+  .competitor-label.visible {
+    opacity: 0.60;
+    transform: scale(1);
+  }
+  .competitor-label.wiped {
+    opacity: 0 !important;
+    transform: scale(0.3) !important;
+  }
+
+  .ford-icon {
+    width: 16px;
+    height: 16px;
+    filter: drop-shadow(0 1px 4px rgba(0,0,0,0.6));
+    transition: transform 0.1s linear;
+  }
+
+  .info-overlay {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 1000;
+    background: rgba(10, 10, 20, 0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 16px 22px;
+    color: #fff;
+    pointer-events: none;
+  }
+  .info-overlay h1 {
+    font-size: 14px;
+    font-weight: 300;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.85);
+    margin-bottom: 4px;
+  }
+  .info-overlay p {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 0.5px;
+  }
+
+  .legend {
+    position: absolute;
+    bottom: 24px;
+    left: 20px;
+    z-index: 1000;
+    background: rgba(10, 10, 20, 0.8);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+    padding: 12px 16px;
+    color: rgba(255,255,255,0.6);
+    font-size: 10px;
+    pointer-events: none;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+  .legend-item:last-child { margin-bottom: 0; }
+  .legend-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .leaflet-popup-content-wrapper {
+    background: rgba(15, 15, 25, 0.95) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+    backdrop-filter: blur(12px) !important;
+  }
+  .leaflet-popup-content {
+    color: #fff !important;
+    font-family: 'Inter', sans-serif !important;
+    margin: 0 !important;
+    min-width: 160px;
+  }
+  .leaflet-popup-tip {
+    background: rgba(15, 15, 25, 0.95) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+  }
+  .popup-photo {
+    width: 240px;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px 6px 0 0;
+    display: block;
+  }
+  .popup-body {
+    padding: 10px 14px 12px;
+  }
+  .popup-category {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #CDA73C;
+    margin-bottom: 3px;
+  }
+  .popup-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 3px;
+  }
+  .popup-desc {
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.4;
+  }
+
+  .leaflet-control-attribution {
+    background: rgba(0,0,0,0.5) !important;
+    color: rgba(255,255,255,0.3) !important;
+    font-size: 9px !important;
+  }
+  .leaflet-control-attribution a {
+    color: rgba(255,255,255,0.4) !important;
+  }
+  .leaflet-control-zoom a {
+    background: rgba(15, 15, 25, 0.85) !important;
+    color: rgba(255,255,255,0.7) !important;
+    border-color: rgba(255,255,255,0.1) !important;
+  }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="info-overlay">
+  <h1>Saint-Barth&eacute;lemy</h1>
+  <p>Every destination needs a car.</p>
+</div>
+
+<div class="legend">
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#4ECDC4"></div>
+    <span>Beaches</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#E85D75"></div>
+    <span>Restaurants</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#E74C3C"></div>
+    <span>Rental Companies</span>
+  </div>
+  <div class="legend-item">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Ford_logo_flat.svg" style="width:12px;height:12px" alt="">
+    <span>Ford Blue Oval Fleet</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#CDA73C"></div>
+    <span>Partners</span>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  var map = L.map('map', {
+    center: [17.9040, -62.8350],
+    zoom: 15,
+    minZoom: 13,
+    maxZoom: 18,
+    scrollWheelZoom: false,
+    zoomControl: true
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(map);
+
+  /* ─── Dev Mode: click anywhere → console.log coordinates ─── */
+  map.on('click', function(e) {
+    console.log('[MAP CLICK] lat: ' + e.latlng.lat.toFixed(6) + ', lng: ' + e.latlng.lng.toFixed(6));
+  });
+
+  /* ═══════════════════════════════════════════════════════════
+     BEACH LABELS — verified coastal positions
+     ═══════════════════════════════════════════════════════════ */
+  var beaches = [
+    { name: 'Shell Beach',       lat: 17.8942, lng: -62.8535 },
+    { name: 'St. Jean',          lat: 17.9055, lng: -62.8370 },
+    { name: 'Gouverneur',        lat: 17.8885, lng: -62.8345 },
+    { name: 'Saline',            lat: 17.8920, lng: -62.8260 },
+    { name: 'Colombier',         lat: 17.9210, lng: -62.8690 },
+    { name: 'Flamands',          lat: 17.9195, lng: -62.8580 },
+    { name: 'Grand Cul-de-Sac',  lat: 17.9100, lng: -62.8010 },
+    { name: 'Lorient',           lat: 17.9100, lng: -62.8230 },
+    { name: 'Toiny',             lat: 17.8930, lng: -62.7980 },
+    { name: 'Corossol',          lat: 17.9065, lng: -62.8570 }
+  ];
+
+  beaches.forEach(function(b) {
+    L.marker([b.lat, b.lng], {
+      icon: L.divIcon({
+        className: 'beach-label',
+        html: b.name,
+        iconSize: null,
+        iconAnchor: [0, 0]
+      }),
+      interactive: false
+    }).addTo(map);
+  });
+
+  /* ═══════════════════════════════════════════════════════════
+     PARTNER LOGOS — floating, no boxes
+     Coordinates from OSM verified nodes + Nuke DB
+     ═══════════════════════════════════════════════════════════ */
+
+  /* Photo assets for popups (from org_assets) */
+  var photos = {
+    'fouquets':    { url: 'https://a.storyblok.com/f/287000/2000x1500/9f6dd5205e/fouquet-s-saint-barth-hero.jpg', desc: 'Hillside dining above Gustavia harbor' },
+    'eden-rock':   { url: 'https://api.st-barths.com/thumbnail/_/1400/900/contain/better/er-ext-3-principal.jpg', desc: 'On the promontory at Baie de St. Jean' },
+    'nikki-beach': { url: 'https://i0.wp.com/nikkibeach.com/saint-barth/wp-content/uploads/sites/5/2024/11/Nikki-Beach-Saint-Barth212.jpg?ssl=1&w=2500&quality=85', desc: 'Beach club on St. Jean' },
+    'rosewood':    { url: 'https://picasso.rosewoodhotelgroup.com/transform/067e1d39-5e01-4e00-b133-75fc0b045f7d/RWLGH_3-0_Brand-com_Assets_generalview_resort_color', desc: 'Colorful resort at Grand Cul-de-Sac' },
+    'le-barth':    { url: 'https://lebarthelemyhotel.com/sliders/our-sublime-location-in-the-caribbean/358c53f5f171bc30493767a46a7a4a55.jpg.webp', desc: 'Beachfront on Grand Cul-de-Sac' },
+    'le-toiny':    { url: 'https://letoiny.com/wp-content/uploads/2024/12/hero-le-toiny-st-barth-scaled.jpg', desc: 'Hillside villas on the southeast coast' },
+    'cheval-blanc': { url: 'https://allaboutstbarts.com/wp-content/uploads/2020/12/all-about-saint-barts-hotel-accomodation-Cheval-Blanc-St-Barth-Isle-de-France-header.jpg', desc: 'Isle de France at Flamands Beach' },
+    'manapany':    { url: 'https://dne30sq7nx8km.cloudfront.net/cache/img/5ca2e4c762c41e322d0785d66c367348f168586a-5ca2e4-1200-627-crop.jpg?q=1702653330', desc: 'Boutique resort at Anse des Cayes' },
+    'fbm':         { url: 'https://fbm-autos.com/wp-content/uploads/2022/04/20220115_120121-scaled.jpg', desc: 'Ford dealership at the airport' },
+    'shell-beach': { url: 'https://upload.wikimedia.org/wikipedia/commons/d/dc/Shell_Beach_%2849909790381%29.jpg', desc: 'Turquoise cove near Gustavia' },
+    'gustavia':    { url: 'https://upload.wikimedia.org/wikipedia/commons/5/5c/Gustavia_Harbor%2C_Saint-Barth%C3%A9lemy.jpg', desc: 'Harbor with yachts and red-roofed buildings' }
+  };
+
+  function makePopup(key, category, name) {
+    var p = photos[key];
+    if (!p) return '<div class="popup-body"><div class="popup-category">' + category + '</div><div class="popup-name">' + name + '</div></div>';
+    return '<img class="popup-photo" src="' + p.url + '" alt="' + name + '" loading="lazy">' +
+           '<div class="popup-body"><div class="popup-category">' + category + '</div>' +
+           '<div class="popup-name">' + name + '</div>' +
+           '<div class="popup-desc">' + p.desc + '</div></div>';
+  }
+
+  /* Fouquet's (Le Carl Gustaf) — OSM: 17.893886, -62.847071 (hotel node) */
+  L.marker([17.8960, -62.8496], {
+    icon: L.divIcon({
+      className: 'partner-logo',
+      html: '<img src="https://a.storyblok.com/f/287000/189x62/d986c0daf7/logo-fouquet-s-saint-barth-white.svg" style="height:22px" alt="Fouquets">',
+      iconSize: null,
+      iconAnchor: [40, 11]
+    })
+  }).addTo(map).bindPopup(makePopup('fouquets', 'Restaurant & Hotel', "Fouquet's Saint-Barth"), {maxWidth: 260});
+
+  /* FBM Automobiles — Nuke DB: 17.90310, -62.84410 (airport frontage) */
+  L.marker([17.9031, -62.8441], {
+    icon: L.divIcon({
+      className: 'partner-text',
+      html: '<span style="color:#2EA3F2;font-size:15px;font-weight:700;letter-spacing:2px">FBM</span>',
+      iconSize: null,
+      iconAnchor: [14, 8]
+    })
+  }).addTo(map).bindPopup(makePopup('fbm', 'Ford Dealership', 'FBM Automobiles'), {maxWidth: 260});
+
+  /* Eden Rock — on the rock promontory, east end of Baie de St. Jean */
+  L.marker([17.9043, -62.8310], {
+    icon: L.divIcon({
+      className: 'partner-text',
+      html: '<span style="color:#CDA73C;font-size:12px;font-weight:700;letter-spacing:2px">EDEN ROCK</span>',
+      iconSize: null,
+      iconAnchor: [38, 6]
+    })
+  }).addTo(map).bindPopup(makePopup('eden-rock', 'Luxury Hotel', 'Eden Rock - St Barths'), {maxWidth: 260});
+
+  /* Nikki Beach — OSM: 17.902496, -62.835192 (restaurant node). Nuke: 17.9062, -62.8342 */
+  L.marker([17.9050, -62.8325], {
+    icon: L.divIcon({
+      className: 'partner-logo',
+      html: '<img src="https://nikkibeach.com/wp-content/uploads/2024/07/logo-group-horizontal.svg" style="height:12px;filter:brightness(10)" alt="Nikki Beach">',
+      iconSize: null,
+      iconAnchor: [30, 6]
+    })
+  }).addTo(map).bindPopup(makePopup('nikki-beach', 'Beach Club', 'Nikki Beach Saint-Barth'), {maxWidth: 260});
+
+  /* Rosewood Le Guanahani — OSM nearby. Nuke DB: 17.90940, -62.80600 */
+  L.marker([17.9094, -62.8060], {
+    icon: L.divIcon({
+      className: 'partner-logo',
+      html: '<img src="https://www.rosewoodhotels.com/content/dam/rosewoodhotels/icons/Wordmark.svg" style="height:12px;filter:brightness(10)" alt="Rosewood">',
+      iconSize: null,
+      iconAnchor: [30, 6]
+    })
+  }).addTo(map).bindPopup(makePopup('rosewood', 'Luxury Resort', 'Rosewood Le Guanahani'), {maxWidth: 260});
+
+  /* Le Barthelemy — OSM: 17.908048, -62.801306 (hotel node). Nuke: 17.91000, -62.80450 */
+  L.marker([17.9080, -62.8013], {
+    icon: L.divIcon({
+      className: 'partner-logo',
+      html: '<img src="https://lebarthelemyhotel.com/images/icons/new_LeBarth_Logo_2_white.svg" style="height:16px" alt="Le Barthelemy">',
+      iconSize: null,
+      iconAnchor: [40, 8]
+    })
+  }).addTo(map).bindPopup(makePopup('le-barth', 'Hotel & Spa', 'Le Barth\u00e9lemy Hotel & Spa'), {maxWidth: 260});
+
+  /* Le Toiny — Nuke DB: 17.89700, -62.79900 */
+  L.marker([17.8970, -62.7990], {
+    icon: L.divIcon({
+      className: 'partner-logo',
+      html: '<img src="https://letoiny.com/wp-content/uploads/2025/02/logo-le-toiny-bleu.svg" style="height:16px" alt="Le Toiny">',
+      iconSize: null,
+      iconAnchor: [25, 8]
+    })
+  }).addTo(map).bindPopup(makePopup('le-toiny', 'Luxury Hotel', 'Le Toiny'), {maxWidth: 260});
+
+  /* Cheval Blanc — OSM: 17.919140, -62.854492 */
+  L.marker([17.9191, -62.8545], {
+    icon: L.divIcon({
+      className: 'partner-text',
+      html: '<span style="color:#C4BCB7;font-size:11px;font-weight:700;letter-spacing:2px">CHEVAL BLANC</span>',
+      iconSize: null,
+      iconAnchor: [42, 6]
+    })
+  }).addTo(map).bindPopup(makePopup('cheval-blanc', 'Luxury Hotel', 'Cheval Blanc St-Barth'), {maxWidth: 260});
+
+  /* Manapany — Nuke DB: 17.91200, -62.84550 (Anse des Cayes) */
+  L.marker([17.9120, -62.8455], {
+    icon: L.divIcon({
+      className: 'partner-text',
+      html: '<span style="color:#378278;font-size:11px;font-weight:700;letter-spacing:2px">MANAPANY</span>',
+      iconSize: null,
+      iconAnchor: [30, 6]
+    })
+  }).addTo(map).bindPopup(makePopup('manapany', 'Boutique Hotel', 'Manapany'), {maxWidth: 260});
+
+  /* Lou Lou — Nuke DB: 17.89400, -62.85300 (near Shell Beach / Gustavia west) */
+  L.marker([17.8940, -62.8530], {
+    icon: L.divIcon({
+      className: 'partner-text',
+      html: '<span style="color:#d4a0ee;font-size:10px;font-weight:700;letter-spacing:2px">LOU LOU</span>',
+      iconSize: null,
+      iconAnchor: [22, 5]
+    })
+  }).addTo(map).bindPopup(makePopup('shell-beach', 'Beach Club', 'Lou Lou Beach Club'), {maxWidth: 260});
+
+  /* ═══════════════════════════════════════════════════════════
+     RESTAURANT DOTS — OSM verified positions
+     ═══════════════════════════════════════════════════════════ */
+  var restaurants = [
+    { name: 'Le Ti St. Barth',       lat: 17.9130, lng: -62.8148, type: 'Lounge & Restaurant' },
+    { name: 'Ristorante Fellini',    lat: 17.9111, lng: -62.8441, type: 'Italian' },
+    { name: 'Restaurant Victoria',   lat: 17.8940, lng: -62.8470, type: 'Fine Dining' },
+    { name: 'La Langouste',          lat: 17.9185, lng: -62.8572, type: 'French Seafood' },
+    { name: 'Le Grain de Sel',       lat: 17.8979, lng: -62.8328, type: 'French Bistro' },
+    { name: 'Le Bouchon',            lat: 17.9067, lng: -62.8285, type: 'Wine Bar' },
+    { name: 'FishCorner',            lat: 17.8977, lng: -62.8493, type: 'Seafood' },
+    { name: 'Restaurant Le Cr\u00eaperie', lat: 17.8978, lng: -62.8491, type: 'Cr\u00eaperie' },
+    { name: 'Megumi Sushi',          lat: 17.8964, lng: -62.8512, type: 'Japanese' },
+    { name: 'Sella',                 lat: 17.9049, lng: -62.8534, type: 'Mediterranean' },
+    { name: 'Nikki Beach Restaurant',lat: 17.9025, lng: -62.8352, type: 'Beach Club' }
+  ];
+
+  restaurants.forEach(function(r) {
+    L.marker([r.lat, r.lng], {
+      icon: L.divIcon({
+        className: 'restaurant-dot',
+        iconSize: [4, 4],
+        iconAnchor: [2, 2]
+      })
+    }).addTo(map).bindPopup(
+      '<div class="popup-body">' +
+      '<div class="popup-category">' + r.type + '</div>' +
+      '<div class="popup-name">' + r.name + '</div></div>',
+      {maxWidth: 200}
+    );
+  });
+
+  /* ═══════════════════════════════════════════════════════════
+     RENTAL COMPANY DOTS — OSM + Nuke DB positions
+     ═══════════════════════════════════════════════════════════ */
+  var rentals = [
+    { name: 'SIXT',                lat: 17.9034, lng: -62.8453, type: 'Car Rental' },
+    { name: 'Welcome Car Rental',  lat: 17.9013, lng: -62.8415, type: 'Car Rental' },
+    { name: 'Auto Deal St Barth',  lat: 17.9035, lng: -62.8440, type: 'Car Rental' },
+    { name: 'Barthloc',            lat: 17.9035, lng: -62.8448, type: 'Car Rental' },
+    { name: 'Cool Rental',         lat: 17.9055, lng: -62.8335, type: 'Car Rental' },
+    { name: 'Turbe Car Rental',    lat: 17.9038, lng: -62.8452, type: 'Car Rental' },
+    { name: 'Maurice Car Rental',  lat: 17.8962, lng: -62.8488, type: 'Car Rental' }
+  ];
+
+  rentals.forEach(function(r) {
+    L.marker([r.lat, r.lng], {
+      icon: L.divIcon({
+        className: 'rental-dot',
+        iconSize: [5, 5],
+        iconAnchor: [2, 2]
+      })
+    }).addTo(map).bindPopup(
+      '<div class="popup-body">' +
+      '<div class="popup-category">' + r.type + '</div>' +
+      '<div class="popup-name">' + r.name + '</div></div>',
+      {maxWidth: 200}
+    );
+  });
+
+  /* ═══════════════════════════════════════════════════════════
+     COMPETITOR WIPE — appear then fade out
+     ═══════════════════════════════════════════════════════════ */
+  var competitors = [
+    { name: 'SUZUKI',   color: '#004C97', lat: 17.9040, lng: -62.8470 },
+    { name: 'DACIA',    color: '#646B52', lat: 17.9028, lng: -62.8462 },
+    { name: 'RENAULT',  color: '#FFD500', lat: 17.9045, lng: -62.8455 },
+    { name: 'MOKE',     color: '#E8927C', lat: 17.9020, lng: -62.8435 },
+    { name: 'MINI',     color: '#8B8B8B', lat: 17.9050, lng: -62.8440 },
+    { name: 'CHANGAN',  color: '#0050AA', lat: 17.9032, lng: -62.8425 },
+    { name: 'JEEP',     color: '#4A7C2D', lat: 17.9048, lng: -62.8418 },
+    { name: 'SMART',    color: '#FF6600', lat: 17.9022, lng: -62.8450 }
+  ];
+
+  var competitorMarkers = [];
+  competitors.forEach(function(c) {
+    var m = L.marker([c.lat, c.lng], {
+      icon: L.divIcon({
+        className: 'competitor-label',
+        html: '<span style="color:' + c.color + '">' + c.name + '</span>',
+        iconSize: null,
+        iconAnchor: [20, 5]
+      }),
+      interactive: false
+    }).addTo(map);
+    competitorMarkers.push(m);
+  });
+
+  /* Fade in after 500ms */
+  setTimeout(function() {
+    competitorMarkers.forEach(function(m) {
+      m.getElement().classList.add('visible');
+    });
+  }, 500);
+
+  /* Wipe after 4 seconds */
+  setTimeout(function() {
+    competitorMarkers.forEach(function(m, i) {
+      setTimeout(function() {
+        m.getElement().classList.remove('visible');
+        m.getElement().classList.add('wiped');
+      }, i * 120);
+    });
+  }, 4000);
+
+  /* ═══════════════════════════════════════════════════════════
+     MOVING FORD LOGOS — real OSM road geometries
+     ═══════════════════════════════════════════════════════════ */
+  var fordRoutes = [
+    /* Route 1: Route de Saint-Jean (Gustavia side to east St. Jean) */
+    [[17.90411,-62.84790],[17.90405,-62.84786],[17.90405,-62.84717],[17.90398,-62.84690],[17.90381,-62.84669],[17.90353,-62.84643],[17.90332,-62.84607],[17.90328,-62.84583],[17.90330,-62.84517],[17.90331,-62.84440],[17.90337,-62.84419],[17.90366,-62.84374],[17.90389,-62.84333],[17.90410,-62.84269],[17.90412,-62.84229],[17.90417,-62.84116],[17.90404,-62.84059],[17.90344,-62.83988],[17.90326,-62.83967],[17.90295,-62.83922],[17.90258,-62.83858],[17.90218,-62.83778],[17.90214,-62.83745],[17.90216,-62.83724],[17.90227,-62.83683],[17.90241,-62.83648],[17.90250,-62.83610],[17.90252,-62.83582],[17.90231,-62.83530],[17.90197,-62.83485],[17.90159,-62.83442],[17.90141,-62.83356],[17.90538,-62.83326]],
+
+    /* Route 2: Route de Colombier + Flamands */
+    [[17.90417,-62.84802],[17.90471,-62.84797],[17.90531,-62.84775],[17.90604,-62.84770],[17.90667,-62.84764],[17.90713,-62.84727],[17.90820,-62.84746],[17.90938,-62.84913],[17.90998,-62.85000],[17.91088,-62.85136],[17.91122,-62.85188],[17.91132,-62.85269],[17.91190,-62.85319],[17.91204,-62.85380],[17.91275,-62.85569],[17.91338,-62.85794],[17.91389,-62.85831],[17.91410,-62.85859],[17.91433,-62.85898],[17.91463,-62.86013],[17.91492,-62.86078],[17.91535,-62.86107],[17.91578,-62.86127],[17.91627,-62.86159],[17.91682,-62.86165],[17.91720,-62.86196],[17.91716,-62.86301],[17.91686,-62.86348],[17.91683,-62.86397],[17.91770,-62.86506],[17.91836,-62.86564],[17.91897,-62.86596],[17.92015,-62.86183]],
+
+    /* Route 3: Route de Lorient + Camaruche */
+    [[17.90538,-62.83258],[17.90574,-62.83279],[17.90588,-62.83256],[17.90615,-62.83215],[17.90657,-62.83182],[17.90731,-62.83129],[17.90754,-62.83089],[17.90754,-62.83051],[17.90747,-62.83030],[17.90748,-62.83011],[17.90742,-62.82990],[17.90715,-62.82981],[17.90702,-62.82944],[17.90672,-62.82888],[17.90656,-62.82850],[17.90654,-62.82801],[17.90663,-62.82767],[17.90661,-62.82713],[17.90660,-62.82677],[17.90658,-62.82613],[17.90658,-62.82550],[17.90639,-62.82470],[17.90627,-62.82430],[17.90612,-62.82368],[17.90602,-62.82330],[17.90609,-62.82301],[17.90625,-62.82257],[17.90645,-62.82203],[17.90661,-62.82159],[17.90668,-62.82121],[17.90649,-62.82093],[17.90638,-62.82073],[17.90612,-62.81807],[17.90595,-62.81684],[17.90815,-62.81519]],
+
+    /* Route 4: Route de Lurin */
+    [[17.89314,-62.83305],[17.89302,-62.83329],[17.89278,-62.83370],[17.89269,-62.83420],[17.89279,-62.83471],[17.89344,-62.83589],[17.89368,-62.83690],[17.89370,-62.83767],[17.89354,-62.83769],[17.89329,-62.83723],[17.89309,-62.83689],[17.89275,-62.83683],[17.89255,-62.83678],[17.89211,-62.83732],[17.89161,-62.83775],[17.89110,-62.83824],[17.89087,-62.83834],[17.89056,-62.83845],[17.89037,-62.83861],[17.89037,-62.83883],[17.89039,-62.83939],[17.89023,-62.84007],[17.89021,-62.84035],[17.89034,-62.84067],[17.89057,-62.84103],[17.89097,-62.84148],[17.89139,-62.84169],[17.89175,-62.84176],[17.89200,-62.84168],[17.89234,-62.84177],[17.89267,-62.84224],[17.89290,-62.84234],[17.89376,-62.84238],[17.89382,-62.84249],[17.89378,-62.84325],[17.89337,-62.84442],[17.89296,-62.84552],[17.89287,-62.84608],[17.89292,-62.84647],[17.89299,-62.84681],[17.89313,-62.84705],[17.89347,-62.84716],[17.89387,-62.84726],[17.89418,-62.84721],[17.89443,-62.84721],[17.89444,-62.84764]],
+
+    /* Route 5: Grand Fond (east coast) */
+    [[17.89503,-62.80135],[17.89452,-62.80233],[17.89415,-62.80297],[17.89392,-62.80376],[17.89362,-62.80448],[17.89347,-62.80538],[17.89323,-62.80631],[17.89313,-62.80691],[17.89302,-62.80842],[17.89303,-62.80984],[17.89336,-62.81027],[17.89389,-62.81080],[17.89499,-62.81179],[17.89522,-62.81202],[17.89547,-62.81247],[17.89579,-62.81289],[17.89580,-62.81320],[17.89571,-62.81395],[17.89600,-62.81446],[17.89647,-62.81493],[17.89764,-62.81580],[17.89915,-62.81601],[17.90023,-62.81650],[17.90094,-62.81739],[17.90073,-62.81845],[17.90049,-62.81919],[17.90077,-62.82104],[17.90078,-62.82185],[17.90093,-62.82246],[17.90120,-62.82292]]
+  ];
+
+  var fordSvg = 'https://upload.wikimedia.org/wikipedia/commons/3/3e/Ford_logo_flat.svg';
+  var fordMarkers = [];
+  var fordPositions = [];
+  var fordDirections = [];
+
+  fordRoutes.forEach(function(route, idx) {
+    var startIdx = Math.floor(Math.random() * Math.floor(route.length / 2));
+    fordPositions.push({ routeIdx: idx, pointIdx: startIdx, forward: true });
+    var marker = L.marker([route[startIdx][0], route[startIdx][1]], {
+      icon: L.divIcon({
+        className: '',
+        html: '<img class="ford-icon" src="' + fordSvg + '" alt="Ford">',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      }),
+      interactive: false,
+      zIndexOffset: 500
+    }).addTo(map);
+    fordMarkers.push(marker);
+  });
+
+  function animateFords() {
+    fordPositions.forEach(function(pos, i) {
+      var route = fordRoutes[pos.routeIdx];
+      if (pos.forward) {
+        pos.pointIdx++;
+        if (pos.pointIdx >= route.length) {
+          pos.forward = false;
+          pos.pointIdx = route.length - 2;
+        }
+      } else {
+        pos.pointIdx--;
+        if (pos.pointIdx < 0) {
+          pos.forward = true;
+          pos.pointIdx = 1;
+        }
+      }
+      var pt = route[Math.max(0, Math.min(pos.pointIdx, route.length - 1))];
+      fordMarkers[i].setLatLng([pt[0], pt[1]]);
+    });
+  }
+
+  setInterval(animateFords, 800);
+
+})();
+</script>
+</body>
+</html>

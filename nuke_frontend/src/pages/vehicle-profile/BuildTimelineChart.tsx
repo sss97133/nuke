@@ -10,12 +10,12 @@ interface BuildPhase {
 }
 
 const BUILD_PHASES: BuildPhase[] = [
-  { name: 'BASELINE', label: 'BASELINE', start: '2021-01', end: '2021-08', color: '#6b7280' },
-  { name: 'PLANNING', label: 'PLANNING', start: '2021-09', end: '2022-06', color: '#3b82f6' },
-  { name: 'ACQUISITION', label: 'ACQUISITION', start: '2022-07', end: '2023-06', color: '#f59e0b' },
-  { name: 'FABRICATION', label: 'FABRICATION', start: '2023-07', end: '2024-08', color: '#ef4444' },
-  { name: 'WIRING', label: 'WIRING', start: '2024-09', end: '2025-06', color: '#8b5cf6' },
-  { name: 'CURRENT', label: 'CURRENT', start: '2025-07', end: '2027-12', color: '#10b981' },
+  { name: 'BASELINE', label: 'BASELINE', start: '2021-01', end: '2021-08', color: 'var(--text-disabled)' },
+  { name: 'PLANNING', label: 'PLANNING', start: '2021-09', end: '2022-06', color: 'var(--info)' },
+  { name: 'ACQUISITION', label: 'ACQUISITION', start: '2022-07', end: '2023-06', color: 'var(--warning)' },
+  { name: 'FABRICATION', label: 'FABRICATION', start: '2023-07', end: '2024-08', color: 'var(--error)' },
+  { name: 'WIRING', label: 'WIRING', start: '2024-09', end: '2025-06', color: 'var(--chart-purple)' },
+  { name: 'CURRENT', label: 'CURRENT', start: '2025-07', end: '2027-12', color: 'var(--success)' },
 ];
 
 interface Props {
@@ -177,7 +177,7 @@ const BuildTimelineChart: React.FC<Props> = ({ snapshots }) => {
                     bottom: '100%',
                     ...align,
                     background: 'var(--vp-ink)',
-                    color: '#fff',
+                    color: 'var(--bg)',
                     padding: '4px 6px',
                     fontSize: '8px',
                     fontFamily: 'var(--vp-font-mono)',

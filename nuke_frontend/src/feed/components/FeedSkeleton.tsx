@@ -13,7 +13,7 @@ const shimmer: CSSProperties = {
   background: 'var(--surface-hover)',
 };
 
-export function FeedSkeleton({ cardsPerRow = 6, rows = 3 }: FeedSkeletonProps) {
+export function FeedSkeleton({ cardsPerRow = 3, rows = 3 }: FeedSkeletonProps) {
   const total = cardsPerRow * rows;
 
   return (

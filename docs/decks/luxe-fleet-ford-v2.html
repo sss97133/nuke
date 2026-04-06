@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luxe Fleet — Ford Motor Company</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bone: #f0efe9;
+    --charcoal: #1a1a2e;
+    --marsh: #4a6741;
+    --sand: #c9a96e;
+    --ford-blue: #003478;
+    --muted: #777;
+    --border: rgba(0,0,0,0.08);
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bone);
+    color: var(--charcoal);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── SLIDE STRUCTURE ── */
+  .slide {
+    min-height: 100vh;
+    padding: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    border-bottom: 1px solid var(--border);
+  }
+  .slide-mark {
+    position: absolute;
+    top: 40px;
+    left: 80px;
+    font-size: 11px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .slide-num {
+    position: absolute;
+    top: 40px;
+    right: 80px;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--muted);
+  }
+
+  /* ── DARK SLIDES ── */
+  .dark {
+    background: var(--charcoal);
+    color: #e8e4de;
+  }
+  .dark h2, .dark h3, .dark h4 { color: #e8e4de; }
+  .dark p, .dark li, .dark td { color: #bbb5aa; }
+  .dark .slide-mark, .dark .slide-num { color: #555; }
+  .dark .card { background: #222233; border-color: rgba(255,255,255,0.06); }
+  .dark .card h4 { color: #e8e4de; }
+  .dark .card p { color: #bbb5aa; }
+  .dark blockquote { border-color: var(--sand); }
+  .dark h3 { color: var(--sand); }
+  .dark ul li::before { background: var(--sand); }
+  .dark ul li strong { color: #e8e4de; }
+  .dark th { color: #666; border-color: rgba(255,255,255,0.08); }
+  .dark td { border-color: rgba(255,255,255,0.08); }
+
+  /* ── FORD BLUE SLIDES ── */
+  .ford-blue {
+    background: var(--ford-blue);
+    color: #fff;
+  }
+  .ford-blue h2, .ford-blue h3, .ford-blue h4,
+  .ford-blue p, .ford-blue li, .ford-blue td { color: #fff; }
+  .ford-blue .slide-mark, .ford-blue .slide-num { color: rgba(255,255,255,0.35); }
+  .ford-blue .card { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.12); }
+  .ford-blue .card h4, .ford-blue .card p { color: #fff; }
+  .ford-blue h3 { color: var(--sand); }
+  .ford-blue ul li::before { background: #fff; }
+  .ford-blue .stat .num { color: #fff; }
+  .ford-blue .stat .label { color: rgba(255,255,255,0.5); }
+
+  /* ── MARSH SLIDES ── */
+  .marsh {
+    background: var(--marsh);
+    color: #fff;
+  }
+  .marsh h2, .marsh h3, .marsh h4,
+  .marsh p, .marsh li { color: #fff; }
+  .marsh .slide-mark, .marsh .slide-num { color: rgba(255,255,255,0.35); }
+  .marsh .card { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.12); }
+  .marsh .card h4, .marsh .card p { color: #fff; }
+  .marsh h3 { color: rgba(255,255,255,0.6); }
+
+  /* ── TYPOGRAPHY ── */
+  h2 {
+    font-size: 40px;
+    font-weight: 300;
+    letter-spacing: -1px;
+    margin-bottom: 32px;
+    line-height: 1.15;
+  }
+  h2 strong { font-weight: 600; }
+  h3 {
+    font-size: 12px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--ford-blue);
+    margin-bottom: 20px;
+    font-weight: 500;
+  }
+  p {
+    font-size: 17px;
+    line-height: 1.7;
+    color: #4a4a4a;
+    max-width: 700px;
+    margin-bottom: 20px;
+  }
+  blockquote {
+    border-left: 3px solid var(--ford-blue);
+    padding-left: 20px;
+    margin: 24px 0;
+    font-style: italic;
+  }
+  .dark blockquote { border-color: var(--sand); }
+
+  /* ── LAYOUT ── */
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: 32px; }
+  .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 32px; margin-top: 32px; }
+  .g4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 24px; margin-top: 32px; }
+
+  .card {
+    padding: 32px;
+    background: #ebe6e0;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+  .card h4 { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+  .card p { font-size: 14px; line-height: 1.6; margin-bottom: 0; max-width: none; }
+
+  .stat-row { display: flex; gap: 64px; margin: 32px 0; flex-wrap: wrap; }
+  .stat .num { font-size: 56px; font-weight: 300; color: var(--ford-blue); }
+  .dark .stat .num { color: #fff; }
+  .stat .label { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+  .dark .stat .label { color: #888; }
+
+  ul { list-style: none; margin-top: 12px; }
+  ul li {
+    font-size: 15px;
+    line-height: 1.8;
+    color: #4a4a4a;
+    padding-left: 18px;
+    position: relative;
+  }
+  ul li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 11px;
+    width: 5px;
+    height: 5px;
+    background: var(--ford-blue);
+    border-radius: 50%;
+  }
+  ul li strong { color: var(--charcoal); font-weight: 600; }
+  .dark ul li { color: #bbb5aa; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 24px; }
+  th {
+    padding: 10px 14px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+
+  .conf {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    position: absolute;
+    bottom: 20px;
+    left: 80px;
+  }
+
+  .img-caption {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .dark .img-caption { color: #666; }
+
+  @media print { .slide { page-break-after: always; } }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 00 — COVER
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide dark" style="padding:0;position:relative;justify-content:center;align-items:center;text-align:center;">
+  <img src="https://a.storyblok.com/f/287000/2000x1500/9f6dd5205e/fouquet-s-saint-barth-hero.jpg"
+       alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.35;">
+  <div style="position:relative;z-index:1;padding:80px;">
+    <div style="font-size:11px;letter-spacing:5px;text-transform:uppercase;color:var(--sand);margin-bottom:48px;">
+      Prepared for Ford Motor Company
+    </div>
+    <h1 style="font-size:72px;font-weight:300;letter-spacing:-2px;color:#fff;margin-bottom:8px;">
+      Luxe <span style="font-weight:600;">Fleet</span>
+    </h1>
+    <div style="font-size:15px;letter-spacing:5px;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-top:12px;">
+      Saint-Barth&eacute;lemy
+    </div>
+    <div style="display:flex;gap:56px;justify-content:center;align-items:center;margin-top:56px;">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Ford_logo_flat.svg"
+           alt="Ford" style="height:44px;object-fit:contain;">
+      <img src="https://a.storyblok.com/f/287000/189x62/d986c0daf7/logo-fouquet-s-saint-barth-white.svg"
+           alt="Fouquet's" style="height:32px;object-fit:contain;">
+      <img src="https://www.lofficielstbarth.com/images/logo-lofficiel-rev-amtd.svg"
+           alt="L'Officiel St Barth" style="height:24px;object-fit:contain;">
+      <img src="https://fbm-autos.com/wp-content/uploads/2022/06/LOGO-blanc_Plan-de-travail-1-1024x388.jpg"
+           alt="FBM Automobiles" style="height:28px;object-fit:contain;">
+    </div>
+  </div>
+  <div class="conf" style="color:rgba(255,255,255,0.3);">Confidential</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 01 — THE THESIS
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide dark" style="position:relative;">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/f/fa/Saint_Barth_-_Vue_a%C3%A9rienne_-_Octobre_2009.jpg"
+       alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.1;">
+  <div style="position:relative;z-index:1;">
+    <span class="slide-mark">Luxe Fleet</span>
+    <span class="slide-num">01</span>
+    <h3>The Thesis</h3>
+    <h2>St. Barths is where brands go<br>to be <strong>seen and validated.</strong></h2>
+    <div class="g2">
+      <div>
+        <p style="color:#bbb5aa;">The Herm&egrave;s boutique in Gustavia is the highest-grossing Herm&egrave;s boutique in the world. Eden Rock is the most recognized hotel destination in the Caribbean. Every luxury brand that matters has a presence on this 25 km&sup2; island — not because of transaction volume, but because being seen there validates the brand at a global level.</p>
+        <p style="color:#bbb5aa;">The heritage paradox: St. Barths protects everything. The beaches, the stone walls, the rooflines, the vegetation — all curated, all preserved. The automotive landscape is the exception. A guest in a heritage villa wearing Loro Piana gets into a Kia Picanto. The villa was restored to spec. The linen was sourced from Italy. The vehicle was sourced from whoever offered the lowest commission.</p>
+      </div>
+      <div>
+        <div class="card" style="background:var(--ford-blue);border:none;padding:40px 32px;">
+          <h4 style="color:#fff;font-size:18px;line-height:1.4;">Ford's experiential marketing budget for a single activation outweighs the entire cost of all vehicle sales on the island.</h4>
+          <p style="color:rgba(255,255,255,0.7);margin-top:16px;">The rental companies see vehicles. We see media real estate. Herm&egrave;s didn't open in Gustavia to sell more bags. They opened there because every bag sold is seen by the right person, in the right light, and validates the brand at a scale no advertising can match.</p>
+          <p style="color:rgba(255,255,255,0.7);">Ford should think about St. Barths the way Herm&egrave;s does.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 02 — YOUR SEAT ISN'T BEING USED
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">02</span>
+  <h3>The Opportunity</h3>
+  <h2>Your seat at the table<br><strong>isn't being used.</strong></h2>
+  <p>FBM Automobiles — airport-front in Gustavia since 1994 — already sells Ford. They special-order Ranger Raptors. They've moved ~20 Broncos through back-channel imports. Motorworld flies technicians to the island because there's no direct Ford support. FBM pays $1,000 per service call.</p>
+  <div class="g2" style="margin-top:24px;">
+    <div class="card" style="background:var(--ford-blue);border:none;">
+      <h4 style="color:#fff;">You invented this. 1966.</h4>
+      <p style="color:rgba(255,255,255,0.85);">GT350-H Rent-a-Racer. 1,003 units in Hertz airport locations. Shelby production went from 562 to 2,386 units — 4x in one year. You've revived the program four times across 56 years. The rental-to-purchase pipeline is Ford's own playbook.</p>
+    </div>
+    <div class="card">
+      <h4>The modern data confirms it</h4>
+      <p><strong>Porsche Experience Centers:</strong> 60% of visitors are non-owners. 80% say "likely to buy" after driving. 500,000+ visitors through 2 US centers.</p>
+      <p style="margin-top:8px;"><strong>Enterprise:</strong> 49% of renters rewrite their purchase wish list after a rental experience.</p>
+      <p style="margin-top:8px;"><strong>Cox Automotive:</strong> 2 in 3 consumers say experience matters more than price.</p>
+    </div>
+  </div>
+  <p>Ford already has a dealer on the most exclusive island in the world. You're treating it as a parts counter. We're proposing you treat it as a marketing outpost — with L'Agence St Barth providing an in-house automotive curation team that bridges luxury hospitality and Ford's brand.</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;margin-top:24px;">
+    <img src="https://fbm-autos.com/wp-content/uploads/2022/04/20220115_120121-scaled.jpg"
+         alt="FBM Automobiles" style="width:100%;height:160px;object-fit:cover;">
+    <img src="https://fbm-autos.com/wp-content/uploads/2022/04/20220115_120024-scaled.jpg"
+         alt="FBM Showroom" style="width:100%;height:160px;object-fit:cover;">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/5/5c/Gustavia_Harbor%2C_Saint-Barth%C3%A9lemy.jpg"
+         alt="Gustavia Harbor" style="width:100%;height:160px;object-fit:cover;">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/d/dc/Shell_Beach_%2849909790381%29.jpg"
+         alt="Shell Beach" style="width:100%;height:160px;object-fit:cover;">
+  </div>
+  <p class="img-caption">FBM Airport Frontage — FBM Showroom — Gustavia Harbor — Shell Beach</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 03 — WHAT GUESTS DRIVE
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide dark">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">03</span>
+  <h3>What Guests Drive Today</h3>
+  <h2>$50M net worth.<br><strong>$15,000 rental car.</strong></h2>
+  <div class="g2">
+    <div>
+      <h4 style="margin-bottom:16px;color:#e8e4de;">The guest experience</h4>
+      <ul>
+        <li>$3,000/night villa at Fouquet's Saint-Barth</li>
+        <li>Private chef, butler, helicopter from St. Maarten</li>
+        <li>Curated wine, art, music — every detail considered</li>
+        <li>Then they walk to the rental counter and get a Jimny</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="margin-bottom:16px;color:#e8e4de;">Current rental fleet landscape</h4>
+      <table>
+        <tr>
+          <td style="width:180px;"><span style="font-weight:700;letter-spacing:1px;color:#00C1DE;">Cool Rental</span></td>
+          <td style="color:#bbb5aa;">Chinese electric buggies</td>
+        </tr>
+        <tr>
+          <td><span style="font-weight:700;letter-spacing:1px;color:#bbb5aa;">TopLoc</span></td>
+          <td style="color:#bbb5aa;">Jimny, Dacia Duster, Smart</td>
+        </tr>
+        <tr>
+          <td><span style="font-weight:700;letter-spacing:1px;color:#F2F2F2;">Turbe / PBS</span></td>
+          <td style="color:#bbb5aa;">Jimny, small SUVs</td>
+        </tr>
+        <tr>
+          <td><span style="font-weight:700;letter-spacing:1px;color:#bbb5aa;">GTA</span></td>
+          <td style="color:#bbb5aa;">Mixed economy fleet</td>
+        </tr>
+        <tr>
+          <td><span style="font-weight:700;letter-spacing:1px;color:#E60000;">Maurice</span></td>
+          <td style="color:#bbb5aa;">Mini Cooper (only "premium")</td>
+        </tr>
+        <tr>
+          <td><span style="font-weight:700;letter-spacing:1px;color:#4CAF50;">Barthloc</span></td>
+          <td style="color:#bbb5aa;">Jimny, Smart, some Jeeps</td>
+        </tr>
+      </table>
+      <p style="font-size:13px;color:#888;margin-top:12px;">No American vehicles. No open-air SUVs. No Ford.</p>
+    </div>
+  </div>
+  <div style="margin-top:32px;">
+    <img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/library/2025/bronco-roadster-concept/Bronco-Roadster-Concept-01.jpg"
+         alt="Bronco Roadster Concept" style="width:100%;height:240px;object-fit:cover;object-position:center 70%;">
+    <p class="img-caption" style="text-align:center;">What it should look like: Bronco Roadster Concept — Robert Gelardi, Ford</p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 04 — A+O SEQUEL
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">04</span>
+  <h3>You've Already Proven This Works</h3>
+  <h2>alice + olivia was the <strong>proof of concept.</strong><br>St. Barths is the sequel.</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;margin-bottom:32px;">
+    <img src="https://www.aliceandolivia.com/on/demandware.static/-/Sites-aando-Library/default/dw4d86c780/images/WorldOfAandO/ArticlePage/BRONCO_25_SLIDE_SHOW_2200x_3300-1@1x.jpg"
+         alt="A+O x Bronco 1" style="width:100%;height:180px;object-fit:cover;">
+    <img src="https://www.aliceandolivia.com/on/demandware.static/-/Sites-aando-Library/default/dw16f13f93/images/WorldOfAandO/ArticlePage/BRONCO_25_MAIN_IMAGE_2200X3300@1x.jpg"
+         alt="A+O x Bronco Main" style="width:100%;height:180px;object-fit:cover;">
+    <img src="https://www.aliceandolivia.com/on/demandware.static/-/Sites-aando-Library/default/dwc4af3e54/images/WorldOfAandO/ArticlePage/BRONCO_25_SLIDE_SHOW_2200x_3300-2@1x.jpg"
+         alt="A+O x Bronco 2" style="width:100%;height:180px;object-fit:cover;">
+    <img src="https://www.aliceandolivia.com/on/demandware.static/-/Sites-aando-Library/default/dw4a5edca9/images/WorldOfAandO/ArticlePage/BRONCO_25_SLIDE_SHOW_2200x_3300-3@1x.jpg"
+         alt="A+O x Bronco 3" style="width:100%;height:180px;object-fit:cover;">
+  </div>
+  <div class="g2">
+    <div>
+      <blockquote>"Bronco is about adventure, capability, and freedom for all. Our collaboration with ALICE + OLIVIA celebrates those qualities through the lens of powerful femininity, modern expression, and a bold style that's classically American."</blockquote>
+      <p style="font-size:13px;color:var(--muted);margin-top:-12px;">— Lisa Materazzo, CMO, Ford Motor Company</p>
+      <p style="margin-top:24px;">The A+O collab proved Bronco belongs in the fashion-luxury context. Custom-wrapped Broncos, capsule collection, nationwide tour. St. Barths is where that customer actually lives — 65% American, UHNW, 5-7 nights, driving every day. Stacey Bendet was on the island 14 weeks ago.</p>
+    </div>
+    <div>
+      <div class="card">
+        <h4>What A+O proved</h4>
+        <p>Bronco + fashion works. Ford CMO personally endorsed it. Two custom vehicles built by Classic Custom Designs. Ten-piece capsule collection.</p>
+        <p style="margin-top:12px;font-weight:600;">What it didn't do:</p>
+        <p>Put the vehicle in UHNW hands for a week. Let them drive it daily in a luxury context. Create organic purchase intent. Close sales.</p>
+      </div>
+      <div class="card" style="margin-top:16px;background:var(--ford-blue);border:none;">
+        <h4 style="color:#fff;">Luxe Fleet does all of that.</h4>
+        <p style="color:rgba(255,255,255,0.8);">5-7 days behind the wheel at the most exclusive resort in the Caribbean. The best test drive is a vacation.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 04b — THE PRECEDENT
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide dark">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">04b</span>
+  <h3>The Precedent</h3>
+  <h2>Ford invented the rental-to-purchase<br><strong>pipeline in 1966.</strong></h2>
+  <div class="g2">
+    <div>
+      <p>GT350-H. 1,003 Shelby Mustangs placed in Hertz airport locations at $17/day. Production went from 562 to 2,386 units in one year — a 4x increase directly attributable to the rental program.</p>
+      <p>You've revived it four times: 1966, 2006, 2016, 2022. The 2022 program placed GT500-H cars at $399/day in Las Vegas, Phoenix, Miami — all vacation markets.</p>
+      <p>The Luxe Fleet is the luxury version of the same thesis: put the product in buyers' hands in aspirational contexts, let the experience create the purchase intent.</p>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:16px;">
+        <h4>What's changed in 60 years</h4>
+        <table>
+          <tr><td><strong>1966</strong></td><td>GT350-H, $17/day, airport counter</td></tr>
+          <tr><td><strong>2025</strong></td><td>Heritage Edition, Fouquet's villa, Shell Beach</td></tr>
+          <tr><td><strong>Context</strong></td><td>Airport rental → luxury resort amenity</td></tr>
+          <tr><td><strong>Duration</strong></td><td>Weekend → 5-7 day immersion</td></tr>
+          <tr><td><strong>Buyer</strong></td><td>Enthusiast → $50M+ UHNW</td></tr>
+        </table>
+      </div>
+      <div class="card" style="background:var(--ford-blue);border:none;">
+        <h4 style="color:#fff;">The Hertz-Tesla lesson</h4>
+        <p style="color:rgba(255,255,255,0.85);">Hertz lost $440M on 35,000 Teslas. EVs depreciate fast, cost 2x to repair, and nobody falls in love with a rental Model 3. Broncos hold value, repair cheap, and create emotional response. The anti-Tesla fleet play.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 05 — THE ROADSTER CONCEPT
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide dark">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">05</span>
+  <h3>OG to 6G</h3>
+  <h2>You already built the <strong>perfect St. Barths vehicle.</strong></h2>
+  <div class="g2" style="align-items:start;">
+    <div>
+      <p style="color:#bbb5aa;">Robert Gelardi and the Bronco design team built the Roadster Concept to celebrate 60 years of Bronco. A modern 6G stripped back to the original U13 essence — half-cab, completely open air, Wimbledon White, fold-down tailgate with stamped FORD wordmark, Fifteen52 Analog wheels.</p>
+      <blockquote style="color:#bbb5aa;">"What struck me about that original roadster was its compelling simplicity. It didn't need big tires, a lift, or off-road lights to look good. It was just this pure expression of what I call 'Go Anywhere, Open Air' — the essential cool that made Bronco special from day one."</blockquote>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:-8px;margin-bottom:16px;">
+        <img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/profiles/authors/author-images/Robert_Gelardi.jpeg"
+             alt="Robert Gelardi" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">
+        <span style="font-size:13px;color:#888;">Robert Gelardi, Bronco Chief Designer</span>
+      </div>
+      <p style="color:#bbb5aa;margin-top:24px;">Debuted at Silver Lake in August. Shown at SEMA in November. Ford is already touring it. Between shows, it sits. St. Barths is the landscape this vehicle was designed for — let it spend a season at Fouquet's instead of waiting for the next convention center.</p>
+    </div>
+    <div>
+      <img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/library/2025/bronco-roadster-concept/Bronco-Roadster-Concept-06.jpg"
+           alt="Bronco Roadster Concept" style="width:100%;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+        <img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/library/2025/bronco-roadster-concept/Bronco-Roadster-Concept-10.jpg"
+             alt="Roadster driving" style="width:100%;">
+        <img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/library/2025/bronco-roadster-concept/Bronco-Roadster-Concept-01.jpg"
+             alt="Roadster 3/4 front" style="width:100%;">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 06 — CLIENT ACCESS
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">06</span>
+  <h3>The Real Value</h3>
+  <h2>Not a sponsorship. Not a placement.<br><strong>Client access.</strong></h2>
+  <div class="g2">
+    <div class="card" style="background:var(--ford-blue);border:none;">
+      <h4 style="color:#fff;">Ford Ambassador at Lou Lou Beach Club</h4>
+      <p style="color:rgba(255,255,255,0.85);">Seasonal hire. Nov-Apr. Not a showroom salesperson — someone at Fouquet's pool when guests come back from driving a Heritage Edition on the coast road. At the Bucket Regatta. With SiBarth clients during villa showings.</p>
+      <p style="color:rgba(255,255,255,0.85);margin-top:12px;">These are people worth $50M+ in the most relaxed setting of their year. They've been driving the product for a week. The Ambassador doesn't sell — they're available. "You love this one? I can have one at your house in Connecticut by the time you land."</p>
+      <p style="color:rgba(255,255,255,0.7);margin-top:12px;font-size:13px;">No dealership can create this context. No activation can replicate a week behind the wheel. This is the highest-quality client access in the automotive industry.</p>
+    </div>
+    <div>
+      <div class="card">
+        <h4>Hotel Fleet (no cost to Ford)</h4>
+        <p>Fouquet's buys Heritage Edition 2-doors through FBM. Doors off, roof off. The guest vehicle. Fouquet's is the buyer. Ford provides allocation.</p>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h4>Publicity Vehicle (recovered on sale)</h4>
+        <p>Ford places 1 Bronco 2-door on-island. L'Officiel shoots it, Lou Lou features it. Sells at end of season through FBM. Ford moves a unit.</p>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h4>Rental Fleet Pipeline</h4>
+        <p>5 of 6 rental operators want Broncos. SiBarth wants them for villa clients. Ford provides allocation through FBM: <strong>10-25 units Year 1.</strong></p>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h4>Service Revenue</h4>
+        <p>FBM currently pays $1K/service with no Ford support. Formalize the relationship: Ford-certified service on-island = recurring parts + labor revenue.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 07 — THE ISLAND
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide ford-blue" style="position:relative;">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/f/fa/Saint_Barth_-_Vue_a%C3%A9rienne_-_Octobre_2009.jpg"
+       alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.15;mix-blend-mode:luminosity;">
+  <div style="position:relative;z-index:1;">
+    <span class="slide-mark">Luxe Fleet</span>
+    <span class="slide-num">07</span>
+    <h3>The Island</h3>
+    <h2>25 km&sup2;. 14 beaches. 50 restaurants.<br><strong>1 road. Every vehicle is visible.</strong></h2>
+    <div class="stat-row">
+      <div class="stat"><div class="num">168</div><div class="label">Hours of product contact per guest</div></div>
+      <div class="stat"><div class="num">336x</div><div class="label">vs a 30-min dealership test drive</div></div>
+      <div class="stat"><div class="num">57%</div><div class="label">of buyers open to switching brands (LexisNexis 2025)</div></div>
+    </div>
+    <p style="color:rgba(255,255,255,0.8);">A single Bronco on St. Barths is seen by hundreds of people per day. Four Broncos generate an estimated 400K-1.2M annual visual impressions — on the most exclusive island in the Caribbean. No billboard, no digital ad, no influencer campaign can match the impression density of a vehicle on this island.</p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 08 — COMPETITIVE LANDSCAPE
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide dark">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">08</span>
+  <h3>Honest Competitive Assessment</h3>
+  <h2>G-Wagons are already there.<br><strong>That's not the play.</strong></h2>
+  <div class="g2">
+    <div>
+      <p style="color:#bbb5aa;">Mercedes G63 AMGs park outside Eden Rock daily. Range Rovers appear at Cheval Blanc. Cayennes are ubiquitous. These are organic — owners and wealthy renters bring what they know.</p>
+      <p style="color:#bbb5aa;">Heritage Edition Bronco doesn't compete on price ($60K vs $200K G63) or status signaling. It competes on <strong style="color:#e8e4de;">character</strong>. And it's already winning — ~20 Broncos sold on-island through back-channel imports, without any Ford support.</p>
+      <ul>
+        <li><strong>G-Wagon</strong> — says "I'm rich." Everyone has one.</li>
+        <li><strong>Range Rover</strong> — says "I'm tasteful." Corporate.</li>
+        <li><strong>Heritage Bronco</strong> — says "I'm interesting." Doors off, heritage design, open air on a Caribbean road. Already on the island. Already chosen.</li>
+      </ul>
+      <p style="color:#bbb5aa;margin-top:16px;">The demand is proven. People are paying a premium to import Broncos through a painful process with no Ford support and $1,000 service calls. Formalize the channel and this scales immediately.</p>
+    </div>
+    <div>
+      <h4 style="margin-bottom:16px;color:#e8e4de;">Hotel vehicle programs today</h4>
+      <table>
+        <tr>
+          <td style="width:180px;"><img src="https://www.edenrockvillarental.com/assets/img/eden-rock/oc-logotype-grey.svg" alt="Eden Rock" style="height:14px;filter:brightness(2);"></td>
+          <td style="color:#bbb5aa;">Minis / Mokes (rotate)</td>
+        </tr>
+        <tr>
+          <td><img src="https://lebarthelemyhotel.com/images/icons/new_LeBarth_Logo_2_white.svg" alt="Le Barthélemy" style="height:16px;"></td>
+          <td style="color:#bbb5aa;">Mini Cooper</td>
+        </tr>
+        <tr>
+          <td><span style="font-weight:700;letter-spacing:1px;color:#C4BCB7;">CHEVAL BLANC</span></td>
+          <td style="color:#bbb5aa;">None (guests rent)</td>
+        </tr>
+        <tr>
+          <td><img src="https://a.storyblok.com/f/287000/189x62/d986c0daf7/logo-fouquet-s-saint-barth-white.svg" alt="Fouquet's" style="height:16px;"></td>
+          <td style="color:#bbb5aa;">None &rarr; <strong style="color:var(--sand);">Luxe Fleet</strong></td>
+        </tr>
+        <tr>
+          <td><img src="https://letoiny.com/wp-content/uploads/2025/02/logo-le-toiny-bleu.svg" alt="Le Toiny" style="height:14px;filter:brightness(2);"></td>
+          <td style="color:#bbb5aa;">None</td>
+        </tr>
+        <tr>
+          <td><img src="https://www.rosewoodhotels.com/content/dam/rosewoodhotels/icons/Wordmark.svg" alt="Rosewood" style="height:12px;filter:brightness(2);"></td>
+          <td style="color:#bbb5aa;">None</td>
+        </tr>
+        <tr>
+          <td><img src="https://360.agencewebcom.com/uploads/api/site-887/ckeditor/KEY-PARADISE-_SBH-LOGO_2024_NOIR-FOND-BLANC.png" alt="Manapany" style="height:18px;filter:brightness(2);"></td>
+          <td style="color:#bbb5aa;">None</td>
+        </tr>
+      </table>
+      <p style="font-size:13px;color:#888;margin-top:16px;">No hotel on St. Barths has a curated American vehicle program. Fouquet's will be first. Eden Rock is next — L'Agence St Barth has the relationship.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 09 — PARTNERS
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">09</span>
+  <h3>The Partners</h3>
+  <h2>Every role is filled. <strong>Ford is the brand.</strong></h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:32px;">
+    <!-- FBM — light bg, use colored logo with grayscale filter -->
+    <div class="card" style="border-top:3px solid #2EA3F2;">
+      <img src="https://fbm-autos.com/wp-content/uploads/2022/06/LOGO_Plan-de-travail-1.jpg"
+           alt="FBM" style="height:28px;object-fit:contain;filter:grayscale(1);margin-bottom:12px;">
+      <h4>FBM Automobiles</h4>
+      <p><strong>Operations.</strong> Airport-front since 1994. Already sold ~20 Broncos. Handles import, customs, registration, insurance, maintenance. Needs Ford support to scale.</p>
+    </div>
+    <!-- Fouquet's — light bg, use black logo -->
+    <div class="card" style="border-top:3px solid var(--sand);">
+      <img src="https://a.storyblok.com/f/287000/189x62/f116ee783e/logo-fouquet-s-saint-barth-black.svg"
+           alt="Fouquet's" style="height:24px;object-fit:contain;margin-bottom:12px;">
+      <h4>Fouquet's Saint-Barth</h4>
+      <p><strong>Venue + Buyer.</strong> Hotels Barri&egrave;re. Guest fleet placement. Lou Lou Beach Club for activations. Buys the Heritage Editions.</p>
+    </div>
+    <!-- L'Officiel — light bg, use dark logo -->
+    <div class="card" style="border-top:3px solid #636363;">
+      <img src="https://www.lofficielstbarth.com/images/logo-lofficiel-amtd.svg"
+           alt="L'Officiel" style="height:16px;object-fit:contain;margin-bottom:12px;">
+      <h4>L'Officiel St Barth</h4>
+      <p><strong>Media.</strong> Luxury lifestyle publication. Editorial shoot, print feature, social. Ford ad placement (EUR 7-60K).</p>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:16px;">
+    <!-- L'Agence — no logo, use text -->
+    <div class="card" style="border-top:3px solid var(--charcoal);">
+      <div style="font-size:14px;font-weight:700;letter-spacing:2px;color:var(--charcoal);margin-bottom:12px;">L'AGENCE ST BARTH</div>
+      <h4>Automotive Curation</h4>
+      <p><strong>In-house specialist team</strong> bridging luxury hospitality and Ford. Property placements, Ford Ambassador management, client introductions. The layer that makes this curated, not commercial.</p>
+    </div>
+    <div class="card" style="border-top:3px solid #343B45;">
+      <img src="https://cdn.prod.website-files.com/61ae2105911cea3662348486/6248cb3c66804a627c3d735c_Logo%20Sibarth%20Real%20Estate-blackbg.svg" alt="SiBarth" style="height:20px;object-fit:contain;margin-bottom:12px;filter:invert(1);" onerror="this.outerHTML='<div style=font-size:14px;font-weight:700;letter-spacing:2px;color:#343B45;margin-bottom:12px>SIBARTH</div>'">
+      <h4>Villa Rentals</h4>
+      <p><strong>600+ properties.</strong> Uses vehicles for client showings and transfers. Founder Ashley bought the first Bronco on SBH — drives UHNW clients in it daily. Natural fleet customer.</p>
+    </div>
+    <div class="card" style="border-top:3px solid #AD1B2D;">
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+        <img src="http://www.cool-rental.com/img/cool-rental-logo.svg" alt="Cool" style="height:16px;">
+        <img src="https://www.barthloc.com/images/logo-green.png" alt="BarthLoc" style="height:16px;">
+        <img src="https://www.mauricecarrental.com/wp-content/themes/mauricecarrental/images/logo.jpg" alt="Maurice" style="height:16px;">
+        <span style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);">TOPLOC</span>
+        <span style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);">GTA</span>
+        <span style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);">TURBE</span>
+      </div>
+      <h4>Volume Pipeline</h4>
+      <p><strong>6 rental operators</strong> hungry for Bronco allocation. 10-25 units if Ford provides access through FBM.</p>
+    </div>
+  </div>
+  <p style="margin-top:24px;font-size:14px;color:var(--muted);">Fouquet's buys the fleet. FBM operates. L'Officiel shoots. SiBarth and rental operators buy more. Ford provides the product, the brand, and the Ambassador. Nobody is asking Ford to fund the fleet — they're asking Ford to show up.</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 10 — CONTENT
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide dark">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">10</span>
+  <h3>Content Ford Receives</h3>
+  <h2>L'Officiel shoots it.<br><strong>Ford owns the content globally.</strong></h2>
+  <div class="g2">
+    <div>
+      <h4 style="margin-bottom:16px;color:#e8e4de;">L'Officiel editorial package</h4>
+      <ul>
+        <li><strong>Print feature</strong> — 4-page editorial in the high-season issue (10,000 copies, 100% UHNW readership)</li>
+        <li><strong>Digital</strong> — Feature article on lofficielstbarth.com</li>
+        <li><strong>Social</strong> — Instagram feed + stories + reels across L'Officiel handles</li>
+        <li><strong>Photography</strong> — Professional lifestyle shoot at Fouquet's, Lou Lou Beach Club, Shell Beach, Gustavia</li>
+      </ul>
+      <p style="margin-top:16px;color:#bbb5aa;">Estimated media value of L'Officiel contribution: <strong style="color:#e8e4de;">EUR 40,000-60,000 per season.</strong></p>
+    </div>
+    <div>
+      <h4 style="margin-bottom:16px;color:#e8e4de;">Ford content rights</h4>
+      <ul>
+        <li><strong>Social repost rights</strong> — @Ford, @FordBronco can amplify all L'Officiel content</li>
+        <li><strong>Global advertising license</strong> — negotiable separately for paid media, dealer materials, broadcast</li>
+        <li><strong>Guest UGC</strong> — UHNW guests (10K-500K followers) creating organic content in Heritage Editions</li>
+      </ul>
+      <h4 style="margin-top:24px;margin-bottom:16px;color:#e8e4de;">Seasonal calendar</h4>
+      <ul>
+        <li><strong>November</strong> — fleet arrives, launch shoot</li>
+        <li><strong>December</strong> — Art Week activation</li>
+        <li><strong>January</strong> — New Year's week (peak content moment)</li>
+        <li><strong>March</strong> — Bucket Regatta (40+ superyachts, 2,000+ UHNW)</li>
+        <li><strong>April</strong> — season close, sell publicity vehicle</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 11 — THE ASK
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide ford-blue">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">11</span>
+  <h3>The Ask</h3>
+  <h2>One vehicle. One ad buy.<br><strong>One season to prove it.</strong></h2>
+  <div class="g3">
+    <div class="card">
+      <h4>1. Place one Bronco 2-door</h4>
+      <p>Send a single unit to St. Barths via FBM as a promotional placement. MSO, never titled in US. It spends the season as the publicity vehicle — L'Officiel shoot, Lou Lou, events. <strong>Sells at end of season through FBM.</strong> Ford moves a unit, gets it back in revenue.</p>
+      <p style="margin-top:12px;font-size:13px;"><strong>Cost to Ford: ~$55K at invoice. Recovered on sale.</strong></p>
+    </div>
+    <div class="card">
+      <h4>2. Fund the L'Officiel ad</h4>
+      <p>One advertorial spread in L'Officiel St Barth's high-season issue. Shot at Fouquet's + Lou Lou Beach Club. Professional lifestyle photography featuring Heritage Edition + Roadster Concept (if placed). FBM tagged.</p>
+      <p style="margin-top:12px;font-size:13px;"><strong>Cost to Ford: EUR 7,000-60,000 depending on scope.</strong></p>
+    </div>
+    <div class="card">
+      <h4>3. Provide FBM allocation</h4>
+      <p>Authorize FBM Automobiles as a Ford-approved importer for St. Barths. Enable them to source Heritage Editions for Fouquet's fleet and base Broncos for rental operators. 10-25 units Year 1.</p>
+      <p style="margin-top:12px;font-size:13px;"><strong>Cost to Ford: $0. Revenue: 10-25 units sold.</strong></p>
+    </div>
+  </div>
+  <p style="color:rgba(255,255,255,0.7);margin-top:32px;font-size:14px;">Total Ford investment: one vehicle (recovered on sale) + one ad buy (EUR 7-60K). What Ford gets: direct access to UHNW buyers in their most receptive context, 10-25 unit sales through FBM, a luxury content library, and a repeatable model for every island destination worldwide.</p>
+  <p style="font-size:12px;color:var(--muted);margin-top:24px;">Benchmarks: Porsche PEC 80% purchase intent (Porsche Newsroom). Enterprise 49% wish list modification (PR Newswire). GT350-H 4x production increase (MotorCities). 57% brand defection risk (LexisNexis 2025).</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 12 — PHOTO GALLERY
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide dark" style="padding:40px;">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">12</span>
+  <h3 style="margin-bottom:12px;">The Setting</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+    <div style="position:relative;">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/d/dc/Shell_Beach_%2849909790381%29.jpg"
+           alt="Shell Beach" style="width:100%;height:200px;object-fit:cover;">
+      <div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Shell Beach</div>
+    </div>
+    <div style="position:relative;">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/5/5c/Gustavia_Harbor%2C_Saint-Barth%C3%A9lemy.jpg"
+           alt="Gustavia Harbor" style="width:100%;height:200px;object-fit:cover;">
+      <div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Gustavia Harbor</div>
+    </div>
+    <div style="position:relative;">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/7/77/St._Barts_Baie_de_Saint-Jean.jpg"
+           alt="St. Jean" style="width:100%;height:200px;object-fit:cover;">
+      <div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Baie de Saint-Jean</div>
+    </div>
+    <div style="position:relative;">
+      <img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/library/2025/bronco-roadster-concept/Bronco-Roadster-Concept-06.jpg"
+           alt="Roadster Concept" style="width:100%;height:200px;object-fit:cover;">
+      <div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Bronco Roadster Concept</div>
+    </div>
+    <div style="position:relative;">
+      <img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/library/2025/bronco-roadster-concept/Bronco-Roadster-Concept-10.jpg"
+           alt="Roadster driving" style="width:100%;height:200px;object-fit:cover;">
+      <div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Roadster — Open Air</div>
+    </div>
+    <div style="position:relative;">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/5/5b/Gustaf_III_Airport_Runway.jpg"
+           alt="SBH Airport" style="width:100%;height:200px;object-fit:cover;">
+      <div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Gustaf III Airport</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-top:6px;">
+    <div style="position:relative;">
+      <img src="https://www.aliceandolivia.com/on/demandware.static/-/Sites-aando-Library/default/dw16f13f93/images/WorldOfAandO/ArticlePage/BRONCO_25_MAIN_IMAGE_2200X3300@1x.jpg"
+           alt="A+O x Bronco" style="width:100%;height:160px;object-fit:cover;">
+      <div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">A+O x Bronco</div>
+    </div>
+    <div style="position:relative;">
+      <img src="https://classicfordbroncos.com/wp-content/uploads/2019/07/passenger_front_34-4-1410x661.jpg"
+           alt="Classic Ford Bronco" style="width:100%;height:160px;object-fit:cover;">
+      <div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Heritage Bronco</div>
+    </div>
+    <div style="position:relative;">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/d/db/St._Barthelemy_Airport_flight_arrival_at_SBH_-_panoramio.jpg"
+           alt="SBH approach" style="width:100%;height:160px;object-fit:cover;">
+      <div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">SBH Approach</div>
+    </div>
+    <div style="position:relative;">
+      <img src="https://api.st-barths.com/thumbnail/_/1400/900/contain/better/er-ext-3-principal.jpg"
+           alt="Eden Rock" style="width:100%;height:160px;object-fit:cover;">
+      <div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Eden Rock</div>
+    </div>
+  </div>
+  <p style="margin-top:12px;font-size:11px;color:#666;">
+    Landscape: Wikimedia Commons (CC). Vehicle: Ford Motor Company (fromtheroad.ford.com, editorial use). Classic Ford Broncos. alice + olivia.
+  </p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     SLIDE 13 — CLOSE
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="slide ford-blue" style="text-align:center;align-items:center;">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">13</span>
+  <div style="font-size:11px;letter-spacing:5px;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-bottom:40px;">Luxe Fleet</div>
+  <h1 style="font-size:56px;font-weight:300;letter-spacing:-2px;color:#fff;">
+    The best test drive<br><span style="font-weight:600;">is a vacation.</span>
+  </h1>
+  <p style="color:rgba(255,255,255,0.7);margin-top:24px;max-width:600px;text-align:center;">
+    Bronco already sells on the island. Your customers are already there. They're driving without you. Luxe Fleet gives Ford a seat at the table — and a handshake on Shell Beach.
+  </p>
+  <div style="margin-top:40px;padding:24px 32px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);display:inline-block;border-radius:2px;">
+    <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:8px;">Next Step</div>
+    <div style="font-size:16px;color:#fff;">30-minute call to discuss allocation and Season 1 timeline</div>
+  </div>
+  <div style="display:flex;gap:56px;justify-content:center;align-items:center;margin-top:48px;">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Ford_logo_flat.svg"
+         alt="Ford" style="height:40px;object-fit:contain;">
+    <img src="https://a.storyblok.com/f/287000/189x62/d986c0daf7/logo-fouquet-s-saint-barth-white.svg"
+         alt="Fouquet's" style="height:28px;object-fit:contain;">
+    <img src="https://www.lofficielstbarth.com/images/logo-lofficiel-rev-amtd.svg"
+         alt="L'Officiel" style="height:20px;object-fit:contain;">
+    <img src="https://fbm-autos.com/wp-content/uploads/2022/06/LOGO-blanc_Plan-de-travail-1-1024x388.jpg"
+         alt="FBM" style="height:22px;object-fit:contain;">
+  </div>
+  <div class="conf" style="color:rgba(255,255,255,0.3);left:50%;transform:translateX(-50%);">Confidential — Luxe Fleet / Ford Motor Company</div>
+</div>
+
+</body>
+</html>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import AddEventWizard from './AddEventWizard';
 import { UniversalImageUpload } from './UniversalImageUpload';

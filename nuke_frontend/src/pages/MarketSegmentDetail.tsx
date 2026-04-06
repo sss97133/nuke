@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useFeedSearchParams } from '../feed/hooks/useFeedSearchParams';
 import { useFeedQuery } from '../feed/hooks/useFeedQuery';
@@ -69,7 +69,6 @@ const fmtPct = (v: number | null) => {
 /* ------------------------------------------------------------------ */
 
 function SegmentHeader({ seg }: { seg: SegmentMeta }) {
-  const navigate = useNavigate();
   const pct7 = fmtPct(seg.change_7d_pct);
   const pct30 = fmtPct(seg.change_30d_pct);
 
@@ -112,13 +111,13 @@ function SegmentHeader({ seg }: { seg: SegmentMeta }) {
           )}
         </div>
 
-        <button
+        <Link
+          to="/market/segments"
           className="button button-secondary"
-          onClick={() => navigate('/market/segments')}
-          style={{ fontSize: 11, padding: '4px 10px' }}
+          style={{ textDecoration: 'none', color: 'inherit', fontSize: 11, padding: '4px 10px' }}
         >
           ALL SEGMENTS
-        </button>
+        </Link>
       </div>
 
       {/* Stats row */}
@@ -154,7 +153,6 @@ function SegmentHeader({ seg }: { seg: SegmentMeta }) {
 
 export default function MarketSegmentDetailPage() {
   const { slug } = useParams();
-  const navigate = useNavigate();
 
   // Segment metadata
   const [segment, setSegment] = useState<SegmentMeta | null>(null);
@@ -267,9 +265,9 @@ export default function MarketSegmentDetailPage() {
       <div style={{ padding: 24, color: 'var(--text-secondary)', fontSize: 12 }}>
         Segment not found.
         <div style={{ marginTop: 10 }}>
-          <button className="button button-secondary" onClick={() => navigate('/market/segments')}>
+          <Link to="/market/segments" className="button button-secondary" style={{ textDecoration: 'none', color: 'inherit' }}>
             All Segments
-          </button>
+          </Link>
         </div>
       </div>
     );

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { readCachedSession } from '../utils/cachedSession';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -175,7 +176,6 @@ const VehiclesInner: React.FC = () => {
     sources: true,
     vehicles: true
   });
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const urlSearchQuery = searchParams.get('search') || '';
   const urlTab = searchParams.get('tab');
@@ -1452,13 +1452,9 @@ const VehiclesInner: React.FC = () => {
                   >
                     COLLAPSE
                   </button>
-                  <button
-                    type="button"
-                    className="button button-primary button-small"
-                    onClick={() => navigate('/vehicle/add')}
-                  >
+                  <Link to="/vehicle/add" className="button button-primary button-small" style={{ textDecoration: 'none', color: 'inherit' }}>
                     ADD VEHICLE
-                  </button>
+                  </Link>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <input
                       type="number"
@@ -1882,13 +1878,9 @@ const VehiclesInner: React.FC = () => {
                       <p className="text-small" style={{ marginBottom: '12px' }}>
                         Your vehicles are stored locally. Sign in to sync across devices.
                       </p>
-                      <button
-                        type="button"
-                        className="button button-primary"
-                        onClick={() => navigate('/login')}
-                      >
+                      <Link to="/login" className="button button-primary" style={{ textDecoration: 'none', color: 'inherit' }}>
                         SIGN IN
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -1938,13 +1930,9 @@ const VehiclesInner: React.FC = () => {
                 >
                   REFRESH
                 </button>
-                <button
-                  type="button"
-                  className="button button-primary button-small"
-                  onClick={() => navigate('/vehicle/add')}
-                >
+                <Link to="/vehicle/add" className="button button-primary button-small" style={{ textDecoration: 'none', color: 'inherit' }}>
                   ADD
-                </button>
+                </Link>
               </div>
             </div>
 
@@ -2014,13 +2002,9 @@ const VehiclesInner: React.FC = () => {
                     <div className="text-small" style={{ marginBottom: '16px' }}>
                       Add a vehicle to start building a clean, low-stress library.
                     </div>
-                    <button
-                      type="button"
-                      className="button button-primary"
-                      onClick={() => navigate('/vehicle/add')}
-                    >
+                    <Link to="/vehicle/add" className="button button-primary" style={{ textDecoration: 'none', color: 'inherit' }}>
                       ADD VEHICLE
-                    </button>
+                    </Link>
                   </div>
                 </div>
               )}

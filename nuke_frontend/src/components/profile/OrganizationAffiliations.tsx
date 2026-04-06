@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import '../../styles/unified-design-system.css';
 
@@ -179,13 +179,13 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
           </div>
         )}
         {isOwnProfile && (
-          <button
-            onClick={() => navigate('/org')}
+          <Link
+            to="/org"
             className="cursor-button"
-            style={{ padding: '10px 20px' }}
+            style={{ textDecoration: 'none', color: 'inherit', padding: '10px 20px' }}
           >
             Browse Organizations
-          </button>
+          </Link>
         )}
       </div>
     );

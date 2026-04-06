@@ -7,8 +7,6 @@ import { FaviconIcon } from '../common/FaviconIcon';
 import { useImageAnalysis } from '../../hooks/useImageAnalysis';
 import { useAutoTagging } from '../../hooks/useAutoTagging';
 import SpatialPartPopup from '../parts/SpatialPartPopup';
-import PartCheckoutModal from '../parts/PartCheckoutModal';
-import PartEnrichmentModal from '../parts/PartEnrichmentModal';
 import { ManualAnnotationViewer } from './ManualAnnotationViewer';
 import { ClickablePartModal } from '../parts/ClickablePartModal';
 import { AnnotoriousImageTagger } from './AnnotoriousImageTagger';

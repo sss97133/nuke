@@ -1,0 +1,420 @@
+/**
+ * Deck Style Guide — design tokens + reusable component classes.
+ * Scoped under .deck-root to isolate from the Nuke design system.
+ *
+ * Brand overrides: set data-brand on .deck-root to apply brand palette.
+ * Example: <div class="deck-root" data-brand="ford">
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ── DESIGN TOKENS ── */
+.deck-root {
+  /* Palette primitives */
+  --dk-bone: #f0efe9;
+  --dk-charcoal: #1a1a2e;
+  --dk-marsh: #4a6741;
+  --dk-sand: #c9a96e;
+  --dk-muted: #777;
+  --dk-border: rgba(0, 0, 0, 0.08);
+
+  /* Brand override slots (neutral defaults) */
+  --dk-brand-primary: var(--dk-charcoal);
+  --dk-brand-accent: var(--dk-sand);
+
+  /* Typography scale (presentation, not web) */
+  --dk-text-xs: 9px;
+  --dk-text-sm: 11px;
+  --dk-text-base: 14px;
+  --dk-text-md: 15px;
+  --dk-text-body: 17px;
+  --dk-text-lg: 24px;
+  --dk-text-xl: 32px;
+  --dk-text-2xl: 40px;
+  --dk-text-3xl: 56px;
+  --dk-text-4xl: 72px;
+  --dk-text-5xl: 96px;
+
+  /* Spacing (8px grid) */
+  --dk-space-1: 8px;
+  --dk-space-2: 16px;
+  --dk-space-3: 24px;
+  --dk-space-4: 32px;
+  --dk-space-5: 40px;
+  --dk-space-6: 48px;
+  --dk-space-7: 56px;
+  --dk-space-8: 64px;
+  --dk-slide-pad: 80px;
+
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--dk-bone);
+  color: var(--dk-charcoal);
+  -webkit-font-smoothing: antialiased;
+}
+
+.deck-root * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+
+/* ── BRAND OVERRIDES ── */
+.deck-root[data-brand="ford"] {
+  --dk-brand-primary: #003478;
+  --dk-brand-accent: #c9a96e;
+}
+
+
+/* ── SLIDE STRUCTURE ── */
+.deck-root .dk-slide {
+  min-height: 100vh;
+  padding: var(--dk-slide-pad);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  border-bottom: 1px solid var(--dk-border);
+}
+
+.deck-root .dk-slide-mark {
+  position: absolute;
+  top: 40px;
+  left: var(--dk-slide-pad);
+  font-size: var(--dk-text-sm);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--dk-muted);
+}
+
+.deck-root .dk-slide-num {
+  position: absolute;
+  top: 40px;
+  right: var(--dk-slide-pad);
+  font-size: var(--dk-text-sm);
+  letter-spacing: 3px;
+  color: var(--dk-muted);
+}
+
+
+/* ── SLIDE BACKGROUNDS ── */
+
+/* Light (default) */
+.deck-root .dk-light {
+  background: var(--dk-bone);
+  color: var(--dk-charcoal);
+}
+
+/* Dark */
+.deck-root .dk-dark {
+  background: var(--dk-charcoal);
+  color: #e8e4de;
+}
+.deck-root .dk-dark h2,
+.deck-root .dk-dark h3,
+.deck-root .dk-dark h4 { color: #e8e4de; }
+.deck-root .dk-dark p,
+.deck-root .dk-dark li,
+.deck-root .dk-dark td { color: #bbb5aa; }
+.deck-root .dk-dark .dk-slide-mark,
+.deck-root .dk-dark .dk-slide-num { color: #555; }
+.deck-root .dk-dark .dk-card { background: #222233; border-color: rgba(255, 255, 255, 0.06); }
+.deck-root .dk-dark .dk-card h4 { color: #e8e4de; }
+.deck-root .dk-dark .dk-card p { color: #bbb5aa; }
+.deck-root .dk-dark blockquote { border-color: var(--dk-sand); }
+.deck-root .dk-dark h3 { color: var(--dk-sand); }
+.deck-root .dk-dark ul li::before { background: var(--dk-sand); }
+.deck-root .dk-dark ul li strong { color: #e8e4de; }
+.deck-root .dk-dark th { color: #666; border-color: rgba(255, 255, 255, 0.08); }
+.deck-root .dk-dark td { border-color: rgba(255, 255, 255, 0.08); }
+
+/* Brand (primary brand color background) */
+.deck-root .dk-brand {
+  background: var(--dk-brand-primary);
+  color: #fff;
+}
+.deck-root .dk-brand h2,
+.deck-root .dk-brand h3,
+.deck-root .dk-brand h4,
+.deck-root .dk-brand p,
+.deck-root .dk-brand li,
+.deck-root .dk-brand td { color: #fff; }
+.deck-root .dk-brand .dk-slide-mark,
+.deck-root .dk-brand .dk-slide-num { color: rgba(255, 255, 255, 0.35); }
+.deck-root .dk-brand .dk-card { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.12); }
+.deck-root .dk-brand .dk-card h4,
+.deck-root .dk-brand .dk-card p { color: #fff; }
+.deck-root .dk-brand h3 { color: var(--dk-brand-accent); }
+.deck-root .dk-brand ul li::before { background: #fff; }
+.deck-root .dk-brand .dk-stat .dk-stat-num { color: #fff; }
+.deck-root .dk-brand .dk-stat .dk-stat-label { color: rgba(255, 255, 255, 0.5); }
+
+/* Accent (secondary brand color background — marsh, etc.) */
+.deck-root .dk-accent {
+  background: var(--dk-marsh);
+  color: #fff;
+}
+.deck-root .dk-accent h2,
+.deck-root .dk-accent h3,
+.deck-root .dk-accent h4,
+.deck-root .dk-accent p,
+.deck-root .dk-accent li { color: #fff; }
+.deck-root .dk-accent .dk-slide-mark,
+.deck-root .dk-accent .dk-slide-num { color: rgba(255, 255, 255, 0.35); }
+.deck-root .dk-accent .dk-card { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.12); }
+.deck-root .dk-accent .dk-card h4,
+.deck-root .dk-accent .dk-card p { color: #fff; }
+.deck-root .dk-accent h3 { color: rgba(255, 255, 255, 0.6); }
+
+
+/* ── TYPOGRAPHY ── */
+.deck-root h2 {
+  font-size: var(--dk-text-2xl);
+  font-weight: 300;
+  letter-spacing: -1px;
+  margin-bottom: var(--dk-space-4);
+  line-height: 1.15;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+.deck-root h2 strong { font-weight: 600; }
+
+.deck-root h3 {
+  font-size: 12px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--dk-brand-primary);
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.deck-root p {
+  font-size: var(--dk-text-body);
+  line-height: 1.7;
+  color: #4a4a4a;
+  max-width: 700px;
+  margin-bottom: 20px;
+}
+
+.deck-root blockquote {
+  border-left: 3px solid var(--dk-brand-primary);
+  padding-left: 20px;
+  margin: var(--dk-space-3) 0;
+  font-style: italic;
+}
+.deck-root .dk-dark blockquote { border-color: var(--dk-sand); }
+
+
+/* ── LAYOUT GRIDS ── */
+.deck-root .dk-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--dk-space-6); margin-top: var(--dk-space-4); }
+.deck-root .dk-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--dk-space-4); margin-top: var(--dk-space-4); }
+.deck-root .dk-grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: var(--dk-space-3); margin-top: var(--dk-space-4); }
+
+
+/* ── CARD ── */
+.deck-root .dk-card {
+  padding: var(--dk-space-4);
+  background: #ebe6e0;
+  border: 1px solid var(--dk-border);
+  border-radius: 2px;
+}
+.deck-root .dk-card h4 { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+.deck-root .dk-card p { font-size: var(--dk-text-base); line-height: 1.6; margin-bottom: 0; max-width: none; }
+
+/* Card variant: brand-colored top border */
+.deck-root .dk-card--accent {
+  border-top: 3px solid var(--dk-brand-primary);
+}
+
+/* Card variant: brand background fill */
+.deck-root .dk-card--brand {
+  background: var(--dk-brand-primary);
+  border-color: transparent;
+  color: #fff;
+}
+.deck-root .dk-card--brand h4,
+.deck-root .dk-card--brand p { color: #fff; }
+
+/* Card variant: large (spans full width or takes more space) */
+.deck-root .dk-card--large {
+  grid-column: 1 / -1;
+}
+
+
+/* ── STATS ── */
+.deck-root .dk-stat-row {
+  display: flex;
+  gap: var(--dk-space-8);
+  margin: var(--dk-space-4) 0;
+  flex-wrap: wrap;
+}
+
+.deck-root .dk-stat .dk-stat-num {
+  font-size: var(--dk-text-3xl);
+  font-weight: 300;
+  color: var(--dk-brand-primary);
+}
+.deck-root .dk-dark .dk-stat .dk-stat-num { color: #fff; }
+
+.deck-root .dk-stat .dk-stat-label {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dk-muted);
+  margin-top: 6px;
+}
+.deck-root .dk-dark .dk-stat .dk-stat-label { color: #888; }
+
+
+/* ── LISTS ── */
+.deck-root ul { list-style: none; margin-top: 12px; }
+.deck-root ul li {
+  font-size: var(--dk-text-md);
+  line-height: 1.8;
+  color: #4a4a4a;
+  padding-left: 18px;
+  position: relative;
+}
+.deck-root ul li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 11px;
+  width: 5px;
+  height: 5px;
+  background: var(--dk-brand-primary);
+  border-radius: 50%;
+}
+.deck-root ul li strong { color: var(--dk-charcoal); font-weight: 600; }
+.deck-root .dk-dark ul li { color: #bbb5aa; }
+
+
+/* ── TABLE ── */
+.deck-root table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--dk-text-base);
+  margin-top: var(--dk-space-3);
+}
+.deck-root th {
+  padding: 10px 14px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-size: 10px;
+  color: var(--dk-muted);
+  text-align: left;
+  border-bottom: 1px solid var(--dk-border);
+}
+.deck-root td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--dk-border);
+}
+
+
+/* ── LOGO BAR ── */
+.deck-root .dk-logo-bar {
+  display: flex;
+  gap: var(--dk-space-7);
+  justify-content: center;
+  align-items: center;
+  margin-top: var(--dk-space-7);
+}
+.deck-root .dk-logo-bar img {
+  height: 32px;
+  object-fit: contain;
+}
+
+
+/* ── IMAGE STRIP (horizontal row of images) ── */
+.deck-root .dk-image-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--dk-space-2);
+  margin-top: var(--dk-space-4);
+}
+.deck-root .dk-image-strip img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+.deck-root .dk-image-strip .dk-img-caption {
+  font-size: 10px;
+  color: var(--dk-muted);
+  margin-top: 4px;
+}
+.deck-root .dk-dark .dk-img-caption { color: #666; }
+
+
+/* ── QUOTE ── */
+.deck-root .dk-quote {
+  border-left: 3px solid var(--dk-brand-primary);
+  padding-left: 20px;
+  margin: var(--dk-space-3) 0;
+  font-style: italic;
+}
+.deck-root .dk-dark .dk-quote { border-color: var(--dk-sand); }
+.deck-root .dk-quote .dk-quote-text {
+  font-size: var(--dk-text-body);
+  line-height: 1.7;
+}
+.deck-root .dk-quote .dk-quote-attr {
+  font-size: var(--dk-text-base);
+  color: var(--dk-muted);
+  margin-top: var(--dk-space-1);
+  font-style: normal;
+}
+.deck-root .dk-quote .dk-quote-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: var(--dk-space-1);
+}
+
+
+/* ── SOURCE LINE ── */
+.deck-root .dk-source-line {
+  font-size: var(--dk-text-xs);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dk-muted);
+  position: absolute;
+  bottom: 20px;
+  left: var(--dk-slide-pad);
+  max-width: calc(100% - 2 * var(--dk-slide-pad));
+}
+.deck-root .dk-dark .dk-source-line,
+.deck-root .dk-brand .dk-source-line,
+.deck-root .dk-accent .dk-source-line { color: rgba(255, 255, 255, 0.3); }
+
+
+/* ── HERO BACKGROUND ── */
+.deck-root .dk-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+
+/* ── CONFIDENTIAL LABEL ── */
+.deck-root .dk-conf {
+  font-size: var(--dk-text-xs);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dk-muted);
+  position: absolute;
+  bottom: 20px;
+  left: var(--dk-slide-pad);
+}
+.deck-root .dk-dark .dk-conf,
+.deck-root .dk-brand .dk-conf { color: rgba(255, 255, 255, 0.3); }
+
+
+/* ── PRINT ── */
+@media print {
+  .deck-root .dk-slide { page-break-after: always; }
+  .deck-toolbar { display: none !important; }
+}

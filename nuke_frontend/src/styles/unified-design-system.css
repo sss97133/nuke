@@ -769,47 +769,6 @@ body {
    BUTTON SYSTEM
    ================================================ */
 
-.btn-utility {
-  border: 2px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  padding: 4px 8px;
-  font-size: var(--fs-9);
-  font-weight: 600;
-  font-family: var(--font-family);
-  cursor: pointer;
-  transition: var(--transition);
-  border-radius: 0;
-}
-
-.btn-utility:hover {
-  background: var(--surface-hover);
-  border-color: var(--accent);
-}
-
-.btn-utility.active {
-  background: var(--text);
-  color: var(--surface);
-  border-color: var(--text);
-}
-
-.btn-primary {
-  border: 2px solid var(--text);
-  background: var(--surface);
-  color: var(--text);
-  padding: 8px 16px;
-  font-size: var(--fs-10);
-  font-weight: 600;
-  cursor: pointer;
-  transition: var(--transition);
-  border-radius: 0;
-}
-
-.btn-primary:hover {
-  background: var(--text);
-  color: var(--surface);
-}
-
 /* Shared base — all .btn-* extend this implicitly via the component */
 .btn-base {
   display: inline-flex;
@@ -839,6 +798,16 @@ body {
 .btn-md { padding: 6px 12px; font-size: var(--fs-10); }
 
 /* Variants */
+.btn-primary {
+  border-color: var(--text);
+  background: var(--surface);
+  color: var(--text);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--text);
+  color: var(--surface);
+}
+
 .btn-secondary {
   border-color: var(--border);
   background: var(--surface);
@@ -857,6 +826,21 @@ body {
 .btn-danger:hover:not(:disabled) {
   background: var(--error);
   color: var(--surface);
+}
+
+.btn-utility {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+.btn-utility:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+.btn-utility.active {
+  background: var(--text);
+  color: var(--surface);
+  border-color: var(--text);
 }
 
 .btn-ghost {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import '../styles/unified-design-system.css';
 import { readCachedSession } from '../utils/cachedSession';
@@ -114,9 +114,9 @@ export default function UnlinkedReceipts() {
                 <button className="button button-secondary" onClick={loadReceipts} style={{ fontSize: '11px' }}>
                   Refresh
                 </button>
-                <button className="button button-secondary" onClick={() => navigate('/org/dashboard')} style={{ fontSize: '11px' }}>
+                <Link to="/org/dashboard" className="button button-secondary" style={{ textDecoration: 'none', color: 'inherit', fontSize: '11px' }}>
                   Back to Dashboard
-                </button>
+                </Link>
               </div>
             </div>
             <div className="card-body">
@@ -158,13 +158,13 @@ export default function UnlinkedReceipts() {
                             <td style={{ padding: '8px' }}>
                               <div>{vehicleLabel}</div>
                               {receipt.vehicle_id && (
-                                <button
+                                <Link
+                                  to={`/vehicle/${receipt.vehicle_id}`}
                                   className="button button-link"
-                                  style={{ fontSize: '11px', padding: 0 }}
-                                  onClick={() => navigate(`/vehicle/${receipt.vehicle_id}`)}
+                                  style={{ fontSize: '11px', padding: 0, textDecoration: 'none' }}
                                 >
                                   Open vehicle
-                                </button>
+                                </Link>
                               )}
                             </td>
                             <td style={{ padding: '8px' }}>

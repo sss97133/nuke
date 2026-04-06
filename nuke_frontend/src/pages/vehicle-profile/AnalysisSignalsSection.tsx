@@ -15,8 +15,8 @@ const SignalDetailPopup: React.FC<{ signal: AnalysisSignal }> = ({ signal }) => 
     <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
       <span style={{
         fontFamily: "'Courier New', monospace", fontSize: '8px', fontWeight: 700,
-        padding: '1px 5px', border: `2px solid ${SEVERITY_BORDER[signal.severity] || '#999'}`,
-        color: SEVERITY_BORDER[signal.severity] || '#999', textTransform: 'uppercase',
+        padding: '1px 5px', border: `2px solid ${SEVERITY_BORDER[signal.severity] || 'var(--text-disabled)'}`,
+        color: SEVERITY_BORDER[signal.severity] || 'var(--text-disabled)', textTransform: 'uppercase',
       }}>{signal.severity}</span>
       {signal.score != null && (
         <span style={{ fontFamily: "'Courier New', monospace", fontSize: '10px', fontWeight: 700 }}>
@@ -105,7 +105,7 @@ const AnalysisSignalsSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) 
           <div style={{
             width: '4px',
             alignSelf: 'stretch',
-            background: SEVERITY_BORDER[signal.severity] || '#999',
+            background: SEVERITY_BORDER[signal.severity] || 'var(--text-disabled)',
           }} />
           <span style={{ color: 'var(--text)' }}>{signal.label}</span>
           <span style={{

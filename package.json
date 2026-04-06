@@ -5,6 +5,9 @@
   "private": true,
   "scripts": {
     "access:firecrawl-logs": "tsx scripts/access-firecrawl-logs-api.ts",
+    "brand:scrape": "dotenvx run -- node scripts/scrape-brand-assets.mjs",
+    "brand:scrape:dry-run": "dotenvx run -- node scripts/scrape-brand-assets.mjs --dry-run",
+    "brand:scrape:preview": "dotenvx run -- node scripts/scrape-brand-assets.mjs --url",
     "backfill:bj-snapshots": "node scripts/bj-snapshot-backfill.mjs",
     "analyze:missing-make-sources": "tsx scripts/analyze-missing-make-sources.ts",
     "analyze:user-stylometrics": "node scripts/user-stylometric-analyzer.mjs",
@@ -89,6 +92,9 @@
     "fb:desc-enrich:playwright": "dotenvx run -- node scripts/fb-desc-enrich-playwright.mjs --active-only",
     "fb:desc-enrich:stats": "dotenvx run -- node scripts/fb-desc-enrich.mjs --stats",
     "fb:desc-enrich:retry": "dotenvx run -- node scripts/fb-desc-enrich.mjs --retry-failed --batch 500",
+    "fb:enrich-cookies": "dotenvx run -- node scripts/fb-enrich-with-cookies.mjs",
+    "fb:create-vehicles": "dotenvx run -- node scripts/fb-create-vehicles-from-listings.mjs",
+    "fb:download-images": "dotenvx run -- node scripts/fb-create-vehicles-from-listings.mjs --images-only",
     "fb:sweep": "dotenvx run -- node scripts/fb-marketplace-local-scraper.mjs --all --max-pages 30",
     "fb:sweep-and-enrich": "dotenvx run -- node scripts/fb-sweep-and-enrich.mjs",
     "fb:taste-enrich": "dotenvx run -- node scripts/fb-marketplace-enricher.mjs --batch 50",
@@ -120,6 +126,11 @@
     "iphoto:work": "dotenvx run -- node scripts/work-photos-intake.mjs",
     "iphoto:work:dry-run": "dotenvx run -- node scripts/work-photos-intake.mjs --dry-run",
     "iphoto:work:watch": "dotenvx run -- node scripts/work-photos-intake.mjs --watch",
+    "imessage:sync": "dotenvx run -- node scripts/imessage-vehicle-sync.mjs",
+    "imessage:sync:backfill": "dotenvx run -- node scripts/imessage-vehicle-sync.mjs --backfill",
+    "imessage:sync:daemon": "dotenvx run -- node scripts/imessage-vehicle-sync.mjs --daemon",
+    "imessage:sync:dry-run": "dotenvx run -- node scripts/imessage-vehicle-sync.mjs --dry-run",
+    "imessage:sync:status": "dotenvx run -- node scripts/imessage-vehicle-sync.mjs --status",
     "import:memes": "tsx scripts/import-popular-memes.ts",
     "index:bat-local-partners": "tsx scripts/index-bat-local-partners.ts",
     "ingest:bat": "tsx scripts/bat-seed-and-import.ts",
@@ -146,6 +157,7 @@
     "ops:regression": "dotenvx run -- bash scripts/scheduled/nightly-regression.sh",
     "ops:smoke": "dotenvx run -- bash scripts/scheduled/smoke-test.sh",
     "overnight": "dotenvx run -- bash scripts/overnight-run.sh",
+    "wiring:extract-positions": "dotenvx run -- node scripts/extract-wiring-positions.mjs",
     "parse:firecrawl-json": "tsx scripts/parse-firecrawl-json-to-make-model.ts",
     "photo-intel": "dotenvx run -- /Users/skylar/nuke/yono/.venv/bin/python -m tools.photo_intel.main",
     "photo-intel:dry": "dotenvx run -- /Users/skylar/nuke/yono/.venv/bin/python -m tools.photo_intel.main --dry-run",
@@ -182,7 +194,8 @@
     "wo:balance": "dotenvx run -- node mcp-servers/nuke-context/balance.mjs",
     "wo:ingest-zelle": "dotenvx run -- node mcp-servers/nuke-context/ingest-zelle.mjs",
     "wo:ingest-receipts": "dotenvx run -- node mcp-servers/nuke-context/ingest-receipts.mjs",
-    "wo:ingest-thread": "dotenvx run -- node mcp-servers/nuke-context/ingest-thread.mjs"
+    "wo:ingest-thread": "dotenvx run -- node mcp-servers/nuke-context/ingest-thread.mjs",
+    "wo:statement": "dotenvx run -- node mcp-servers/nuke-context/statement-html.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",
@@ -196,6 +209,7 @@
     "chrome-cookies-secure": "^3.0.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
+    "exifr": "^7.1.3",
     "express": "^5.2.1",
     "jsdom": "^27.0.1",
     "node-fetch": "^3.3.2",
@@ -205,13 +219,14 @@
     "pg": "^8.18.0",
     "playwright": "^1.58.1",
     "plist": "^3.1.0",
+    "sharp": "^0.33.0",
     "stripe": "^20.3.0"
   },
   "overrides": {
     "minimatch": "^10.2.1",
     "axios": "^1.13.5",
     "qs": "^6.14.2",
-    "tar": "^7.5.8"
+    "tar": "^7.5.11"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

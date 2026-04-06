@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 // AppLayout now provided globally by App.tsx
@@ -27,8 +27,6 @@ const ProfileVerification = React.lazy(() => import('../components/ProfileVerifi
 const ChangePasswordForm = React.lazy(() => import('../components/auth/ChangePasswordForm'));
 const DatabaseDiagnostic = React.lazy(() => import('../components/debug/DatabaseDiagnostic'));
 const OrganizationAffiliations = React.lazy(() => import('../components/profile/OrganizationAffiliations'));
-const MyOrganizations = React.lazy(() => import('./MyOrganizations'));
-const MyAuctions = React.lazy(() => import('./MyAuctions'));
 const PublicAuctionTrackRecord = React.lazy(() => import('../components/profile/PublicAuctionTrackRecord'));
 const VehicleMergeInterface = React.lazy(() => import('../components/vehicle/VehicleMergeInterface'));
 const PersonalPhotoLibrary = React.lazy(() => import('./PersonalPhotoLibrary').then(m => ({ default: m.PersonalPhotoLibrary })));
@@ -583,13 +581,14 @@ const Profile: React.FC = () => {
             {/* Action buttons */}
             <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
               {currentUserId && (
-                <button
+                <Link
+                  to="/claim-identity"
                   className="button button-small"
-                  onClick={() => navigate('/claim-identity')}
+                  style={{ textDecoration: 'none', color: 'inherit' }}
                   title="Claim external activity sources (handles) and merge them into your activity repo"
                 >
                   CLAIM
-                </button>
+                </Link>
               )}
               {isOwnProfile && (
                 <button
@@ -600,10 +599,11 @@ const Profile: React.FC = () => {
                 </button>
               )}
               {isAdmin && (
-                <button
+                <Link
+                  to="/admin"
                   className="button button-small"
-                  onClick={() => navigate('/admin')}
                   style={{
+                    textDecoration: 'none',
                     background: 'var(--black)',
                     color: 'var(--white)',
                     border: '2px solid var(--black)',
@@ -611,7 +611,7 @@ const Profile: React.FC = () => {
                   }}
                 >
                   ADMIN
-                </button>
+                </Link>
               )}
             </div>
           </div>
@@ -819,12 +819,12 @@ const Profile: React.FC = () => {
                       {!profileData.completion?.first_vehicle_added && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '11px' }}>
                           <span style={{ color: 'var(--text-muted)', fontFamily: "'Courier New', monospace" }}>[ ]</span>
-                          <button
-                            style={{ all: 'unset', cursor: 'pointer', color: 'var(--text)', textDecoration: 'underline' }}
-                            onClick={() => navigate('/vehicle/add')}
+                          <Link
+                            to="/vehicle/add"
+                            style={{ color: 'var(--text)', textDecoration: 'underline' }}
                           >
                             Add your first vehicle
-                          </button>
+                          </Link>
                         </div>
                       )}
                     </div>
@@ -893,25 +893,17 @@ const Profile: React.FC = () => {
             
             {activeTab === 'organizations' && (
               <div>
-                {isOwnProfile ? (
-                  <MyOrganizations />
-                ) : (
-                  <OrganizationAffiliations userId={profile.id} isOwnProfile={isOwnProfile} />
-                )}
+                <OrganizationAffiliations userId={profile.id} isOwnProfile={isOwnProfile} />
               </div>
             )}
 
             {activeTab === 'auctions' && (
               <div>
-                {isOwnProfile ? (
-                  <MyAuctions />
-                ) : (
-                  <PublicAuctionTrackRecord
-                    listings={comprehensiveData?.listings || []}
-                    loading={!comprehensiveData}
-                    profileName={profile.full_name || profile.username || null}
-                  />
-                )}
+                <PublicAuctionTrackRecord
+                  listings={comprehensiveData?.listings || []}
+                  loading={!comprehensiveData}
+                  profileName={profile.full_name || profile.username || null}
+                />
               </div>
             )}
 

@@ -56,9 +56,9 @@ function getSourceLabel(sourceType: string): string {
 /* ------------------------------------------------------------------ */
 
 function getConfidenceColor(confidence: number): string {
-  if (confidence >= 0.85) return '#1a5c1a';  // green
-  if (confidence >= 0.50) return '#8a6b1a';  // gold
-  return '#8a1a1a';                          // red
+  if (confidence >= 0.85) return 'var(--success)';
+  if (confidence >= 0.50) return 'var(--warning)';
+  return 'var(--error)';
 }
 
 
@@ -98,7 +98,7 @@ const S = {
     letterSpacing: '0.04em',
     textTransform: 'uppercase' as const,
     padding: '1px 4px',
-    border: '1px solid #999',
+    border: '1px solid var(--text-disabled)',
     background: 'var(--bg)',
     color: 'var(--text)',
     maxWidth: '100px',
@@ -246,14 +246,14 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
           gap: '6px',
           marginBottom: '4px',
           paddingBottom: '4px',
-          borderBottom: '1px solid #ddd',
+          borderBottom: '1px solid var(--border)',
         }}>
           <span style={S.label}>SOURCES</span>
           <span style={{ ...S.label, color: 'var(--text-disabled)' }}>
             {totalSources} INPUT{totalSources !== 1 ? 'S' : ''}
           </span>
           {agreementCount > 1 && (
-            <span style={{ ...S.label, color: '#444' }}>
+            <span style={{ ...S.label, color: 'var(--text)' }}>
               {agreementCount}/{totalSources} AGREE
             </span>
           )}
@@ -261,9 +261,9 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
             <span style={{
               ...S.conflictBadge,
               ...(conflictType === 'genuine' ? {} :
-                conflictType === 'refinement' ? { borderColor: '#b05a00', background: '#fff8f0', color: '#804000' } :
-                conflictType === 'synonym' ? { borderColor: '#666', background: '#f5f5f5', color: '#666' } :
-                conflictType === 'variance' ? { borderColor: '#666', background: '#f5f5f5', color: '#666' } : {}),
+                conflictType === 'refinement' ? { borderColor: 'var(--warning)', background: 'var(--warning-dim)', color: 'var(--warning)' } :
+                conflictType === 'synonym' ? { borderColor: 'var(--text-secondary)', background: 'var(--bg)', color: 'var(--text-secondary)' } :
+                conflictType === 'variance' ? { borderColor: 'var(--text-secondary)', background: 'var(--bg)', color: 'var(--text-secondary)' } : {}),
             }}>
               {conflictType === 'genuine' ? 'CONFLICT' :
                conflictType === 'refinement' ? 'REFINEMENT' :
@@ -342,7 +342,7 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
           <div style={{
             marginTop: '4px',
             paddingTop: '4px',
-            borderTop: '1px solid #ddd',
+            borderTop: '1px solid var(--border)',
           }}>
             <span style={{ ...S.label, marginRight: '4px' }}>NOTE</span>
             <span style={{ ...S.value, whiteSpace: 'normal' as const }}>{primary.notes}</span>
@@ -387,9 +387,9 @@ export const SourceBadge: React.FC<SourceBadgeProps> = ({ group, onClick }) => {
         ...S.badge,
         fontSize: '8px',
         padding: '0px 3px',
-        borderColor: isGenuine ? '#c00' : 'var(--text-disabled)',
-        background: isGenuine ? '#fee' : 'var(--bg)',
-        color: isGenuine ? '#900' : 'var(--text)',
+        borderColor: isGenuine ? 'var(--error)' : 'var(--text-disabled)',
+        background: isGenuine ? 'var(--error-dim)' : 'var(--bg)',
+        color: isGenuine ? 'var(--error)' : 'var(--text)',
       }}>
         {getSourceLabel(primary.source_type)}
       </span>

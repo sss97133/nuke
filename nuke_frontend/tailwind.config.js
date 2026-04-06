@@ -7,6 +7,17 @@ export default {
   ],
   theme: {
     extend: {},
+    fontSize: {
+      'xs':  'var(--fs-8)',
+      'sm':  'var(--fs-9)',
+      'base': 'var(--fs-10)',
+      'lg':  'var(--fs-11)',
+      'xl':  'var(--fs-11)',
+      '2xl': 'var(--fs-12)',
+      '3xl': 'var(--fs-12)',
+      '4xl': 'var(--fs-12)',
+      '5xl': 'var(--fs-12)',
+    },
     borderRadius: {
       DEFAULT: '0',
       none: '0',

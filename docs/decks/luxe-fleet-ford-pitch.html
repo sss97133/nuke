@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luxe Fleet — Ford Motor Company</title>
+<!--
+  Luxe Fleet — Ford Pitch Deck
+  Target: Lisa Materazzo, CMO Ford Motor Company
+  Path: Hauthils → Stacey Bendet → Materazzo
+
+  Brand data from: organizations.brand_design_language
+  Images: fromtheroad.ford.com (editorial use cleared)
+  Composition: docs/library/technical/design-book/13-multi-brand-composition.md
+-->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bone: #f0efe9;
+    --charcoal: #1a1a2e;
+    --marsh: #4a6741;
+    --sand: #c9a96e;
+    --ford-blue: #003478;
+    --ford-dark: #00274C;
+    --muted: #777;
+    --border: rgba(0,0,0,0.08);
+  }
+
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bone); color: var(--charcoal); -webkit-font-smoothing: antialiased; }
+
+  .slide { min-height: 100vh; padding: 80px; display: flex; flex-direction: column; justify-content: center; position: relative; border-bottom: 1px solid var(--border); }
+  .slide-num { position: absolute; top: 40px; right: 80px; font-size: 11px; letter-spacing: 3px; color: var(--muted); }
+  .slide-mark { position: absolute; top: 40px; left: 80px; font-size: 11px; letter-spacing: 4px; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+
+  .dark { background: var(--charcoal) !important; color: #e8e4de !important; }
+  .dark h2, .dark h3, .dark h4 { color: #e8e4de; }
+  .dark p, .dark li, .dark td { color: #bbb5aa; }
+  .dark .slide-num, .dark .slide-mark { color: #666; }
+  .dark .card { background: #222233; border-color: rgba(255,255,255,0.06); }
+  .dark .card h4 { color: #e8e4de; }
+  .dark .card p { color: #bbb5aa; }
+
+  .ford-blue { background: var(--ford-blue) !important; color: #fff !important; }
+  .ford-blue h2, .ford-blue h3, .ford-blue h4, .ford-blue p, .ford-blue li { color: #fff; }
+  .ford-blue .slide-num, .ford-blue .slide-mark { color: rgba(255,255,255,0.4); }
+  .ford-blue .card { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.12); }
+  .ford-blue .card h4, .ford-blue .card p { color: #fff; }
+  .ford-blue .sub { color: rgba(255,255,255,0.6); }
+
+  .cover { text-align: center; align-items: center; }
+  .cover h1 { font-size: 64px; font-weight: 300; letter-spacing: -2px; margin-bottom: 8px; }
+  .cover h1 span { font-weight: 600; }
+
+  h2 { font-size: 40px; font-weight: 300; letter-spacing: -1px; margin-bottom: 32px; line-height: 1.15; }
+  h2 strong { font-weight: 600; }
+  h3 { font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: var(--ford-blue); margin-bottom: 20px; font-weight: 500; }
+  .dark h3, .ford-blue h3 { color: var(--sand); }
+  p { font-size: 17px; line-height: 1.7; color: #4a4a4a; max-width: 700px; margin-bottom: 20px; }
+  .dark p { color: #bbb5aa; }
+  blockquote { border-left: 3px solid var(--ford-blue); padding-left: 20px; margin: 24px 0; font-style: italic; }
+  .dark blockquote { border-color: var(--sand); }
+
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: 32px; }
+  .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 32px; margin-top: 32px; }
+  .g4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 24px; margin-top: 32px; }
+
+  .card { padding: 32px; background: #ebe6e0; border: 1px solid var(--border); border-radius: 2px; }
+  .card h4 { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+  .card p { font-size: 14px; line-height: 1.6; margin-bottom: 0; max-width: none; }
+
+  .stat-row { display: flex; gap: 64px; margin: 32px 0; flex-wrap: wrap; }
+  .stat .num { font-size: 56px; font-weight: 300; color: var(--ford-blue); }
+  .dark .stat .num, .ford-blue .stat .num { color: #fff; }
+  .stat .label { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+  .dark .stat .label { color: #888; }
+
+  ul { list-style: none; margin-top: 12px; }
+  ul li { font-size: 15px; line-height: 1.8; color: #4a4a4a; padding-left: 18px; position: relative; }
+  ul li::before { content: ''; position: absolute; left: 0; top: 11px; width: 5px; height: 5px; background: var(--ford-blue); border-radius: 50%; }
+  ul li strong { color: var(--charcoal); font-weight: 600; }
+  .dark ul li { color: #bbb5aa; }
+  .dark ul li::before { background: var(--sand); }
+  .dark ul li strong { color: #e8e4de; }
+  .ford-blue ul li::before { background: #fff; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 24px; }
+  th { padding: 10px 14px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 10px; color: var(--muted); text-align: left; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .dark th { color: #666; border-color: rgba(255,255,255,0.08); }
+  .dark td { border-color: rgba(255,255,255,0.08); }
+
+  .hero-img { width: 100%; max-height: 500px; object-fit: cover; margin: 24px 0; }
+  .conf { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); position: absolute; bottom: 20px; left: 80px; }
+
+  @media print { .slide { page-break-after: always; } }
+</style>
+</head>
+<body>
+
+<!-- 00: COVER — full bleed image with overlay -->
+<div class="slide dark" style="padding:0;position:relative;justify-content:center;align-items:center;text-align:center;">
+  <img src="https://a.storyblok.com/f/287000/2000x1500/9f6dd5205e/fouquet-s-saint-barth-hero.jpg" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.35;">
+  <div style="position:relative;z-index:1;padding:80px;">
+    <div style="font-size:11px;letter-spacing:5px;text-transform:uppercase;color:var(--sand);margin-bottom:48px;">Prepared for Ford Motor Company</div>
+    <h1 style="font-size:72px;color:#fff;">Luxe <span>Fleet</span></h1>
+    <div style="font-size:15px;letter-spacing:5px;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-top:12px;">Saint-Barthélemy</div>
+    <div style="display:flex;gap:56px;justify-content:center;align-items:center;margin-top:56px;">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Ford_logo_flat.svg" alt="Ford" style="height:44px;object-fit:contain;">
+      <img src="https://a.storyblok.com/f/287000/189x62/d986c0daf7/logo-fouquet-s-saint-barth-white.svg" alt="Fouquet's" style="height:32px;object-fit:contain;">
+      <img src="https://www.lofficielstbarth.com/images/logo-lofficiel-rev-amtd.svg" alt="L'Officiel St Barth" style="height:24px;object-fit:contain;">
+      <img src="https://fbm-autos.com/wp-content/uploads/2022/06/LOGO-blanc_Plan-de-travail-1-1024x388.jpg" alt="FBM" style="height:28px;object-fit:contain;">
+    </div>
+  </div>
+  <div class="conf" style="color:rgba(255,255,255,0.3);">Confidential</div>
+</div>
+
+<!-- MAP: built separately, embed when ready -->
+
+
+<!-- 01: THE THESIS -->
+<div class="slide dark">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">01</span>
+  <h3>The Thesis</h3>
+  <h2>St. Barths is where brands go<br>to be <strong>seen and validated.</strong></h2>
+  <div class="g2">
+    <div>
+      <p>The Hermès boutique in Gustavia is the highest-grossing Hermès boutique in the world. Eden Rock is the most recognized hotel destination in the Caribbean. Every luxury brand that matters has a presence on this 25 km² island — not because of transaction volume, but because being seen there validates the brand at a global level.</p>
+      <p>The automotive landscape is the exception. It's flooded with Jimnys, Mokes, and Chinese electric buggies — because the rental companies answering the call optimize for margins, negotiating whether a commission is $1,500 or $2,000. Nobody from the brand side has shown up.</p>
+    </div>
+    <div>
+      <div class="card" style="background:var(--ford-blue);border:none;padding:40px 32px;">
+        <h4 style="color:#fff;font-size:18px;line-height:1.4;">Ford's experiential marketing budget for a single activation outweighs the entire cost of all vehicle sales on the island.</h4>
+        <p style="color:rgba(255,255,255,0.7);margin-top:16px;">The rental companies see vehicles. We see media real estate. Hermès didn't open in Gustavia to sell more bags. They opened there because every bag sold is seen by the right person, in the right light, and validates the brand at a scale no advertising can match.</p>
+        <p style="color:rgba(255,255,255,0.7);">Ford should think about St. Barths the way Hermès does.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 02: THE OPPORTUNITY -->
+<div class="slide">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">01</span>
+  <h3>The Opportunity</h3>
+  <h2>Your seat at the table<br><strong>isn't being used.</strong></h2>
+  <p>FBM Automobiles — airport-front in Gustavia since 1994 — already sells Ford. They special-order Ranger Raptors. They've moved ~20 Broncos through back-channel imports. Motorworld flies technicians to the island because there's no direct Ford support. FBM pays $1,000 per service call.</p>
+  <div class="stat-row">
+    <div class="stat"><div class="num">~20</div><div class="label">Broncos already on SBH</div></div>
+    <div class="stat"><div class="num">$1K</div><div class="label">Per service call (no support)</div></div>
+    <div class="stat"><div class="num">65%</div><div class="label">American visitors</div></div>
+    <div class="stat"><div class="num">300K</div><div class="label">Annual visitors, 100% need a car</div></div>
+  </div>
+  <p>Ford already has a dealer on the most exclusive island in the world. You're treating it as a parts counter. We're proposing you treat it as a marketing outpost — with L'Agence St Barth providing an in-house automotive curation team that bridges luxury hospitality and Ford's brand.</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:24px;">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/d/dc/Shell_Beach_%2849909790381%29.jpg" style="width:100%;height:160px;object-fit:cover;">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/5/5c/Gustavia_Harbor%2C_Saint-Barth%C3%A9lemy.jpg" style="width:100%;height:160px;object-fit:cover;">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/7/77/St._Barts_Baie_de_Saint-Jean.jpg" style="width:100%;height:160px;object-fit:cover;">
+  </div>
+  <p style="font-size:10px;color:var(--muted);margin-top:4px;">Shell Beach — Gustavia Harbor — Baie de Saint-Jean</p>
+</div>
+
+<!-- 02: THE PROBLEM FORD SOLVES -->
+<div class="slide dark">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">02</span>
+  <h3>What Guests Drive Today</h3>
+  <h2>$50M net worth.<br><strong>$15,000 rental car.</strong></h2>
+  <div class="g2">
+    <div>
+      <h4 style="margin-bottom:16px;">The guest experience</h4>
+      <ul>
+        <li>$3,000/night villa at Fouquet's Saint-Barth</li>
+        <li>Private chef, butler, helicopter from St. Maarten</li>
+        <li>Curated wine, art, music — every detail considered</li>
+        <li>Then they walk to the rental counter and get a Jimny</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="margin-bottom:16px;">Current rental fleet landscape</h4>
+      <table>
+        <tr><td style="width:180px;"><span style="font-weight:700;letter-spacing:1px;color:#88aa66;">Cool Rental</span></td><td>Chinese electric buggies</td></tr>
+        <tr><td><span style="font-weight:700;letter-spacing:1px;color:#e8e4de;">TopLoc</span></td><td>Jimny, Dacia Duster, Smart</td></tr>
+        <tr><td><span style="font-weight:700;letter-spacing:1px;color:#e8e4de;">Turbe</span></td><td>Jimny, small SUVs</td></tr>
+        <tr><td><span style="font-weight:700;letter-spacing:1px;color:#e8e4de;">GTA</span></td><td>Mixed economy fleet</td></tr>
+        <tr><td><span style="font-weight:700;letter-spacing:1px;color:#e8e4de;">Maurice</span></td><td>Mini Cooper (only "premium")</td></tr>
+        <tr><td><span style="font-weight:700;letter-spacing:1px;color:#4CAF50;">Barthloc</span></td><td>Jimny, Smart, some Jeeps</td></tr>
+      </table>
+      <p style="font-size:13px;color:#888;margin-top:12px;">No American vehicles. No open-air SUVs. No Ford.</p>
+    </div>
+  </div>
+  <div style="margin-top:32px;">
+    <img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/library/2025/bronco-roadster-concept/Bronco-Roadster-Concept-01.jpg" style="width:100%;height:240px;object-fit:cover;object-position:center 70%;border-radius:2px;">
+    <p style="font-size:10px;color:#555;margin-top:4px;text-align:center;">What it should look like: Bronco Roadster Concept — Robert Gelardi, Ford</p>
+  </div>
+</div>
+
+<!-- 03: ALICE + OLIVIA SEQUEL -->
+<div class="slide">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">03</span>
+  <h3>You've Already Proven This Works</h3>
+  <h2>alice + olivia was the <strong>proof of concept.</strong><br>St. Barths is the sequel.</h2>
+  <!-- A+O x Bronco campaign images -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;margin-bottom:32px;">
+    <img src="https://www.aliceandolivia.com/on/demandware.static/-/Sites-aando-Library/default/dw4d86c780/images/WorldOfAandO/ArticlePage/BRONCO_25_SLIDE_SHOW_2200x_3300-1@1x.jpg" style="width:100%;height:180px;object-fit:cover;">
+    <img src="https://www.aliceandolivia.com/on/demandware.static/-/Sites-aando-Library/default/dw16f13f93/images/WorldOfAandO/ArticlePage/BRONCO_25_MAIN_IMAGE_2200X3300@1x.jpg" style="width:100%;height:180px;object-fit:cover;">
+    <img src="https://www.aliceandolivia.com/on/demandware.static/-/Sites-aando-Library/default/dwc4af3e54/images/WorldOfAandO/ArticlePage/BRONCO_25_SLIDE_SHOW_2200x_3300-2@1x.jpg" style="width:100%;height:180px;object-fit:cover;">
+    <img src="https://www.aliceandolivia.com/on/demandware.static/-/Sites-aando-Library/default/dw4a5edca9/images/WorldOfAandO/ArticlePage/BRONCO_25_SLIDE_SHOW_2200x_3300-3@1x.jpg" style="width:100%;height:180px;object-fit:cover;">
+  </div>
+  <div class="g2">
+    <div>
+      <blockquote>"Bronco is about adventure, capability, and freedom for all. Our collaboration with ALICE + OLIVIA celebrates those qualities through the lens of powerful femininity, modern expression, and a bold style that's classically American."</blockquote>
+      <p style="font-size:13px;color:var(--muted);margin-top:-12px;">— Lisa Materazzo, CMO, Ford Motor Company</p>
+      <p style="margin-top:24px;">The A+O collab proved Bronco belongs in the fashion-luxury context. Custom-wrapped Broncos, capsule collection, nationwide tour. St. Barths is where that customer actually lives — 65% American, UHNW, 5-7 nights, driving every day. Stacey Bendet was on the island 14 weeks ago.</p>
+    </div>
+    <div>
+      <div class="card">
+        <h4>What A+O proved</h4>
+        <p>Bronco + fashion works. Ford CMO personally endorsed it. Two custom vehicles built by Classic Custom Designs. Ten-piece capsule collection.</p>
+        <p style="margin-top:12px;font-weight:600;">What it didn't do:</p>
+        <p>Put the vehicle in UHNW hands for a week. Let them drive it daily in a luxury context. Create organic purchase intent. Close sales.</p>
+      </div>
+      <div class="card" style="margin-top:16px;background:var(--ford-blue);border:none;">
+        <h4 style="color:#fff;">Luxe Fleet does all of that.</h4>
+        <p style="color:rgba(255,255,255,0.8);">5-7 days behind the wheel at the most exclusive resort in the Caribbean. The best test drive is a vacation.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 04: THE ROADSTER CONCEPT -->
+<div class="slide dark">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">04</span>
+  <h3>OG to 6G</h3>
+  <h2>You already built the <strong>perfect St. Barths vehicle.</strong></h2>
+  <div class="g2" style="align-items:center;">
+    <div>
+      <p>Robert Gelardi and the Bronco design team built the Roadster Concept to celebrate 60 years of Bronco. A modern 6G stripped back to the original U13 essence — half-cab, completely open air, Wimbledon White, fold-down tailgate with stamped FORD wordmark, Fifteen52 Analog wheels.</p>
+      <blockquote>"What struck me about that original roadster was its compelling simplicity. It didn't need big tires, a lift, or off-road lights to look good. It was just this pure expression of what I call 'Go Anywhere, Open Air' — the essential cool that made Bronco special from day one."</blockquote>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:-8px;margin-bottom:16px;">
+        <img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/profiles/authors/author-images/Robert_Gelardi.jpeg" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">
+        <span style="font-size:13px;color:#888;">Robert Gelardi, Bronco Chief Designer</span>
+      </div>
+      <p style="margin-top:24px;">Debuted at Silver Lake in August. Shown at SEMA in November. Ford is already touring it. Between shows, it sits. St. Barths is the landscape this vehicle was designed for — let it spend a season at Fouquet's instead of waiting for the next convention center.</p>
+    </div>
+    <div>
+      <img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/library/2025/bronco-roadster-concept/Bronco-Roadster-Concept-01.jpg" style="width:100%;border-radius:2px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+        <img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/library/2025/bronco-roadster-concept/Bronco-Roadster-Concept-10.jpg" style="width:100%;border-radius:2px;">
+        <img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/library/2025/bronco-roadster-concept/Bronco-Roadster-Concept-07.jpg" style="width:100%;border-radius:2px;">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 05: THE BUSINESS MODEL -->
+<div class="slide">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">05</span>
+  <h3>The Real Value</h3>
+  <h2>Not a sponsorship. Not a placement.<br><strong>Client access.</strong></h2>
+  <div class="g2">
+    <div class="card" style="background:var(--ford-blue);border:none;">
+      <h4 style="color:#fff;">Ford Ambassador on Shell Beach</h4>
+      <p style="color:rgba(255,255,255,0.85);">Seasonal hire. Nov-Apr. Not a showroom salesperson — someone valeting the Roadster Concept at Lou Lou Beach Club, riding with SiBarth villa clients to showings, at Fouquet's pool when a guest comes back from driving a Heritage Edition on the coast road. Shaking hands at the Bucket Regatta.</p>
+      <p style="color:rgba(255,255,255,0.85);margin-top:12px;">These are people worth $50M+ in the most relaxed setting of their year. They've been driving the product for a week. The Ambassador doesn't sell — they're available. "You love this one? I can have one at your house in Connecticut by the time you land."</p>
+      <p style="color:rgba(255,255,255,0.7);margin-top:12px;font-size:13px;">No dealership can create this context. No activation can replicate a week behind the wheel. This is the highest-quality client access in the automotive industry.</p>
+    </div>
+    <div>
+      <div class="card">
+        <h4>Hotel Fleet (no cost to Ford)</h4>
+        <p>Fouquet's buys Heritage Edition 2-doors through FBM. Doors off, roof off. The guest vehicle. Fouquet's is the buyer. Ford provides allocation.</p>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h4>Publicity Vehicle (recovered on sale)</h4>
+        <p>Ford places 1 Bronco 2-door on-island. L'Officiel shoots it, Lou Lou features it. Sells at end of season through FBM. Ford moves a unit.</p>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h4>Rental Fleet Pipeline</h4>
+        <p>5 of 6 rental operators want Broncos. SiBarth wants them for villa clients. Ford provides allocation through FBM: <strong>10-25 units Year 1.</strong></p>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h4>Service Revenue</h4>
+        <p>FBM currently pays $1K/service with no Ford support. Formalize the relationship: Ford-certified service on-island = recurring parts + labor revenue.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 06: THE MARKET -->
+<div class="slide ford-blue" style="position:relative;">
+  <img src="https://www.hotelsofstbarth.org/images/medias/pictures/H%C3%B4tel%20Barri%C3%A8re%20Le%20Carl%20Gustaf%20St%20Barth.jpg" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.15;mix-blend-mode:luminosity;">
+  <div style="position:relative;z-index:1;">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">06</span>
+  <h3>The Island</h3>
+  <h2>25 km². 14 beaches. 50 restaurants.<br><strong>1 road. Every vehicle is visible.</strong></h2>
+  <div class="stat-row">
+    <div class="stat"><div class="num">25</div><div class="label">Hotels (400 rooms total)</div></div>
+    <div class="stat"><div class="num">600+</div><div class="label">Villas ($2K-100K/week)</div></div>
+    <div class="stat"><div class="num">40+</div><div class="label">Superyachts (Bucket Regatta)</div></div>
+    <div class="stat"><div class="num">0</div><div class="label">Uber, Lyft, taxi apps</div></div>
+  </div>
+  <p style="color:rgba(255,255,255,0.8);">A single Bronco on St. Barths is seen by hundreds of people per day. Four Broncos generate an estimated 400K-1.2M annual visual impressions — on the most exclusive island in the Caribbean. No billboard, no digital ad, no influencer campaign can match the impression density of a vehicle on this island.</p>
+  </div><!-- close z-index wrapper -->
+</div>
+
+<!-- 07: COMPETITIVE LANDSCAPE -->
+<div class="slide dark">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">07</span>
+  <h3>Honest Competitive Assessment</h3>
+  <h2>G-Wagons are already there.<br><strong>That's not the play.</strong></h2>
+  <div class="g2">
+    <div>
+      <p>Mercedes G63 AMGs park outside Eden Rock daily. Range Rovers appear at Cheval Blanc. Cayennes are ubiquitous. These are organic — owners and wealthy renters bring what they know.</p>
+      <p>Heritage Edition Bronco doesn't compete on price ($60K vs $200K G63) or status signaling. It competes on <strong>character</strong>. And it's already winning — ~20 Broncos sold on-island through back-channel imports, without any Ford support.</p>
+      <ul>
+        <li><strong>G-Wagon</strong> — says "I'm rich." Everyone has one.</li>
+        <li><strong>Range Rover</strong> — says "I'm tasteful." Corporate.</li>
+        <li><strong>Heritage Bronco</strong> — says "I'm interesting." Doors off, heritage design, open air on a Caribbean road. Already on the island. Already chosen.</li>
+      </ul>
+      <p style="margin-top:16px;">The demand is proven. People are paying a premium to import Broncos through a painful process with no Ford support and $1,000 service calls. Formalize the channel and this scales immediately.</p>
+    </div>
+    <div>
+      <h4 style="margin-bottom:16px;">Hotel vehicle programs today</h4>
+      <table>
+        <tr><td style="width:180px;"><span style="font-weight:700;letter-spacing:1px;color:#CDA73C;">Eden Rock</span></td><td>Minis / Mokes (rotate)</td></tr>
+        <tr><td><span style="font-weight:700;letter-spacing:1px;color:#8a7e76;">Le Barthélemy</span></td><td>Mini Cooper</td></tr>
+        <tr><td><span style="font-weight:700;letter-spacing:1px;color:#ccc;">Cheval Blanc</span></td><td>None (guests rent)</td></tr>
+        <tr><td><img src="https://a.storyblok.com/f/287000/189x62/d986c0daf7/logo-fouquet-s-saint-barth-white.svg" style="height:16px;vertical-align:middle;margin-right:8px;"> <span style="font-weight:700;">Fouquet's</span></td><td>None → <strong style="color:var(--sand);">Luxe Fleet</strong></td></tr>
+        <tr><td><span style="font-weight:700;letter-spacing:1px;color:#446084;">Le Toiny</span></td><td>None</td></tr>
+        <tr><td><span style="font-weight:700;letter-spacing:1px;color:#bbb;">Rosewood</span></td><td>None</td></tr>
+      </table>
+      <p style="font-size:13px;color:#888;margin-top:16px;">No hotel on St. Barths has a curated American vehicle program. Fouquet's will be first. Eden Rock is next — L'Agence St Barth (our local agency partner) has the relationship.</p>
+    </div>
+  </div>
+</div>
+
+<!-- 08: PARTNER ECOSYSTEM -->
+<div class="slide">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">08</span>
+  <h3>The Partners</h3>
+  <h2>Every role is filled. <strong>Ford is the brand.</strong></h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:32px;">
+    <div class="card" style="border-top:3px solid var(--ford-blue);">
+      <img src="https://fbm-autos.com/wp-content/uploads/2022/06/LOGO_Plan-de-travail-1.jpg" alt="FBM" style="height:28px;object-fit:contain;filter:grayscale(1);margin-bottom:12px;">
+      <h4>FBM Automobiles</h4>
+      <p><strong>Operations.</strong> Airport-front since 1994. Already sold ~20 Broncos. Handles import, customs, registration, insurance, maintenance. Needs Ford support to scale.</p>
+    </div>
+    <div class="card" style="border-top:3px solid #CDA73C;">
+      <img src="https://a.storyblok.com/f/287000/189x62/f116ee783e/logo-fouquet-s-saint-barth-black.svg" style="height:24px;object-fit:contain;margin-bottom:12px;">
+      <h4>Fouquet's Saint-Barth</h4>
+      <p><strong>Venue + Buyer.</strong> Hotels Barrière. Guest fleet placement. Lou Lou Beach Club for activations. Buys the Heritage Editions.</p>
+    </div>
+    <div class="card" style="border-top:3px solid #636363;">
+      <img src="https://lofficielstbarth.com/images/logo-lofficiel-amtd.svg" style="height:16px;object-fit:contain;margin-bottom:12px;">
+      <h4>L'Officiel St Barth</h4>
+      <p><strong>Media.</strong> Luxury lifestyle publication. Editorial shoot, print feature, social. Ford ad placement (EUR 7-60K).</p>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:16px;">
+    <div class="card" style="border-top:3px solid var(--sand);">
+      <h4>L'Agence St Barth</h4>
+      <p><strong>Automotive curation.</strong> In-house specialist team bridging luxury hospitality and Ford. Property placements, Ford Ambassador management, client introductions. The layer that makes this curated, not commercial.</p>
+    </div>
+    <div class="card" style="border-top:3px solid var(--marsh);">
+      <img src="https://sibarth.com/wp-content/uploads/2020/12/cropped-sibarth-favicon-32x32.png" style="height:24px;margin-bottom:12px;">
+      <h4>SiBarth</h4>
+      <p><strong>Villa Rentals.</strong> 600+ properties. Uses vehicles for client showings and transfers. Natural Bronco fleet customer.</p>
+    </div>
+    <div class="card" style="border-top:3px solid #AD1B2D;">
+      <h4>Rental Operators</h4>
+      <p><strong>Volume.</strong> TopLoc, GTA, Maurice, Turbe, Barthloc — 5 companies, 10-25 units if Ford provides allocation.</p>
+    </div>
+  </div>
+  <p style="margin-top:24px;font-size:14px;color:var(--muted);">Fouquet's buys the fleet. FBM operates. L'Officiel shoots. SiBarth and rental operators buy more. Ford provides the product, the brand, and the Ambassador. Nobody is asking Ford to fund the fleet — they're asking Ford to show up.</p>
+</div>
+
+<!-- 09: MEDIA & CONTENT -->
+<div class="slide dark">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">09</span>
+  <h3>Content Ford Receives</h3>
+  <h2>L'Officiel shoots it.<br><strong>Ford owns the content globally.</strong></h2>
+  <div class="g2">
+    <div>
+      <h4 style="margin-bottom:16px;">L'Officiel editorial package</h4>
+      <ul>
+        <li><strong>Print feature</strong> — 4-page editorial in the high-season issue (10,000 copies, 100% UHNW readership)</li>
+        <li><strong>Digital</strong> — Feature article on lofficielstbarth.com</li>
+        <li><strong>Social</strong> — Instagram feed + stories + reels across L'Officiel handles</li>
+        <li><strong>Photography</strong> — Professional lifestyle shoot at Fouquet's, Lou Lou Beach Club, Shell Beach, Gustavia</li>
+      </ul>
+      <p style="margin-top:16px;">Estimated media value of L'Officiel contribution: <strong>EUR 40,000-60,000 per season.</strong></p>
+    </div>
+    <div>
+      <h4 style="margin-bottom:16px;">Ford content rights</h4>
+      <ul>
+        <li><strong>Social repost rights</strong> — @Ford, @FordBronco can amplify all L'Officiel content with credit</li>
+        <li><strong>Global advertising license</strong> — negotiable separately for paid media, dealer materials, broadcast</li>
+        <li><strong>Guest UGC</strong> — UHNW guests (10K-500K followers) creating organic content in Heritage Editions</li>
+      </ul>
+      <h4 style="margin-top:24px;margin-bottom:16px;">Seasonal calendar</h4>
+      <ul>
+        <li><strong>November</strong> — fleet arrives, launch shoot</li>
+        <li><strong>December</strong> — Art Week activation</li>
+        <li><strong>January</strong> — New Year's week (peak content moment)</li>
+        <li><strong>March</strong> — Bucket Regatta (40+ superyachts, 2,000+ UHNW)</li>
+        <li><strong>April</strong> — season close, sell publicity vehicle</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- 10: THE ASK -->
+<div class="slide ford-blue">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">10</span>
+  <h3>The Ask</h3>
+  <h2>One vehicle. One ad buy.<br><strong>One season to prove it.</strong></h2>
+  <div class="g3">
+    <div class="card">
+      <h4>1. Place one Bronco 2-door</h4>
+      <p>Send a single unit to St. Barths via FBM as a promotional placement. MSO, never titled in US. It spends the season as the publicity vehicle — L'Officiel shoot, Lou Lou, events. <strong>Sells at end of season through FBM.</strong> Ford moves a unit, gets it back in revenue.</p>
+      <p style="margin-top:12px;font-size:13px;"><strong>Cost to Ford: ~$55K at invoice. Recovered on sale.</strong></p>
+    </div>
+    <div class="card">
+      <h4>2. Fund the L'Officiel ad</h4>
+      <p>One advertorial spread in L'Officiel St Barth's high-season issue. Shot at Fouquet's + Lou Lou Beach Club. Professional lifestyle photography featuring Heritage Edition + Roadster Concept (if placed). FBM tagged.</p>
+      <p style="margin-top:12px;font-size:13px;"><strong>Cost to Ford: EUR 7,000-60,000 depending on activation scope.</strong></p>
+    </div>
+    <div class="card">
+      <h4>3. Provide FBM allocation</h4>
+      <p>Authorize FBM Automobiles as a Ford-approved importer for St. Barths. Enable them to source Heritage Editions for Fouquet's fleet and base Broncos for rental operators. 10-25 units Year 1.</p>
+      <p style="margin-top:12px;font-size:13px;"><strong>Cost to Ford: $0. Revenue: 10-25 units sold.</strong></p>
+    </div>
+  </div>
+  <p style="color:rgba(255,255,255,0.7);margin-top:32px;font-size:14px;">Total Ford investment: one vehicle (recovered on sale) + one ad buy (EUR 7-60K). What Ford gets: direct access to UHNW buyers in their most receptive context, 10-25 unit sales through FBM, a luxury content library, and a repeatable model for every island destination worldwide.</p>
+</div>
+
+<!-- 11: MEASUREMENT -->
+<div class="slide">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">11</span>
+  <h3>How We Measure It</h3>
+  <h2>KPIs before the activation,<br><strong>not after.</strong></h2>
+  <div class="g2">
+    <div>
+      <h4 style="margin-bottom:16px;">Impressions & reach</h4>
+      <table>
+        <tr><td>On-island visual impressions (4 vehicles)</td><td><strong>400K-1.2M/year</strong></td></tr>
+        <tr><td>L'Officiel print reach</td><td><strong>10,000 copies</strong></td></tr>
+        <tr><td>L'Officiel digital + social</td><td><strong>TBD (audit pre-launch)</strong></td></tr>
+        <tr><td>Guest UGC (estimated)</td><td><strong>200-500 posts/season</strong></td></tr>
+        <tr><td>Media value (L'Officiel alone)</td><td><strong>EUR 40-60K/season</strong></td></tr>
+      </table>
+    </div>
+    <div>
+      <h4 style="margin-bottom:16px;">Sales attribution</h4>
+      <ul>
+        <li><strong>Ambassador closes</strong> — direct attribution on US-side dealer sales originating from SBH</li>
+        <li><strong>QR code in vehicle</strong> — links to Ford configurator with SBH campaign UTM. Tracks online configuration starts.</li>
+        <li><strong>Post-stay survey</strong> — Fouquet's checkout survey includes vehicle satisfaction + purchase intent</li>
+        <li><strong>Island unit sales</strong> — direct: publicity vehicle sale + rental fleet sales through FBM</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- 11b: THE SETTING -->
+<div class="slide dark" style="padding:40px;">
+  <span class="slide-mark">Luxe Fleet</span>
+  <h3 style="margin-bottom:12px;">The Setting</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+    <div style="position:relative;"><img src="https://www.hotelsofstbarth.org/images/medias/pictures/H%C3%B4tel%20Barri%C3%A8re%20Le%20Carl%20Gustaf%20St%20Barth_7.jpg" style="width:100%;height:200px;object-fit:cover;"><div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Fouquet's Saint-Barth</div></div>
+    <div style="position:relative;"><img src="https://www.hotelsofstbarth.org/images/medias/pictures/H%C3%B4tel%20Barri%C3%A8re%20Le%20Carl%20Gustaf%20St%20Barth_3.jpg" style="width:100%;height:200px;object-fit:cover;"><div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Shell Beach</div></div>
+    <div style="position:relative;"><img src="https://www.hotelsofstbarth.org/images/medias/pictures/H%C3%B4tel%20Barri%C3%A8re%20Le%20Carl%20Gustaf%20St%20Barth_2.jpg" style="width:100%;height:200px;object-fit:cover;"><div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Gustavia Harbor</div></div>
+    <div style="position:relative;"><img src="https://www.hotelsofstbarth.org/images/medias/pictures/H%C3%B4tel%20Barri%C3%A8re%20Le%20Carl%20Gustaf%20St%20Barth_5.jpg" style="width:100%;height:200px;object-fit:cover;"><div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Villa</div></div>
+    <div style="position:relative;"><img src="https://www.hotelsofstbarth.org/images/medias/pictures/H%C3%B4tel%20Barri%C3%A8re%20Le%20Carl%20Gustaf%20St%20Barth_1.jpg" style="width:100%;height:200px;object-fit:cover;"><div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Terrace</div></div>
+    <div style="position:relative;"><img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/library/2025/bronco-roadster-concept/Bronco-Roadster-Concept-06.jpg" style="width:100%;height:200px;object-fit:cover;"><div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Bronco Roadster Concept</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+    <div style="position:relative;"><img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/library/2025/bronco-roadster-concept/Bronco-Roadster-Concept-10.jpg" style="width:100%;height:200px;object-fit:cover;"><div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Roadster — Open Air</div></div>
+    <div style="position:relative;"><img src="https://www.fromtheroad.ford.com/content/dam/fordmediasite/us/en/library/2025/bronco-roadster-concept/Bronco-Roadster-Concept-04.jpg" style="width:100%;height:200px;object-fit:cover;"><div style="position:absolute;bottom:6px;left:6px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;">Roadster — Interior</div></div>
+  </div>
+  <p style="margin-top:12px;font-size:11px;color:#666;">Property images: Fouquet's Saint-Barth / Hotels Barrière. Vehicle images: Ford Motor Company (fromtheroad.ford.com, editorial use).</p>
+</div>
+
+<!-- 12: SCALE -->
+<div class="slide dark">
+  <span class="slide-mark">Luxe Fleet</span>
+  <span class="slide-num">12</span>
+  <h3>Scale</h3>
+  <h2>St. Barths is Season 1.<br><strong>Every island is the same gap.</strong></h2>
+  <div class="g4">
+    <div class="card"><h4>Caribbean</h4><p>St. Barths, Turks & Caicos, Anguilla, Mustique, BVI</p></div>
+    <div class="card"><h4>Mediterranean</h4><p>Mykonos, Sardinia, Ibiza, Amalfi, St-Tropez</p></div>
+    <div class="card"><h4>Mountain</h4><p>Aspen, Courchevel, Verbier, Niseko, Jackson Hole</p></div>
+    <div class="card"><h4>Desert</h4><p>Marrakech, Dubai, Scottsdale, Tulum, Los Cabos</p></div>
+  </div>
+  <p style="margin-top:32px;color:#bbb5aa;">Every luxury destination has the same problem: curated everything except the vehicle. Every one is a franchise-dark or franchise-lite market where Ford has limited presence. Luxe Fleet is a repeatable model — place vehicles, create content, sell units, move to the next island. One Ambassador, one local operator (like FBM), one media partner. The playbook transfers.</p>
+</div>
+
+<!-- 13: CLOSE -->
+<div class="slide cover ford-blue" style="position:relative;">
+  <div style="font-size:11px;letter-spacing:5px;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-bottom:40px;">Luxe Fleet</div>
+  <h1 style="color:#fff;font-size:56px;">The best test drive<br><span>is a vacation.</span></h1>
+  <p style="color:rgba(255,255,255,0.7);margin-top:24px;max-width:600px;">Bronco already sells on the island. Your customers are already there. They're driving without you. Luxe Fleet gives Ford a seat at the table — and a handshake on Shell Beach.</p>
+  <div style="margin-top:40px;padding:24px 32px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);display:inline-block;border-radius:2px;">
+    <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:8px;">Next Step</div>
+    <div style="font-size:16px;color:#fff;">30-minute call to discuss allocation and Season 1 timeline</div>
+  </div>
+  <div style="display:flex;gap:56px;justify-content:center;align-items:center;margin-top:48px;">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Ford_logo_flat.svg" alt="Ford" style="height:40px;object-fit:contain;">
+    <img src="https://a.storyblok.com/f/287000/189x62/d986c0daf7/logo-fouquet-s-saint-barth-white.svg" alt="Fouquet's" style="height:28px;object-fit:contain;">
+    <img src="https://www.lofficielstbarth.com/images/logo-lofficiel-rev-amtd.svg" alt="L'Officiel" style="height:20px;object-fit:contain;">
+    <img src="https://fbm-autos.com/wp-content/uploads/2022/06/LOGO-blanc_Plan-de-travail-1-1024x388.jpg" alt="FBM" style="height:22px;object-fit:contain;">
+  </div>
+  <div class="conf" style="color:rgba(255,255,255,0.3);">Confidential — Luxe Fleet / Ford Motor Company</div>
+</div>
+
+<!-- Map assets removed — rebuilding separately -->
+<!--
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  .leaflet-popup-content-wrapper { background: #1a1a2e !important; color: #e8e4de !important; border-radius: 2px !important; font-family: 'Inter', sans-serif !important; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important; }
+  .leaflet-popup-tip { background: #1a1a2e !important; }
+  .leaflet-popup-content { margin: 10px 14px !important; font-size: 12px !important; line-height: 1.5 !important; }
+  .leaflet-control-zoom a { background: #1a1a2e !important; color: #e8e4de !important; border-color: rgba(255,255,255,0.1) !important; }
+  /* Clean floating labels — no boxes */
+  .map-label { background: none !important; border: none !important; box-shadow: none !important; font-family: 'Inter', sans-serif; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 500; white-space: nowrap; }
+  .map-label-beach { color: rgba(78,205,196,0.5); }
+  .map-label-hotel { color: rgba(205,167,60,0.5); }
+  /* Floating logos — no background boxes */
+  .fl { opacity: 0.4; transition: opacity 0.2s ease; cursor: pointer; }
+  .fl:hover { opacity: 1; }
+  .fl img { height: 18px; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8)); }
+  .fl span { font-family: 'Inter', sans-serif; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; text-shadow: 0 1px 4px rgba(0,0,0,0.9); }
+  /* Moving Ford vehicles */
+  .ford-mover { pointer-events: none; }
+  .ford-mover img { height: 16px; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.8)); }
+  /* Competitor logos that get wiped */
+  .competitor { transition: opacity 1.5s ease, transform 1.5s ease; pointer-events: none; }
+  .competitor.bye { opacity: 0 !important; transform: scale(0.3); }
+  .competitor span { font-family: 'Inter', sans-serif; font-size: 8px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; opacity: 0.5; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+</style>
+<script>
+(function() {
+  var map = L.map('cover-map', {
+    center: [17.9010, -62.832],
+    zoom: 14.3,
+    zoomControl: false,
+    attributionControl: false,
+    scrollWheelZoom: false,
+    dragging: true,
+    touchZoom: true,
+    doubleClickZoom: true
+  });
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+
+  // Floating logo — no box, 40% opacity, 100% on hover
+  function fl(lat, lng, html, w) {
+    var icon = L.divIcon({ className: '', html: '<div class="fl">'+html+'</div>', iconSize: [w||120, 24], iconAnchor: [(w||120)/2, 12] });
+    return L.marker([lat, lng], { icon: icon });
+  }
+
+  function pop(type, color, name, desc) {
+    return '<div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:'+color+';">'+type+'</div><div style="font-weight:600;font-size:13px;margin:4px 0;color:#e8e4de;">'+name+'</div><div style="color:#999;font-size:12px;">'+desc+'</div>';
+  }
+
+  // ── PARTNER LOGOS — floating, no boxes ──
+  fl(17.8966, -62.8510, '<img src="https://a.storyblok.com/f/287000/189x62/d986c0daf7/logo-fouquet-s-saint-barth-white.svg" style="height:20px;">', 140)
+    .bindPopup(pop('partner','#CDA73C','Fouquet\'s Saint-Barth','Hotels Barrière. Lou Lou Beach Club. Guest fleet HQ.'),{maxWidth:240}).addTo(map);
+
+  fl(17.9034, -62.8430, '<img src="https://fbm-autos.com/wp-content/uploads/2022/06/cropped-LOGO-blanc_Plan-de-travail-1.jpg" style="height:18px;border-radius:2px;">', 100)
+    .bindPopup(pop('operations','#5588cc','FBM Automobiles','Airport-front. ~20 Broncos sold. Since 1994.'),{maxWidth:240}).addTo(map);
+
+  fl(17.8975, -62.8465, '<img src="https://www.lofficielstbarth.com/images/logo-lofficiel-rev-amtd.svg" style="height:14px;">', 120)
+    .bindPopup(pop('media','#fff','L\'Officiel St Barth','Luxury lifestyle publication. Ford ad placement.'),{maxWidth:240}).addTo(map);
+
+  // ── HOTELS — logos where we have them, text where we dont ──
+  fl(17.9042, -62.8350, '<span style="color:#CDA73C;">EDEN ROCK</span>', 100)
+    .bindPopup(pop('hotel','#CDA73C','Eden Rock','Oetker Collection. Minis/Mokes. Next Luxe Fleet target.'),{maxWidth:240}).addTo(map);
+
+  fl(17.9170, -62.8560, '<span style="color:#ccc;">CHEVAL BLANC</span>', 110)
+    .bindPopup(pop('hotel','#ccc','Cheval Blanc','LVMH. Flamands.'),{maxWidth:240}).addTo(map);
+
+  fl(17.9094, -62.8090, '<img src="https://www.rosewoodhotels.com/content/dam/rosewoodhotels/icons/Wordmark.svg" style="height:12px;filter:brightness(10);">', 110)
+    .bindPopup(pop('hotel','#bbb','Rosewood Le Guanahani','Grand Cul-de-Sac.'),{maxWidth:240}).addTo(map);
+
+  fl(17.9100, -62.8045, '<img src="https://lebarthelemyhotel.com/images/shared/Select_logo_new.png" style="height:14px;filter:brightness(10);">', 100)
+    .bindPopup(pop('hotel','#8a7e76','Le Barthélemy','Mini Coopers for guests.'),{maxWidth:240}).addTo(map);
+
+  fl(17.8970, -62.7990, '<img src="https://hotelletoiny.com/wp-content/uploads/2025/09/logo-1gom.webp" style="height:14px;filter:brightness(10);">', 100)
+    .bindPopup(pop('hotel','#446084','Le Toiny','Most exclusive. 15 suites.'),{maxWidth:240}).addTo(map);
+
+  fl(17.9120, -62.8455, '<img src="https://360.agencewebcom.com/uploads/api/site-887/ckeditor/KEY-PARADISE-_SBH-LOGO_2024_NOIR-FOND-BLANC.png" style="height:14px;filter:brightness(10);">', 100)
+    .bindPopup(pop('hotel','#378278','Manapany','Anse des Cayes. Boutique.'),{maxWidth:240}).addTo(map);
+
+  fl(17.9135, -62.8610, '<span style="color:#CDA73C;">VILLA MARIE</span>', 100)
+    .bindPopup(pop('hotel','#CDA73C','Villa Marie','Colombier hillside.'),{maxWidth:240}).addTo(map);
+
+  // ── VENUES ──
+  fl(17.8938, -62.8535, '<span style="color:#d4a0ee;">LOU LOU</span>', 80)
+    .bindPopup(pop('venue','#9B59B6','Lou Lou Beach Club','Fouquet\'s. Shell Beach. The Roadster parks here.'),{maxWidth:240}).addTo(map);
+
+  fl(17.9062, -62.8342, '<img src="https://nikkibeach.com/wp-content/uploads/2024/07/logo-group-horizontal.svg" style="height:12px;filter:brightness(10);">', 100)
+    .bindPopup(pop('club','#E85D75','Nikki Beach','St. Jean. Day club.'),{maxWidth:240}).addTo(map);
+
+  // ── BEACHES — simple teal labels ──
+  var beaches = [
+    [17.8930,-62.8530,'Shell Beach'],[17.9068,-62.8355,'St. Jean'],[17.8870,-62.8376,'Gouverneur'],
+    [17.8905,-62.8229,'Saline'],[17.9195,-62.8680,'Colombier'],[17.9195,-62.8572,'Flamands'],
+    [17.9070,-62.8010,'Grand Cul-de-Sac'],[17.9072,-62.8270,'Lorient'],[17.8977,-62.7990,'Toiny'],
+    [17.9088,-62.8565,'Corossol'],
+  ];
+  beaches.forEach(function(b) {
+    L.marker([b[0],b[1]], { icon: L.divIcon({className:'',html:'<div style="width:6px;height:6px;background:#4ECDC4;border-radius:50%;opacity:0.6;"></div>',iconSize:[6,6],iconAnchor:[3,3]}) })
+      .bindTooltip(b[2], { permanent:true, direction:'right', offset:[6,0], className:'map-label map-label-beach' }).addTo(map);
+  });
+
+  // ── RESTAURANTS — tiny dots ──
+  [[17.8966,-62.8498],[17.8950,-62.8488],[17.8958,-62.8505],[17.8938,-62.8538],[17.8962,-62.8492],[17.8908,-62.8260],[17.9150,-62.8155],[17.9042,-62.8348]].forEach(function(r) {
+    L.marker(r, { icon: L.divIcon({className:'',html:'<div style="width:4px;height:4px;background:#E85D75;border-radius:50%;opacity:0.4;"></div>',iconSize:[4,4],iconAnchor:[2,2]}) }).addTo(map);
+  });
+
+  // ── GUSTAVIA ──
+  L.marker([17.8955,-62.8500], { icon: L.divIcon({className:'',html:'<div style="width:5px;height:5px;background:#F39C12;border-radius:50%;opacity:0.5;"></div>',iconSize:[5,5],iconAnchor:[2.5,2.5]}) })
+    .bindTooltip('GUSTAVIA', { permanent:true, direction:'bottom', offset:[0,6], className:'map-label', }).addTo(map);
+
+  // ── COMPETITOR LOGOS — scattered, then wiped ──
+  var fordLogoUrl = 'https://www.fromtheroad.ford.com/dam/fordmediasite/ford-logo.png';
+  var competitors = [
+    { n:'SUZUKI', c:'#E4002B', lat:17.9048, lng:-62.8448 },
+    { n:'DACIA', c:'#646B52', lat:17.9032, lng:-62.8436 },
+    { n:'RENAULT', c:'#FFCC00', lat:17.9058, lng:-62.8332 },
+    { n:'MOKE', c:'#88aa66', lat:17.9052, lng:-62.8338 },
+    { n:'MINI', c:'#333', lat:17.8960, lng:-62.8485 },
+    { n:'CHANGAN', c:'#0066CC', lat:17.9042, lng:-62.8452 },
+    { n:'JIMNY', c:'#E4002B', lat:17.9035, lng:-62.8430 },
+    { n:'JEEP', c:'#3B5323', lat:17.9055, lng:-62.8345 },
+    { n:'BYD', c:'#AC1E2D', lat:17.9065, lng:-62.8318 },
+    { n:'SMART', c:'#aaa', lat:17.9028, lng:-62.8442 },
+  ];
+  var compMarkers = [];
+  competitors.forEach(function(c) {
+    var icon = L.divIcon({ className:'', html:'<div class="competitor"><span style="color:'+c.c+';">'+c.n+'</span></div>', iconSize:[50,14], iconAnchor:[25,7] });
+    var m = L.marker([c.lat, c.lng], { icon: icon, interactive: false }).addTo(map);
+    compMarkers.push(m);
+  });
+
+  // ── FORD VEHICLES — moving along roads ──
+  var routes = [
+    // Route 1: Gustavia → Airport → St. Jean → Eden Rock
+    { logo: fordLogoUrl, speed: 0.6, path: [
+      [17.8960,-62.8490],[17.8975,-62.8480],[17.8990,-62.8468],[17.9005,-62.8458],[17.9020,-62.8445],[17.9030,-62.8435],[17.9042,-62.8415],[17.9050,-62.8390],[17.9055,-62.8365],[17.9050,-62.8350]
+    ]},
+    // Route 2: Airport → Corossol → Flamands → Colombier
+    { logo: fordLogoUrl, speed: 0.5, path: [
+      [17.9030,-62.8440],[17.9050,-62.8470],[17.9070,-62.8500],[17.9088,-62.8530],[17.9100,-62.8545],[17.9130,-62.8555],[17.9155,-62.8565],[17.9175,-62.8600],[17.9185,-62.8640],[17.9190,-62.8675]
+    ]},
+    // Route 3: St. Jean → Lorient → Grand Cul-de-Sac
+    { logo: fordLogoUrl, speed: 0.45, path: [
+      [17.9055,-62.8350],[17.9060,-62.8320],[17.9065,-62.8290],[17.9068,-62.8260],[17.9070,-62.8230],[17.9075,-62.8180],[17.9080,-62.8120],[17.9075,-62.8060],[17.9070,-62.8015]
+    ]},
+    // Route 4: Gustavia → Lurin → Gouverneur
+    { logo: fordLogoUrl, speed: 0.4, path: [
+      [17.8960,-62.8490],[17.8948,-62.8470],[17.8935,-62.8450],[17.8920,-62.8430],[17.8905,-62.8410],[17.8890,-62.8395],[17.8878,-62.8380]
+    ]},
+    // Route 5: Pointe Milou circuit
+    { logo: fordLogoUrl, speed: 0.35, path: [
+      [17.9075,-62.8230],[17.9090,-62.8210],[17.9105,-62.8190],[17.9120,-62.8170],[17.9140,-62.8155],[17.9155,-62.8160],[17.9140,-62.8155],[17.9120,-62.8170]
+    ]},
+  ];
+
+  var movers = [];
+  routes.forEach(function(route) {
+    var icon = L.divIcon({ className:'ford-mover', html:'<img src="'+route.logo+'">', iconSize:[16,16], iconAnchor:[8,8] });
+    var m = L.marker(route.path[0], { icon: icon, interactive: false }).addTo(map);
+    movers.push({ marker: m, path: route.path, pos: Math.random() * route.path.length, speed: route.speed });
+  });
+
+  // Animate movers
+  function lerp(a, b, t) { return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]; }
+  function animateMovers() {
+    movers.forEach(function(mv) {
+      mv.pos += mv.speed * 0.02;
+      if (mv.pos >= mv.path.length - 1) mv.pos = 0;
+      var idx = Math.floor(mv.pos);
+      var t = mv.pos - idx;
+      var next = Math.min(idx + 1, mv.path.length - 1);
+      var pos = lerp(mv.path[idx], mv.path[next], t);
+      mv.marker.setLatLng(pos);
+    });
+    requestAnimationFrame(animateMovers);
+  }
+  animateMovers();
+
+  // ── WIPE: after 4 seconds, competitors fade out ──
+  setTimeout(function() {
+    document.querySelectorAll('.competitor').forEach(function(el) {
+      el.classList.add('bye');
+    });
+  }, 4000);
+
+  L.control.scale({ position: 'bottomright', imperial: true, metric: false }).addTo(map);
+})();
+-->
+</script>
+</body>
+</html>

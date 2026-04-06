@@ -135,6 +135,8 @@ export interface BizPin {
   lat: number;
   lng: number;
   type: string | null;
+  color: [number, number, number] | null;
+  logoUrl: string | null;
 }
 
 export interface ColPin {

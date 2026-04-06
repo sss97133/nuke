@@ -221,9 +221,9 @@ const VehicleSubHeader: React.FC = () => {
               fontWeight: 800,
               textTransform: 'uppercase' as const,
               letterSpacing: '0.3px',
-              color: '#999',
+              color: 'var(--text-disabled)',
               padding: '1px 4px',
-              border: '2px solid #ccc',
+              border: '2px solid var(--border)',
               marginLeft: 4,
             }}>THIN</span>
           ) : null;

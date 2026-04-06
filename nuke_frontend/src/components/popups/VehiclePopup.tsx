@@ -460,19 +460,28 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
             </ClickableText>
           )}
         </div>
+      </div>
+
+      {/* Action buttons */}
+      <div style={{ padding: '0 12px 10px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
         {(vehicle.discovery_url || vehicle.listing_url) && (
           <a
             href={vehicle.discovery_url || vehicle.listing_url || '#'}
             target="_blank" rel="noopener noreferrer"
-            style={{ fontFamily: MONO, fontSize: 8, fontWeight: 700, textTransform: 'uppercase', color: '#2a2a2a', textDecoration: 'none', borderBottom: '1px dashed #999' }}
+            style={{
+              fontFamily: SANS, fontSize: 9, fontWeight: 800,
+              textTransform: 'uppercase', letterSpacing: '0.3px',
+              padding: '4px 12px', border: '2px solid #2a2a2a',
+              background: 'transparent', color: '#2a2a2a',
+              textDecoration: 'none', display: 'inline-block',
+              transition: 'opacity 150ms ease',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
           >
-            VIEW SOURCE
+            VIEW LISTING
           </a>
         )}
-      </div>
-
-      {/* Full profile link */}
-      <div style={{ padding: '0 12px 10px', textAlign: 'right' }}>
         <a
           href={`/vehicle/${vehicle.id}`}
           style={{

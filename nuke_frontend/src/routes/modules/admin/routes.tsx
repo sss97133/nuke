@@ -14,8 +14,6 @@ const OwnershipVerificationDashboard = React.lazy(() => import('../../../compone
 const MergeProposalsDashboard = React.lazy(() => import('../../../pages/MergeProposalsDashboard'));
 const BulkPriceEditor = React.lazy(() => import('../../../pages/admin/BulkPriceEditor'));
 const PriceCsvImport = React.lazy(() => import('../../../pages/admin/PriceCsvImport'));
-const ShippingSettings = React.lazy(() => import('../../../pages/admin/ShippingSettings'));
-const X402Settings = React.lazy(() => import('../../../pages/admin/X402Settings'));
 const KSLScraper = React.lazy(() => import('../../../pages/admin/KSLScraper'));
 const ScraperDashboard = React.lazy(() => import('../../../pages/admin/ScraperDashboard'));
 const MemeLibraryAdmin = React.lazy(() => import('../../../pages/admin/MemeLibraryAdmin'));
@@ -31,7 +29,6 @@ const DatabaseAudit = React.lazy(() => import('../../../pages/DatabaseAudit'));
 const DataDiagnostic = React.lazy(() => import('../../../pages/DataDiagnostic'));
 const TestContributions = React.lazy(() => import('../../../pages/TestContributions'));
 const AdminPendingVehicles = React.lazy(() => import('../../../pages/AdminPendingVehicles'));
-const HoverCardDemo = React.lazy(() => import('../../../pages/admin/HoverCardDemo'));
 const VehicleMakeLogosCatalog = React.lazy(() => import('../../../pages/admin/VehicleMakeLogosCatalog'));
 const MarketDataTools = React.lazy(() => import('../../../pages/MarketDataTools'));
 const BotTestDashboard = React.lazy(() => import('../../../pages/admin/BotTestDashboard'));
@@ -41,7 +38,6 @@ const AdminIdentityClaims = React.lazy(() => import('../../../pages/admin/AdminI
 const InventoryAnalytics = React.lazy(() => import('../../../pages/admin/InventoryAnalytics'));
 const AdminInbox = React.lazy(() => import('../../../pages/admin/AdminInbox'));
 const AdminAgentInbox = React.lazy(() => import('../../../pages/admin/AdminAgentInbox'));
-const ProxyBidOperations = React.lazy(() => import('../../../pages/admin/ProxyBidOperations'));
 const UnifiedScraperDashboard = React.lazy(() => import('../../../pages/admin/UnifiedScraperDashboard'));
 const DataQualityDashboard = React.lazy(() => import('../../../pages/admin/DataQualityDashboard'));
 const TransfersDashboard = React.lazy(() => import('../../../pages/admin/TransfersDashboard'));
@@ -99,8 +95,6 @@ const AdminModuleRoutes = () => {
           <Route path="bi" element={<BusinessIntelligence />} />
           <Route path="price-editor" element={<BulkPriceEditor />} />
           <Route path="price-import" element={<PriceCsvImport />} />
-          <Route path="shipping-settings" element={<ShippingSettings />} />
-          <Route path="x402-settings" element={<X402Settings />} />
           <Route path="ksl-scraper" element={<KSLScraper />} />
           <Route path="scrapers" element={<ScraperDashboard />} />
           <Route path="meme-library" element={<MemeLibraryAdmin />} />
@@ -111,9 +105,7 @@ const AdminModuleRoutes = () => {
           <Route path="data-diagnostic" element={<DataDiagnostic />} />
           <Route path="test-contributions" element={<TestContributions />} />
           <Route path="query-console" element={<NLQueryConsole />} />
-          <Route path="hover-demo" element={<HoverCardDemo />} />
           <Route path="bot-testing" element={<BotTestDashboard />} />
-          <Route path="proxy-bids" element={<ProxyBidOperations />} />
           <Route path="unified-scrapers" element={<UnifiedScraperDashboard />} />
           <Route path="data-quality" element={<DataQualityDashboard />} />
           <Route path="transfers" element={<TransfersDashboard />} />

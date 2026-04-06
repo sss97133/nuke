@@ -5,5 +5,4 @@
  */
 
 export { DemoModeBanner, DemoWatermark, DemoTradeWrapper } from './DemoModeBanner';
-export { RiskDisclosureModal } from './RiskDisclosureModal';
 export { SubscriptionFlow } from './SubscriptionFlow';

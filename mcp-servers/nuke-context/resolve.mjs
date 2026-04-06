@@ -59,7 +59,7 @@ function transformRPCResult(rpc) {
       quantity: p.quantity,
       is_comped: p.is_comped,
       comp_reason: p.comp_reason,
-      comp_retail_value: p.price,
+      comp_retail_value: p.comp_retail_value || p.price,
     })),
     labor: (wo.labor || []).map(l => ({
       task_name: l.task,
@@ -68,6 +68,8 @@ function transformRPCResult(rpc) {
       total_cost: l.total,
       rate_source: l.rate_source,
       is_comped: l.is_comped,
+      comp_reason: l.comp_reason,
+      comp_retail_value: l.comp_retail_value || l.total,
     })),
     payments: (wo.payments || []).map(p => ({
       amount: p.amount,

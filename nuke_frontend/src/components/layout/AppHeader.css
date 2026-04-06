@@ -10,7 +10,7 @@
 .header-wrapper {
   position: sticky;
   top: 0;
-  z-index: 1000;
+  z-index: 10000;
   background: var(--surface);
   border-bottom: 2px solid var(--border);
   width: 100%;
@@ -26,7 +26,7 @@
 
 .header {
   display: grid;
-  grid-template-columns: max-content 1fr max-content;
+  grid-template-columns: max-content max-content 1fr max-content;
   align-items: center;
   gap: 12px;
   height: 40px;
@@ -64,7 +64,40 @@
 }
 
 /* ============================================================================
-   ZONE 2: COMMAND INPUT
+   ZONE 2: NAVIGATION
+   ============================================================================ */
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.header-nav-link {
+  font-size: var(--fs-8);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  transition: color 120ms;
+  white-space: nowrap;
+}
+
+.header-nav-link:hover {
+  color: var(--text);
+}
+
+.header-nav-link.active {
+  color: var(--text);
+  font-weight: 700;
+  border-bottom: 2px solid var(--text);
+  margin-bottom: -2px;
+}
+
+/* ============================================================================
+   ZONE 3: COMMAND INPUT
    ============================================================================ */
 
 .header-command {
@@ -251,7 +284,13 @@
 
 @media (max-width: 767px) {
   .header {
+    grid-template-columns: max-content 1fr max-content;
     gap: 6px;
+  }
+
+  /* Hide desktop nav on mobile — use bottom nav instead */
+  .header-nav {
+    display: none;
   }
 
   /* User dropdown full width */

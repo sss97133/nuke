@@ -36,15 +36,15 @@ interface Observation {
 
 const KIND_CONFIG: Record<string, { label: string; border: string }> = {
   listing:       { label: 'LISTING',       border: 'var(--text-secondary)' },
-  sale_result:   { label: 'SALE RESULT',   border: '#16825d' },
-  comment:       { label: 'COMMENT',       border: '#6040a0' },
-  bid:           { label: 'BID',           border: '#2a6fa0' },
-  work_record:   { label: 'WORK RECORD',   border: '#b05a00' },
+  sale_result:   { label: 'SALE RESULT',   border: 'var(--success)' },
+  comment:       { label: 'COMMENT',       border: 'var(--chart-purple)' },
+  bid:           { label: 'BID',           border: 'var(--info)' },
+  work_record:   { label: 'WORK RECORD',   border: 'var(--warning)' },
   ownership:     { label: 'OWNERSHIP',     border: 'var(--text)' },
   specification: { label: 'SPEC',          border: 'var(--text-secondary)' },
-  provenance:    { label: 'PROVENANCE',    border: '#16825d' },
-  valuation:     { label: 'VALUATION',     border: '#b05a00' },
-  condition:     { label: 'CONDITION',     border: '#2a6fa0' },
+  provenance:    { label: 'PROVENANCE',    border: 'var(--success)' },
+  valuation:     { label: 'VALUATION',     border: 'var(--warning)' },
+  condition:     { label: 'CONDITION',     border: 'var(--info)' },
   media:         { label: 'MEDIA',         border: 'var(--text-disabled)' },
 };
 
@@ -57,9 +57,9 @@ function getKindConfig(kind: string): { label: string; border: string } {
 /* ------------------------------------------------------------------ */
 
 function confidenceColor(conf: string | null, score: number | null): string {
-  if (conf === 'high' || (score !== null && score >= 0.8)) return '#16825d';
-  if (conf === 'medium' || (score !== null && score >= 0.4)) return '#b05a00';
-  if (conf === 'low' || (score !== null && score > 0)) return '#d13438';
+  if (conf === 'high' || (score !== null && score >= 0.8)) return 'var(--success)';
+  if (conf === 'medium' || (score !== null && score >= 0.4)) return 'var(--warning)';
+  if (conf === 'low' || (score !== null && score > 0)) return 'var(--error)';
   return 'var(--text-disabled)';
 }
 

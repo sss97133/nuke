@@ -230,7 +230,7 @@ export interface FeedViewConfig {
 
 export const DEFAULT_VIEW_CONFIG: FeedViewConfig = {
   viewMode: 'grid',
-  cardsPerRow: 6,
+  cardsPerRow: 3,
   thumbnailFit: 'cover',
   infoDense: false,
   thermalPricing: false,

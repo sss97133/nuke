@@ -1,0 +1,809 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SECTION 2: ENGINE - LS3  |  PAGE 2 OF 2  |  ENGINE SENSORS + THROTTLE BODY
+     DWG NO: NKW-K5-02-2  |  REV: --  |  DATE: 2026-04-04
+     ANSI D (22x34") landscape  |  viewBox 0 0 3400 2200
+     12 wires: CKP(shielded), CMP(shielded), KS1(shielded), KS2(shielded),
+               OPS, MAP, IAT, CLT, FPS, OTS, ETB(1 wire in cut list)
+     Plus sensor 5V ref and sensor ground buses
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3400 2200" width="3400" height="2200">
+<defs>
+  <style>
+    text { font-family: 'Courier New', monospace; }
+    .grid-label { font-size: 14px; fill: #999; text-anchor: middle; }
+    .grid-line { stroke: #CCCCCC; stroke-width: 0.25; }
+    .zone-boundary { stroke: #666666; stroke-width: 0.5; stroke-dasharray: 4,2; fill: none; }
+    .zone-label { font-size: 16px; font-weight: bold; fill: #666; font-family: Arial, sans-serif; text-anchor: middle; }
+    .wire-hot { stroke: #000; stroke-width: 0.5; fill: none; }
+    .wire-signal { stroke: #000; stroke-width: 0.35; fill: none; }
+    .wire-ground { stroke: #000; stroke-width: 0.5; fill: none; stroke-dasharray: 6,3; }
+    .wire-shielded-env { stroke: #000; stroke-width: 0.8; fill: none; stroke-dasharray: 3,2; }
+    .wire-label { font-size: 9px; fill: #000; font-family: 'Courier New', monospace; }
+    .comp-label { font-size: 11px; fill: #000; font-weight: bold; font-family: 'Courier New', monospace; }
+    .comp-detail { font-size: 8px; fill: #333; font-family: 'Courier New', monospace; }
+    .pin-label { font-size: 8px; fill: #000; font-family: 'Courier New', monospace; }
+    .connector-outline { fill: white; stroke: black; stroke-width: 1.2; }
+    .pin-filled { fill: black; stroke: black; stroke-width: 0.6; }
+    .pin-empty { fill: white; stroke: black; stroke-width: 0.6; }
+    .junction { fill: #000; }
+    .title-box { fill: white; stroke: black; stroke-width: 1; }
+    .title-text { font-family: Arial, sans-serif; }
+    .cross-ref { font-size: 8px; fill: #444; font-family: Arial, sans-serif; }
+    .note-text { font-size: 8px; fill: #333; font-family: Arial, sans-serif; }
+    .shield-hatch { stroke: #000; stroke-width: 0.4; }
+  </style>
+
+  <!-- Reusable: Hall Effect Sensor (I-03) -->
+  <symbol id="sym-hall" viewBox="0 0 40 40">
+    <rect x="10" y="8" width="20" height="24" rx="1" ry="1" fill="white" stroke="black" stroke-width="1.5"/>
+    <text x="20" y="22" font-family="Courier New, monospace" font-size="10" font-weight="bold" fill="black" text-anchor="middle" dominant-baseline="middle">H</text>
+    <line x1="32" y1="20" x2="36" y2="20" stroke="black" stroke-width="1"/>
+    <polygon points="36,20 33,18 33,22" fill="black" stroke="none"/>
+    <line x1="10" y1="13" x2="4" y2="13" stroke="black" stroke-width="1.5"/>
+    <line x1="10" y1="20" x2="4" y2="20" stroke="black" stroke-width="1.5"/>
+    <line x1="10" y1="27" x2="4" y2="27" stroke="black" stroke-width="1.5"/>
+  </symbol>
+
+  <!-- Reusable: Knock Sensor (I-04) -->
+  <symbol id="sym-knock" viewBox="0 0 40 40">
+    <polygon points="20,6 32,13 32,27 20,34 8,27 8,13" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/>
+    <text x="20" y="22" font-family="Courier New, monospace" font-size="8" font-weight="bold" fill="black" text-anchor="middle" dominant-baseline="middle">KS</text>
+    <circle cx="20" cy="13" r="2" fill="none" stroke="black" stroke-width="1"/>
+    <circle cx="20" cy="13" r="0.8" fill="black" stroke="none"/>
+    <line x1="8" y1="20" x2="2" y2="20" stroke="black" stroke-width="1.5"/>
+    <line x1="32" y1="20" x2="38" y2="20" stroke="black" stroke-width="1.5"/>
+  </symbol>
+
+  <!-- Reusable: Thermistor (I-01) -->
+  <symbol id="sym-therm" viewBox="0 0 40 40">
+    <circle cx="20" cy="20" r="12" fill="white" stroke="black" stroke-width="1.5"/>
+    <polyline points="12,20 14,16 16,24 18,16 20,24 22,16 24,24 26,16 28,20" fill="none" stroke="black" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="20" y="30" font-family="Courier New, monospace" font-size="5" font-weight="bold" fill="black" text-anchor="middle">T</text>
+    <line x1="20" y1="2" x2="20" y2="8" stroke="black" stroke-width="1.5"/>
+    <line x1="20" y1="32" x2="20" y2="38" stroke="black" stroke-width="1.5"/>
+  </symbol>
+
+  <!-- Reusable: Pressure Transducer (I-02) -->
+  <symbol id="sym-press" viewBox="0 0 40 40">
+    <circle cx="20" cy="20" r="12" fill="white" stroke="black" stroke-width="1.5"/>
+    <path d="M13 20 Q20 12, 27 20" fill="none" stroke="black" stroke-width="1.2"/>
+    <line x1="20" y1="26" x2="20" y2="15" stroke="black" stroke-width="1"/>
+    <polygon points="20,15 18,18 22,18" fill="black" stroke="none"/>
+    <text x="20" y="30" font-family="Courier New, monospace" font-size="5" font-weight="bold" fill="black" text-anchor="middle">P</text>
+    <line x1="20" y1="2" x2="20" y2="8" stroke="black" stroke-width="1.5"/>
+    <line x1="20" y1="32" x2="20" y2="38" stroke="black" stroke-width="1.5"/>
+  </symbol>
+
+  <!-- Reusable: Throttle Body (O-10) -->
+  <symbol id="sym-etb" viewBox="0 0 40 40">
+    <circle cx="14" cy="20" r="10" fill="white" stroke="black" stroke-width="1.5"/>
+    <text x="14" y="22" font-family="Courier New, monospace" font-size="8" font-weight="bold" fill="black" text-anchor="middle" dominant-baseline="middle">M</text>
+    <line x1="6" y1="14" x2="6" y2="26" stroke="black" stroke-width="1"/>
+    <polygon points="6,14 4,17 8,17" fill="black" stroke="none"/>
+    <polygon points="6,26 4,23 8,23" fill="black" stroke="none"/>
+    <rect x="26" y="12" width="10" height="16" rx="1" ry="1" fill="white" stroke="black" stroke-width="1.5"/>
+    <text x="31" y="18" font-family="Courier New, monospace" font-size="4" font-weight="bold" fill="black" text-anchor="middle">TPS</text>
+    <text x="31" y="24" font-family="Courier New, monospace" font-size="4" fill="black" text-anchor="middle">1+2</text>
+    <line x1="24" y1="20" x2="26" y2="20" stroke="black" stroke-width="1" stroke-dasharray="2,1"/>
+    <line x1="4" y1="16" x2="1" y2="16" stroke="black" stroke-width="1.5"/>
+    <line x1="4" y1="24" x2="1" y2="24" stroke="black" stroke-width="1.5"/>
+    <line x1="36" y1="15" x2="39" y2="15" stroke="black" stroke-width="1.5"/>
+    <line x1="36" y1="19" x2="39" y2="19" stroke="black" stroke-width="1.5"/>
+    <line x1="36" y1="23" x2="39" y2="23" stroke="black" stroke-width="1.5"/>
+    <line x1="36" y1="27" x2="39" y2="27" stroke="black" stroke-width="1.5"/>
+  </symbol>
+
+  <!-- Reusable: Sensor Ground (G-04) -->
+  <symbol id="sym-sensor-gnd" viewBox="0 0 40 40">
+    <line x1="20" y1="2" x2="20" y2="10" stroke="black" stroke-width="1.5"/>
+    <polygon points="8,10 32,10 20,30" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/>
+    <text x="20" y="22" font-family="Courier New, monospace" font-size="7" font-weight="bold" fill="black" text-anchor="middle" dominant-baseline="middle">SG</text>
+  </symbol>
+</defs>
+
+<!-- Background -->
+<rect width="3400" height="2200" fill="white"/>
+
+<!-- ============================================================ -->
+<!-- GRID                                                          -->
+<!-- ============================================================ -->
+<g id="grid">
+  <!-- Vertical grid lines (columns 1-37) - same spacing as page 1 -->
+  <line x1="60" y1="40" x2="60" y2="2060" class="grid-line"/>
+  <line x1="148" y1="40" x2="148" y2="2060" class="grid-line"/>
+  <line x1="237" y1="40" x2="237" y2="2060" class="grid-line"/>
+  <line x1="325" y1="40" x2="325" y2="2060" class="grid-line"/>
+  <line x1="414" y1="40" x2="414" y2="2060" class="grid-line"/>
+  <line x1="502" y1="40" x2="502" y2="2060" class="grid-line"/>
+  <line x1="591" y1="40" x2="591" y2="2060" class="grid-line"/>
+  <line x1="679" y1="40" x2="679" y2="2060" class="grid-line"/>
+  <line x1="768" y1="40" x2="768" y2="2060" class="grid-line"/>
+  <line x1="856" y1="40" x2="856" y2="2060" class="grid-line"/>
+  <line x1="945" y1="40" x2="945" y2="2060" class="grid-line"/>
+  <line x1="1033" y1="40" x2="1033" y2="2060" class="grid-line"/>
+  <line x1="1122" y1="40" x2="1122" y2="2060" class="grid-line"/>
+  <line x1="1210" y1="40" x2="1210" y2="2060" class="grid-line"/>
+  <line x1="1299" y1="40" x2="1299" y2="2060" class="grid-line"/>
+  <line x1="1387" y1="40" x2="1387" y2="2060" class="grid-line"/>
+  <line x1="1476" y1="40" x2="1476" y2="2060" class="grid-line"/>
+  <line x1="1564" y1="40" x2="1564" y2="2060" class="grid-line"/>
+  <line x1="1653" y1="40" x2="1653" y2="2060" class="grid-line"/>
+  <line x1="1741" y1="40" x2="1741" y2="2060" class="grid-line"/>
+  <line x1="1830" y1="40" x2="1830" y2="2060" class="grid-line"/>
+  <line x1="1918" y1="40" x2="1918" y2="2060" class="grid-line"/>
+  <line x1="2007" y1="40" x2="2007" y2="2060" class="grid-line"/>
+  <line x1="2095" y1="40" x2="2095" y2="2060" class="grid-line"/>
+  <line x1="2184" y1="40" x2="2184" y2="2060" class="grid-line"/>
+  <line x1="2272" y1="40" x2="2272" y2="2060" class="grid-line"/>
+  <line x1="2361" y1="40" x2="2361" y2="2060" class="grid-line"/>
+  <line x1="2449" y1="40" x2="2449" y2="2060" class="grid-line"/>
+  <line x1="2538" y1="40" x2="2538" y2="2060" class="grid-line"/>
+  <line x1="2626" y1="40" x2="2626" y2="2060" class="grid-line"/>
+  <line x1="2715" y1="40" x2="2715" y2="2060" class="grid-line"/>
+  <line x1="2803" y1="40" x2="2803" y2="2060" class="grid-line"/>
+  <line x1="2892" y1="40" x2="2892" y2="2060" class="grid-line"/>
+  <line x1="2980" y1="40" x2="2980" y2="2060" class="grid-line"/>
+  <line x1="3069" y1="40" x2="3069" y2="2060" class="grid-line"/>
+  <line x1="3157" y1="40" x2="3157" y2="2060" class="grid-line"/>
+  <line x1="3246" y1="40" x2="3246" y2="2060" class="grid-line"/>
+
+  <!-- Horizontal grid lines (A-Z) -->
+  <line x1="60" y1="40" x2="3340" y2="40" class="grid-line"/>
+  <line x1="60" y1="118" x2="3340" y2="118" class="grid-line"/>
+  <line x1="60" y1="196" x2="3340" y2="196" class="grid-line"/>
+  <line x1="60" y1="274" x2="3340" y2="274" class="grid-line"/>
+  <line x1="60" y1="352" x2="3340" y2="352" class="grid-line"/>
+  <line x1="60" y1="430" x2="3340" y2="430" class="grid-line"/>
+  <line x1="60" y1="508" x2="3340" y2="508" class="grid-line"/>
+  <line x1="60" y1="586" x2="3340" y2="586" class="grid-line"/>
+  <line x1="60" y1="664" x2="3340" y2="664" class="grid-line"/>
+  <line x1="60" y1="742" x2="3340" y2="742" class="grid-line"/>
+  <line x1="60" y1="820" x2="3340" y2="820" class="grid-line"/>
+  <line x1="60" y1="898" x2="3340" y2="898" class="grid-line"/>
+  <line x1="60" y1="976" x2="3340" y2="976" class="grid-line"/>
+  <line x1="60" y1="1054" x2="3340" y2="1054" class="grid-line"/>
+  <line x1="60" y1="1132" x2="3340" y2="1132" class="grid-line"/>
+  <line x1="60" y1="1210" x2="3340" y2="1210" class="grid-line"/>
+  <line x1="60" y1="1288" x2="3340" y2="1288" class="grid-line"/>
+  <line x1="60" y1="1366" x2="3340" y2="1366" class="grid-line"/>
+  <line x1="60" y1="1444" x2="3340" y2="1444" class="grid-line"/>
+  <line x1="60" y1="1522" x2="3340" y2="1522" class="grid-line"/>
+  <line x1="60" y1="1600" x2="3340" y2="1600" class="grid-line"/>
+  <line x1="60" y1="1678" x2="3340" y2="1678" class="grid-line"/>
+  <line x1="60" y1="1756" x2="3340" y2="1756" class="grid-line"/>
+  <line x1="60" y1="1834" x2="3340" y2="1834" class="grid-line"/>
+  <line x1="60" y1="1912" x2="3340" y2="1912" class="grid-line"/>
+  <line x1="60" y1="1990" x2="3340" y2="1990" class="grid-line"/>
+  <line x1="60" y1="2060" x2="3340" y2="2060" class="grid-line"/>
+
+  <!-- Column labels top -->
+  <text x="104" y="30" class="grid-label">1</text><text x="192" y="30" class="grid-label">2</text>
+  <text x="281" y="30" class="grid-label">3</text><text x="369" y="30" class="grid-label">4</text>
+  <text x="458" y="30" class="grid-label">5</text><text x="546" y="30" class="grid-label">6</text>
+  <text x="635" y="30" class="grid-label">7</text><text x="723" y="30" class="grid-label">8</text>
+  <text x="812" y="30" class="grid-label">9</text><text x="900" y="30" class="grid-label">10</text>
+  <text x="989" y="30" class="grid-label">11</text><text x="1077" y="30" class="grid-label">12</text>
+  <text x="1166" y="30" class="grid-label">13</text><text x="1254" y="30" class="grid-label">14</text>
+  <text x="1343" y="30" class="grid-label">15</text><text x="1431" y="30" class="grid-label">16</text>
+  <text x="1520" y="30" class="grid-label">17</text><text x="1608" y="30" class="grid-label">18</text>
+  <text x="1697" y="30" class="grid-label">19</text><text x="1785" y="30" class="grid-label">20</text>
+  <text x="1874" y="30" class="grid-label">21</text><text x="1962" y="30" class="grid-label">22</text>
+  <text x="2051" y="30" class="grid-label">23</text><text x="2139" y="30" class="grid-label">24</text>
+  <text x="2228" y="30" class="grid-label">25</text><text x="2316" y="30" class="grid-label">26</text>
+  <text x="2405" y="30" class="grid-label">27</text><text x="2493" y="30" class="grid-label">28</text>
+  <text x="2582" y="30" class="grid-label">29</text><text x="2670" y="30" class="grid-label">30</text>
+  <text x="2759" y="30" class="grid-label">31</text><text x="2847" y="30" class="grid-label">32</text>
+  <text x="2936" y="30" class="grid-label">33</text><text x="3024" y="30" class="grid-label">34</text>
+  <text x="3113" y="30" class="grid-label">35</text><text x="3201" y="30" class="grid-label">36</text>
+  <text x="3290" y="30" class="grid-label">37</text>
+
+  <!-- Row labels left -->
+  <text x="40" y="83" class="grid-label">A</text><text x="40" y="161" class="grid-label">B</text>
+  <text x="40" y="239" class="grid-label">C</text><text x="40" y="317" class="grid-label">D</text>
+  <text x="40" y="395" class="grid-label">E</text><text x="40" y="473" class="grid-label">F</text>
+  <text x="40" y="551" class="grid-label">G</text><text x="40" y="629" class="grid-label">H</text>
+  <text x="40" y="707" class="grid-label">I</text><text x="40" y="785" class="grid-label">J</text>
+  <text x="40" y="863" class="grid-label">K</text><text x="40" y="941" class="grid-label">L</text>
+  <text x="40" y="1019" class="grid-label">M</text><text x="40" y="1097" class="grid-label">N</text>
+  <text x="40" y="1175" class="grid-label">O</text><text x="40" y="1253" class="grid-label">P</text>
+  <text x="40" y="1331" class="grid-label">Q</text><text x="40" y="1409" class="grid-label">R</text>
+  <text x="40" y="1487" class="grid-label">S</text><text x="40" y="1565" class="grid-label">T</text>
+  <text x="40" y="1643" class="grid-label">U</text><text x="40" y="1721" class="grid-label">V</text>
+  <text x="40" y="1799" class="grid-label">W</text><text x="40" y="1877" class="grid-label">X</text>
+  <text x="40" y="1955" class="grid-label">Y</text><text x="40" y="2033" class="grid-label">Z</text>
+
+  <!-- Row labels right -->
+  <text x="3360" y="83" class="grid-label">A</text><text x="3360" y="161" class="grid-label">B</text>
+  <text x="3360" y="239" class="grid-label">C</text><text x="3360" y="317" class="grid-label">D</text>
+  <text x="3360" y="395" class="grid-label">E</text><text x="3360" y="473" class="grid-label">F</text>
+  <text x="3360" y="551" class="grid-label">G</text><text x="3360" y="629" class="grid-label">H</text>
+  <text x="3360" y="707" class="grid-label">I</text><text x="3360" y="785" class="grid-label">J</text>
+  <text x="3360" y="863" class="grid-label">K</text><text x="3360" y="941" class="grid-label">L</text>
+  <text x="3360" y="1019" class="grid-label">M</text><text x="3360" y="1097" class="grid-label">N</text>
+  <text x="3360" y="1175" class="grid-label">O</text><text x="3360" y="1253" class="grid-label">P</text>
+  <text x="3360" y="1331" class="grid-label">Q</text><text x="3360" y="1409" class="grid-label">R</text>
+  <text x="3360" y="1487" class="grid-label">S</text><text x="3360" y="1565" class="grid-label">T</text>
+  <text x="3360" y="1643" class="grid-label">U</text><text x="3360" y="1721" class="grid-label">V</text>
+  <text x="3360" y="1799" class="grid-label">W</text><text x="3360" y="1877" class="grid-label">X</text>
+  <text x="3360" y="1955" class="grid-label">Y</text><text x="3360" y="2033" class="grid-label">Z</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- ZONES                                                         -->
+<!-- ============================================================ -->
+<g id="zones">
+  <line x1="900" y1="40" x2="900" y2="2060" class="zone-boundary" stroke-width="1"/>
+  <text x="900" y="60" class="zone-label" font-size="12">FRONT OF DASH</text>
+  <text x="400" y="75" class="zone-label">ECU / DASH SIDE</text>
+  <text x="2100" y="75" class="zone-label">ENGINE BAY</text>
+  <rect x="1250" y="100" width="2000" height="1900" rx="8" ry="8" class="zone-boundary"/>
+</g>
+
+<!-- ============================================================ -->
+<!-- M130 CONNECTOR B  (26-pin Superseal)                          -->
+<!-- Sensor pins: B01-B07, B13, B15-B16 + reference voltages       -->
+<!-- ============================================================ -->
+<g id="M130-connB" transform="translate(120, 100)">
+  <rect x="0" y="0" width="280" height="1500" rx="6" ry="6" class="connector-outline" stroke-width="1.5"/>
+  <rect x="110" y="-12" width="60" height="14" rx="3" ry="3" fill="white" stroke="black" stroke-width="1"/>
+
+  <text x="140" y="30" class="comp-label" text-anchor="middle" font-size="14">M130</text>
+  <text x="140" y="48" class="comp-label" text-anchor="middle" font-size="12">CONNECTOR B</text>
+  <text x="140" y="64" class="comp-detail" text-anchor="middle">26-PIN SUPERSEAL</text>
+
+  <!-- ===== SHIELDED DIGITAL INPUTS ===== -->
+  <line x1="10" y1="80" x2="270" y2="80" stroke="#999" stroke-width="0.5"/>
+  <text x="140" y="97" class="comp-detail" text-anchor="middle" font-weight="bold">SHIELDED DIGITAL INPUTS</text>
+
+  <!-- B01 UDIG1 - Crank Position Sensor -->
+  <circle cx="30" cy="125" r="5" class="pin-filled"/>
+  <text x="30" y="127" font-family="Courier New, monospace" font-size="5" fill="white" text-anchor="middle" dominant-baseline="middle">1</text>
+  <text x="50" y="122" class="pin-label">B01 UDIG1</text>
+  <text x="50" y="133" class="comp-detail">CRANK POSITION (58X)</text>
+  <line x1="280" y1="125" x2="300" y2="125" class="wire-signal"/>
+
+  <!-- B02 UDIG2 - Cam Position Sensor -->
+  <circle cx="30" cy="195" r="5" class="pin-filled"/>
+  <text x="30" y="197" font-family="Courier New, monospace" font-size="5" fill="white" text-anchor="middle" dominant-baseline="middle">2</text>
+  <text x="50" y="192" class="pin-label">B02 UDIG2</text>
+  <text x="50" y="203" class="comp-detail">CAM POSITION (GEN IV)</text>
+  <line x1="280" y1="195" x2="300" y2="195" class="wire-signal"/>
+
+  <!-- ===== KNOCK INPUTS ===== -->
+  <line x1="10" y1="240" x2="270" y2="240" stroke="#999" stroke-width="0.5"/>
+  <text x="140" y="257" class="comp-detail" text-anchor="middle" font-weight="bold">KNOCK SENSOR INPUTS</text>
+
+  <!-- B07 KNOCK1 -->
+  <circle cx="30" cy="285" r="5" class="pin-filled"/>
+  <text x="30" y="287" font-family="Courier New, monospace" font-size="5" fill="white" text-anchor="middle" dominant-baseline="middle">7</text>
+  <text x="50" y="282" class="pin-label">B07 KNOCK1</text>
+  <text x="50" y="293" class="comp-detail">KNOCK SENSOR BANK 1</text>
+  <line x1="280" y1="285" x2="300" y2="285" class="wire-signal"/>
+
+  <!-- B13 KNOCK2 -->
+  <circle cx="30" cy="355" r="5" class="pin-filled"/>
+  <text x="30" y="357" font-family="Courier New, monospace" font-size="5" fill="white" text-anchor="middle" dominant-baseline="middle">13</text>
+  <text x="50" y="352" class="pin-label">B13 KNOCK2</text>
+  <text x="50" y="363" class="comp-detail">KNOCK SENSOR BANK 2</text>
+  <line x1="280" y1="355" x2="300" y2="355" class="wire-signal"/>
+
+  <!-- ===== ANALOG TEMPERATURE INPUTS ===== -->
+  <line x1="10" y1="400" x2="270" y2="400" stroke="#999" stroke-width="0.5"/>
+  <text x="140" y="417" class="comp-detail" text-anchor="middle" font-weight="bold">ANALOG TEMPERATURE INPUTS</text>
+
+  <!-- B03 AN_TEMP2 - IAT (from cut list #109) -->
+  <circle cx="30" cy="445" r="5" class="pin-filled"/>
+  <text x="30" y="447" font-family="Courier New, monospace" font-size="5" fill="white" text-anchor="middle" dominant-baseline="middle">3</text>
+  <text x="50" y="442" class="pin-label">B03 AN_TEMP2</text>
+  <text x="50" y="453" class="comp-detail">INTAKE AIR TEMP (IAT)</text>
+  <line x1="280" y1="445" x2="300" y2="445" class="wire-signal"/>
+
+  <!-- B04 AN_TEMP3 - CLT (from cut list #110) -->
+  <circle cx="30" cy="515" r="5" class="pin-filled"/>
+  <text x="30" y="517" font-family="Courier New, monospace" font-size="5" fill="white" text-anchor="middle" dominant-baseline="middle">4</text>
+  <text x="50" y="512" class="pin-label">B04 AN_TEMP3</text>
+  <text x="50" y="523" class="comp-detail">COOLANT TEMP (CLT)</text>
+  <line x1="280" y1="515" x2="300" y2="515" class="wire-signal"/>
+
+  <!-- B05 AN_TEMP4 - OTS (from cut list #113) -->
+  <circle cx="30" cy="585" r="5" class="pin-filled"/>
+  <text x="30" y="587" font-family="Courier New, monospace" font-size="5" fill="white" text-anchor="middle" dominant-baseline="middle">5</text>
+  <text x="50" y="582" class="pin-label">B05 AN_TEMP4</text>
+  <text x="50" y="593" class="comp-detail">OIL TEMPERATURE (OTS)</text>
+  <line x1="280" y1="585" x2="300" y2="585" class="wire-signal"/>
+
+  <!-- ===== ANALOG VOLTAGE INPUTS (from Conn A) ===== -->
+  <line x1="10" y1="630" x2="270" y2="630" stroke="#999" stroke-width="0.5"/>
+  <text x="140" y="647" class="comp-detail" text-anchor="middle" font-weight="bold">ANALOG VOLTAGE (CONN A)</text>
+
+  <!-- A14 AV1 - Oil Pressure (from cut list #102) -->
+  <circle cx="30" cy="675" r="5" class="pin-filled"/>
+  <text x="30" y="677" font-family="Courier New, monospace" font-size="5" fill="white" text-anchor="middle" dominant-baseline="middle">A14</text>
+  <text x="50" y="672" class="pin-label">A14 AV1</text>
+  <text x="50" y="683" class="comp-detail">OIL PRESSURE (OPS)</text>
+  <line x1="280" y1="675" x2="300" y2="675" class="wire-signal"/>
+
+  <!-- A15 AV2 - MAP Sensor (from cut list #108) -->
+  <circle cx="30" cy="745" r="5" class="pin-filled"/>
+  <text x="30" y="747" font-family="Courier New, monospace" font-size="5" fill="white" text-anchor="middle" dominant-baseline="middle">A15</text>
+  <text x="50" y="742" class="pin-label">A15 AV2</text>
+  <text x="50" y="753" class="comp-detail">MAP SENSOR</text>
+  <line x1="280" y1="745" x2="300" y2="745" class="wire-signal"/>
+
+  <!-- A16 AV3 - Fuel Pressure (from cut list #112) -->
+  <circle cx="30" cy="815" r="5" class="pin-filled"/>
+  <text x="30" y="817" font-family="Courier New, monospace" font-size="5" fill="white" text-anchor="middle" dominant-baseline="middle">A16</text>
+  <text x="50" y="812" class="pin-label">A16 AV3</text>
+  <text x="50" y="823" class="comp-detail">FUEL PRESSURE (FPS)</text>
+  <line x1="280" y1="815" x2="300" y2="815" class="wire-signal"/>
+
+  <!-- ===== THROTTLE BODY (1 wire in cut list #4) ===== -->
+  <line x1="10" y1="865" x2="270" y2="865" stroke="#999" stroke-width="0.5"/>
+  <text x="140" y="882" class="comp-detail" text-anchor="middle" font-weight="bold">THROTTLE BODY (ETB)</text>
+  <text x="140" y="896" class="comp-detail" text-anchor="middle">CUT LIST #4 - 18AWG ORG</text>
+  <text x="140" y="910" class="comp-detail" text-anchor="middle">6-PIN GM 12605109</text>
+  <text x="140" y="924" class="comp-detail" text-anchor="middle">SEE ETB DETAIL (GRID M20)</text>
+
+  <!-- ===== SENSOR GROUND PINS ===== -->
+  <line x1="10" y1="950" x2="270" y2="950" stroke="#999" stroke-width="0.5"/>
+  <text x="140" y="967" class="comp-detail" text-anchor="middle" font-weight="bold">SENSOR GROUNDS</text>
+
+  <!-- B15 SEN_0V_A -->
+  <circle cx="30" cy="995" r="5" class="pin-filled"/>
+  <text x="30" y="997" font-family="Courier New, monospace" font-size="5" fill="white" text-anchor="middle" dominant-baseline="middle">15</text>
+  <text x="50" y="992" class="pin-label">B15 SEN_0V_A</text>
+  <text x="50" y="1003" class="comp-detail">SENSOR GROUND A (STAR)</text>
+
+  <!-- B16 SEN_0V_B -->
+  <circle cx="30" cy="1035" r="5" class="pin-filled"/>
+  <text x="30" y="1037" font-family="Courier New, monospace" font-size="5" fill="white" text-anchor="middle" dominant-baseline="middle">16</text>
+  <text x="50" y="1032" class="pin-label">B16 SEN_0V_B</text>
+  <text x="50" y="1043" class="comp-detail">SENSOR GROUND B (STAR)</text>
+
+  <!-- ===== 5V REFERENCE ===== -->
+  <line x1="10" y1="1070" x2="270" y2="1070" stroke="#999" stroke-width="0.5"/>
+  <text x="140" y="1087" class="comp-detail" text-anchor="middle" font-weight="bold">5V SENSOR REFERENCE</text>
+  <text x="140" y="1101" class="comp-detail" text-anchor="middle">A02 SEN_5V0_A, A09 SEN_5V0_B</text>
+  <text x="140" y="1115" class="comp-detail" text-anchor="middle">B19 SEN_6V3 (6.3V REF)</text>
+
+  <!-- Remaining unused pins note -->
+  <line x1="10" y1="1140" x2="270" y2="1140" stroke="#999" stroke-width="0.5"/>
+  <text x="140" y="1160" class="comp-detail" text-anchor="middle" font-weight="bold">CAN / ETHERNET / MISC</text>
+  <text x="20" y="1178" class="comp-detail">B17 CAN_HI -> SEE SEC 11</text>
+  <text x="20" y="1192" class="comp-detail">B18 CAN_LO -> SEE SEC 11</text>
+  <text x="20" y="1206" class="comp-detail">B23-B26 ETHERNET -> SEE SEC 3</text>
+  <text x="20" y="1220" class="comp-detail">B12 BAT_BAK -> SEE SEC 0</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- FIREWALL                                                      -->
+<!-- ============================================================ -->
+<g id="firewall">
+  <text x="910" y="120" font-family="Arial, sans-serif" font-size="10" fill="#666" text-anchor="start" font-weight="bold">FIREWALL</text>
+  <text x="910" y="132" font-family="Arial, sans-serif" font-size="8" fill="#666" text-anchor="start">BULKHEAD</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- SHIELDED SENSORS (CKP, CMP, KS1, KS2)                        -->
+<!-- These require R-04 shielded cable indicator                   -->
+<!-- ============================================================ -->
+<g id="shielded-sensors">
+
+  <!-- ===== CKP (CRANK POSITION SENSOR) - Grid E20 ===== -->
+  <g transform="translate(1700, 120)">
+    <use href="#sym-hall" width="55" height="55"/>
+    <text x="27" y="-10" class="comp-label" text-anchor="middle">E-CKP</text>
+    <text x="27" y="64" class="comp-detail" text-anchor="middle">ACDelco 213-4573</text>
+    <text x="27" y="74" class="comp-detail" text-anchor="middle">GM 12615626</text>
+    <text x="27" y="84" class="comp-detail" text-anchor="middle">58X HALL EFFECT</text>
+    <text x="27" y="94" class="comp-detail" text-anchor="middle">FRONT OF BLOCK</text>
+    <text x="27" y="104" class="comp-detail" text-anchor="middle">PIGTAIL: WPCKP40</text>
+    <!-- 5V ref label -->
+    <text x="-10" y="16" class="comp-detail" font-size="6">5V</text>
+    <!-- Signal label -->
+    <text x="-10" y="30" class="comp-detail" font-size="6">SIG</text>
+    <!-- Ground label -->
+    <text x="-10" y="42" class="comp-detail" font-size="6">GND</text>
+  </g>
+
+  <!-- CKP wire: M130:B01 -> CKP signal (shielded) -->
+  <g id="wire-CKP">
+    <!-- Shielded cable envelope -->
+    <rect x="440" y="215" x2="1680" width="1240" height="26" rx="3" ry="3" class="wire-shielded-env"/>
+    <!-- Hatch marks on envelope -->
+    <line x1="500" y1="215" x2="505" y2="221" class="shield-hatch"/>
+    <line x1="600" y1="215" x2="605" y2="221" class="shield-hatch"/>
+    <line x1="700" y1="215" x2="705" y2="221" class="shield-hatch"/>
+    <line x1="800" y1="215" x2="805" y2="221" class="shield-hatch"/>
+    <line x1="1000" y1="215" x2="1005" y2="221" class="shield-hatch"/>
+    <line x1="1200" y1="215" x2="1205" y2="221" class="shield-hatch"/>
+    <line x1="1400" y1="215" x2="1405" y2="221" class="shield-hatch"/>
+    <line x1="1600" y1="215" x2="1605" y2="221" class="shield-hatch"/>
+    <!-- Signal conductor inside -->
+    <line x1="420" y1="225" x2="1700" y2="225" class="wire-signal"/>
+    <line x1="1700" y1="225" x2="1700" y2="157" class="wire-signal"/>
+    <circle cx="1700" cy="157" r="3" class="junction"/>
+    <!-- Shield drain to sensor ground -->
+    <line x1="1060" y1="241" x2="1060" y2="268" stroke="#000" stroke-width="0.5"/>
+    <use href="#sym-sensor-gnd" x="1046" y="268" width="28" height="28"/>
+    <text x="1082" y="285" class="comp-detail" font-size="6">B15</text>
+    <!-- Wire label -->
+    <text x="650" y="212" class="wire-label">CKP-SIG  22AWG  BLU/WHT/WHT  (SHIELDED 2C)</text>
+    <text x="1200" y="212" class="wire-label">M130:B01 -> E-CKP:SIG</text>
+  </g>
+
+  <!-- ===== CMP (CAM POSITION SENSOR) - Grid F20 ===== -->
+  <g transform="translate(1700, 260)">
+    <use href="#sym-hall" width="55" height="55"/>
+    <text x="27" y="-10" class="comp-label" text-anchor="middle">E-CMP</text>
+    <text x="27" y="64" class="comp-detail" text-anchor="middle">ACDelco 213-3826</text>
+    <text x="27" y="74" class="comp-detail" text-anchor="middle">GM 12591720</text>
+    <text x="27" y="84" class="comp-detail" text-anchor="middle">TIMING COVER</text>
+    <text x="27" y="94" class="comp-detail" text-anchor="middle">PIGTAIL: WPCMP30</text>
+  </g>
+
+  <!-- CMP wire: M130:B02 -> CMP signal (shielded) -->
+  <g id="wire-CMP">
+    <rect x="440" y="285" width="1240" height="26" rx="3" ry="3" class="wire-shielded-env"/>
+    <line x1="500" y1="285" x2="505" y2="291" class="shield-hatch"/>
+    <line x1="700" y1="285" x2="705" y2="291" class="shield-hatch"/>
+    <line x1="900" y1="285" x2="905" y2="291" class="shield-hatch"/>
+    <line x1="1100" y1="285" x2="1105" y2="291" class="shield-hatch"/>
+    <line x1="1300" y1="285" x2="1305" y2="291" class="shield-hatch"/>
+    <line x1="1500" y1="285" x2="1505" y2="291" class="shield-hatch"/>
+    <line x1="420" y1="295" x2="1700" y2="295" class="wire-signal"/>
+    <line x1="1700" y1="295" x2="1700" y2="297" class="wire-signal"/>
+    <circle cx="1700" cy="297" r="3" class="junction"/>
+    <!-- Shield drain -->
+    <line x1="1060" y1="311" x2="1060" y2="338" stroke="#000" stroke-width="0.5"/>
+    <use href="#sym-sensor-gnd" x="1046" y="338" width="28" height="28"/>
+    <text x="1082" y="355" class="comp-detail" font-size="6">B15</text>
+    <text x="650" y="282" class="wire-label">CMP-SIG  22AWG  BLU/WHT/BLK  (SHIELDED 2C)</text>
+    <text x="1200" y="282" class="wire-label">M130:B02 -> E-CMP:SIG</text>
+  </g>
+
+  <!-- ===== KS1 (KNOCK SENSOR BANK 1) - Grid H25 ===== -->
+  <g transform="translate(2200, 380)">
+    <use href="#sym-knock" width="50" height="50"/>
+    <text x="25" y="-8" class="comp-label" text-anchor="middle">E-KS1</text>
+    <text x="25" y="58" class="comp-detail" text-anchor="middle">ACDelco 213-1576</text>
+    <text x="25" y="68" class="comp-detail" text-anchor="middle">GM 12623730</text>
+    <text x="25" y="78" class="comp-detail" text-anchor="middle">VALLEY, BANK 1</text>
+    <text x="25" y="88" class="comp-detail" text-anchor="middle">PIGTAIL: WPKN040</text>
+  </g>
+
+  <!-- KS1 wire: M130:B07 -> KS1 (shielded) -->
+  <g id="wire-KS1">
+    <rect x="440" y="375" width="1740" height="26" rx="3" ry="3" class="wire-shielded-env"/>
+    <line x1="500" y1="375" x2="505" y2="381" class="shield-hatch"/>
+    <line x1="800" y1="375" x2="805" y2="381" class="shield-hatch"/>
+    <line x1="1100" y1="375" x2="1105" y2="381" class="shield-hatch"/>
+    <line x1="1400" y1="375" x2="1405" y2="381" class="shield-hatch"/>
+    <line x1="1700" y1="375" x2="1705" y2="381" class="shield-hatch"/>
+    <line x1="2000" y1="375" x2="2005" y2="381" class="shield-hatch"/>
+    <line x1="420" y1="385" x2="2200" y2="385" class="wire-signal"/>
+    <line x1="2200" y1="385" x2="2200" y2="405" class="wire-signal"/>
+    <circle cx="2200" cy="405" r="3" class="junction"/>
+    <!-- Shield drain -->
+    <line x1="1340" y1="401" x2="1340" y2="428" stroke="#000" stroke-width="0.5"/>
+    <use href="#sym-sensor-gnd" x="1326" y="428" width="28" height="28"/>
+    <text x="1362" y="445" class="comp-detail" font-size="6">B15</text>
+    <text x="650" y="372" class="wire-label">KNK1-SIG  22AWG  GRY  (SHIELDED 2C)</text>
+    <text x="1200" y="372" class="wire-label">M130:B07 -> E-KS1:SIG</text>
+  </g>
+
+  <!-- ===== KS2 (KNOCK SENSOR BANK 2) - Grid I25 ===== -->
+  <g transform="translate(2200, 480)">
+    <use href="#sym-knock" width="50" height="50"/>
+    <text x="25" y="-8" class="comp-label" text-anchor="middle">E-KS2</text>
+    <text x="25" y="58" class="comp-detail" text-anchor="middle">BANK 2</text>
+    <text x="25" y="68" class="comp-detail" text-anchor="middle">VALLEY, BANK 2</text>
+  </g>
+
+  <!-- KS2 wire: M130:B13 -> KS2 (shielded) -->
+  <g id="wire-KS2">
+    <rect x="440" y="455" width="1740" height="26" rx="3" ry="3" class="wire-shielded-env"/>
+    <line x1="600" y1="455" x2="605" y2="461" class="shield-hatch"/>
+    <line x1="900" y1="455" x2="905" y2="461" class="shield-hatch"/>
+    <line x1="1200" y1="455" x2="1205" y2="461" class="shield-hatch"/>
+    <line x1="1500" y1="455" x2="1505" y2="461" class="shield-hatch"/>
+    <line x1="1800" y1="455" x2="1805" y2="461" class="shield-hatch"/>
+    <line x1="2100" y1="455" x2="2105" y2="461" class="shield-hatch"/>
+    <line x1="420" y1="455" x2="2200" y2="455" class="wire-signal"/>
+    <line x1="2200" y1="455" x2="2200" y2="505" class="wire-signal"/>
+    <circle cx="2200" cy="505" r="3" class="junction"/>
+    <!-- Shield drain -->
+    <line x1="1340" y1="481" x2="1340" y2="508" stroke="#000" stroke-width="0.5"/>
+    <use href="#sym-sensor-gnd" x="1326" y="508" width="28" height="28"/>
+    <text x="1362" y="525" class="comp-detail" font-size="6">B16</text>
+    <text x="650" y="450" class="wire-label">KNK2-SIG  22AWG  GRY/WHT  (SHIELDED 2C)</text>
+    <text x="1200" y="450" class="wire-label">M130:B13 -> E-KS2:SIG</text>
+  </g>
+</g>
+
+<!-- ============================================================ -->
+<!-- UNSHIELDED SENSORS (IAT, CLT, OTS, OPS, MAP, FPS)             -->
+<!-- ============================================================ -->
+<g id="analog-sensors">
+
+  <!-- ===== IAT (INTAKE AIR TEMP) - Grid K20 ===== -->
+  <g transform="translate(1700, 540)">
+    <use href="#sym-therm" width="44" height="44"/>
+    <text x="22" y="-8" class="comp-label" text-anchor="middle">E-IAT</text>
+    <text x="22" y="52" class="comp-detail" text-anchor="middle">GM 25036751</text>
+    <text x="22" y="62" class="comp-detail" text-anchor="middle">NTC THERMISTOR</text>
+    <text x="22" y="72" class="comp-detail" text-anchor="middle">INTAKE MANIFOLD</text>
+  </g>
+  <g id="wire-IAT">
+    <line x1="420" y1="545" x2="900" y2="545" class="wire-signal"/>
+    <line x1="900" y1="545" x2="1722" y2="545" class="wire-signal"/>
+    <line x1="1722" y1="545" x2="1722" y2="542" class="wire-signal"/>
+    <circle cx="1722" cy="542" r="3" class="junction"/>
+    <text x="650" y="539" class="wire-label">IAT-SIG  22AWG  TAN</text>
+    <text x="1100" y="539" class="wire-label">M130:B03 -> E-IAT:SIG</text>
+  </g>
+
+  <!-- ===== CLT (COOLANT TEMP) - Grid L22 ===== -->
+  <g transform="translate(1920, 540)">
+    <use href="#sym-therm" width="44" height="44"/>
+    <text x="22" y="-8" class="comp-label" text-anchor="middle">E-CLT</text>
+    <text x="22" y="52" class="comp-detail" text-anchor="middle">ACDelco 213-4514</text>
+    <text x="22" y="62" class="comp-detail" text-anchor="middle">GM 19236568</text>
+    <text x="22" y="72" class="comp-detail" text-anchor="middle">CYL HEAD, DRIVER</text>
+    <text x="22" y="82" class="comp-detail" text-anchor="middle">PIGTAIL: WPCTS30</text>
+  </g>
+  <g id="wire-CLT">
+    <line x1="420" y1="615" x2="900" y2="615" class="wire-signal"/>
+    <line x1="900" y1="615" x2="1942" y2="615" class="wire-signal"/>
+    <line x1="1942" y1="615" x2="1942" y2="584" class="wire-signal"/>
+    <circle cx="1942" cy="584" r="3" class="junction"/>
+    <text x="650" y="609" class="wire-label">CLT-SIG  22AWG  TAN/WHT</text>
+    <text x="1100" y="609" class="wire-label">M130:B04 -> E-CLT:SIG</text>
+  </g>
+
+  <!-- ===== OTS (OIL TEMP) - Grid L24 ===== -->
+  <g transform="translate(2140, 540)">
+    <use href="#sym-therm" width="44" height="44"/>
+    <text x="22" y="-8" class="comp-label" text-anchor="middle">E-OTS</text>
+    <text x="22" y="52" class="comp-detail" text-anchor="middle">NTC THERMISTOR</text>
+    <text x="22" y="62" class="comp-detail" text-anchor="middle">OIL PAN/BLOCK</text>
+  </g>
+  <g id="wire-OTS">
+    <line x1="420" y1="685" x2="900" y2="685" class="wire-signal"/>
+    <line x1="900" y1="685" x2="2162" y2="685" class="wire-signal"/>
+    <line x1="2162" y1="685" x2="2162" y2="584" class="wire-signal"/>
+    <circle cx="2162" cy="584" r="3" class="junction"/>
+    <text x="650" y="679" class="wire-label">OTS-SIG  22AWG  TAN/BLK</text>
+    <text x="1100" y="679" class="wire-label">M130:B05 -> E-OTS:SIG</text>
+  </g>
+
+  <!-- ===== OPS (OIL PRESSURE) - Grid M20 ===== -->
+  <g transform="translate(1700, 700)">
+    <use href="#sym-press" width="44" height="44"/>
+    <text x="22" y="-8" class="comp-label" text-anchor="middle">E-OPS</text>
+    <text x="22" y="52" class="comp-detail" text-anchor="middle">ACDelco D1846A</text>
+    <text x="22" y="62" class="comp-detail" text-anchor="middle">GM 12673134</text>
+    <text x="22" y="72" class="comp-detail" text-anchor="middle">3-PIN OVAL SEALED</text>
+    <text x="22" y="82" class="comp-detail" text-anchor="middle">REAR OF BLOCK</text>
+    <text x="22" y="92" class="comp-detail" text-anchor="middle">PIGTAIL: WP0IL40</text>
+  </g>
+  <g id="wire-OPS">
+    <line x1="420" y1="775" x2="900" y2="775" class="wire-signal"/>
+    <line x1="900" y1="775" x2="1722" y2="775" class="wire-signal"/>
+    <line x1="1722" y1="775" x2="1722" y2="744" class="wire-signal"/>
+    <circle cx="1722" cy="744" r="3" class="junction"/>
+    <text x="650" y="769" class="wire-label">OPS-SIG  22AWG  VIO</text>
+    <text x="1100" y="769" class="wire-label">M130:A14 -> E-OPS:SIG</text>
+  </g>
+
+  <!-- ===== MAP (MANIFOLD ABSOLUTE PRESSURE) - Grid N22 ===== -->
+  <g transform="translate(1920, 700)">
+    <use href="#sym-press" width="44" height="44"/>
+    <text x="22" y="-8" class="comp-label" text-anchor="middle">E-MAP</text>
+    <text x="22" y="52" class="comp-detail" text-anchor="middle">GM 55573248</text>
+    <text x="22" y="62" class="comp-detail" text-anchor="middle">1-BAR BOSCH</text>
+    <text x="22" y="72" class="comp-detail" text-anchor="middle">3-PIN BOSCH SEALED</text>
+    <text x="22" y="82" class="comp-detail" text-anchor="middle">INTAKE MANIFOLD</text>
+  </g>
+  <g id="wire-MAP">
+    <line x1="420" y1="845" x2="900" y2="845" class="wire-signal"/>
+    <line x1="900" y1="845" x2="1942" y2="845" class="wire-signal"/>
+    <line x1="1942" y1="845" x2="1942" y2="744" class="wire-signal"/>
+    <circle cx="1942" cy="744" r="3" class="junction"/>
+    <text x="650" y="839" class="wire-label">MAP-SIG  22AWG  VIO/WHT</text>
+    <text x="1100" y="839" class="wire-label">M130:A15 -> E-MAP:SIG</text>
+  </g>
+
+  <!-- ===== FPS (FUEL PRESSURE) - Grid N24 ===== -->
+  <g transform="translate(2140, 700)">
+    <use href="#sym-press" width="44" height="44"/>
+    <text x="22" y="-8" class="comp-label" text-anchor="middle">E-FPS</text>
+    <text x="22" y="52" class="comp-detail" text-anchor="middle">FUEL RAIL</text>
+    <text x="22" y="62" class="comp-detail" text-anchor="middle">PRESSURE SENSOR</text>
+  </g>
+  <g id="wire-FPS">
+    <line x1="420" y1="915" x2="900" y2="915" class="wire-signal"/>
+    <line x1="900" y1="915" x2="2162" y2="915" class="wire-signal"/>
+    <line x1="2162" y1="915" x2="2162" y2="744" class="wire-signal"/>
+    <circle cx="2162" cy="744" r="3" class="junction"/>
+    <text x="650" y="909" class="wire-label">FPS-SIG  22AWG  VIO/BLK</text>
+    <text x="1100" y="909" class="wire-label">M130:A16 -> E-FPS:SIG</text>
+  </g>
+
+  <!-- 5V REFERENCE BUS (horizontal, to all 3-pin sensors) -->
+  <line x1="1680" y1="650" x2="2200" y2="650" stroke="#000" stroke-width="0.35" fill="none"/>
+  <text x="1900" y="644" class="wire-label">5V REF BUS (M130:A02 SEN_5V0_A)</text>
+  <!-- Taps to sensors needing 5V -->
+  <line x1="1722" y1="650" x2="1722" y2="702" stroke="#000" stroke-width="0.35"/>
+  <circle cx="1722" cy="650" r="2" class="junction"/>
+  <line x1="1942" y1="650" x2="1942" y2="702" stroke="#000" stroke-width="0.35"/>
+  <circle cx="1942" cy="650" r="2" class="junction"/>
+  <line x1="2162" y1="650" x2="2162" y2="702" stroke="#000" stroke-width="0.35"/>
+  <circle cx="2162" cy="650" r="2" class="junction"/>
+
+  <!-- SENSOR GROUND BUS (horizontal, dashed) -->
+  <line x1="1680" y1="810" x2="2200" y2="810" stroke="#000" stroke-width="0.35" stroke-dasharray="6,3"/>
+  <text x="1900" y="824" class="wire-label">SENSOR GND BUS (M130:B15 SEN_0V_A)</text>
+  <use href="#sym-sensor-gnd" x="2208" y="800" width="24" height="24"/>
+  <text x="2240" y="822" class="comp-detail" font-size="6">B15</text>
+  <!-- Taps from sensors needing ground -->
+  <line x1="1722" y1="744" x2="1722" y2="810" stroke="#000" stroke-width="0.35" stroke-dasharray="4,2"/>
+  <circle cx="1722" cy="810" r="2" class="junction"/>
+  <line x1="1942" y1="744" x2="1942" y2="810" stroke="#000" stroke-width="0.35" stroke-dasharray="4,2"/>
+  <circle cx="1942" cy="810" r="2" class="junction"/>
+  <line x1="2162" y1="744" x2="2162" y2="810" stroke="#000" stroke-width="0.35" stroke-dasharray="4,2"/>
+  <circle cx="2162" cy="810" r="2" class="junction"/>
+  <!-- Temperature sensors also need ground -->
+  <line x1="1722" y1="584" x2="1660" y2="584" stroke="#000" stroke-width="0.35" stroke-dasharray="4,2"/>
+  <line x1="1660" y1="584" x2="1660" y2="810" stroke="#000" stroke-width="0.35" stroke-dasharray="4,2"/>
+  <circle cx="1660" cy="810" r="2" class="junction"/>
+  <line x1="1942" y1="584" x2="1900" y2="584" stroke="#000" stroke-width="0.35" stroke-dasharray="4,2"/>
+  <line x1="1900" y1="584" x2="1900" y2="810" stroke="#000" stroke-width="0.35" stroke-dasharray="4,2"/>
+  <circle cx="1900" cy="810" r="2" class="junction"/>
+</g>
+
+<!-- ============================================================ -->
+<!-- ELECTRONIC THROTTLE BODY - Grid M-N 28-32                     -->
+<!-- ============================================================ -->
+<g id="throttle-body">
+  <g transform="translate(2500, 620)">
+    <use href="#sym-etb" width="80" height="80"/>
+    <text x="40" y="-12" class="comp-label" text-anchor="middle">E-ETB</text>
+    <text x="40" y="92" class="comp-detail" text-anchor="middle">GM 12605109</text>
+    <text x="40" y="102" class="comp-detail" text-anchor="middle">LS3 90mm DBW</text>
+    <text x="40" y="112" class="comp-detail" text-anchor="middle">6-PIN SEALED</text>
+    <!-- Pin labels on left (motor) -->
+    <text x="-15" y="34" class="comp-detail" font-size="7">M+ (A)</text>
+    <text x="-15" y="52" class="comp-detail" font-size="7">M- (B)</text>
+    <!-- Pin labels on right (TPS) -->
+    <text x="90" y="32" class="comp-detail" font-size="7">5V (C)</text>
+    <text x="90" y="42" class="comp-detail" font-size="7">TPS1 (D)</text>
+    <text x="90" y="52" class="comp-detail" font-size="7">TPS2 (F)</text>
+    <text x="90" y="62" class="comp-detail" font-size="7">GND (E)</text>
+  </g>
+
+  <!-- ETB wire from cut list #4 (18AWG ORG) -->
+  <text x="2300" y="590" class="note-text" font-size="9">ETB WIRING: 6 CONDUCTORS IN 1 HARNESS</text>
+  <text x="2300" y="604" class="note-text" font-size="9">CUT LIST #4: 18AWG ORG (BUNDLE)</text>
+  <text x="2300" y="618" class="note-text" font-size="9">M130 HALF-BRIDGE OUTPUTS A01/A18 (MOTOR)</text>
+  <text x="2300" y="632" class="note-text" font-size="9">M130 AV INPUTS (TPS1/TPS2)</text>
+  <text x="2300" y="646" class="note-text" font-size="9">M130 SEN_5V0 + SEN_0V (REF + GND)</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- WIRE SCHEDULE TABLE                                           -->
+<!-- ============================================================ -->
+<g id="wire-schedule" transform="translate(80, 960)">
+  <text x="0" y="0" class="comp-label" font-size="12">WIRE SCHEDULE - PAGE 2: ENGINE SENSORS + THROTTLE BODY</text>
+  <line x1="0" y1="8" x2="2400" y2="8" stroke="#000" stroke-width="0.5"/>
+
+  <text x="0" y="25" class="comp-detail" font-weight="bold">CUT#  CIRCUIT ID     M130 PIN    DESTINATION              AWG    COLOR        LENGTH  NOTES</text>
+  <line x1="0" y1="30" x2="2400" y2="30" stroke="#999" stroke-width="0.3"/>
+
+  <!-- Shielded sensors -->
+  <text x="0" y="44" class="comp-detail">#99   CKP-SIG        B01         Crank Position Sensor    22     BLU/WHT/WHT  4.6ft   SHIELDED 2C</text>
+  <text x="0" y="56" class="comp-detail">#101  CMP-SIG        B02         Cam Position Sensor      22     BLU/WHT/BLK  4.6ft   SHIELDED 2C</text>
+  <text x="0" y="68" class="comp-detail">#103  KNK1-SIG       B07         Knock Sensor Bank 1      22     GRY          4.6ft   SHIELDED 2C</text>
+  <text x="0" y="80" class="comp-detail">#104  KNK2-SIG       B13         Knock Sensor Bank 2      22     GRY/WHT      4.6ft   SHIELDED 2C</text>
+  <line x1="0" y1="86" x2="2400" y2="86" stroke="#999" stroke-width="0.3"/>
+
+  <!-- Analog sensors -->
+  <text x="0" y="100" class="comp-detail">#102  OPS-SIG        A14         Oil Pressure Sensor      22     VIO          4.6ft</text>
+  <text x="0" y="112" class="comp-detail">#108  MAP-SIG        A15         MAP Sensor               22     VIO/WHT      4.6ft</text>
+  <text x="0" y="124" class="comp-detail">#109  IAT-SIG        B03         Intake Air Temp          22     TAN          4.6ft</text>
+  <text x="0" y="136" class="comp-detail">#110  CLT-SIG        B04         Coolant Temp Sensor      22     TAN/WHT      4.6ft</text>
+  <text x="0" y="148" class="comp-detail">#112  FPS-SIG        A16         Fuel Pressure Sensor     22     VIO/BLK      4.6ft</text>
+  <text x="0" y="160" class="comp-detail">#113  OTS-SIG        B05         Oil Temperature Sensor   22     TAN/BLK      4.6ft</text>
+  <line x1="0" y1="166" x2="2400" y2="166" stroke="#999" stroke-width="0.3"/>
+
+  <!-- ETB -->
+  <text x="0" y="180" class="comp-detail">#4    ETB            A01/A18     Electronic Throttle Body 18     ORG          4.6ft   6-PIN BUNDLE</text>
+  <line x1="0" y1="186" x2="2400" y2="186" stroke="#999" stroke-width="0.3"/>
+
+  <!-- Backup camera (appears in engine loom per cut list) -->
+  <text x="0" y="200" class="comp-detail">#97   CAM            PDM30:OUT15 Rear Backup Camera       20     BLU/WHT      18.4ft  ROUTES THROUGH ENGINE LOOM</text>
+  <line x1="0" y1="206" x2="2400" y2="206" stroke="#000" stroke-width="0.5"/>
+
+  <text x="0" y="222" class="comp-detail" font-weight="bold">12 WIRES ON THIS PAGE  |  16 WIRES ON PAGE 1 (IGNITION COILS + FUEL INJECTORS)</text>
+  <text x="0" y="236" class="comp-detail" font-weight="bold">28 TOTAL ENGINE LOOM WIRES  |  142.6 FT TOTAL</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- NOTES                                                         -->
+<!-- ============================================================ -->
+<g id="notes" transform="translate(80, 1260)">
+  <text x="0" y="0" class="comp-label" font-size="11">NOTES</text>
+  <line x1="0" y1="6" x2="1000" y2="6" stroke="#000" stroke-width="0.3"/>
+  <text x="0" y="20" class="note-text" font-size="9">1. ALL SHIELDED CABLES: 22AWG 2-CONDUCTOR SHIELDED. SHIELD DRAIN TO SENSOR GROUND (M130:B15/B16), NOT CHASSIS GROUND.</text>
+  <text x="0" y="34" class="note-text" font-size="9">2. CKP (58X) AND CMP ARE HALL EFFECT SENSORS WITH 3 PINS: 5V REF, SIGNAL, GROUND. ONLY SIGNAL WIRE RUNS INDIVIDUALLY TO ECU.</text>
+  <text x="0" y="48" class="note-text" font-size="9">3. KNOCK SENSORS ARE 2-PIN PIEZOELECTRIC (FLAT-RESPONSE, GEN IV). NOT COMPATIBLE WITH GEN III SINGLE-WIRE RESONANT SENSORS.</text>
+  <text x="0" y="62" class="note-text" font-size="9">4. 5V REFERENCE BUS: M130:A02 (SEN_5V0_A) FEEDS OPS, MAP, FPS, CKP, CMP, ETB TPS. A09 (SEN_5V0_B) IS BACKUP.</text>
+  <text x="0" y="76" class="note-text" font-size="9">5. SENSOR GROUND BUS: M130:B15 (SEN_0V_A) IS THE PRIMARY STAR GROUND FOR ALL SENSOR RETURNS. B16 (SEN_0V_B) PARALLELS.</text>
+  <text x="0" y="90" class="note-text" font-size="9">6. ETB IS COMPOUND: 2 MOTOR WIRES (HALF-BRIDGE FROM A01/A18) + 4 SENSOR WIRES (TPS1, TPS2, 5V REF, GND).</text>
+  <text x="0" y="104" class="note-text" font-size="9">7. TEMPERATURE SENSORS (IAT, CLT, OTS) ARE 2-PIN NTC THERMISTORS: SIGNAL + GROUND. NO 5V REF NEEDED.</text>
+  <text x="0" y="118" class="note-text" font-size="9">8. PRESSURE SENSORS (OPS, MAP, FPS) ARE 3-PIN: 5V REF, SIGNAL (0-5V), GROUND.</text>
+  <text x="0" y="132" class="note-text" font-size="9">9. BACKUP CAMERA (#97) ROUTES THROUGH ENGINE LOOM BUT IS PDM-POWERED (NOT M130). INCLUDED FOR LOOM COMPLETENESS.</text>
+  <text x="0" y="146" class="note-text" font-size="9">10. ALL WIRE LENGTHS ARE ESTIMATED (4.6ft ENGINE BAY). VERIFY ON VEHICLE BEFORE CUTTING.</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- CROSS-REFERENCES                                              -->
+<!-- ============================================================ -->
+<g id="cross-refs" transform="translate(80, 1440)">
+  <text x="0" y="0" class="comp-label" font-size="11">CROSS-REFERENCES</text>
+  <line x1="0" y1="6" x2="800" y2="6" stroke="#000" stroke-width="0.3"/>
+  <text x="0" y="22" class="cross-ref" font-size="9">IGNITION COILS + FUEL INJECTORS -> SEE SEC 2, PAGE 1 (NKW-K5-02-1)</text>
+  <text x="0" y="36" class="cross-ref" font-size="9">SENSOR 5V REFERENCE (A02, A09) -> SEE SEC 3 (M130 PINOUT)</text>
+  <text x="0" y="50" class="cross-ref" font-size="9">SENSOR GROUND (B15, B16) -> SEE SEC 12 (GROUND DISTRIBUTION)</text>
+  <text x="0" y="64" class="cross-ref" font-size="9">CAN BUS (B17, B18) -> SEE SEC 11 (CAN BUS NETWORK)</text>
+  <text x="0" y="78" class="cross-ref" font-size="9">ETHERNET (B23-B26) -> SEE SEC 3 (M130 PINOUT)</text>
+  <text x="0" y="92" class="cross-ref" font-size="9">BACKUP CAMERA POWER (PDM30:OUT15) -> SEE SEC 4 (PDM30 CHANNEL MAP)</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- TITLE BLOCK                                                   -->
+<!-- ============================================================ -->
+<g id="titleblock">
+  <rect x="2600" y="1950" width="740" height="240" class="title-box"/>
+  <line x1="2600" y1="1990" x2="3340" y2="1990" stroke="black" stroke-width="0.5"/>
+  <line x1="2600" y1="2030" x2="3340" y2="2030" stroke="black" stroke-width="0.5"/>
+  <line x1="2600" y1="2070" x2="3340" y2="2070" stroke="black" stroke-width="0.5"/>
+  <line x1="2600" y1="2100" x2="3340" y2="2100" stroke="black" stroke-width="0.5"/>
+  <line x1="2600" y1="2130" x2="3340" y2="2130" stroke="black" stroke-width="0.5"/>
+  <line x1="2600" y1="2160" x2="3340" y2="2160" stroke="black" stroke-width="0.5"/>
+  <line x1="2970" y1="2070" x2="2970" y2="2190" stroke="black" stroke-width="0.5"/>
+
+  <text x="2620" y="1980" class="title-text" font-size="16" font-weight="bold">NUKE LTD</text>
+  <text x="3320" y="1980" class="title-text" font-size="10" text-anchor="end">DRAWN: NUKE  DATE: 2026-04-04</text>
+  <text x="2620" y="2018" class="title-text" font-size="10">676 WELLS RD, BOULDER CITY NV 89005</text>
+  <text x="3320" y="2018" class="title-text" font-size="10" text-anchor="end">CHK'D: ___   DATE: ___</text>
+  <text x="2620" y="2058" class="title-text" font-size="14" font-weight="bold">1977 CHEVROLET K5 BLAZER</text>
+  <text x="2620" y="2092" class="title-text" font-size="12" font-weight="bold">SECTION 2: ENGINE - LS3</text>
+  <text x="2980" y="2092" class="title-text" font-size="10">SCALE: NTS</text>
+  <text x="2620" y="2122" class="title-text" font-size="12">ENGINE SENSORS + THROTTLE BODY</text>
+  <text x="2980" y="2122" class="title-text" font-size="10">SHEET: 2 OF 2</text>
+  <text x="2620" y="2152" class="title-text" font-size="11">LS3 6.2L / MOTEC M130 / PDM30</text>
+  <text x="2980" y="2152" class="title-text" font-size="10">REV: --</text>
+  <text x="2620" y="2182" class="title-text" font-size="10">VIN: CCL187Z210370</text>
+  <text x="2980" y="2182" class="title-text" font-size="11" font-weight="bold">DWG NO: NKW-K5-02-2</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- REVISION TABLE                                                -->
+<!-- ============================================================ -->
+<g id="revision-table" transform="translate(2800, 40)">
+  <rect x="0" y="0" width="500" height="70" fill="white" stroke="black" stroke-width="0.5"/>
+  <line x1="0" y1="20" x2="500" y2="20" stroke="black" stroke-width="0.3"/>
+  <text x="10" y="14" class="comp-detail" font-weight="bold" font-size="7">REV</text>
+  <text x="50" y="14" class="comp-detail" font-weight="bold" font-size="7">DATE</text>
+  <text x="150" y="14" class="comp-detail" font-weight="bold" font-size="7">BY</text>
+  <text x="210" y="14" class="comp-detail" font-weight="bold" font-size="7">DESCRIPTION</text>
+  <text x="10" y="36" class="comp-detail" font-size="7">--</text>
+  <text x="50" y="36" class="comp-detail" font-size="7">2026-04-04</text>
+  <text x="150" y="36" class="comp-detail" font-size="7">NUKE</text>
+  <text x="210" y="36" class="comp-detail" font-size="7">INITIAL RELEASE</text>
+  <text x="10" y="52" class="comp-detail" font-size="7">A</text>
+  <text x="50" y="52" class="comp-detail" font-size="7">TBD</text>
+</g>
+
+</svg>

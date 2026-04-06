@@ -3469,20 +3469,16 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       {needsVIN && (
                         <li style={{ marginBottom: '6px' }}>
                           <strong>Add a VIN:</strong> Go to{' '}
-                          <button
-                            onClick={() => navigate(`/vehicle/${vehicle.id}/edit`)}
+                          <Link
+                            to={`/vehicle/${vehicle.id}/edit`}
                             style={{
-                              background: 'transparent',
-                              border: 'none',
                               color: 'var(--warning)',
                               textDecoration: 'underline',
-                              cursor: 'pointer',
-                              padding: 0,
                               fontSize: 'inherit',
                             }}
                           >
                             Edit Vehicle
-                          </button>
+                          </Link>
                           {' '}and enter the VIN or chassis identifier
                         </li>
                       )}

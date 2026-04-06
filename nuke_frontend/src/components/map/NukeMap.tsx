@@ -15,6 +15,12 @@ import MapVehicleDetail from './panels/MapVehicleDetail';
 import MapOrgDetail from './panels/MapOrgDetail';
 import EventPinDetail from './panels/EventPinDetail';
 
+function hexToRgb(hex: string): [number, number, number] | null {
+  const m = hex.replace('#', '').match(/.{2}/g);
+  if (!m || m.length < 3) return null;
+  return [parseInt(m[0], 16), parseInt(m[1], 16), parseInt(m[2], 16)];
+}
+
 const ChoroplethMap = lazy(() => import('./ChoroplethMap'));
 const DeckGLMap = lazy(() => import('./DeckGLMap'));
 
@@ -30,8 +36,19 @@ class MapErrorBoundary extends Component<
 
 // ─── Main NukeMap ──────────────────────────────────────────────────────────────
 export default function NukeMap() {
-  const [viewState, setViewState] = useState<MapViewState>(INITIAL_VIEW);
-  const [mode] = useState<MapMode>('county');
+  // Support URL params for initial viewport: ?lat=17.9&lng=-62.83&zoom=14
+  const initialView = (() => {
+    const params = new URLSearchParams(window.location.search);
+    const lat = params.get('lat');
+    const lng = params.get('lng');
+    const zoom = params.get('zoom');
+    if (lat && lng) {
+      return { ...INITIAL_VIEW, latitude: parseFloat(lat), longitude: parseFloat(lng), zoom: zoom ? parseFloat(zoom) : 14 };
+    }
+    return INITIAL_VIEW;
+  })();
+  const [viewState, setViewState] = useState<MapViewState>(initialView);
+  const [mode, setMode] = useState<MapMode>('points');
   const [showBusinesses, setShowBusinesses] = useState(true);
   const [showCollections, setShowCollections] = useState(true);
   const [showApproximate, setShowApproximate] = useState(false);
@@ -63,10 +80,18 @@ export default function NukeMap() {
   useEffect(() => {
     async function loadOverlays() {
       const [bizRes, colRes] = await Promise.all([
-        supabase.from('businesses').select('id, name, latitude, longitude, type').not('latitude', 'is', null).limit(3000),
-        supabase.from('businesses').select('id, name, slug, instagram_handle, country, city, latitude, longitude, total_inventory').eq('type', 'collection').not('latitude', 'is', null).limit(1000),
+        supabase.from('businesses').select('id, name, latitude, longitude, type, brand_design_language').not('latitude', 'is', null).limit(3000),
+        supabase.from('businesses').select('id, name, slug, instagram_handle, country, city, latitude, longitude, total_inventory, brand_design_language').eq('type', 'collection').not('latitude', 'is', null).limit(1000),
       ]);
-      if (bizRes.data) setBusinesses(bizRes.data.map((b: any) => ({ id: b.id, name: b.name, lat: b.latitude, lng: b.longitude, type: b.type })));
+      if (bizRes.data) setBusinesses(bizRes.data.map((b: any) => {
+        const bdl = b.brand_design_language;
+        const hex = bdl?.colors?.primary;
+        return {
+          id: b.id, name: b.name, lat: b.latitude, lng: b.longitude, type: b.type,
+          color: hex ? hexToRgb(hex) : null,
+          logoUrl: bdl?.logos?.svg || bdl?.logos?.primary_dark || bdl?.logos?.primary_light || null,
+        };
+      }));
       if (colRes.data) setCollections(colRes.data.map((c: any) => ({
         id: c.id, name: c.name, slug: c.slug || '', ig: c.instagram_handle,
         country: c.country || '', city: c.city || '', lat: c.latitude, lng: c.longitude,
@@ -128,7 +153,8 @@ export default function NukeMap() {
         <MapErrorBoundary fallback={deckFallback}>
           <Suspense fallback={loadingFallback}>
             <DeckGLMap viewState={viewState} onViewStateChange={setViewState}
-              layers={layers} mapStyle={CARTO_DARK} timeline={timeline} mode={mode} />
+              layers={layers} mapStyle={CARTO_DARK} timeline={timeline} mode={mode}
+              businesses={businesses} onBusinessClick={onBusinessClick} />
           </Suspense>
         </MapErrorBoundary>
       )}

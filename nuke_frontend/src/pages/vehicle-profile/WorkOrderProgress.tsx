@@ -229,7 +229,7 @@ const WorkOrderProgress: React.FC<Props> = ({ vehicleId, isOwnerView }) => {
                       }}
                     >
                       {isComplete && (
-                        <span style={{ color: '#fff', fontSize: '8px', fontWeight: 700, lineHeight: 1 }}>
+                        <span style={{ color: 'var(--bg)', fontSize: '8px', fontWeight: 700, lineHeight: 1 }}>
                           {'\u2713'}
                         </span>
                       )}

@@ -277,6 +277,33 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 
 ---
 
+## Wiring System (Agentic Harness Design)
+
+| Intent | Use This | Notes |
+|--------|----------|-------|
+| Compute wiring overlay (harness spec) | `compute-wiring-overlay` | POST `{ vehicle_id }`. Returns wire list, ECU/PDM/alternator sizing, bulkhead pin assignments, warnings. Upserts to `vehicle_wiring_overlays`. |
+| Generate vehicle-layout diagram (plan view SVG) | `generate-vehicle-diagram` | POST `{ vehicle_id, view?, show_bulkhead?, highlight_zone? }`. Returns `diagram_url` + summary. View: "plan" (top-down truck layout), "engine_bay", "dash", etc. Toggle bulkhead connector in/out — wire lengths auto-recalculate. |
+| Generate connection diagram (WireViz) | `generate-wiring-diagram` | POST `{ vehicle_id, zone?, format? }`. Returns `diagram_url` + summary. Connection-level nodes-and-edges diagram via Kroki.io. Zone optional. Format: "svg" (default) or "png". |
+| Generate wiring BOM | `generate-wiring-bom` | POST `{ vehicle_id }`. Parts list with pricing. |
+| Generate cost quote | `generate-wiring-quote` | POST `{ vehicle_id }`. Itemized labor + parts quote. |
+| Read/write build manifest | `execute_sql` MCP on `vehicle_build_manifest` | INSERT/UPDATE devices directly. |
+| Search GM wiring specs | `search_service_manuals` MCP | Torque specs, wire gauges, procedures. |
+| Resolve components | SQL on `component_library` | 95 entries, extensible via INSERT. |
+
+### Agentic Loop
+```
+User: "Move the ECU under the dash"
+Agent: → UPDATE location_zone = 'dash' in manifest
+       → Bulkhead connector auto-inserts (engine↔interior boundary)
+       → Wire lengths recalculate (engine devices route through bulkhead)
+       → curl generate-vehicle-diagram { vehicle_id, view: "plan" }
+       → Returns plan view SVG with ECU under dash, wires through milspec connector
+```
+
+**Retired:** `query-wiring-needs` (NL query handler) — the agent IS the NL interface now.
+
+---
+
 ## Discovery & Lead Generation
 
 | Intent | Use This | Notes |

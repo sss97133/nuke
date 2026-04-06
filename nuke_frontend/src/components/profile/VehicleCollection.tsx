@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import VehicleCardDense from '../vehicles/VehicleCardDense';
 
@@ -11,8 +11,6 @@ interface VehicleCollectionProps {
 const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProfile }) => {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
-
   useEffect(() => {
     loadVehicles();
   }, [userId]);
@@ -82,12 +80,13 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 'var(--space-4)' }}>
                 Add your first vehicle to start tracking ownership history, photos, and events.
               </div>
-              <button
+              <Link
+                to="/vehicle/add"
                 className="button"
-                onClick={() => navigate('/vehicle/add')}
+                style={{ textDecoration: 'none', color: 'inherit' }}
               >
                 + Add a vehicle
-              </button>
+              </Link>
             </div>
           ) : (
             <div className="text text-muted" style={{ fontSize: '11px' }}>

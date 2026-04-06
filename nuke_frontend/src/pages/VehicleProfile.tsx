@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useValuationIntel } from '../hooks/useValuationIntel';
 import { useVehicleMemeDrops } from '../hooks/useVehicleMemeDrops';
@@ -181,12 +181,13 @@ const VehicleProfileInner: React.FC = () => {
             <p className="text-small text-muted" style={{ marginBottom: '16px' }}>
               The requested vehicle could not be found.
             </p>
-            <button
+            <Link
+              to="/vehicles"
               className="button button-primary"
-              onClick={() => navigate('/vehicles')}
+              style={{ textDecoration: 'none', color: 'inherit' }}
             >
               View All Vehicles
-            </button>
+            </Link>
           </div>
         </div>
     );

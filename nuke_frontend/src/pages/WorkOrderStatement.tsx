@@ -104,6 +104,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
             <div style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '0.08em' }}>NUKE</div>
             <div style={{ fontSize: '9px', color: '#4a6080' }}>Vehicle Build & Service</div>
             <div style={{ fontSize: '9px', color: '#4a6080' }}>Las Vegas, NV</div>
+            <div style={{ fontSize: '9px', color: '#4a6080' }}>support@nuke.ag &middot; nuke.ag</div>
           </div>
 
           {/* Order number */}
@@ -276,6 +277,28 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
             </div>
           </div>
 
+          {/* Payment Instructions */}
+          <div style={{ margin: '10px 0', padding: '8px 10px', border: '1px solid #7B96B0', background: '#e8edf3' }}>
+            <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#1a3050', marginBottom: '6px' }}>Payment Instructions</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', fontSize: '9px', color: '#1a3050', lineHeight: 1.5 }}>
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: '2px' }}>Zelle</div>
+                <div>shkylar@gmail.com</div>
+                <div style={{ fontSize: '7px', color: '#4a6080' }}>Reference: {roNum}</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: '2px' }}>Wire Transfer</div>
+                <div>Contact support@nuke.ag</div>
+                <div style={{ fontSize: '7px', color: '#4a6080' }}>for wire instructions</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: '2px' }}>Cash</div>
+                <div>Accepted in person</div>
+                <div style={{ fontSize: '7px', color: '#4a6080' }}>by appointment</div>
+              </div>
+            </div>
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '8px', marginLeft: '12px', marginRight: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
               <QRCodeSVG
@@ -285,7 +308,7 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
                 fgColor="#1a3050"
                 bgColor="transparent"
               />
-              <div style={{ fontSize: '7px', color: '#4a6080', textTransform: 'uppercase' }}>ESTIMATES FOR LABOR ONLY —<br/>MATERIAL ADDITIONAL</div>
+              <div style={{ fontSize: '7px', color: '#4a6080', textTransform: 'uppercase' }}>Payment due upon receipt<br/>Questions? Contact support@nuke.ag</div>
             </div>
             <>
               <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
@@ -349,6 +372,8 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
             <div style={T.shopName}>NUKE</div>
             <div style={T.shopDetail}>Vehicle Build & Service</div>
             <div style={T.shopDetail}>Las Vegas, NV</div>
+            <div style={T.shopDetail}>support@nuke.ag</div>
+            <div style={T.shopDetail}>nuke.ag</div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={T.invoiceTitle}>INVOICE</div>
@@ -575,11 +600,33 @@ const InvoiceView: React.FC<{ data: any; onEdit: () => void; onSend: () => void;
           </>
         )}
 
+        {/* Payment Instructions */}
+        <div style={{ marginTop: '24px', padding: '16px', border: '2px solid #1a1a1a', background: '#fafafa' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '10px' }}>Payment Instructions</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', fontSize: '10px', lineHeight: 1.5 }}>
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: '4px' }}>Zelle</div>
+              <div>shkylar@gmail.com</div>
+              <div style={{ color: '#888', marginTop: '2px' }}>Reference: {invoiceNum}</div>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: '4px' }}>Wire Transfer</div>
+              <div>Contact support@nuke.ag</div>
+              <div>for wire instructions</div>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: '4px' }}>Cash</div>
+              <div>Accepted in person</div>
+              <div>by appointment</div>
+            </div>
+          </div>
+        </div>
+
         {/* Footer */}
         <div style={T.footer}>
           <div>Thank you for your business.</div>
           <div style={{ marginTop: '4px', fontSize: '10px', color: '#999' }}>
-            Payment due upon receipt. Questions? Contact us at nuke.ag
+            Payment due upon receipt. Questions? Contact support@nuke.ag
           </div>
         </div>
 

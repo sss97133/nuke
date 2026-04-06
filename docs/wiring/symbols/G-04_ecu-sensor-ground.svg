@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <title>G-04 ECU Sensor Ground</title>
+  <desc>ECU sensor ground symbol. Triangle with SG inside, pin reference label. Used at each ECU sensor ground return (M130 pins B15/B16 SEN_0V_A/B). Distinguishes sensor grounds from chassis/power grounds. 4mm x 4mm per spec.</desc>
+
+  <!-- Connection lead (top) -->
+  <line x1="20" y1="2" x2="20" y2="10" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Triangle (inverted, pointing down) -->
+  <polygon points="8,10 32,10 20,30" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/>
+
+  <!-- SG label inside triangle -->
+  <text x="20" y="22" font-family="Courier New, monospace" font-size="7" font-weight="bold" fill="black" text-anchor="middle" dominant-baseline="middle">SG</text>
+
+  <!-- Pin reference label below -->
+  <text x="20" y="36" font-family="Courier New, monospace" font-size="3.5" fill="black" text-anchor="middle">B15</text>
+</svg>

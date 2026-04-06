@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VLVA FINANCIAL REPORT</title>
+<style>
+  :root {
+    --font-family: Arial, sans-serif;
+    --font-mono: 'Courier New', monospace;
+    --fs-7: 7px; --fs-8: 8px; --fs-9: 9px; --fs-10: 10px; --fs-11: 11px; --fs-12: 12px; --fs-13: 13px;
+    --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px;
+    --bg: #1e1e1e;
+    --bg-secondary: #1a1a1a;
+    --surface: #252526;
+    --surface-hover: #2d2d30;
+    --surface-elevated: #2d2d30;
+    --text: #cccccc;
+    --text-secondary: #858585;
+    --text-disabled: #656565;
+    --border: #3e3e42;
+    --border-focus: #cccccc;
+    --accent: #cccccc;
+    --accent-dim: rgba(204, 204, 204, 0.12);
+    --success: #16825d;
+    --success-dim: rgba(22, 130, 93, 0.15);
+    --warning: #b05a00;
+    --warning-dim: rgba(176, 90, 0, 0.15);
+    --error: #d13438;
+    --error-dim: rgba(209, 52, 56, 0.15);
+    --info: #38bdf8;
+    --info-dim: rgba(56, 189, 248, 0.12);
+  }
+  *, *::before, *::after { border-radius: 0 !important; box-shadow: none !important; margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-family); font-size: var(--fs-10); line-height: 1.5; }
+  .page { max-width: 1200px; margin: 0 auto; padding: var(--space-4); }
+
+  /* Header */
+  .page-header { border-bottom: 2px solid var(--border); padding-bottom: var(--space-3); margin-bottom: var(--space-4); }
+  .page-header h1 { font-size: var(--fs-13); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .page-header .meta { font-size: var(--fs-8); color: var(--text-secondary); margin-top: var(--space-1); text-transform: uppercase; letter-spacing: 0.04em; }
+
+  /* Cards */
+  .card { background: var(--surface); border: 2px solid var(--border); margin-bottom: var(--space-3); }
+  .card-header { padding: var(--space-3); border-bottom: 2px solid var(--border); font-size: var(--fs-10); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; display: flex; justify-content: space-between; align-items: center; }
+  .card-body { padding: var(--space-3); }
+
+  /* Stat grid */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
+  .stat { background: var(--surface); border: 2px solid var(--border); padding: var(--space-3); }
+  .stat .label { font-size: var(--fs-8); text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); }
+  .stat .value { font-family: var(--font-mono); font-size: var(--fs-12); font-weight: 700; margin-top: var(--space-1); }
+  .stat .sub { font-size: var(--fs-8); color: var(--text-secondary); margin-top: var(--space-1); }
+  .stat.status-success { border-color: var(--success); }
+  .stat.status-success .value { color: var(--success); }
+  .stat.status-warning { border-color: var(--warning); }
+  .stat.status-warning .value { color: var(--warning); }
+  .stat.status-error { border-color: var(--error); }
+  .stat.status-error .value { color: var(--error); }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: var(--fs-9); }
+  thead th { text-align: left; padding: var(--space-2) var(--space-3); font-size: var(--fs-8); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); border-bottom: 2px solid var(--border); background: var(--bg-secondary); position: sticky; top: 0; z-index: 1; }
+  thead th.r { text-align: right; }
+  tbody td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); vertical-align: top; }
+  tbody tr:hover td { background: var(--accent-dim); }
+  .mono { font-family: var(--font-mono); }
+  .r { text-align: right; }
+  .totals td { font-weight: 700; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border); background: var(--accent-dim); }
+
+  /* Tags */
+  .tag { display: inline-block; padding: 1px var(--space-2); font-size: var(--fs-8); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; border: 1px solid; }
+  .tag-inv { color: var(--info); border-color: var(--info); background: var(--info-dim); }
+  .tag-con { color: #9d8bb1; border-color: #9d8bb1; background: rgba(157,139,177,0.12); }
+  .tag-bat { color: var(--success); border-color: var(--success); background: var(--success-dim); }
+  .tag-off { color: var(--warning); border-color: var(--warning); background: var(--warning-dim); }
+  .tag-blank { color: var(--text-disabled); border-color: var(--border); }
+  .tag-flag { color: var(--error); border-color: var(--error); background: var(--error-dim); }
+  .tag-s { color: var(--success); border-color: var(--success); background: var(--success-dim); }
+  .tag-d { color: var(--warning); border-color: var(--warning); background: var(--warning-dim); }
+
+  /* Colors */
+  .c-success { color: var(--success); }
+  .c-error { color: var(--error); }
+  .c-warning { color: var(--warning); }
+  .c-muted { color: var(--text-secondary); }
+  .c-disabled { color: var(--text-disabled); }
+
+  /* Section divider */
+  .divider { border: none; border-top: 2px solid var(--border); margin: var(--space-6) 0; }
+
+  /* Alert */
+  .alert { border: 2px solid; padding: var(--space-3); margin-bottom: var(--space-3); }
+  .alert-error { border-color: var(--error); background: var(--error-dim); }
+  .alert-warning { border-color: var(--warning); background: var(--warning-dim); }
+  .alert-info { border-color: var(--info); background: var(--info-dim); }
+  .alert .alert-title { font-size: var(--fs-9); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: var(--space-1); }
+
+  /* Coverage bar */
+  .bar-track { height: var(--space-2); background: var(--border); }
+  .bar-fill { height: 100%; }
+
+  /* Two column */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+  @media (max-width: 800px) { .cols { grid-template-columns: 1fr; } }
+
+  /* Expense line */
+  .exp-line { display: flex; justify-content: space-between; padding: var(--space-2) 0; border-bottom: 1px solid var(--border); font-size: var(--fs-9); }
+  .exp-line:last-child { border-bottom: none; }
+  .exp-line .el { color: var(--text-secondary); }
+  .exp-line .ev { font-family: var(--font-mono); }
+
+  /* Vehicle name */
+  .vname { font-weight: 700; font-size: var(--fs-10); }
+  .vdetail { font-size: var(--fs-8); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+  .blank { color: var(--text-disabled); font-style: italic; }
+  .section-label { font-size: var(--fs-9); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin-bottom: var(--space-3); margin-top: var(--space-5); }
+  .section-desc { font-size: var(--fs-9); color: var(--text-secondary); margin-bottom: var(--space-3); }
+
+  /* Print */
+  @media print {
+    body { background: #fff; color: #222; }
+    .card, .stat { border-color: #ccc; background: #fafafa; }
+    thead th { background: #eee; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="page-header">
+  <h1>VLVA FINANCIAL REPORT</h1>
+  <div class="meta">VIVA LAS VEGAS AUTOS &mdash; OCT 2023 TO PRESENT &mdash; GENERATED 2026-03-31</div>
+  <div class="meta" style="margin-top:var(--space-1)">SOURCES: BAT PUBLIC RECORDS &bull; SP2024 INTERNAL SPREADSHEET &bull; INVENTORY 2024.NUMBERS &bull; DEAL_JACKETS DB</div>
+</div>
+
+<!-- CAPITAL STRUCTURE -->
+<div class="card" style="border-color:var(--accent);margin-bottom:var(--space-4)">
+  <div class="card-header">CAPITAL STRUCTURE &mdash; HOW MONEY FLOWS</div>
+  <div class="card-body">
+    <div style="font-size:var(--fs-9);line-height:2">
+      <div class="exp-line"><span class="el">OPERATING PARTNERS</span><span class="ev">DOUG WILLIAMS &amp; SKYLAR</span></div>
+      <div class="exp-line"><span class="el">ACL / BUSINESS FEE</span><span class="ev">5% OF SALE PRICE ON ALL DEALS</span></div>
+      <div class="exp-line"><span class="el">PROFIT SPLIT (INVENTORY)</span><span class="ev">(PROFIT - ACL) / 2 BETWEEN PARTNERS</span></div>
+      <div class="exp-line"><span class="el">CONSIGNMENT FEE</span><span class="ev">8% OF SALE PRICE</span></div>
+    </div>
+    <div style="border-top:2px solid var(--border);margin-top:var(--space-3);padding-top:var(--space-3)">
+      <div style="font-size:var(--fs-8);text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary);margin-bottom:var(--space-2)">CAPITAL PARTNERS (INVESTORS)</div>
+      <div class="exp-line"><span class="el"><span class="tag tag-d">LAURA</span> &mdash; PRIMARY CAPITAL PARTNER ("BANK")</span><span class="ev">7.5% &ndash; 15% RETURN</span></div>
+      <div class="exp-line"><span class="el" style="padding-left:var(--space-4);color:var(--text-disabled)">BOUGHT ENTIRE PRICE, UT COLLECTION (16 VEHICLES) ON 1/19/24</span><span class="ev"></span></div>
+      <div class="exp-line"><span class="el" style="padding-left:var(--space-4);color:var(--text-disabled)">LOANED $50,650 ON K5 BLAZER BUILD, $10,000 ON JIMMY, $48,200 ON 912 (HIGH SCENARIO)</span><span class="ev"></span></div>
+      <div class="exp-line"><span class="el"><span class="tag tag-d">DON</span> &mdash; CAPITAL ON 1988 JEEP WRANGLER</span><span class="ev">$6,000</span></div>
+      <div class="exp-line"><span class="el"><span class="tag tag-s">SKYLAR</span> &mdash; ALSO PROVIDES CAPITAL ON DEALS</span><span class="ev">$137,900 DEPLOYED (SP2024)</span></div>
+    </div>
+    <div class="alert alert-error" style="margin-top:var(--space-3)">
+      <div class="alert-title">DOCUMENTED PATTERN: REPAYMENT OBLIGATIONS NOTED BUT NOT PAID</div>
+      <div style="font-size:var(--fs-9);color:var(--text-secondary)">Doug documents what he owes capital partners (Laura, Skylar) but does not make repayments. This pattern is consistent across multiple capital relationships.</div>
+    </div>
+  </div>
+</div>
+
+<!-- PRICE UT BATCH -->
+<div class="card" style="margin-bottom:var(--space-4)">
+  <div class="card-header">PRICE, UT COLLECTION &mdash; LAURA'S CAPITAL<span class="c-muted" style="font-weight:400;font-size:var(--fs-8)">16 VEHICLES ACQUIRED 1/19/24</span></div>
+  <div class="card-body" style="padding:0;overflow-x:auto">
+    <table>
+      <thead><tr><th>#</th><th>YEAR</th><th>MAKE</th><th>MODEL</th><th>TRIM</th><th>CAB</th><th>COLOR</th><th>VIN</th><th class="r">STATUS</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">1</td><td class="mono">1958</td><td>CHEVROLET</td><td>C10</td><td>APACHE</td><td>REG</td><td>WHITE</td><td class="mono blank">???</td><td class="blank r">???</td></tr>
+        <tr><td class="mono">2</td><td class="mono">1965</td><td>CHEVROLET</td><td>C10</td><td>CUSTOM</td><td>REG</td><td>TEAL/WHITE</td><td class="mono blank">???</td><td class="blank r">???</td></tr>
+        <tr><td class="mono">3</td><td class="mono">1966</td><td>CHEVROLET</td><td>C10</td><td>CUSTOM</td><td>REG</td><td>PEWTER/WHITE</td><td class="mono">C1446S140169</td><td><span class="tag tag-bat">SOLD $60K</span></td></tr>
+        <tr><td class="mono">4</td><td class="mono">1972</td><td>CHEVROLET</td><td>K10</td><td>CHEYENNE SUPER</td><td>REG</td><td>RED/WHITE</td><td class="mono">CKE142B143858</td><td><span class="tag tag-bat">SOLD $78.5K</span></td></tr>
+        <tr><td class="mono">5</td><td class="mono">1972</td><td>CHEVROLET</td><td>K10</td><td>CUSTOM DELUXE</td><td>REG</td><td>OCHRE (YELLOW)</td><td class="mono">CKE142Z161636</td><td><span class="tag tag-off">LIQ $21.5K</span></td></tr>
+        <tr><td class="mono">6</td><td class="mono">1974</td><td>CHEVROLET</td><td>K20</td><td>CHEYENNE SUPER</td><td>REG</td><td>OCHRE/WHITE</td><td class="mono">CKY2442103570</td><td class="blank r">???</td></tr>
+        <tr><td class="mono">7</td><td class="mono">1976</td><td>CHEVROLET</td><td>C30</td><td>SILVERADO</td><td>CREW</td><td>GREEN/GREEN</td><td class="mono">CCS2462153447</td><td><span class="tag tag-bat">SOLD $63K</span></td></tr>
+        <tr><td class="mono">8</td><td class="mono">1977</td><td>CHEVROLET</td><td>K10</td><td>SILVERADO</td><td>REG</td><td>RED/TAN</td><td class="mono">CKL147Z186644</td><td class="blank r">PROJECTED $32K</td></tr>
+        <tr><td class="mono">9</td><td class="mono">1978</td><td>CHEVROLET</td><td>K20</td><td>SCOTTSDALE</td><td>REG</td><td>BROWN/TAN</td><td class="mono">CKL248Z129851</td><td class="blank r">PROJECTED $35K</td></tr>
+        <tr><td class="mono">10</td><td class="mono">1978</td><td>GMC</td><td>K1500</td><td>SIERRA CLASSIC</td><td>REG</td><td>FROST WHITE</td><td class="mono">TKL148F714125</td><td class="blank r">???</td></tr>
+        <tr><td class="mono">11</td><td class="mono">1978</td><td>CHEVROLET</td><td>K20</td><td>CHEYENNE</td><td>REG</td><td>BLUE</td><td class="mono">CKL248Z164631</td><td><span class="tag tag-off">SOLD $3K</span></td></tr>
+        <tr><td class="mono">12</td><td class="mono">1978</td><td>CHEVROLET</td><td>K10</td><td>CHEYENNE</td><td>REG</td><td>BROWN/TAN</td><td class="mono blank">???</td><td class="blank r">???</td></tr>
+        <tr><td class="mono">13</td><td class="mono">1980</td><td>CHEVROLET</td><td>K30</td><td>SILVERADO</td><td>CREW</td><td>CAMEL/TAN</td><td class="mono">CKM34AB120952</td><td><span class="tag tag-bat">SOLD $50K</span></td></tr>
+        <tr><td class="mono">14</td><td class="mono">1987</td><td>GMC</td><td>K20</td><td>HIGH SIERRA</td><td>REG</td><td>RED/WHITE</td><td class="mono blank">???</td><td class="blank r">???</td></tr>
+        <tr><td class="mono">15</td><td class="mono">1988</td><td>GMC</td><td>V3500</td><td></td><td>REG</td><td>WHITE</td><td class="mono">1GDJV34WXJJ507422</td><td class="blank r">???</td></tr>
+        <tr><td class="mono">16</td><td class="mono"></td><td>YAMAHA</td><td>MOTORCYCLE</td><td></td><td></td><td></td><td class="mono blank">???</td><td class="blank r">???</td></tr>
+      </tbody>
+    </table>
+    <div style="padding:var(--space-3);font-size:var(--fs-9);color:var(--text-secondary)">
+      SOURCE: INVENTORY 2024.NUMBERS "PRICE COLLECTION" SHEET. LAURA PROVIDED CAPITAL FOR ENTIRE BATCH. SOLD STATUS CROSS-REFERENCED WITH SP2024 + BAT RECORDS. VEHICLES WITHOUT STATUS ARE UNACCOUNTED &mdash; UNKNOWN IF SOLD, IN INVENTORY, OR DISPOSED.
+    </div>
+  </div>
+</div>
+
+<!-- TOP STATS -->
+<div class="stat-grid">
+  <div class="stat status-success">
+    <div class="label">TOTAL REVENUE</div>
+    <div class="value">$930,724</div>
+    <div class="sub">23 VEHICLES SOLD</div>
+  </div>
+  <div class="stat">
+    <div class="label">DOCUMENTED COST BASIS</div>
+    <div class="value">$255,400</div>
+    <div class="sub">10 OF 23 HAVE DATA</div>
+  </div>
+  <div class="stat status-success">
+    <div class="label">DOCUMENTED PROFIT</div>
+    <div class="value">$85,930</div>
+    <div class="sub">ON 10 DOCUMENTED DEALS</div>
+  </div>
+  <div class="stat status-warning">
+    <div class="label">UNDOCUMENTED</div>
+    <div class="value">13 VEHICLES</div>
+    <div class="sub">$547,249 IN SALES, ZERO COST DATA</div>
+  </div>
+</div>
+
+<div class="stat-grid" style="grid-template-columns: repeat(3, 1fr);">
+  <div class="stat">
+    <div class="label">INVENTORY SALES</div>
+    <div class="value">$383,475</div>
+    <div class="sub">10 VEHICLES &mdash; VLVA BOUGHT &amp; SOLD</div>
+  </div>
+  <div class="stat">
+    <div class="label">CONSIGNMENT REVENUE</div>
+    <div class="value">$99,075</div>
+    <div class="sub">3 VEHICLES &mdash; 8% FEE TO VLVA</div>
+  </div>
+  <div class="stat status-warning">
+    <div class="label">UNCLASSIFIED</div>
+    <div class="value">$448,174</div>
+    <div class="sub">10 VEHICLES &mdash; INV OR CONSIGN UNKNOWN</div>
+  </div>
+</div>
+
+<!-- COVERAGE ALERT -->
+<div class="alert alert-warning">
+  <div class="alert-title">DATA COVERAGE: 43% OF VEHICLES HAVE FINANCIAL DOCUMENTATION</div>
+  <div style="font-size:var(--fs-9);color:var(--text-secondary);margin-bottom:var(--space-2)">10 of 23 sold vehicles have cost/expense data from SP2024. The remaining 13 have only the BaT hammer price. 931 document images sit unmatched in the database.</div>
+  <div class="bar-track"><div class="bar-fill" style="width:43%;background:var(--warning)"></div></div>
+</div>
+
+<hr class="divider">
+
+<!-- INVENTORY SALES -->
+<div class="section-label">INVENTORY SALES &mdash; VLVA-OWNED VEHICLES</div>
+<div class="section-desc">Vehicles purchased with partner capital. Profit = Sale - Purchase - Expenses. ACL (5% of sale) taken off top. Remainder split 50/50.
+<span class="tag tag-s">S</span> SKYLAR CAPITAL &nbsp; <span class="tag tag-d">D</span> DOUG CAPITAL</div>
+
+<div class="card">
+  <div class="card-header">SP2024 CONFIRMED DEALS<span class="c-muted" style="font-weight:400;font-size:var(--fs-8)">7 VEHICLES &bull; AS OF 10/5/24</span></div>
+  <div class="card-body" style="padding:0;overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>VEHICLE</th>
+          <th>RECEIVED</th>
+          <th>SOLD</th>
+          <th>DAYS</th>
+          <th>CHANNEL</th>
+          <th class="r">PURCHASE</th>
+          <th class="r">EXPENSES</th>
+          <th class="r">SOLD</th>
+          <th class="r">PROFIT</th>
+          <th class="r">ACL 5%</th>
+          <th>CAP</th>
+          <th class="r">CAP ROI</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="vname">1968 PORSCHE 911</span><br><span class="vdetail">VIN 11835401</span></td>
+          <td class="mono">9/24/23</td><td class="mono">4/9/24</td><td class="mono">198</td>
+          <td><span class="tag tag-bat">BAT</span></td>
+          <td class="mono r">$12,500</td><td class="mono r">$5,000</td><td class="mono r">$26,150</td>
+          <td class="mono r c-success">$8,650</td><td class="mono r">$1,308</td>
+          <td><span class="tag tag-s">S</span></td><td class="mono r">$1,298</td>
+        </tr>
+        <tr>
+          <td><span class="vname">1966 CHEVROLET C10</span><br><span class="vdetail">PRICE UT BATCH</span></td>
+          <td class="mono">1/19/24</td><td class="mono">5/3/24</td><td class="mono">105</td>
+          <td><span class="tag tag-off">OFF-BAT</span></td>
+          <td class="mono r">$40,000</td><td class="mono r">$10,000</td><td class="mono r">$60,000</td>
+          <td class="mono r c-success">$10,000</td><td class="mono r">$3,000</td>
+          <td><span class="tag tag-s">S</span></td><td class="mono r">$1,500</td>
+        </tr>
+        <tr>
+          <td><span class="vname">1972 CHEVROLET K10</span><br><span class="vdetail">SHORT BED</span></td>
+          <td class="mono">1/19/24</td><td class="mono">6/10/24</td><td class="mono">143</td>
+          <td><span class="tag tag-off">OFF-BAT</span></td>
+          <td class="mono r">$40,000</td><td class="mono r">$20,000</td><td class="mono r">$78,500</td>
+          <td class="mono r c-success">$18,500</td><td class="mono r">$3,925</td>
+          <td><span class="tag tag-s">S</span></td><td class="mono r">$2,775</td>
+        </tr>
+        <tr>
+          <td><span class="vname">1972 CHEVROLET K10L</span><br><span class="vdetail">LONG BED YELLOW</span></td>
+          <td class="mono">1/19/24</td><td class="mono">7/5/24</td><td class="mono">168</td>
+          <td><span class="tag tag-off">OFF-BAT</span></td>
+          <td class="mono r">$20,000</td><td class="mono r">$1,000</td><td class="mono r">$21,500</td>
+          <td class="mono r c-success">$500</td><td class="mono r">$1,075</td>
+          <td><span class="tag tag-s">S</span></td><td class="mono r">$75</td>
+        </tr>
+        <tr>
+          <td><span class="vname">1978 CHEVROLET K20</span></td>
+          <td class="mono">1/19/24</td><td class="mono">7/24/24</td><td class="mono">187</td>
+          <td><span class="tag tag-off">OFF-BAT</span></td>
+          <td class="mono r">$400</td><td class="mono r">$1,260</td><td class="mono r">$3,000</td>
+          <td class="mono r c-success">$1,340</td><td class="mono r">$150</td>
+          <td><span class="tag tag-s">S</span></td><td class="mono r">$201</td>
+        </tr>
+        <tr>
+          <td><span class="vname">1976 CHEVROLET C20</span><br><span class="vdetail">VIN CCS246Z153447</span></td>
+          <td class="mono">1/19/24</td><td class="mono">10/5/24</td><td class="mono">260</td>
+          <td><span class="tag tag-bat">BAT</span></td>
+          <td class="mono r">$25,000</td><td class="mono r">$5,000</td><td class="mono r">$63,000</td>
+          <td class="mono r c-success">$33,000</td><td class="mono r">$3,150</td>
+          <td><span class="tag tag-s">S</span></td><td class="mono r">$4,950</td>
+        </tr>
+        <tr>
+          <td><span class="vname">1983 MERCEDES-BENZ 240D</span><br><span class="vdetail">VIN WDBAB23A1DB393871</span></td>
+          <td class="mono">6/20/24</td><td class="mono">10/5/24</td><td class="mono">107</td>
+          <td><span class="tag tag-bat">BAT</span></td>
+          <td class="mono r">$25,000</td><td class="mono r">$3,000</td><td class="mono r">$32,000</td>
+          <td class="mono r c-success">$4,000</td><td class="mono r">$1,600</td>
+          <td><span class="tag tag-d">D</span></td><td class="mono r">$600</td>
+        </tr>
+        <tr class="totals">
+          <td colspan="5"><strong>INVENTORY TOTAL</strong></td>
+          <td class="mono r">$162,900</td><td class="mono r">$45,260</td><td class="mono r">$284,150</td>
+          <td class="mono r c-success">$75,990</td><td class="mono r">$14,208</td>
+          <td></td><td class="mono r">$11,399</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- NON-BAT SALES -->
+<div class="card">
+  <div class="card-header">NON-BAT LIQUIDATIONS<span class="c-muted" style="font-weight:400;font-size:var(--fs-8)">FROM SP2024</span></div>
+  <div class="card-body" style="padding:0;overflow-x:auto">
+    <table>
+      <thead><tr><th>VEHICLE</th><th class="r">PURCHASE</th><th class="r">EXPENSES</th><th class="r">LIQUIDATED</th><th class="r">PROFIT</th><th class="r">PAID TO ACL</th><th class="r">BALANCE</th><th class="r">DOUG OWED</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="vname">1972 K10</span></td>
+          <td class="mono r">$20,000</td><td class="mono r">$800</td><td class="mono r">$21,500</td>
+          <td class="mono r c-success">$700</td><td class="mono r">$14,000</td><td class="mono r c-error">-$6,000</td><td class="mono r">$350</td>
+        </tr>
+        <tr>
+          <td><span class="vname">1978 K20</span></td>
+          <td class="mono r">$400</td><td class="mono r">$1,260</td><td class="mono r">$3,000</td>
+          <td class="mono r c-success">$1,340</td><td class="mono r">$0</td><td class="mono r c-error">-$1,150</td><td class="mono r">$670</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- CONSIGNMENT -->
+<div class="section-label">CONSIGNMENT SALES</div>
+<div class="section-desc">Vehicles VLVA did not purchase. VLVA provided listing, prep, storage. Earns 8% of sale price. All three found by Doug.</div>
+
+<div class="card">
+  <div class="card-header">CONSIGNMENTS<span class="c-muted" style="font-weight:400;font-size:var(--fs-8)">3 VEHICLES &bull; 8% FEE</span></div>
+  <div class="card-body" style="padding:0;overflow-x:auto">
+    <table>
+      <thead><tr><th>VEHICLE</th><th>RECEIVED</th><th>SOLD</th><th>DAYS</th><th class="r">UP-FRONT</th><th class="r">EXPENSES</th><th class="r">SALE PRICE</th><th class="r">VLVA 8% FEE</th><th>FINDER</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="vname">2008 BENTLEY CONTINENTAL GTC</span><br><span class="vdetail">VIN SCBDR33W18C052453</span></td>
+          <td class="mono">10/10/23</td><td class="mono">12/12/23</td><td class="mono">63</td>
+          <td class="mono r">$1,000</td><td class="mono r">$600</td><td class="mono r">$42,000</td>
+          <td class="mono r c-success">$3,760</td><td><span class="tag tag-d">D</span></td>
+        </tr>
+        <tr>
+          <td><span class="vname">2003 MERCEDES-BENZ S55 AMG</span><br><span class="vdetail">VIN WDBNG74J13A366043</span></td>
+          <td class="mono">4/15/24</td><td class="mono">8/20/24</td><td class="mono">127</td>
+          <td class="mono r">$3,600</td><td class="mono r">$3,000</td><td class="mono r">$20,825</td>
+          <td class="mono r c-success">$2,266</td><td><span class="tag tag-d">D</span></td>
+        </tr>
+        <tr>
+          <td><span class="vname">1932 FORD HIGHBOY ROADSTER</span><br><span class="vdetail">VIN AZ388121</span></td>
+          <td class="mono">7/11/24</td><td class="mono">8/31/24</td><td class="mono">51</td>
+          <td class="mono r">$600</td><td class="mono r">$800</td><td class="mono r">$36,250</td>
+          <td class="mono r c-success">$2,700</td><td><span class="tag tag-d">D</span></td>
+        </tr>
+        <tr class="totals">
+          <td colspan="4"><strong>CONSIGNMENT TOTAL</strong></td>
+          <td class="mono r">$5,200</td><td class="mono r">$4,400</td><td class="mono r">$99,075</td>
+          <td class="mono r c-success">$8,726</td><td></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- UNDOCUMENTED BAT SALES -->
+<div class="section-label">UNDOCUMENTED BAT SALES</div>
+<div class="section-desc">Sold under VivaLasVegasAutos on BaT but NO entry in SP2024 or any internal spreadsheet. Inventory vs consignment unknown. All cost data blank.</div>
+
+<div class="card">
+  <div class="card-header">NO INTERNAL DOCS<span class="c-muted" style="font-weight:400;font-size:var(--fs-8)">16 VEHICLES &bull; $565,999 TOTAL HAMMER</span></div>
+  <div class="card-body" style="padding:0;overflow-x:auto">
+    <table>
+      <thead><tr><th>VEHICLE</th><th>BAT DATE</th><th class="r">HAMMER</th><th>BUYER</th><th class="r">ACQ COST</th><th class="r">EXPENSES</th><th class="r">PROFIT</th><th>TYPE</th></tr></thead>
+      <tbody>
+        <tr><td><span class="vname">1989 CADILLAC ELDORADO BIARRITZ</span></td><td class="mono">11/15/23</td><td class="mono r">$11,500</td><td class="mono">59caddyman</td><td class="blank r">???</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr><td><span class="vname">1988 JEEP WRANGLER SAHARA</span><br><span class="vdetail">VIN 2BCCZ8124JB538686 &bull; DON CAPITAL $6K</span></td><td class="mono">4/15/24</td><td class="mono r">$11,000</td><td class="mono">scarp215</td><td class="mono r">$6,000</td><td class="mono r">$1,550</td><td class="mono r c-success">$3,000</td><td><span class="tag tag-inv">INV</span></td></tr>
+        <tr><td><span class="vname">1946 MERCURY EIGHT WOODIE</span></td><td class="mono c-muted">~4/1/24</td><td class="mono r">$34,000</td><td class="mono">the</td><td class="blank r">???</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr><td><span class="vname">1971 CHEVROLET C10 CHEYENNE 402</span><br><span class="vdetail">VIN CE141B647123</span></td><td class="mono c-muted">~10/5/24</td><td class="mono r">$62,000</td><td class="blank">???</td><td class="blank r">???</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr><td><span class="vname">1980 CHEVROLET K30 CREW CAB</span><br><span class="vdetail">VIN CKM34AB120952</span></td><td class="mono c-muted">~12/22/24</td><td class="mono r">$49,999</td><td class="mono">the</td><td class="mono r">$25,000</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr><td><span class="vname">2023 FORD F-150 RAPTOR 37</span><br><span class="vdetail">VIN 1FTFW1RG9PFA48165</span></td><td class="mono">2/3/25</td><td class="mono r">$75,000</td><td class="mono">platinum911sc</td><td class="blank r">???</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr><td><span class="vname">1970 FORD RANCHERO</span><br><span class="vdetail">VIN 0R02F121561</span></td><td class="mono">2/8/25</td><td class="mono r">$37,000</td><td class="mono">ride7474</td><td class="blank r">???</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr><td><span class="vname">1984 CITROEN 2CV6 SPECIAL</span><br><span class="vdetail">VIN VF7AZKA00KA013148</span></td><td class="mono">2/17/25</td><td class="mono r">$14,500</td><td class="mono">paulyg</td><td class="blank r">???</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr><td><span class="vname">1985 CHEVROLET SUBURBAN K10</span><br><span class="vdetail">VIN 1G8EK16L3FF114243</span></td><td class="mono">5/5/25</td><td class="mono r">$34,000</td><td class="mono">AKracing</td><td class="mono r">$14,000</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr><td><span class="vname">1958 CITROEN 2CV</span></td><td class="mono">6/3/25</td><td class="mono r">$14,250</td><td class="mono">BrianBaca</td><td class="blank r">???</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr><td><span class="vname">2023 SPEED UTV EL JEFE</span><br><span class="vdetail">VIN A05U4A1JEP7000402</span></td><td class="mono">6/24/25</td><td class="mono r">$46,250</td><td class="mono">wait</td><td class="blank r">???</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr><td><span class="vname">1993 CORVETTE ZR-1 40TH</span><br><span class="vdetail">VIN 1G1YZ23J8P5800060</span></td><td class="mono">10/20/25</td><td class="mono r">$36,000</td><td class="mono">64Sting</td><td class="blank r">???</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr><td><span class="vname">1987 GMC V1500 SUBURBAN</span></td><td class="mono">10/27/25</td><td class="mono r">$37,250</td><td class="mono">BaT</td><td class="blank r">???</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr><td><span class="vname">1979 GMC K1500 SIERRA GRANDE</span><br><span class="vdetail">VIN TKL149J507665</span></td><td class="mono c-muted">~2/13/26</td><td class="mono r">$30,000</td><td class="blank">???</td><td class="blank r">???</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr><td><span class="vname">1972 FORD ECONOLINE E-200</span><br><span class="vdetail">VIN E25GHP84159</span></td><td class="mono">2/18/26</td><td class="mono r">$30,750</td><td class="blank">???</td><td class="blank r">???</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr><td><span class="vname">2025 FACTORY FIVE MK4 ROADSTER</span></td><td class="mono c-muted">~3/19/26</td><td class="mono r">$52,500</td><td class="mono">rych232</td><td class="blank r">???</td><td class="blank r">???</td><td class="blank r">???</td><td><span class="tag tag-blank">???</span></td></tr>
+        <tr class="totals"><td colspan="2"><strong>UNDOCUMENTED TOTAL</strong></td><td class="mono r">$565,999</td><td colspan="5"></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- FLAGGED -->
+<div class="card" style="border-color:var(--error)">
+  <div class="card-header" style="border-bottom-color:var(--error)"><span class="c-error">FLAGGED TRANSACTION</span></div>
+  <div class="card-body" style="padding:0">
+    <table>
+      <tr>
+        <td><span class="vname">2001 GMC YUKON XL SLT 4X4</span><br><span class="vdetail">VIN 3GKGK26G11G271515</span></td>
+        <td class="mono">11/15/23</td>
+        <td><span class="tag tag-flag">SELF-PURCHASE</span></td>
+        <td class="mono r">$22,000</td>
+        <td style="font-size:var(--fs-9);color:var(--text-secondary)">BUYER = VIVALASVEGASAUTOS. VLVA WON ITS OWN AUCTION. NOT REVENUE.</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- PARTNER ECONOMICS -->
+<div class="section-label">PARTNER ECONOMICS</div>
+<div class="section-desc">From SP2024 internal spreadsheet, Apr&ndash;Oct 2024 window</div>
+
+<div class="cols">
+  <div class="card">
+    <div class="card-header">INCOME SPLIT (INVENTORY ONLY)</div>
+    <div class="card-body">
+      <div class="exp-line"><span class="el">TOTAL INVENTORY PROFIT</span><span class="ev">$75,990</span></div>
+      <div class="exp-line"><span class="el">LESS: ACL (5% OF SALES)</span><span class="ev c-error">-$14,208</span></div>
+      <div class="exp-line"><span class="el">DISTRIBUTABLE PROFIT</span><span class="ev">$61,783</span></div>
+      <div class="exp-line" style="border-top:2px solid var(--border);padding-top:var(--space-3);margin-top:var(--space-2)"><span class="el" style="font-weight:700;color:var(--text)">SKYLAR SHARE (50%)</span><span class="ev c-success" style="font-weight:700">$30,891</span></div>
+      <div class="exp-line"><span class="el" style="font-weight:700;color:var(--text)">DOUG SHARE (50%)</span><span class="ev c-success" style="font-weight:700">$30,891</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">CAPITAL DEPLOYED &amp; RETURNS</div>
+    <div class="card-body">
+      <div class="exp-line"><span class="el">SKYLAR CAPITAL IN (6 DEALS)</span><span class="ev">$137,900</span></div>
+      <div class="exp-line"><span class="el">DOUG CAPITAL IN (1 DEAL)</span><span class="ev">$25,000</span></div>
+      <div class="exp-line"><span class="el">SKYLAR CAP ROI EARNED</span><span class="ev c-success">$10,799</span></div>
+      <div class="exp-line"><span class="el">DOUG CAP ROI EARNED</span><span class="ev c-success">$600</span></div>
+      <div class="exp-line" style="border-top:2px solid var(--border);padding-top:var(--space-3);margin-top:var(--space-2)"><span class="el">SKYLAR TOTAL INCOME</span><span class="ev" style="font-weight:700">$41,690</span></div>
+      <div class="exp-line"><span class="el">DOUG TOTAL INCOME</span><span class="ev" style="font-weight:700">$31,491</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- EXPENSES -->
+<div class="card" style="margin-top:var(--space-3)">
+  <div class="card-header">2024 OPERATING EXPENSES<span class="c-muted" style="font-weight:400;font-size:var(--fs-8)">NOT SUBTRACTED FROM DEAL PROFITS</span></div>
+  <div class="card-body">
+    <div class="cols">
+      <div>
+        <div class="exp-line"><span class="el">707 YUCCA MORTGAGE (10 MO)</span><span class="ev">$60,000</span></div>
+        <div class="exp-line"><span class="el">707 YUCCA ELECTRICITY</span><span class="ev">$7,000</span></div>
+        <div class="exp-line"><span class="el">676 WELLS SHOP RENT</span><span class="ev">$20,000</span></div>
+        <div class="exp-line"><span class="el">676 WELLS ELECTRICITY</span><span class="ev">$5,000</span></div>
+      </div>
+      <div>
+        <div class="exp-line"><span class="el">676 WELLS DOUG RENT</span><span class="ev">$7,500</span></div>
+        <div class="exp-line"><span class="el">674 WELLS SKYLAR RENT</span><span class="ev">$15,000</span></div>
+        <div class="exp-line"><span class="el">DOUG LIVING COST</span><span class="ev">$20,000</span></div>
+        <div class="exp-line"><span class="el">SKYLAR LIVING COST</span><span class="ev">$20,000</span></div>
+      </div>
+    </div>
+    <div class="exp-line" style="border-top:2px solid var(--border);padding-top:var(--space-3);margin-top:var(--space-2)"><span class="el" style="font-weight:700;color:var(--text)">TOTAL 2024 OVERHEAD</span><span class="ev c-error" style="font-weight:700">$154,500</span></div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- UNACCOUNTED -->
+<div class="section-label">THE UNACCOUNTED GAP</div>
+<div class="section-desc">From "WHERE'S THE MONEY 2024" spreadsheet</div>
+
+<div class="stat-grid" style="grid-template-columns: repeat(4, 1fr);">
+  <div class="stat status-error">
+    <div class="label">UNACCOUNTED</div>
+    <div class="value">$63,816</div>
+    <div class="sub">PER YOUR SPREADSHEET</div>
+  </div>
+  <div class="stat">
+    <div class="label">DOUG "OTHER SOURCES"</div>
+    <div class="value">$188,134</div>
+    <div class="sub">CONSIGN + RANDOM + ACL + CAP</div>
+  </div>
+  <div class="stat">
+    <div class="label">SKYLAR "OTHER SOURCES"</div>
+    <div class="value">$10,500</div>
+    <div class="sub">78 K20 $3K + 72 K10 YLW $7.5K</div>
+  </div>
+  <div class="stat status-warning">
+    <div class="label">CASH OUT ON CARS</div>
+    <div class="value">$23,300</div>
+  </div>
+</div>
+
+<div class="alert alert-error">
+  <div class="alert-title">DOUG'S "OTHER SOURCES" BREAKDOWN</div>
+  <div style="font-size:var(--fs-9)">
+    <div class="exp-line"><span class="el">CONSIGNMENTS (8%)</span><span class="ev">$8,726</span></div>
+    <div class="exp-line"><span class="el">RANDOM DEALS</span><span class="ev">$8,700</span></div>
+    <div class="exp-line"><span class="el">ACL FEES (5% OF ALL SALES)</span><span class="ev">$14,208</span></div>
+    <div class="exp-line"><span class="el">FLUCTUATING CAPITAL</span><span class="ev">$156,500</span></div>
+    <div class="exp-line" style="border-top:2px solid var(--error)"><span class="el" style="font-weight:700">TOTAL</span><span class="ev" style="font-weight:700">$188,134</span></div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- MYSTERY DEAL -->
+<div class="card" style="border-color:var(--warning)">
+  <div class="card-header" style="border-bottom-color:var(--warning)"><span class="c-warning">UNIDENTIFIED DEAL JACKET: VLVA-13-0000-0534</span></div>
+  <div class="card-body">
+    <div class="exp-line"><span class="el">STOCK NUMBER</span><span class="ev">VLVA-13-0000-0534</span></div>
+    <div class="exp-line"><span class="el">SOLD DATE</span><span class="ev">JANUARY 30, 2025</span></div>
+    <div class="exp-line"><span class="el">SALE PRICE INC DOC</span><span class="ev">$44,000</span></div>
+    <div class="exp-line"><span class="el">DOC FEE</span><span class="ev">$250</span></div>
+    <div class="exp-line"><span class="el">TOTAL SELLING PRICE</span><span class="ev">$44,250</span></div>
+    <div class="exp-line"><span class="el">GROSS PROFIT</span><span class="ev c-success">$3,594.61</span></div>
+    <div class="exp-line"><span class="el">VEHICLE</span><span class="ev blank">NOT LINKED &mdash; WHICH CAR IS THIS?</span></div>
+  </div>
+</div>
+
+<!-- PROJECTIONS VS REALITY -->
+<div class="section-label">SP2024 PROJECTIONS VS REALITY</div>
+<div class="card">
+  <div class="card-header">UNSOLD AS OF 10/5/24 &mdash; PROJECTED VS ACTUAL</div>
+  <div class="card-body" style="padding:0;overflow-x:auto">
+    <table>
+      <thead><tr><th>VEHICLE</th><th class="r">PURCHASE</th><th class="r">PROJ EXPENSES</th><th class="r">PROJ SALE</th><th class="r">PROJ PROFIT</th><th class="r">ACTUAL BAT SALE</th><th>DELTA</th></tr></thead>
+      <tbody>
+        <tr><td class="vname">1980 K30 CREW CAB</td><td class="mono r">$25,000</td><td class="mono r">$15,000</td><td class="mono r">$110,000</td><td class="mono r">$70,000</td><td class="mono r">$49,999</td><td class="c-error" style="font-size:var(--fs-8)">-55% VS PROJ</td></tr>
+        <tr><td class="vname">1987 GMC SUBURBAN</td><td class="mono r">$12,000</td><td class="mono r">$8,000</td><td class="mono r">$35,000</td><td class="mono r">$15,000</td><td class="mono r">$37,250</td><td class="c-success" style="font-size:var(--fs-8)">+6%</td></tr>
+        <tr><td class="vname">1985 SUBURBAN</td><td class="mono r">$15,000</td><td class="mono r">$8,000</td><td class="mono r">$35,000</td><td class="mono r">$12,000</td><td class="mono r">$34,000</td><td class="c-muted" style="font-size:var(--fs-8)">-3%</td></tr>
+        <tr><td class="vname">1979 K15</td><td class="mono r">$6,000</td><td class="mono r">$10,000</td><td class="mono r">$32,000</td><td class="mono r">$16,000</td><td class="mono r">$30,000</td><td class="c-muted" style="font-size:var(--fs-8)">-6%</td></tr>
+        <tr><td class="vname">1978 K20</td><td class="mono r">$15,000</td><td class="mono r">$10,000</td><td class="mono r">$35,000</td><td class="mono r">$10,000</td><td class="blank r">???</td><td class="blank" style="font-size:var(--fs-8)">NO BAT RECORD</td></tr>
+        <tr><td class="vname">1977 K10</td><td class="mono r">$4,000</td><td class="mono r">$12,000</td><td class="mono r">$32,000</td><td class="mono r">$16,000</td><td class="blank r">???</td><td class="blank" style="font-size:var(--fs-8)">NO BAT RECORD</td></tr>
+        <tr><td class="vname">1988 SUBURBAN</td><td class="mono r">$0</td><td class="mono r">$12,000</td><td class="mono r">$35,000</td><td class="mono r">$23,000</td><td class="blank r">???</td><td class="blank" style="font-size:var(--fs-8)">NO BAT RECORD</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- DOCUMENT STATUS -->
+<div class="section-label">DOCUMENT PHOTO STATUS</div>
+<div class="stat-grid" style="grid-template-columns: repeat(4, 1fr);">
+  <div class="stat"><div class="label">TOTAL DOC PHOTOS</div><div class="value">931</div></div>
+  <div class="stat"><div class="label">OCR COMPLETE</div><div class="value">916</div></div>
+  <div class="stat status-error"><div class="label">LINKED TO VEHICLES</div><div class="value">17</div><div class="sub">9 VEHICLES, ALL PRE-2023</div></div>
+  <div class="stat status-error"><div class="label">LINKED TO OCT 23+ VEHICLES</div><div class="value">0</div></div>
+</div>
+
+<!-- WHAT WOULD COMPLETE -->
+<div class="card" style="border-color:var(--accent);margin-top:var(--space-4)">
+  <div class="card-header">WHAT WOULD COMPLETE THIS REPORT</div>
+  <div class="card-body" style="font-size:var(--fs-9);color:var(--text-secondary);line-height:2">
+    <div>1. CLASSIFY 13 UNDOCUMENTED VEHICLES AS INVENTORY OR CONSIGNMENT</div>
+    <div>2. GET ACQUISITION COSTS FOR UNDOCUMENTED VEHICLES</div>
+    <div>3. MATCH 931 DOCUMENT PHOTOS TO VEHICLES BY VIN/STOCK NUMBER</div>
+    <div>4. IDENTIFY VLVA-13-0000-0534 &mdash; WHICH VEHICLE SOLD 1/30/25 FOR $44,250?</div>
+    <div>5. GET BAT PAYOUT STATEMENTS FOR ACTUAL NET PROCEEDS</div>
+    <div>6. RECONCILE BENTLEY &mdash; BAT SAYS $26,500, SP2024 SAYS $42,000</div>
+    <div>7. ACCOUNT FOR 3 PROJECTED VEHICLES WITH NO BAT RECORD (1978 K20, 1977 K10, 1988 SUBURBAN)</div>
+    <div>8. UPDATE NOV 2024 &ndash; MAR 2026 &mdash; SP2024 ONLY COVERS THROUGH 10/5/24</div>
+  </div>
+</div>
+
+<div style="font-size:var(--fs-8);color:var(--text-disabled);text-align:center;padding:var(--space-6) 0;text-transform:uppercase;letter-spacing:0.05em">
+  GENERATED FROM NUKE DATABASE + SP2024.PDF + WHERES_THE_MONEY_2024.PDF + INVENTORY_2024.NUMBERS<br>
+  ALL FIGURES SUBJECT TO VERIFICATION &bull; 2026-03-31
+</div>
+
+</div>
+</body>
+</html>

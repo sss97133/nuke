@@ -1,0 +1,789 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SECTION 2: ENGINE - LS3  |  PAGE 1 OF 2  |  IGNITION COILS (DEL-Stributor) + FUEL INJECTORS
+     DWG NO: NKW-K5-02-1  |  REV: v2  |  DATE: 2026-04-04
+     ANSI D (22x34") landscape  |  viewBox 0 0 3400 2200  |  10 units/mm approx
+     KEY CHANGE: All 8 coils in single DEL-Stributor cluster, center-rear near firewall
+     Coil wire lengths ~2.5ft (not 4.6ft). Pin-to-cylinder: IGN_LS(n) = Cyl(n).
+     16 engine wires: 8 IGN coil IC signals + 8 fuel injectors
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3400 2200" width="3400" height="2200">
+<defs>
+  <style>
+    text { font-family: 'Courier New', monospace; }
+    .grid-label { font-size: 14px; fill: #999; text-anchor: middle; }
+    .grid-line { stroke: #CCCCCC; stroke-width: 0.25; }
+    .zone-boundary { stroke: #666666; stroke-width: 0.5; stroke-dasharray: 4,2; fill: none; }
+    .zone-label { font-size: 16px; font-weight: bold; fill: #666; font-family: Arial, sans-serif; text-anchor: middle; }
+    .wire-hot { stroke: #000; stroke-width: 0.5; fill: none; }
+    .wire-signal { stroke: #000; stroke-width: 0.35; fill: none; }
+    .wire-label { font-size: 9px; fill: #000; font-family: 'Courier New', monospace; }
+    .comp-label { font-size: 11px; fill: #000; font-weight: bold; font-family: 'Courier New', monospace; }
+    .comp-detail { font-size: 8px; fill: #333; font-family: 'Courier New', monospace; }
+    .pin-label { font-size: 8px; fill: #000; font-family: 'Courier New', monospace; }
+    .connector-outline { fill: white; stroke: black; stroke-width: 1.2; }
+    .pin-filled { fill: black; stroke: black; stroke-width: 0.6; }
+    .pin-empty { fill: white; stroke: black; stroke-width: 0.6; }
+    .junction { fill: #000; }
+    .title-box { fill: white; stroke: black; stroke-width: 1; }
+    .title-text { font-family: Arial, sans-serif; }
+    .cross-ref { font-size: 8px; fill: #444; font-family: Arial, sans-serif; }
+    .note-text { font-size: 8px; fill: #333; font-family: Arial, sans-serif; }
+    .bus-wire { stroke: #000; stroke-width: 0.8; fill: none; }
+    .bracket-outline { fill: #f0f0f0; stroke: black; stroke-width: 1.5; rx: 6; ry: 6; }
+  </style>
+
+  <!-- Reusable symbol: Ignition Coil (O-05) D510C -->
+  <symbol id="sym-coil" viewBox="0 0 40 40">
+    <rect x="8" y="4" width="24" height="32" rx="2" ry="2" fill="white" stroke="black" stroke-width="1.5"/>
+    <path d="M13,10 Q20,7 27,10 M13,13 Q20,10 27,13 M13,16 Q20,13 27,16" fill="none" stroke="black" stroke-width="1.2" stroke-linecap="round"/>
+    <line x1="12" y1="18" x2="28" y2="18" stroke="black" stroke-width="1" stroke-dasharray="2,1"/>
+    <path d="M13,21 Q20,19 27,21 M13,23 Q20,21 27,23 M13,25 Q20,23 27,25 M13,27 Q20,25 27,27 M13,29 Q20,27 27,29 M13,31 Q20,29 27,31" fill="none" stroke="black" stroke-width="0.8" stroke-linecap="round"/>
+    <line x1="8" y1="8" x2="2" y2="8" stroke="black" stroke-width="1.5"/>
+    <text x="2" y="6" font-family="Courier New, monospace" font-size="3" fill="black" text-anchor="middle">B+</text>
+    <line x1="32" y1="8" x2="38" y2="8" stroke="black" stroke-width="1.5"/>
+    <text x="37" y="6" font-family="Courier New, monospace" font-size="3" fill="black" text-anchor="middle">IGN</text>
+    <line x1="8" y1="32" x2="2" y2="32" stroke="black" stroke-width="1.5"/>
+    <text x="3" y="35.5" font-family="Courier New, monospace" font-size="3" fill="black" text-anchor="middle">GND</text>
+    <line x1="32" y1="32" x2="38" y2="32" stroke="black" stroke-width="1.5"/>
+    <text x="37" y="35.5" font-family="Courier New, monospace" font-size="3" fill="black" text-anchor="middle">HV</text>
+  </symbol>
+
+  <!-- Reusable symbol: Fuel Injector (O-04) -->
+  <symbol id="sym-injector" viewBox="0 0 40 40">
+    <line x1="20" y1="2" x2="20" y2="6" stroke="black" stroke-width="1.5"/>
+    <rect x="12" y="6" width="16" height="18" rx="1" ry="1" fill="white" stroke="black" stroke-width="1.5"/>
+    <path d="M15,10 Q20,8 25,10 M15,13 Q20,11 25,13 M15,16 Q20,14 25,16 M15,19 Q20,17 25,19" fill="none" stroke="black" stroke-width="0.8"/>
+    <polygon points="16,24 24,24 22,30 18,30" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/>
+    <line x1="18" y1="30" x2="20" y2="34" stroke="black" stroke-width="1.5"/>
+    <line x1="22" y1="30" x2="20" y2="34" stroke="black" stroke-width="1.5"/>
+    <line x1="17" y1="35" x2="15" y2="38" stroke="black" stroke-width="0.8"/>
+    <line x1="20" y1="35" x2="20" y2="38" stroke="black" stroke-width="0.8"/>
+    <line x1="23" y1="35" x2="25" y2="38" stroke="black" stroke-width="0.8"/>
+  </symbol>
+
+  <!-- Reusable symbol: Chassis Ground (G-01) -->
+  <symbol id="sym-chassis-gnd" viewBox="0 0 40 40">
+    <line x1="20" y1="4" x2="20" y2="14" stroke="black" stroke-width="1.5"/>
+    <line x1="8" y1="14" x2="32" y2="14" stroke="black" stroke-width="1.5"/>
+    <line x1="12" y1="20" x2="28" y2="20" stroke="black" stroke-width="1.5"/>
+    <line x1="16" y1="26" x2="24" y2="26" stroke="black" stroke-width="1.5"/>
+  </symbol>
+
+  <!-- Reusable symbol: Sensor Ground (G-04) -->
+  <symbol id="sym-sensor-gnd" viewBox="0 0 40 40">
+    <line x1="20" y1="2" x2="20" y2="10" stroke="black" stroke-width="1.5"/>
+    <polygon points="8,10 32,10 20,30" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/>
+    <text x="20" y="22" font-family="Courier New, monospace" font-size="7" font-weight="bold" fill="black" text-anchor="middle" dominant-baseline="middle">SG</text>
+  </symbol>
+</defs>
+
+<!-- ============================================================ -->
+<!-- BACKGROUND                                                    -->
+<!-- ============================================================ -->
+<rect width="3400" height="2200" fill="white"/>
+
+<!-- ============================================================ -->
+<!-- GRID: 37 columns x 26 rows (A-Z)                             -->
+<!-- Column width ~88.6px, Row height ~77.7px                      -->
+<!-- Margins: left=60, top=40, right=60, bottom=100               -->
+<!-- Drawing area: 3280 x 2020                                    -->
+<!-- ============================================================ -->
+<g id="grid">
+  <!-- Vertical grid lines (columns 1-37) -->
+  <line x1="60" y1="40" x2="60" y2="2060" class="grid-line"/>
+  <line x1="148" y1="40" x2="148" y2="2060" class="grid-line"/>
+  <line x1="237" y1="40" x2="237" y2="2060" class="grid-line"/>
+  <line x1="325" y1="40" x2="325" y2="2060" class="grid-line"/>
+  <line x1="414" y1="40" x2="414" y2="2060" class="grid-line"/>
+  <line x1="502" y1="40" x2="502" y2="2060" class="grid-line"/>
+  <line x1="591" y1="40" x2="591" y2="2060" class="grid-line"/>
+  <line x1="679" y1="40" x2="679" y2="2060" class="grid-line"/>
+  <line x1="768" y1="40" x2="768" y2="2060" class="grid-line"/>
+  <line x1="856" y1="40" x2="856" y2="2060" class="grid-line"/>
+  <line x1="945" y1="40" x2="945" y2="2060" class="grid-line"/>
+  <line x1="1033" y1="40" x2="1033" y2="2060" class="grid-line"/>
+  <line x1="1122" y1="40" x2="1122" y2="2060" class="grid-line"/>
+  <line x1="1210" y1="40" x2="1210" y2="2060" class="grid-line"/>
+  <line x1="1299" y1="40" x2="1299" y2="2060" class="grid-line"/>
+  <line x1="1387" y1="40" x2="1387" y2="2060" class="grid-line"/>
+  <line x1="1476" y1="40" x2="1476" y2="2060" class="grid-line"/>
+  <line x1="1564" y1="40" x2="1564" y2="2060" class="grid-line"/>
+  <line x1="1653" y1="40" x2="1653" y2="2060" class="grid-line"/>
+  <line x1="1741" y1="40" x2="1741" y2="2060" class="grid-line"/>
+  <line x1="1830" y1="40" x2="1830" y2="2060" class="grid-line"/>
+  <line x1="1918" y1="40" x2="1918" y2="2060" class="grid-line"/>
+  <line x1="2007" y1="40" x2="2007" y2="2060" class="grid-line"/>
+  <line x1="2095" y1="40" x2="2095" y2="2060" class="grid-line"/>
+  <line x1="2184" y1="40" x2="2184" y2="2060" class="grid-line"/>
+  <line x1="2272" y1="40" x2="2272" y2="2060" class="grid-line"/>
+  <line x1="2361" y1="40" x2="2361" y2="2060" class="grid-line"/>
+  <line x1="2449" y1="40" x2="2449" y2="2060" class="grid-line"/>
+  <line x1="2538" y1="40" x2="2538" y2="2060" class="grid-line"/>
+  <line x1="2626" y1="40" x2="2626" y2="2060" class="grid-line"/>
+  <line x1="2715" y1="40" x2="2715" y2="2060" class="grid-line"/>
+  <line x1="2803" y1="40" x2="2803" y2="2060" class="grid-line"/>
+  <line x1="2892" y1="40" x2="2892" y2="2060" class="grid-line"/>
+  <line x1="2980" y1="40" x2="2980" y2="2060" class="grid-line"/>
+  <line x1="3069" y1="40" x2="3069" y2="2060" class="grid-line"/>
+  <line x1="3157" y1="40" x2="3157" y2="2060" class="grid-line"/>
+  <line x1="3246" y1="40" x2="3246" y2="2060" class="grid-line"/>
+
+  <!-- Horizontal grid lines (rows A-Z) -->
+  <line x1="60" y1="40" x2="3340" y2="40" class="grid-line"/>
+  <line x1="60" y1="118" x2="3340" y2="118" class="grid-line"/>
+  <line x1="60" y1="196" x2="3340" y2="196" class="grid-line"/>
+  <line x1="60" y1="274" x2="3340" y2="274" class="grid-line"/>
+  <line x1="60" y1="352" x2="3340" y2="352" class="grid-line"/>
+  <line x1="60" y1="430" x2="3340" y2="430" class="grid-line"/>
+  <line x1="60" y1="508" x2="3340" y2="508" class="grid-line"/>
+  <line x1="60" y1="586" x2="3340" y2="586" class="grid-line"/>
+  <line x1="60" y1="664" x2="3340" y2="664" class="grid-line"/>
+  <line x1="60" y1="742" x2="3340" y2="742" class="grid-line"/>
+  <line x1="60" y1="820" x2="3340" y2="820" class="grid-line"/>
+  <line x1="60" y1="898" x2="3340" y2="898" class="grid-line"/>
+  <line x1="60" y1="976" x2="3340" y2="976" class="grid-line"/>
+  <line x1="60" y1="1054" x2="3340" y2="1054" class="grid-line"/>
+  <line x1="60" y1="1132" x2="3340" y2="1132" class="grid-line"/>
+  <line x1="60" y1="1210" x2="3340" y2="1210" class="grid-line"/>
+  <line x1="60" y1="1288" x2="3340" y2="1288" class="grid-line"/>
+  <line x1="60" y1="1366" x2="3340" y2="1366" class="grid-line"/>
+  <line x1="60" y1="1444" x2="3340" y2="1444" class="grid-line"/>
+  <line x1="60" y1="1522" x2="3340" y2="1522" class="grid-line"/>
+  <line x1="60" y1="1600" x2="3340" y2="1600" class="grid-line"/>
+  <line x1="60" y1="1678" x2="3340" y2="1678" class="grid-line"/>
+  <line x1="60" y1="1756" x2="3340" y2="1756" class="grid-line"/>
+  <line x1="60" y1="1834" x2="3340" y2="1834" class="grid-line"/>
+  <line x1="60" y1="1912" x2="3340" y2="1912" class="grid-line"/>
+  <line x1="60" y1="1990" x2="3340" y2="1990" class="grid-line"/>
+  <line x1="60" y1="2060" x2="3340" y2="2060" class="grid-line"/>
+
+  <!-- Column labels (top) -->
+  <text x="104" y="30" class="grid-label">1</text>
+  <text x="192" y="30" class="grid-label">2</text>
+  <text x="281" y="30" class="grid-label">3</text>
+  <text x="369" y="30" class="grid-label">4</text>
+  <text x="458" y="30" class="grid-label">5</text>
+  <text x="546" y="30" class="grid-label">6</text>
+  <text x="635" y="30" class="grid-label">7</text>
+  <text x="723" y="30" class="grid-label">8</text>
+  <text x="812" y="30" class="grid-label">9</text>
+  <text x="900" y="30" class="grid-label">10</text>
+  <text x="989" y="30" class="grid-label">11</text>
+  <text x="1077" y="30" class="grid-label">12</text>
+  <text x="1166" y="30" class="grid-label">13</text>
+  <text x="1254" y="30" class="grid-label">14</text>
+  <text x="1343" y="30" class="grid-label">15</text>
+  <text x="1431" y="30" class="grid-label">16</text>
+  <text x="1520" y="30" class="grid-label">17</text>
+  <text x="1608" y="30" class="grid-label">18</text>
+  <text x="1697" y="30" class="grid-label">19</text>
+  <text x="1785" y="30" class="grid-label">20</text>
+  <text x="1874" y="30" class="grid-label">21</text>
+  <text x="1962" y="30" class="grid-label">22</text>
+  <text x="2051" y="30" class="grid-label">23</text>
+  <text x="2139" y="30" class="grid-label">24</text>
+  <text x="2228" y="30" class="grid-label">25</text>
+  <text x="2316" y="30" class="grid-label">26</text>
+  <text x="2405" y="30" class="grid-label">27</text>
+  <text x="2493" y="30" class="grid-label">28</text>
+  <text x="2582" y="30" class="grid-label">29</text>
+  <text x="2670" y="30" class="grid-label">30</text>
+  <text x="2759" y="30" class="grid-label">31</text>
+  <text x="2847" y="30" class="grid-label">32</text>
+  <text x="2936" y="30" class="grid-label">33</text>
+  <text x="3024" y="30" class="grid-label">34</text>
+  <text x="3113" y="30" class="grid-label">35</text>
+  <text x="3201" y="30" class="grid-label">36</text>
+  <text x="3290" y="30" class="grid-label">37</text>
+
+  <!-- Column labels (bottom) -->
+  <text x="104" y="2080" class="grid-label">1</text>
+  <text x="192" y="2080" class="grid-label">2</text>
+  <text x="281" y="2080" class="grid-label">3</text>
+  <text x="369" y="2080" class="grid-label">4</text>
+  <text x="458" y="2080" class="grid-label">5</text>
+  <text x="546" y="2080" class="grid-label">6</text>
+  <text x="635" y="2080" class="grid-label">7</text>
+  <text x="723" y="2080" class="grid-label">8</text>
+  <text x="812" y="2080" class="grid-label">9</text>
+  <text x="900" y="2080" class="grid-label">10</text>
+  <text x="989" y="2080" class="grid-label">11</text>
+  <text x="1077" y="2080" class="grid-label">12</text>
+  <text x="1166" y="2080" class="grid-label">13</text>
+  <text x="1254" y="2080" class="grid-label">14</text>
+  <text x="1343" y="2080" class="grid-label">15</text>
+  <text x="1431" y="2080" class="grid-label">16</text>
+  <text x="1520" y="2080" class="grid-label">17</text>
+  <text x="1608" y="2080" class="grid-label">18</text>
+  <text x="1697" y="2080" class="grid-label">19</text>
+  <text x="1785" y="2080" class="grid-label">20</text>
+  <text x="1874" y="2080" class="grid-label">21</text>
+  <text x="1962" y="2080" class="grid-label">22</text>
+  <text x="2051" y="2080" class="grid-label">23</text>
+  <text x="2139" y="2080" class="grid-label">24</text>
+  <text x="2228" y="2080" class="grid-label">25</text>
+  <text x="2316" y="2080" class="grid-label">26</text>
+  <text x="2405" y="2080" class="grid-label">27</text>
+  <text x="2493" y="2080" class="grid-label">28</text>
+  <text x="2582" y="2080" class="grid-label">29</text>
+  <text x="2670" y="2080" class="grid-label">30</text>
+  <text x="2759" y="2080" class="grid-label">31</text>
+  <text x="2847" y="2080" class="grid-label">32</text>
+  <text x="2936" y="2080" class="grid-label">33</text>
+  <text x="3024" y="2080" class="grid-label">34</text>
+  <text x="3113" y="2080" class="grid-label">35</text>
+  <text x="3201" y="2080" class="grid-label">36</text>
+  <text x="3290" y="2080" class="grid-label">37</text>
+
+  <!-- Row labels (left) -->
+  <text x="40" y="83" class="grid-label">A</text>
+  <text x="40" y="161" class="grid-label">B</text>
+  <text x="40" y="239" class="grid-label">C</text>
+  <text x="40" y="317" class="grid-label">D</text>
+  <text x="40" y="395" class="grid-label">E</text>
+  <text x="40" y="473" class="grid-label">F</text>
+  <text x="40" y="551" class="grid-label">G</text>
+  <text x="40" y="629" class="grid-label">H</text>
+  <text x="40" y="707" class="grid-label">I</text>
+  <text x="40" y="785" class="grid-label">J</text>
+  <text x="40" y="863" class="grid-label">K</text>
+  <text x="40" y="941" class="grid-label">L</text>
+  <text x="40" y="1019" class="grid-label">M</text>
+  <text x="40" y="1097" class="grid-label">N</text>
+  <text x="40" y="1175" class="grid-label">O</text>
+  <text x="40" y="1253" class="grid-label">P</text>
+  <text x="40" y="1331" class="grid-label">Q</text>
+  <text x="40" y="1409" class="grid-label">R</text>
+  <text x="40" y="1487" class="grid-label">S</text>
+  <text x="40" y="1565" class="grid-label">T</text>
+  <text x="40" y="1643" class="grid-label">U</text>
+  <text x="40" y="1721" class="grid-label">V</text>
+  <text x="40" y="1799" class="grid-label">W</text>
+  <text x="40" y="1877" class="grid-label">X</text>
+  <text x="40" y="1955" class="grid-label">Y</text>
+  <text x="40" y="2033" class="grid-label">Z</text>
+
+  <!-- Row labels (right) -->
+  <text x="3360" y="83" class="grid-label">A</text>
+  <text x="3360" y="161" class="grid-label">B</text>
+  <text x="3360" y="239" class="grid-label">C</text>
+  <text x="3360" y="317" class="grid-label">D</text>
+  <text x="3360" y="395" class="grid-label">E</text>
+  <text x="3360" y="473" class="grid-label">F</text>
+  <text x="3360" y="551" class="grid-label">G</text>
+  <text x="3360" y="629" class="grid-label">H</text>
+  <text x="3360" y="707" class="grid-label">I</text>
+  <text x="3360" y="785" class="grid-label">J</text>
+  <text x="3360" y="863" class="grid-label">K</text>
+  <text x="3360" y="941" class="grid-label">L</text>
+  <text x="3360" y="1019" class="grid-label">M</text>
+  <text x="3360" y="1097" class="grid-label">N</text>
+  <text x="3360" y="1175" class="grid-label">O</text>
+  <text x="3360" y="1253" class="grid-label">P</text>
+  <text x="3360" y="1331" class="grid-label">Q</text>
+  <text x="3360" y="1409" class="grid-label">R</text>
+  <text x="3360" y="1487" class="grid-label">S</text>
+  <text x="3360" y="1565" class="grid-label">T</text>
+  <text x="3360" y="1643" class="grid-label">U</text>
+  <text x="3360" y="1721" class="grid-label">V</text>
+  <text x="3360" y="1799" class="grid-label">W</text>
+  <text x="3360" y="1877" class="grid-label">X</text>
+  <text x="3360" y="1955" class="grid-label">Y</text>
+  <text x="3360" y="2033" class="grid-label">Z</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- ZONES                                                         -->
+<!-- ============================================================ -->
+<g id="zones">
+  <!-- Firewall: dashed vertical line at column ~10 -->
+  <line x1="900" y1="40" x2="900" y2="2060" class="zone-boundary" stroke-width="1"/>
+  <text x="900" y="60" class="zone-label" font-size="12">FRONT OF DASH</text>
+
+  <!-- Engine outline (dashed box, cols 2-9) -->
+  <rect x="148" y="80" width="740" height="1900" class="zone-boundary"/>
+  <text x="518" y="100" class="zone-label">ENGINE BAY</text>
+
+  <!-- Driver side label -->
+  <text x="200" y="170" class="zone-label" font-size="10">DRIVER (LEFT)</text>
+
+  <!-- Passenger side label -->
+  <text x="200" y="1200" class="zone-label" font-size="10">PASSENGER (RIGHT)</text>
+
+  <!-- Fuel rail zones -->
+  <rect x="180" y="1360" width="500" height="340" rx="4" ry="4" fill="none" stroke="#888" stroke-width="0.5" stroke-dasharray="3,2"/>
+  <text x="430" y="1380" class="note-text" text-anchor="middle">DRIVER SIDE FUEL RAIL (CYL 1,3,5,7)</text>
+  <rect x="180" y="1730" width="500" height="340" rx="4" ry="4" fill="none" stroke="#888" stroke-width="0.5" stroke-dasharray="3,2"/>
+  <text x="430" y="1750" class="note-text" text-anchor="middle">PASSENGER SIDE FUEL RAIL (CYL 2,4,6,8)</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- M130 ECU — CONNECTOR A (COLUMNS 11-16, RIGHT OF FIREWALL)    -->
+<!-- Showing ignition + injector pins used on this page            -->
+<!-- ============================================================ -->
+<g id="m130-connector-a">
+  <!-- ECU box -->
+  <rect x="960" y="80" width="420" height="1980" rx="4" ry="4" class="connector-outline"/>
+  <text x="1170" y="110" class="comp-label" text-anchor="middle">MOTEC M130</text>
+  <text x="1170" y="128" class="comp-detail" text-anchor="middle">CONNECTOR A</text>
+  <text x="1170" y="144" class="comp-detail" text-anchor="middle">GPR-LS3 FIRMWARE</text>
+
+  <!-- Divider: Ignition outputs -->
+  <line x1="970" y1="165" x2="1370" y2="165" stroke="#999" stroke-width="0.5"/>
+  <text x="1170" y="182" class="comp-detail" text-anchor="middle">IGNITION OUTPUTS (IGN_LS1-8)</text>
+  <line x1="970" y1="190" x2="1370" y2="190" stroke="#999" stroke-width="0.5"/>
+
+  <!-- Pin A03: IGN_LS1 = Cyl 1 -->
+  <circle cx="975" cy="220" r="4" class="pin-filled"/>
+  <text x="985" y="224" class="pin-label">A03  IGN_LS1  CYL 1  20AWG</text>
+
+  <!-- Pin A04: IGN_LS2 = Cyl 2 -->
+  <circle cx="975" cy="290" r="4" class="pin-filled"/>
+  <text x="985" y="294" class="pin-label">A04  IGN_LS2  CYL 2  20AWG</text>
+
+  <!-- Pin A05: IGN_LS3 = Cyl 3 -->
+  <circle cx="975" cy="360" r="4" class="pin-filled"/>
+  <text x="985" y="364" class="pin-label">A05  IGN_LS3  CYL 3  20AWG</text>
+
+  <!-- Pin A06: IGN_LS4 = Cyl 4 -->
+  <circle cx="975" cy="430" r="4" class="pin-filled"/>
+  <text x="985" y="434" class="pin-label">A06  IGN_LS4  CYL 4  20AWG</text>
+
+  <!-- Pin A07: IGN_LS5 = Cyl 5 -->
+  <circle cx="975" cy="500" r="4" class="pin-filled"/>
+  <text x="985" y="504" class="pin-label">A07  IGN_LS5  CYL 5  20AWG</text>
+
+  <!-- Pin A08: IGN_LS6 = Cyl 6 -->
+  <circle cx="975" cy="570" r="4" class="pin-filled"/>
+  <text x="985" y="574" class="pin-label">A08  IGN_LS6  CYL 6  20AWG</text>
+
+  <!-- Pin A12: IGN_LS7 = Cyl 7 -->
+  <circle cx="975" cy="640" r="4" class="pin-filled"/>
+  <text x="985" y="644" class="pin-label">A12  IGN_LS7  CYL 7  20AWG</text>
+
+  <!-- Pin A13: IGN_LS8 = Cyl 8 -->
+  <circle cx="975" cy="710" r="4" class="pin-filled"/>
+  <text x="985" y="714" class="pin-label">A13  IGN_LS8  CYL 8  20AWG</text>
+
+  <!-- Divider: Injector outputs -->
+  <line x1="970" y1="770" x2="1370" y2="770" stroke="#999" stroke-width="0.5"/>
+  <text x="1170" y="787" class="comp-detail" text-anchor="middle">INJECTOR OUTPUTS (INJ_PH1-8)</text>
+  <line x1="970" y1="795" x2="1370" y2="795" stroke="#999" stroke-width="0.5"/>
+
+  <!-- Pin A19: INJ_PH1 = Cyl 1 -->
+  <circle cx="975" cy="830" r="4" class="pin-filled"/>
+  <text x="985" y="834" class="pin-label">A19  INJ_PH1  CYL 1  18AWG</text>
+
+  <!-- Pin A20: INJ_PH2 = Cyl 2 -->
+  <circle cx="975" cy="900" r="4" class="pin-filled"/>
+  <text x="985" y="904" class="pin-label">A20  INJ_PH2  CYL 2  18AWG</text>
+
+  <!-- Pin A21: INJ_PH3 = Cyl 3 -->
+  <circle cx="975" cy="970" r="4" class="pin-filled"/>
+  <text x="985" y="974" class="pin-label">A21  INJ_PH3  CYL 3  18AWG</text>
+
+  <!-- Pin A22: INJ_PH4 = Cyl 4 -->
+  <circle cx="975" cy="1040" r="4" class="pin-filled"/>
+  <text x="985" y="1044" class="pin-label">A22  INJ_PH4  CYL 4  18AWG</text>
+
+  <!-- Pin A27: INJ_PH5 = Cyl 5 -->
+  <circle cx="975" cy="1110" r="4" class="pin-filled"/>
+  <text x="985" y="1114" class="pin-label">A27  INJ_PH5  CYL 5  18AWG</text>
+
+  <!-- Pin A28: INJ_PH6 = Cyl 6 -->
+  <circle cx="975" cy="1180" r="4" class="pin-filled"/>
+  <text x="985" y="1184" class="pin-label">A28  INJ_PH6  CYL 6  18AWG</text>
+
+  <!-- Pin A29: INJ_PH7 = Cyl 7 -->
+  <circle cx="975" cy="1250" r="4" class="pin-filled"/>
+  <text x="985" y="1254" class="pin-label">A29  INJ_PH7  CYL 7  18AWG</text>
+
+  <!-- Pin A30: INJ_PH8 = Cyl 8 -->
+  <circle cx="975" cy="1320" r="4" class="pin-filled"/>
+  <text x="985" y="1324" class="pin-label">A30  INJ_PH8  CYL 8  18AWG</text>
+
+  <!-- Cross-reference to page 2 -->
+  <line x1="970" y1="1400" x2="1370" y2="1400" stroke="#999" stroke-width="0.5"/>
+  <text x="1170" y="1420" class="cross-ref" text-anchor="middle">SENSORS + ETB: SEE S2 PAGE 2</text>
+  <text x="1170" y="1438" class="cross-ref" text-anchor="middle">A01, A02, A14-A18 --> P2</text>
+  <text x="1170" y="1456" class="cross-ref" text-anchor="middle">CONNECTOR B PINS --> P2</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- DEL-STRIBUTOR COIL CLUSTER                                    -->
+<!-- All 8 D510C coils in single bracket, center-rear of engine   -->
+<!-- Near firewall (column 8-9), vertically centered              -->
+<!-- ============================================================ -->
+<g id="del-stributor-cluster">
+  <!-- DEL-Stributor bracket background -->
+  <rect x="680" y="130" width="180" height="680" rx="8" ry="8" fill="#f5f5f0" stroke="black" stroke-width="2"/>
+  <text x="770" y="155" class="comp-label" text-anchor="middle" font-size="10">DEL-STRIBUTOR</text>
+  <text x="770" y="170" class="comp-detail" text-anchor="middle">DELMO SPEED</text>
+  <text x="770" y="183" class="comp-detail" text-anchor="middle">8x D510C COILS</text>
+  <text x="770" y="196" class="comp-detail" text-anchor="middle">CENTER-REAR ENGINE</text>
+
+  <!-- Coil B+ power bus (horizontal, top of bracket) -->
+  <line x1="695" y1="215" x2="845" y2="215" class="bus-wire" stroke-width="1.0"/>
+  <text x="770" y="210" class="wire-label" text-anchor="middle" font-size="7">B+ BUS 16AWG (PDM30)</text>
+
+  <!-- Coil GND bus (horizontal, bottom of bracket) -->
+  <line x1="695" y1="790" x2="845" y2="790" stroke="black" stroke-width="1.0" stroke-dasharray="6,3" fill="none"/>
+  <text x="770" y="808" class="wire-label" text-anchor="middle" font-size="7">GND BUS 16AWG (CHASSIS)</text>
+
+  <!-- Chassis ground symbol at bottom of GND bus -->
+  <use href="#sym-chassis-gnd" x="750" y="815" width="40" height="40"/>
+
+  <!-- COIL 1 — Cyl 1 — Slot 1 (Driver front) — M130:A03 -->
+  <use href="#sym-coil" x="700" y="225" width="50" height="50"/>
+  <text x="755" y="242" class="pin-label">CYL 1</text>
+  <text x="755" y="254" class="comp-detail">SLOT 1</text>
+  <text x="755" y="264" class="comp-detail">DRV FRT</text>
+
+  <!-- COIL 2 — Cyl 2 — Slot 2 (Pass front) — M130:A04 -->
+  <use href="#sym-coil" x="700" y="285" width="50" height="50"/>
+  <text x="755" y="302" class="pin-label">CYL 2</text>
+  <text x="755" y="314" class="comp-detail">SLOT 2</text>
+
+  <!-- COIL 3 — Cyl 3 — Slot 3 (Driver mid-front) — M130:A05 -->
+  <use href="#sym-coil" x="700" y="345" width="50" height="50"/>
+  <text x="755" y="362" class="pin-label">CYL 3</text>
+  <text x="755" y="374" class="comp-detail">SLOT 3</text>
+
+  <!-- COIL 4 — Cyl 4 — Slot 4 (Pass mid-front) — M130:A06 -->
+  <use href="#sym-coil" x="700" y="405" width="50" height="50"/>
+  <text x="755" y="422" class="pin-label">CYL 4</text>
+  <text x="755" y="434" class="comp-detail">SLOT 4</text>
+
+  <!-- COIL 5 — Cyl 5 — Slot 5 (Driver mid-rear) — M130:A07 -->
+  <use href="#sym-coil" x="700" y="465" width="50" height="50"/>
+  <text x="755" y="482" class="pin-label">CYL 5</text>
+  <text x="755" y="494" class="comp-detail">SLOT 5</text>
+
+  <!-- COIL 6 — Cyl 6 — Slot 6 (Pass mid-rear) — M130:A08 -->
+  <use href="#sym-coil" x="700" y="525" width="50" height="50"/>
+  <text x="755" y="542" class="pin-label">CYL 6</text>
+  <text x="755" y="554" class="comp-detail">SLOT 6</text>
+
+  <!-- COIL 7 — Cyl 7 — Slot 7 (Driver rear) — M130:A12 -->
+  <use href="#sym-coil" x="700" y="585" width="50" height="50"/>
+  <text x="755" y="602" class="pin-label">CYL 7</text>
+  <text x="755" y="614" class="comp-detail">SLOT 7</text>
+
+  <!-- COIL 8 — Cyl 8 — Slot 8 (Passenger rear) — M130:A13 -->
+  <use href="#sym-coil" x="700" y="645" width="50" height="50"/>
+  <text x="755" y="662" class="pin-label">CYL 8</text>
+  <text x="755" y="674" class="comp-detail">SLOT 8</text>
+
+  <!-- HV spark plug wire outputs (right side of coils, to cylinders) -->
+  <!-- Arrows indicating spark plug wires radiate to individual cylinders -->
+  <line x1="750" y1="266" x2="690" y2="266" stroke="red" stroke-width="0.5" stroke-dasharray="2,1"/>
+  <text x="685" y="269" class="comp-detail" text-anchor="end" fill="red">SPK 1</text>
+  <line x1="750" y1="326" x2="690" y2="326" stroke="red" stroke-width="0.5" stroke-dasharray="2,1"/>
+  <text x="685" y="329" class="comp-detail" text-anchor="end" fill="red">SPK 2</text>
+  <line x1="750" y1="386" x2="690" y2="386" stroke="red" stroke-width="0.5" stroke-dasharray="2,1"/>
+  <text x="685" y="389" class="comp-detail" text-anchor="end" fill="red">SPK 3</text>
+  <line x1="750" y1="446" x2="690" y2="446" stroke="red" stroke-width="0.5" stroke-dasharray="2,1"/>
+  <text x="685" y="449" class="comp-detail" text-anchor="end" fill="red">SPK 4</text>
+  <line x1="750" y1="506" x2="690" y2="506" stroke="red" stroke-width="0.5" stroke-dasharray="2,1"/>
+  <text x="685" y="509" class="comp-detail" text-anchor="end" fill="red">SPK 5</text>
+  <line x1="750" y1="566" x2="690" y2="566" stroke="red" stroke-width="0.5" stroke-dasharray="2,1"/>
+  <text x="685" y="569" class="comp-detail" text-anchor="end" fill="red">SPK 6</text>
+  <line x1="750" y1="626" x2="690" y2="626" stroke="red" stroke-width="0.5" stroke-dasharray="2,1"/>
+  <text x="685" y="629" class="comp-detail" text-anchor="end" fill="red">SPK 7</text>
+  <line x1="750" y1="686" x2="690" y2="686" stroke="red" stroke-width="0.5" stroke-dasharray="2,1"/>
+  <text x="685" y="689" class="comp-detail" text-anchor="end" fill="red">SPK 8</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- IGNITION COIL IC SIGNAL WIRES (M130 -> DEL-Stributor)        -->
+<!-- 8 wires, Manhattan routed, all ~2.5ft                        -->
+<!-- Route: M130 pin -> left through firewall -> coil IGN terminal -->
+<!-- ============================================================ -->
+<g id="wires-ignition">
+
+  <!-- Wire #24: M130:A03 -> Coil Cyl 1 | 20AWG WHT/ORG | 2.5ft -->
+  <polyline points="971,220 900,220 850,220 850,235 750,235" class="wire-signal"/>
+  <text x="870" y="215" class="wire-label">#24  20AWG  WHT/ORG</text>
+  <text x="870" y="227" class="wire-label">IGN CYL1  2.5ft</text>
+  <!-- Firewall pass-through dot -->
+  <circle cx="900" cy="220" r="3" class="junction"/>
+
+  <!-- Wire #9: M130:A04 -> Coil Cyl 2 | 20AWG WHT/RED | 2.5ft -->
+  <polyline points="971,290 900,290 840,290 840,295 750,295" class="wire-signal"/>
+  <text x="870" y="285" class="wire-label">#9  20AWG  WHT/RED</text>
+  <text x="870" y="297" class="wire-label">IGN CYL2  2.5ft</text>
+  <circle cx="900" cy="290" r="3" class="junction"/>
+
+  <!-- Wire #5: M130:A05 -> Coil Cyl 3 | 20AWG WHT | 2.5ft -->
+  <polyline points="971,360 900,360 830,360 830,355 750,355" class="wire-signal"/>
+  <text x="870" y="350" class="wire-label">#5  20AWG  WHT</text>
+  <text x="870" y="362" class="wire-label">IGN CYL3  2.5ft</text>
+  <circle cx="900" cy="360" r="3" class="junction"/>
+
+  <!-- Wire #10: M130:A06 -> Coil Cyl 4 | 20AWG WHT/BLU | 2.5ft -->
+  <polyline points="971,430 900,430 820,430 820,415 750,415" class="wire-signal"/>
+  <text x="870" y="420" class="wire-label">#10  20AWG  WHT/BLU</text>
+  <text x="870" y="432" class="wire-label">IGN CYL4  2.5ft</text>
+  <circle cx="900" cy="430" r="3" class="junction"/>
+
+  <!-- Wire #7: M130:A07 -> Coil Cyl 5 | 20AWG WHT/WHT | 2.5ft -->
+  <polyline points="971,500 900,500 810,500 810,475 750,475" class="wire-signal"/>
+  <text x="870" y="492" class="wire-label">#7  20AWG  WHT/WHT</text>
+  <text x="870" y="504" class="wire-label">IGN CYL5  2.5ft</text>
+  <circle cx="900" cy="500" r="3" class="junction"/>
+
+  <!-- Wire #11: M130:A08 -> Coil Cyl 6 | 20AWG WHT/YEL | 2.5ft -->
+  <polyline points="971,570 900,570 800,570 800,535 750,535" class="wire-signal"/>
+  <text x="870" y="562" class="wire-label">#11  20AWG  WHT/YEL</text>
+  <text x="870" y="574" class="wire-label">IGN CYL6  2.5ft</text>
+  <circle cx="900" cy="570" r="3" class="junction"/>
+
+  <!-- Wire #8: M130:A12 -> Coil Cyl 7 | 20AWG WHT/BLK | 2.5ft -->
+  <polyline points="971,640 900,640 790,640 790,595 750,595" class="wire-signal"/>
+  <text x="870" y="632" class="wire-label">#8  20AWG  WHT/BLK</text>
+  <text x="870" y="644" class="wire-label">IGN CYL7  2.5ft</text>
+  <circle cx="900" cy="640" r="3" class="junction"/>
+
+  <!-- Wire #12: M130:A13 -> Coil Cyl 8 | 20AWG WHT/VIO | 2.5ft -->
+  <polyline points="971,710 900,710 780,710 780,655 750,655" class="wire-signal"/>
+  <text x="870" y="702" class="wire-label">#12  20AWG  WHT/VIO</text>
+  <text x="870" y="714" class="wire-label">IGN CYL8  2.5ft</text>
+  <circle cx="900" cy="710" r="3" class="junction"/>
+</g>
+
+<!-- ============================================================ -->
+<!-- FUEL INJECTORS — DRIVER SIDE (CYL 1, 3, 5, 7)               -->
+<!-- On driver-side fuel rail, front to rear                       -->
+<!-- ============================================================ -->
+<g id="injectors-driver">
+
+  <!-- INJ CYL 1 — M130:A19 — Wire #13 — 18AWG GRN — 4.6ft -->
+  <use href="#sym-injector" x="300" y="1370" width="40" height="40"/>
+  <text x="350" y="1385" class="comp-label" font-size="9">INJ CYL 1</text>
+  <text x="350" y="1397" class="comp-detail">EV6/USCAR</text>
+  <!-- Wire from M130 pin A19 through firewall to injector -->
+  <polyline points="971,830 900,830 900,1387 340,1387" class="wire-hot"/>
+  <text x="870" y="825" class="wire-label">#13  18AWG  GRN</text>
+  <text x="870" y="837" class="wire-label">INJ CYL1  4.6ft</text>
+  <circle cx="900" cy="830" r="3" class="junction"/>
+
+  <!-- INJ CYL 3 — M130:A21 — Wire #15 — 18AWG GRN/BLK — 4.6ft -->
+  <use href="#sym-injector" x="420" y="1370" width="40" height="40"/>
+  <text x="470" y="1385" class="comp-label" font-size="9">INJ CYL 3</text>
+  <text x="470" y="1397" class="comp-detail">EV6/USCAR</text>
+  <polyline points="971,970 900,970 893,970 893,1447 460,1447" class="wire-hot"/>
+  <text x="870" y="965" class="wire-label">#15  18AWG  GRN/BLK</text>
+  <text x="870" y="977" class="wire-label">INJ CYL3  4.6ft</text>
+  <circle cx="900" cy="970" r="3" class="junction"/>
+
+  <!-- INJ CYL 5 — M130:A27 — Wire #17 — 18AWG GRN/BLU — 4.6ft -->
+  <use href="#sym-injector" x="540" y="1370" width="40" height="40"/>
+  <text x="590" y="1385" class="comp-label" font-size="9">INJ CYL 5</text>
+  <text x="590" y="1397" class="comp-detail">EV6/USCAR</text>
+  <polyline points="971,1110 900,1110 886,1110 886,1507 580,1507" class="wire-hot"/>
+  <text x="870" y="1105" class="wire-label">#17  18AWG  GRN/BLU</text>
+  <text x="870" y="1117" class="wire-label">INJ CYL5  4.6ft</text>
+  <circle cx="900" cy="1110" r="3" class="junction"/>
+
+  <!-- INJ CYL 7 — M130:A29 — Wire #19 — 18AWG GRN/VIO — 4.6ft -->
+  <use href="#sym-injector" x="660" y="1370" width="40" height="40"/>
+  <text x="710" y="1385" class="comp-label" font-size="9">INJ CYL 7</text>
+  <text x="710" y="1397" class="comp-detail">EV6/USCAR</text>
+  <polyline points="971,1250 900,1250 879,1250 879,1567 700,1567" class="wire-hot"/>
+  <text x="870" y="1245" class="wire-label">#19  18AWG  GRN/VIO</text>
+  <text x="870" y="1257" class="wire-label">INJ CYL7  4.6ft</text>
+  <circle cx="900" cy="1250" r="3" class="junction"/>
+</g>
+
+<!-- ============================================================ -->
+<!-- FUEL INJECTORS — PASSENGER SIDE (CYL 2, 4, 6, 8)            -->
+<!-- On passenger-side fuel rail, front to rear                    -->
+<!-- ============================================================ -->
+<g id="injectors-passenger">
+
+  <!-- INJ CYL 2 — M130:A20 — Wire #14 — 18AWG GRN/WHT — 4.6ft -->
+  <use href="#sym-injector" x="300" y="1740" width="40" height="40"/>
+  <text x="350" y="1755" class="comp-label" font-size="9">INJ CYL 2</text>
+  <text x="350" y="1767" class="comp-detail">EV6/USCAR</text>
+  <polyline points="971,900 900,900 872,900 872,1757 340,1757" class="wire-hot"/>
+  <text x="870" y="895" class="wire-label">#14  18AWG  GRN/WHT</text>
+  <text x="870" y="907" class="wire-label">INJ CYL2  4.6ft</text>
+  <circle cx="900" cy="900" r="3" class="junction"/>
+
+  <!-- INJ CYL 4 — M130:A22 — Wire #16 — 18AWG GRN/RED — 4.6ft -->
+  <use href="#sym-injector" x="420" y="1740" width="40" height="40"/>
+  <text x="470" y="1755" class="comp-label" font-size="9">INJ CYL 4</text>
+  <text x="470" y="1767" class="comp-detail">EV6/USCAR</text>
+  <polyline points="971,1040 900,1040 865,1040 865,1817 460,1817" class="wire-hot"/>
+  <text x="870" y="1035" class="wire-label">#16  18AWG  GRN/RED</text>
+  <text x="870" y="1047" class="wire-label">INJ CYL4  4.6ft</text>
+  <circle cx="900" cy="1040" r="3" class="junction"/>
+
+  <!-- INJ CYL 6 — M130:A28 — Wire #18 — 18AWG GRN/YEL — 4.6ft -->
+  <use href="#sym-injector" x="540" y="1740" width="40" height="40"/>
+  <text x="590" y="1755" class="comp-label" font-size="9">INJ CYL 6</text>
+  <text x="590" y="1767" class="comp-detail">EV6/USCAR</text>
+  <polyline points="971,1180 900,1180 858,1180 858,1877 580,1877" class="wire-hot"/>
+  <text x="870" y="1175" class="wire-label">#18  18AWG  GRN/YEL</text>
+  <text x="870" y="1187" class="wire-label">INJ CYL6  4.6ft</text>
+  <circle cx="900" cy="1180" r="3" class="junction"/>
+
+  <!-- INJ CYL 8 — M130:A30 — Wire #20 — 18AWG GRN/ORG — 4.6ft -->
+  <use href="#sym-injector" x="660" y="1740" width="40" height="40"/>
+  <text x="710" y="1755" class="comp-label" font-size="9">INJ CYL 8</text>
+  <text x="710" y="1767" class="comp-detail">EV6/USCAR</text>
+  <polyline points="971,1320 900,1320 851,1320 851,1937 700,1937" class="wire-hot"/>
+  <text x="870" y="1315" class="wire-label">#20  18AWG  GRN/ORG</text>
+  <text x="870" y="1327" class="wire-label">INJ CYL8  4.6ft</text>
+  <circle cx="900" cy="1320" r="3" class="junction"/>
+</g>
+
+<!-- ============================================================ -->
+<!-- NOTES BOX (upper right)                                       -->
+<!-- ============================================================ -->
+<g id="notes">
+  <rect x="1500" y="80" width="800" height="380" rx="4" ry="4" fill="#fffff0" stroke="#999" stroke-width="0.5"/>
+  <text x="1520" y="105" class="comp-label" font-size="10">COIL WIRING NOTES (v2)</text>
+  <line x1="1510" y1="112" x2="2280" y2="112" stroke="#999" stroke-width="0.5"/>
+
+  <text x="1520" y="135" class="note-text" font-size="9">1. IGN_LS(n) = CYLINDER(n). Firmware handles firing order.</text>
+  <text x="1520" y="155" class="note-text" font-size="9">2. LS3 firing order: 1-8-7-2-6-5-4-3 (in firmware, NOT wiring).</text>
+  <text x="1520" y="175" class="note-text" font-size="9">3. All 8 D510C coils mount on DEL-Stributor bracket,</text>
+  <text x="1540" y="192" class="note-text" font-size="9">center-rear of engine near firewall.</text>
+  <text x="1520" y="215" class="note-text" font-size="9">4. Coil IC signal wires are ~2.5ft (firewall grommet to bracket).</text>
+  <text x="1520" y="235" class="note-text" font-size="9">5. Coil B+ power bus: 16AWG from PDM30 dedicated output.</text>
+  <text x="1520" y="255" class="note-text" font-size="9">6. Coil ground bus: 16AWG to engine block/chassis ground stud.</text>
+  <text x="1520" y="275" class="note-text" font-size="9">7. Each D510C has 4 pins: B+(C), IGN(A), GND(D), HV-spark(B).</text>
+  <text x="1520" y="295" class="note-text" font-size="9">8. Only the IGN (IC signal) wire is individual per coil.</text>
+  <text x="1520" y="315" class="note-text" font-size="9">   B+, GND are bussed on the bracket. HV goes to spark plug.</text>
+  <text x="1520" y="340" class="note-text" font-size="9">9. Injectors: 18AWG, peak-and-hold from M130 INJ_PH outputs.</text>
+  <text x="1520" y="360" class="note-text" font-size="9">   4 per side on standard LS3 fuel rails, EV6/USCAR connectors.</text>
+
+  <line x1="1510" y1="375" x2="2280" y2="375" stroke="#999" stroke-width="0.5"/>
+  <text x="1520" y="395" class="cross-ref" font-size="9">REF: K5_coil_mapping.md (AUTHORITATIVE)</text>
+  <text x="1520" y="412" class="cross-ref" font-size="9">REF: K5_cut_list_v2.txt (123 wires)</text>
+  <text x="1520" y="429" class="cross-ref" font-size="9">BRACKET: Delmo Speed DEL-Stributor (DELSTRIB01)</text>
+  <text x="1520" y="446" class="cross-ref" font-size="9">COILS: ACDelco D510C / GM 12611424 (x8)</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- LS3 CYLINDER LAYOUT REFERENCE (right side)                    -->
+<!-- ============================================================ -->
+<g id="cylinder-layout">
+  <rect x="1500" y="500" width="800" height="300" rx="4" ry="4" fill="#f8f8ff" stroke="#999" stroke-width="0.5"/>
+  <text x="1900" y="525" class="comp-label" text-anchor="middle" font-size="10">LS3 CYLINDER LAYOUT</text>
+  <line x1="1510" y1="532" x2="2280" y2="532" stroke="#999" stroke-width="0.5"/>
+
+  <!-- Engine top view -->
+  <rect x="1600" y="560" width="600" height="200" rx="8" ry="8" fill="white" stroke="black" stroke-width="1"/>
+  <text x="1600" y="555" class="comp-detail">FRONT</text>
+  <text x="2200" y="555" class="comp-detail" text-anchor="end">REAR (FIREWALL)</text>
+
+  <!-- Driver side cylinders -->
+  <text x="1620" y="580" class="comp-detail">DRIVER</text>
+  <circle cx="1680" cy="610" r="18" fill="#e8e8ff" stroke="black" stroke-width="1"/>
+  <text x="1680" y="615" class="comp-label" text-anchor="middle" font-size="12">1</text>
+  <circle cx="1780" cy="610" r="18" fill="#e8e8ff" stroke="black" stroke-width="1"/>
+  <text x="1780" y="615" class="comp-label" text-anchor="middle" font-size="12">3</text>
+  <circle cx="1880" cy="610" r="18" fill="#e8e8ff" stroke="black" stroke-width="1"/>
+  <text x="1880" y="615" class="comp-label" text-anchor="middle" font-size="12">5</text>
+  <circle cx="1980" cy="610" r="18" fill="#e8e8ff" stroke="black" stroke-width="1"/>
+  <text x="1980" y="615" class="comp-label" text-anchor="middle" font-size="12">7</text>
+
+  <!-- Passenger side cylinders -->
+  <text x="1620" y="710" class="comp-detail">PASS</text>
+  <circle cx="1680" cy="720" r="18" fill="#ffe8e8" stroke="black" stroke-width="1"/>
+  <text x="1680" y="725" class="comp-label" text-anchor="middle" font-size="12">2</text>
+  <circle cx="1780" cy="720" r="18" fill="#ffe8e8" stroke="black" stroke-width="1"/>
+  <text x="1780" y="725" class="comp-label" text-anchor="middle" font-size="12">4</text>
+  <circle cx="1880" cy="720" r="18" fill="#ffe8e8" stroke="black" stroke-width="1"/>
+  <text x="1880" y="725" class="comp-label" text-anchor="middle" font-size="12">6</text>
+  <circle cx="1980" cy="720" r="18" fill="#ffe8e8" stroke="black" stroke-width="1"/>
+  <text x="1980" y="725" class="comp-label" text-anchor="middle" font-size="12">8</text>
+
+  <!-- DEL-Stributor position indicator -->
+  <rect x="2060" y="640" width="80" height="60" rx="6" ry="6" fill="#f0f0e0" stroke="black" stroke-width="1.5"/>
+  <text x="2100" y="660" class="comp-detail" text-anchor="middle" font-size="7">DEL-</text>
+  <text x="2100" y="673" class="comp-detail" text-anchor="middle" font-size="7">STRIB</text>
+  <text x="2100" y="686" class="comp-detail" text-anchor="middle" font-size="7">8 COILS</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- WIRE SUMMARY TABLE (right side, below cylinder layout)        -->
+<!-- ============================================================ -->
+<g id="wire-summary">
+  <rect x="1500" y="850" width="800" height="750" rx="4" ry="4" fill="white" stroke="#999" stroke-width="0.5"/>
+  <text x="1900" y="875" class="comp-label" text-anchor="middle" font-size="10">WIRE TABLE — PAGE 1 (16 WIRES)</text>
+  <line x1="1510" y1="882" x2="2280" y2="882" stroke="#999" stroke-width="0.5"/>
+
+  <!-- Table header -->
+  <text x="1520" y="900" class="pin-label" font-weight="bold">WIRE  PIN    FUNCTION         AWG  COLOR      LEN</text>
+  <line x1="1510" y1="907" x2="2280" y2="907" stroke="#ccc" stroke-width="0.3"/>
+
+  <!-- Ignition coil wires -->
+  <text x="1520" y="925" class="pin-label">#24   A03    IGN CYL1         20   WHT/ORG    2.5ft</text>
+  <text x="1520" y="943" class="pin-label">#9    A04    IGN CYL2         20   WHT/RED    2.5ft</text>
+  <text x="1520" y="961" class="pin-label">#5    A05    IGN CYL3         20   WHT        2.5ft</text>
+  <text x="1520" y="979" class="pin-label">#10   A06    IGN CYL4         20   WHT/BLU    2.5ft</text>
+  <text x="1520" y="997" class="pin-label">#7    A07    IGN CYL5         20   WHT/WHT    2.5ft</text>
+  <text x="1520" y="1015" class="pin-label">#11   A08    IGN CYL6         20   WHT/YEL    2.5ft</text>
+  <text x="1520" y="1033" class="pin-label">#8    A12    IGN CYL7         20   WHT/BLK    2.5ft</text>
+  <text x="1520" y="1051" class="pin-label">#12   A13    IGN CYL8         20   WHT/VIO    2.5ft</text>
+
+  <line x1="1510" y1="1062" x2="2280" y2="1062" stroke="#ccc" stroke-width="0.3"/>
+
+  <!-- Fuel injector wires -->
+  <text x="1520" y="1080" class="pin-label">#13   A19    INJ CYL1         18   GRN        4.6ft</text>
+  <text x="1520" y="1098" class="pin-label">#14   A20    INJ CYL2         18   GRN/WHT    4.6ft</text>
+  <text x="1520" y="1116" class="pin-label">#15   A21    INJ CYL3         18   GRN/BLK    4.6ft</text>
+  <text x="1520" y="1134" class="pin-label">#16   A22    INJ CYL4         18   GRN/RED    4.6ft</text>
+  <text x="1520" y="1152" class="pin-label">#17   A27    INJ CYL5         18   GRN/BLU    4.6ft</text>
+  <text x="1520" y="1170" class="pin-label">#18   A28    INJ CYL6         18   GRN/YEL    4.6ft</text>
+  <text x="1520" y="1188" class="pin-label">#19   A29    INJ CYL7         18   GRN/VIO    4.6ft</text>
+  <text x="1520" y="1206" class="pin-label">#20   A30    INJ CYL8         18   GRN/ORG    4.6ft</text>
+
+  <line x1="1510" y1="1218" x2="2280" y2="1218" stroke="#ccc" stroke-width="0.3"/>
+  <text x="1520" y="1240" class="pin-label" font-weight="bold">TOTAL: 16 wires  |  56.8 ft</text>
+  <text x="1520" y="1260" class="pin-label">IGN: 8 x 2.5ft = 20.0ft  |  INJ: 8 x 4.6ft = 36.8ft</text>
+
+  <!-- Change callout -->
+  <line x1="1510" y1="1280" x2="2280" y2="1280" stroke="#999" stroke-width="0.5"/>
+  <text x="1520" y="1300" class="note-text" font-size="9" font-weight="bold">CHANGES v1 -> v2:</text>
+  <text x="1520" y="1318" class="note-text" font-size="9">- Coil wires 4.6ft -> 2.5ft (DEL-Stributor central mount)</text>
+  <text x="1520" y="1336" class="note-text" font-size="9">- Pin assignments corrected: IGN_LS(n) = Cylinder(n)</text>
+  <text x="1520" y="1354" class="note-text" font-size="9">- Old: coils spread across valve covers</text>
+  <text x="1520" y="1372" class="note-text" font-size="9">- New: all 8 coils in single DEL-Stributor bracket</text>
+  <text x="1520" y="1390" class="note-text" font-size="9">- Net savings: 16.8ft of ignition wire</text>
+
+  <!-- Coil detail callout -->
+  <line x1="1510" y1="1410" x2="2280" y2="1410" stroke="#999" stroke-width="0.5"/>
+  <text x="1520" y="1430" class="note-text" font-size="9" font-weight="bold">D510C COIL PINOUT:</text>
+  <text x="1520" y="1448" class="note-text" font-size="9">Pin A = IC signal (individual, from M130 IGN_LS)</text>
+  <text x="1520" y="1466" class="note-text" font-size="9">Pin B = Low reference (bussed to sensor ground)</text>
+  <text x="1520" y="1484" class="note-text" font-size="9">Pin C = B+ power (bussed 16AWG from PDM30)</text>
+  <text x="1520" y="1502" class="note-text" font-size="9">Pin D = Chassis ground (bussed 16AWG to block)</text>
+
+  <text x="1520" y="1530" class="note-text" font-size="9" font-weight="bold">INJECTOR CONNECTOR: GM EV6/USCAR</text>
+  <text x="1520" y="1548" class="note-text" font-size="9">Peak-and-hold drive from M130 INJ_PH outputs</text>
+  <text x="1520" y="1566" class="note-text" font-size="9">Injector ground returns internally via M130</text>
+</g>
+
+<!-- ============================================================ -->
+<!-- TITLE BLOCK (bottom-right)                                    -->
+<!-- ============================================================ -->
+<g id="titleblock">
+  <rect x="2700" y="1900" width="600" height="160" class="title-box"/>
+  <line x1="2700" y1="1930" x2="3300" y2="1930" stroke="black" stroke-width="0.5"/>
+  <line x1="2700" y1="1960" x2="3300" y2="1960" stroke="black" stroke-width="0.5"/>
+  <line x1="2700" y1="1990" x2="3300" y2="1990" stroke="black" stroke-width="0.5"/>
+  <line x1="2700" y1="2020" x2="3300" y2="2020" stroke="black" stroke-width="0.5"/>
+
+  <text x="3000" y="1922" class="title-text" text-anchor="middle" font-size="14" font-weight="bold">NUKE LTD</text>
+  <text x="3000" y="1952" class="title-text" text-anchor="middle" font-size="12" font-weight="bold">1977 CHEVROLET K5 BLAZER</text>
+  <text x="3000" y="1982" class="title-text" text-anchor="middle" font-size="11">SECTION 2 — ENGINE (LS3)  PAGE 1 OF 2</text>
+  <text x="3000" y="2012" class="title-text" text-anchor="middle" font-size="10">IGNITION COILS (DEL-Stributor) + FUEL INJECTORS</text>
+  <text x="3000" y="2042" class="title-text" text-anchor="middle" font-size="9">DWG: NKW-K5-02-1 | REV: v2 | 2026-04-04 | MOTEC M130 GPR-LS3</text>
+  <text x="3000" y="2055" class="title-text" text-anchor="middle" font-size="7">16 wires (8 IGN + 8 INJ) | Coils: DEL-Stributor central mount</text>
+</g>
+
+</svg>

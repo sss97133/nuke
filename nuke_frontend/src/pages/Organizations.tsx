@@ -1,6 +1,6 @@
 // Organizations Directory - Investment-grade organization commodities
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/env';
 import { OrgLogo } from '../components/common/OrgLogo';
@@ -161,7 +161,6 @@ function getSignalTier(score: number): { label: string; color: string; bg: strin
 }
 
 export default function Organizations() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlSearch = searchParams.get('search') || '';
   const urlType = searchParams.get('type') || 'all';
@@ -350,13 +349,13 @@ export default function Organizations() {
             Auction houses, dealerships, shops, and collections as investable commodities
           </p>
         </div>
-        <button
-          onClick={() => navigate('/org/create')}
+        <Link
+          to="/org/create"
           className="button button-primary"
-          style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+          style={{ textDecoration: 'none', color: 'inherit', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
         >
           <Plus size={12} /> Add Organization
-        </button>
+        </Link>
       </div>
 
       {/* Market Summary Bar */}
@@ -478,7 +477,7 @@ export default function Organizations() {
           gap: '12px',
         }}>
           {displayOrgs.map(org => (
-            <OrgCard key={org.id} org={org} coverage={coverageByOrg[org.id]} onClick={() => navigate(`/org/${org.id}`)} />
+            <OrgCard key={org.id} org={org} coverage={coverageByOrg[org.id]} to={`/org/${org.id}`} />
           ))}
         </div>
       )}
@@ -487,7 +486,7 @@ export default function Organizations() {
 }
 
 /** Individual org card - investment commodity style */
-function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: OrgExtractionCoverage | null; onClick: () => void }) {
+function OrgCard({ org, coverage, to }: { org: Organization; coverage?: OrgExtractionCoverage | null; to: string }) {
   const signalScore = org.data_signal_score || 0;
   const signalTier = getSignalTier(signalScore);
   // Prefer extraction coverage count when we have it (e.g. BAT from vehicle_events), else org total
@@ -542,13 +541,14 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
   const location = [org.city, org.state].filter(Boolean).join(', ');
 
   return (
-    <div
-      onClick={onClick}
+    <Link
+      to={to}
       className="hover-lift"
       style={{
+        textDecoration: 'none',
+        color: 'inherit',
         background: 'var(--white)',
         border: '1px solid var(--border)', overflow: 'hidden',
-        cursor: 'pointer',
         transition: '0.12s',
         display: 'flex',
         flexDirection: 'column',
@@ -750,6 +750,6 @@ function OrgCard({ org, coverage, onClick }: { org: Organization; coverage?: Org
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

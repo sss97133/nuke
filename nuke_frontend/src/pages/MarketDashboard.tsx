@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useFeedSearchParams } from '../feed/hooks/useFeedSearchParams';
 import { useFeedQuery } from '../feed/hooks/useFeedQuery';
@@ -64,8 +64,6 @@ const fmtPct = (v: number | null) => {
 /* ------------------------------------------------------------------ */
 
 function MarketSegmentsStrip({ segments, loading }: { segments: MarketSegment[]; loading: boolean }) {
-  const navigate = useNavigate();
-
   if (loading) {
     return (
       <div style={{ display: 'flex', gap: 8, padding: '8px 16px', overflowX: 'auto' }}>
@@ -103,15 +101,16 @@ function MarketSegmentsStrip({ segments, loading }: { segments: MarketSegment[];
         const isUp = (seg.change_7d_pct ?? 0) > 0;
         const isDown = (seg.change_7d_pct ?? 0) < 0;
         return (
-          <button
+          <Link
             key={seg.segment_id}
-            onClick={() => navigate(`/market/segments/${seg.slug}`)}
+            to={`/market/segments/${seg.slug}`}
             style={{
+              textDecoration: 'none',
+              color: 'inherit',
               minWidth: 180,
               border: '2px solid var(--border)',
               padding: '10px 14px',
               background: 'var(--surface)',
-              cursor: 'pointer',
               textAlign: 'left',
               display: 'flex',
               flexDirection: 'column',
@@ -149,19 +148,19 @@ function MarketSegmentsStrip({ segments, loading }: { segments: MarketSegment[];
                 </span>
               )}
             </div>
-          </button>
+          </Link>
         );
       })}
 
       {/* View All card */}
-      <button
-        onClick={() => navigate('/market/segments')}
+      <Link
+        to="/market/segments"
         style={{
+          textDecoration: 'none',
           minWidth: 120,
           border: '2px dashed var(--border)',
           padding: '10px 14px',
           background: 'transparent',
-          cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -175,7 +174,7 @@ function MarketSegmentsStrip({ segments, loading }: { segments: MarketSegment[];
         }}
       >
         VIEW ALL &rarr;
-      </button>
+      </Link>
     </div>
   );
 }

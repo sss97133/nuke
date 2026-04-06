@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import OwnerAuctionDashboard from '../components/auction/OwnerAuctionDashboard';
@@ -61,7 +61,6 @@ function formatTimeRemaining(endTimeIso: string | null) {
 
 export default function AuctionListing() {
   const { listingId } = useParams();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [listing, setListing] = useState<ListingRow | null>(null);
@@ -135,7 +134,7 @@ export default function AuctionListing() {
       <div className="card" style={{ padding: '16px' }}>
         <div style={{ fontWeight: 800, marginBottom: 8 }}>Auction</div>
         <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{error || 'Not found'}</div>
-        <div style={{ marginTop: 12 }}><button className="button button-small" onClick={() => navigate('/auctions')}>Back to Auctions</button></div>
+        <div style={{ marginTop: 12 }}><Link to="/auctions" className="button button-small" style={{ textDecoration: 'none', color: 'inherit' }}>Back to Auctions</Link></div>
       </div>
     </div>
   );

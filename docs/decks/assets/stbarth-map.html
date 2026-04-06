@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>St. Barths — Why You Need a Ride</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --marsh: #4a6741;
+    --sand: #c9a96e;
+    --charcoal: #1a1a2e;
+    --bone: #f0efe9;
+    --ford-blue: #003478;
+    --fouquets-gold: #CDA73C;
+    --accent-red: #AD1B2D;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--charcoal);
+    color: #e8e4de;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .header {
+    padding: 24px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .header h1 {
+    font-size: 20px;
+    font-weight: 300;
+    letter-spacing: 1px;
+  }
+  .header h1 span { font-weight: 600; }
+  .header .subtitle {
+    font-size: 11px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--sand);
+  }
+
+  #map {
+    width: 100%;
+    height: calc(100vh - 140px);
+  }
+
+  .legend {
+    display: flex;
+    gap: 24px;
+    padding: 12px 32px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 11px;
+    letter-spacing: 1px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  /* Leaflet popup overrides */
+  .leaflet-popup-content-wrapper {
+    background: var(--charcoal) !important;
+    color: #e8e4de !important;
+    border-radius: 2px !important;
+    font-family: 'Inter', sans-serif !important;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
+  }
+  .leaflet-popup-tip { background: var(--charcoal) !important; }
+  .leaflet-popup-content {
+    margin: 12px 16px !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+  }
+  .popup-name {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+  .popup-type {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--sand);
+    margin-bottom: 6px;
+  }
+  .popup-note {
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+  }
+  .popup-drive {
+    font-size: 11px;
+    color: var(--marsh);
+    font-weight: 500;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+
+  /* Filter bar */
+  .filters {
+    display: flex;
+    gap: 8px;
+    padding: 10px 32px;
+    background: rgba(0,0,0,0.3);
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 5px 14px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-family: 'Inter', sans-serif;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #999;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: rgba(255,255,255,0.3); color: #ccc; }
+  .filter-btn.active { background: var(--marsh); border-color: var(--marsh); color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>St. Barths — <span>Why You Need a Ride</span></h1>
+  </div>
+  <div class="subtitle">Luxe Fleet</div>
+</div>
+
+<div class="filters">
+  <button class="filter-btn active" onclick="toggleFilter('all')">All</button>
+  <button class="filter-btn" onclick="toggleFilter('beach')">Beaches</button>
+  <button class="filter-btn" onclick="toggleFilter('hotel')">Hotels</button>
+  <button class="filter-btn" onclick="toggleFilter('restaurant')">Restaurants</button>
+  <button class="filter-btn" onclick="toggleFilter('club')">Clubs</button>
+  <button class="filter-btn" onclick="toggleFilter('shop')">Shopping</button>
+  <button class="filter-btn" onclick="toggleFilter('ops')">Operations</button>
+  <button class="filter-btn" onclick="toggleFilter('rental')">Rental Cos</button>
+</div>
+
+<div id="map"></div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#4ECDC4;"></div> Beaches</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#CDA73C;"></div> Hotels</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#E85D75;"></div> Restaurants</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#9B59B6;"></div> Clubs</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#F39C12;"></div> Shopping</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#003478;"></div> Operations</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#E74C3C;"></div> Rental Cos</div>
+  <div class="legend-item" style="margin-left:auto;color:#666;">Every pin = a reason to drive. No Uber. No taxi app. No public transit.</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// --- Map setup ---
+const map = L.map('map', {
+  center: [17.9035, -62.834],
+  zoom: 14.5,
+  zoomControl: false,
+  attributionControl: false
+});
+
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// Dark tile layer
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 19
+}).addTo(map);
+
+// --- Color config ---
+const colors = {
+  beach: '#4ECDC4',
+  hotel: '#CDA73C',
+  restaurant: '#E85D75',
+  club: '#9B59B6',
+  shop: '#F39C12',
+  ops: '#003478',
+  rental: '#E74C3C'
+};
+
+function makeIcon(color, size) {
+  return L.divIcon({
+    className: 'custom-pin',
+    html: `<div style="width:${size}px;height:${size}px;background:${color};border-radius:50%;border:2px solid rgba(255,255,255,0.6);box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2]
+  });
+}
+
+// --- POI Data ---
+const pois = [
+  // BEACHES — the reason you drive
+  { name: "Shell Beach", type: "beach", lat: 17.8955, lng: -62.8535, note: "Walking distance from Gustavia. Iconic sunset spot.", drive: "2 min from Gustavia" },
+  { name: "St. Jean Beach", type: "beach", lat: 17.9050, lng: -62.8320, note: "The main beach. Eden Rock overlooks it. Plane spotting.", drive: "5 min from Gustavia" },
+  { name: "Gouverneur Beach", type: "beach", lat: 17.8880, lng: -62.8365, note: "Steep access road. No facilities. The most beautiful beach.", drive: "8 min, steep hill road" },
+  { name: "Grande Saline", type: "beach", lat: 17.8870, lng: -62.8228, note: "Clothing optional. Long flat beach. Salt pond behind.", drive: "10 min + 10 min walk" },
+  { name: "Colombier Beach", type: "beach", lat: 17.9190, lng: -62.8688, note: "Hike-in or boat-in only. Untouched. Worth it.", drive: "15 min to trailhead, then 25 min hike" },
+  { name: "Flamands Beach", type: "beach", lat: 17.9160, lng: -62.8550, note: "Wide sand, big waves. Cheval Blanc is here.", drive: "10 min from Gustavia" },
+  { name: "Grand Cul-de-Sac", type: "beach", lat: 17.9120, lng: -62.8100, note: "Lagoon. Kite + windsurf. Le Barthelemy + Guanahani.", drive: "12 min, opposite side of island" },
+  { name: "Lorient Beach", type: "beach", lat: 17.9080, lng: -62.8220, note: "Local vibe. Surfers. Less crowded.", drive: "8 min from Gustavia" },
+  { name: "Anse des Cayes", type: "beach", lat: 17.9120, lng: -62.8420, note: "Surf break. Manapany hotel nearby.", drive: "7 min" },
+  { name: "Toiny Beach", type: "beach", lat: 17.8940, lng: -62.8060, note: "Wild Atlantic side. Le Toiny hotel. Strong currents.", drive: "15 min, winding coast road" },
+  { name: "Petit Cul-de-Sac", type: "beach", lat: 17.9050, lng: -62.8140, note: "Quiet. Residential area.", drive: "12 min" },
+  { name: "Corossol Beach", type: "beach", lat: 17.9040, lng: -62.8550, note: "Fishing village. Traditional SBH.", drive: "5 min" },
+  { name: "Anse du Grand Galet", type: "beach", lat: 17.8915, lng: -62.8440, note: "Also called Shell Beach South. Rocks + shells.", drive: "3 min from Gustavia" },
+  { name: "Marigot Beach", type: "beach", lat: 17.9100, lng: -62.8170, note: "Tiny, hidden. Between Lorient and GCdS.", drive: "10 min" },
+
+  // HOTELS — where the guests are
+  { name: "Fouquet's St Barth (Le Carl Gustaf)", type: "hotel", lat: 17.8968, lng: -62.8510, note: "Hotels Barriere. Shell Beach overlook. Lou Lou Beach Club. THE Luxe Fleet partner.", drive: "In Gustavia — but guests need to get everywhere else" },
+  { name: "Eden Rock", type: "hotel", lat: 17.9050, lng: -62.8325, note: "Oetker Collection. St. Jean Beach. Currently uses Minis/Mokes for guests.", drive: "5 min from Gustavia. L'Agence target for Bronco placement." },
+  { name: "Cheval Blanc", type: "hotel", lat: 17.9155, lng: -62.8540, note: "LVMH. Anse des Flamands. Would never partner with Ford. But their guests still need cars.", drive: "10 min from Gustavia" },
+  { name: "Le Barthelemy", type: "hotel", lat: 17.9130, lng: -62.8105, note: "Grand Cul-de-Sac. Offers Mini Coopers to guests. Direct competitor to Luxe Fleet concept.", drive: "12 min, opposite coast" },
+  { name: "Hotel Le Toiny", type: "hotel", lat: 17.8935, lng: -62.8055, note: "Most expensive on-island. 15 suites. Remote southeast coast.", drive: "15 min, winding road" },
+  { name: "Rosewood Le Guanahani", type: "hotel", lat: 17.9140, lng: -62.8130, note: "Grand Cul-de-Sac. Recently Rosewood-branded.", drive: "12 min" },
+  { name: "Manapany", type: "hotel", lat: 17.9095, lng: -62.8400, note: "Anse des Cayes. Boutique. Surf-adjacent.", drive: "7 min" },
+  { name: "Villa Marie", type: "hotel", lat: 17.9165, lng: -62.8630, note: "Colombier hillside. Small luxury.", drive: "12 min" },
+  { name: "Christopher Hotel", type: "hotel", lat: 17.9110, lng: -62.8200, note: "Pointe Milou. Bay views.", drive: "8 min" },
+  { name: "Hotel Taiwana", type: "hotel", lat: 17.9155, lng: -62.8535, note: "Flamands. Intimate.", drive: "10 min" },
+
+  // RESTAURANTS — dinner requires a car
+  { name: "Bonito", type: "restaurant", lat: 17.8972, lng: -62.8500, note: "Gustavia harbor views. High-end. Reservation essential.", drive: "Central Gustavia" },
+  { name: "Maya's", type: "restaurant", lat: 17.8945, lng: -62.8490, note: "Creole + French. Public/Gustavia waterfront. Institution.", drive: "Gustavia harbor" },
+  { name: "Bagatelle", type: "restaurant", lat: 17.8960, lng: -62.8505, note: "Gustavia. Party restaurant. Late night.", drive: "Central Gustavia" },
+  { name: "Shellona", type: "restaurant", lat: 17.8958, lng: -62.8530, note: "Shell Beach. Greek-Mediterranean. Sunset.", drive: "Shell Beach, 2 min" },
+  { name: "L'Isola", type: "restaurant", lat: 17.8965, lng: -62.8495, note: "Italian. Gustavia harbor.", drive: "Central Gustavia" },
+  { name: "Tamarin", type: "restaurant", lat: 17.8930, lng: -62.8260, note: "Near Saline. Garden setting. French Creole.", drive: "10 min from Gustavia" },
+  { name: "Le Ti St Barth", type: "restaurant", lat: 17.9095, lng: -62.8215, note: "Pointe Milou. Cabaret dinner show. The wildest night.", drive: "8 min" },
+  { name: "Orega", type: "restaurant", lat: 17.8970, lng: -62.8500, note: "Japanese. Gustavia.", drive: "Central Gustavia" },
+  { name: "Black Ginger", type: "restaurant", lat: 17.8962, lng: -62.8502, note: "Thai. Gustavia.", drive: "Central Gustavia" },
+  { name: "La Petite Plage", type: "restaurant", lat: 17.9125, lng: -62.8108, note: "Grand Cul-de-Sac. Waterfront.", drive: "12 min" },
+  { name: "L'Esprit", type: "restaurant", lat: 17.8928, lng: -62.8260, note: "Saline area. Jean-Claude Dufour. Fine dining.", drive: "10 min" },
+  { name: "Gyp Sea", type: "restaurant", lat: 17.8952, lng: -62.8535, note: "Shell Beach. Casual feet-in-sand.", drive: "Shell Beach, 2 min" },
+  { name: "On the Rocks (Eden Rock)", type: "restaurant", lat: 17.9048, lng: -62.8320, note: "At Eden Rock. St. Jean Beach. Celebrity scene.", drive: "5 min" },
+  { name: "Aux Amis", type: "restaurant", lat: 17.9118, lng: -62.8095, note: "Grand Cul-de-Sac lagoon. Le Guanahani.", drive: "12 min" },
+
+  // CLUBS & NIGHTLIFE
+  { name: "Nikki Beach", type: "club", lat: 17.9058, lng: -62.8340, note: "St. Jean. Day club → night. The scene.", drive: "5 min from Gustavia" },
+  { name: "Lou Lou Beach Club", type: "club", lat: 17.8960, lng: -62.8525, note: "NEW. Fouquet's / Carl Gustaf. Shell Beach. Luxe Fleet activation venue.", drive: "In Gustavia, at Fouquet's" },
+
+  // SHOPPING
+  { name: "Gustavia — Luxury Shopping", type: "shop", lat: 17.8960, lng: -62.8498, note: "Hermes, Cartier, Louis Vuitton, Chopard, Bulgari. Duty-free.", drive: "Central Gustavia" },
+  { name: "St. Jean Shopping", type: "shop", lat: 17.9058, lng: -62.8345, note: "Villa Creole, Les Galeries. More casual.", drive: "5 min" },
+  { name: "Ligne St Barth", type: "shop", lat: 17.9082, lng: -62.8225, note: "Lorient. Iconic SBH beauty brand. Factory/shop.", drive: "8 min" },
+
+  // OPERATIONS — Luxe Fleet infrastructure
+  { name: "FBM Automobiles", type: "ops", lat: 17.9040, lng: -62.8440, note: "Airport-front. Full-service garage + dealership since 1994. Luxe Fleet operations hub.", drive: "AT the airport. First thing every visitor sees." },
+  { name: "SBH Airport (Gustaf III)", type: "ops", lat: 17.9035, lng: -62.8435, note: "Famous short runway. Commercial (Winair, St Barth Commuter) + private jets.", drive: "Where it all starts" },
+  { name: "Gustavia Harbor", type: "ops", lat: 17.8950, lng: -62.8500, note: "Superyacht marina. Bucket Regatta base. Customs/port authority.", drive: "Gustavia center" },
+
+  // RENTAL COMPANIES — the competition
+  { name: "Cool Rental St Barth", type: "rental", lat: 17.9045, lng: -62.8328, note: "Chinese electric dune buggies, Mokes. The 'fun' option. No real vehicle.", drive: "St. Jean area" },
+  { name: "TopLoc", type: "rental", lat: 17.9042, lng: -62.8445, note: "Near airport. Standard fleet: Jimny, Dacia, Smart.", drive: "Airport area" },
+  { name: "Turbe Car Rental", type: "rental", lat: 17.9038, lng: -62.8448, note: "Airport. Similar fleet to TopLoc.", drive: "Airport area" },
+  { name: "GTA (Gumbs Tourisme Auto)", type: "rental", lat: 17.9035, lng: -62.8432, note: "Airport. One of the larger operators.", drive: "Airport area" },
+  { name: "Maurice Car Rental", type: "rental", lat: 17.9030, lng: -62.8428, note: "Gustavia area. Mini Coopers available.", drive: "Gustavia" },
+  { name: "Barthloc", type: "rental", lat: 17.9048, lng: -62.8335, note: "St. Jean. Jimnys, Smarts, some Jeeps.", drive: "St. Jean" }
+];
+
+// --- Create markers ---
+const layers = {};
+Object.keys(colors).forEach(type => { layers[type] = L.layerGroup().addTo(map); });
+
+pois.forEach(poi => {
+  const size = (poi.type === 'ops') ? 14 : (poi.type === 'hotel') ? 12 : 10;
+  const marker = L.marker([poi.lat, poi.lng], {
+    icon: makeIcon(colors[poi.type], size)
+  });
+
+  let popup = `<div class="popup-type">${poi.type}</div>`;
+  popup += `<div class="popup-name">${poi.name}</div>`;
+  if (poi.note) popup += `<div>${poi.note}</div>`;
+  if (poi.drive) popup += `<div class="popup-drive">${poi.drive}</div>`;
+
+  marker.bindPopup(popup, { maxWidth: 280 });
+  marker.addTo(layers[poi.type]);
+});
+
+// --- Filter logic ---
+let activeFilter = 'all';
+function toggleFilter(type) {
+  activeFilter = type;
+  document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+
+  Object.keys(layers).forEach(layerType => {
+    if (type === 'all' || type === layerType) {
+      map.addLayer(layers[layerType]);
+    } else {
+      map.removeLayer(layers[layerType]);
+    }
+  });
+}
+
+// --- Add "No Uber" callout ---
+const noUber = L.control({ position: 'topleft' });
+noUber.onAdd = function() {
+  const div = L.DomUtil.create('div');
+  div.innerHTML = `
+    <div style="background:rgba(26,26,46,0.92);padding:16px 20px;border:1px solid rgba(255,255,255,0.1);max-width:260px;font-family:Inter,sans-serif;margin:10px;">
+      <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#c9a96e;margin-bottom:8px;">The Island Reality</div>
+      <div style="font-size:14px;font-weight:600;color:#e8e4de;margin-bottom:6px;">No Uber. No Lyft. No taxi app.</div>
+      <div style="font-size:12px;color:#999;line-height:1.5;">14 beaches. 50+ restaurants. 1 road. 25 sq km of steep hills and hairpin turns. Every guest needs a vehicle. The question is: what vehicle?</div>
+    </div>
+  `;
+  return div;
+};
+noUber.addTo(map);
+
+// --- Distance scale ---
+L.control.scale({ position: 'bottomleft', imperial: true, metric: true }).addTo(map);
+</script>
+
+</body>
+</html>

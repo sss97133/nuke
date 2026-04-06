@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <title>I-02 Pressure Transducer</title>
+  <desc>Pressure transducer symbol. Circle with internal diaphragm element (curved line) and pressure arrow. Used for oil pressure sensor (ECU), MAP sensor, fuel pressure sensor, and A/C pressure switches. 6mm diameter per spec.</desc>
+
+  <!-- Sensor circle -->
+  <circle cx="20" cy="20" r="12" fill="white" stroke="black" stroke-width="1.5"/>
+
+  <!-- Diaphragm element (curved line) -->
+  <path d="M13 20 Q20 12, 27 20" fill="none" stroke="black" stroke-width="1.2" stroke-linecap="round"/>
+
+  <!-- Pressure arrow (pointing down at diaphragm) -->
+  <line x1="20" y1="26" x2="20" y2="15" stroke="black" stroke-width="1" stroke-linecap="round"/>
+  <polygon points="20,15 18,18 22,18" fill="black" stroke="none"/>
+
+  <!-- P label -->
+  <text x="20" y="30" font-family="Courier New, monospace" font-size="5" font-weight="bold" fill="black" text-anchor="middle">P</text>
+
+  <!-- Top terminal lead -->
+  <line x1="20" y1="2" x2="20" y2="8" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Bottom terminal lead -->
+  <line x1="20" y1="32" x2="20" y2="38" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

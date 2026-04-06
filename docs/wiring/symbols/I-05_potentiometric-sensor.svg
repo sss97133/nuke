@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <title>I-05 Potentiometric Sensor (TPS)</title>
+  <desc>Position sensor (potentiometric) symbol. Resistor body with wiper arrow, 3 terminals (5V ref, signal/wiper, ground). Used for throttle position sensor (integrated in throttle body) and fuel level sender. 6mm x 4mm per spec.</desc>
+
+  <!-- Resistor body -->
+  <rect x="8" y="14" width="24" height="12" rx="1" ry="1" fill="white" stroke="black" stroke-width="1.5"/>
+
+  <!-- Resistor element (zigzag inside) -->
+  <polyline points="10,20 12,16 15,24 18,16 21,24 24,16 27,24 30,20" fill="none" stroke="black" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Wiper arrow (from top, pointing into resistor body) -->
+  <line x1="20" y1="4" x2="20" y2="14" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+  <polygon points="20,14 18,10 22,10" fill="black" stroke="none"/>
+
+  <!-- Terminal 1: 5V ref (left) -->
+  <line x1="8" y1="20" x2="2" y2="20" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Terminal 3: Ground (right) -->
+  <line x1="32" y1="20" x2="38" y2="20" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Pin labels -->
+  <text x="3" y="18" font-family="Courier New, monospace" font-size="3.5" fill="black" text-anchor="middle">5V</text>
+  <text x="20" y="3" font-family="Courier New, monospace" font-size="3.5" fill="black" text-anchor="middle">SIG</text>
+  <text x="37" y="18" font-family="Courier New, monospace" font-size="3.5" fill="black" text-anchor="middle">GND</text>
+</svg>

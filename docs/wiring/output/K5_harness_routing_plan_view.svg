@@ -1,0 +1,400 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4200 1800" width="4200" height="1800">
+<defs>
+  <style>
+    .frame { fill: none; stroke: #666; stroke-width: 3; }
+    .frame-x { fill: none; stroke: #888; stroke-width: 2; }
+    .body { fill: none; stroke: #AAA; stroke-width: 1.5; stroke-dasharray: 8,4; }
+    .firewall { stroke: #C00; stroke-width: 2.5; stroke-dasharray: 6,3; }
+    .comp { stroke: #000; stroke-width: 1.5; }
+    .comp-ecu { fill: rgba(200,0,0,0.15); stroke: #C00; stroke-width: 2; }
+    .comp-pdm { fill: rgba(0,100,200,0.12); stroke: #06C; stroke-width: 2; }
+    .comp-sensor { fill: rgba(102,0,170,0.2); stroke: #60A; stroke-width: 1.5; }
+    .comp-light { fill: rgba(255,200,0,0.2); stroke: #DA0; stroke-width: 1.5; }
+    .comp-motor { fill: rgba(0,150,0,0.15); stroke: #080; stroke-width: 1.5; }
+    .comp-power { fill: rgba(200,0,0,0.12); stroke: #C00; stroke-width: 1.5; }
+    .comp-audio { fill: rgba(0,150,200,0.15); stroke: #09C; stroke-width: 1.5; }
+    .trunk-engine { stroke: #C00; stroke-width: 4; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .trunk-front { stroke: #DA0; stroke-width: 3.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .trunk-rear { stroke: #06C; stroke-width: 3.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .trunk-dash { stroke: #080; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .trunk-power { stroke: #C00; stroke-width: 5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .trunk-can { stroke: #F60; stroke-width: 2; fill: none; stroke-dasharray: 4,2; }
+    .trunk-audio { stroke: #09C; stroke-width: 2.5; fill: none; stroke-linecap: round; }
+    .branch { stroke-width: 2; fill: none; stroke-linecap: round; }
+    .junction { fill: #333; stroke: #000; stroke-width: 1.5; }
+    .grommet { fill: rgba(100,100,100,0.4); stroke: #444; stroke-width: 2; }
+    .lbl { font-family: 'Courier New', monospace; font-size: 11px; }
+    .lbl-sm { font-family: 'Courier New', monospace; font-size: 9px; fill: #555; }
+    .lbl-comp { font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; }
+    .lbl-zone { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; fill: #888; }
+    .title { font-family: Arial, sans-serif; font-weight: bold; }
+    .dim { font-family: 'Courier New', monospace; font-size: 8px; fill: #999; }
+  </style>
+  <marker id="dot" markerWidth="6" markerHeight="6" refX="3" refY="3"><circle cx="3" cy="3" r="2.5" fill="#333"/></marker>
+</defs>
+
+<!-- Background -->
+<rect width="4200" height="1800" fill="#FAFAFA"/>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- LAYER 0: FRAME (plan view, 168.86" overall)     -->
+<!-- Scale: 20px per inch. Frame centered vertically -->
+<!-- Front = LEFT, Rear = RIGHT                      -->
+<!-- Driver = TOP, Passenger = BOTTOM                -->
+<!-- ═══════════════════════════════════════════════ -->
+<g id="frame" transform="translate(200, 500)">
+  <!-- Frame rails (32.88" apart at front, tapering) -->
+  <!-- Using 20px/inch scale, overall = 3377px -->
+
+  <!-- Driver rail (top) -->
+  <polyline points="0,0 200,0 2700,0 3100,-20 3377,-20" class="frame"/>
+  <!-- Passenger rail (bottom) -->
+  <polyline points="0,320 200,320 2700,320 3100,340 3377,340" class="frame"/>
+
+  <!-- Crossmembers -->
+  <!-- Front crossmember (radiator support) x=0 -->
+  <line x1="0" y1="0" x2="0" y2="320" class="frame-x"/>
+  <text x="0" y="-10" text-anchor="middle" class="dim">RADIATOR SUPPORT</text>
+
+  <!-- Engine crossmember x=330 (16.50") -->
+  <line x1="330" y1="0" x2="330" y2="320" class="frame-x"/>
+
+  <!-- Transmission crossmember x=945 (47.24") -->
+  <line x1="945" y1="40" x2="945" y2="280" class="frame-x"/>
+  <text x="945" y="170" text-anchor="middle" class="dim">TRANS XM</text>
+
+  <!-- Front cab mount x=768 (38.40") -->
+  <rect x="755" y="-15" width="26" height="14" rx="3" fill="#888" opacity="0.4"/>
+  <rect x="755" y="321" width="26" height="14" rx="3" fill="#888" opacity="0.4"/>
+
+  <!-- Rear cab mount x=1229 (61.49") -->
+  <rect x="1216" y="-15" width="26" height="14" rx="3" fill="#888" opacity="0.4"/>
+  <rect x="1216" y="321" width="26" height="14" rx="3" fill="#888" opacity="0.4"/>
+
+  <!-- Center crossmember x=1229 -->
+  <line x1="1229" y1="40" x2="1229" y2="280" class="frame-x"/>
+
+  <!-- Rear axle x=2080 (104.00" wheelbase) -->
+  <line x1="2080" y1="-30" x2="2080" y2="350" stroke="#888" stroke-width="3"/>
+  <text x="2080" y="-40" text-anchor="middle" class="dim">REAR AXLE (104" WB)</text>
+
+  <!-- Rear crossmember x=2760 -->
+  <line x1="2760" y1="-20" x2="2760" y2="340" class="frame-x"/>
+
+  <!-- Spare tire crossmember x=3100 -->
+  <line x1="3100" y1="-20" x2="3100" y2="340" class="frame-x"/>
+
+  <!-- Front axle indicator -->
+  <line x1="200" y1="-30" x2="200" y2="350" stroke="#888" stroke-width="3"/>
+  <text x="200" y="-40" text-anchor="middle" class="dim">FRONT AXLE</text>
+
+  <!-- Body outline (dashed) -->
+  <rect x="-80" y="-120" width="1500" height="560" rx="40" class="body"/>
+  <text x="670" y="-130" text-anchor="middle" class="lbl-zone">CAB / BODY</text>
+
+  <!-- Engine bay outline -->
+  <rect x="-80" y="-80" width="800" height="480" rx="10" stroke="#AAA" stroke-width="1" stroke-dasharray="4,4" fill="none"/>
+  <text x="320" y="-90" text-anchor="middle" class="lbl-zone">ENGINE BAY</text>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- FIREWALL — the critical boundary                -->
+  <!-- x=700 (~35" from front of frame)                -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <line x1="700" y1="-100" x2="700" y2="420" class="firewall"/>
+  <text x="700" y="-110" text-anchor="middle" class="title" font-size="13" fill="#C00">FIREWALL</text>
+
+  <!-- Firewall grommets (4 penetration points) -->
+  <circle cx="700" cy="60" r="14" class="grommet"/>
+  <text x="720" y="55" class="lbl-sm" fill="#C00">H1 ENGINE</text>
+  <text x="720" y="67" class="lbl-sm" fill="#C00">33 wires</text>
+
+  <circle cx="700" cy="130" r="10" class="grommet"/>
+  <text x="720" y="125" class="lbl-sm" fill="#C00">H2 POWER</text>
+  <text x="720" y="137" class="lbl-sm" fill="#C00">6AWG+16AWG</text>
+
+  <circle cx="700" cy="200" r="10" class="grommet"/>
+  <text x="720" y="195" class="lbl-sm" fill="#C00">H3 A/C</text>
+
+  <circle cx="700" cy="270" r="10" class="grommet"/>
+  <text x="720" y="265" class="lbl-sm" fill="#C00">H4 HEATER</text>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- LAYER 1: COMPONENTS at physical positions       -->
+  <!-- ═══════════════════════════════════════════════ -->
+
+  <!-- === FIREWALL COMPONENTS (x=730-820) === -->
+
+  <!-- M130 ECU — passenger side firewall -->
+  <rect x="730" y="200" width="80" height="55" rx="4" class="comp-ecu"/>
+  <text x="770" y="222" text-anchor="middle" class="lbl-comp" fill="#C00">M130</text>
+  <text x="770" y="235" text-anchor="middle" class="lbl-sm" fill="#C00">ECU</text>
+  <text x="770" y="248" text-anchor="middle" class="lbl-sm" fill="#C00">60 pins</text>
+
+  <!-- PDM30 — next to M130 -->
+  <rect x="730" y="120" width="80" height="55" rx="4" class="comp-pdm"/>
+  <text x="770" y="142" text-anchor="middle" class="lbl-comp" fill="#06C">PDM30</text>
+  <text x="770" y="155" text-anchor="middle" class="lbl-sm" fill="#06C">PDM</text>
+  <text x="770" y="168" text-anchor="middle" class="lbl-sm" fill="#06C">61 pins</text>
+
+  <!-- CAN bus between M130 and PDM30 -->
+  <line x1="770" y1="175" x2="770" y2="200" class="trunk-can" stroke-width="3"/>
+  <text x="815" y="192" class="lbl-sm" fill="#F60">CAN 120Ω</text>
+
+  <!-- === ENGINE BAY COMPONENTS === -->
+
+  <!-- DEL-Stributor (coils) — center-rear of engine near firewall -->
+  <rect x="550" y="120" width="70" height="70" rx="6" class="comp-ecu"/>
+  <text x="585" y="150" text-anchor="middle" class="lbl-comp" fill="#C00">DEL-</text>
+  <text x="585" y="163" text-anchor="middle" class="lbl-comp" fill="#C00">STRIB</text>
+  <text x="585" y="178" text-anchor="middle" class="lbl-sm" fill="#C00">8 COILS</text>
+
+  <!-- Injectors driver side (4) -->
+  <g transform="translate(300, 50)">
+    <rect x="0" y="0" width="200" height="22" rx="3" fill="rgba(0,136,0,0.15)" stroke="#080" stroke-width="1"/>
+    <text x="100" y="15" text-anchor="middle" class="lbl-sm" fill="#080">INJ 1,3,5,7 (DRIVER FUEL RAIL)</text>
+  </g>
+
+  <!-- Injectors passenger side (4) -->
+  <g transform="translate(300, 248)">
+    <rect x="0" y="0" width="200" height="22" rx="3" fill="rgba(0,136,0,0.15)" stroke="#080" stroke-width="1"/>
+    <text x="100" y="15" text-anchor="middle" class="lbl-sm" fill="#080">INJ 2,4,6,8 (PASS FUEL RAIL)</text>
+  </g>
+
+  <!-- Throttle body — top of intake -->
+  <circle cx="400" cy="160" r="18" fill="rgba(255,102,0,0.15)" stroke="#F60" stroke-width="1.5"/>
+  <text x="400" y="155" text-anchor="middle" class="lbl-comp" fill="#F60">ETB</text>
+  <text x="400" y="168" text-anchor="middle" class="lbl-sm" fill="#F60">6-PIN</text>
+
+  <!-- MAP sensor -->
+  <polygon points="450,130 460,140 450,150 440,140" class="comp-sensor"/>
+  <text x="465" y="144" class="lbl-sm" fill="#60A">MAP</text>
+
+  <!-- IAT sensor -->
+  <polygon points="350,140 360,150 350,160 340,150" class="comp-sensor"/>
+  <text x="330" y="170" class="lbl-sm" fill="#60A">IAT</text>
+
+  <!-- Coolant temp — driver side front -->
+  <polygon points="250,80 260,90 250,100 240,90" class="comp-sensor"/>
+  <text x="225" y="75" class="lbl-sm" fill="#60A">CLT</text>
+
+  <!-- Oil pressure — driver side rear -->
+  <polygon points="500,80 510,90 500,100 490,90" class="comp-sensor"/>
+  <text x="515" y="95" class="lbl-sm" fill="#60A">OPS</text>
+
+  <!-- Oil temp — bottom of block -->
+  <polygon points="400,280 410,290 400,300 390,290" class="comp-sensor"/>
+  <text x="415" y="295" class="lbl-sm" fill="#60A">OTS</text>
+
+  <!-- Fuel pressure — on fuel rail -->
+  <polygon points="480,180 490,190 480,200 470,190" class="comp-sensor"/>
+  <text x="495" y="195" class="lbl-sm" fill="#60A">FPS</text>
+
+  <!-- Crank sensor — rear of block -->
+  <polygon points="600,280 610,290 600,300 590,290" class="comp-sensor"/>
+  <text x="615" y="295" class="lbl-sm" fill="#60A">CKP</text>
+
+  <!-- Cam sensor — front of engine -->
+  <polygon points="200,160 210,170 200,180 190,170" class="comp-sensor"/>
+  <text x="175" y="175" class="lbl-sm" fill="#60A">CMP</text>
+
+  <!-- Knock sensors — both sides of block in valley -->
+  <polygon points="420,100 430,110 420,120 410,110" class="comp-sensor"/>
+  <text x="435" y="115" class="lbl-sm" fill="#60A">KS1</text>
+  <polygon points="420,210 430,220 420,230 410,220" class="comp-sensor"/>
+  <text x="435" y="225" class="lbl-sm" fill="#60A">KS2</text>
+
+  <!-- Alternator — front driver side -->
+  <circle cx="150" cy="60" r="20" class="comp-power"/>
+  <text x="150" y="55" text-anchor="middle" class="lbl-comp" fill="#C00">ALT</text>
+  <text x="150" y="68" text-anchor="middle" class="lbl-sm" fill="#C00">220A</text>
+
+  <!-- Starter — passenger side rear -->
+  <circle cx="580" cy="300" r="16" class="comp-power"/>
+  <text x="580" y="304" text-anchor="middle" class="lbl-comp" fill="#C00">STRT</text>
+
+  <!-- Battery — passenger side -->
+  <rect x="100" y="250" width="50" height="35" rx="3" class="comp-power"/>
+  <text x="125" y="268" text-anchor="middle" class="lbl-comp" fill="#C00">BATT</text>
+  <text x="125" y="280" text-anchor="middle" class="lbl-sm" fill="#C00">GRP34</text>
+
+  <!-- Radiator fans -->
+  <circle cx="60" cy="120" r="28" fill="rgba(0,150,200,0.1)" stroke="#09C" stroke-width="1"/>
+  <circle cx="60" cy="200" r="28" fill="rgba(0,150,200,0.1)" stroke="#09C" stroke-width="1"/>
+  <text x="60" y="124" text-anchor="middle" class="lbl-sm" fill="#09C">FAN1</text>
+  <text x="60" y="204" text-anchor="middle" class="lbl-sm" fill="#09C">FAN2</text>
+
+  <!-- === FRONT LIGHTING === -->
+  <circle cx="-40" cy="30" r="14" class="comp-light"/>
+  <text x="-40" y="34" text-anchor="middle" class="lbl-sm" fill="#DA0">HL-L</text>
+
+  <circle cx="-40" cy="290" r="14" class="comp-light"/>
+  <text x="-40" y="294" text-anchor="middle" class="lbl-sm" fill="#DA0">HL-R</text>
+
+  <rect x="-60" y="60" width="16" height="10" rx="2" class="comp-light"/>
+  <text x="-80" y="70" class="lbl-sm" fill="#DA0">PK-L</text>
+
+  <rect x="-60" y="250" width="16" height="10" rx="2" class="comp-light"/>
+  <text x="-80" y="260" class="lbl-sm" fill="#DA0">PK-R</text>
+
+  <!-- === REAR COMPONENTS === -->
+
+  <!-- Tail lights -->
+  <rect x="2900" y="-50" width="30" height="20" rx="3" class="comp-light"/>
+  <text x="2915" y="-35" text-anchor="middle" class="lbl-sm" fill="#DA0">TL-L</text>
+
+  <rect x="2900" y="350" width="30" height="20" rx="3" class="comp-light"/>
+  <text x="2915" y="365" text-anchor="middle" class="lbl-sm" fill="#DA0">TL-R</text>
+
+  <!-- License plate light -->
+  <rect x="3050" y="150" width="24" height="14" rx="2" class="comp-light"/>
+  <text x="3062" y="145" text-anchor="middle" class="lbl-sm" fill="#DA0">LIC</text>
+
+  <!-- Third brake light -->
+  <rect x="2800" y="150" width="24" height="14" rx="2" class="comp-light"/>
+  <text x="2812" y="145" text-anchor="middle" class="lbl-sm" fill="#DA0">3RD</text>
+
+  <!-- Fuel pump — under rear body -->
+  <circle cx="2400" cy="260" r="14" class="comp-motor"/>
+  <text x="2400" y="264" text-anchor="middle" class="lbl-sm" fill="#080">PUMP</text>
+
+  <!-- Fuel sender -->
+  <polygon points="2400,120 2410,130 2400,140 2390,130" class="comp-sensor"/>
+  <text x="2415" y="135" class="lbl-sm" fill="#60A">FUEL</text>
+
+  <!-- AMP Research steps -->
+  <rect x="900" y="-60" width="600" height="12" rx="3" fill="rgba(0,150,0,0.1)" stroke="#080" stroke-width="1"/>
+  <text x="1200" y="-65" text-anchor="middle" class="lbl-sm" fill="#080">AMP RESEARCH STEP — DRIVER</text>
+  <rect x="900" y="368" width="600" height="12" rx="3" fill="rgba(0,150,0,0.1)" stroke="#080" stroke-width="1"/>
+  <text x="1200" y="395" text-anchor="middle" class="lbl-sm" fill="#080">AMP RESEARCH STEP — PASSENGER</text>
+
+  <!-- O2 sensors — on exhaust behind engine -->
+  <polygon points="650,50 660,60 650,70 640,60" class="comp-sensor"/>
+  <text x="665" y="55" class="lbl-sm" fill="#60A">O2-1</text>
+  <polygon points="650,260 660,270 650,280 640,270" class="comp-sensor"/>
+  <text x="665" y="265" class="lbl-sm" fill="#60A">O2-2</text>
+
+  <!-- LTCD controller — on firewall near PDM -->
+  <rect x="730" y="60" width="50" height="30" rx="3" fill="rgba(255,102,0,0.12)" stroke="#F60" stroke-width="1.5"/>
+  <text x="755" y="80" text-anchor="middle" class="lbl-sm" fill="#F60">LTCD</text>
+
+  <!-- VSS — at transfer case -->
+  <polygon points="950" y="220 960,230 950,240 940,230" class="comp-sensor"/>
+  <text x="965" y="235" class="lbl-sm" fill="#60A">VSS</text>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- LAYER 2: HARNESS TRUNKS (the wire routes)       -->
+  <!-- ═══════════════════════════════════════════════ -->
+
+  <!-- ENGINE LOOM (red): M130 → through H1 → across engine -->
+  <polyline points="730,230 700,60 620,60 585,120" class="trunk-engine"/>
+  <!-- Branch to driver injectors -->
+  <polyline points="620,60 500,55 300,55" class="branch" stroke="#080" stroke-width="2"/>
+  <!-- Branch to passenger injectors -->
+  <polyline points="620,80 500,255 300,255" class="branch" stroke="#080" stroke-width="2"/>
+  <!-- Branch to sensors along block -->
+  <polyline points="585,160 500,160 400,160" class="branch" stroke="#60A" stroke-width="1.5"/>
+  <!-- Branch to front sensors -->
+  <polyline points="400,160 300,160 200,165" class="branch" stroke="#60A" stroke-width="1.5"/>
+  <!-- Branch to rear sensors (CKP) -->
+  <polyline points="585,170 600,250 600,280" class="branch" stroke="#60A" stroke-width="1.5"/>
+  <!-- Branch to knock sensors -->
+  <polyline points="450,160 420,110" class="branch" stroke="#60A" stroke-width="1.5"/>
+  <polyline points="450,160 420,220" class="branch" stroke="#60A" stroke-width="1.5"/>
+
+  <!-- FRONT LIGHTING LOOM (yellow): PDM → through firewall → to radiator support → L/R -->
+  <polyline points="730,140 700,60 200,40 0,40" class="trunk-front"/>
+  <polyline points="0,40 -40,30" class="branch" stroke="#DA0" stroke-width="2"/>
+  <polyline points="0,40 -40,290" class="branch" stroke="#DA0" stroke-width="2"/>
+  <polyline points="50,40 -50,65" class="branch" stroke="#DA0" stroke-width="1.5"/>
+  <polyline points="50,40 -50,255" class="branch" stroke="#DA0" stroke-width="1.5"/>
+
+  <!-- REAR LOOM (blue): PDM → under cab → along driver frame rail → to rear -->
+  <polyline points="730,145 780,160 780,350 780,400 700,420 0,420 0,400" class="trunk-rear" stroke-dasharray="0" opacity="0"/>
+  <!-- Actually route: down from PDM, through floor, along driver rail -->
+  <polyline points="730,150 760,300 760,350" class="trunk-rear" stroke-width="2"/>
+  <!-- Floor exit point -->
+  <circle cx="760" cy="350" r="8" class="grommet"/>
+  <text x="778" y="355" class="lbl-sm" fill="#06C">FLOOR</text>
+  <!-- Along driver frame rail -->
+  <polyline points="760,350 760,10 800,10 2900,10 2900,-50" class="trunk-rear"/>
+  <!-- Branch to passenger tail -->
+  <polyline points="2900,10 2900,350" class="branch" stroke="#06C" stroke-width="2"/>
+  <!-- Branch to fuel pump -->
+  <polyline points="2400,10 2400,120" class="branch" stroke="#06C" stroke-width="1.5"/>
+  <polyline points="2400,150 2400,260" class="branch" stroke="#06C" stroke-width="1.5"/>
+  <!-- Branch to license plate -->
+  <polyline points="2950,10 3050,10 3050,150" class="branch" stroke="#06C" stroke-width="1.5"/>
+  <!-- Branch to third brake -->
+  <polyline points="2800,10 2800,150" class="branch" stroke="#06C" stroke-width="1.5"/>
+
+  <!-- AMP Research branches off rear loom along rockers -->
+  <polyline points="900,10 900,-60" class="branch" stroke="#080" stroke-width="1.5"/>
+  <polyline points="900,10 900,320 900,368" class="branch" stroke="#080" stroke-width="1.5"/>
+
+  <!-- POWER CABLES (thick red) -->
+  <polyline points="125,250 125,200 150,130 200,130 700,130" class="trunk-power"/>
+  <text x="400" y="125" class="lbl-sm" fill="#C00">6AWG → PDM30 | 16AWG → M130</text>
+  <!-- Battery to starter -->
+  <polyline points="150,270 300,300 580,300" stroke="#C00" stroke-width="3" fill="none"/>
+  <text x="400" y="310" class="lbl-sm" fill="#C00">4AWG STARTER</text>
+  <!-- Alt to battery -->
+  <polyline points="150,60 135,100 125,200 125,250" stroke="#C00" stroke-width="2.5" fill="none"/>
+  <text x="110" y="150" class="lbl-sm" fill="#C00" transform="rotate(-90,110,150)">8AWG ALT</text>
+
+  <!-- Engine ground strap -->
+  <polyline points="500,300 600,320 700,320 760,320" stroke="#000" stroke-width="3" fill="none" stroke-dasharray="8,4"/>
+  <text x="620" y="340" class="lbl-sm">ENGINE GND STRAP 4AWG</text>
+
+</g>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- LEGEND                                         -->
+<!-- ═══════════════════════════════════════════════ -->
+<g id="legend" transform="translate(50, 50)">
+  <rect x="0" y="0" width="300" height="230" fill="white" stroke="black" stroke-width="1.5" rx="4"/>
+  <text x="150" y="22" text-anchor="middle" class="title" font-size="13">HARNESS ROUTING — PLAN VIEW</text>
+
+  <line x1="15" y1="40" x2="60" y2="40" class="trunk-engine"/>
+  <text x="70" y="44" class="lbl">Engine Loom (33 wires)</text>
+
+  <line x1="15" y1="60" x2="60" y2="60" class="trunk-front"/>
+  <text x="70" y="64" class="lbl">Front Lighting (11 wires)</text>
+
+  <line x1="15" y1="80" x2="60" y2="80" class="trunk-rear"/>
+  <text x="70" y="84" class="lbl">Rear Loom (17 wires)</text>
+
+  <line x1="15" y1="100" x2="60" y2="100" class="trunk-dash"/>
+  <text x="70" y="104" class="lbl">Dash Loom (18 wires)</text>
+
+  <line x1="15" y1="120" x2="60" y2="120" class="trunk-power"/>
+  <text x="70" y="124" class="lbl">Power (4-8 AWG)</text>
+
+  <line x1="15" y1="140" x2="60" y2="140" class="trunk-can"/>
+  <text x="70" y="144" class="lbl">CAN Bus (twisted pair)</text>
+
+  <line x1="15" y1="160" x2="60" y2="160" stroke="#000" stroke-width="3" stroke-dasharray="8,4"/>
+  <text x="70" y="164" class="lbl">Ground Circuit</text>
+
+  <circle cx="37" cy="185" r="8" class="grommet"/>
+  <text x="70" y="189" class="lbl">Firewall/Floor Grommet</text>
+
+  <rect x="22" y="200" width="30" height="16" rx="3" class="comp-ecu"/>
+  <text x="70" y="212" class="lbl">ECU / PDM Component</text>
+</g>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- TITLE BLOCK                                    -->
+<!-- ═══════════════════════════════════════════════ -->
+<g id="titleblock">
+  <rect x="3700" y="1680" width="480" height="100" fill="white" stroke="black" stroke-width="2" rx="4"/>
+  <line x1="3700" y1="1710" x2="4180" y2="1710" stroke="black" stroke-width="1"/>
+  <line x1="3700" y1="1740" x2="4180" y2="1740" stroke="black" stroke-width="0.5"/>
+  <line x1="3700" y1="1760" x2="4180" y2="1760" stroke="black" stroke-width="0.5"/>
+  <text x="3940" y="1705" text-anchor="middle" class="title" font-size="14">NUKE LTD — BOULDER CITY NV</text>
+  <text x="3940" y="1733" text-anchor="middle" class="title" font-size="12">1977 K5 BLAZER — LS3 / MOTEC M130</text>
+  <text x="3940" y="1755" text-anchor="middle" class="lbl">HARNESS ROUTING — PLAN VIEW</text>
+  <text x="3940" y="1773" text-anchor="middle" class="lbl-sm">VIN CCL187Z210370 | 123 WIRES | 905 FT | M22759/32 TEFZEL</text>
+</g>
+
+</svg>

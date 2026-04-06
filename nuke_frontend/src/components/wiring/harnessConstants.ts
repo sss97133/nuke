@@ -1,5 +1,13 @@
 // harnessConstants.ts — Engineering reference data for wire gauge selection, colors, lengths
 
+// Wire tier types — determines which wire_catalog products to use
+export type WireTier = 'professional' | 'standard';
+
+export const WIRE_TIERS: { value: WireTier; label: string; description: string }[] = [
+  { value: 'professional', label: 'Professional (Tefzel)', description: 'M22759/32 — MIL-Spec, 200C, aerospace grade' },
+  { value: 'standard', label: 'Standard (TXL)', description: 'TXL — Automotive, 125C, cost-effective' },
+];
+
 // AWG copper wire resistance and ampacity table
 // Resistance in ohms per foot at 20°C
 // Max amps for chassis wiring (enclosed bundle, not free air)

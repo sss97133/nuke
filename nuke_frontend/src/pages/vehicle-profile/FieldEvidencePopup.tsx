@@ -219,7 +219,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
                   <span style={{
                     position: 'absolute', bottom: 0, left: 0, right: 0,
                     fontSize: '6px', fontFamily: "'Courier New', monospace",
-                    background: 'rgba(0,0,0,0.6)', color: '#fff',
+                    background: 'rgba(0,0,0,0.6)', color: 'var(--bg)',
                     padding: '1px 2px', textTransform: 'uppercase', letterSpacing: '0.05em',
                   }}>
                     {img.zone.replace(/_/g, ' ')}

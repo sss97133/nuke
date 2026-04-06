@@ -8,13 +8,12 @@
  */
 
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 type Step = 'signup' | 'creating-key' | 'done';
 
 export default function DeveloperSignup() {
-  const navigate = useNavigate();
   const [step, setStep] = useState<Step>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -225,12 +224,12 @@ const comps = await nuke.comps.get({
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={() => navigate('/developers/dashboard')}
-              style={{ flex: 1, padding: '10px', background: 'var(--accent)', color: 'var(--text-on-accent, #fff)', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'Arial, sans-serif', fontSize: 'var(--fs-9, 9px)' }}
+            <Link
+              to="/developers/dashboard"
+              style={{ flex: 1, padding: '10px', background: 'var(--accent)', color: 'var(--text-on-accent, #fff)', textDecoration: 'none', textAlign: 'center', fontWeight: 600, fontFamily: 'Arial, sans-serif', fontSize: 'var(--fs-9, 9px)' }}
             >
               Go to Dashboard
-            </button>
+            </Link>
             <Link to="/api" style={{ flex: 1, padding: '10px', background: 'var(--surface)', color: 'var(--text)', border: '2px solid var(--border)', textDecoration: 'none', textAlign: 'center', fontWeight: 600, fontFamily: 'Arial, sans-serif', fontSize: 'var(--fs-9, 9px)' }}>
               View Docs
             </Link>

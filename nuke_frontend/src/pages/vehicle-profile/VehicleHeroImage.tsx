@@ -136,7 +136,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                   style={{
                     position: 'absolute',
                     inset: 0,
-                    background: '#111',
+                    background: 'var(--text)',
                   }}
                 />
               )}

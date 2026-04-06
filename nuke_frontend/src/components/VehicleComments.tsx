@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { ContentDetector } from '../services/contentDetector';
 import UserReputationBadge from './UserReputationBadge';
 import ExtractionQueueStatus from './ExtractionQueueStatus';
+import { useVehicleAllComments } from '../hooks/useVehicleAllComments';
 
 interface Comment {
   id: string;
@@ -22,8 +23,7 @@ interface VehicleCommentsProps {
 }
 
 const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { data: comments = [], isLoading: loading, refetch } = useVehicleAllComments(vehicleId);
   const [newComment, setNewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [scrapingStatus, setScrapingStatus] = useState<string | null>(null);
@@ -31,144 +31,17 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadAllComments();
-    // Get current user ID
     supabase.auth.getSession().then(({ data: { session } }) => {
       setCurrentUserId(session?.user?.id || null);
     });
-  }, [vehicleId]);
+  }, []);
 
-  const loadAllComments = async () => {
-    setLoading(true);
-    try {
-      // Load comments from all sources for this vehicle without PostgREST joins
-      const [vehicleComments, imageComments, eventComments, dataPointComments] = await Promise.all([
-        supabase
-          .from('vehicle_comments')
-          .select('*')
-          .eq('vehicle_id', vehicleId)
-          .order('created_at', { ascending: false }),
-
-        supabase
-          .from('vehicle_image_comments')
-          .select('*, image:vehicle_images(thumbnail_url)')
-          .eq('vehicle_id', vehicleId)
-          .order('created_at', { ascending: false }),
-
-        supabase
-          .from('timeline_event_comments')
-          .select('*')
-          .eq('vehicle_id', vehicleId)
-          .order('created_at', { ascending: false }),
-
-        supabase
-          .from('data_point_comments')
-          .select('*')
-          .eq('vehicle_id', vehicleId)
-          .order('created_at', { ascending: false })
-      ]);
-
-      const allComments: Comment[] = [];
-
-      // Process vehicle comments
-      if (vehicleComments.data) {
-        allComments.push(...vehicleComments.data.map(c => ({
-          ...c,
-          target_type: 'vehicle',
-          target_label: 'General Comment',
-          user_email: undefined,
-          user_name: undefined,
-          avatar_url: undefined
-        })));
-      }
-
-      // Process image comments
-      if (imageComments.data) {
-        allComments.push(...imageComments.data.map((c: any) => ({
-          ...c,
-          target_type: 'image',
-          target_label: 'Vehicle Image',
-          image_thumbnail: c.image?.thumbnail_url,
-          user_email: undefined,
-          user_name: undefined,
-          avatar_url: undefined
-        })));
-      }
-
-      // Process event comments
-      if (eventComments.data) {
-        allComments.push(...eventComments.data.map(c => ({
-          ...c,
-          target_type: 'event',
-          target_label: 'Timeline Event',
-          user_email: undefined,
-          user_name: undefined,
-          avatar_url: undefined
-        })));
-      }
-
-      // Process data point comments
-      if (dataPointComments.data) {
-        allComments.push(...dataPointComments.data.map(c => ({
-          ...c,
-          target_type: 'data_point',
-          target_label: `${c.data_point_type ? c.data_point_type.charAt(0).toUpperCase() + c.data_point_type.slice(1) : 'Data Point'}: ${c.data_point_value || 'N/A'}`,
-          user_email: undefined,
-          user_name: undefined,
-          avatar_url: undefined
-        })));
-      }
-
-      // Optionally enrich with usernames/avatars from profiles
-      try {
-        const uniqueUserIds = Array.from(new Set(allComments.map(c => c.user_id).filter(Boolean)));
-        if (uniqueUserIds.length > 0) {
-          const { data: profilesData, error: profilesError } = await supabase
-            .from('profiles')
-            .select('id, username, avatar_url')
-            .in('id', uniqueUserIds as string[]);
-          if (profilesError) {
-            console.warn('Profiles enrichment blocked or unavailable:', profilesError.message);
-          }
-          const byId: Record<string, { username?: string; avatar_url?: string }> = {};
-          (profilesData || []).forEach((p: any) => { byId[p.id] = { username: p.username, avatar_url: p.avatar_url }; });
-          allComments.forEach(c => {
-            const p = c.user_id ? byId[c.user_id] : undefined;
-            if (p) {
-              c.user_name = p.username || undefined;
-              c.avatar_url = p.avatar_url || c.avatar_url;
-            }
-          });
-
-          // Fallback: if current auth user is present, inject their username/email for their own comments
-          const { data: authData } = await supabase.auth.getUser();
-          const authUser = authData?.user;
-          if (authUser) {
-            const authUsername = (authUser.user_metadata as any)?.username || (authUser.email ? authUser.email.split('@')[0] : undefined);
-            allComments.forEach(c => {
-              if (c.user_id === authUser.id && !c.user_name) {
-                c.user_name = authUsername || c.user_name;
-              }
-            });
-          }
-        }
-      } catch (e) {
-        // Ignore enrichment failure; comments still display
-      }
-
-      // Sort all comments by date
-      allComments.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
-      setComments(allComments);
-      
-      // Self-healing: Check existing comments for BAT URLs
-      await checkExistingCommentsForBATUrls(allComments);
-    } catch (error) {
-      console.error('Error loading comments:', error);
-    } finally {
-      setLoading(false);
+  // Self-healing check on comments load
+  useEffect(() => {
+    if (comments.length > 0) {
+      checkExistingCommentsForBATUrls(comments);
     }
-  };
+  }, [comments]);
 
   const getCommentTypeIcon = (type: string) => {
     switch (type) {
@@ -261,7 +134,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
       }
 
       // Reload comments
-      loadAllComments();
+      refetch();
     } catch (error) {
       console.error('Error deleting comment:', error);
       alert('Failed to delete comment');
@@ -948,7 +821,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
       }
 
       setNewComment('');
-      loadAllComments();
+      refetch();
 
       // NEW: Intelligent content detection
       setScrapingStatus('Analyzing content...');

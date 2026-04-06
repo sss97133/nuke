@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactDOM from 'react-dom';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/supabase';
 import { FaviconIcon } from '../components/common/FaviconIcon';
@@ -1950,13 +1950,13 @@ export default function OrganizationProfile() {
           </div>
         )}
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => navigate('/org')}
+          <Link
+            to="/org"
             className="button button-secondary"
-            style={{ fontSize: '12px', padding: '8px 16px' }}
+            style={{ fontSize: '12px', padding: '8px 16px', textDecoration: 'none', color: 'inherit' }}
           >
             Browse Organizations
-          </button>
+          </Link>
           <button
             onClick={() => navigate(-1)}
             className="button button-primary"
@@ -2442,10 +2442,10 @@ export default function OrganizationProfile() {
                 {competitiveContext.volume_peers.length > 0 && (
                   <span style={{ marginLeft: '12px' }}>
                     Similar volume: {competitiveContext.volume_peers.map(p => (
-                      <a key={p.org_id} href={`/org/${p.org_id}`} onClick={(e) => { e.preventDefault(); navigate(`/org/${p.org_id}`); }}
+                      <Link key={p.org_id} to={`/org/${p.org_id}`}
                         style={{ color: 'var(--text)', textDecoration: 'underline', marginRight: '8px' }}>
                         {p.business_name} ({p.vehicle_count})
-                      </a>
+                      </Link>
                     ))}
                   </span>
                 )}

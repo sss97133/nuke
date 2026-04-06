@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { applyNonAutoFilters } from '../lib/nonAutoExclusion';
 import SearchFilters from './feed/SearchFilters';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 
@@ -472,13 +472,15 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
               gap: '12px'
             }}>
           {filteredVehicles.map(vehicle => (
-            <div
+            <Link
               key={vehicle.id}
-              onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
+              to={`/vehicle/${vehicle.vehicle_id}`}
+              style={{ textDecoration: 'none', color: 'inherit' }}
+            >
+            <div
               style={{
                 border: '2px solid var(--border)', overflow: 'hidden',
                 background: 'var(--white)',
-                cursor: 'pointer',
                 transition: 'transform 0.12s'
               }}
               className="hover-lift"
@@ -565,6 +567,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                 </div>
               </div>
             </div>
+            </Link>
           ))}
         </div>
       )}
@@ -577,13 +580,15 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
               gap: '10px'
             }}>
           {filteredVehicles.map(vehicle => (
-            <div
+            <Link
               key={vehicle.id}
-              onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
+              to={`/vehicle/${vehicle.vehicle_id}`}
+              style={{ textDecoration: 'none', color: 'inherit' }}
+            >
+            <div
               style={{
                 border: '2px solid var(--border)', overflow: 'hidden',
                 background: 'var(--white)',
-                cursor: 'pointer'
               }}
               className="hover-lift"
             >
@@ -630,6 +635,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                 </div>
               </div>
             </div>
+            </Link>
           ))}
         </div>
       )}

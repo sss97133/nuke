@@ -16,13 +16,14 @@ export function createBusinessLayer(
       radiusUnits: 'meters' as const,
       radiusMinPixels: 4,
       radiusMaxPixels: 10,
-      getFillColor: [...BIZ_COLOR, 200] as [number, number, number, number],
+      getFillColor: (d: BizPin) => d.color ? [...d.color, 200] as [number, number, number, number] : [...BIZ_COLOR, 200] as [number, number, number, number],
       getLineColor: [255, 255, 255, 80],
       getLineWidth: 1,
       lineWidthUnits: 'pixels' as const,
       stroked: true,
       pickable: true,
       onClick,
+      updateTriggers: { getFillColor: [businesses] },
     }),
   ];
 
@@ -34,13 +35,14 @@ export function createBusinessLayer(
         getPosition: (d: BizPin) => [d.lng, d.lat],
         getText: (d: BizPin) => d.name,
         getSize: 9,
-        getColor: [...BIZ_COLOR, 200] as [number, number, number, number],
+        getColor: (d: BizPin) => d.color ? [...d.color, 220] as [number, number, number, number] : [...BIZ_COLOR, 200] as [number, number, number, number],
         getTextAnchor: 'start' as const,
         getAlignmentBaseline: 'center' as const,
         getPixelOffset: [8, 0],
         fontFamily: 'Arial, Helvetica, sans-serif',
         fontWeight: 700,
         billboard: false,
+        updateTriggers: { getColor: [businesses] },
       }),
     );
   }
