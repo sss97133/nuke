@@ -112,6 +112,10 @@ Deno.serve(async (req) => {
           continue;
         }
         try {
+          // Stagger requests to avoid Gemini 429 rate limiting
+          if (results.length > 0) {
+            await new Promise((r) => setTimeout(r, 2000));
+          }
           const resp = await fetch(
             `${SUPABASE_URL}/functions/v1/photo-pipeline-orchestrator`,
             {
@@ -324,10 +328,11 @@ Deno.serve(async (req) => {
 // ============================================================
 
 async function classifyImage(imageUrl: string): Promise<ClassificationResult> {
-  const geminiKey = Deno.env.get("free_api_key") ??
-    Deno.env.get("GOOGLE_AI_API_KEY") ??
+  // Prefer paid keys over free tier to avoid 429s
+  const geminiKey = Deno.env.get("GOOGLE_AI_API_KEY") ??
     Deno.env.get("GEMINI_API_KEY") ??
-    Deno.env.get("GOOGLE_API_KEY");
+    Deno.env.get("GOOGLE_API_KEY") ??
+    Deno.env.get("free_api_key");
 
   if (!geminiKey) {
     console.warn("[photo-pipeline] No Gemini key, falling back to basic classification");
@@ -339,25 +344,29 @@ async function classifyImage(imageUrl: string): Promise<ClassificationResult> {
     };
   }
 
-  try {
-    // Fetch image as base64
-    const imageResponse = await fetch(imageUrl);
-    const imageBuffer = await imageResponse.arrayBuffer();
-    const base64Image = btoa(
-      new Uint8Array(imageBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ""),
-    );
-    const mimeType = imageResponse.headers.get("content-type") || "image/jpeg";
+  // Fetch image as base64 (once, before retry loop)
+  const imageResponse = await fetch(imageUrl);
+  const imageBuffer = await imageResponse.arrayBuffer();
+  const base64Image = btoa(
+    new Uint8Array(imageBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ""),
+  );
+  const mimeType = imageResponse.headers.get("content-type") || "image/jpeg";
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                text: `Classify this automotive image. Respond in JSON only:
+  const MAX_RETRIES = 3;
+  const BASE_DELAY_MS = 1000; // 1s, 2s, 4s exponential backoff
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                {
+                  text: `Classify this automotive image. Respond in JSON only:
 {
   "image_type": one of ["vehicle_exterior", "vehicle_interior", "engine_bay", "undercarriage", "detail_closeup", "vin_plate", "part_closeup", "receipt_document", "progress_shot", "other"],
   "image_medium": one of ["photograph", "render", "drawing", "screenshot"],
@@ -375,57 +384,66 @@ image_medium definitions:
 - "render": 3D render, CGI, digital mockup, or AI-generated image of a vehicle
 - "drawing": hand-drawn sketch, pencil drawing, technical illustration, blueprint
 - "screenshot": screenshot from a website, app, parts catalog, or software`,
-              },
-              {
-                inlineData: { mimeType, data: base64Image },
-              },
-            ],
-          }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 1024,
-            responseMimeType: "application/json",
-            // Disable thinking for classification — it's unnecessary and consumes output tokens
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        }),
-      },
-    );
+                },
+                {
+                  inlineData: { mimeType, data: base64Image },
+                },
+              ],
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 1024,
+              responseMimeType: "application/json",
+              // Disable thinking for classification — it's unnecessary and consumes output tokens
+              thinkingConfig: { thinkingBudget: 0 },
+            },
+          }),
+        },
+      );
 
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`);
+      // Rate limited — retry with exponential backoff
+      if (response.status === 429) {
+        const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+        console.warn(`[photo-pipeline] Gemini 429 (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${delay}ms`);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      // Gemini 2.5+ may include thinking parts before the actual response
+      // Find the last text part (thinking parts come first, JSON response last)
+      const parts = result.candidates?.[0]?.content?.parts || [];
+      const text = parts.filter((p: any) => p.text && !p.thought).pop()?.text
+        || parts[parts.length - 1]?.text;
+
+      if (!text) throw new Error("No classification response");
+
+      const parsed = JSON.parse(text);
+      return {
+        image_type: parsed.image_type || "other",
+        confidence: parsed.confidence || 0.5,
+        is_automotive: parsed.is_automotive !== false,
+        description: parsed.description || "",
+        detected_text: parsed.detected_text,
+        vin_detected: parsed.vin_detected,
+        image_medium: parsed.image_medium || "photograph",
+        medium_context: parsed.medium_context,
+        vehicle_hints: parsed.vehicle_hints,
+      };
+    } catch (error: any) {
+      // Non-429 errors: don't retry, propagate immediately
+      // This ensures the outer handler marks ai_processing_status = 'failed'
+      console.error(`[photo-pipeline] Classification error (attempt ${attempt + 1}): ${error.message}`);
+      throw error;
     }
-
-    const result = await response.json();
-    // Gemini 2.5+ may include thinking parts before the actual response
-    // Find the last text part (thinking parts come first, JSON response last)
-    const parts = result.candidates?.[0]?.content?.parts || [];
-    const text = parts.filter((p: any) => p.text && !p.thought).pop()?.text
-      || parts[parts.length - 1]?.text;
-
-    if (!text) throw new Error("No classification response");
-
-    const parsed = JSON.parse(text);
-    return {
-      image_type: parsed.image_type || "other",
-      confidence: parsed.confidence || 0.5,
-      is_automotive: parsed.is_automotive !== false,
-      description: parsed.description || "",
-      detected_text: parsed.detected_text,
-      vin_detected: parsed.vin_detected,
-      image_medium: parsed.image_medium || "photograph",
-      medium_context: parsed.medium_context,
-      vehicle_hints: parsed.vehicle_hints,
-    };
-  } catch (error: any) {
-    console.warn("[photo-pipeline] Classification failed, using fallback:", error.message);
-    return {
-      image_type: "other",
-      confidence: 0.3,
-      is_automotive: true,
-      description: `Classification failed: ${error.message}`,
-    };
   }
+
+  // All retries exhausted on 429 — throw so outer handler marks as 'failed', not 'completed'
+  throw new Error("Gemini API rate limited (429) after 3 retries");
 }
 
 // ============================================================
